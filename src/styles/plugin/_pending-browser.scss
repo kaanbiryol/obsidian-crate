@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/sync-review";
 @use "../../ui/shared/styles/navigation-row";
 
 .crate-reminders-ui .crate-activity-surface.is-centered {
@@ -6,45 +7,44 @@
     height: min(660px, calc(100dvh - 48px));
     padding-bottom: 0;
 }
-.crate-activity-modal:has(.crate-pending-browser) .crate-activity-tab-bar { margin-bottom: 0; }
 .crate-activity-panel.has-file-browser { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 .crate-pending-browser {
     display: grid;
-    grid-template-columns: minmax(244px, calc(30% + 24px)) minmax(0, 1fr);
+    grid-template-columns: sync-review.$sidebar-columns;
     height: 100%;
     min-height: 0;
     color: var(--text-normal);
 }
 .crate-browser-sidebar, .crate-browser-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.crate-browser-sidebar { border-right: 1px solid color-mix(in srgb, var(--crate-activity-divider) 45%, transparent); }
+.crate-browser-sidebar { border-right: 1px solid sync-review.$pane-divider; }
 .crate-browser-list-heading {
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
     min-height: 34px;
-    padding: 12px 20px;
+    padding: sync-review.$section-heading-gap sync-review.$list-inset 8px;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
     font-weight: var(--font-medium);
 }
-.crate-browser-files { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 8px 8px; }
+.crate-browser-files { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 sync-review.$list-inset 8px; }
 .crate-pending-browser .crate-browser-file {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     width: 100%;
     height: auto;
-    min-height: 44px;
-    padding: 7px 12px;
+    @include sync-review.row;
     margin: 1px 0;
     @include navigation-row.surface;
     font-family: inherit;
 }
 .crate-browser-file-icon { display: flex; flex-shrink: 0; padding-top: 2px; color: var(--text-muted); svg { width: 15px; height: 15px; } }
 .crate-browser-file-info { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
-.crate-browser-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
-.crate-browser-file-meta { display: flex; min-width: 0; gap: 8px; font-size: 11px; color: var(--text-muted); }
+.crate-browser-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; @include sync-review.title; }
+.crate-browser-file-meta { display: flex; min-width: 0; gap: 8px; @include sync-review.metadata; }
 .crate-browser-file-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crate-browser-file-status { flex-shrink: 0; font-variant-numeric: tabular-nums; &.is-unchanged { color: var(--text-faint); } }
 // Keep the selection explanation available to assistive technology without a footer row.
@@ -55,13 +55,13 @@
     flex-shrink: 0;
     gap: 12px;
     min-height: 54px;
-    padding: 10px 16px;
+    padding: 10px sync-review.$panel-inset;
     border-bottom: 0;
     &[hidden] { display: none; }
 }
 .crate-browser-file-heading { min-width: 0; flex: 1; }
-.crate-browser-file-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crate-browser-file-folder { font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crate-browser-file-title { @include sync-review.title; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crate-browser-file-folder { @include sync-review.metadata; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crate-pending-browser .crate-browser-back {
     display: flex;
     flex-shrink: 0;
@@ -99,7 +99,7 @@
 }
 .crate-browser-empty-icon { color: var(--text-faint); margin-bottom: 4px; svg { width: 28px; height: 28px; stroke-width: 1.25px; } }
 .crate-browser-empty-title { color: var(--text-normal); font-size: 13px; font-weight: var(--font-medium); }
-@container (max-width: 640px) {
+@container (max-width: #{sync-review.$compact-width}) {
     .crate-pending-browser { grid-template-columns: minmax(0, 1fr); }
     .crate-browser-sidebar { border-right: 0; }
     .crate-browser-detail { display: none; }
@@ -109,13 +109,10 @@
     }
     .crate-pending-browser .crate-browser-back { display: flex; min-height: 36px; }
     .crate-browser-toolbar { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
-    .crate-pending-browser .crate-browser-file { min-height: 52px; }
-    .crate-browser-file-name { font-size: 13px; }
-    .crate-browser-file-meta { font-size: 12px; }
 }
 
 .crate-sync-now-btn[hidden] { display: none; }
-.crate-browser-select-all { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.crate-browser-select-all { color: color-mix(in srgb, var(--text-muted) 80%, transparent); display: flex; align-items: center; gap: 16px; cursor: pointer; padding-left: 12px; }
 .crate-pending-browser input[type='checkbox'] {
     appearance: none;
     -webkit-appearance: none;
@@ -165,7 +162,7 @@
     align-items: center;
     border-radius: 4px;
     &:hover { background: var(--background-modifier-hover); }
-    &:has(.crate-browser-file[aria-pressed='true']) { background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary)); }
+    &:has(.crate-browser-file[aria-pressed='true']) { background: sync-review.$selection; }
     &:has(.crate-browser-file[aria-pressed='true']):has(+ .crate-browser-file-row .crate-browser-file[aria-pressed='true']) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
     &:has(.crate-browser-file[aria-pressed='true']) + .crate-browser-file-row:has(.crate-browser-file[aria-pressed='true']) { border-top-left-radius: 0; border-top-right-radius: 0; }
     &:has(.crate-browser-file:focus-visible) { outline: 1px solid var(--crate-activity-focus-ring); outline-offset: -1px; }
@@ -244,3 +241,6 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
 }
 
 .crate-browser-actions[hidden], .crate-browser-actions button[hidden] { display: none; }
+
+.crate-browser-toolbar > .crate-diff-header { align-self: flex-start; padding-top: 0; }
+.crate-browser-toolbar .crate-diff-stats { padding-block: 0; line-height: 1.4; }

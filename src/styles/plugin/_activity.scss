@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/sync-review";
 /* Shared modal vocabulary, aligned with the reminder editor. */
 .crate-activity-modal {
 	--crate-activity-control-bg: var(--background-modifier-form-field, var(--interactive-normal));
@@ -213,7 +214,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 .crate-activity-tab-bar {
 	position: relative;
 	display: flex;
-	margin: 0 0 16px;
+	margin: 0;
 	padding-inline: var(--crate-activity-space-inline);
 	border-bottom: 0;
 }
@@ -348,10 +349,8 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 12px 8px;
+    @include sync-review.row;
     border: 0;
-    border-radius: 0;
     background: transparent;
     box-shadow: none;
 }
@@ -468,7 +467,8 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 }
 
 .crate-history-day-label {
-    margin: 12px 10px 6px;
+    margin: sync-review.$section-heading-gap 10px 6px;
+    line-height: 1.4;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     font-weight: var(--font-medium);
@@ -477,7 +477,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 
 .crate-history-entry {
     overflow: hidden;
-    border-bottom: 1px solid color-mix(in srgb, var(--crate-activity-divider) 55%, transparent);
+    border-bottom: 1px solid sync-review.$row-divider;
     background: transparent;
 
     &:last-child { border-bottom: 0; }
@@ -620,8 +620,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
     gap: 6px;
 
     .crate-activity-file-card {
-        min-height: 44px;
-        padding: 6px 0;
+        @include sync-review.row;
         gap: 10px;
     }
 }
@@ -631,7 +630,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 }
 
 // Respond to the sheet's width, including narrow desktop windows.
-@container (max-width: 640px) {
+@container (max-width: #{sync-review.$compact-width}) {
     .crate-activity-subtitle { display: none; }
 
     .crate-history-header {
@@ -708,16 +707,22 @@ body.reduce-motion .crate-activity-modal {
     animation: crate-spin 1s linear infinite;
 }
 
+.crate-activity-list:has(> .crate-conflict-row) {
+    // File cards already contribute 5px of top padding.
+    padding-top: sync-review.$section-heading-gap - 5px;
+}
 .crate-conflict-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    border-bottom: 1px solid var(--crate-activity-divider);
+    border-bottom: 1px solid sync-review.$row-divider;
+    padding-bottom: 8px;
+    &:last-child { border-bottom: 0; }
     .crate-activity-file-card { flex: 1; min-width: 0; }
     > button { flex-shrink: 0; }
 }
 .modal.crate-shared-modal.crate-conflict-review-modal {
-    width: min(1040px, calc(100vw - 48px));
+    width: min(940px, calc(100vw - 48px));
     max-width: calc(100vw - 48px);
     .modal-content {
         display: flex;
@@ -731,13 +736,14 @@ body.reduce-motion .crate-activity-modal {
         min-height: 0;
         overflow-y: auto;
         overscroll-behavior: contain;
-        padding: 20px 24px 16px;
+        padding: 8px 24px 16px;
     }
     button { font-size: var(--font-ui-small); border-radius: var(--radius-s, 6px); }
 }
+.modal.crate-conflict-review-modal .reminder-modal-header { border-bottom: 0; }
 .crate-conflict-intro { display: flex; align-items: center; gap: 12px; }
 .crate-conflict-file-heading { min-width: 0; }
-.crate-conflict-review-path { margin: 0 0 4px; font-size: var(--font-ui-medium); font-weight: var(--font-semibold); overflow-wrap: anywhere; }
+.crate-conflict-review-path { margin: 0 0 4px; @include sync-review.title; overflow-wrap: anywhere; }
 .crate-conflict-review-help { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; overflow-wrap: anywhere; }
 .crate-conflict-load-error {
     display: flex;
@@ -759,12 +765,12 @@ body.reduce-motion .crate-activity-modal {
 }
 .crate-conflict-compare {
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
-    border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); overflow: hidden;
+    border: 0; border-radius: 0; overflow: hidden; @include sync-review.diff-colors;
 }
 .crate-conflict-version {
     min-width: 0;
-    + .crate-conflict-version { border-left: 1px solid var(--background-modifier-border); }
-    h3 { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-secondary); }
+    + .crate-conflict-version { border-left: 1px solid sync-review.$pane-divider; }
+    h3 { margin: 0; padding: 8px 12px; border: 0; background: transparent; @include sync-review.title; }
     p { padding: 16px; color: var(--text-muted); font-size: var(--font-ui-small); }
     h3 > button {
         display: flex; align-items: center; justify-content: space-between;
@@ -776,32 +782,32 @@ body.reduce-motion .crate-activity-modal {
 }
 .crate-conflict-code {
     margin: 0; padding: 12px 0; min-height: 260px; max-height: 44dvh;
-    overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.65;
+    overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.6;
     background: var(--background-primary); white-space: pre; user-select: text;
 }
 .crate-conflict-line {
     display: flex;
     min-width: 100%;
     width: max-content;
-    min-height: 1.65em;
+    min-height: 1.6em;
     border-left: 2px solid transparent;
     padding-right: 12px;
-    &.is-removed { --conflict-diff-color: var(--text-error, #e06c75); }
-    &.is-added { --conflict-diff-color: var(--text-success, #5fb98a); }
+    &.is-removed { --conflict-diff-color: var(--crate-diff-removed); }
+    &.is-added { --conflict-diff-color: var(--crate-diff-added); }
     &.is-removed, &.is-added {
-        background: color-mix(in srgb, var(--conflict-diff-color) 16%, transparent);
+        background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-row-tint), transparent);
         border-left-color: var(--conflict-diff-color);
     }
-    &.is-empty { background: var(--background-secondary); }
+    &.is-empty { background: transparent; }
 }
-.crate-conflict-line-number { width: 4ch; flex-shrink: 0; text-align: right; color: var(--text-faint); user-select: none; }
-.crate-conflict-line-sign { width: 3ch; flex-shrink: 0; text-align: center; color: var(--conflict-diff-color, var(--text-faint)); user-select: none; }
-.crate-conflict-word { background: color-mix(in srgb, var(--conflict-diff-color) 32%, transparent); border-radius: 2px; }
+.crate-conflict-line-number { width: 3ch; flex-shrink: 0; text-align: right; color: var(--text-faint); user-select: none; }
+.crate-conflict-line-sign { width: 2ch; flex-shrink: 0; text-align: center; color: var(--conflict-diff-color, var(--text-faint)); user-select: none; }
+.crate-conflict-line .crate-diff-word { background: color-mix(in srgb, var(--conflict-diff-color) var(--crate-diff-word-tint), transparent); border-radius: 2px; }
 
 .crate-conflict-actions {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px;
     flex-shrink: 0;
-    align-items: end; margin-top: 0; padding: 16px 24px; background: var(--background-primary); border-top: 1px solid var(--background-modifier-border);
+    align-items: end; margin-top: 0; padding: 16px 24px; background: var(--background-primary); border-top: 0;
     > .crate-conflict-action { grid-column: 2; grid-row: 3; justify-self: end; }
 }
 .crate-conflict-resolution-help { grid-column: 1 / -1; grid-row: 2; margin: 0; min-height: 1.5em; }
@@ -843,18 +849,18 @@ body.reduce-motion .crate-activity-modal {
     input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 }
 .crate-conflict-manual { margin-top: 16px; font-size: var(--font-ui-small); }
-.crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.65; resize: vertical; }
-@media (max-width: 600px) {
+.crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.6; resize: vertical; }
+@media (max-width: sync-review.$compact-width) {
     .modal.crate-shared-modal.crate-conflict-review-modal { width: calc(100vw - 16px); max-width: calc(100vw - 16px); .crate-modal-body { padding: 16px; } }
     .crate-conflict-intro { flex-wrap: wrap; }
     .crate-conflict-toolbar { width: 100%; margin-left: 0; }
     .crate-conflict-compare { grid-template-columns: 1fr; }
-    .crate-conflict-version + .crate-conflict-version { border-left: 0; border-top: 1px solid var(--background-modifier-border); }
+    .crate-conflict-version + .crate-conflict-version { border: 0; margin-top: 20px; }
     .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
     .crate-conflict-actions { grid-template-columns: 1fr; > .crate-conflict-action { grid-column: 1; grid-row: 3; width: 100%; } }
 }
 
-@container (max-width: 640px) {
+@container (max-width: #{sync-review.$compact-width}) {
     .crate-activity-modal .crate-activity-tab { min-height: 44px; }
 }
 
@@ -880,7 +886,7 @@ body.reduce-motion .crate-activity-modal {
     border-color: var(--text-normal);
     &::after { opacity: 1; }
 }
-@media (max-width: 600px) {
+@media (max-width: sync-review.$compact-width) {
     .crate-conflict-actions { padding: 12px 16px; }
 }
 
@@ -891,3 +897,11 @@ body.reduce-motion .crate-activity-modal {
 }
 
 .crate-activity-subtitle[data-state='pending']::before { display: none; }
+
+.crate-reminders-ui .crate-activity-modal .crate-conflict-review-button,
+.crate-reminders-ui .crate-file-history .crate-history-restore.reminder-modal-header-action,
+.modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action { @include sync-review.action; }
+.crate-conflict-row .crate-file-info { @include sync-review.metadata; }
+.crate-conflict-row .crate-conflict-explanation { white-space: normal; overflow-wrap: anywhere; margin: 4px 0 0; }
+.crate-file-name { @include sync-review.title; }
+.crate-file-path { @include sync-review.metadata; }

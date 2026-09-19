@@ -4,6 +4,7 @@ import type { FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types
 import type { SyncRuntime } from '../sync/runtime';
 import type { FileHistoryPreview } from '../sync/file-history-preview';
 import { buildDiff, type DiffLine } from './activity/diff-model';
+import { renderDiffLines } from './activity/diff-renderer';
 import { openConfirmationModal } from './confirmation-modal';
 
 export type FileHistoryRuntime = Pick<SyncRuntime, 'listRecentFileVersions' | 'getPendingRestores' | 'loadFileHistoryPreview' | 'restoreRecentFileVersion' | 'loadCurrentSyncedPreview'>;
@@ -12,8 +13,8 @@ function formatSize(bytes: number): string {
 	return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 function versionDate(value: string): Date { return new Date(value.includes(' ') ? `${value.replace(' ', 'T')}Z` : value); }
-function formatDate(date: Date): string {
-	return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+function formatDate(date: Date, seconds = false): string {
+	return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' as const } : {}) }).format(date);
 }
 function action(container: HTMLElement, text: string, run: () => void, cls = ''): HTMLButtonElement {
 	const button = container.createEl('button', { text, cls, attr: { type: 'button' } });
@@ -33,7 +34,7 @@ function renderFileText(container: HTMLElement, text: string, words?: DiffLine['
 		const start = boundaries[i]!, end = boundaries[i + 1]!;
 		const cls = [
 			markers.some(range => start >= range.start && start < range.end) ? 'crate-history-internal-marker' : '',
-			changes.some(range => start >= range.start && start < range.end) ? 'crate-history-diff-word' : '',
+			changes.some(range => start >= range.start && start < range.end) ? 'crate-diff-word' : '',
 		].filter(Boolean).join(' ');
 		container.createSpan({ cls, text: text.slice(start, end) });
 	}
@@ -59,7 +60,7 @@ class RemoteRecoveryModal extends SharedModal {
 	private previewEl!: HTMLElement;
 	private workspaceEl!: HTMLElement;
 
-	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string) { super(app); }
+	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string, private readonly onBack?: () => void) { super(app); }
 
 	onOpen(): void {
 		this.closed = false;
@@ -67,6 +68,10 @@ class RemoteRecoveryModal extends SharedModal {
 		this.modalEl.addClass('crate-file-history-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
 		this.bodyEl.addClass('crate-file-history');
+		if (this.onBack) action(this.bodyEl, '← Sync activity', () => {
+			this.close();
+			this.onBack?.();
+		}, 'crate-history-activity-back');
 		const context = this.bodyEl.createDiv({ cls: 'crate-history-file-context' });
 		context.createEl('h3', { text: this.selectedPath });
 		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for 30 days.' });
@@ -93,12 +98,12 @@ class RemoteRecoveryModal extends SharedModal {
 
 	onClose(): void { this.cancelInitialFocus?.(); this.cancelInitialFocus = undefined; this.closed = true; ++this.previewRevision; ++this.fileRequestRevision; super.onClose(); }
 	private showPane(pane: 'list' | 'preview'): void { this.workspaceEl.setAttribute('data-pane', pane); }
-	private versionButton(container: HTMLElement, version: RemoteFileVersion): HTMLButtonElement {
+	private versionButton(container: HTMLElement, version: RemoteFileVersion, seconds: boolean): HTMLButtonElement {
 		const button = action(container, '', () => { void this.selectVersion(version); }, 'crate-history-version');
 		button.disabled = this.busy; button.setAttribute('data-version-key', version.storage_key);
 		button.setAttribute('aria-current', String(version.storage_key === this.selectedVersion?.storage_key));
 		{
-			button.createSpan({ cls: 'crate-history-file-name', text: formatDate(versionDate(version.created_at)), attr: { title: versionDate(version.created_at).toLocaleString() } });
+			button.createSpan({ cls: 'crate-history-file-name', text: formatDate(versionDate(version.created_at), seconds), attr: { title: versionDate(version.created_at).toLocaleString() } });
 			button.createSpan({ cls: 'crate-history-file-folder', text: `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}` });
 		}
 		if (this.isPending(version)) button.createSpan({ cls: 'crate-history-file-folder', text: 'Restore needs to finish' });
@@ -121,20 +126,37 @@ class RemoteRecoveryModal extends SharedModal {
 		}
 	}
 
+	private versionRows(): RemoteFileVersion[] {
+		return [...new Map([...this.fileVersions, ...this.runtime.getPendingRestores()].map(row => [row.storage_key, row])).values()].filter(row => row.path === this.selectedPath).sort((a, b) => b.created_at.localeCompare(a.created_at));
+	}
+
+	private formatHistoryDate(date: Date): string {
+		const dates = this.versionRows().map(row => versionDate(row.created_at));
+		const local = this.app.vault.getFileByPath(this.selectedPath);
+		if (local) dates.push(new Date(local.stat.mtime));
+		return formatDate(date, dates.filter(value => Math.floor(value.getTime() / 60_000) === Math.floor(date.getTime() / 60_000)).length > 1);
+	}
+
 	private renderVersions(): void {
 		const focused = this.listEl.querySelector<HTMLButtonElement>('.crate-history-version:focus')?.getAttribute('data-version-key');
 		this.listEl.empty();
 		this.listEl.createEl('h4', { cls: 'crate-history-group', text: 'Versions' });
+		const rows = this.versionRows();
+		const dates = rows.map(row => versionDate(row.created_at));
+		const local = this.app.vault.getFileByPath(this.selectedPath);
+		if (local) dates.push(new Date(local.stat.mtime));
+		const needsSeconds = (date: Date) => dates.filter(value => Math.floor(value.getTime() / 60_000) === Math.floor(date.getTime() / 60_000)).length > 1;
 		const current = action(this.listEl, '', () => { void this.selectCurrent(this.selectedPath); }, 'crate-history-version crate-history-current');
 		current.setAttribute('data-version-key', 'current');
-		const local = this.app.vault.getFileByPath(this.selectedPath);
 		current.setAttribute('aria-label', local ? 'Current local file' : 'Current synced version');
-		current.createSpan({ cls: 'crate-history-file-name', text: local ? formatDate(new Date(local.stat.mtime)) : 'Synced version', attr: local ? { title: new Date(local.stat.mtime).toLocaleString() } : {} });
-		current.createSpan({ cls: 'crate-history-file-folder', text: local ? `Current · ${formatSize(local.stat.size)}` : 'Current' });
+		current.createSpan({ cls: 'crate-history-file-name', text: local ? formatDate(new Date(local.stat.mtime), needsSeconds(new Date(local.stat.mtime))) : 'Synced version', attr: local ? { title: new Date(local.stat.mtime).toLocaleString() } : {} });
+		const currentMeta = current.createSpan({ cls: 'crate-history-file-folder' });
+		currentMeta.createSpan({ cls: 'crate-history-current-label', text: 'Current' });
+		if (local) currentMeta.createSpan({ text: ` · ${formatSize(local.stat.size)}` });
 		current.disabled = this.busy; current.setAttribute('aria-current', String(!this.selectedVersion));
 		if (focused === 'current') current.focus();
-		const rows = [...new Map([...this.fileVersions, ...this.runtime.getPendingRestores()].map(row => [row.storage_key, row])).values()].filter(row => row.path === this.selectedPath).sort((a, b) => b.created_at.localeCompare(a.created_at));
-		for (const version of rows) { const button = this.versionButton(this.listEl, version); if (focused === version.storage_key) button.focus(); }
+
+		for (const version of rows) { const button = this.versionButton(this.listEl, version, needsSeconds(versionDate(version.created_at))); if (focused === version.storage_key) button.focus(); }
 		if (this.fileLoading) this.listEl.createEl('p', { text: 'Loading version history…', attr: { role: 'status' } });
 		else if (this.fileError) {
 			this.listEl.createEl('p', { text: this.fileError, attr: { role: 'alert' } });
@@ -159,7 +181,7 @@ class RemoteRecoveryModal extends SharedModal {
 		this.selectedVersion = undefined; const revision = ++this.previewRevision; this.renderVersions();
 		const local = this.app.vault.getFileByPath(path);
 		if (local) {
-			this.previewHeader(formatDate(new Date(local.stat.mtime)), `Current local file · ${formatSize(local.stat.size)}`).setAttribute('title', new Date(local.stat.mtime).toLocaleString());
+			this.previewHeader(this.formatHistoryDate(new Date(local.stat.mtime)), `Current local file · ${formatSize(local.stat.size)}`).setAttribute('title', new Date(local.stat.mtime).toLocaleString());
 			const content = this.previewEl.createDiv({ cls: 'crate-history-preview-output' });
 			if (local.stat.size > 256_000 || local.extension !== 'md') { content.createEl('p', { text: 'Preview is available for Markdown files up to 250 KiB. Select a saved version to compare or restore it.' }); return; }
 			try {
@@ -188,7 +210,7 @@ class RemoteRecoveryModal extends SharedModal {
 	private async selectVersion(version: RemoteFileVersion): Promise<void> {
 		if (this.busy) return;
 		this.selectedVersion = version; const revision = ++this.previewRevision; this.renderVersions();
-		const header = this.previewHeader(formatDate(versionDate(version.created_at)), `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}`);
+		const header = this.previewHeader(this.formatHistoryDate(versionDate(version.created_at)), `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}`);
 		header.setAttribute('title', versionDate(version.created_at).toLocaleString());
 		const actions = header.createDiv({ cls: 'crate-history-version-actions' });
 		const restore = action(actions, this.isPending(version) ? 'Resume restore' : 'Restore this version', () => { void this.restore(version, restore, restoreLabel); }, 'crate-history-restore reminder-modal-header-action is-enabled');
@@ -240,13 +262,8 @@ class RemoteRecoveryModal extends SharedModal {
 		const stats = comparison.createSpan({ cls: 'crate-history-diff-summary', attr: { 'aria-label': `${result.added} added lines, ${result.removed} removed lines` } });
 		stats.createSpan({ cls: 'is-added', text: `+${result.added}` });
 		stats.createSpan({ cls: 'is-removed', text: `−${result.removed}` });
-		const code = output.createEl('pre', { attr: { tabindex: '0', 'aria-label': 'Changes from current local file to saved version' } });
-		for (const line of result.lines) {
-			const row = code.createSpan({ cls: `crate-history-diff-line crate-history-diff-${line.kind}` });
-			row.createSpan({ text: `${line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '} ` });
-			renderFileText(row, line.text, line.words);
-			row.createSpan({ text: '\n' });
-		}
+		output.addClass('crate-file-diff', 'crate-history-diff');
+		renderDiffLines(output, result.lines, 'Changes from current local file to saved version', (container, line) => renderFileText(container, line.text || ' ', line.words));
 	}
 
 	private isPending(version: RemoteFileVersion): boolean { return this.runtime.getPendingRestores().some(row => row.storage_key === version.storage_key); }
@@ -273,6 +290,6 @@ class RemoteRecoveryModal extends SharedModal {
 	}
 }
 
-export function openRemoteRecoveryModal(app: App, runtime: FileHistoryRuntime, path: string): void {
-	new RemoteRecoveryModal(app, runtime, path).open();
+export function openRemoteRecoveryModal(app: App, runtime: FileHistoryRuntime, path: string, onBack?: () => void): void {
+	new RemoteRecoveryModal(app, runtime, path, onBack).open();
 }

@@ -61,12 +61,11 @@ export function renderConflictsPanel(container: HTMLElement, conflicts: Conflict
 	const list = container.createDiv({ cls: 'crate-activity-list' });
 	for (const conflict of conflicts) {
 		const row = list.createDiv({ cls: 'crate-conflict-row' });
-		renderFileMicroCard(
-			row,
-			conflict.conflictPath,
-			'conflict',
-			`Original: ${conflict.originalPath} · ${conflict.cause === 'incoming-review' ? 'Manual file review required; original retained' : conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
-		);
+		const card = renderFileMicroCard(row, conflict.conflictPath, 'conflict');
+		card.querySelector('.crate-file-info')?.createEl('p', {
+			cls: 'crate-conflict-explanation',
+			text: `Original: ${conflict.originalPath} · ${conflict.cause === 'incoming-review' ? 'Manual file review required; original retained' : conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
+		});
 		if (onReview) {
 			const review = row.createEl('button', { text: 'Review', cls: 'crate-conflict-review-button', attr: { type: 'button', 'aria-label': `Review conflict for ${conflict.originalPath}` } });
 			review.addEventListener('click', () => onReview(conflict));

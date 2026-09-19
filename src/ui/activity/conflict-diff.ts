@@ -1,3 +1,4 @@
+import { renderDiffText } from './diff-renderer';
 import { diffWordsWithSpace } from 'diff';
 import { diffSequence } from '../../sync/text-diff';
 
@@ -48,7 +49,5 @@ export function renderConflictDiffLine(parent: HTMLElement, line: ConflictDiffLi
     row.createSpan({ text: line?.number.toString() ?? '', cls: 'crate-conflict-line-number', attr: { 'aria-hidden': 'true' } });
     row.createSpan({ text: line?.changed ? side === 'current' ? '−' : '+' : ' ', cls: 'crate-conflict-line-sign' });
     const text = row.createSpan({ cls: 'crate-conflict-line-text' });
-    if (line?.words) {
-        for (const word of line.words) text.createSpan({ text: word.text, cls: word.changed ? 'crate-conflict-word' : '' });
-    } else text.setText(line?.text || ' ');
+    renderDiffText(text, line?.text ?? '', line?.words);
 }

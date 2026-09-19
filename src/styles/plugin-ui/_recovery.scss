@@ -1,7 +1,8 @@
+@use "../../ui/shared/styles/sync-review";
 @use "../../ui/shared/styles/navigation-row";
 
 @mixin styles {
-  .crate-file-history-link { flex-shrink: 0; font-size: var(--font-ui-smaller); }
+  .crate-file-history-link { flex-shrink: 0; @include sync-review.action; }
   .crate-file-history {
     display: flex;
     flex: 1;
@@ -9,10 +10,11 @@
     flex-direction: column;
     gap: 20px;
     font-size: var(--font-ui-small);
+    .crate-history-activity-back { @include sync-review.action; align-self: flex-start; }
     .crate-history-description { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
-    .crate-history-group { margin: 0 0 10px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 500; padding: 0 10px; border: 0; overflow-wrap: anywhere; }
+    .crate-history-group { margin: 0 0 10px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 500; padding: 0 12px; border: 0; overflow-wrap: anywhere; }
     .crate-history-state-icon svg { width: 16px; height: 16px; }
-    .crate-history-version-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+    .crate-history-version-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
     .crate-history-event-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); margin-top: 2px; }
     .crate-history-change-type { font-weight: 400; &.is-deleted { color: var(--text-error); } }
     .crate-history-hint { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
@@ -21,35 +23,39 @@
     .crate-history-file-context { h3 { margin-bottom: 4px; } }
     .crate-history-no-diff { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-muted); p { margin: 0; font-size: var(--font-ui-smaller); line-height: 1.5; } .crate-history-state-title { color: var(--text-normal); font-weight: 500; margin-bottom: 3px; } }
     .crate-history-state-icon { display: flex; color: var(--text-success); }
-    .crate-history-content-disclosure { margin-top: 12px; summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); padding: 8px 0; } }
+    .crate-history-content-disclosure { margin-top: 8px; summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); padding: 8px 0; } }
     button[aria-pressed="true"] { background: var(--background-modifier-hover); color: var(--text-accent); }
     button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
-    .crate-history-workspace { display: grid; grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.65fr); flex: 1; min-height: 0; border: 0; overflow: hidden; }
-    .crate-history-list-pane, .crate-history-preview-pane { min-width: 0; overflow: auto; padding: 0 20px; overscroll-behavior: contain; }
-    .crate-history-list-pane { padding-left: 0; border-right: 1px solid color-mix(in srgb, var(--background-modifier-border) 45%, transparent); }
+    .crate-history-workspace { display: grid; grid-template-columns: sync-review.$sidebar-columns; flex: 1; min-height: 0; border: 0; }
+    .crate-history-list-pane, .crate-history-preview-pane { min-width: 0; overflow: auto; padding: 0 sync-review.$panel-inset; overscroll-behavior: contain; }
+    // Let row backgrounds extend into the inset while text aligns with the file heading.
+    .crate-history-list-pane { margin-left: -12px; padding-inline: 0 sync-review.$list-inset; border-right: 1px solid sync-review.$pane-divider; }
     .crate-history-preview-pane { padding-right: 0; }
-    .crate-history-list-pane > h3 { padding-inline: 10px; }
+    .crate-history-restore.reminder-modal-header-action { @include sync-review.action; }
     .crate-file-history-count { color: var(--text-muted); font-size: var(--font-ui-smaller); margin: 0 0 12px; line-height: 1.5; }
     h3:not(.crate-history-day-label) { font-size: var(--font-ui-small); font-weight: 500; margin: 0 0 8px; overflow-wrap: anywhere; }
     .crate-history-version {
-      display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px;
-      width: 100%; height: auto; min-height: 50px; padding: 8px 10px; margin: 0 0 2px;
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+      width: 100%; height: auto; @include sync-review.row; margin: 1px 0;
       @include navigation-row.surface;
-      border-radius: var(--radius-s, 6px);
+      border-radius: 4px;
       white-space: normal;
-      &[aria-current="true"] { background: color-mix(in srgb, var(--background-modifier-hover) 70%, transparent); }
+      &[aria-current="true"] { background: sync-review.$selection; }
     }
-    .crate-history-file-name { font-weight: 500; font-size: var(--font-ui-small); overflow-wrap: anywhere; line-height: 1.4; }
-    .crate-history-file-folder, .crate-history-file-count { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; line-height: 1.4; }
-    .crate-history-preview-header { padding-bottom: 0; border: 0; margin-bottom: 28px; display: flex; flex-direction: column; gap: 4px; h3 { margin-bottom: 4px; } .crate-file-history-count { margin: 0; } }
+    .crate-history-file-name { @include sync-review.title; overflow-wrap: anywhere; line-height: 1.4; }
+    .crate-history-file-folder, .crate-history-file-count { @include sync-review.metadata; overflow-wrap: anywhere; }
+    .crate-history-preview-header { padding-bottom: 0; border: 0; margin-bottom: 22px; display: flex; flex-direction: column; gap: 4px; h3 { margin-bottom: 4px; } .crate-file-history-count { margin: 0; } }
     .crate-history-preview-output pre { white-space: pre; overflow-wrap: normal; overflow-x: auto; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.6; user-select: text; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; }
     .crate-history-internal-marker { opacity: 0.25; overflow-wrap: anywhere; }
-    .crate-history-diff-added { background: color-mix(in srgb, var(--text-success) 6%, transparent); .crate-history-diff-word { color: var(--text-success); background: color-mix(in srgb, var(--text-success) 22%, transparent); } }
-    .crate-history-diff-removed { background: color-mix(in srgb, var(--text-error) 6%, transparent); .crate-history-diff-word { color: var(--text-error); background: color-mix(in srgb, var(--text-error) 22%, transparent); } }
+    .crate-history-current-label { color: var(--text-normal); font-weight: 500; }
+    .crate-history-diff .crate-diff-code { flex: none; max-width: 100%; }
+    .crate-history-diff .crate-diff-line { width: max-content; min-width: 100%; grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); box-sizing: border-box; }
+    .crate-history-diff .crate-diff-text { white-space: pre; overflow-wrap: normal; }
     .crate-history-back { display: none; margin-bottom: 16px; }
-    @media (max-width: 700px) {
+    @media (max-width: sync-review.$compact-width) {
       .crate-history-workspace { display: block; position: relative; }
       .crate-history-list-pane, .crate-history-preview-pane { height: 100%; box-sizing: border-box; padding: 0; border: 0; display: none; }
+      .crate-history-list-pane { padding-inline: 0 sync-review.$list-inset; }
       .crate-history-workspace[data-pane="list"] .crate-history-list-pane,
       .crate-history-workspace[data-pane="preview"] .crate-history-preview-pane { display: block; }
       .crate-history-back { display: inline-flex; }
