@@ -44,6 +44,7 @@
 }
 
 .crate-activity-body {
+    container-type: size;
     display: flex;
     flex: 1;
     min-height: 0;
@@ -56,24 +57,87 @@
 
 .crate-reminders-ui .crate-activity-modal .reminder-modal-header {
     border-bottom: 0;
+    padding: 12px 10px 0;
+
+    .reminder-modal-header-side.is-right {
+        min-width: 0;
+        gap: 16px;
+    }
+}
+
+// Keep the close control quiet, including when the host theme styles buttons.
+.crate-reminders-ui .crate-activity-modal .reminder-modal-header-close {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+
+    &:hover { color: var(--text-normal); }
+    &:focus-visible {
+        outline: 2px solid var(--crate-activity-focus-ring);
+        outline-offset: 1px;
+    }
 }
 
 .crate-activity-subtitle {
     display: block;
     align-self: center;
-    flex: 0 1 auto;
+    flex: 0 0 220px;
+    width: 220px;
     min-width: 0;
-    margin-left: auto;
-    padding-left: 16px;
+    margin-left: 0;
+    position: relative;
+    padding: 0 12px 0 0;
+    text-align: right;
+    border-right: 1px solid var(--crate-activity-divider-strong);
     font-size: var(--font-ui-smaller, 12px);
     line-height: 1.4;
     font-weight: 400;
-    color: var(--text-muted);
+    color: var(--text-normal);
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.crate-activity-subtitle::before {
+    content: '';
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+// Match the shared sync indicator's connected green.
+.crate-activity-subtitle[data-state='synced']::before { background: #22c55e; }
+.crate-activity-subtitle[data-state='syncing']::before {
+    background: transparent;
+    border: 1px solid currentColor;
+    border-right-color: transparent;
+    animation: crate-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .crate-activity-subtitle[data-state='syncing']::before { animation: none; }
+}
+body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { animation: none; }
+.crate-activity-subtitle[data-state='attention']::before { background: var(--text-warning); }
+
+.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action {
+    height: 28px;
+    width: 11ch;
+    min-width: 11ch;
+    white-space: nowrap;
+    padding: 0 8px;
+    flex-shrink: 0;
+    font-size: var(--font-ui-smaller, 12px);
+    font-weight: 400;
+    border: 1px solid color-mix(in srgb, var(--crate-activity-divider) 90%, transparent) !important;
+    color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
+    border-radius: var(--crate-activity-radius-control);
+}
+
+.crate-activity-subtitle:empty { display: none; }
 
 .crate-sync-error-notice {
 	display: flex;
@@ -124,7 +188,8 @@
 .crate-activity-tab-bar {
 	position: relative;
 	display: flex;
-	margin: 0 var(--crate-activity-space-inline) 16px;
+	margin: 0 0 16px;
+	padding-inline: var(--crate-activity-space-inline);
 	border-bottom: 1px solid var(--crate-activity-divider);
 }
 
@@ -140,8 +205,8 @@
 .crate-activity-panel[hidden] { display: none; }
 
 .crate-activity-tab-indicator {
-    left: var(--active-tab-left);
-    width: var(--active-tab-width);
+    left: calc(var(--active-tab-left) + 12px);
+    width: calc(var(--active-tab-width) - 24px);
 	position: absolute;
 	bottom: -1px;
 	height: 1px;
@@ -199,10 +264,19 @@
 }
 
 .crate-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-s, 4px);
+    background: var(--background-modifier-hover);
 	font-variant-numeric: tabular-nums;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 }
+
+.crate-tab-count:empty { display: none; }
 
 .crate-tab-count-warning {
 	color: var(--text-warning);
@@ -312,6 +386,7 @@
 	min-height: 100%;
 	gap: 14px;
 	padding: 32px 20px;
+    padding-bottom: calc(32px + 12cqh);
 	box-sizing: border-box;
 }
 
@@ -365,8 +440,16 @@
 .crate-activity-timeline {
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 16px;
 }
+
+.crate-history-day-label {
+    margin: 12px 10px 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-medium);
+}
+.crate-history-separator { color: var(--text-faint); }
 
 .crate-history-entry {
     overflow: hidden;
@@ -423,7 +506,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 12px;
+    gap: 4px 8px;
     min-width: 0;
     font-size: var(--font-ui-small);
     color: var(--text-normal);
@@ -476,6 +559,7 @@
 
     &:hover {
         background: var(--crate-activity-control-hover-bg);
+        .crate-history-chevron { color: var(--text-normal); }
     }
 
     &:focus-visible {
@@ -522,7 +606,7 @@
 }
 
 // Respond to the sheet's width, including narrow desktop windows.
-@container (max-width: 440px) {
+@container (max-width: 640px) {
     .crate-activity-subtitle { display: none; }
 
     .crate-history-header {

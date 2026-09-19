@@ -45,7 +45,7 @@ it('replaces the pending file list with a loading indicator during sync', () => 
 it.each([false, true])('shows a conflict state without a duplicate sync subtitle (checking: %s)', checking => {
     const element = new FakeElement('div');
     renderConflictsPanel(element as never, [], checking);
-    expect(element.collectText()).toBe(checking ? 'Checking for conflicts…' : 'No conflicts');
+    expect(element.collectText()).toBe(checking ? 'Checking for conflicts…' : 'No conflicts There are no files requiring attention.');
 });
 
 it.each([

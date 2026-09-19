@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { groupHistory } from './history-groups';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 
@@ -9,29 +10,33 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 	}
 
 	const timeline = container.createDiv({ cls: 'crate-activity-timeline' });
-	for (const entry of history) {
-		const entryEl = timeline.createDiv({ cls: 'crate-history-entry' });
-		if (!entry.success) entryEl.addClass('is-error');
+	for (const group of groupHistory(history)) {
+        const section = timeline.createEl('section', { cls: 'crate-history-day' });
+        section.createEl('h3', { text: group.label, cls: 'crate-history-day-label' });
+        for (const { entry, count } of group.rows) {
+			const entryEl = section.createDiv({ cls: 'crate-history-entry' });
+			if (!entry.success) entryEl.addClass('is-error');
 
-		if (hasFilePaths(entry) || entry.errorCount > 0) {
-			const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
-			const summary = details.createEl('summary', { cls: 'crate-history-card' });
-			renderHistoryHeader(summary, entry, true);
-			renderHistoryFiles(details, entry);
-		} else {
-			const card = entryEl.createDiv({ cls: 'crate-history-card' });
-			renderHistoryHeader(card, entry, false);
+			if (hasFilePaths(entry) || entry.errorCount > 0) {
+				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
+				const summary = details.createEl('summary', { cls: 'crate-history-card' });
+				renderHistoryHeader(summary, entry, true);
+				renderHistoryFiles(details, entry);
+			} else {
+				const card = entryEl.createDiv({ cls: 'crate-history-card' });
+				renderHistoryHeader(card, entry, false, count);
+			}
 		}
-	}
+    }
 }
 
-function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expandable: boolean): void {
+function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expandable: boolean, count = 1): void {
 	const header = element.createDiv({ cls: 'crate-history-header' });
 	if (expandable) {
 		const chevron = header.createDiv({ cls: 'crate-history-chevron', attr: { 'aria-hidden': 'true' } });
 		setIcon(chevron, 'chevron-right');
 	}
-	renderHistorySummary(header, entry);
+	renderHistorySummary(header, entry, count);
 	const meta = header.createDiv({ cls: 'crate-history-meta' });
 	if (entry.type !== 'sync') {
         meta.createSpan({ text: entry.type === 'initial' ? 'Initial sync' : 'Full sync', cls: 'crate-history-type' });
@@ -89,11 +94,11 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	return new Intl.DateTimeFormat(undefined, {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
     }).format(date);
 }
 
-function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry): void {
+function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, count: number): void {
     const summary = header.createDiv({ cls: 'crate-history-summary' });
     if (!entry.success) {
         summary.createSpan({
@@ -109,12 +114,13 @@ function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry): voi
         { count: entry.conflictCount, label: entry.conflictCount === 1 ? 'conflict' : 'conflicts' },
         { count: entry.resolvedRaceCount ?? 0, label: entry.resolvedRaceCount === 1 ? 'race resolved' : 'races resolved' },
     ].filter(metric => metric.count > 0);
-    for (const metric of metrics) {
+    for (const [index, metric] of metrics.entries()) {
+        if (index > 0) summary.createSpan({ text: '·', cls: 'crate-history-separator', attr: { 'aria-hidden': 'true' } });
         const stat = summary.createSpan({ cls: 'crate-history-stat' });
         stat.createSpan({ text: metric.count.toLocaleString(), cls: 'crate-history-count' });
-        stat.createSpan({ text: metric.label });
+        stat.createSpan({ text: metrics.length === 1 && metric.count === 1 && ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label) ? `file ${metric.label}` : metric.label });
     }
     if (entry.success && metrics.length === 0) {
-        summary.createSpan({ text: 'No changes', cls: 'crate-history-unchanged' });
+        summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} syncs` : 'No changes', cls: 'crate-history-unchanged' });
     }
 }

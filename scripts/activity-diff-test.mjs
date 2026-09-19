@@ -149,13 +149,14 @@ for (const browserType of [chromium, webkit]) {
                     .mod-warning { border: 0; border-radius: 5px; background: var(--text-error); color: white; padding: 6px 12px; }
                     .crate-activity-modal { height: 660px; max-width: 940px; margin: auto; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); }
                     .fixture-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: var(--text-normal); font-size: 14px; font-weight: 500; }
+                    .fixture-header .crate-activity-subtitle { margin-left: auto; }
                     .fixture-close { color: var(--text-faint); font-size: 22px; font-weight: 400; }
                     .fixture-tab { padding: 8px 12px; color: var(--text-muted); font-size: 12px; }
                     .fixture-tab:first-child { border-bottom: 1px solid var(--text-normal); color: var(--text-normal); font-weight: 500; }
                     @media(max-width: 440px) { body { padding: 12px 6px; } .fixture-header { padding: 12px 16px; } }
                 </style><div class="crate-activity-modal">
-                    <div class="fixture-header"><span class="fixture-close">×</span>Sync activity</div>
-                    <div class="crate-activity-tab-bar"><span class="fixture-tab">Pending (6)</span><span class="fixture-tab">Conflicts</span><span class="fixture-tab">History</span><span class="crate-activity-subtitle">Synced 1h ago</span></div>
+                    <div class="fixture-header"><span class="fixture-close">×</span>Sync activity<span class="crate-activity-subtitle">Synced 1h ago</span></div>
+                    <div class="crate-activity-tab-bar"><span class="fixture-tab">Pending (6)</span><span class="fixture-tab">Conflicts</span><span class="fixture-tab">History</span></div>
                     <div class="crate-activity-panel"></div>
                 </div></html>`);
                 await page.addStyleTag({ content: css });

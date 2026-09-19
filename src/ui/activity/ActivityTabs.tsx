@@ -7,7 +7,6 @@ interface ActivityTabElements {
     history: HTMLDivElement;
     pendingCount: HTMLSpanElement;
     conflictsCount: HTMLSpanElement;
-    subtitle: HTMLSpanElement;
 }
 
 interface Props {
@@ -24,11 +23,10 @@ export function ActivityTabs({ initialTab, onMount, onTabChange }: Props) {
     const history = useRef<HTMLDivElement>(null);
     const pendingCount = useRef<HTMLSpanElement>(null);
     const conflictsCount = useRef<HTMLSpanElement>(null);
-    const subtitle = useRef<HTMLSpanElement>(null);
     useLayoutEffect(() => {
-        if (!pending.current || !conflicts.current || !history.current || !pendingCount.current || !conflictsCount.current || !subtitle.current) return;
+        if (!pending.current || !conflicts.current || !history.current || !pendingCount.current || !conflictsCount.current) return;
         onMount({ pending: pending.current, conflicts: conflicts.current, history: history.current,
-            pendingCount: pendingCount.current, conflictsCount: conflictsCount.current, subtitle: subtitle.current });
+            pendingCount: pendingCount.current, conflictsCount: conflictsCount.current });
     }, [onMount]);
     return <Tabs.Root value={active} onValueChange={value => {
         const tab = value as typeof active;
@@ -46,7 +44,6 @@ export function ActivityTabs({ initialTab, onMount, onTabChange }: Props) {
                 </Tabs.Tab>)}
                 <Tabs.Indicator className="crate-activity-tab-indicator" />
             </Tabs.List>
-            <span ref={subtitle} className="crate-activity-subtitle" />
         </div>
         <Tabs.Panel keepMounted value="pending" ref={pending} className="crate-activity-panel crate-activity-panel-pending" />
         <Tabs.Panel keepMounted value="conflicts" ref={conflicts} className="crate-activity-panel crate-activity-panel-conflicts" />
