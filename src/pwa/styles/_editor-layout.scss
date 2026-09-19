@@ -74,6 +74,7 @@
       min-width: 0;
       max-width: 100%;
       overflow-x: auto;
+      overflow-y: hidden;
       touch-action: pan-x pinch-zoom;
       overscroll-behavior-x: contain;
       scrollbar-width: none;
@@ -108,6 +109,10 @@
       padding: 4px 6px;
       gap: 4px;
       color: color-mix(in srgb, var(--text-muted) 60%, var(--background-primary));
+
+      // Start native pans on the button, not a clipped animated label or SVG.
+      // These decorative descendants must not become nested gesture targets.
+      > * { pointer-events: none; }
 
       &.is-active { color: var(--crate-semantic-color); }
       &:hover:not(.is-active) { color: var(--text-muted); }
