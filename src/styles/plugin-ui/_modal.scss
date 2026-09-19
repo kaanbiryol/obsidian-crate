@@ -150,6 +150,7 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
 }
 
 .crate-reminder-editor-surface {
+  border: 0;
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
   border-radius: var(--crate-radius-sheet);

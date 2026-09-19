@@ -1,5 +1,5 @@
 import type { DataAdapter } from 'obsidian';
-import type { SyncApiClient } from './api';
+import type { FileEntry } from '../protocol/sync-types';
 import { assertLocalSyncPath } from './local-path-safety';
 import { computeHash } from './hasher';
 import { isBinaryPreviewPath } from './preview-format';
@@ -12,6 +12,7 @@ export interface PendingDiff {
     kind: 'added' | 'modified' | 'deleted';
     unavailable?: string;
     unchanged?: boolean;
+    baselineUnavailable?: boolean;
 }
 
 const MAX_PREVIEW_BYTES = 256_000;
@@ -19,20 +20,20 @@ const MAX_PREVIEW_BYTES = 256_000;
 /** Read a snapshot for display only; never advance the manifest or sync queue. */
 export async function loadPendingDiff(
     adapter: Pick<DataAdapter, 'stat' | 'readBinary'>,
-    api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile'>,
+    baseline: FileEntry | undefined,
+    readBase: (path: string, hash: string) => Promise<ArrayBuffer | null>,
     path: string,
     deleted: boolean,
 ): Promise<PendingDiff> {
     assertLocalSyncPath(path);
-    const [local, metadata] = await Promise.all([adapter.stat(path), api.getFileMetadata([path])]);
+    const local = await adapter.stat(path);
     if (deleted ? local !== null : local?.type !== 'file') {
         throw new Error('This file changed. Refresh sync activity to see its latest state.');
     }
-    const remote = metadata.files[path];
     const result: PendingDiff = {
-        beforeSize: remote?.size ?? 0,
+        beforeSize: baseline?.size ?? 0,
         afterSize: local?.size ?? 0,
-        kind: deleted ? 'deleted' : remote ? 'modified' : 'added',
+        kind: deleted ? 'deleted' : baseline ? 'modified' : 'added',
     };
     if (isBinaryPreviewPath(path)) {
         return { ...result, unavailable: 'A text preview isn’t available for this file. Open it to review its contents.' };
@@ -44,18 +45,20 @@ export async function loadPendingDiff(
     if (afterBytes.byteLength > MAX_PREVIEW_BYTES) {
         return { ...result, afterSize: afterBytes.byteLength, unavailable: 'This file is too large to preview (limit: 256 KB).' };
     }
-    // Most touched config files are identical. Hash locally to avoid downloading them.
-    const unchanged = !deleted && !!remote && await computeHash(afterBytes) === remote.hash;
+    // A matching last-synced hash needs no cached contents, including for config files.
+    const unchanged = !deleted && !!baseline && await computeHash(afterBytes) === baseline.hash;
     let beforeBytes = new ArrayBuffer(0);
     if (unchanged) {
         beforeBytes = afterBytes;
         result.unchanged = true;
-    } else if (remote) {
-        const before = await api.downloadFile(path);
-        if (before.hash !== remote.hash || before.revision !== remote.revision) {
-            throw new Error('The server copy changed. Try again to load the latest version.');
+    } else if (baseline) {
+        const before = await readBase(path, baseline.hash);
+        if (!before) {
+            return { ...result, baselineUnavailable: true, unavailable: 'The last-synced copy isn’t available on this device. Line changes can’t be shown.' };
         }
-        beforeBytes = before.content;
+        beforeBytes = before;
+    } else if (deleted) {
+        return { ...result, baselineUnavailable: true, unavailable: 'The last-synced copy isn’t available on this device. Line changes can’t be shown.' };
     }
     result.beforeSize = beforeBytes.byteLength;
     result.afterSize = afterBytes.byteLength;

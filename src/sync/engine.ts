@@ -1,3 +1,4 @@
+import { loadPendingDiff } from './pending-diff';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
@@ -253,6 +254,17 @@ export class SyncEngine {
 
 	getState(): SyncState {
 		return { ...this.state };
+	}
+
+	async loadPendingDiff(path: string, deleted: boolean) {
+		assertLocalSyncPath(path);
+		const baseline = this.localManifest.getEntry(path);
+		const preview = await loadPendingDiff(this.vault.adapter, baseline,
+			(filePath, hash) => this.markdownBaseCache.readBase(filePath, hash), path, deleted);
+		if (this.localManifest.getEntry(path)?.hash !== baseline?.hash) {
+			throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
+		}
+		return preview;
 	}
 
 	getPendingPaths(): string[] {

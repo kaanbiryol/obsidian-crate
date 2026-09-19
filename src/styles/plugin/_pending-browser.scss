@@ -16,7 +16,7 @@
     color: var(--text-normal);
 }
 .crate-browser-sidebar, .crate-browser-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.crate-browser-sidebar { border-right: 1px solid var(--crate-activity-divider); }
+.crate-browser-sidebar { border-right: 1px solid color-mix(in srgb, var(--crate-activity-divider) 45%, transparent); }
 .crate-browser-list-heading {
     display: flex;
     justify-content: space-between;
@@ -36,7 +36,7 @@
     width: 100%;
     height: auto;
     min-height: 44px;
-    padding: 10px 12px;
+    padding: 7px 12px;
     margin: 1px 0;
     @include navigation-row.surface;
     font-family: inherit;
@@ -56,7 +56,7 @@
     gap: 12px;
     min-height: 54px;
     padding: 10px 16px;
-    border-bottom: 1px solid var(--crate-activity-divider);
+    border-bottom: 0;
     &[hidden] { display: none; }
 }
 .crate-browser-file-heading { min-width: 0; flex: 1; }
@@ -187,7 +187,7 @@
     flex-shrink: 0;
     gap: 8px;
     padding: 12px;
-    border-top: 1px solid var(--crate-activity-divider);
+    border-top: 0;
     button {
         display: inline-flex;
         align-items: center;
@@ -210,14 +210,14 @@
         order: 2;
         width: 100%;
         padding-inline: 14px;
-        border: 1px solid var(--crate-activity-divider);
+        border: 0;
         border-radius: var(--input-radius, var(--radius-s, 4px));
         background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary));
         color: var(--text-normal);
         font-size: var(--font-ui-small, 13px);
         font-weight: 500;
         transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
-        &:hover:enabled { background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)); border-color: var(--background-modifier-border-hover); }
+        &:hover:enabled { background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)); }
         &:active:enabled { background: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary)); }
     }
 
@@ -242,3 +242,5 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
     .crate-discard-help { font-size: var(--font-ui-smaller); color: var(--text-muted); }
     .crate-discard-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 }
+
+.crate-browser-actions[hidden], .crate-browser-actions button[hidden] { display: none; }

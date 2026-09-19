@@ -1,6 +1,6 @@
 import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
-import { Notice, type Events, type TAbstractFile } from 'obsidian';
+import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
@@ -28,11 +28,18 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 }
 
 export function registerSyncCommands(plugin: CratePlugin): void {
+	plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
+		if (!(file instanceof TFile) || !plugin.syncRuntime.isConfigured()) return;
+		menu.addItem(item => item.setTitle('File history').setIcon('history').onClick(() => {
+			openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, file.path);
+		}));
+	}));
 	plugin.addCommand({
 		id: 'show-file-history', name: 'Show file history',
 		checkCallback: checking => {
-			const available = plugin.syncRuntime.isConfigured();
-			if (!checking && available) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime);
+			const file = plugin.app.workspace.getActiveFile();
+			const available = plugin.syncRuntime.isConfigured() && file !== null;
+			if (!checking && available) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, file.path);
 			return available;
 		},
 	});

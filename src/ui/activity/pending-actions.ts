@@ -29,9 +29,11 @@ export function createPendingActions(
         all.indeterminate = selected.length > 0 && selected.length < keys.length;
         all.disabled = busy;
         for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = busy; }
-        syncLabel.textContent = busy ? 'Syncing…' : `Sync ${selected.length} selected`;
-        sync.setAttribute('aria-label', busy ? 'Syncing…' : `Sync ${selected.length} selected`);
+        syncLabel.textContent = busy ? 'Syncing…' : 'Sync selected';
+        sync.setAttribute('aria-label', busy ? 'Syncing…' : 'Sync selected');
         sync.disabled = busy || selected.length === 0;
+        sync.hidden = !busy && (selected.length === 0 || selected.length === keys.length);
+        footer.hidden = sync.hidden && !status.textContent;
     };
     all.addEventListener('change', () => {
         for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }

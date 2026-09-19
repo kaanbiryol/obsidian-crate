@@ -126,7 +126,7 @@ export class ActivityModal extends BaseUiModal {
 		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
 		this.syncBtn = header.createEl('button', {
 			cls: 'crate-sync-now-btn reminder-modal-header-action',
-			attr: { type: 'button', 'aria-label': 'Sync now', title: 'Sync now' },
+			attr: { type: 'button', 'aria-label': 'Sync all', title: 'Sync all' },
 		});
 		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
 		this.syncBtn.addEventListener('click', () => {
@@ -191,7 +191,7 @@ export class ActivityModal extends BaseUiModal {
         const text = syncing
             ? formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
             : needsAttention ? label
-            : pending > 0 ? 'Changes pending' : label;
+            : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
         if (this.subtitleEl.textContent !== text) this.subtitleEl.setText(text);
         this.subtitleEl.setAttribute('title', text);
         this.subtitleEl.setAttribute('data-state', syncing ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle');
@@ -225,7 +225,7 @@ export class ActivityModal extends BaseUiModal {
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		const canStop = syncing && !!this.deps.stopSync;
-		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync now';
+		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync all';
 		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
 		this.syncBtn.hidden = false;
 		this.syncBtn.setAttribute('aria-label', label);
@@ -262,8 +262,8 @@ export class ActivityModal extends BaseUiModal {
 			.map((entry) => entry.getAttribute('data-history-key')));
 		this.historyPanel.empty();
 		const deps = this.deps;
-		const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.listCurrentSyncedFiles && deps.loadCurrentSyncedPreview ? {
-			listCurrentSyncedFiles: deps.listCurrentSyncedFiles.bind(deps), loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
+		const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.loadCurrentSyncedPreview ? {
+			loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
 			listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
 			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
 		} : undefined;

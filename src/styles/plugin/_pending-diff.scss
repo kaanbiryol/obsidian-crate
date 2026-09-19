@@ -42,7 +42,7 @@
 }
 .crate-diff-line {
     display: grid;
-    grid-template-columns: 3.5ch 3.5ch 2.5ch minmax(0, 1fr);
+    grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr);
     padding: 0 12px 0 0;
     border-left: 2px solid transparent;
     font-family: var(--font-monospace);
@@ -54,7 +54,7 @@
     &.is-removed .crate-diff-sign { color: var(--crate-diff-removed); }
     .crate-diff-text {
         display: block;
-        padding: 0 0 0 8px;
+        padding: 0 0 0 4px;
         border: 0;
         background: transparent;
         color: var(--text-normal);
@@ -66,7 +66,7 @@
 }
 .crate-diff-number, .crate-diff-sign { color: var(--text-faint); text-align: center; user-select: none; }
 .crate-diff-number { font-size: 10px; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--background-primary) 94%, black); color: color-mix(in srgb, var(--text-faint) 75%, transparent); }
-.crate-diff-footnote { border-top: 1px solid var(--crate-activity-divider); font-size: 11px; }
+.crate-diff-footnote { border: 0; font-size: 11px; padding: 8px 16px 6px; }
 .crate-file-diff .crate-diff-gap > button,
 .crate-file-diff .crate-diff-message > button {
     height: auto;
@@ -103,5 +103,5 @@
 .crate-diff-line.is-added .crate-diff-word { background: color-mix(in srgb, var(--crate-diff-added) 28%, transparent); }
 .crate-diff-line.is-removed .crate-diff-word { background: color-mix(in srgb, var(--crate-diff-removed) 28%, transparent); }
 .crate-diff-word { border-radius: 2px; }
-.crate-diff-stats { gap: 8px; padding: 3px 6px; border-radius: 4px; background: var(--background-secondary); font-size: 10px; }
+.crate-diff-stats { gap: 8px; padding: 3px 6px; border-radius: 0; background: transparent; font-size: 10px; }
 .crate-browser-detail .crate-browser-file-folder { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
