@@ -190,7 +190,7 @@ export class ActivityModal extends BaseUiModal {
         const text = syncing
             ? formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
             : needsAttention ? label
-            : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
+            : pending > 0 ? 'Changes pending' : label;
         if (this.subtitleEl.textContent !== text) this.subtitleEl.setText(text);
         this.subtitleEl.setAttribute('title', text);
         this.subtitleEl.setAttribute('data-state', syncing ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle');

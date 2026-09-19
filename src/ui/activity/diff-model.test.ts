@@ -5,7 +5,7 @@ describe('diff presentation', () => {
     it('numbers before and after independently through multiple edits', () => {
         const diff = buildDiff('a\nb\nc\nd', 'a\nx\ny\nc');
         expect(diff).toMatchObject({ added: 2, removed: 2 });
-        expect(diff.lines).toEqual([
+        expect(diff.lines).toMatchObject([
             { kind: 'context', text: 'a', before: 1, after: 1 },
             { kind: 'removed', text: 'b', before: 2 },
             { kind: 'added', text: 'x', after: 2 },
@@ -24,7 +24,7 @@ describe('diff presentation', () => {
         const before = '{"enabled":true}', after = '{\n  "enabled": true\n}';
         const diff = buildDiff(before, after);
         expect(diff).toMatchObject({ added: 3, removed: 1 });
-        expect(diff.lines[0]).toEqual({ kind: 'removed', text: before, before: 1 });
+        expect(diff.lines[0]).toMatchObject({ kind: 'removed', text: before, before: 1 });
         expect(buildDiff('', after)).toMatchObject({ added: 3, removed: 0 });
         expect(buildDiff('{invalid', after)).toMatchObject({ added: 3, removed: 1 });
     });
@@ -75,4 +75,10 @@ describe('diff presentation', () => {
             expect(buildDiff('a\nb', 'c\nd').limited).toBe(true);
         } finally { now.mockRestore(); }
     });
+});
+
+it('highlights replacement phrases without losing whitespace or punctuation', () => {
+    const diff = buildDiff('- Morning walk.', '- Sleep.');
+    expect(diff.lines.map(line => line.words?.map(word => word.text).join(''))).toEqual(['- Morning walk.', '- Sleep.']);
+    expect(diff.lines.map(line => line.words?.filter(word => word.changed).map(word => word.text).join(''))).toEqual(['Morning walk', 'Sleep']);
 });

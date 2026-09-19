@@ -28,9 +28,9 @@ export class PendingDiscardModal extends SharedModal {
             else this.bodyEl.createEl('p', { text: 'Recovery copies of replaced files are saved on this device.', cls: 'crate-discard-help' });
             const status = this.bodyEl.createDiv({ attr: { role: 'status', 'aria-live': 'polite' } });
             const buttons = this.bodyEl.createDiv({ cls: 'crate-discard-buttons' });
-            const cancel = buttons.createEl('button', { text: 'Cancel', attr: { type: 'button' } });
+            const cancel = buttons.createEl('button', { text: 'Cancel', cls: 'crate-activity-action', attr: { type: 'button' } });
             cancel.addEventListener('click', () => this.close());
-            const confirm = buttons.createEl('button', { text: `Discard changes (${review.items.length})`, cls: 'mod-warning', attr: { type: 'button' } });
+            const confirm = buttons.createEl('button', { text: `Discard changes (${review.items.length})`, cls: 'crate-activity-action crate-activity-action-danger', attr: { type: 'button' } });
             confirm.disabled = review.items.length === 0;
             confirm.addEventListener('click', () => {
                 confirm.disabled = true; cancel.disabled = true;
@@ -54,7 +54,7 @@ export class PendingDiscardModal extends SharedModal {
         }
     }
     private addRetry(container: HTMLElement): void {
-        const retry = container.createEl('button', { text: 'Review again', attr: { type: 'button' } });
+        const retry = container.createEl('button', { text: 'Review again', cls: 'crate-activity-action', attr: { type: 'button' } });
         retry.addEventListener('click', () => { void this.render(); });
     }
     onClose(): void { this.active = false; super.onClose(); }

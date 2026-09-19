@@ -81,8 +81,8 @@ it('keeps Stop sync visible and enabled while pending files are transferring', (
 });
 
 it.each([
-    ['idle', 1, '1 change pending', 'pending'],
-    ['idle', 2, '2 changes pending', 'pending'],
+    ['idle', 1, 'Changes pending', 'pending'],
+    ['idle', 2, 'Changes pending', 'pending'],
     ['idle', 0, 'Synced just now', 'synced'],
     ['error', 1, 'Last sync had errors', 'attention'],
     ['offline', 1, 'Offline', 'attention'],

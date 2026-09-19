@@ -123,19 +123,43 @@
 body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { animation: none; }
 .crate-activity-subtitle[data-state='attention']::before { background: var(--text-warning); }
 
-.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action {
+.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action,
+.crate-reminders-ui .crate-activity-modal button.crate-activity-action,
+.modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
+.crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
+.modal.crate-conflict-review-modal .crate-reminders-ui .crate-conflict-choices label,
+.modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
     height: 28px;
-    width: 11ch;
-    min-width: 11ch;
+    min-height: 28px;
     white-space: nowrap;
     padding: 0 8px;
     flex-shrink: 0;
     font-size: var(--font-ui-smaller, 12px);
     font-weight: 400;
-    border: 1px solid color-mix(in srgb, var(--crate-activity-divider) 90%, transparent) !important;
+    border: 1px solid var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent)) !important;
     color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
-    border-radius: var(--crate-activity-radius-control);
+    border-radius: var(--input-radius, var(--radius-s, 4px));
 }
+
+.crate-reminders-ui .crate-activity-modal button.crate-activity-action,
+.modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
+.crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
+.modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    box-shadow: none;
+    transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+    &:not(:disabled) {
+        cursor: pointer;
+        &:hover { background: var(--crate-control-hover-bg); }
+        &:active { background: var(--crate-control-active-bg); }
+    }
+    &:disabled { background: transparent; cursor: default; opacity: 0.5; }
+    &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+}
+.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn { width: 11ch; min-width: 11ch; }
 
 .crate-activity-subtitle:empty { display: none; }
 
@@ -494,9 +518,9 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 }
 
 .crate-history-time {
-    font-size: var(--font-ui-smaller);
+    font-size: 10px;
     font-weight: var(--font-normal, 400);
-    color: var(--text-muted);
+    color: var(--text-faint);
     font-variant-numeric: tabular-nums;
 }
 
@@ -589,15 +613,16 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 
 .crate-history-files {
     margin: 0 10px 0 32px;
-    padding: 0 0 12px;
+    padding: 0 0 6px;
     border-top: 0;
     display: flex;
     flex-direction: column;
     gap: 0;
 
     .crate-activity-file-card {
-        min-height: 44px;
-        padding: 6px 0;
+        min-height: 34px;
+        padding: 2px 0;
+        gap: 6px;
     }
 }
 
@@ -730,15 +755,7 @@ body.reduce-motion .crate-activity-modal {
     gap: 8px;
     margin-left: auto;
     flex-shrink: 0;
-    button {
-        min-height: 32px;
-        padding: 6px 12px;
-        border: 1px solid var(--background-modifier-border);
-        background: var(--interactive-normal);
-        box-shadow: none;
-        color: var(--text-normal);
-    }
-    button:hover { background: var(--interactive-hover); }
+
 }
 .crate-conflict-compare {
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
@@ -752,27 +769,44 @@ body.reduce-motion .crate-activity-modal {
     h3 > button {
         display: flex; align-items: center; justify-content: space-between;
         width: 100%; height: auto; padding: 2px 0;
-        background: transparent; box-shadow: none; font-weight: var(--font-medium); color: var(--text-muted);
+        background: transparent; box-shadow: none; font-weight: var(--font-semibold); color: var(--text-normal);
         &:hover { color: var(--text-normal); }
-        svg { width: 14px; height: 14px; }
+        svg { width: 14px; height: 14px; color: var(--text-faint); }
     }
 }
 .crate-conflict-code {
     margin: 0; padding: 12px 0; min-height: 260px; max-height: 44dvh;
     overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.65;
-    background: var(--background-primary); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
-    counter-reset: conflict-line;
-    > div { position: relative; padding: 0 12px 0 44px; border-left: 2px solid transparent; }
-    > div::before { counter-increment: conflict-line; content: counter(conflict-line); position: absolute; left: 8px; width: 22px; text-align: right; color: var(--text-faint); font-size: 0.9em; user-select: none; }
-    > .crate-conflict-changed { background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left-color: var(--interactive-accent); }
+    background: var(--background-primary); white-space: pre; user-select: text;
 }
+.crate-conflict-line {
+    display: flex;
+    min-width: 100%;
+    width: max-content;
+    min-height: 1.65em;
+    border-left: 2px solid transparent;
+    padding-right: 12px;
+    &.is-removed { --conflict-diff-color: var(--text-error, #e06c75); }
+    &.is-added { --conflict-diff-color: var(--text-success, #5fb98a); }
+    &.is-removed, &.is-added {
+        background: color-mix(in srgb, var(--conflict-diff-color) 16%, transparent);
+        border-left-color: var(--conflict-diff-color);
+    }
+    &.is-empty { background: var(--background-secondary); }
+}
+.crate-conflict-line-number { width: 4ch; flex-shrink: 0; text-align: right; color: var(--text-faint); user-select: none; }
+.crate-conflict-line-sign { width: 3ch; flex-shrink: 0; text-align: center; color: var(--conflict-diff-color, var(--text-faint)); user-select: none; }
+.crate-conflict-word { background: color-mix(in srgb, var(--conflict-diff-color) 32%, transparent); border-radius: 2px; }
+
 .crate-conflict-actions {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px;
-    align-items: end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--background-modifier-border);
-    > .mod-cta { grid-column: 2; grid-row: 1; align-self: end; min-height: 34px; }
+    flex-shrink: 0;
+    align-items: end; margin-top: 0; padding: 16px 24px; background: var(--background-primary); border-top: 1px solid var(--background-modifier-border);
+    > .crate-conflict-action { grid-column: 2; grid-row: 3; justify-self: end; }
 }
-.crate-conflict-resolution-help { grid-column: 1; grid-row: 2; margin: 0; min-height: 1.5em; }
+.crate-conflict-resolution-help { grid-column: 1 / -1; grid-row: 2; margin: 0; min-height: 1.5em; }
 .crate-conflict-choices {
+    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -788,27 +822,24 @@ body.reduce-motion .crate-activity-modal {
     }
     label {
         position: relative;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 34px;
-        padding: 6px 12px;
-        border: 1px solid var(--background-modifier-border);
-        border-radius: var(--radius-s, 6px);
         cursor: pointer;
-        font-size: var(--font-ui-small);
         line-height: 1.4;
-        color: var(--text-muted);
-        background: var(--background-primary);
-        &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+        background: transparent;
+        transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+        &:not(:has(input:disabled)):hover { background: var(--crate-control-hover-bg); }
+        &:not(:has(input:disabled)):active { background: var(--crate-control-active-bg); }
+        gap: 5px;
         &:has(input:checked) {
             background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
-            border-color: var(--interactive-accent);
-            color: var(--text-normal);
+            --crate-choice-border: var(--interactive-accent);
         }
-        &:has(input:focus-visible) { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+        &:has(input:focus-visible) { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
         &:has(input:disabled) { opacity: 0.5; cursor: default; }
     }
+
     input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 }
 .crate-conflict-manual { margin-top: 16px; font-size: var(--font-ui-small); }
@@ -820,9 +851,37 @@ body.reduce-motion .crate-activity-modal {
     .crate-conflict-compare { grid-template-columns: 1fr; }
     .crate-conflict-version + .crate-conflict-version { border-left: 0; border-top: 1px solid var(--background-modifier-border); }
     .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
-    .crate-conflict-actions { grid-template-columns: 1fr; > .mod-cta { grid-column: 1; grid-row: 3; width: 100%; } }
+    .crate-conflict-actions { grid-template-columns: 1fr; > .crate-conflict-action { grid-column: 1; grid-row: 3; width: 100%; } }
 }
 
 @container (max-width: 640px) {
     .crate-activity-modal .crate-activity-tab { min-height: 44px; }
 }
+
+.modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action-danger {
+    --crate-choice-border: color-mix(in srgb, var(--text-error) 55%, transparent);
+    color: var(--text-error);
+    &:not(:disabled):hover { background: color-mix(in srgb, var(--text-error) 12%, transparent); }
+    &:not(:disabled):active { background: color-mix(in srgb, var(--text-error) 20%, transparent); }
+}
+
+.crate-conflict-choice-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border: 1px solid var(--text-faint);
+    border-radius: 50%;
+    &::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0; }
+}
+.crate-conflict-choices label:has(input:checked) .crate-conflict-choice-check {
+    border-color: var(--text-normal);
+    &::after { opacity: 1; }
+}
+@media (max-width: 600px) {
+    .crate-conflict-actions { padding: 12px 16px; }
+}
+
+.crate-history-details[open] > summary { padding-bottom: 3px; }
