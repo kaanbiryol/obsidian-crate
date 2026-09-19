@@ -60,7 +60,7 @@ class RemoteRecoveryModal extends SharedModal {
 	private previewEl!: HTMLElement;
 	private workspaceEl!: HTMLElement;
 
-	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string, private readonly onBack?: () => void) { super(app); }
+	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string) { super(app); }
 
 	onOpen(): void {
 		this.closed = false;
@@ -68,10 +68,6 @@ class RemoteRecoveryModal extends SharedModal {
 		this.modalEl.addClass('crate-file-history-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
 		this.bodyEl.addClass('crate-file-history');
-		if (this.onBack) action(this.bodyEl, '← Sync activity', () => {
-			this.close();
-			this.onBack?.();
-		}, 'crate-history-activity-back');
 		const context = this.bodyEl.createDiv({ cls: 'crate-history-file-context' });
 		context.createEl('h3', { text: this.selectedPath });
 		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for 30 days.' });
@@ -290,6 +286,6 @@ class RemoteRecoveryModal extends SharedModal {
 	}
 }
 
-export function openRemoteRecoveryModal(app: App, runtime: FileHistoryRuntime, path: string, onBack?: () => void): void {
-	new RemoteRecoveryModal(app, runtime, path, onBack).open();
+export function openRemoteRecoveryModal(app: App, runtime: FileHistoryRuntime, path: string): void {
+	new RemoteRecoveryModal(app, runtime, path).open();
 }

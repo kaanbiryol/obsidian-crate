@@ -87,8 +87,8 @@ for(const browserType of [chromium,webkit]) {
    await expect(page.getByRole('button', {name:'Close dialog',exact:true})).toBeFocused();
    await page.keyboard.press('Tab');
    const bounds = await page.locator('.crate-file-history-modal').boundingBox();
-   assert.equal(bounds.width, width < 700 ? width : Math.min(940, width - 48));
-   assert.equal(bounds.height, width < 700 ? 900 * 0.85 : 660);
+   assert.equal(bounds.width, width < 700 ? width : Math.min(800, width - 48));
+   assert.equal(bounds.height, width < 700 ? 900 * 0.85 : 560);
    const openFile = async path => { await page.evaluate(path => window.mount(path), path); };
    const openInbox = () => openFile('Reminders/Inbox.md');
    await expect(page.getByRole('button',{name:'← All files',exact:true})).toHaveCount(0);

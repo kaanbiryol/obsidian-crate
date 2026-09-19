@@ -1,0 +1,26 @@
+// Original outlined activity-button style, shared across action surfaces.
+@mixin styles {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  height: 28px;
+  white-space: nowrap;
+  padding: 0 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent)) !important;
+  border-radius: var(--input-radius, var(--radius-s, 4px));
+  background: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
+  font-size: var(--font-ui-smaller, 12px);
+  font-weight: 400;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+  &:not(:disabled) {
+    cursor: pointer;
+    &:hover { background: var(--crate-control-hover-bg); }
+    &:active { background: var(--crate-control-active-bg); }
+  }
+  &:disabled { background: transparent; cursor: default; opacity: 0.5; }
+  &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+}

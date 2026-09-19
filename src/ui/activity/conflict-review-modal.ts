@@ -20,6 +20,7 @@ export class ConflictReviewModal extends SharedModal {
     onOpen(): void {
         this.openLayout('Review conflict');
         this.modalEl.addClass('crate-conflict-review-modal');
+        this.modalEl.toggleClass('is-mobile', Platform.isMobile);
         this.contentEl.win.addEventListener('focus', this.returnToReview);
         void this.refresh();
     }
@@ -130,7 +131,7 @@ export class ConflictReviewModal extends SharedModal {
             });
         }
         const primary = button(actions, 'Resolve conflict', () => { if (selected) void resolve(selected); });
-        primary.addClass('crate-conflict-action'); primary.disabled = true;
+        primary.addClass('crate-conflict-primary-action', 'crate-sync-primary-action'); primary.disabled = true;
         const resolve = async (choice: ConflictChoice) => {
             this.busy = true; controls.forEach(el => { el.disabled = true; }); editor.disabled = true;
             status.setText('Saving your choice…');
