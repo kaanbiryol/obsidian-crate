@@ -77,5 +77,57 @@ it('keeps Stop sync visible and enabled while pending files are transferring', (
     internal.updateSyncBtn();
     expect(button.getAttribute('aria-label')).toBe('Sync now');
     expect(label.collectText()).toBe('Sync now');
-    expect((button as unknown as HTMLButtonElement).hidden).toBe(true);
+    expect((button as unknown as HTMLButtonElement).hidden).toBe(false);
+});
+
+it.each([
+    ['idle', 1, '1 change pending', 'pending'],
+    ['idle', 2, '2 changes pending', 'pending'],
+    ['idle', 0, 'Synced just now', 'synced'],
+    ['error', 1, 'Last sync had errors', 'attention'],
+    ['offline', 1, 'Offline', 'attention'],
+] as const)('describes %s with %i pending files in the header', (status, count, text, indicator) => {
+    const deps = {
+        getState: () => ({ status, lastSync: new Date().toISOString() } as SyncState),
+        getPendingPaths: () => Array.from({ length: count }, (_, i) => `${i}.md`),
+        getActiveConflicts: () => [],
+        sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+    };
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
+    const subtitle = new FakeElement('span');
+    const internal = modal as unknown as {
+        subtitleEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
+    };
+    internal.subtitleEl = subtitle as unknown as HTMLElement;
+    internal.conflictsPanel = new FakeElement('div') as unknown as HTMLElement;
+    internal.updateSyncStatusText();
+    expect(subtitle.collectText()).toBe(text);
+    expect(subtitle.getAttribute('data-state')).toBe(indicator);
+});
+
+it('updates phase text while retaining the syncing indicator', () => {
+    const state = { status: 'syncing', work: { phase: 'scanning' } } as SyncState;
+    const deps = {
+        getState: () => state,
+        getPendingPaths: () => ['note.md'], getActiveConflicts: () => [],
+        sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+    };
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
+    const subtitle = new FakeElement('span');
+    const internal = modal as unknown as {
+        subtitleEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
+    };
+    internal.subtitleEl = subtitle as unknown as HTMLElement;
+    internal.conflictsPanel = new FakeElement('div') as unknown as HTMLElement;
+    for (const [phase, label] of [
+        ['server', 'Loading server changes…'],
+        ['scanning', 'Scanning and comparing vault files…'],
+        ['saving', 'Saving sync progress…'],
+    ] as const) {
+        state.work = { phase };
+        internal.updateSyncStatusText();
+        expect(subtitle.collectText()).toBe(label);
+        expect(subtitle.getAttribute('title')).toBe(label);
+        expect(subtitle.getAttribute('data-state')).toBe('syncing');
+    }
 });

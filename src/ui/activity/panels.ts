@@ -54,7 +54,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 
 export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], checking: boolean, onReview?: (conflict: ConflictRecord) => void): void {
 	if (conflicts.length === 0) {
-		renderEmptyState(container, checking ? 'search' : 'shield-check', checking ? 'Checking for conflicts…' : 'No conflicts', '', checking ? 'accent' : 'success');
+		renderEmptyState(container, checking ? 'search' : 'shield-check', checking ? 'Checking for conflicts…' : 'No conflicts', checking ? '' : 'There are no files requiring attention.', checking ? 'accent' : 'success');
 		return;
 	}
 

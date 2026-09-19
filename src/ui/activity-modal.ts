@@ -122,6 +122,7 @@ export class ActivityModal extends BaseUiModal {
 
 		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
 
+		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
 		this.syncBtn = header.createEl('button', {
 			cls: 'crate-sync-now-btn reminder-modal-header-action',
 			attr: { type: 'button', 'aria-label': 'Sync now', title: 'Sync now' },
@@ -164,7 +165,6 @@ export class ActivityModal extends BaseUiModal {
                 this.historyPanel = elements.history;
                 this.pendingCount = elements.pendingCount;
                 this.conflictsCount = elements.conflictsCount;
-                this.subtitleEl = elements.subtitle;
                 this.refresh();
                 this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
                 this.deps.addStateChangeListener(this.onStateChange);
@@ -184,9 +184,16 @@ export class ActivityModal extends BaseUiModal {
     private updateSyncStatusText(): void {
         const label = this.formatLastSync();
         const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
-        this.subtitleEl.setText(syncing
-            ? this.currentTabIndex === 0 ? '' : formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
-            : label === 'Not synced yet' ? '' : label);
+        const status = this.deps.getState().status;
+        const pending = this.deps.getPendingPaths().length;
+        const needsAttention = status === 'error' || status === 'offline';
+        const text = syncing
+            ? formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
+            : needsAttention ? label
+            : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
+        if (this.subtitleEl.textContent !== text) this.subtitleEl.setText(text);
+        this.subtitleEl.setAttribute('title', text);
+        this.subtitleEl.setAttribute('data-state', syncing ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle');
         if (this.deps.getActiveConflicts().length === 0) {
             this.conflictsPanel.empty();
             renderConflictsPanel(this.conflictsPanel, [], this.isCheckingConflicts());
@@ -198,8 +205,8 @@ export class ActivityModal extends BaseUiModal {
 		const pendingLen = this.deps.getPendingPaths().length;
 		const conflictLen = this.deps.getActiveConflicts().length;
 
-		this.pendingCount.setText(pendingLen > 0 ? `(${pendingLen})` : '');
-		this.conflictsCount.setText(conflictLen > 0 ? `(${conflictLen})` : '');
+		this.pendingCount.setText(pendingLen > 0 ? String(pendingLen) : '');
+		this.conflictsCount.setText(conflictLen > 0 ? String(conflictLen) : '');
 
 		if (conflictLen > 0) {
 			this.conflictsCount.addClass('crate-tab-count-warning');
@@ -219,7 +226,7 @@ export class ActivityModal extends BaseUiModal {
 		const canStop = syncing && !!this.deps.stopSync;
 		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync now';
 		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
-		this.syncBtn.hidden = !syncing && !this.stoppingSync && this.currentTabIndex === 0 && !!this.deps.syncSelected && !!this.deps.createPendingDiscard && this.deps.getPendingPaths().length > 0 && !!this.deps.loadPendingDiff;
+		this.syncBtn.hidden = false;
 		this.syncBtn.setAttribute('aria-label', label);
 		this.syncBtn.setAttribute('title', label);
 		this.syncBtnLabel.setText(label);

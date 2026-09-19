@@ -14,7 +14,7 @@ describe('sync activity modal styles', () => {
 		expect(component).toContain('<ModalHeader title="Sync activity"');
 		expect(styles).not.toContain('.crate-activity-close-btn');
 		expect(styles).not.toContain('.crate-sync-now-btn {');
-		expect(styles).toContain('margin: 0 var(--crate-activity-space-inline) 16px');
+		expect(styles).toContain('padding-inline: var(--crate-activity-space-inline)');
 		expect(styles).toContain('padding: 0 var(--crate-activity-space-inline) 20px');
 	});
 });

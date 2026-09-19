@@ -81,7 +81,7 @@
     &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
     &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: -2px; }
 }
-.crate-file-diff .crate-diff-gap > button { width: 100%; border-radius: 0; text-align: left; padding-left: 24px; }
+.crate-file-diff .crate-diff-gap > button { width: 100%; border-radius: 0; text-align: center; padding-inline: 24px; }
 .crate-diff-message { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: var(--text-muted); overflow-wrap: anywhere; text-align: center; line-height: 1.6; }
 @container (max-width: 440px) {
     .crate-diff-line { grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); padding-right: 8px; }

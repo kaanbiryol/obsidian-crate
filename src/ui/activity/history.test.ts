@@ -33,7 +33,7 @@ describe('activity history', () => {
         expect(details?.tagName).toBe('details');
         expect(details?.children[0]?.tagName).toBe('summary');
         expect(details?.children[1]?.classNames.has('crate-history-files')).toBe(true);
-        expect(container.collectText()).toContain('1 uploaded');
+        expect(container.collectText()).toContain('1 file uploaded');
         expect(container.collectText()).toContain('Inbox.md Reminders');
         expect(find(container, 'crate-history-type')).toBeUndefined();
         expect(find(container, 'crate-history-dot')).toBeUndefined();
@@ -63,7 +63,7 @@ describe('activity history', () => {
 
     it('spells out transfer and deletion counts', () => {
         const container = render({ downloaded: 2, deleted: 3 });
-        expect(container.collectText()).toContain('1 uploaded 2 downloaded 3 deleted');
+        expect(container.collectText()).toContain('1 uploaded · 2 downloaded · 3 deleted');
     });
 
     it('retains failure, conflict, and resolved-race information', () => {
@@ -73,7 +73,7 @@ describe('activity history', () => {
             resolvedRaces: [{ path: 'Draft.md', resolution: 'kept-local-edit' }],
         });
         expect(find(container, 'crate-history-entry')?.classNames.has('is-error')).toBe(true);
-        expect(container.collectText()).toContain('Failed (2 errors) 1 uploaded 1 conflict 1 race resolved');
+        expect(container.collectText()).toContain('Failed (2 errors) 1 uploaded · 1 conflict · 1 race resolved');
         expect(container.collectText()).toContain('Edit/delete race: kept local edit');
     });
 
@@ -91,4 +91,14 @@ it('does not expose saved timing diagnostics in history', () => {
   } });
   expect(element.collectText()).not.toContain('Timing details');
   expect(find(element, 'crate-history-details')).toBeUndefined();
+});
+
+it('renders a collapsed no-change row with its latest time', () => {
+    const container = new FakeElement('div');
+    const history = [14, 13, 12].map(hour => ({ ...entry, uploaded: 0, uploadedPaths: [],
+        timestamp: new Date(2026, 8, 19, hour, 15).toISOString() }));
+    renderHistoryPanel(container as unknown as HTMLElement, history);
+    expect(container.collectText()).toContain('No changes · 3 syncs');
+    expect(find(container, 'crate-history-time')?.collectText()).toBe('14:15');
+    expect(find(container, 'crate-history-details')).toBeUndefined();
 });
