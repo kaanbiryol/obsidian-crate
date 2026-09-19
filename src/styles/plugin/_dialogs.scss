@@ -191,6 +191,9 @@
 	box-sizing: border-box;
 	.modal-content { display: flex; flex-direction: column; height: 100%; max-height: none; overflow: hidden; }
 	.crate-modal-header-host { flex-shrink: 0; }
+	.reminder-modal-header { border-bottom: 0; }
+	.reminder-modal-header-title:focus { outline: none; }
+	.crate-modal-body { padding: 8px 24px 24px; }
 	&.is-mobile {
 		width: 100%;
 		max-width: none;

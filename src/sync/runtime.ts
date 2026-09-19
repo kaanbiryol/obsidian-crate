@@ -1,7 +1,6 @@
 import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
 import type { CrateServerInfo } from '../protocol';
 import { createConflictReview } from './conflict-review';
-import { loadPendingDiff } from './pending-diff';
 import type { SyncActivityProgress } from './types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
@@ -47,14 +46,6 @@ export class SyncRuntime {
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
-
-	async listCurrentSyncedFiles() {
-		const api = this.apiClient;
-		if (!api) throw new Error('Sync is not configured');
-		const manifest = await api.getManifest();
-		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
-		return manifest.files;
-	}
 
 	async loadCurrentSyncedPreview(path: string) {
 		const api = this.apiClient;
@@ -115,16 +106,16 @@ export class SyncRuntime {
 	}
 
 	async loadPendingDiff(path: string, deleted: boolean) {
-		const api = this.apiClient;
-		if (!api) throw new Error('Sync is not configured');
+		const engine = this.syncEngine;
+		if (!engine) throw new Error('Sync is not initialized');
 		const pendingPath = deleted ? `delete:${path}` : path;
 		const verify = () => {
-			if (api !== this.apiClient || this.getState().status === 'syncing' || !this.getPendingPaths().includes(pendingPath)) {
+			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !this.getPendingPaths().includes(pendingPath)) {
 				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
 			}
 		};
 		verify();
-		const preview = await loadPendingDiff(this.plugin.app.vault.adapter, api, path, deleted);
+		const preview = await engine.loadPendingDiff(path, deleted);
 		verify();
 		return preview;
 	}

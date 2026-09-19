@@ -88,7 +88,7 @@
     position: relative;
     padding: 0 12px 0 0;
     text-align: right;
-    border-right: 1px solid var(--crate-activity-divider-strong);
+    border-right: 0;
     font-size: var(--font-ui-smaller, 12px);
     line-height: 1.4;
     font-weight: 400;
@@ -215,7 +215,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 	display: flex;
 	margin: 0 0 16px;
 	padding-inline: var(--crate-activity-space-inline);
-	border-bottom: 1px solid var(--crate-activity-divider);
+	border-bottom: 0;
 }
 
 .crate-activity-tabs {
@@ -292,10 +292,9 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 16px;
-    padding: 0 4px;
-    border-radius: var(--radius-s, 4px);
-    background: var(--background-modifier-hover);
+    min-width: 0;
+    padding: 0;
+    background: transparent;
 	font-variant-numeric: tabular-nums;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
@@ -489,7 +488,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
     min-height: 44px;
     padding: 9px 10px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--crate-activity-radius-control);
     background: transparent;
     box-shadow: none;
 }
@@ -613,17 +612,17 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 }
 
 .crate-history-files {
-    margin: 0 10px 0 32px;
-    padding: 0 0 6px;
+    margin: 8px 10px 0 32px;
+    padding: 0 0 12px;
     border-top: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 6px;
 
     .crate-activity-file-card {
-        min-height: 34px;
-        padding: 2px 0;
-        gap: 6px;
+        min-height: 44px;
+        padding: 6px 0;
+        gap: 10px;
     }
 }
 
@@ -885,4 +884,10 @@ body.reduce-motion .crate-activity-modal {
     .crate-conflict-actions { padding: 12px 16px; }
 }
 
-.crate-history-details[open] > summary { padding-bottom: 3px; }
+.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action {
+    border-color: transparent !important;
+    background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary));
+    &:hover:enabled { background: var(--crate-activity-control-hover-bg); }
+}
+
+.crate-activity-subtitle[data-state='pending']::before { display: none; }

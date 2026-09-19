@@ -24,7 +24,6 @@ const { outputFiles } = await build({
  const currentFiles = Object.fromEntries([versions[0], versions[3], {...row,path:'Notes/New.md'}, {...row,path:'Notes/Trips/New.md'}, {...row,path:'Root.md'}].map(row => [row.path,{hash:row.hash,revision:'current',size:300,modified:'2026-09-19T15:00:00Z'}]));
  const runtime = {
   getSyncHistory: () => [{timestamp:'2026-09-19T16:00:00Z',type:'sync',success:true,uploaded:0,downloaded:1,merged:0,deleted:0,conflictCount:0,errorCount:0,downloadedPaths:['Reminders/Inbox.md']}],
-  listCurrentSyncedFiles: async () => currentFiles,
   loadCurrentSyncedPreview: async path => {
    if(!currentFiles[path]) throw new Error('This file is no longer on the server.');
    return {file:currentFiles[path],text:'# Current synced contents\\nThis is the server copy.'};
@@ -35,12 +34,13 @@ const { outputFiles } = await build({
    window.previewCalls.push(version.storage_key);
    if(window.delay) { window.delay=false; await new Promise(resolve => window.release=resolve); }
    if(window.fail) throw new Error('Offline');
+   if(window.timestampDiff) return {current:'Buy flowers 2026-09-19T14:23:00.000Z <!-- crate-id:long-internal-marker-123456789012345678901234567890 -->',saved:'Buy flowers 2026-09-19T14:21:00.000Z <!-- crate-id:long-internal-marker-123456789012345678901234567890 -->'};
    return {saved:'# Inbox\\n- [ ] Read the saved note <!-- crate-id:preview-123 -->\\n<script>not executed</script>',current:window.same ? '# Inbox\\n- [ ] Read the saved note <!-- crate-id:preview-123 -->\\n<script>not executed</script>' : '# Inbox\\n- [x] Read the current note'};
   },
   restoreRecentFileVersion: async version => {window.restores.push(version.storage_key);return {success:true,errors:[]};}
  };
  const localFiles=Object.keys(currentFiles).map(path=>({path,extension:'md',stat:{size:100,mtime:Date.now()}}));
- window.mount = () => openRemoteRecoveryModal({vault:{getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}},runtime);
+ window.mount = (path = 'Reminders/Inbox.md') => { document.querySelectorAll('.modal').forEach(el => el.remove()); openRemoteRecoveryModal({vault:{getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}},runtime,path); };
  ` },
  plugins: [{name:'obsidian',setup(builder) {
   builder.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'fixture'}));
@@ -48,7 +48,7 @@ const { outputFiles } = await build({
    export const Platform = { get isMobile() { return innerWidth < 700; } };
    export class Modal {
     constructor(app) {this.app=app;this.modalEl=document.createElement('div');this.modalEl.className='modal';this.contentEl=this.modalEl.createDiv({cls:'modal-content'});}
-    setTitle() {} open() {document.body.append(this.modalEl);this.onOpen();} close() {this.onClose();this.modalEl.remove();}
+    setTitle() {} open() {document.body.append(this.modalEl);this.onOpen();if(this.modalEl.classList.contains('crate-file-history-modal')) this.modalEl.querySelector('button')?.focus();} close() {this.onClose();this.modalEl.remove();}
    }
    export class Notice {constructor(message){window.notice=message;}}
    export function setIcon(el,name) {
@@ -82,27 +82,18 @@ for(const browserType of [chromium,webkit]) {
    *{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:14px system-ui;display:flex;align-items:center;justify-content:center;height:100vh}button,input{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button.mod-cta{background:var(--interactive-accent);color:white}.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}.modal.crate-confirmation-modal{position:fixed;z-index:10;box-shadow:0 0 0 200vmax #0008}.setting-item{display:flex}.setting-item-control{display:flex;gap:8px}
    </style><style>${css}</style>`);
    await page.addScriptTag({content:outputFiles[0].text});await page.evaluate(()=>window.mount());
+   await expect(page.locator('.reminder-modal-header-title')).toBeFocused();
+   await page.keyboard.press('Shift+Tab');
+   await expect(page.getByRole('button', {name:'Close dialog',exact:true})).toBeFocused();
+   await page.keyboard.press('Tab');
    const bounds = await page.locator('.crate-file-history-modal').boundingBox();
    assert.equal(bounds.width, width < 700 ? width : Math.min(940, width - 48));
    assert.equal(bounds.height, width < 700 ? 900 * 0.85 : 660);
-   const allFiles = async () => {
-    const back = page.getByRole('button',{name:'← Versions',exact:true});
-    if(await back.isVisible()) await back.click();
-    const all = page.getByRole('button',{name:'← All files',exact:true});
-    if(await all.isVisible()) await all.click();
-   };
-   const openInbox = async () => {
-    await allFiles();
-    const folder = page.getByRole('button',{name:'Reminders',exact:true});
-    if(await folder.getAttribute('aria-expanded')==='false') await folder.click();
-    await page.getByRole('button',{name:'Reminders/Inbox.md',exact:true}).click();
-    if(width<700) await page.getByRole('button',{name:'← Versions',exact:true}).click();
-   };
-   await expect(page.getByRole('button',{name:'History',exact:true})).toHaveCount(0);
-   await expect(page.getByRole('button',{name:'Files',exact:true})).toHaveCount(0);
-   await expect(page.getByRole('textbox',{name:'Search files or folders'})).toBeVisible();
-   await openInbox();
-   await expect(page.locator('.crate-history-version')).toHaveCount(2);
+   const openFile = async path => { await page.evaluate(path => window.mount(path), path); };
+   const openInbox = () => openFile('Reminders/Inbox.md');
+   await expect(page.getByRole('button',{name:'← All files',exact:true})).toHaveCount(0);
+   await expect(page.getByRole('textbox')).toHaveCount(0);
+   await expect(page.locator('.crate-history-version')).toHaveCount(3);
    await page.locator('[data-version-key=first]').focus();await page.keyboard.press('Enter');
    await expect(page.getByLabel('Changes from current local file to saved version')).toContainText('<script>not executed</script>');
    assert.equal(await page.locator('.crate-history-preview-output script').count(),0);
@@ -119,31 +110,8 @@ for(const browserType of [chromium,webkit]) {
    await page.getByRole('button',{name:'Restore this version',exact:true}).click();
    await page.getByRole('button',{name:'Restore',exact:true}).click();
    await expect.poll(()=>page.evaluate(()=>window.restores)).toEqual(['first']);
-   await allFiles();
-   const search = page.getByRole('textbox',{name:'Search files or folders'});
-   await expect(page.getByRole('button',{name:'Refresh files',exact:true})).toHaveCount(0);
-   await expect(page.getByRole('button',{name:'Notes',exact:true})).toHaveAttribute('aria-expanded','false');
-   await page.getByRole('button',{name:'Notes',exact:true}).click();
-   await expect(page.getByRole('button',{name:'Notes',exact:true})).toHaveAttribute('aria-expanded','true');
-   await expect(page.getByRole('button',{name:'Root.md',exact:true})).toBeVisible();
-   const folderRow = page.getByRole('button',{name:'Notes',exact:true});
-   await expect(folderRow).toHaveCSS('display','flex');
-   await expect(folderRow).toHaveCSS('justify-content','flex-start');
-   await expect(page.getByRole('button',{name:'Root.md',exact:true})).toHaveCSS('justify-content','flex-start');
-   assert.ok(await folderRow.evaluate(el => Math.abs(el.getBoundingClientRect().width - el.parentElement.clientWidth + 32) < 2));
-   await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-tree.png'});
-   await page.getByRole('button',{name:'Trips',exact:true}).focus(); await page.keyboard.press('Enter');
-   await expect(page.getByRole('button',{name:'Notes/Trips/New.md',exact:true})).toBeVisible();
-   await page.getByRole('button',{name:'Notes',exact:true}).click();
-   await expect(page.getByRole('button',{name:'Notes/Trips/New.md',exact:true})).toHaveCount(0);
-   await search.fill('New.md'); await search.press('Enter');
-   await expect(page.locator('.crate-history-file')).toHaveCount(2);
-   await expect(page.locator('.crate-history-file-folder')).toContainText(['Notes', 'Notes/Trips']);
-   await page.getByRole('button',{name:'Clear search',exact:true}).click();
-   await page.getByRole('button',{name:'Notes',exact:true}).click();
-   await expect(page.getByRole('button',{name:'Notes/Trips/New.md',exact:true})).toBeVisible();
-   await expect(page.getByRole('button',{name:'Archive/Deleted.md',exact:true})).toHaveCount(0);
-   await page.getByRole('button',{name:'Notes/New.md',exact:true}).click();
+   await openFile('Notes/New.md');
+   await page.getByRole('button',{name:'Current local file',exact:true}).click();
    await expect(page.getByLabel('Current local file contents')).toContainText('Local contents');
    await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toHaveCount(0);
    if(width<700) await page.getByRole('button',{name:'← Versions',exact:true}).click();
@@ -152,7 +120,7 @@ for(const browserType of [chromium,webkit]) {
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-files.png'});
    await openInbox();
    await page.evaluate(()=>window.fail=true);
-   await page.locator('.crate-history-version').first().click();
+   await page.locator('[data-version-key=first]').click();
    await expect(page.getByRole('alert')).toContainText('Offline');
    await page.evaluate(()=>window.fail=false);
    await page.getByRole('button',{name:'Retry preview',exact:true}).click();
@@ -164,8 +132,24 @@ for(const browserType of [chromium,webkit]) {
    await expect(page.getByLabel('Saved file contents')).not.toBeVisible();
    await page.getByText('View file contents',{exact:true}).click();
    await expect(page.getByLabel('Saved file contents')).toBeVisible();
+   await page.evaluate(()=>{ window.timestampDiff=true; window.same=false; });
+   await openInbox();
+   await page.locator('[data-version-key=first]').click();
+   const diff = page.getByLabel('Changes from current local file to saved version');
+   await expect(diff).toHaveCSS('white-space', 'pre');
+   await expect(diff.locator('.crate-history-diff-word')).toHaveText(['23', '21']);
+   await expect(diff.locator('.crate-history-internal-marker')).toHaveCount(2);
+   await expect(diff.locator('.crate-history-internal-marker').first()).toHaveCSS('opacity', '0.25');
+   await expect(page.locator('.crate-history-file-context h3')).toHaveText('Reminders/Inbox.md');
+   await expect(page.locator('.crate-history-list-pane h3')).toHaveCount(0);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   assert.ok(await diff.evaluate(el=>el.scrollWidth>el.clientWidth));
+   await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-timestamp.png'});
+   await openFile('Archive/Deleted.md');
+   await page.locator('[data-version-key=deleted]').click();
+   await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toBeVisible();
    assert.deepEqual(errors,[]);await page.close();
   }
  } finally {await browser.close();}
 }
-console.log('File history: Chromium and WebKit, desktop/mobile, light/dark, history, current files, keyboard, previews, folder search, retry and confirmed restore passed.');
+console.log('File history: Chromium and WebKit, desktop/mobile, light/dark, history, current files, keyboard, previews, deleted files, retry and confirmed restore passed.');

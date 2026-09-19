@@ -22,40 +22,29 @@ const button = (text: string) => {
 	const native = MockModal.instances.flatMap(modal => descendants(modal.contentEl)).filter(el => el.tagName === 'button' && (el.textContent === text || el.getAttribute('aria-label') === text || (!el.textContent && el.collectText().includes(text))) && clicks.has(el)).at(-1);
 	return native ? { click: () => clicks.get(native)!() } : MockSetting.instances.flatMap(setting => setting.buttons).filter(item => item.buttonEl.textContent === text).at(-1)!;
 };
-const submitSearch = () => MockSetting.instances[0]!.texts[0]!.inputEl.dispatchEvent('keydown', { key: 'Enter', preventDefault() {} } as unknown as Event);
 const row = { path: 'older.md', hash: 'a'.repeat(64), storage_key: 'retained', size: 10, created_at: '2026-09-09', expires_at: Date.now() + 300_000, reason: 'deleted' as const };
-async function open(listRecentFileVersions = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockResolvedValue({ versions: [row], hasMore: false }), pending: RemoteFileVersion[] = [], initialPath?: string) {
+async function open(listRecentFileVersions = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockResolvedValue({ versions: [row], hasMore: false }), pending: RemoteFileVersion[] = [], initialPath = 'new.md') {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: false } }));
 	const { openRemoteRecoveryModal } = await import('./remote-recovery-modal');
-	const runtime = { getSyncHistory: () => [{ timestamp: '2026-09-19T16:00:00Z', type: 'sync', success: true, uploaded: 0, downloaded: 1, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, downloadedPaths: ['older.md'] }], listCurrentSyncedFiles: vi.fn().mockResolvedValue({ 'new.md': { hash: 'a'.repeat(64), revision: 'current', size: 12, modified: '2026-09-19' } }), loadCurrentSyncedPreview: vi.fn().mockResolvedValue({ file: { hash: 'a'.repeat(64), revision: 'current', size: 12, modified: '2026-09-19' }, text: 'synced contents' }), loadFileHistoryPreview: vi.fn().mockResolvedValue({ saved: 'saved text', current: 'local text' }), getPendingRestores: vi.fn().mockReturnValue(pending), listRecentFileVersions, restoreRecentFileVersion: vi.fn().mockResolvedValue({ success: true, errors: [] }) };
+	const runtime = { getSyncHistory: () => [{ timestamp: '2026-09-19T16:00:00Z', type: 'sync', success: true, uploaded: 0, downloaded: 1, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, downloadedPaths: ['older.md'] }], loadCurrentSyncedPreview: vi.fn().mockResolvedValue({ file: { hash: 'a'.repeat(64), revision: 'current', size: 12, modified: '2026-09-19' }, text: 'synced contents' }), loadFileHistoryPreview: vi.fn().mockResolvedValue({ saved: 'saved text', current: 'local text' }), getPendingRestores: vi.fn().mockReturnValue(pending), listRecentFileVersions, restoreRecentFileVersion: vi.fn().mockResolvedValue({ success: true, errors: [] }) };
 	const file = { path: 'new.md', extension: 'md', stat: { size: 12, mtime: 1 } };
 	openRemoteRecoveryModal({ vault: { getFiles: () => [file], getFileByPath: (path: string) => path === file.path ? file : null, cachedRead: async () => 'local contents' } } as never, runtime as never, initialPath);
 	return { runtime, modal: MockModal.instances[0]! };
 }
 
-it('opens the vault browser without duplicate tabs', async () => {
+it('opens versions directly without a vault browser', async () => {
  const { runtime, modal } = await open();
- expect(modal.contentEl.collectText()).toContain('1 vault file');
- expect(button('History')).toBeUndefined(); expect(button('Files')).toBeUndefined();
- expect(runtime.listRecentFileVersions).not.toHaveBeenCalled();
+ await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('local contents'));
+ expect(button('← All files')).toBeUndefined();
+ expect(MockSetting.instances.flatMap(setting => setting.texts)).toHaveLength(0);
+ expect(runtime.loadCurrentSyncedPreview).not.toHaveBeenCalled();
+ expect(runtime.listRecentFileVersions).toHaveBeenCalledWith({ path: 'new.md', cursor: undefined });
 });
-it('opens a file directly from Sync Activity', async () => {
+it('opens a deleted file directly from Sync Activity', async () => {
  const { runtime } = await open(undefined, [], 'older.md');
  await vi.waitFor(() => expect(runtime.listRecentFileVersions).toHaveBeenCalledWith({ path: 'older.md', cursor: undefined }));
- expect(button('← All files')).toBeDefined();
-});
-it('lists local-only files without fetching a remote inventory and previews local contents', async () => {
- const { runtime, modal } = await open();
- expect(runtime.listCurrentSyncedFiles).not.toHaveBeenCalled();
- expect(modal.contentEl.collectText()).toContain('1 vault file');
- button('new.md').click();
- await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('local contents'));
- expect(runtime.loadCurrentSyncedPreview).not.toHaveBeenCalled();
-});
-it('searches the local file list', async () => {
- const { modal } = await open();
- MockSetting.instances[0]!.texts[0]!.change('missing'); submitSearch();
- expect(modal.contentEl.collectText()).toContain('No vault files match this search.');
+ expect(button('← All files')).toBeUndefined();
+ expect(runtime.loadCurrentSyncedPreview).toHaveBeenCalledWith('older.md');
 });
 it('loads older versions for the selected file and confirms restore before mutation', async () => {
  const list = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>()
@@ -71,18 +60,8 @@ it('loads older versions for the selected file and confirms restore before mutat
  expect(runtime.restoreRecentFileVersion).not.toHaveBeenCalled(); button('Restore').click();
  await vi.waitFor(() => expect(runtime.restoreRecentFileVersion).toHaveBeenCalledWith(expect.objectContaining({ storage_key: 'oldest' })));
 });
-it('ignores a delayed file timeline after returning to Files', async () => {
- let finish!: (value: FileVersionsPage) => void;
- const list = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>(() => new Promise(resolve => { finish = resolve; }));
- const { modal } = await open(list, [], 'older.md'); button('← All files').click();
- finish({ versions: [row], hasMore: false });
- await Promise.resolve();
- expect(modal.contentEl.collectText()).toContain('1 vault file');
- expect(descendants(modal.contentEl).some(el => el.getAttribute('data-version-key') === row.storage_key)).toBe(false);
-});
-it('keeps vault files usable when saved history cannot be loaded', async () => {
+it('keeps the current file usable when saved history cannot be loaded', async () => {
  const { modal } = await open(vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockRejectedValue(new Error('Offline')));
- button('new.md').click();
  await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('Offline'));
  expect(modal.contentEl.collectText()).toContain('local contents');
  expect(button('Retry versions')).toBeDefined();

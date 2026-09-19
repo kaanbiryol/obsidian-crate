@@ -27,7 +27,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
     if (!actions) heading.createSpan({ text: 'Files' });
     const list = sidebar.createEl('nav', { cls: 'crate-browser-files', attr: { 'aria-label': 'Pending files' } });
-    const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes include files in sync. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Touched files stay here until sync.' });
+    const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose files for Sync selected. Sync all includes every pending file. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Touched files stay here until sync.' });
     listHint.id = `crate-pending-hint-${++nextBrowserId}`;
     list.setAttribute('aria-describedby', listHint.id);
 
@@ -49,7 +49,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     const empty = preview.createDiv({ cls: 'crate-browser-empty' });
     setIcon(empty.createSpan({ cls: 'crate-browser-empty-icon', attr: { 'aria-hidden': 'true' } }), 'file-diff');
     empty.createDiv({ text: 'Select a file', cls: 'crate-browser-empty-title' });
-    empty.createDiv({ text: 'Compare the server copy with this device.' });
+    empty.createDiv({ text: 'Compare this device’s changes with its last-synced copy.' });
 
     let requestRevision = 0;
     let selectedIndex = -1;
@@ -192,6 +192,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 
 function describeSnapshot(snapshot: PendingDiff): string {
     if (snapshot.unchanged) return 'Unchanged';
+    if (snapshot.baselineUnavailable) return snapshot.kind === 'deleted' ? 'Deleted' : 'Modified';
     if (snapshot.unavailable || snapshot.before === undefined || snapshot.after === undefined) return 'No preview';
     if (snapshot.kind === 'added') return 'Added';
     if (snapshot.kind === 'deleted') return 'Deleted';

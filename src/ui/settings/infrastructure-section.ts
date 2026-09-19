@@ -5,7 +5,6 @@ import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
 import type { InfrastructureSectionContext } from './infrastructure-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { renderTroubleshootingSettings } from './troubleshooting-section';
-import { openRemoteRecoveryModal } from '../remote-recovery-modal';
 import { Setting } from 'obsidian';
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
@@ -13,13 +12,19 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	const recoverySection = createSettingsDisclosure(containerEl, 'Recovery and troubleshooting');
 	if (context.isConfigured) {
 		const recoveryEl = createSettingsDisclosure(recoverySection, 'File history');
-		new Setting(recoveryEl)
-			.setName('Browse file history')
-			.setDesc('Previous versions and deleted files are kept for 30 days.')
-			.addButton(button => button
-				.setButtonText('Open file history')
-				.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
-
+		const history = new Setting(recoveryEl)
+			.setName('File history')
+			.setDesc('Previous versions are kept for 30 days. Open a file’s context menu and select ');
+		history.descEl.createEl('strong', { text: 'File history' });
+		history.descEl.appendText(', or use ');
+		history.descEl.createEl('strong', { text: 'Show file history' });
+		history.descEl.appendText(' for the active file. For deleted files, use ');
+		history.descEl.createEl('strong', { text: 'Sync activity' });
+		history.descEl.appendText(' → ');
+		history.descEl.createEl('strong', { text: 'History' });
+		history.descEl.appendText(' → ');
+		history.descEl.createEl('strong', { text: 'File history' });
+		history.descEl.appendText('.');
 
 	}
 	const troubleshootingEl = createSettingsDisclosure(recoverySection, 'Troubleshooting');
