@@ -10,6 +10,12 @@ export function VersionSettings() {
 	const [asset, setAsset] = useState<string | null>(null);
 	const [checking, setChecking] = useState(true);
 	const [copyStatus, setCopyStatus] = useState('');
+	const [showDiagnostics, setShowDiagnostics] = useState(false);
+	const diagnostics = JSON.stringify({
+		format: 'crate-version-diagnostics', webAppRevision: release.revision, webAppBuild: PWA_ASSET_VERSION,
+		serverRevision: server?.serverRevision ?? null, serverBuild: asset,
+		serverFingerprint: server?.deploymentFingerprint ?? null,
+	}, null, 2);
 	useEffect(() => {
 		let active = true;
 		const controller = new AbortController();
@@ -36,17 +42,18 @@ export function VersionSettings() {
 					? 'This web app matches the server build.' : 'This web app differs from the server build. An update may be waiting to load.'
 					: 'Build comparison unavailable while the server cannot be reached.'}</span>
 			</div></div>
-			<div className="settings-row"><div className="settings-row__copy"><span role="status">{copyStatus || 'Version details for troubleshooting.'}</span></div>
+			<div className="settings-row settings-row--diagnostics"><div className="settings-row__copy"><span role="status">{copyStatus || 'Version details for troubleshooting.'}</span></div>
 				<PwaButton className="settings-action-button" type="button" onClick={async () => {
 					try {
-					await navigator.clipboard.writeText(JSON.stringify({
-						format: 'crate-version-diagnostics', webAppRevision: release.revision, webAppBuild: PWA_ASSET_VERSION,
-						serverRevision: server?.serverRevision ?? null, serverBuild: asset,
-						serverFingerprint: server?.deploymentFingerprint ?? null,
-					}, null, 2));
-					setCopyStatus('Version details copied.');
-					} catch { setCopyStatus('Could not copy version details.'); }
+						await navigator.clipboard.writeText(diagnostics);
+						setShowDiagnostics(false);
+						setCopyStatus('Version details copied.');
+					} catch {
+						setShowDiagnostics(true);
+						setCopyStatus('Select and copy the version details below.');
+					}
 				}}>Copy diagnostics</PwaButton>
+				{showDiagnostics && <textarea className="settings-diagnostics-text" aria-label="Version diagnostics" readOnly value={diagnostics} onFocus={event => event.currentTarget.select()} />}
 			</div>
 		</div>
 	</section>;

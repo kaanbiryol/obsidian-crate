@@ -16,6 +16,8 @@ async function checkNavigation(page, inset) {
 			bar: bounds('.bottom-tab-bar'),
 			items: bounds('.bottom-tab-items'),
 			fab: bounds('.reminders-fab'),
+			selection: bounds('.bottom-tab-slider'),
+			activeContent: bounds('.bottom-tab-button.is-active .bottom-tab-content'),
 			buttons: [...document.querySelectorAll('[data-action="switch-tab"]')].map(button => button.getBoundingClientRect().toJSON()),
 		};
 	});
@@ -27,6 +29,8 @@ async function checkNavigation(page, inset) {
 		assert.ok(button.bottom <= height - inset + 1, 'entire tab touch target stays outside the safe area');
 		assert.ok(button.height >= 44, 'tab retains its touch target');
 	}
+	assert.ok(geometry.selection.height >= 56, 'selected background covers the icon and label with padding');
+	assert.ok(Math.abs((geometry.selection.left + geometry.selection.width / 2) - (geometry.activeContent.left + geometry.activeContent.width / 2)) < 1, 'selected background is centered on its tab');
 	assert.ok(geometry.fab.bottom <= geometry.bar.top - 15, 'add button clears the tab bar');
 }
 
@@ -86,6 +90,23 @@ try {
 				await page.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
 				await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
 				await checkNavigation(page, standalone ? 34 : 0);
+				await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+				const copyButton = page.getByRole('button', { name: 'Copy diagnostics', exact: true });
+				await expect(copyButton).toBeVisible();
+				assert.ok(await copyButton.evaluate(button => button.scrollWidth <= button.clientWidth), 'diagnostics label fits inside its button');
+				await page.evaluate(() => {
+					Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+						writeText: async text => { window.copiedDiagnostics = text; },
+					} });
+				});
+				await copyButton.tap();
+				await expect(page.getByRole('status').filter({ hasText: 'Version details copied.' })).toBeVisible();
+				assert.equal(await page.evaluate(() => JSON.parse(window.copiedDiagnostics).format), 'crate-version-diagnostics');
+				await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard denied'); }; });
+				await copyButton.tap();
+				const fallback = page.getByRole('textbox', { name: 'Version diagnostics', exact: true });
+				await expect(fallback).toBeVisible();
+				assert.equal(JSON.parse(await fallback.inputValue()).format, 'crate-version-diagnostics');
 				await page.close();
 			}
 			console.log(`${browserType.name()}: navigation safe areas, standalone viewport, rotation, and sheet dismissal passed`);
