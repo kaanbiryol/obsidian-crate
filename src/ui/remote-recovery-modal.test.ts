@@ -23,12 +23,12 @@ const button = (text: string) => {
 	return native ? { click: () => clicks.get(native)!() } : MockSetting.instances.flatMap(setting => setting.buttons).filter(item => item.buttonEl.textContent === text).at(-1)!;
 };
 const row = { path: 'older.md', hash: 'a'.repeat(64), storage_key: 'retained', size: 10, created_at: '2026-09-09', expires_at: Date.now() + 300_000, reason: 'deleted' as const };
-async function open(listRecentFileVersions = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockResolvedValue({ versions: [row], hasMore: false }), pending: RemoteFileVersion[] = [], initialPath = 'new.md') {
+async function open(listRecentFileVersions = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockResolvedValue({ versions: [row], hasMore: false }), pending: RemoteFileVersion[] = [], initialPath = 'new.md', onBack?: () => void) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: false } }));
 	const { openRemoteRecoveryModal } = await import('./remote-recovery-modal');
 	const runtime = { getSyncHistory: () => [{ timestamp: '2026-09-19T16:00:00Z', type: 'sync', success: true, uploaded: 0, downloaded: 1, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, downloadedPaths: ['older.md'] }], loadCurrentSyncedPreview: vi.fn().mockResolvedValue({ file: { hash: 'a'.repeat(64), revision: 'current', size: 12, modified: '2026-09-19' }, text: 'synced contents' }), loadFileHistoryPreview: vi.fn().mockResolvedValue({ saved: 'saved text', current: 'local text' }), getPendingRestores: vi.fn().mockReturnValue(pending), listRecentFileVersions, restoreRecentFileVersion: vi.fn().mockResolvedValue({ success: true, errors: [] }) };
 	const file = { path: 'new.md', extension: 'md', stat: { size: 12, mtime: 1 } };
-	openRemoteRecoveryModal({ vault: { getFiles: () => [file], getFileByPath: (path: string) => path === file.path ? file : null, cachedRead: async () => 'local contents' } } as never, runtime as never, initialPath);
+	openRemoteRecoveryModal({ vault: { getFiles: () => [file], getFileByPath: (path: string) => path === file.path ? file : null, cachedRead: async () => 'local contents' } } as never, runtime as never, initialPath, onBack);
 	return { runtime, modal: MockModal.instances[0]! };
 }
 
@@ -36,9 +36,18 @@ it('opens versions directly without a vault browser', async () => {
  const { runtime, modal } = await open();
  await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('local contents'));
  expect(button('← All files')).toBeUndefined();
+ expect(button('← Sync activity')).toBeUndefined();
  expect(MockSetting.instances.flatMap(setting => setting.texts)).toHaveLength(0);
  expect(runtime.loadCurrentSyncedPreview).not.toHaveBeenCalled();
  expect(runtime.listRecentFileVersions).toHaveBeenCalledWith({ path: 'new.md', cursor: undefined });
+});
+it('returns to Sync activity only when opened with a back destination', async () => {
+ const onBack = vi.fn();
+ const { modal } = await open(undefined, [], 'older.md', onBack);
+ const close = vi.spyOn(modal, 'close');
+ button('← Sync activity').click();
+ expect(close).toHaveBeenCalledOnce();
+ expect(onBack).toHaveBeenCalledOnce();
 });
 it('opens a deleted file directly from Sync Activity', async () => {
  const { runtime } = await open(undefined, [], 'older.md');

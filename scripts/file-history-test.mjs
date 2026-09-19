@@ -20,7 +20,7 @@ const { outputFiles } = await build({
  HTMLElement.prototype.empty = function() { this.replaceChildren(); };
  const row = { path:'Reminders/Inbox.md', hash:'a'.repeat(64), storage_key:'first', size:212, created_at:'2026-09-19T11:59:42Z', expires_at:9999999999999, reason:'replaced' };
  window.restores = []; window.previewCalls = []; window.fail = false; window.delay = false;
- const versions = [row, {...row, storage_key:'second', created_at:'2026-09-18T18:42:00Z'}, {...row, path:'Archive/Deleted.md',storage_key:'deleted',reason:'deleted'}, {...row,path:'Notes/A very long file name that should wrap without overflowing the file history pane.md',storage_key:'long'}];
+ const versions = [row, {...row, storage_key:'second', created_at:'2026-09-19T11:59:07Z'}, {...row, path:'Archive/Deleted.md',storage_key:'deleted',reason:'deleted'}, {...row,path:'Notes/A very long file name that should wrap without overflowing the file history pane.md',storage_key:'long'}];
  const currentFiles = Object.fromEntries([versions[0], versions[3], {...row,path:'Notes/New.md'}, {...row,path:'Notes/Trips/New.md'}, {...row,path:'Root.md'}].map(row => [row.path,{hash:row.hash,revision:'current',size:300,modified:'2026-09-19T15:00:00Z'}]));
  const runtime = {
   getSyncHistory: () => [{timestamp:'2026-09-19T16:00:00Z',type:'sync',success:true,uploaded:0,downloaded:1,merged:0,deleted:0,conflictCount:0,errorCount:0,downloadedPaths:['Reminders/Inbox.md']}],
@@ -94,6 +94,8 @@ for(const browserType of [chromium,webkit]) {
    await expect(page.getByRole('button',{name:'← All files',exact:true})).toHaveCount(0);
    await expect(page.getByRole('textbox')).toHaveCount(0);
    await expect(page.locator('.crate-history-version')).toHaveCount(3);
+   await expect(page.locator('[data-version-key=first]')).toContainText(':59:42');
+   await expect(page.locator('[data-version-key=second]')).toContainText(':59:07');
    await page.locator('[data-version-key=first]').focus();await page.keyboard.press('Enter');
    await expect(page.getByLabel('Changes from current local file to saved version')).toContainText('<script>not executed</script>');
    assert.equal(await page.locator('.crate-history-preview-output script').count(),0);
@@ -136,14 +138,17 @@ for(const browserType of [chromium,webkit]) {
    await openInbox();
    await page.locator('[data-version-key=first]').click();
    const diff = page.getByLabel('Changes from current local file to saved version');
-   await expect(diff).toHaveCSS('white-space', 'pre');
-   await expect(diff.locator('.crate-history-diff-word')).toHaveText(['23', '21']);
+   await expect(diff.locator('.crate-diff-text').first()).toHaveCSS('white-space', 'pre');
+   await expect(diff.locator('.crate-diff-word')).toHaveText(['23', '21']);
    await expect(diff.locator('.crate-history-internal-marker')).toHaveCount(2);
    await expect(diff.locator('.crate-history-internal-marker').first()).toHaveCSS('opacity', '0.25');
    await expect(page.locator('.crate-history-file-context h3')).toHaveText('Reminders/Inbox.md');
    await expect(page.locator('.crate-history-list-pane h3')).toHaveCount(0);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.ok(await diff.evaluate(el=>el.scrollWidth>el.clientWidth));
+   await expect(diff.locator('.crate-diff-number')).toHaveCount(4);
+   await expect(diff.locator('.crate-diff-line.is-removed')).toHaveCount(1);
+   await expect(diff.locator('.crate-diff-line.is-added')).toHaveCount(1);
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-timestamp.png'});
    await openFile('Archive/Deleted.md');
    await page.locator('[data-version-key=deleted]').click();

@@ -268,7 +268,10 @@ export class ActivityModal extends BaseUiModal {
 			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
 		} : undefined;
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? [], historyRuntime ? path => {
-			this.close(); openRemoteRecoveryModal(this.app, historyRuntime, path);
+			this.close();
+			openRemoteRecoveryModal(this.app, historyRuntime, path, () => {
+				new ActivityModal(this.app, this.settings, this.deps, 'history').open();
+			});
 		} : undefined);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));
