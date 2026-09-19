@@ -1,3 +1,5 @@
+import { BottomTabBar } from '@/reminders/components/BottomTabBar';
+import type { TabId } from '@/reminders/ui/layoutConstants';
 import { LoaderCircle, TriangleAlert } from 'lucide-react';
 import type { ThemeIconProps } from '@/reminders/components/theme-icon';
 import React, { useRef, useState } from 'react';
@@ -60,6 +62,7 @@ function SourceNoticeFixture() {
 
 function Gallery() {
   const [result, setResult] = useState('Ready');
+  const [activeTab, setActiveTab] = useState<TabId>('today');
   const [project, setProject] = useState('Work');
   const [title, setTitle] = useState('Review the shared reminder controls');
   const [description, setDescription] = useState('A longer description that wraps on a narrow screen. Check typography, spacing, and the circular completion controls.');
@@ -69,7 +72,8 @@ function Gallery() {
   const richRef = useRef<RichTextInputHandle>(null);
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
-  if (scene === 'lexical') content = <LexicalTrial />;
+  if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} /></div>;
+  else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture />;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
