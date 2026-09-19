@@ -91,7 +91,7 @@ may sync when the vault is reopened.
 
 Keep reusable sample changes in `fixtures/test-vault/`. Only Markdown demo notes
 belong there; do not copy `.obsidian/`, credentials, caches, or personal content
-from a working vault. The screenshot baseline includes Today and Home dashboards,
+from a working vault. The screenshot baseline includes Today, Upcoming, and Home dashboards,
 linked launch, travel, and reading notes, and nine reminder projects. Reminder
 dates are anchored to September 18, 2026; refresh them before taking screenshots
 on another day. Nested projects, recurrence, descriptions, priorities, and
