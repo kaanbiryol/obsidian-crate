@@ -221,23 +221,26 @@
 }
 
 .bottom-tab-slider-track {
-    inset: 6px 8px;
-    column-gap: 16px;
+    inset: 8px 0;
 }
 
 .bottom-tab-slider {
-    border: 1px solid var(--crate-divider);
-    border-radius: var(--nav-item-radius, var(--radius-m, 11px));
+    margin: 4px 8px;
+    border: 0;
+    border-radius: 14px;
     background: var(--crate-tab-active-bg);
     box-shadow: none;
 }
 
 .bottom-tab-button {
-    color: var(--text-faint);
+    --icon-l: 27px;
+    --icon-l-stroke-width: 2px;
+    padding: 8.5px 4px;
+    color: var(--text-muted);
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 
     &.is-active {
-        color: var(--crate-tab-active-color, var(--interactive-accent));
+        color: var(--crate-tab-active-color);
     }
 }
 
@@ -263,9 +266,9 @@
 }
 
 .bottom-tab-label {
-    font-size: var(--reminder-font-xxs);
+    font-size: var(--font-ui-smaller, 12px);
     font-weight: var(--reminder-font-weight-semibold);
-    line-height: 13px;
+    line-height: 16px;
     letter-spacing: normal;
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }

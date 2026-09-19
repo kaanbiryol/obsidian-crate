@@ -45,6 +45,11 @@
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 
+	&.pwa-shadow-root {
+		--crate-tab-active-color: var(--text-accent, var(--interactive-accent));
+		--crate-tab-active-bg: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+	}
+
 	.reminders-empty-state-icon,
 	.reminders-view.is-primary .reminders-empty-state-icon {
 		background: transparent;
