@@ -8,7 +8,7 @@ async function render(configured = true, resetting = false, deployed = false) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment: start }));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal: confirm }));
-	const { renderServerResetSetting } = await import('./server-reset-setting');
+	const { renderServerRepairSetting } = await import('./server-repair-setting');
 	const plugin = {
 		app: {},
 		settings: { cloudflareDeployment: {
@@ -20,7 +20,7 @@ async function render(configured = true, resetting = false, deployed = false) {
 		} },
 		syncRuntime: { isConfigured: () => configured },
 	};
-	renderServerResetSetting(new FakeElement('div') as never, plugin as never);
+	renderServerRepairSetting(new FakeElement('div') as never, plugin as never);
 	return plugin;
 }
 
@@ -32,37 +32,10 @@ afterEach(() => {
 	vi.doUnmock('../confirmation-modal');
 });
 
-describe('server reset settings', () => {
-	it('shows the exact target and consequences before starting reset authorization', async () => {
-		const plugin = await render();
-		confirm.mockResolvedValue(true);
-		MockSetting.instances[0]!.buttons[0]!.click();
-		await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'reset'));
-		const options = confirm.mock.calls[0]![1];
-		expect(options.warning).toBe(true);
-		expect(options.details.join(' ')).toContain(plugin.settings.cloudflareDeployment.d1DatabaseId);
-		expect(options.details.join(' ')).toContain(plugin.settings.cloudflareDeployment.accountId);
-		expect(options.details.join(' ')).toContain('recovery history');
-		expect(options.details.join(' ')).toContain('local files are kept');
-	});
-
-	it('does nothing when confirmation is cancelled', async () => {
+describe('server maintenance settings', () => {
+	it('does not offer rebuild for a connected server', async () => {
 		await render();
-		confirm.mockResolvedValue(false);
-		MockSetting.instances[0]!.buttons[0]!.click();
-		await Promise.resolve();
-		expect(start).not.toHaveBeenCalled();
-	});
-
-	it('refuses a target changed while confirmation is open', async () => {
-		const plugin = await render();
-		confirm.mockImplementation(async () => {
-			plugin.settings.cloudflareDeployment.d1DatabaseId = 'different-database';
-			return true;
-		});
-		MockSetting.instances[0]!.buttons[0]!.click();
-		await Promise.resolve();
-		expect(start).not.toHaveBeenCalled();
+		expect(MockSetting.instances).toHaveLength(0);
 	});
 
 	it('hides server actions for a disconnected device with a completed deployment', async () => {
@@ -78,12 +51,10 @@ describe('server reset settings', () => {
 		expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'update');
 		expect(confirm).not.toHaveBeenCalled();
 	});
-	it('offers a confirmed resume instead of a repair action while cleanup is pending', async () => {
-		const plugin = await render(false, true);
-		confirm.mockResolvedValue(true);
-		expect(MockSetting.instances.some(item => item.nameEl.textContent === 'Repair server')).toBe(false);
-		MockSetting.instances[0]!.buttons[0]!.click();
-		await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'reset'));
+	it('preserves legacy recovery guidance without offering rebuild', async () => {
+		await render(false, true);
+		expect(MockSetting.instances[0]!.nameEl.textContent).toBe('Interrupted server cleanup');
+		expect(MockSetting.instances[0]!.buttons).toHaveLength(0);
 	});
 
 	it('requires confirmation of exact resources for delete-only authorization', async () => {
@@ -91,11 +62,25 @@ describe('server reset settings', () => {
 		const { renderServerDeleteSetting } = await import('./server-delete-setting');
 		renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
 		confirm.mockResolvedValue(true);
-		const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server')!;
+		const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server and all data')!;
 		setting.buttons[0]!.click();
 		await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'delete'));
-		expect(confirm.mock.calls[0]![1].details.join(' ')).toContain('Nothing is rebuilt');
+		expect(confirm.mock.calls[0]![1].details.join(' ')).toContain('Your local vault files are kept');
 		expect(confirm.mock.calls[0]![1].details.join(' ')).toContain(plugin.settings.cloudflareDeployment.d1DatabaseId);
 	});
 
+});
+
+
+it.each(['cancel', 'changed target'])('does not delete after %s', async reason => {
+	const plugin = await render();
+	const { renderServerDeleteSetting } = await import('./server-delete-setting');
+	renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
+	confirm.mockImplementation(async () => {
+		if (reason === 'changed target') plugin.settings.cloudflareDeployment.d1DatabaseId = 'other';
+		return reason !== 'cancel';
+	});
+	MockSetting.instances[0]!.buttons[0]!.click();
+	await Promise.resolve();
+	expect(start).not.toHaveBeenCalled();
 });

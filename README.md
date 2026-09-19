@@ -284,9 +284,9 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 - [Worker API](docs/worker-api.md)
 - [Testing](docs/testing.md)
 
-## Resetting a Crate server
+## Deleting a Crate server
 
-**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Rebuild server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and valid Cloudflare authorization, reusing the saved login when available, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server rebuild** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
+**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes the server and its remote files, history, and reminders for all devices. Local vault files are kept. To start over, delete the server, select **Connect with Cloudflare**, create a new server, then select **Crate: Sync now**. See [server deletion and recovery](docs/deployment.md#delete-a-crate-server).
 
 ## License
 

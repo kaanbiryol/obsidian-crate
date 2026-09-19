@@ -1,5 +1,5 @@
 import { renderServerDeleteSetting } from './server-delete-setting';
-import { renderServerResetSetting } from './server-reset-setting';
+import { renderServerRepairSetting } from './server-repair-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
 import type { InfrastructureSectionContext } from './infrastructure-types';
@@ -25,7 +25,7 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	const troubleshootingEl = createSettingsDisclosure(recoverySection, 'Troubleshooting');
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);
-	renderServerResetSetting(troubleshootingEl, plugin);
+	renderServerRepairSetting(troubleshootingEl, plugin);
 	if (context.isConfigured || plugin.settings.cloudflareDeployment?.d1DatabaseId) {
 		const advancedEl = createSettingsDisclosure(containerEl, 'Advanced server actions');
 		if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });

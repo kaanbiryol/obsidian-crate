@@ -8,6 +8,7 @@ export interface ConfirmationModalOptions {
 	confirmText: string;
 	cancelText?: string;
 	warning?: boolean;
+	checkbox?: { label: string; onChange: (checked: boolean) => void };
 }
 
 class ConfirmationModal extends SharedModal {
@@ -44,6 +45,12 @@ class ConfirmationModal extends SharedModal {
 			for (const detail of details) {
 				detailList.createEl('li', { text: detail });
 			}
+		}
+
+		if (this.options.checkbox) {
+			const checkbox = this.options.checkbox;
+			new Setting(contentEl).setName(checkbox.label)
+				.addToggle(toggle => toggle.setValue(false).onChange(checkbox.onChange));
 		}
 
 		new Setting(contentEl)

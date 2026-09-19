@@ -64,3 +64,21 @@ describe('openConfirmationModal', () => {
 		await expect(resultPromise).resolves.toBe(false);
 	});
 });
+
+
+it('starts the optional forget switch unchecked and reports changes without confirming', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openConfirmationModal } = await import('./confirmation-modal');
+	const onChange = vi.fn();
+	const result = openConfirmationModal({} as never, {
+		title: 'Disconnect this device', message: 'Stop sync here?', confirmText: 'Disconnect this device',
+		checkbox: { label: 'Also forget the saved server connection', onChange },
+	});
+	const option = MockSetting.instances[0]!;
+	expect(option.toggles[0]!.value).toBe(false);
+	expect(onChange).not.toHaveBeenCalled();
+	option.toggles[0]!.change(true);
+	expect(onChange).toHaveBeenCalledWith(true);
+	MockSetting.instances[1]!.buttons[0]!.click();
+	await expect(result).resolves.toBe(false);
+});

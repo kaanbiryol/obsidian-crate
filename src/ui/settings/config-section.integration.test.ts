@@ -1,3 +1,4 @@
+import type { ConfirmationModalOptions } from '../confirmation-modal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	FakeElement,
@@ -104,7 +105,7 @@ describe('renderConfigSection integration', () => {
 		const rerender = vi.fn();
 		openConfirmationModal.mockResolvedValue(confirmed);
 		renderForgetServerSetting({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
-		getSettingByName('Forget server').buttons[0]!.click();
+		getSettingByName('Forget saved connection').buttons[0]!.click();
 		if (confirmed) {
 			await vi.waitFor(() => expect(rerender).toHaveBeenCalledOnce());
 			expect(plugin.settings.cloudflareDeployment).toBeNull();
@@ -241,4 +242,47 @@ it('lets an older server save its vault name through an explicit update', async 
 	expect(setting.buttons[0]?.buttonEl.textContent).toBe('Save vault name');
 	setting.buttons[0]?.click();
 	expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin, 'update');
+});
+
+
+it.each([false, true])('disconnects with optional forgetting (%s)', async forget => {
+	const { renderAccountSection } = await loadConfigSectionModule();
+	const saved = { accountId: 'account', d1DatabaseId: 'database' };
+	const plugin = {
+		app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
+		cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
+		clearSettingsUiState: vi.fn(),
+		syncRuntime: { isConfigured: () => true, clearSyncConfiguration: vi.fn(async () => {}) },
+		writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
+	};
+	openConfirmationModal.mockImplementation(async (_app: unknown, options: ConfirmationModalOptions) => {
+		expect(options.checkbox!.label).toBe('Also forget the saved server connection');
+		if (forget) options.checkbox!.onChange(true);
+		return true;
+	});
+	const rerender = vi.fn();
+	renderAccountSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
+	getSettingByName('account').buttons[0]!.click();
+	await vi.waitFor(() => expect(rerender).toHaveBeenCalledOnce());
+	expect(plugin.syncRuntime.clearSyncConfiguration).toHaveBeenCalledOnce();
+	expect(plugin.settings.cloudflareDeployment).toBe(forget ? null : saved);
+	expect(plugin.cloudflareDeploymentService.cancelPendingDeployment).toHaveBeenCalledTimes(forget ? 1 : 0);
+});
+
+it('does not forget or disconnect when the dialog is cancelled after choosing forget', async () => {
+	const { renderAccountSection } = await loadConfigSectionModule();
+	const plugin = {
+		app: {}, settings: { cloudflareDeployment: { accountId: 'account' } },
+		clearSettingsUiState: vi.fn(), writeSettings: vi.fn(),
+		syncRuntime: { isConfigured: () => true, clearSyncConfiguration: vi.fn() },
+	};
+	openConfirmationModal.mockImplementation(async (_app: unknown, options: ConfirmationModalOptions) => {
+		options.checkbox!.onChange(true);
+		return false;
+	});
+	renderAccountSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	getSettingByName('account').buttons[0]!.click();
+	await flushMicrotasks();
+	expect(plugin.syncRuntime.clearSyncConfiguration).not.toHaveBeenCalled();
+	expect(plugin.writeSettings).not.toHaveBeenCalled();
 });

@@ -177,19 +177,18 @@ async function runCloudflareOperation(
 		if (isDelete) {
 			plugin.refreshSettingsTab();
 			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
-				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server'} to check and continue.`],
+				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'} to check and continue.`],
 				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } });
 			return;
 		}
 		if (isReset) {
 			plugin.refreshSettingsTab();
-			const resetAction = plugin.settings.cloudflareDeployment?.reset ? 'Resume server rebuild' : 'Rebuild server';
 			progress.fail(
 				'Server rebuild failed',
 				'Crate couldn’t finish rebuilding your Cloudflare server.',
 				[deploymentErrorMessage(error).startsWith('Reset blocked:')
 					? 'Review the technical details below. The reported issue must be resolved before rebuilding this server.'
-					: `In Crate settings → Recovery and troubleshooting → Troubleshooting, select “${resetAction}” to try again.`],
+					: 'This rebuild was started by an earlier Crate version. Complete recovery using that version before changing this connection. Keep this vault’s saved settings.'],
 				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
 			);
 			return;
@@ -209,7 +208,7 @@ async function runCloudflareOperation(
 
 	if (deployment.deleted) {
 		plugin.refreshSettingsTab();
-		progress.succeed('Crate server deleted', 'This server’s Worker and remote data have been removed. Your local vault files are kept.');
+		progress.succeed('Crate server deleted', 'This server and its remote data have been removed. Your local vault files are kept. To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync now.');
 		return;
 	}
 

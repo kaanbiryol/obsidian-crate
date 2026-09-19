@@ -168,7 +168,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(progress.fail).toHaveBeenCalledWith(
 			'Server rebuild failed',
 			'Crate couldn’t finish rebuilding your Cloudflare server.',
-			[expect.stringContaining(resumable ? 'Resume server rebuild' : 'Rebuild server')],
+			[expect.stringContaining('Complete recovery using that version')],
 			expect.objectContaining({ technicalDetails: 'Namespace listing incomplete' }),
 		);
 		const options = progress.fail.mock.calls[0]![3] as { action: { onClick: () => void } };

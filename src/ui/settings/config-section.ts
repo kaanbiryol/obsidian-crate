@@ -88,20 +88,34 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 				.setButtonText('Disconnect this device')
 				.setDestructive()
 				.onClick(async () => {
+					let forgetConnection = false;
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Disconnect this device',
 						message: 'Disconnect this device from its Crate server?',
-						details: ['Sync stops on this device. Your saved server and Cloudflare login are kept for reconnecting. Cloudflare resources and synced data are not deleted.'],
-						confirmText: 'Disconnect device',
+						details: ['Sync stops on this device. Local files, server data, and your Cloudflare login are kept. Other devices stay connected. Your saved server connection is kept unless you choose to forget it.'],
+						checkbox: deployment && !deployment.reset ? {
+							label: 'Also forget the saved server connection',
+							onChange: checked => { forgetConnection = checked; },
+						} : undefined,
+						confirmText: 'Disconnect this device',
 						warning: true,
 					});
 					if (!confirmed) {
 						return;
 					}
-					plugin.clearSettingsUiState();
-					await plugin.syncRuntime.clearSyncConfiguration();
-					new Notice('This device was disconnected');
-					rerender();
+					button.setDisabled(true);
+					try {
+						if (forgetConnection) plugin.cloudflareDeploymentService.cancelPendingDeployment();
+						plugin.clearSettingsUiState();
+						await plugin.syncRuntime.clearSyncConfiguration();
+						if (forgetConnection) await plugin.writeSettings({ cloudflareDeployment: null });
+						new Notice('This device was disconnected');
+						rerender();
+					} catch {
+						new Notice('Could not finish disconnecting. Wait for any Cloudflare operation to finish and try again.');
+					} finally {
+						button.setDisabled(false);
+					}
 				}));
 	}
 }
