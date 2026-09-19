@@ -23,6 +23,7 @@ describe('authenticated route scopes', () => {
 		const principal = { tokenId: 'pwa-token', scope: 'reminders' } as const;
 		expect(isAuthenticatedRouteAllowed(principal, '/sync/manifest', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/sync/download', 'GET')).toBe(false);
+		expect(isAuthenticatedRouteAllowed(principal, '/sync/version-preview', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/settings', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/tokens', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/test', 'POST')).toBe(false);

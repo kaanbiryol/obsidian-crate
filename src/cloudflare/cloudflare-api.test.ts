@@ -103,6 +103,7 @@ describe('CloudflareApiClient', () => {
 		const multipart = buildWorkerMultipartBody({
 			publicOrigin: 'https://worker.test',
 			vaultName: 'Notes',
+			uploadTag: 'crate-12345678-1234-1234-1234-123456789012',
 			artifacts,
 			d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef',
 			r2BucketName: 'crate-0123456789abcdef',
@@ -118,7 +119,7 @@ describe('CloudflareApiClient', () => {
 		expect(body).not.toContain('"name":"SETUP"');
 		expect(body).not.toContain('SetupCoordinator');
 		expect(body).toContain('"storage":"sqlite","state":"created"');
-		expect(body).toContain('"workers/tag":"crate"');
+		expect(body).toContain('"workers/tag":"crate-12345678-1234-1234-1234-123456789012"');
 		expect(body).toContain(`"workers/message":"Crate 0.1.0 ${'f'.repeat(64)}"`);
 		expect(body).toContain(artifacts.workerBundle);
 	});

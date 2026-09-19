@@ -23,13 +23,16 @@ function plugin(status: 'blocked' | 'recovered') {
         },
     };
 }
-it('offers diagnostics without retrying an uncertain update', async () => {
-    vi.stubGlobal('navigator', { clipboard: { writeText: mocks.copy } });
-    await checkAndRecoverUpdate(plugin('blocked') as never);
-    const options = mocks.modal.fail.mock.calls[0]?.[3] as { action: { label: string; onClick(): void } };
-    expect(options.action.label).toBe('Copy diagnostics');
+it('offers a fresh check and cancel without asking users to attest upload safety', async () => {
+    const instance = plugin('blocked');
+    await checkAndRecoverUpdate(instance as never);
+    const options = mocks.modal.fail.mock.calls[0]?.[3] as { dismissLabel: string; technicalDetails: string; action: { label: string; onClick(): void } };
+    expect(options.dismissLabel).toBe('Cancel');
+    expect(options.technicalDetails).toBe('{"step":"upload-worker"}');
+    expect(options.action.label).toBe('Check again');
     options.action.onClick();
-    expect(mocks.copy).toHaveBeenCalledWith('{"step":"upload-worker"}');
+    await vi.waitFor(() => expect(instance.cloudflareDeploymentService.recoverUpdate).toHaveBeenCalledTimes(2));
+    expect(instance.cloudflareDeploymentService.recoverUpdate).toHaveBeenLastCalledWith(expect.any(Function));
     expect(mocks.start).not.toHaveBeenCalled();
 });
 it('offers an explicit update after successful recovery', async () => {

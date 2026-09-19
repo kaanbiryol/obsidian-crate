@@ -3,6 +3,7 @@
 @use "plugin-ui/theme" as plugin-theme;
 @use "plugin-ui/reminder-editor";
 @use "plugin-ui/modal";
+@use "plugin-ui/recovery";
 @use "plugin-ui/settings-alignment";
 @source "../**/*.{ts,tsx,js,jsx}";
 @source not "../**/*.test.ts";
@@ -15,6 +16,7 @@
   @include plugin-theme.styles;
   @include reminder-editor.styles;
   @include modal.styles;
+  @include recovery.styles;
 }
 
 @include settings-alignment.styles;

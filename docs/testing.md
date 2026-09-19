@@ -265,6 +265,10 @@ const context = {
 
 `npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.
 
+## File history browser checks
+
+Run `npm run build && npm run test:file-history-browser` for the production file-history renderer in Chromium and WebKit, at desktop/mobile widths in light and dark themes. The harness covers chronological history, current synced files with no earlier versions, desktop/mobile navigation, keyboard selection, Enter-to-search and clearing, compact no-difference previews, saved text escaping, local comparisons, deletion filtering, preview retry, and restore confirmation/cancellation. Screenshots are written to `.generated/file-history/`. Obsidian supplies the real modal focus shell; verify native focus/dismissal and physical-device navigation separately.
+
 ## Pasted links and page titles
 
 Run `npm run test:page-titles` for the production build, lookup/transport unit tests,

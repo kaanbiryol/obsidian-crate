@@ -14,11 +14,11 @@ export function showCloudflareServerUpdateNotice(plugin: CratePlugin): void {
 	}
 
 	const fragment = new DocumentFragment();
-	fragment.createSpan({ text: 'A Crate server update is available. ' });
+	fragment.createSpan({ text: 'Review your Crate server update. ' });
 	const link = fragment.createEl('a', { text: 'Open settings' });
 	link.addEventListener('click', () => {
 		plugin.openSettingsTab();
 	});
-	fragment.createSpan({ text: ' to update the Worker and web app.' });
+	fragment.createSpan({ text: ' to update or verify the Worker and web app.' });
 	new Notice(fragment, 15000);
 }

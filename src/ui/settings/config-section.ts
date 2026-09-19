@@ -1,6 +1,6 @@
 import { renderVersionSettings, renderUpdateVersions } from './version-settings';
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
-import { Notice, Setting } from 'obsidian';
+import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
@@ -39,14 +39,24 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
     if (!plugin.syncRuntime.isConfigured() || !deployment
         || !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
 
+    let needsVerification = false;
+    let updateButton: ButtonComponent;
     const update = new Setting(containerEl)
         .setName('Cloudflare update available')
         .setDesc('Update your sync server and reminders web app to the version included with this Crate plugin.')
-        .addButton(button => button
-            .setButtonText('Update server')
-            .setCta()
-            .onClick(() => { void startCloudflareDeployment(plugin); }));
-    renderUpdateVersions(update, plugin);
+        .addButton(button => {
+            updateButton = button;
+            button.setButtonText('Update server').setCta().onClick(() => {
+                if (needsVerification) void checkAndRecoverUpdate(plugin);
+                else void startCloudflareDeployment(plugin);
+            });
+        });
+    renderUpdateVersions(update, plugin, () => {
+        needsVerification = true;
+        update.setName('Verify server update')
+            .setDesc('The live server matches this plugin, but the saved update has not been confirmed. Check its status and recover any interrupted update.');
+        updateButton.setButtonText('Check and recover update');
+    });
 }
 
 export function renderServerSection(context: ConfigSectionContext): void {

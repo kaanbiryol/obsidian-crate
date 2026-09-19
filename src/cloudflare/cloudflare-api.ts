@@ -111,6 +111,7 @@ function concatBytes(parts: Uint8Array[]): ArrayBuffer {
 export function buildWorkerMultipartBody(input: {
 	publicOrigin: string;
 	vaultName?: string;
+	uploadTag?: string;
 	artifacts: CloudflareDeploymentArtifacts;
 	d1DatabaseId: string;
 	r2BucketName: string;
@@ -120,7 +121,7 @@ export function buildWorkerMultipartBody(input: {
 		compatibility_date: '2026-08-18',
 		annotations: {
 			'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}`,
-			'workers/tag': 'crate',
+			'workers/tag': input.uploadTag ?? 'crate',
 		},
 		bindings: [
 				...(normalizeVaultName(input.vaultName) ? [{ type: 'plain_text', name: VAULT_NAME_BINDING, text: normalizeVaultName(input.vaultName) }] : []),
@@ -346,6 +347,7 @@ export class CloudflareApiClient {
 	async uploadWorker(input: {
 		publicOrigin: string;
 		vaultName?: string;
+		uploadTag?: string;
 		accountId: string;
 		workerName: string;
 		artifacts: CloudflareDeploymentArtifacts;

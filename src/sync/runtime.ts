@@ -1,3 +1,4 @@
+import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
 import type { CrateServerInfo } from '../protocol';
 import { createConflictReview } from './conflict-review';
 import { loadPendingDiff } from './pending-diff';
@@ -46,6 +47,30 @@ export class SyncRuntime {
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async listCurrentSyncedFiles() {
+		const api = this.apiClient;
+		if (!api) throw new Error('Sync is not configured');
+		const manifest = await api.getManifest();
+		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
+		return manifest.files;
+	}
+
+	async loadCurrentSyncedPreview(path: string) {
+		const api = this.apiClient;
+		if (!api) throw new Error('Sync is not configured');
+		const preview = await loadCurrentSyncedPreview(api, path);
+		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
+		return preview;
+	}
+
+	async loadFileHistoryPreview(version: RemoteFileVersion) {
+		const api = this.apiClient;
+		if (!api) throw new Error('Sync is not configured');
+		const preview = await loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version);
+		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
+		return preview;
+	}
 
 	async listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
 		if (!this.apiClient) throw new Error('Sync is not configured');

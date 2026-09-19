@@ -165,7 +165,7 @@ The conditional release cannot erase a replacement owner, but it cannot fence an
 - If the browser handoff fails, select **Open Obsidian** on the callback page.
 - If OAuth expires, return to Crate settings and start again. Authorization state and PKCE material are intentionally not recoverable after plugin reload.
 - **Disconnect this device** clears the Worker URL and device secret but retains the non-secret deployment identity, allowing a later Cloudflare sign-in to reuse the same Worker. It never deletes Cloudflare resources.
-- Replaced and deleted sync objects remain recoverable for 30 days under **Settings → Crate → Infrastructure → Restore remote file**. Recovery verifies the retained bytes and refuses to overwrite a remote path that changed after the recovery screen was opened.
+- Replaced and deleted sync objects remain recoverable for 30 days under **Settings → Crate → Recovery and troubleshooting → File history**. Recovery verifies the retained bytes and refuses to overwrite a remote path that changed after the recovery screen was opened.
 - **Run diagnostics** reports manifest access, pending backend queues, and the last scheduled-maintenance result. Use it after a server upgrade and before relying on a newly seeded vault.
 - To destroy the server and synced data, explicitly delete its Worker, R2 bucket, D1 database, and Durable Object resources in the Cloudflare dashboard.
 
@@ -215,7 +215,9 @@ When address activation is confirmed and the live Worker matches the saved updat
 
 An unconfirmed address activation has a narrow recovery path: Crate reads Cloudflare's Worker subdomain settings and requires `enabled: true` and `previews_enabled: false` before taking ownership, then rechecks them and verifies the published build and database. Protocol 1 always requests those exact flags, so a delayed repeat cannot upload old code or alter vault data. The previous updater cannot advance after the ownership comparison changes. Recovery sends no activation request. Ordinary updates also read these settings and skip activation when they already match.
 
-Other unconfirmed requests, older operation records, reset/deletion, mismatched servers, and ownership changes remain blocked. The dialog explains the result and offers **Copy diagnostics**. These diagnostics contain server identifiers, build fingerprints, operation identifiers and step metadata, but no credentials or vault contents. They help support inspect the provider outcome; they do not prove an unconfirmed request has stopped.
+New uploads carry a unique request tag in both the saved checkpoint and Cloudflare's version metadata. If the upload succeeded but its response was lost, **Check and recover update** matches that tag, build and storage, confirms the exact checkpoint conditionally, and resumes verification inside Crate. It keeps sync locked until verification finishes; no dashboard action is needed for this case. Each upload dispatch must have a fresh tag and must not be retried by the transport.
+
+Other unconfirmed requests, older uploads without a unique tag, reset/deletion, mismatched servers, and ownership changes remain blocked. The dialog explains the result and offers **Copy diagnostics**. These diagnostics contain server identifiers, build fingerprints, operation identifiers and step metadata, but no credentials or vault contents. They help support inspect the provider outcome; they do not prove an unconfirmed request has stopped.
 
 Reminder folder changes save locally with a server-bound pending update before any
 network request. Startup, reconnect, foreground sync and periodic checks retry it.

@@ -124,6 +124,7 @@ body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { anim
 .crate-activity-subtitle[data-state='attention']::before { background: var(--text-warning); }
 
 .crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action,
+.crate-reminders-ui .crate-file-history .crate-history-restore.reminder-modal-header-action,
 .crate-reminders-ui .crate-activity-modal button.crate-activity-action,
 .modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
 .crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,

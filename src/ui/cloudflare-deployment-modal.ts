@@ -15,6 +15,7 @@ type DeploymentProgressState = 'working' | 'success' | 'error';
 export type CloudflareDeploymentMode = 'setup' | 'update';
 
 interface FailureOptions {
+	dismissLabel?: string;
 	technicalDetails?: string;
 	action?: { label: string; onClick: () => void };
 }
@@ -175,7 +176,7 @@ export class CloudflareDeploymentModal extends Modal {
 		const footer = this.content.state === 'working' ? undefined : createElement('div', { className: 'crate-status-actions' },
 			createElement(Button, {
 				onClick: () => this.close(),
-				children: this.content.state === 'success' ? 'Done' : 'Close',
+				children: this.content.dismissLabel ?? (this.content.state === 'success' ? 'Done' : 'Close'),
 			}),
 			action && createElement(Button, {
 				className: 'mod-cta',

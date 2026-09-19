@@ -28,6 +28,12 @@ A failed check keeps writers fenced. **Check and recover update** resumes a conf
 
 Acquiring or taking over the fence atomically records a confirmed acquisition checkpoint. Closing the app or losing the response immediately afterward remains recoverable, including repeated interruptions during recovery. The next provider mutation must first conditionally advance that exact ownership record; recovering a paused acquisition prevents the old owner from dispatching it.
 
+When recovery cannot establish a safe checkpoint, the app offers **Check again** to perform a fresh check and **Cancel** to close the result. Diagnostics stay in the technical details disclosure. It does not ask users to attest provider quiescence or settle an uncertain upload through a checkbox; unresolved legacy operations retain the operator recovery workflow below.
+
+New Worker uploads store a fresh random `uploadTag` in the durable checkpoint before dispatch, and send it as Cloudflare's `workers/tag` version annotation. Each tag is used for one request only; the transport must never retry that upload. **Check and recover update** can acknowledge a lost response when the live Worker has that exact tag, version, fingerprint, and original storage bindings. It conditionally changes only the inspected checkpoint to confirmed, retains the fence, and resumes the exact artifact through normal verification. A concurrent ownership change stops recovery. A crash during acknowledgment is recoverable on the next check.
+
+A matching fingerprint without the unique tag is not sufficient. Legacy uploads, mismatched tags, unpublished requests, and a different installed artifact remain blocked. Hosted acceptance must test a published upload with a lost client response and verify that the live settings return its tag before distributing this flow. Cloudflare documents these [version annotations](https://developers.cloudflare.com/workers/configuration/multipart-upload-metadata/).
+
 A timed-out provider request remains uncertain. Do not infer completion from elapsed time or from a matching annotation. After an operator has stopped old deployment clients and established that all in-flight requests have settled, `scripts/crate-deployment-fence.py settle ... --confirm-quiescent` marks only the inspected owner as settled while retaining the fence. Then use **Check and recover update**. The script refuses to release an update that still needs verification.
 
 ## Adding the first real migration

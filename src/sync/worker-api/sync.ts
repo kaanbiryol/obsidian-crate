@@ -1,3 +1,5 @@
+import { computeHash } from '../hasher';
+import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { BATCH_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
@@ -263,6 +265,15 @@ export class SyncWorkerApi {
 			method: 'POST',
 			body: JSON.stringify({ files }),
 		});
+	}
+
+	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
+		const params = new URLSearchParams({ path: version.path, storageKey: version.storage_key });
+		const { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
+		if (body.byteLength > 256_000 || body.byteLength !== version.size || await computeHash(body) !== version.hash) {
+			throw new Error('Saved version failed integrity validation.');
+		}
+		return body;
 	}
 
 	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {

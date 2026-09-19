@@ -1,3 +1,4 @@
+import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
 import { BaseUiModal } from './shared/BaseUiModal';
 import { getPendingFileActions } from './activity/file-actions';
 import type { PendingDiscardReview } from '../sync/pending-discard';
@@ -17,7 +18,7 @@ import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
 
-export interface ActivityModalDeps {
+export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
 	loadPendingDiff?: PendingDiffLoader;
     syncSelected?(keys: string[]): Promise<unknown>;
     createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
@@ -260,7 +261,15 @@ export class ActivityModal extends BaseUiModal {
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
 			.map((entry) => entry.getAttribute('data-history-key')));
 		this.historyPanel.empty();
-		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
+		const deps = this.deps;
+		const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.listCurrentSyncedFiles && deps.loadCurrentSyncedPreview ? {
+			listCurrentSyncedFiles: deps.listCurrentSyncedFiles.bind(deps), loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
+			listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
+			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
+		} : undefined;
+		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? [], historyRuntime ? path => {
+			this.close(); openRemoteRecoveryModal(this.app, historyRuntime, path);
+		} : undefined);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));
 		});

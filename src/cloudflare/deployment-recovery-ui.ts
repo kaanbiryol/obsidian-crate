@@ -23,16 +23,10 @@ export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> 
         if (signal.aborted) return;
         plugin.refreshSettingsTab();
         if (result.status === 'blocked') {
-            progress.fail('Server update needs review', result.message, [
-                'If another device is updating this server, let it finish and check again.',
-                'If the operation was interrupted, share these diagnostics with whoever supports your Crate server.',
-            ], {
+            progress.fail(result.title ?? 'Could not recover update yet', result.message, undefined, {
                 technicalDetails: result.diagnostics,
-                action: { label: 'Copy diagnostics', onClick: () => {
-                    void navigator.clipboard.writeText(result.diagnostics)
-                        .then(() => { new Notice('Recovery diagnostics copied'); })
-                        .catch(() => { new Notice('Could not copy diagnostics. Select the technical details and copy them manually.'); });
-                } },
+                dismissLabel: 'Cancel',
+                action: { label: 'Check again', onClick: () => { void checkAndRecoverUpdate(plugin); } },
             });
         } else if (result.status === 'completed') {
             progress.succeed('Server updated', result.message);
