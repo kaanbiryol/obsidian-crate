@@ -83,8 +83,11 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
       editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
         if (editor.isComposing() || tags.has('external-value') || (!dirtyElements.size && !dirtyLeaves.size && !tags.has(COMPOSITION_END_TAG))) return;
         const { text, offsets } = editorState.read(() => ({ text: $readReminder(), offsets: $selectionOffsets(true) }));
-        if (text !== latest.current.value) latest.current.onChange(text);
-        const query = offsets ? extractHashtagQuery(text, offsets.focus) : null;
+        const textChanged = text !== latest.current.value;
+        if (textChanged) latest.current.onChange(text);
+        // Focus and chip/link decoration can dirty nodes without editing text.
+        // Only an edit should start project suggestions for an existing hashtag.
+        const query = textChanged && offsets ? extractHashtagQuery(text, offsets.focus) : null;
         latest.current.onAutocompleteQuery?.(query?.query ?? null, query ? getEditorSelectionRange(element)?.getBoundingClientRect() ?? null : null);
       }),
     );
