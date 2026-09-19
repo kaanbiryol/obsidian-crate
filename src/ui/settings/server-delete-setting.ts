@@ -8,12 +8,12 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
     if (!saved?.accountId || !saved.d1DatabaseId || (saved.reset && !saved.reset.deleteOnly)) return;
     const snapshot = JSON.stringify(saved);
     const deployment = JSON.parse(snapshot) as typeof saved;
-    const label = deployment.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server';
+    const label = deployment.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data';
     new Setting(containerEl)
-        .setName('Delete server')
+        .setName('Delete server and all data')
         .setDesc(deployment.reset?.deleteOnly
             ? 'Check the interrupted deletion and continue removing this server. Local vault files are kept.'
-            : 'Permanently remove this Crate server and all its remote data without rebuilding. Local vault files are kept.')
+            : 'Permanently delete the server and its remote data for all devices. Local vault files are kept.')
         .addButton(button => button.setButtonText(label).setDestructive().onClick(async () => {
             button.setDisabled(true);
             try {
@@ -26,10 +26,11 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
                         `Database: ${deployment.d1DatabaseName} (${deployment.d1DatabaseId})`,
                         `File bucket: ${deployment.r2BucketName}`,
                         'The Worker, web app, remote files, retained versions, recovery history, database, reminders, device registrations, and push subscriptions will be removed.',
-                        'Nothing is rebuilt. All devices lose access to this server. Your local files are kept.',
+                        'All devices lose access to this server. Your local vault files are kept. Deleted server data cannot be recovered.',
+                        'To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync now.',
                         'Other Crate deployments and unrelated Cloudflare resources are kept.',
                     ],
-                    confirmText: 'Delete server',
+                    confirmText: 'Delete server and all data',
                     warning: true,
                 });
                 if (!confirmed) return;

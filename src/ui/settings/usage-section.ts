@@ -16,7 +16,7 @@ export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin
 	const reconnect = new Setting(connectionContainer ?? container)
 		.setName('Cloudflare connection')
 		.setDesc('Sign in again to restore Cloudflare access. Saved usage stays visible.')
-		.addButton(button => button.setButtonText('Reconnect Cloudflare')
+		.addButton(button => button.setButtonText('Sign in to Cloudflare again')
 			.setDisabled(!isCloudflareOAuthConfigured()).onClick(async () => {
 				try {
 					await connection.connect();
