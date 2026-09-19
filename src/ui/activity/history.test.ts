@@ -28,12 +28,12 @@ function find(element: FakeElement, className: string): FakeElement | undefined 
 
 describe('activity history', () => {
     it('keeps a sync summary and its files in one native disclosure', () => {
-        const container = render();
+        const container = render({ uploaded: 2, uploadedPaths: ['Reminders/Inbox.md', 'Notes/Plan.md'] });
         const details = find(container, 'crate-history-details');
         expect(details?.tagName).toBe('details');
         expect(details?.children[0]?.tagName).toBe('summary');
         expect(details?.children[1]?.classNames.has('crate-history-files')).toBe(true);
-        expect(container.collectText()).toContain('1 file uploaded');
+        expect(container.collectText()).toContain('Uploaded 2 files');
         expect(container.collectText()).toContain('Inbox.md Reminders');
         expect(find(container, 'crate-history-type')).toBeUndefined();
         expect(find(container, 'crate-history-dot')).toBeUndefined();
@@ -42,7 +42,7 @@ describe('activity history', () => {
     it('shows plugin uploads and their configuration folder paths', () => {
         const uploadedPaths = Array.from({ length: 53 }, (_, index) => `.obsidian/plugins/plugin-${index}/data.json`);
         const container = render({ uploaded: 53, uploadedPaths });
-        expect(container.collectText()).toContain('53 uploaded');
+        expect(container.collectText()).toContain('Uploaded 53 files');
         expect(container.collectText()).not.toContain('No changes');
         for (const path of uploadedPaths) {
             expect(container.collectText()).toContain(`data.json ${path.slice(0, path.lastIndexOf('/'))}`);
@@ -63,7 +63,7 @@ describe('activity history', () => {
 
     it('spells out transfer and deletion counts', () => {
         const container = render({ downloaded: 2, deleted: 3 });
-        expect(container.collectText()).toContain('1 uploaded · 2 downloaded · 3 deleted');
+        expect(container.collectText()).toContain('Uploaded 1 · Downloaded 2 · Deleted 3');
     });
 
     it('retains failure, conflict, and resolved-race information', () => {
@@ -73,7 +73,7 @@ describe('activity history', () => {
             resolvedRaces: [{ path: 'Draft.md', resolution: 'kept-local-edit' }],
         });
         expect(find(container, 'crate-history-entry')?.classNames.has('is-error')).toBe(true);
-        expect(container.collectText()).toContain('Failed (2 errors) 1 uploaded · 1 conflict · 1 race resolved');
+        expect(container.collectText()).toContain('Failed (2 errors) Uploaded 1 · 1 conflict · 1 race resolved');
         expect(container.collectText()).toContain('Edit/delete race: kept local edit');
     });
 
@@ -101,4 +101,17 @@ it('renders a collapsed no-change row with its latest time', () => {
     expect(container.collectText()).toContain('No changes · 3 checks');
     expect(find(container, 'crate-history-time')?.collectText()).toBe('14:15');
     expect(find(container, 'crate-history-details')).toBeUndefined();
+});
+
+it('keeps single-file successes expandable with a summary and file row', () => {
+    const container = render();
+    expect(container.collectText()).toContain('Uploaded 1 file');
+    expect(container.collectText()).toContain('Inbox.md Reminders');
+    expect(find(container, 'crate-history-details')).toBeDefined();
+    expect(find(container, 'crate-history-files')).toBeDefined();
+});
+it('keeps single-file failures expandable', () => {
+    const container = render({ success: false, errorCount: 1, errors: ['Failed to finish'] });
+    expect(find(container, 'crate-history-details')).toBeDefined();
+    expect(container.collectText()).toContain('Failed to finish');
 });

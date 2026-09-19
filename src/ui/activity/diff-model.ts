@@ -1,10 +1,11 @@
-import { diffArrays } from 'diff';
+import { diffArrays, diffWordsWithSpace } from 'diff';
 
 export interface DiffLine {
     kind: 'context' | 'added' | 'removed';
     text: string;
     before?: number;
     after?: number;
+    words?: Array<{ text: string; changed: boolean }>;
 }
 
 export function buildDiff(before: string, after: string) {
@@ -27,6 +28,24 @@ export function buildDiff(before: string, after: string) {
             } else {
                 lines.push({ kind: 'context', text, before: ++oldLine, after: ++newLine });
             }
+        }
+    }
+    const wordDeadline = Date.now() + 30;
+    // Pair adjacent replacement lines; keep standalone additions/deletions intact.
+    for (let i = 0; i < lines.length;) {
+        if (lines[i]!.kind !== 'removed') { i++; continue; }
+        const start = i;
+        while (lines[i]?.kind === 'removed') i++;
+        const split = i;
+        while (lines[i]?.kind === 'added') i++;
+        for (let j = 0; j < Math.min(split - start, i - split); j++) {
+            if (Date.now() >= wordDeadline) break;
+            const old = lines[start + j]!, next = lines[split + j]!;
+            if (old.text.length + next.text.length > 10_000) continue;
+            const words = diffWordsWithSpace(old.text, next.text, { maxEditLength: 500, timeout: 10 });
+            if (!words) continue;
+            old.words = words.filter(word => !word.added).map(word => ({ text: word.value, changed: !!word.removed }));
+            next.words = words.filter(word => !word.removed).map(word => ({ text: word.value, changed: !!word.added }));
         }
     }
     return { lines, added, removed, limited: false };

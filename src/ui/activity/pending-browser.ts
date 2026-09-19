@@ -26,7 +26,6 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     const sidebar = browser.createDiv({ cls: 'crate-browser-sidebar' });
     const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
     if (!actions) heading.createSpan({ text: 'Files' });
-    heading.createSpan({ text: String(paths.length), cls: 'crate-browser-count' });
     const list = sidebar.createEl('nav', { cls: 'crate-browser-files', attr: { 'aria-label': 'Pending files' } });
     const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes include files in sync. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Touched files stay here until sync.' });
     listHint.id = `crate-pending-hint-${++nextBrowserId}`;
@@ -121,7 +120,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
             row.status.textContent = 'Unavailable';
             const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
             message.createSpan({ text: error instanceof Error ? error.message : 'Could not load changes.' });
-            const retry = message.createEl('button', { text: 'Try again', attr: { type: 'button' } });
+            const retry = message.createEl('button', { text: 'Try again', cls: 'crate-activity-action', attr: { type: 'button' } });
             retry.addEventListener('click', () => { void select(index, false); });
         } finally {
             if (browser.isConnected && revision === requestRevision) {

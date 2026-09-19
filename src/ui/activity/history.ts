@@ -117,8 +117,11 @@ function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, coun
     for (const [index, metric] of metrics.entries()) {
         if (index > 0) summary.createSpan({ text: '·', cls: 'crate-history-separator', attr: { 'aria-hidden': 'true' } });
         const stat = summary.createSpan({ cls: 'crate-history-stat' });
+        const transfer = ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label);
+        if (transfer) stat.createSpan({ text: metric.label[0]!.toUpperCase() + metric.label.slice(1) });
         stat.createSpan({ text: metric.count.toLocaleString(), cls: 'crate-history-count' });
-        stat.createSpan({ text: metrics.length === 1 && metric.count === 1 && ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label) ? `file ${metric.label}` : metric.label });
+        if (transfer && metrics.length === 1) stat.createSpan({ text: metric.count === 1 ? 'file' : 'files' });
+        if (!transfer) stat.createSpan({ text: metric.label });
     }
     if (entry.success && metrics.length === 0) {
         summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} checks` : 'No changes', cls: 'crate-history-unchanged' });

@@ -43,18 +43,18 @@
 .crate-diff-line {
     display: grid;
     grid-template-columns: 3.5ch 3.5ch 2.5ch minmax(0, 1fr);
-    padding: 0 12px 0 6px;
+    padding: 0 12px 0 0;
     border-left: 2px solid transparent;
     font-family: var(--font-monospace);
     font-size: 12px;
-    line-height: 1.85;
-    &.is-added { background: color-mix(in srgb, var(--crate-diff-added) 9%, transparent); border-left-color: var(--crate-diff-added); }
-    &.is-removed { background: color-mix(in srgb, var(--crate-diff-removed) 9%, transparent); border-left-color: var(--crate-diff-removed); }
+    line-height: 1.6;
+    &.is-added { background: color-mix(in srgb, var(--crate-diff-added) 5.5%, transparent); border-left-color: var(--crate-diff-added); }
+    &.is-removed { background: color-mix(in srgb, var(--crate-diff-removed) 5.5%, transparent); border-left-color: var(--crate-diff-removed); }
     &.is-added .crate-diff-sign { color: var(--crate-diff-added); }
     &.is-removed .crate-diff-sign { color: var(--crate-diff-removed); }
     .crate-diff-text {
         display: block;
-        padding: 0;
+        padding: 0 0 0 8px;
         border: 0;
         background: transparent;
         color: var(--text-normal);
@@ -65,7 +65,7 @@
     }
 }
 .crate-diff-number, .crate-diff-sign { color: var(--text-faint); text-align: center; user-select: none; }
-.crate-diff-number { font-size: 11px; font-variant-numeric: tabular-nums; }
+.crate-diff-number { font-size: 10px; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--background-primary) 94%, black); color: color-mix(in srgb, var(--text-faint) 75%, transparent); }
 .crate-diff-footnote { border-top: 1px solid var(--crate-activity-divider); font-size: 11px; }
 .crate-file-diff .crate-diff-gap > button,
 .crate-file-diff .crate-diff-message > button {
@@ -81,8 +81,27 @@
     &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
     &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: -2px; }
 }
-.crate-file-diff .crate-diff-gap > button { width: 100%; border-radius: 0; text-align: center; padding-inline: 24px; }
+.crate-reminders-ui .crate-file-diff .crate-diff-gap > button {
+    display: block;
+    width: 100%;
+    border: 0;
+    min-height: 22px;
+    padding-block: 1px;
+    color: var(--text-faint);
+    border-radius: 0;
+    text-align: center;
+    padding-inline: 24px;
+    font-family: var(--font-interface);
+    font-size: 11px;
+    font-weight: 400;
+}
 .crate-diff-message { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: var(--text-muted); overflow-wrap: anywhere; text-align: center; line-height: 1.6; }
 @container (max-width: 440px) {
     .crate-diff-line { grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); padding-right: 8px; }
 }
+
+.crate-diff-line.is-added .crate-diff-word { background: color-mix(in srgb, var(--crate-diff-added) 28%, transparent); }
+.crate-diff-line.is-removed .crate-diff-word { background: color-mix(in srgb, var(--crate-diff-removed) 28%, transparent); }
+.crate-diff-word { border-radius: 2px; }
+.crate-diff-stats { gap: 8px; padding: 3px 6px; border-radius: 4px; background: var(--background-secondary); font-size: 10px; }
+.crate-browser-detail .crate-browser-file-folder { font-size: 10px; color: var(--text-faint); margin-top: 3px; }

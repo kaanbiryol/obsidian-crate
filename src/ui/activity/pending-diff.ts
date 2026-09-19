@@ -6,7 +6,10 @@ function renderLine(container: HTMLElement, line: DiffLine): void {
     row.createSpan({ text: line.before?.toString() ?? '', cls: 'crate-diff-number', attr: { 'aria-hidden': 'true' } });
     row.createSpan({ text: line.after?.toString() ?? '', cls: 'crate-diff-number', attr: { 'aria-hidden': 'true' } });
     row.createSpan({ text: line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' ', cls: 'crate-diff-sign' });
-    row.createEl('code', { text: line.text || ' ', cls: 'crate-diff-text' });
+    const text = row.createEl('code', { cls: 'crate-diff-text' });
+    if (line.words) {
+        for (const word of line.words) text.createSpan({ text: word.text, cls: word.changed ? 'crate-diff-word' : '' });
+    } else text.setText(line.text || ' ');
 }
 
 export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff, path: string, header: HTMLElement): void {
@@ -36,7 +39,7 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
                 continue;
             }
             const gap = code.createDiv({ cls: 'crate-diff-gap' });
-            const expand = gap.createEl('button', { text: `Show ${group.lines.length} unchanged lines`, attr: { type: 'button' } });
+            const expand = gap.createEl('button', { text: `··· ${group.lines.length} unchanged lines ···`, attr: { type: 'button', 'aria-label': `Show ${group.lines.length} unchanged lines` } });
             expand.addEventListener('click', () => {
                 gap.empty();
                 for (const line of group.lines) renderLine(gap, line);

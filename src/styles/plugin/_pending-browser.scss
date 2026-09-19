@@ -8,7 +8,7 @@
 .crate-activity-panel.has-file-browser { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 .crate-pending-browser {
     display: grid;
-    grid-template-columns: minmax(220px, 30%) minmax(0, 1fr);
+    grid-template-columns: minmax(244px, calc(30% + 24px)) minmax(0, 1fr);
     height: 100%;
     min-height: 0;
     color: var(--text-normal);
@@ -26,7 +26,6 @@
     font-size: 11px;
     font-weight: var(--font-medium);
 }
-.crate-browser-count { font-variant-numeric: tabular-nums; color: var(--text-faint); }
 .crate-browser-files { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 8px 8px; }
 .crate-pending-browser .crate-browser-file {
     display: flex;
@@ -78,18 +77,19 @@
     justify-content: center;
     gap: 6px;
     min-width: 30px;
-    height: 30px;
-    padding: 6px;
+    height: 28px;
+    padding: 0 8px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--input-radius, var(--radius-s, 4px));
     box-shadow: none;
     background: transparent;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: var(--font-ui-smaller, 12px);
+    font-weight: 400;
     cursor: pointer;
     svg { display: block; width: 14px; height: 14px; }
-    &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
-    &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: 2px; }
+    &:hover { background: var(--crate-control-hover-bg); color: var(--text-normal); }
+    &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
     &:disabled { cursor: default; opacity: 0.4; }
 }
 .crate-pending-browser .crate-browser-back { display: none; }
@@ -173,7 +173,7 @@
     align-items: center;
     border-radius: 4px;
     &:hover { background: var(--background-modifier-hover); }
-    &:has(.crate-browser-file[aria-pressed='true']) { background: color-mix(in srgb, var(--text-normal) 7%, var(--background-primary)); }
+    &:has(.crate-browser-file[aria-pressed='true']) { background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary)); }
     &:has(.crate-browser-file[aria-pressed='true']):has(+ .crate-browser-file-row .crate-browser-file[aria-pressed='true']) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
     &:has(.crate-browser-file[aria-pressed='true']) + .crate-browser-file-row:has(.crate-browser-file[aria-pressed='true']) { border-top-left-radius: 0; border-top-right-radius: 0; }
     &:has(.crate-browser-file:focus-visible) { outline: 1px solid var(--crate-activity-focus-ring); outline-offset: -1px; }
@@ -217,23 +217,29 @@
     .crate-browser-sync {
         order: 2;
         width: 100%;
-        border-color: var(--crate-activity-divider);
-        background: var(--background-secondary);
+        padding-inline: 14px;
+        border: 1px solid var(--crate-activity-divider);
+        border-radius: var(--input-radius, var(--radius-s, 4px));
+        background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary));
         color: var(--text-normal);
+        font-size: var(--font-ui-small, 13px);
         font-weight: 500;
-        &:hover:enabled { background: var(--background-modifier-hover); border-color: var(--text-faint); }
+        transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+        &:hover:enabled { background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)); border-color: var(--background-modifier-border-hover); }
+        &:active:enabled { background: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary)); }
     }
+
     button:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: 2px; }
     button:disabled { opacity: 0.4; cursor: default; }
 }
-.crate-browser-sync-count {
-    padding-left: 8px;
-    border-left: 1px solid var(--crate-activity-divider);
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: 400;
-    font-variant-numeric: tabular-nums;
+body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync {
+    height: 44px;
+    min-height: 44px;
 }
+@media (pointer: coarse) {
+    .crate-pending-browser .crate-browser-actions .crate-browser-sync { height: 44px; min-height: 44px; }
+}
+
 .crate-browser-action-status { order: 3; flex-basis: 100%; color: var(--text-error); font-size: 12px; line-height: 1.4; &:empty { display: none; } }
 .crate-pending-discard-modal {
     .crate-modal-body > p:first-child { margin-block-start: 0; }

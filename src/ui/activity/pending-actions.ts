@@ -13,13 +13,12 @@ export function createPendingActions(
     sidebar: HTMLElement, heading: HTMLElement, keys: string[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
     const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Unchecked files stay pending. Selection applies to this sync only.' } });
-    const all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Include all files in sync' } });
-    selectAll.createSpan({ text: 'Include all' });
+    const all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Select all files for sync' } });
+    selectAll.createSpan({ text: 'Select all' });
     heading.prepend(selectAll);
     const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
     const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-    const syncLabel = sync.createSpan({ text: 'Sync checked' });
-    const syncCount = sync.createSpan({ cls: 'crate-browser-sync-count', attr: { 'aria-hidden': 'true' } });
+    const syncLabel = sync.createSpan({ text: 'Sync selected' });
     const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
     const checkboxes = new Map<string, HTMLInputElement>();
     let busy = false;
@@ -30,9 +29,8 @@ export function createPendingActions(
         all.indeterminate = selected.length > 0 && selected.length < keys.length;
         all.disabled = busy;
         for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = busy; }
-        syncLabel.textContent = busy ? 'Syncing…' : 'Sync checked';
-        syncCount.textContent = String(selected.length);
-        sync.setAttribute('aria-label', busy ? 'Syncing…' : `Sync checked (${selected.length})`);
+        syncLabel.textContent = busy ? 'Syncing…' : `Sync ${selected.length} selected`;
+        sync.setAttribute('aria-label', busy ? 'Syncing…' : `Sync ${selected.length} selected`);
         sync.disabled = busy || selected.length === 0;
     };
     all.addEventListener('change', () => {
