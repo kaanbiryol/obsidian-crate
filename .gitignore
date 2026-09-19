@@ -31,8 +31,6 @@ deploy.local.json
 *.gen.ts
 .generated
 site/assets/site.generated.css
-site/assets/canvas-composer.generated.js
-site/assets/canvas-composer.generated.css
 site/website-options/crate-ui/crate-ui.generated.css
 
 # Exclude macOS Finder (System Explorer) View States

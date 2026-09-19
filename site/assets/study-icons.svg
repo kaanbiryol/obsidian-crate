@@ -30,4 +30,5 @@
 <symbol id="obsidian-outline" viewBox="0 0 24 24"><path d="M3 5h.01"></path><path d="M3 12h.01"></path><path d="M3 19h.01"></path><path d="M8 5h13"></path><path d="M8 12h13"></path><path d="M8 19h13"></path></symbol>
 <symbol id="obsidian-reminders" viewBox="0 0 24 24"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></symbol>
 <symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle></symbol>
+<symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4"></path></symbol>
 </svg>
