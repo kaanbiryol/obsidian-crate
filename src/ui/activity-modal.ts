@@ -126,7 +126,7 @@ export class ActivityModal extends BaseUiModal {
 		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
 		this.syncBtn = header.createEl('button', {
 			cls: 'crate-sync-now-btn reminder-modal-header-action',
-			attr: { type: 'button', 'aria-label': 'Sync all', title: 'Sync all' },
+			attr: { type: 'button', 'aria-label': 'Sync vault', title: 'Sync all local and remote changes, including unchecked files.' },
 		});
 		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
 		this.syncBtn.addEventListener('click', () => {
@@ -225,11 +225,11 @@ export class ActivityModal extends BaseUiModal {
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		const canStop = syncing && !!this.deps.stopSync;
-		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync all';
+		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync vault';
 		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
 		this.syncBtn.hidden = false;
 		this.syncBtn.setAttribute('aria-label', label);
-		this.syncBtn.setAttribute('title', label);
+		this.syncBtn.setAttribute('title', label === 'Sync vault' ? 'Sync all local and remote changes, including unchecked files.' : label);
 		this.syncBtnLabel.setText(label);
 		this.syncBtn.toggleClass('is-enabled', !this.syncBtn.disabled);
 

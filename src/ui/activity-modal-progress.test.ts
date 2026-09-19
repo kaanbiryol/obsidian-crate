@@ -75,8 +75,8 @@ it('keeps Stop sync visible and enabled while pending files are transferring', (
     internal.stoppingSync = false;
     syncing = false;
     internal.updateSyncBtn();
-    expect(button.getAttribute('aria-label')).toBe('Sync all');
-    expect(label.collectText()).toBe('Sync all');
+    expect(button.getAttribute('aria-label')).toBe('Sync vault');
+    expect(label.collectText()).toBe('Sync vault');
     expect((button as unknown as HTMLButtonElement).hidden).toBe(false);
 });
 
