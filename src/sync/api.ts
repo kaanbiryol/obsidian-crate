@@ -187,6 +187,10 @@ export class SyncApiClient {
 		return this.syncApi.batchDelete(paths, expectedHashes, expectedRevisions);
 	}
 
+	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
+		return this.syncApi.previewFileVersion(version);
+	}
+
 	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
 		return this.syncApi.listFileVersions(query);
 	}

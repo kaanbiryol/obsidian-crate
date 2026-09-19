@@ -16,7 +16,7 @@ export function renderFileMicroCard(
 	filePath: string,
 	type: FileCardType,
 	description?: string,
-): void {
+): HTMLElement {
 	const card = container.createDiv({
 		cls: `crate-activity-file-card${type === 'conflict' ? ' crate-file-card-conflict' : ''}`,
 	});
@@ -33,6 +33,7 @@ export function renderFileMicroCard(
 	info.createSpan({ text: fileName, cls: 'crate-file-name', attr: { title: filePath } });
 	if (description) info.createSpan({ text: description, cls: 'crate-file-path' });
 	else if (dirPath) info.createSpan({ text: dirPath, cls: 'crate-file-path' });
+	return card;
 }
 
 export function renderEmptyState(

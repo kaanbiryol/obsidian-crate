@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import type { CloudflareWorkerSettings } from './cloudflare-api';
 import { recoverDeployment } from './deployment-recovery';
 import { DEPLOYMENT_FENCE_KEY } from './deployment-fence';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
@@ -16,13 +17,14 @@ function harness(overrides: Record<string, unknown> = {}) {
         step: 'upload-worker', stepState: 'confirmed', ...overrides,
     });
     const api = {
-        getWorkerSettings: vi.fn(async () => ({
+        getWorkerSettings: vi.fn(async (): Promise<CloudflareWorkerSettings> => ({
             annotations: { 'workers/message': 'Crate 0.1.0 ' + 'a'.repeat(64) },
             bindings: [{ name: 'DB', type: 'd1', id: 'database' }, { name: 'BUCKET', type: 'r2_bucket', bucket_name: 'bucket' }],
         })),
         queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]) => {
             if (sql.includes('sqlite_master')) return [{ results: [{ name: 'maintenance_state' }] }];
             if (sql.startsWith('SELECT')) return [{ results: held ? [{ value: held }] : [] }];
+            if (sql.startsWith('UPDATE') && held === params?.[2]) { held = params[0]!; return [{ results: [{ value: held }] }]; }
             if (sql.startsWith('DELETE') && held === params?.[1]) {
                 held = null;
                 return [{ results: [{ key: DEPLOYMENT_FENCE_KEY }] }];
@@ -99,4 +101,53 @@ it('offers read-and-verify recovery for the fixed address activation without cle
     const value = h.held();
     expect(await recoverDeployment(h.api, target, 'b'.repeat(64))).toMatchObject({ status: 'verify', resumeValue: value });
     expect(h.held()).toBe(value);
+});
+
+it('does not unlock an unconfirmed upload even when the live build matches', async () => {
+    const h = harness({ verificationPending: true, stepState: 'started' });
+    const original = h.held();
+    expect(await recoverDeployment(h.api, target, 'a'.repeat(64))).toMatchObject({ status: 'blocked', title: 'Upload status is uncertain', message: 'Crate couldn’t confirm whether the previous upload finished. Continuing now could let it overwrite a newer update.' });
+    expect(h.held()).toBe(original);
+    expect(h.api.queryD1.mock.calls.some(([, , sql]) => /^(UPDATE|DELETE)/.test(sql))).toBe(false);
+});
+
+const uploadTag = 'crate-12345678-1234-1234-1234-123456789012';
+it('recovers a lost upload response from its exact provider receipt while retaining the lock', async () => {
+    const h = harness({ verificationPending: true, stepState: 'started', uploadTag });
+    const settings = await h.api.getWorkerSettings();
+    h.api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': uploadTag } });
+    const result = await recoverDeployment(h.api, target, 'a'.repeat(64));
+    expect(result).toMatchObject({ status: 'resume', resumeValue: h.held() });
+    expect(JSON.parse(h.held()!)).toMatchObject({ stepState: 'confirmed', verificationPending: true, uploadTag });
+    expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE'))).toBe(false);
+    expect((await recoverDeployment(h.api, target, 'a'.repeat(64))).status).toBe('resume');
+});
+it.each(['crate', 'crate-aaaaaaaa-1234-1234-1234-123456789012', undefined])('never treats another upload tag as a receipt: %s', async liveTag => {
+    const h = harness({ verificationPending: true, stepState: 'started', uploadTag });
+    const original = h.held();
+    const settings = await h.api.getWorkerSettings();
+    h.api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': liveTag } });
+    expect((await recoverDeployment(h.api, target, 'a'.repeat(64))).status).toBe('blocked');
+    expect(h.held()).toBe(original);
+});
+it('does not acknowledge a receipt when ownership changes concurrently', async () => {
+    const h = harness({ verificationPending: true, stepState: 'started', uploadTag });
+    const settings = await h.api.getWorkerSettings();
+    h.api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': uploadTag } });
+    const query = h.api.queryD1.getMockImplementation()!;
+    h.api.queryD1.mockImplementation(async (...args) => args[2].startsWith('UPDATE') ? [{ results: [] }] : query(...args));
+    expect((await recoverDeployment(h.api, target, 'a'.repeat(64))).status).toBe('blocked');
+    expect(JSON.parse(h.held()!)).toMatchObject({ stepState: 'started' });
+});
+
+it.each([
+    { fingerprint: 'b'.repeat(64) }, { version: '9.0.0' },
+    { verificationPending: false }, { uploadTag: 'crate' },
+])('keeps mismatched receipt metadata locked: %j', async overrides => {
+    const h = harness({ verificationPending: true, stepState: 'started', uploadTag, ...overrides });
+    const original = h.held();
+    const settings = await h.api.getWorkerSettings();
+    h.api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': uploadTag } });
+    expect((await recoverDeployment(h.api, target, 'a'.repeat(64))).status).toBe('blocked');
+    expect(h.held()).toBe(original);
 });

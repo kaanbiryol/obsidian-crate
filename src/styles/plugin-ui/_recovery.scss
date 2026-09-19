@@ -1,0 +1,86 @@
+@use "../../ui/shared/styles/navigation-row";
+
+@mixin styles {
+  .crate-file-history-link { flex-shrink: 0; font-size: var(--font-ui-smaller); }
+  .crate-file-history {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+    font-size: var(--font-ui-small);
+    .crate-history-description { margin: 0; color: var(--text-muted); line-height: 1.5; }
+    .crate-history-toolbar[hidden] { display: none; }
+    .crate-history-toolbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .crate-history-search.setting-item {
+      flex: 1; min-width: 0; padding: 0; border: 0;
+      .setting-item-info { display: none; }
+      .setting-item-control { position: relative; display: flex; flex: 1; padding: 0; }
+      input { flex: 1; width: 100%; min-width: 0; height: 40px; padding-inline: 34px;
+        &:focus, &:focus-visible { border-width: 1px; border-color: var(--interactive-accent); outline: none; box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 15%, transparent); }
+      }
+      .crate-history-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; display: flex; }
+      .crate-history-search-clear { position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; min-height: 32px; padding: 6px; background: transparent; box-shadow: none; border: 0; color: var(--text-muted); &[hidden] { display: none; } }
+    }
+    .crate-history-group { margin: 24px 0 10px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); overflow-wrap: anywhere; }
+    .crate-history-list-back { margin-bottom: 16px; }
+    .crate-history-list-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; .crate-file-history-count { flex: 1; margin: 0; } }
+    .crate-history-search-icon svg, .crate-history-search-clear svg, .crate-history-state-icon svg { width: 16px; height: 16px; }
+    .crate-history-version-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+    .crate-history-event-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); margin-top: 2px; }
+    .crate-history-change-type { font-weight: 400; &.is-deleted { color: var(--text-error); } }
+    .crate-history-hint { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+    .crate-history-diff-summary { font-size: var(--font-ui-smaller); margin: 0 0 12px; }
+    .crate-history-no-diff { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-muted); p { margin: 0; font-size: var(--font-ui-smaller); line-height: 1.5; } .crate-history-state-title { color: var(--text-normal); font-weight: 500; margin-bottom: 3px; } }
+    .crate-history-state-icon { display: flex; color: var(--text-success); }
+    .crate-history-content-disclosure { margin-top: 12px; summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); padding: 8px 0; } }
+    button[aria-pressed="true"] { background: var(--background-modifier-hover); color: var(--text-accent); }
+    button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+    .crate-history-workspace { display: grid; grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr); flex: 1; min-height: 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden; }
+    .crate-history-list-pane, .crate-history-preview-pane { min-width: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; }
+    .crate-history-list-pane { border-right: 1px solid var(--background-modifier-border); }
+    .crate-file-history-count { color: var(--text-muted); font-size: var(--font-ui-smaller); margin: 0 0 12px; line-height: 1.5; }
+    .crate-history-empty { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; color: var(--text-muted); line-height: 1.6; h3 { margin: 12px 0 4px; font-weight: 500; color: var(--text-normal); } p { max-width: 260px; margin: 0; font-size: var(--font-ui-small); } }
+    .crate-history-empty-icon { display: flex; color: var(--text-faint); svg { width: 28px; height: 28px; stroke-width: 1.25px; } }
+    h3:not(.crate-history-day-label) { font-size: var(--font-ui-medium); margin: 0 0 8px; overflow-wrap: anywhere; }
+    .crate-history-file, .crate-history-version {
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px;
+      width: 100%; height: auto; min-height: 64px; padding: 12px; margin: 0 0 6px;
+      @include navigation-row.surface;
+      white-space: normal;
+    }
+    .crate-history-file.crate-history-current {
+      flex-direction: row; align-items: center; justify-content: space-between; gap: 12px;
+      min-height: 44px; padding: 10px 12px;
+      .crate-history-file-name { font-weight: 500; }
+      .crate-history-current-label { flex-shrink: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 400; line-height: 1.4; }
+    }
+    .crate-history-tree-children { margin-left: 12px; padding-left: 8px; border-left: 1px solid var(--nav-indentation-guide-color, var(--background-modifier-border)); }
+    .crate-history-tree-folder, .crate-history-tree-file {
+      @include navigation-row.surface;
+      display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 32px; height: auto; box-sizing: border-box;
+      padding: var(--nav-item-padding, 6px 8px); margin: 1px 0;
+      border-radius: var(--nav-item-radius, 4px); color: var(--nav-item-color, var(--text-muted));
+      white-space: normal; overflow-wrap: anywhere; font-size: var(--nav-item-size, var(--font-ui-small)); font-weight: var(--nav-item-weight, 400);
+      &:hover { background: var(--nav-item-background-hover, var(--background-modifier-hover)); color: var(--nav-item-color-hover, var(--text-normal)); }
+      span:last-child { flex: 1; min-width: 0; text-align: start; line-height: 1.4; }
+    }
+    .crate-history-tree-icon { display: flex; flex-shrink: 0; color: var(--nav-collapse-icon-color, var(--text-muted)); svg { width: 14px; height: 14px; } }
+    .crate-history-file-name { font-weight: 600; font-size: var(--font-ui-small); overflow-wrap: anywhere; line-height: 1.4; }
+    .crate-history-file-folder, .crate-history-file-count { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; line-height: 1.4; }
+    .crate-history-preview-header { padding-bottom: 16px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px; h3 { margin-bottom: 4px; } .crate-file-history-count { margin: 0; } }
+    .crate-history-preview-output pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--font-ui-smaller); line-height: 1.6; user-select: text; margin: 0; padding: 12px; background: var(--background-secondary); border-radius: var(--radius-s); }
+    .crate-history-internal-marker { opacity: 0.55; overflow-wrap: anywhere; }
+    .crate-history-diff-added { color: var(--text-success); background: color-mix(in srgb, var(--text-success) 10%, transparent); }
+    .crate-history-diff-removed { color: var(--text-error); background: color-mix(in srgb, var(--text-error) 10%, transparent); }
+    .crate-history-back { display: none; margin-bottom: 16px; }
+    @media (max-width: 700px) {
+      .crate-history-workspace { display: block; position: relative; }
+      .crate-history-list-pane, .crate-history-preview-pane { height: 100%; box-sizing: border-box; border: 0; display: none; }
+      .crate-history-workspace[data-pane="list"] .crate-history-list-pane,
+      .crate-history-workspace[data-pane="preview"] .crate-history-preview-pane { display: block; }
+      .crate-history-back { display: inline-flex; }
+      button { min-height: 44px; }
+    }
+  }
+}

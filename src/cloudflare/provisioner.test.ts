@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiError, type CloudflareWorkerSettings } from './cloudflare-api';
+import { recoverDeployment } from './deployment-recovery';
+import type { CloudflareApiClient } from './cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
 import { createFenceQueryHarness } from './deployment-fence-test-harness';
 
@@ -42,7 +44,7 @@ function createApi() {
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: 1, created_version: 1 }] }] : [])),
-		uploadWorker: vi.fn(async () => {}),
+		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
     verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
@@ -179,4 +181,27 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.uploadWorker).toHaveBeenCalledTimes(1);
 		expect(api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('INSERT INTO crate_release') || sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
 	});
+});
+
+it('resumes and verifies after Cloudflare publishes an upload but its response is lost', async () => {
+    const api = createApi();
+    const metadata = createMetadata();
+    const input = { api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} };
+    api.uploadWorker.mockImplementationOnce(async upload => {
+        const held = await api.queryD1(input.accountId, metadata.d1DatabaseId!, 'SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence']);
+        expect(JSON.parse(String(held[0]!.results![0]!.value))).toMatchObject({ step: 'upload-worker', stepState: 'started', uploadTag: upload.uploadTag });
+        const settings = await api.getWorkerSettings();
+        api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { ...settings.annotations, 'workers/tag': upload.uploadTag } });
+        throw new Error('Lost upload response');
+    });
+    await expect(provisionCloudflareDeployment(input)).rejects.toThrow('Lost upload response');
+    expect(api.uploadWorker).toHaveBeenCalledTimes(1);
+    const recovery = await recoverDeployment(api as never, metadata, artifacts.fingerprint);
+    expect(recovery.status).toBe('resume');
+    await provisionCloudflareDeployment({ ...input, resumeUpdateValue: recovery.resumeValue });
+    expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+    expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
+    const calls = api.uploadWorker.mock.calls;
+    expect(calls[0]![0].uploadTag).not.toBe(calls[1]![0].uploadTag);
+    expect((await recoverDeployment(api as never, metadata, artifacts.fingerprint)).status).toBe('ready');
 });

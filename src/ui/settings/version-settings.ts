@@ -17,11 +17,11 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 	}).catch(() => server.setDesc('Version unavailable. Connect to the server to check.'));
 }
 
-export function renderUpdateVersions(setting: Setting, plugin: CratePlugin): void {
+export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMatchingServer: () => void): void {
 	const target = `revision ${release.revision} (${EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint.slice(0, 8)})`;
 	setting.setDesc(`Server revision unknown → ${target}. Update your sync server and reminders web app.`);
 	void plugin.syncRuntime.getVersionInfo().then(info => {
-		if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) { setting.settingEl.hide(); return; }
+		if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) { onMatchingServer(); return; }
 		setting.setDesc(`Server ${info.serverRevision ? `revision ${info.serverRevision}` : 'revision unknown'} → ${target}. Update your sync server and reminders web app.`);
 	}).catch(() => {});
 }

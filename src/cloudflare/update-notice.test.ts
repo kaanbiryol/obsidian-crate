@@ -94,8 +94,8 @@ describe('showCloudflareServerUpdateNotice', () => {
 
 		expect(notices).toHaveLength(1);
 		expect(notices[0]?.spans).toEqual([
-			'A Crate server update is available. ',
-			' to update the Worker and web app.',
+			'Review your Crate server update. ',
+			' to update or verify the Worker and web app.',
 		]);
 		expect(notices[0]?.links[0]?.text).toBe('Open settings');
 

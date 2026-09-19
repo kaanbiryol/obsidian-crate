@@ -182,3 +182,20 @@
 	margin-top: 0;
 	color: var(--text-muted);
 }
+
+.modal.crate-shared-modal.crate-file-history-modal {
+	width: min(940px, calc(100vw - 48px));
+	max-width: 940px;
+	height: min(660px, calc(100dvh - 48px));
+	max-height: calc(100dvh - 48px);
+	box-sizing: border-box;
+	.modal-content { display: flex; flex-direction: column; height: 100%; max-height: none; overflow: hidden; }
+	.crate-modal-header-host { flex-shrink: 0; }
+	&.is-mobile {
+		width: 100%;
+		max-width: none;
+		height: 85dvh;
+		max-height: 90dvh;
+		.crate-modal-body { padding: 12px; }
+	}
+}

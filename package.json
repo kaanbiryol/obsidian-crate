@@ -62,6 +62,7 @@
 		"release:candidate": "node scripts/release-candidate.mjs",
 		"check:server-revision": "npm run build:worker && node scripts/check-server-revision.mjs",
 		"test:server-revision": "node --test scripts/check-server-revision.test.mjs",
+		"test:file-history-browser": "node scripts/file-history-test.mjs",
 		"test:activity-browser": "node scripts/activity-diff-test.mjs",
 		"test:editor-compat": "node scripts/editor-contract-compare.mjs",
 		"test:editor-contract": "node scripts/editor-contract-compare.mjs current",

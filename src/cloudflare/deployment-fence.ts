@@ -23,6 +23,7 @@ export interface DeploymentFenceRecord {
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
   verificationPending?: boolean;
   completionOnly?: boolean;
+	uploadTag?: string;
 	resetId?: string;
 	cleanupTokenHash?: string;
 	batchHash?: string;
@@ -47,11 +48,11 @@ export class DeploymentFence {
     this.verificationPending = (JSON.parse(value) as DeploymentFenceRecord).verificationPending === true;
   }
 
-	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string): Promise<T> {
+	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string, uploadTag?: string): Promise<T> {
 		const rows = (await this.api.queryD1(this.account, this.database,
 			'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
 		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
-		await this.recordStep(step, 'started', batchHash);
+		await this.recordStep(step, 'started', batchHash, uploadTag);
 		// Never expire or steal this fence: the provider cannot reject an old,
 		// already-dispatched upload using a D1 fencing token.
 		this.uncertain = true;
@@ -70,10 +71,10 @@ export class DeploymentFence {
 	}
 
 
-    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string): Promise<void> {
+    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string, uploadTag?: string): Promise<void> {
         if (this.databaseRemoved) return;
         const record = JSON.parse(this.value) as DeploymentFenceRecord;
-        const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
+        const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
         try {
             const rows = (await this.api.queryD1(this.account, this.database,
                 "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
@@ -85,6 +86,12 @@ export class DeploymentFence {
             throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.');
         }
     }
+
+  /** Each dispatch has a fresh provider-visible receipt; never retry this request. */
+  async uploadWorker(operation: (tag: string) => Promise<void>): Promise<void> {
+    const tag = `crate-${crypto.randomUUID()}`;
+    await this.mutate(() => operation(tag), 'upload-worker', undefined, tag);
+  }
 
   // Once storage or code changes, keep the lock until both have been verified.
   async checkpoint(step: string): Promise<void> { await this.recordStep(step, 'confirmed'); }

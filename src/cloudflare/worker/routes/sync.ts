@@ -1,3 +1,4 @@
+import { handleFileVersionPreview } from '../file-version-preview';
 import {
 	handleBatchDelete,
 	handleBatchUpload,
@@ -81,6 +82,9 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb, audit));
+	}
+	if (path === '/sync/version-preview' && method === 'GET') {
+		return await withDatabase(db, requiredDb => handleFileVersionPreview(request, bucket, requiredDb));
 	}
 	if (path === '/sync/versions' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleListFileVersions(request, requiredDb));

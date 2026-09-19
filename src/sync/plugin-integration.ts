@@ -1,3 +1,4 @@
+import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
@@ -27,6 +28,14 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 }
 
 export function registerSyncCommands(plugin: CratePlugin): void {
+	plugin.addCommand({
+		id: 'show-file-history', name: 'Show file history',
+		checkCallback: checking => {
+			const available = plugin.syncRuntime.isConfigured();
+			if (!checking && available) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime);
+			return available;
+		},
+	});
 	plugin.addCommand({
 		id: 'sync-now',
 		name: 'Sync now',

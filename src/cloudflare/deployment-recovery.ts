@@ -6,6 +6,7 @@ import type { CloudflareDeploymentMetadata } from './deployment-types';
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
 export interface DeploymentRecoveryResult {
     status: 'ready' | 'recovered' | 'blocked' | 'resume' | 'verify' | 'completed';
+    title?: string;
     resumeValue?: string;
     message: string;
     diagnostics: string;
@@ -45,7 +46,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
         'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(row => row.results ?? []);
     if (!rows.length) return result('ready', 'No interrupted update is blocking this server.');
     if (rows.length !== 1 || typeof rows[0]?.value !== 'string') return result('blocked', 'The saved operation record is invalid. Copy diagnostics for support.');
-    const value = rows[0].value;
+    let value = rows[0].value;
     let record: Record<string, unknown>;
     try {
         const parsed: unknown = JSON.parse(value);
@@ -60,11 +61,35 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
         || !/^[a-f0-9-]{36}$/.test(record.owner)) {
         return result('blocked', 'This record belongs to another operation. No lock was cleared.');
     }
+    // A unique tag identifies this single non-retried dispatch, unlike a build
+    // fingerprint shared by repeated uploads. Its presence on the live version
+    // establishes publication even if the response/checkpoint was lost.
+    if (record.recoveryProtocol === 1 && record.verificationPending === true
+        && record.step === 'upload-worker' && record.stepState === 'started'
+        && typeof record.uploadTag === 'string'
+        && /^crate-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(record.uploadTag)
+        && settings?.annotations?.['workers/tag'] === record.uploadTag
+        && build?.[1] === record.version && build?.[2] === record.fingerprint
+        && fingerprint === record.fingerprint) {
+        const confirmed = JSON.stringify({ ...record, stepState: 'confirmed' });
+        const changed = (await api.queryD1(account, database,
+            'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;',
+            [confirmed, DEPLOYMENT_FENCE_KEY, value])).flatMap(row => row.results ?? []);
+        if (changed.length !== 1 || changed[0]?.value !== confirmed) {
+            return result('blocked', 'The operation changed during the check. Check again to read its latest status.');
+        }
+        value = confirmed;
+        record = { ...record, stepState: 'confirmed' };
+        report.stepState = 'confirmed';
+    }
     const pendingAddress = isPendingAddressActivation(record);
     const settled = ['confirmed', 'rejected', 'settled'].includes(String(record.stepState));
     const knownStep = confirmedSteps.has(String(record.step)) || SERVER_RELEASE.migrations.some(migration => record.step === `migrate-${migration.id}`);
+    if (record.recoveryProtocol === 1 && record.step === 'upload-worker' && record.stepState === 'started') {
+        return { ...result('blocked', 'Crate couldn’t confirm whether the previous upload finished. Continuing now could let it overwrite a newer update.'), title: 'Upload status is uncertain' };
+    }
     if (record.recoveryProtocol !== 1 || !(settled || pendingAddress) || !knownStep) {
-        return result('blocked', 'Cloudflare may still be processing the interrupted request. Crate cannot safely unlock it yet. Copy diagnostics for support; no server data was changed.');
+        return result('blocked', 'Cloudflare has not confirmed that the interrupted request finished. Crate cannot safely resume this update yet.');
     }
     if (record.verificationPending === true) {
         if (build?.[2] === record.fingerprint && build?.[1] === record.version

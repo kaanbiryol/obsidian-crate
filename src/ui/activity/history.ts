@@ -3,7 +3,7 @@ import { groupHistory } from './history-groups';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 
-export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[]): void {
+export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void): void {
 	if (history.length === 0) {
 		renderEmptyState(container, 'clock', 'No activity yet', 'Sync history will appear here.');
 		return;
@@ -21,7 +21,7 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
 				const summary = details.createEl('summary', { cls: 'crate-history-card' });
 				renderHistoryHeader(summary, entry, true);
-				renderHistoryFiles(details, entry);
+				renderHistoryFiles(details, entry, openFileHistory);
 			} else {
 				const card = entryEl.createDiv({ cls: 'crate-history-card' });
 				renderHistoryHeader(card, entry, false, count);
@@ -47,7 +47,7 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
     }).format(new Date(entry.timestamp)));
 }
 
-function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): void {
+function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, openFileHistory?: (path: string) => void): void {
 	const filesEl = container.createDiv({ cls: 'crate-history-files' });
 	for (const error of entry.errors ?? []) {
 		filesEl.createDiv({ text: error, cls: 'crate-history-error' });
@@ -65,7 +65,13 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): vo
 		{ paths: entry.conflictPaths ?? [], type: 'conflict', total: entry.conflictCount, label: 'conflicting' },
 	];
 	for (const group of groups) {
-		for (const filePath of group.paths) renderFileMicroCard(filesEl, filePath, group.type);
+		for (const filePath of group.paths) {
+			const card = renderFileMicroCard(filesEl, filePath, group.type);
+			if (openFileHistory) {
+				const button = card.createEl('button', { cls: 'crate-file-history-link', text: 'File history', attr: { type: 'button', 'aria-label': `File history for ${filePath}` } });
+				button.addEventListener('click', () => openFileHistory(filePath));
+			}
+		}
 		if (group.total > group.paths.length) {
 			filesEl.createDiv({ text: `Showing ${group.paths.length} of ${group.total} ${group.label} files.`, cls: 'crate-file-path' });
 		}

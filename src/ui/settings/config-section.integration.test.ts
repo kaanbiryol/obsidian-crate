@@ -9,6 +9,7 @@ import {
 
 const openConfirmationModal = vi.fn();
 const startCloudflareDeployment = vi.fn();
+const checkAndRecoverUpdate = vi.fn();
 const embeddedArtifact = {
 	version: '0.1.0',
 	fingerprint: 'f'.repeat(64),
@@ -21,6 +22,7 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadConfigSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
+	vi.doMock('../../cloudflare/deployment-recovery-ui', () => ({ checkAndRecoverUpdate }));
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
 	vi.doMock('../../cloudflare/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
@@ -49,6 +51,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../cloudflare/plugin-integration');
+	vi.doUnmock('../../cloudflare/deployment-recovery-ui');
 	vi.doUnmock('../../cloudflare/embedded-artifacts');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('./section-helpers');
@@ -285,4 +288,20 @@ it('does not forget or disconnect when the dialog is cancelled after choosing fo
 	await flushMicrotasks();
 	expect(plugin.syncRuntime.clearSyncConfiguration).not.toHaveBeenCalled();
 	expect(plugin.writeSettings).not.toHaveBeenCalled();
+});
+
+it('keeps a matching live build visible and routes it to recovery when saved deployment metadata is stale', async () => {
+    const { renderServerUpdateNotice } = await loadConfigSectionModule();
+    const plugin = {
+        settings: { cloudflareDeployment: { lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) } },
+        syncRuntime: { isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
+    };
+    renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+    await flushMicrotasks();
+    const update = getSettingByName('Verify server update');
+    expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');
+    expect(update.settingEl.style.display).not.toBe('none');
+    update.buttons[0]?.click();
+    expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin);
+    expect(startCloudflareDeployment).not.toHaveBeenCalled();
 });

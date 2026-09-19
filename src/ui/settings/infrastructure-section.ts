@@ -12,12 +12,12 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	const { containerEl, plugin } = context;
 	const recoverySection = createSettingsDisclosure(containerEl, 'Recovery and troubleshooting');
 	if (context.isConfigured) {
-		const recoveryEl = createSettingsDisclosure(recoverySection, 'File recovery');
+		const recoveryEl = createSettingsDisclosure(recoverySection, 'File history');
 		new Setting(recoveryEl)
-			.setName('Restore a file')
+			.setName('Browse file history')
 			.setDesc('Previous versions and deleted files are kept for 30 days.')
 			.addButton(button => button
-				.setButtonText('Browse files')
+				.setButtonText('Open file history')
 				.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
 
 

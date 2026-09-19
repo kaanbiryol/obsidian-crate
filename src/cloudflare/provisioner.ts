@@ -163,7 +163,8 @@ export async function provisionCloudflareDeployment(input: {
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
     fence.requireVerification();
-		await fence.mutate(() => input.api.uploadWorker({
+		await fence.uploadWorker(uploadTag => input.api.uploadWorker({
+      uploadTag,
 			publicOrigin: `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`,
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,
@@ -171,7 +172,7 @@ export async function provisionCloudflareDeployment(input: {
 			artifacts: input.artifacts,
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
-		}), 'upload-worker');
+		}));
 		input.onProgress?.('Configuring server maintenance…');
 		await fence.mutate(() => input.api.updateWorkerSchedules(
 			input.accountId,
