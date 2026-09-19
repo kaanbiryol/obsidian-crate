@@ -27,7 +27,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
     if (!actions) heading.createSpan({ text: 'Files' });
     const list = sidebar.createEl('nav', { cls: 'crate-browser-files', attr: { 'aria-label': 'Pending files' } });
-    const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose files for Sync selected. Sync all includes every pending file. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Touched files stay here until sync.' });
+    const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose which files to sync with the button below the list. Sync vault syncs all local and remote changes, including unchecked files. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Touched files stay here until sync.' });
     listHint.id = `crate-pending-hint-${++nextBrowserId}`;
     list.setAttribute('aria-describedby', listHint.id);
 

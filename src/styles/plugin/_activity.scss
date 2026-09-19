@@ -89,7 +89,7 @@
     position: relative;
     padding: 0 12px 0 0;
     text-align: right;
-    border-right: 0;
+    border-right: 1px solid var(--crate-activity-divider-strong);
     font-size: var(--font-ui-smaller, 12px);
     line-height: 1.4;
     font-weight: 400;
@@ -104,7 +104,7 @@
     content: '';
     display: inline-block;
     margin-right: 8px;
-    vertical-align: 0.125em;
+    vertical-align: middle;
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -891,12 +891,9 @@ body.reduce-motion .crate-activity-modal {
 }
 
 .crate-reminders-ui .crate-activity-modal .crate-sync-now-btn.reminder-modal-header-action {
-    border-color: transparent !important;
-    background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary));
+    background: transparent;
     &:hover:enabled { background: var(--crate-activity-control-hover-bg); }
 }
-
-.crate-activity-subtitle[data-state='pending']::before { display: none; }
 
 .crate-reminders-ui .crate-activity-modal .crate-conflict-review-button,
 .crate-reminders-ui .crate-file-history .crate-history-restore.reminder-modal-header-action,

@@ -12,13 +12,14 @@ export interface PendingActions {
 export function createPendingActions(
     sidebar: HTMLElement, heading: HTMLElement, keys: string[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
-    const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Unchecked files stay pending. Selection applies to this sync only.' } });
+    const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Choose files to sync with the button below. Sync vault also includes unchecked files.' } });
     const all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Select all files for sync' } });
     selectAll.createSpan({ text: 'Select all' });
     heading.prepend(selectAll);
+    const count = heading.createSpan({ cls: 'crate-browser-selection-count', attr: { role: 'status' } });
     const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
     const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-    const syncLabel = sync.createSpan({ text: 'Sync selected' });
+    const syncLabel = sync.createSpan({ text: 'Sync files' });
     const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
     const checkboxes = new Map<string, HTMLInputElement>();
     let busy = false;
@@ -29,11 +30,11 @@ export function createPendingActions(
         all.indeterminate = selected.length > 0 && selected.length < keys.length;
         all.disabled = busy;
         for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = busy; }
-        syncLabel.textContent = busy ? 'Syncing…' : 'Sync selected';
-        sync.setAttribute('aria-label', busy ? 'Syncing…' : 'Sync selected');
+        count.textContent = `${selected.length} of ${keys.length} files selected`;
+        const label = busy ? 'Syncing…' : selected.length ? `Sync ${selected.length} ${selected.length === 1 ? 'file' : 'files'}` : 'Sync files';
+        syncLabel.textContent = label;
+        sync.setAttribute('aria-label', label);
         sync.disabled = busy || selected.length === 0;
-        sync.hidden = !busy && (selected.length === 0 || selected.length === keys.length);
-        footer.hidden = sync.hidden && !status.textContent;
     };
     all.addEventListener('change', () => {
         for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }

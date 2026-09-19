@@ -177,7 +177,9 @@ for (const browserType of [chromium, webkit]) {
                 const all = page.getByRole('checkbox', { name: 'Select all files for sync', exact: true });
                 const checks = page.locator('.crate-browser-file-check input');
                 const syncSelected = page.locator('.crate-browser-sync');
-                await expect(syncSelected).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toHaveText('Sync 6 files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 await expect(page.locator('.crate-browser-actions button')).toHaveCount(1);
                 await expect(page.getByRole('button', { name: 'File actions', exact: true })).toHaveCount(0);
                 await expect(all).toBeChecked();
@@ -190,18 +192,23 @@ for (const browserType of [chromium, webkit]) {
                 assert.equal(await first.evaluate(el => getComputedStyle(el.parentElement).backgroundColor), rowBackground);
 
                 await checks.nth(1).uncheck();
-                await expect(page.getByRole('button', { name: 'Sync selected' })).toBeEnabled();
+                await expect(page.getByRole('button', { name: /^Sync \d+ files?$/ })).toBeEnabled();
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
-                await page.getByRole('button', { name: 'Sync selected' }).click();
+                await page.getByRole('button', { name: /^Sync \d+ files?$/ }).click();
                 assert.deepEqual(await page.evaluate(() => window.syncKeys), [
                     '.obsidian/appearance.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', 'delete:Notes/Archive.md',
                 ]);
                 await page.evaluate(() => window.mount());
                 await expect(checks.nth(1)).not.toBeChecked();
                 await all.check();
-                await expect(syncSelected).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toHaveText('Sync 6 files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 await all.uncheck();
-                await expect(page.locator('.crate-browser-sync')).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toBeDisabled();
+                await expect(syncSelected).toHaveText('Sync files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 6 files selected');
                 const highlighted = page.locator('.crate-browser-file[aria-pressed="true"]');
                 for (const shortcut of ['Control+a', 'Meta+a']) {
                     await first.focus();
@@ -209,7 +216,10 @@ for (const browserType of [chromium, webkit]) {
                     await expect(all).not.toBeChecked();
                     await expect(page.locator('.crate-browser-file-check input:checked')).toHaveCount(0);
                     await expect(highlighted).toHaveCount(6);
-                    await expect(page.locator('.crate-browser-sync')).toBeHidden();
+                    await expect(syncSelected).toBeVisible();
+                    await expect(syncSelected).toBeDisabled();
+                    await expect(syncSelected).toHaveText('Sync files');
+                    await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 6 files selected');
                 }
                 await checks.nth(1).check();
                 await expect(highlighted).toHaveCount(6);
@@ -226,7 +236,9 @@ for (const browserType of [chromium, webkit]) {
                 await page.getByRole('button', { name: 'Cancel', exact: true }).click();
                 assert.equal(await page.evaluate(() => window.discarded), 0, 'Cancel leaves files untouched');
                 await all.check();
-                await expect(syncSelected).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toHaveText('Sync 6 files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 await checks.nth(1).uncheck();
                 await page.evaluate(() => { window.syncFailure = true; });
                 await syncSelected.click();
@@ -234,14 +246,16 @@ for (const browserType of [chromium, webkit]) {
                 await page.evaluate(() => { window.syncFailure = false; });
                 await syncSelected.click();
                 await all.check();
-                await expect(syncSelected).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toHaveText('Sync 6 files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 // Remounting intentionally rechecks statuses; reset the call baseline.
                 await expect(rows.last().getByText('Deleted', { exact: true })).toBeVisible();
                 const checkedCalls = await page.evaluate(() => window.calls);
                 await first.focus();
                 await page.keyboard.press('Space');
                 await expect(checks.first()).not.toBeChecked();
-                await expect(page.getByRole('button', { name: 'Sync selected' })).toBeEnabled();
+                await expect(page.getByRole('button', { name: /^Sync \d+ files?$/ })).toBeEnabled();
                 await expect(first).toBeFocused();
                 await expect(highlighted).toHaveCount(6);
                 await page.keyboard.down('Space');
@@ -358,7 +372,7 @@ for (const browserType of [chromium, webkit]) {
                     // macOS reserves native Control-click for context menus; simulate the Windows click event.
                     await rows.nth(2).dispatchEvent('click', { ctrlKey: true });
                     await expect(highlighted).toHaveCount(3);
-                    await expect(page.getByRole('button', { name: 'Sync selected' })).toBeEnabled();
+                    await expect(page.getByRole('button', { name: /^Sync \d+ files?$/ })).toBeEnabled();
                     if (browserType === chromium) await page.screenshot({ path: `.generated/activity-diff/${theme}-${width}-multiselect.png` });
                     // Cmd+A in the diff keeps row selection intact.
                     await preview.click();
@@ -401,7 +415,10 @@ for (const browserType of [chromium, webkit]) {
                 await all.uncheck();
                 await first.focus();
                 await page.keyboard.press('Control+a');
-                await expect(page.locator('.crate-browser-sync')).toBeHidden();
+                await expect(syncSelected).toBeVisible();
+                await expect(syncSelected).toBeDisabled();
+                await expect(syncSelected).toHaveText('Sync files');
+                await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 20 files selected');
                 await expect(highlighted).toHaveCount(20);
                 await page.keyboard.press('Shift+F10');
                 await page.getByRole('menuitem', { name: 'Discard 20 items…', exact: true }).click();

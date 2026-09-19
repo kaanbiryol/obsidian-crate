@@ -244,3 +244,6 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
 
 .crate-browser-toolbar > .crate-diff-header { align-self: flex-start; padding-top: 0; }
 .crate-browser-toolbar .crate-diff-stats { padding-block: 0; line-height: 1.4; }
+
+.crate-browser-list-heading { flex-wrap: wrap; gap: 8px; }
+.crate-browser-selection-count { white-space: nowrap; }
