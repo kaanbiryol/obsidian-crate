@@ -50,9 +50,9 @@ async function paste(editor: Locator, text: string) {
 const errors = new WeakMap<object, string[]>();
 test.beforeEach(({ page }) => { const list: string[] = []; errors.set(page, list); page.on('pageerror', error => list.push(error.message)); });
 test.afterEach(({ page }) => { expect(errors.get(page)).toEqual([]); });
-async function open(page: import('@playwright/test').Page, host: unknown, value: string) {
+async function open(page: import('@playwright/test').Page, host: unknown, value: string, autoFocus = false) {
   if (host !== 'pwa' && host !== 'plugin') throw new Error('Unknown test host');
-  await page.goto(`/?host=${host}&value=${encodeURIComponent(value)}`);
+  await page.goto(`/?host=${host}&value=${encodeURIComponent(value)}&autofocus=${autoFocus}`);
   const editor = page.getByRole('textbox', { name: 'Reminder', exact: true });
   await expect(editor).toBeVisible();
   await expect(page.getByTestId('value')).toHaveJSProperty('textContent', value);
@@ -132,6 +132,19 @@ test('inserts and rejoins a newline', async ({ page }, info) => {
   await range(editor, 5); await page.keyboard.press('Enter');
   await expect(output).toHaveJSProperty('textContent', 'alpha\nomega');
   await page.keyboard.press('Backspace'); await expect(output).toHaveText('alphaomega');
+});
+test('keeps project suggestions closed on focus and opens them when editing the project', async ({ page }, info) => {
+  const { editor, output } = await open(page, info.project.metadata.host, 'Buy coffee #Work', true);
+  await expect(editor).toBeFocused();
+  await expect(page.getByTestId('query')).toHaveText('(none)');
+  await page.getByRole('button', { name: 'Focus end', exact: true }).click();
+  await expectCaret(editor, 'Buy coffee #Work'.length);
+  await expect(page.getByTestId('query')).toHaveText('(none)');
+  await expect(output).toHaveText('Buy coffee #Work');
+  await page.keyboard.press('Backspace');
+  await expect(page.getByTestId('query')).toHaveText('Wor');
+  await page.keyboard.type('k ');
+  await expect(page.getByTestId('query')).toHaveText('(none)');
 });
 test('reports autocomplete after a Markdown link and accepts a host keyboard action', async ({ page }, info) => {
   const { editor, output } = await open(page, info.project.metadata.host, 'Read [docs](https://example.com) ');

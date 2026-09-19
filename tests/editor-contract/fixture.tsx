@@ -19,6 +19,7 @@ function Fixture() {
   return <main className="crate-reminders-ui reminders-shadow-root">
     <RichTextInput key={generation} ref={ref} value={value} onChange={setValue}
       ariaLabel="Reminder" placeholder="Write a reminder" readOnly={readOnly}
+      autoFocus={params.get('autofocus') === 'true'}
       knownProjects={projects} focusRequestKey={focusRequest} syncContentBeforePaint
       onAutocompleteQuery={setQuery}
       onAutocompleteKeyDown={event => {
