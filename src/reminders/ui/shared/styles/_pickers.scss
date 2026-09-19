@@ -199,11 +199,6 @@
     color: var(--text-normal);
   }
 
-  &.is-selected {
-    background: var(--picker-selected-bg);
-    color: var(--crate-accent-text);
-    font-weight: var(--reminder-font-weight-medium);
-  }
 }
 
 .recurrence-options {
@@ -923,6 +918,18 @@
   }
 }
 
+
+.reminder-picker .recurrence-frequency-button.is-selected {
+  background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  color: var(--text-normal);
+  font-weight: var(--reminder-font-weight-semibold);
+
+  &:hover:not(:disabled),
+  &:focus-within,
+  &:active:not(:disabled) {
+    background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  }
+}
 
 @media (max-width: 640px) {
   .reminder-picker {

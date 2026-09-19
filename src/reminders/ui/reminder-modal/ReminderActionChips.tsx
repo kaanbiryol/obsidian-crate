@@ -8,6 +8,9 @@ import { formatDueDate } from '../../utils/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { useReminderClock } from '../useReminderClock';
 import { AnimatedActionLabel } from './AnimatedActionLabel';
+import { calculateFirstOccurrence } from '../../utils/recurrenceCalculator';
+import { recurrenceCalendarDate } from '../../core/recurrenceCalendar';
+import { formatLocalDateKey } from '../../utils/reminderDate';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;
@@ -37,14 +40,23 @@ export function ReminderActionChips({
     inert = false,
     preventFocusOnPress,
     dueDateLabel,
-    animateLabels = false,
+    animateLabels = true,
     onOpenDatePicker,
     onOpenProjectPicker,
     onOpenRecurrencePicker,
     onTogglePriority,
 }: ReminderActionChipsProps) {
     const clock = useReminderClock();
-    const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined, undefined, clock.now, recurrence);
+    // A changed repeat rule deliberately clears the persisted occurrence in the
+    // draft. Preview the same first occurrence that saving will calculate.
+    let previewDate = dueDate;
+    if (!previewDate && recurrence) {
+        const first = calculateFirstOccurrence(recurrence);
+        previewDate = recurrence.hour !== undefined
+            ? first.toISOString()
+            : formatLocalDateKey(recurrenceCalendarDate(first, recurrence));
+    }
+    const dueDateDisplay = dueDateLabel ?? formatDueDate(previewDate ?? undefined, undefined, clock.now, recurrence);
     const renderLabel = (label: string) => animateLabels
         ? <AnimatedActionLabel>{label}</AnimatedActionLabel>
         : <span className="reminder-action-label">{label}</span>;
@@ -57,7 +69,7 @@ export function ReminderActionChips({
                 onClick={onOpenDatePicker}
                 data-action="toggle-picker" data-picker="date"
                 aria-haspopup="dialog"
-                className={`reminder-action-chip crate-semantic-token tone-primary${dueDate ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-primary${previewDate ? ' is-active' : ''}`}
             >
                 <ThemeIcon size="xs" id="calendar" />
                 {renderLabel(dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date)}

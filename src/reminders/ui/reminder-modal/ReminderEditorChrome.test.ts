@@ -8,6 +8,7 @@ import { DatePickerModal } from './DatePickerModal';
 import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
+import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
@@ -21,6 +22,28 @@ vi.mock('../../components/BaseModal', () => ({
 }));
 
 describe('reminder editor chrome', () => {
+    it.each([' ', '\u00a0'])('previews the occurrence when typing a time into a repeat rule (%j)', space => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
+        try {
+            const initial = parseReminderEditorContent('Plan next week every Fri #Work', ['Work']);
+            const edited = parseReminderEditorContent(`Plan next week every Fri${space}09:00 #Work`, ['Work']);
+            expect(initial.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5] });
+            expect(edited.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5], hour: 9, minute: 0 });
+            expect(edited.dueDate).toBeUndefined();
+            const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
+                dueDate: null, recurrence: edited.recurrence, project: 'Work', defaultProject: 'Inbox', priority: 4,
+                onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
+                onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
+            }));
+            expect(markup).toContain('09:00');
+            expect(markup).toContain('tone-primary is-active');
+            expect(markup).not.toContain('>Date<');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('focuses the title on the next paint instead of waiting for the opening animation', async () => {
         const presentation = await readFile(
             new URL('./useReminderModalPresentation.ts', import.meta.url),

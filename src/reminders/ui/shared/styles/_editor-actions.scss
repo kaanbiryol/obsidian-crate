@@ -71,6 +71,20 @@
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
+
+    &.is-animated {
+      display: inline-block;
+      max-width: 100%;
+      overflow: clip;
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow-wrap: normal;
+
+      > span {
+        display: block;
+        width: max-content;
+      }
+    }
   }
 
 }
