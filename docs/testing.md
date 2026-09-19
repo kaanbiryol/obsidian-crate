@@ -264,3 +264,29 @@ const context = {
 ## Portable visual baselines
 
 `npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.
+
+## Pasted links and page titles
+
+Run `npm run test:page-titles` for the production build, lookup/transport unit tests,
+authenticated Worker-runtime tests, and Chromium/WebKit editor tests. The browser
+cases run the shared editor in both PWA and plugin hosts; plugin title/description
+fixtures use Shadow DOM. The browser suite is also included in `test:visual` and
+`test:lexical`, while unit and Worker cases join their normal test commands.
+
+Coverage includes automatic lookup without preferences or browser storage; title and description
+pastes; selected labels; Unicode/entity/Markdown handling; caret and focus retention;
+undo/redo; concurrent and out-of-order responses; external loads, remounts, read-only
+state, and composition while a request is pending. Failure cases cover
+network errors, unsupported servers, malformed responses, empty titles, and deadlines.
+Worker tests cover authentication, expired/revoked sessions, rate limits, public URL
+validation on every redirect, request/body size bounds, stream cancellation, and
+ignoring title-like text in scripts, comments, attributes, and other raw-text elements.
+Outbound page responses are controlled fixtures; these tests do not contact websites
+or establish physical-device, installed-PWA, or hosted-network acceptance.
+
+Avoid rebuilding the generated styles from another task during browser tests: the
+visual gallery imports `dist/styles.css`, and Vite can reload an active fixture when
+that file changes. For concurrent work, build the gallery once with
+`npx vite build --config vite.visual.config.mts --outDir /tmp/crate-title-gallery`,
+serve that snapshot with `npx vite preview --config vite.visual.config.mts --outDir /tmp/crate-title-gallery --host 127.0.0.1 --port 8790`,
+and run the Playwright command against that existing server.

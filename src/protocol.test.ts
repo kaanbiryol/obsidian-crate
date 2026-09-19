@@ -3,8 +3,14 @@ import {
 	areProtocolRangesCompatible,
 	CRATE_PLUGIN_PROTOCOL,
 	isCompatibleCrateServer,
+	isCrateMutation,
 	parseCrateServerInfo,
 } from './protocol';
+
+it('treats page title lookup as a read', () => {
+	expect(isCrateMutation('/links/title', 'POST')).toBe(false);
+	expect(isCrateMutation('/reminders/update', 'POST')).toBe(true);
+});
 
 describe('Crate protocol contract', () => {
 	it('accepts server metadata with a compatible protocol range', () => {

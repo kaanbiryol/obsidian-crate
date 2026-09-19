@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { RichTextInput } from '@/reminders/components/RichTextInput';
 
 
@@ -6,6 +7,7 @@ const projects = ['Inbox', 'Work', 'Crate Demo'];
 const sample = 'Review [the notes](https://example.com/notes) #Crate Demo ! tomorrow';
 
 export function LexicalTrial() {
+  const resolvePageTitle = useContext(PageTitleContext);
   const [lexical, setLexical] = useState(sample);
   const [draft, setDraft] = useState(sample);
   const [readOnly, setReadOnly] = useState(false);
@@ -17,7 +19,7 @@ export function LexicalTrial() {
       <p>Test the shared reminder editor. Try selecting a chip, pasting several lines, and undoing your changes.</p>
     </header>
     <section aria-label="Lexical editor comparison"><h2>Reminder editor</h2>
-      <RichTextInput key={generation} readOnly={readOnly} value={lexical} onChange={setLexical} knownProjects={projects} ariaLabel="Lexical reminder" />
+      <RichTextInput key={generation} readOnly={readOnly} value={lexical} onChange={setLexical} knownProjects={projects} ariaLabel="Lexical reminder" resolvePageTitle={resolvePageTitle} />
       <details open><summary>Reminder text</summary><pre data-testid="lexical-value">{lexical}</pre></details>
     </section>
     <section><h2>Load a reminder</h2>

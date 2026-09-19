@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import { PluginContext } from '../reminders-context';
+import { PageTitleContext } from '../../components/lexical/pageTitles';
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 import type { RecurrenceRule } from '../../types';
 import { getProjectColor } from '../../utils/projectColors';
@@ -52,6 +54,12 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onOpenRecurrencePicker,
     onTogglePriority,
 }) => {
+    const plugin = PluginContext.use();
+    const resolvePageTitle = useCallback(async (url: string) => {
+        const api = plugin.syncRuntime.getApiClient();
+        const title = await api?.fetchPageTitle(url) ?? null;
+        return api === plugin.syncRuntime.getApiClient() ? title : null;
+    }, [plugin]);
     const projectColor = getProjectColor(project || defaultProject)[isDark ? 'dark' : 'light'].accent;
 
     return (
@@ -61,17 +69,19 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 data-base-ui-swipe-ignore=""
                 style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
             >
-                <ReminderEditorFields
-                    content={content}
-                    onContentChange={onContentChange}
-                    description={description}
-                    onDescriptionChange={onDescriptionChange}
-                    onKeyDown={onKeyDown}
-                    allowAutoFocus={allowAutoFocus}
-                    projects={projects}
-                    textareaRef={textareaRef}
-                    richTextInputRef={richTextInputRef}
-                />
+                <PageTitleContext.Provider value={plugin.syncRuntime.getApiClient() ? resolvePageTitle : undefined}>
+                    <ReminderEditorFields
+                        content={content}
+                        onContentChange={onContentChange}
+                        description={description}
+                        onDescriptionChange={onDescriptionChange}
+                        onKeyDown={onKeyDown}
+                        allowAutoFocus={allowAutoFocus}
+                        projects={projects}
+                        textareaRef={textareaRef}
+                        richTextInputRef={richTextInputRef}
+                    />
+                </PageTitleContext.Provider>
 
                 <ReminderActionChips
                     dueDate={dueDate}

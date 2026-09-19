@@ -84,6 +84,13 @@ export class SyncApiClient {
 		return this.http.isConfigured();
 	}
 
+	async fetchPageTitle(url: string): Promise<string | null> {
+		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
+			method: 'POST', body: JSON.stringify({ url }),
+		}, 7000);
+		return typeof result.title === 'string' ? result.title : null;
+	}
+
 	getWorkerUrl(): string {
 		return this.http.getWorkerUrl();
 	}

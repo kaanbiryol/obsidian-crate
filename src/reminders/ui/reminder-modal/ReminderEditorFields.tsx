@@ -1,6 +1,7 @@
 import { assertReminderMutationInput } from '../../core/reminderMutationInput';
 import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useContext } from 'react';
+import { PageTitleContext } from '../../components/lexical/pageTitles';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
@@ -41,6 +42,7 @@ export function ReminderEditorFields({
     titleInputProps,
     descriptionInputProps,
 }: ReminderEditorFieldsProps) {
+    const resolvePageTitle = useContext(PageTitleContext);
     const localContainerRef = useRef<HTMLDivElement>(null);
     const localDescriptionRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? localContainerRef;
@@ -69,6 +71,7 @@ export function ReminderEditorFields({
             {inputError && <p role="alert" style={{ color: 'var(--text-error, #d33)' }}>{inputError}</p>}
             <RichTextInput
                 {...titleInputProps}
+                resolvePageTitle={resolvePageTitle}
                 readOnly={disabled}
                 ariaLabel="Reminder title"
                 ref={richTextInputRef}
@@ -101,6 +104,7 @@ export function ReminderEditorFields({
             <div className="reminder-description-wrap">
                 <RichTextInput
                     {...descriptionInputProps}
+                    resolvePageTitle={resolvePageTitle}
                     readOnly={disabled}
                     markers={false}
                     ariaLabel="Reminder description"
@@ -111,6 +115,7 @@ export function ReminderEditorFields({
                     className={`reminder-description-input ios-scroll ${descriptionInputProps?.className ?? ''}`}
                 />
             </div>
+
         </div>
     );
 }

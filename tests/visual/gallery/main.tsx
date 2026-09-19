@@ -1,3 +1,4 @@
+import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { BottomTabBar } from '@/reminders/components/BottomTabBar';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { LoaderCircle, TriangleAlert } from 'lucide-react';
@@ -88,7 +89,12 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'source' || (scene === 'lexical' && host === 'plugin');
+const useShadow = scene === 'source' || (host === 'plugin' && (scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
-createRoot(mount).render(<Gallery />);
+const resolvePageTitle = async (url: string) => {
+  const response = await fetch('/__test/page-title', { method: 'POST', body: JSON.stringify({ url }) });
+  if (!response.ok) return null;
+  return ((await response.json()) as { title: string | null }).title;
+};
+createRoot(mount).render(<PageTitleContext.Provider value={new URLSearchParams(location.search).has('titles') ? resolvePageTitle : undefined}><Gallery /></PageTitleContext.Provider>);
