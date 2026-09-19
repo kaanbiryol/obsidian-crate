@@ -1,3 +1,4 @@
+@use "action";
 // Shared visual vocabulary for sync lists and comparison dialogs.
 $compact-width: 640px;
 $panel-inset: 16px;
@@ -14,33 +15,17 @@ $selection: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary))
   border-radius: 4px;
 }
 @mixin title {
-  font-size: var(--font-ui-small, 13px);
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
+  line-height: var(--reminder-line-height-normal);
 }
 @mixin metadata {
-  font-size: var(--font-ui-smaller, 12px);
+  font-size: var(--reminder-font-xs);
   color: var(--text-muted);
   line-height: 1.4;
 }
 @mixin action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  height: auto;
-  padding: 4px 8px;
-  border: 0 !important;
-  border-radius: 4px;
-  box-shadow: none;
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-  font-size: var(--font-ui-smaller, 12px);
-  line-height: 1.4;
-  font-weight: 500;
-  &:hover:enabled { background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)); }
-  &:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-  @media (max-width: $compact-width) { min-height: 44px; }
+  @include action.styles;
 }
 @mixin diff-colors {
   --crate-diff-added: var(--text-success, #37855a);

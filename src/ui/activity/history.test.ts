@@ -39,6 +39,14 @@ describe('activity history', () => {
         expect(find(container, 'crate-history-dot')).toBeUndefined();
     });
 
+    it('uses the same secondary action style as conflict review', () => {
+        const container = new FakeElement('div');
+        renderHistoryPanel(container as unknown as HTMLElement, [entry], vi.fn());
+        const button = find(container, 'crate-file-history-link');
+        expect(button?.tagName).toBe('button');
+        expect(button?.classNames.has('crate-activity-action')).toBe(true);
+    });
+
     it('shows plugin uploads and their configuration folder paths', () => {
         const uploadedPaths = Array.from({ length: 53 }, (_, index) => `.obsidian/plugins/plugin-${index}/data.json`);
         const container = render({ uploaded: 53, uploadedPaths });

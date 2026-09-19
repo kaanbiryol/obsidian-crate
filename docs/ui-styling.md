@@ -65,6 +65,14 @@ both hosts together.
 
 ## Making a visual change
 
+Modal surfaces inherit the shared theme border, including editors, exclusions,
+and mobile sheets. Do not remove it in a screen-specific rule. Standard text
+actions use `src/ui/shared/styles/_action.scss` for typography, geometry, transparent
+backgrounds, theme-derived borders, and interaction states. Reminder header actions retain their transparent text-button
+style in `_modal-header.scss`; icon controls use the shared icon button. Keep semantic
+danger/accent treatments and responsive touch targets, but use the shared tokens
+instead of introducing a separate palette or button style for each screen.
+
 1. Change the shared component or stylesheet when the rule should apply to both
    hosts. Use existing tokens before adding a new one.
 2. For a new token, give both hosts a complete value or fallback. Keep theme

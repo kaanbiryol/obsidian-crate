@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/action";
 /* Crate supplies its own accessible close control in these modal shells. */
 .crate-custom-modal-close > .modal-close-button,
 .crate-custom-modal-close > .modal-header-button {
@@ -67,10 +68,7 @@
 	.crate-modal-body { padding: 16px; }
 	.reminder-modal-header-title { white-space: normal; }
 	.setting-item-control button {
-		background: var(--interactive-normal);
-		color: var(--text-normal);
-		box-shadow: var(--input-shadow);
-		&:hover { background: var(--interactive-hover); }
+		@include action.styles;
 		&.mod-cta { background: var(--interactive-accent); color: var(--text-on-accent); }
 		&.mod-warning { background: color-mix(in srgb, var(--text-error) 10%, transparent); color: var(--text-error); }
 	}
@@ -184,9 +182,9 @@
 }
 
 .modal.crate-shared-modal.crate-file-history-modal {
-	width: min(940px, calc(100vw - 48px));
-	max-width: 940px;
-	height: min(660px, calc(100dvh - 48px));
+	width: min(800px, calc(100vw - 48px));
+	max-width: 800px;
+	height: min(560px, calc(100dvh - 48px));
 	max-height: calc(100dvh - 48px);
 	box-sizing: border-box;
 	.modal-content { display: flex; flex-direction: column; height: 100%; max-height: none; overflow: hidden; }

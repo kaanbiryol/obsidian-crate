@@ -1,3 +1,4 @@
+@use "action";
 @mixin styles {
 .base-modal-surface.delete-confirmation-surface {
   position: relative;
@@ -61,25 +62,13 @@
 }
 
 .delete-confirmation-button {
+  @include action.styles;
   min-width: 72px;
-  min-height: 32px;
   padding: 0 var(--size-4-3, 12px);
-  border: 1px solid transparent;
-  border-radius: var(--crate-radius-button);
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-medium);
-  line-height: var(--reminder-line-height-tight);
 }
 
 .delete-confirmation-cancel {
-  border-color: var(--crate-divider);
-  background: var(--crate-control-bg);
   color: var(--text-normal);
-
-  &:hover:not(:disabled) {
-    border-color: var(--crate-divider-strong);
-    background: var(--crate-control-hover-bg);
-  }
 }
 
 .delete-confirmation-confirm {
@@ -93,7 +82,7 @@
 
 @media (max-width: 640px) {
   .base-modal-surface.delete-confirmation-surface {
-    border-radius: max(16px, var(--crate-radius-sheet));
+    border-radius: var(--crate-radius-sheet);
   }
 
   .delete-confirmation-message {
@@ -112,8 +101,6 @@
     min-height: 48px;
     height: auto;
     padding: 12px;
-    border-radius: max(10px, var(--crate-radius-button));
-    font-size: max(16px, var(--reminder-font-sm));
     white-space: normal;
     overflow-wrap: anywhere;
   }

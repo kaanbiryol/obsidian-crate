@@ -125,7 +125,7 @@ export class ActivityModal extends BaseUiModal {
 
 		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
 		this.syncBtn = header.createEl('button', {
-			cls: 'crate-sync-now-btn reminder-modal-header-action',
+			cls: 'crate-sync-now-btn crate-sync-primary-action reminder-modal-header-action',
 			attr: { type: 'button', 'aria-label': 'Sync vault', title: 'Sync all local and remote changes, including unchecked files.' },
 		});
 		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
@@ -268,10 +268,7 @@ export class ActivityModal extends BaseUiModal {
 			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
 		} : undefined;
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? [], historyRuntime ? path => {
-			this.close();
-			openRemoteRecoveryModal(this.app, historyRuntime, path, () => {
-				new ActivityModal(this.app, this.settings, this.deps, 'history').open();
-			});
+			openRemoteRecoveryModal(this.app, historyRuntime, path);
 		} : undefined);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));

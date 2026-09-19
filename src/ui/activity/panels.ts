@@ -67,7 +67,7 @@ export function renderConflictsPanel(container: HTMLElement, conflicts: Conflict
 			text: `Original: ${conflict.originalPath} · ${conflict.cause === 'incoming-review' ? 'Manual file review required; original retained' : conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
 		});
 		if (onReview) {
-			const review = row.createEl('button', { text: 'Review', cls: 'crate-conflict-review-button', attr: { type: 'button', 'aria-label': `Review conflict for ${conflict.originalPath}` } });
+			const review = row.createEl('button', { text: 'Review', cls: 'crate-conflict-review-button crate-activity-action', attr: { type: 'button', 'aria-label': `Review conflict for ${conflict.originalPath}` } });
 			review.addEventListener('click', () => onReview(conflict));
 		}
 	}

@@ -1,12 +1,6 @@
 @use "../../ui/shared/styles/sync-review";
 @use "../../ui/shared/styles/navigation-row";
 
-.crate-reminders-ui .crate-activity-surface.is-centered {
-    width: min(940px, calc(100vw - 48px));
-    max-width: 940px;
-    height: min(660px, calc(100dvh - 48px));
-    padding-bottom: 0;
-}
 .crate-activity-panel.has-file-browser { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 .crate-pending-browser {
     display: grid;

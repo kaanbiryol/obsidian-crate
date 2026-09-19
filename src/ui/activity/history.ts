@@ -68,7 +68,7 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, ope
 		for (const filePath of group.paths) {
 			const card = renderFileMicroCard(filesEl, filePath, group.type);
 			if (openFileHistory) {
-				const button = card.createEl('button', { cls: 'crate-file-history-link', text: 'File history', attr: { type: 'button', 'aria-label': `File history for ${filePath}` } });
+				const button = card.createEl('button', { cls: 'crate-file-history-link crate-activity-action', text: 'File history', attr: { type: 'button', 'aria-label': `File history for ${filePath}` } });
 				button.addEventListener('click', () => openFileHistory(filePath));
 			}
 		}
