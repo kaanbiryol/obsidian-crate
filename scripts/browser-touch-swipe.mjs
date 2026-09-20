@@ -4,6 +4,11 @@ import { chromium } from '@playwright/test';
 // Chromium receives native touch input. Desktop WebKit has no touch-drag API;
 // dispatch its TouchEvents to cover the drawer's gesture arbitration there.
 export async function swipe(page, target, distance = 120, duration = 80) {
+	// WebKit can emit a layout-driven mouse hover at the previous tap location
+	// while a synthetic finger drags the sheet. Base UI then reads that hover as
+	// a reversed drag. Park the desktop cursor outside the viewport so this touch
+	// gesture has one input source; do not suppress the app's pointer handlers.
+	await page.mouse.move(-1, -1);
 	const box = await target.boundingBox();
 	assert.ok(box);
 	const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };

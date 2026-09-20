@@ -11,7 +11,7 @@ import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
 
 type Files = Record<string, FileEntry>;
-export interface HistoryRestoreItem { path: string; action: 'revert' | 'restore' | 'remove' }
+interface HistoryRestoreItem { path: string; action: 'revert' | 'restore' | 'remove' }
 export interface HistoryRestoreReview {
     items: HistoryRestoreItem[];
     unchangedCount: number;

@@ -27,13 +27,13 @@ async function verify(browser) {
 	const errors = [];
 	for (const tab of [page, other]) tab.on('pageerror', error => errors.push(error.message));
 	let fail = true;
-	const attempts = []; const committed = [];
+	const attempts = []; const confirmed = [];
 	await context.route('**/outbox-seed', route => route.fulfill({ body: '<!doctype html><title>Seed</title>', contentType: 'text/html' }));
 	await context.route('**/reminders/create', async route => {
 		const body = route.request().postDataJSON(); attempts.push(body);
 		if (fail) return route.fulfill({ status: 503, body: 'Injected network failure' });
 		const result = await route.fetch();
-		expect(result.ok()).toBe(true); committed.push(body);
+		expect(result.ok()).toBe(true); confirmed.push(body);
 		return route.fulfill({ response: result });
 	});
 	try {
@@ -62,8 +62,24 @@ async function verify(browser) {
 		for (const tab of [page, other]) await card(tab, 'Healthy pending creation').waitFor();
 		await page.getByRole('button', { name: 'Resume saved changes', exact: true }).click();
 		for (const tab of [page, other]) await card(tab, 'Healthy recovered creation').waitFor();
-		expect(committed.map(body => body.operationId).sort()).toEqual([healthyId, oldHealthyId].sort());
+		// A second tab may receive the same receipt after retrying an uncertain
+		// command. Assert immutable requests and unique effects, not request count.
+		expect([...new Set(confirmed.map(body => body.operationId))].sort()).toEqual([healthyId, oldHealthyId].sort());
 		expect(attempts.every(body => [healthyId, oldHealthyId].includes(body.operationId))).toBe(true);
+		const response = await fetch(`${origin}/reminders/list?folderPath=Reminders`, {
+			headers: { Authorization: `Bearer ${previewAuthToken}` },
+		});
+		expect(response.ok).toBe(true);
+		const { reminders } = await response.json();
+		for (const [operationId, content] of [[healthyId, 'Healthy pending creation'], [oldHealthyId, 'Healthy recovered creation']]) {
+			for (const body of attempts.filter(attempt => attempt.operationId === operationId)) {
+				expect(body).toEqual({ operationId, id: operationId, folderPath: 'Reminders', content, project: 'Inbox', priority: 4 });
+			}
+			const stored = reminders.filter(reminder => reminder.id === operationId);
+			expect(stored).toHaveLength(1);
+			expect(stored[0].content).toBe(content);
+			for (const tab of [page, other]) await expect(card(tab, content)).toHaveCount(1);
+		}
 		expect(await page.evaluate(key => localStorage.getItem(key), healthyKey)).toBeNull();
 		expect(await page.evaluate(key => localStorage.getItem(key), oldHealthyKey)).toBeNull();
 		await notice(page).getByText('Review damaged entries', { exact: true }).focus();
