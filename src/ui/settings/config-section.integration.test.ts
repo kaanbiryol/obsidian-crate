@@ -58,7 +58,25 @@ afterEach(() => {
 });
 
 describe('renderConfigSection integration', () => {
-	it('uses Cloudflare as the only unconfigured-device connection path', async () => {
+	it('shows local management guidance without Cloudflare dashboard or update controls', async () => {
+		const { renderServerSection, renderServerUpdateNotice } = await loadConfigSectionModule();
+		const context = {
+			containerEl: new FakeElement('div') as never,
+			plugin: { manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: null, workerUrl: 'http://localhost:8787' },
+				syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn(async () => ({ serverRevision: 56 })) },
+			} as never,
+			rerender: vi.fn(),
+		};
+		renderServerSection(context);
+		renderServerUpdateNotice(context);
+		await flushMicrotasks();
+		const names = MockSetting.instances.map(setting => setting.nameEl.textContent);
+		expect(names).toContain('Self-hosted server');
+		expect(names).not.toContain('Cloudflare dashboard');
+		expect(names).not.toContain('Cloudflare update available');
+	});
+
+	it('offers Cloudflare and a self-hosted connection on an unconfigured device', async () => {
 		const { renderConfigSection } = await loadConfigSectionModule();
 
 		renderConfigSection({
@@ -72,6 +90,7 @@ describe('renderConfigSection integration', () => {
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Connect with Cloudflare',
+			'Server address', 'Pairing code or access token', 'Connect to your server',
 		]);
 		expect(getSettingByName('Connect with Cloudflare').descEl.textContent).toBe(
 			'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.',
@@ -259,6 +278,8 @@ it.each([false, true])('disconnects with optional forgetting (%s)', async forget
 		writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
 	};
 	openConfirmationModal.mockImplementation(async (_app: unknown, options: ConfirmationModalOptions) => {
+		expect(options.message).toBe('Sync will stop on this device.');
+		expect(options.details).toEqual(['Your local files, server data, and Cloudflare login are kept. Other devices stay connected.']);
 		expect(options.checkbox!.label).toBe('Forget saved connection');
 		if (forget) options.checkbox!.onChange(true);
 		return true;

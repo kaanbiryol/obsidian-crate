@@ -79,6 +79,7 @@ describe('renderDevicesSection', () => {
 			containerEl: new FakeElement('div') as never,
 			plugin: {
 				app: {},
+				settings: { cloudflareDeployment: { accountId: 'account' } },
 				settingsUiState: { devices: null },
 				syncRuntime: {
 					getApiClient: () => ({

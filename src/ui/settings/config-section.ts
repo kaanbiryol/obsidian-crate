@@ -7,6 +7,7 @@ import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading, createSettingsDisclosure } from './section-helpers';
+import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 
 export function renderConfigSection(context: ConfigSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
@@ -30,6 +31,7 @@ export function renderConfigSection(context: ConfigSectionContext, showHeading =
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
 				}));
+		renderSelfHostedSetting(context);
 	}
 }
 
@@ -77,6 +79,12 @@ export function renderServerSection(context: ConfigSectionContext): void {
     }
 	const details = createSettingsDisclosure(containerEl, 'Server details');
 	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');
+	if (!deployment) {
+		renderSelfHostedAddressSetting({ ...context, containerEl: details });
+		new Setting(details).setName('Self-hosted server')
+			.setDesc('Manage updates, backups, and new device tokens on the computer running this server.');
+		return;
+	}
 	new Setting(details).setName('Cloudflare dashboard')
 		.addButton(button => button.setButtonText('Open Cloudflare').onClick(() => {
 			window.open('https://dash.cloudflare.com/', '_blank', 'noopener,noreferrer');
@@ -102,7 +110,9 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Disconnect this device',
 						message: 'Sync will stop on this device.',
-						details: ['Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'],
+						details: [deployment
+							? 'Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'
+							: 'Your access token is revoked when the server is reachable. Local files and server data are kept. Other devices stay connected. Generate a new pairing code on your server to reconnect.'],
 						checkbox: deployment && !deployment.reset ? {
 							label: 'Forget saved connection',
 							description: 'You’ll need to select a server to reconnect.',

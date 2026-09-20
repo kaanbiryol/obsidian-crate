@@ -10,6 +10,15 @@ All non-public API endpoints require an `Authorization: Bearer <token>` header. 
 
 Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. These tokens cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
+Self-hosted installations additionally have a Node gateway, outside the Worker:
+`GET /__crate/ready` returns a per-process readiness identifier, and
+`POST /__crate/pair` exchanges `{ code }` for `{ authToken }`. Pairing codes have
+256 bits of randomness, expire after ten minutes, and are claimed once before
+credential creation. Only a local authenticated administration socket can issue
+codes; this socket is never forwarded through the public tunnel. The gateway
+does not enable device registration on Cloudflare-hosted Workers. Existing vault
+tokens and scoped PWA enrollment keep their current behavior.
+
 ## Endpoints
 
 | Method | Path | Purpose |

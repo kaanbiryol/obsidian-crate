@@ -67,3 +67,7 @@ Maintain at least the current and immediately preceding safe protocol through th
 
 
 Server revisions and database versions now start at 1 independently of the existing wire protocol. See [server upgrades](server-upgrades.md) for the empty registry, checkpoint integration requirement, verification and release rules.
+
+## Local server storage
+
+Self-hosted Miniflare storage requires the same runtime version and schema hash, and an equal or newer server revision. `check-upgrade` validates these constraints without changing stored data. Runtime or schema changes are blocked until a tested migration exists; editing metadata does not make them compatible. Keep a verified backup and its matching installation before updating. See [self-hosting backup and restore](self-hosting.md#verified-backups-restore-and-updates).

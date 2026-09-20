@@ -369,9 +369,12 @@ export class SyncRuntime {
 		}, FOREGROUND_SYNC_DEBOUNCE_MS);
 	}
 
-	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal): Promise<void> {
+	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal, expected?: ApplyInfrastructureConfigInput): Promise<void> {
 		return this.changeConfiguration(async () => {
 			signal?.throwIfAborted();
+			if (expected && (this.settings.workerUrl !== expected.workerUrl || this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken)) {
+				throw new Error('The server connection changed. Reopen settings and try again.');
+			}
 			const workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
 			if (!config.authToken.trim()) throw new Error('Auth token is required');
 			const changingServer = workerUrl !== normalizeWorkerUrl(this.settings.workerUrl);
