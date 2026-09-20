@@ -101,13 +101,14 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 					let forgetConnection = false;
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Disconnect this device',
-						message: 'Disconnect this device from its Crate server?',
-						details: ['Sync stops on this device. Local files, server data, and your Cloudflare login are kept. Other devices stay connected. Your saved server connection is kept unless you choose to forget it.'],
+						message: 'Sync will stop on this device.',
+						details: ['Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'],
 						checkbox: deployment && !deployment.reset ? {
-							label: 'Also forget the saved server connection',
+							label: 'Forget saved connection',
+							description: 'You’ll need to select a server to reconnect.',
 							onChange: checked => { forgetConnection = checked; },
 						} : undefined,
-						confirmText: 'Disconnect this device',
+						confirmText: 'Disconnect',
 						warning: true,
 					});
 					if (!confirmed) {

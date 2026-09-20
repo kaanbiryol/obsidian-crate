@@ -41,7 +41,7 @@ describe('selectCloudflareServer', () => {
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Notes',
 			'Work',
-			'Create server',
+			'New server',
 		]);
 		MockSetting.instances[1]?.buttons[0]?.click();
 		await expect(result).resolves.toBe(second);
@@ -68,7 +68,7 @@ it('explains a missing previous vault and offers creation', async () => {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	const { selectCloudflareServer } = await import('./cloudflare-server-picker-modal');
 	const result = selectCloudflareServer({} as never, [], true);
-	expect(MockModal.instances[0]?.titleEl.textContent).toBe('Your previous server is no longer available');
+	expect(MockModal.instances[0]?.titleEl.textContent).toBe('Server unavailable');
 	MockSetting.instances[0]?.buttons[0]?.click();
 	await expect(result).resolves.toBe('create');
 });

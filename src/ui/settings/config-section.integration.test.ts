@@ -259,7 +259,7 @@ it.each([false, true])('disconnects with optional forgetting (%s)', async forget
 		writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
 	};
 	openConfirmationModal.mockImplementation(async (_app: unknown, options: ConfirmationModalOptions) => {
-		expect(options.checkbox!.label).toBe('Also forget the saved server connection');
+		expect(options.checkbox!.label).toBe('Forget saved connection');
 		if (forget) options.checkbox!.onChange(true);
 		return true;
 	});

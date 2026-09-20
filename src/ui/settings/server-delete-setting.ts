@@ -21,16 +21,16 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
                     title: label,
                     message: 'Permanently delete this Crate server and all its remote data?',
                     details: [
-                        `Account: ${deployment.accountName ?? deployment.accountId} (${deployment.accountId})`,
+                        'All devices will lose access. Deleted server data cannot be recovered.',
+                        'Your local vault files are kept. Other Crate servers and unrelated Cloudflare resources are kept.',
+                        'This removes the web app, remote files and versions, recovery history, reminders, and device registrations with their push subscriptions.',
+                        `Account: ${deployment.accountName ? `${deployment.accountName} (${deployment.accountId})` : deployment.accountId}`,
                         `Worker: ${deployment.workerName}`,
                         `Database: ${deployment.d1DatabaseName} (${deployment.d1DatabaseId})`,
                         `File bucket: ${deployment.r2BucketName}`,
-                        'The Worker, web app, remote files, retained versions, recovery history, database, reminders, device registrations, and push subscriptions will be removed.',
-                        'All devices lose access to this server. Your local vault files are kept. Deleted server data cannot be recovered.',
-                        'To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync now.',
-                        'Other Crate deployments and unrelated Cloudflare resources are kept.',
+                        'To sync again, connect with Cloudflare, create a new server, then run Crate: Sync now.',
                     ],
-                    confirmText: 'Delete server and all data',
+                    confirmText: 'Delete server',
                     warning: true,
                 });
                 if (!confirmed) return;

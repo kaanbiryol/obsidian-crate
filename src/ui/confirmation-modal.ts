@@ -8,7 +8,7 @@ export interface ConfirmationModalOptions {
 	confirmText: string;
 	cancelText?: string;
 	warning?: boolean;
-	checkbox?: { label: string; onChange: (checked: boolean) => void };
+	checkbox?: { label: string; description?: string; onChange: (checked: boolean) => void };
 }
 
 class ConfirmationModal extends SharedModal {
@@ -49,7 +49,10 @@ class ConfirmationModal extends SharedModal {
 
 		if (this.options.checkbox) {
 			const checkbox = this.options.checkbox;
-			new Setting(contentEl).setName(checkbox.label)
+			new Setting(contentEl)
+				.setClass('crate-confirmation-option')
+				.setName(checkbox.label)
+				.setDesc(checkbox.description ?? '')
 				.addToggle(toggle => toggle.setValue(false).onChange(checkbox.onChange));
 		}
 
