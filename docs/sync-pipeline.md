@@ -198,7 +198,8 @@ File events (create, modify, delete, rename) are debounced before syncing:
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
 5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
 6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
-7. A conditional-write conflict sends only the affected queue keys through a bounded three-attempt reconciliation pass; current remote metadata is fetched only for those paths, and unrelated vault paths are not scanned
+7. After successful reconciliation, pending events from applied downloads, merges, and deletions are checked against the committed local baseline. Matching contents clear in the same run; newer events or differing contents stay pending. Incremental paths whose local and remote hashes already match also settle without another transfer.
+8. A conditional-write conflict sends only the affected queue keys through a bounded three-attempt reconciliation pass; current remote metadata is fetched only for those paths, and unrelated vault paths are not scanned
 
 If a local Markdown file changes after an automatic merge has already been accepted remotely, Crate keeps the uploaded local snapshot as a virtual merge base and immediately replans the path. This prevents both overwriting the newer local edit and duplicating changes already included in the remote merge.
 
