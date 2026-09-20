@@ -22,6 +22,7 @@ function harness(automaticSync = true) {
         saveHistoryCheckpoint: vi.fn(async () => 'b'.repeat(64)),
         createHistoryRestore: vi.fn(async (_id: string, beforeApply: () => Promise<void>) => ({
             items: [{ path: 'note.md', action: 'revert' as const }], unchangedCount: 2,
+            preview: async () => ({ current: 'new', saved: 'old' }),
             restore: async () => { await beforeApply(); await apply(); }, verifySynced,
         })),
     };
@@ -33,6 +34,8 @@ describe('history restore orchestration', () => {
     it.each([true, false])('persists the pause before writes and restores the previous automatic-sync setting (%s) only after verifying sync', async automaticSync => {
         const h = harness(automaticSync);
         const review = await h.runtime.createHistoryRestore(h.entry);
+        expect(await review.preview('note.md')).toEqual({ current: 'new', saved: 'old' });
+        expect(h.apply).not.toHaveBeenCalled();
         expect(h.persistSettings).not.toHaveBeenCalled();
         await review.restore();
         expect(h.apply).toHaveBeenCalledOnce();
@@ -64,6 +67,7 @@ describe('history restore orchestration', () => {
         const h = harness();
         const review = await h.runtime.createHistoryRestore(h.entry);
         setSyncEngine(h.runtime, { ...h.engine });
+        await expect(review.preview('note.md')).rejects.toThrow('connection changed');
         await expect(review.restore()).rejects.toThrow('connection changed');
         expect(h.apply).not.toHaveBeenCalled();
     });

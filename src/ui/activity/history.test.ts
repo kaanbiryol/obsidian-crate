@@ -107,7 +107,7 @@ it('renders a collapsed no-change row with its latest time', () => {
         timestamp: new Date(2026, 8, 19, hour, 15).toISOString() }));
     renderHistoryPanel(container as unknown as HTMLElement, history);
     expect(container.collectText()).toContain('No changes · 3 checks');
-    expect(find(container, 'crate-history-time')?.collectText()).toBe('14:15');
+    expect(find(container, 'crate-history-time')?.collectText()).toBe('14:15:00');
     expect(find(container, 'crate-history-details')).toBeUndefined();
 });
 
@@ -128,12 +128,33 @@ it('offers a checkpoint restore independently of truncated file lists', () => {
     const container = new FakeElement('div');
     renderHistoryPanel(container as unknown as HTMLElement, [{ ...entry, uploaded: 400, uploadedPaths: [], historyCheckpoint: 'a'.repeat(64) }], undefined, vi.fn());
     expect(find(container, 'crate-history-details')).toBeDefined();
-    expect(container.collectText()).toContain('Return to this state');
+    expect(container.collectText()).toContain('Review restore point');
 });
 
 it('explains why older entries cannot restore the whole vault', () => {
     const container = new FakeElement('div');
     renderHistoryPanel(container as unknown as HTMLElement, [entry], undefined, vi.fn());
     expect(container.collectText()).toContain('This entry has no available vault checkpoint');
-    expect(container.collectText()).not.toContain('Return to this state');
+    expect(container.collectText()).not.toContain('Review restore point');
+});
+
+
+it('identifies same-minute restore points and exposes review without expanding file lists', () => {
+    const container = new FakeElement('div');
+    renderHistoryPanel(container as unknown as HTMLElement, [
+        { ...entry, timestamp: '2026-09-20T10:18:42Z', sharedCheckpoint: '12345678-1234-1234-1234-123456789012' },
+        { ...entry, timestamp: '2026-09-20T10:18:07Z', historyCheckpoint: 'b'.repeat(64) },
+    ], undefined, vi.fn());
+    const timeline = find(container, 'crate-activity-timeline')!;
+    const rows = timeline.children[0]!.children.slice(1);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.collectText()).not.toContain('Restore point 12345678');
+    expect(rows[1]!.collectText()).not.toContain('Restore point bbbbbbbb');
+    expect(find(rows[0]!, 'crate-history-header')?.collectText()).not.toContain('Inbox.md');
+    expect(find(rows[0]!, 'crate-history-files')?.collectText()).toContain('Inbox.md');
+    expect(find(rows[0]!, 'crate-history-time')?.collectText()).toMatch(/:18:42$/);
+    expect(find(rows[1]!, 'crate-history-time')?.collectText()).toMatch(/:18:07$/);
+    for (const row of rows) {
+        expect(row.children.some(child => child.classNames.has('crate-history-state-actions'))).toBe(true);
+    }
 });

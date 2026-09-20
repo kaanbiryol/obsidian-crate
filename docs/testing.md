@@ -319,6 +319,13 @@ Whole-vault history restore is covered by `src/sync/history-restore.test.ts`,
 `src/cloudflare/worker/history-state-restore.integration.ts`. The file-history browser
 harness also checks the checkpoint action, per-file preview, cancellation, busy
 controls, unavailable versions, and retry in both engines and viewport sizes.
+History rows show second-level timestamps; restore-point IDs appear in the review. Browser checks
+cover selecting same-minute points, exact-point text diffs, addition/removal
+previews, escaped text, and ignoring stale previews when switching files.
+The restore review reuses the file-history split layout: files on the left and a
+diff on the right, with list/detail navigation on mobile and a fixed action footer.
+Browser checks cover pane layout, keyboard focus return, and cancelling the final
+restore confirmation without changing files.
 For native Obsidian acceptance, verify dismissal is blocked while restoring,
 restore an edit/deletion/rename/addition checkpoint in a disposable synced vault,
 and confirm another device converges. Interrupt a restore and restart Obsidian to
