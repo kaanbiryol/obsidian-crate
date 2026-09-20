@@ -22,7 +22,7 @@ const { outputFiles } = await build({
         HTMLElement.prototype.empty = function() { this.replaceChildren(); };
         Object.defineProperty(HTMLElement.prototype, 'win', { get: () => window });
         window.current = 'Title\\nCurrent change'; window.saved = 'Title\\nSaved change';
-        window.writes = []; window.opened = [];
+        window.writes = []; window.opened = []; window.revealed = [];
         window.mount = () => {
             window.modal = new ConflictReviewModal({}, { originalPath: 'Note.md', conflictPath: 'Note.conflict.md' }, async () => ({
                 currentText: window.current, savedText: window.saved, currentSize: 20, savedSize: 18,
@@ -36,10 +36,10 @@ const { outputFiles } = await build({
     plugins: [{ name: 'host-fixture', setup(builder) {
         builder.onResolve({ filter: /^(obsidian|\.\.\/shared\/SharedModal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `
-            export const Platform = { isMobile: innerWidth < 600, isDesktopApp: true };
+            export const Platform = { isMobile: innerWidth < 600, isDesktopApp: innerWidth >= 600 };
             export class Notice {}
             export function setIcon() {}
-        ` : args.path === './file-actions' ? 'export const getPendingFileActions = () => [];' : `
+        ` : args.path === './file-actions' ? `export const getPendingFileActions = (_app, path) => innerWidth < 600 ? [] : [{ id: 'reveal', title: 'Reveal in Finder', run: async () => { window.revealed.push(path); } }];` : `
             export class SharedModal {
                 constructor() {
                     this.modalEl = document.createElement('div'); this.modalEl.className = 'modal crate-shared-modal';
@@ -86,7 +86,12 @@ for (const browserType of [chromium, webkit]) {
             await expect(result).toBeHidden();
             await custom.check();
             await expect(result).toHaveValue('Title\nCurrent change\nSaved change');
-            await page.getByRole('button', { name: 'Current file', exact: true }).click();
+            const actionTitle = width >= 600 ? 'Reveal in Finder' : 'Open file in Obsidian';
+            await expect(page.locator('.crate-conflict-version > button')).toHaveCount(0);
+            await page.getByRole('button', { name: `${actionTitle}: Saved copy`, exact: true }).click();
+            await page.getByRole('button', { name: `${actionTitle}: Current file`, exact: true }).click();
+            assert.deepEqual(await page.evaluate(() => window.revealed), width >= 600 ? ['Note.conflict.md', 'Note.md'] : []);
+            assert.deepEqual(await page.evaluate(() => window.opened), width >= 600 ? [] : ['saved', 'current']);
             await page.evaluate(() => { window.current = 'New current text'; window.dispatchEvent(new Event('focus')); });
             await expect(page.getByRole('status')).toContainText('Versions refreshed');
             await expect(custom).toBeChecked();

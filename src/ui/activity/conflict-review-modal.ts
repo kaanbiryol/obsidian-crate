@@ -54,8 +54,10 @@ export class ConflictReviewModal extends SharedModal {
         const intro = body.createDiv({ cls: 'crate-conflict-intro' });
         const fileInfo = intro.createDiv({ cls: 'crate-conflict-file-heading' });
         const parts = this.record.originalPath.split('/');
-        fileInfo.createEl('h3', { text: parts.pop()!, cls: 'crate-conflict-review-path' });
-        fileInfo.createSpan({ text: parts.join('/') || 'Vault root', cls: 'crate-conflict-review-help' });
+        const filename = parts.pop()!;
+        const heading = fileInfo.createEl('h3', { cls: 'crate-conflict-review-path' });
+        if (parts.length) heading.createSpan({ text: `${parts.join('/')}/`, cls: 'crate-conflict-review-folder' });
+        heading.createSpan({ text: filename });
         body.createEl('p', { text: 'Choose which version to keep, or edit a combined result.', cls: 'crate-conflict-review-help' });
         const status = body.createDiv({ cls: 'crate-conflict-review-help', attr: { role: 'status', 'aria-live': 'polite' } });
         if (returning) status.setText('Versions refreshed. Review the latest content and choose a result. Your result draft, if any, is preserved.');
@@ -78,28 +80,19 @@ export class ConflictReviewModal extends SharedModal {
         ] as const) {
             const panel = compare.createDiv({ cls: 'crate-conflict-version' });
             const heading = panel.createEl('h3');
-            const open = button(heading, title, () => {
+            const path = version === 'current' ? this.record.originalPath : this.record.conflictPath;
+            const reveal = getPendingFileActions(this.app, path, () => {}).find(action => action.id === 'reveal');
+            const actionTitle = reveal?.title ?? 'Open file in Obsidian';
+            const action = button(heading, title, () => {
                 this.awaitingExternal = true;
-                void review.openVersion(version).catch((error: unknown) => {
+                void (reveal ? reveal.run() : review.openVersion(version)).catch((error: unknown) => {
                     this.awaitingExternal = false;
                     status.setText(error instanceof Error ? error.message : String(error));
                 });
             });
-            open.title = Platform.isDesktopApp ? 'Open in the default system application' : 'Open file in Obsidian';
-            setIcon(open.createSpan({ attr: { 'aria-hidden': 'true' } }), 'external-link');
-            const path = version === 'current' ? this.record.originalPath : this.record.conflictPath;
-            const reveal = getPendingFileActions(this.app, path, () => {}).find(action => action.id === 'reveal');
-            if (reveal) {
-                const revealButton = button(panel, reveal.title, () => {
-                    this.awaitingExternal = true;
-                    void reveal.run().catch((error: unknown) => {
-                        this.awaitingExternal = false;
-                        status.setText(error instanceof Error ? error.message : String(error));
-                    });
-                });
-                revealButton.addClass('crate-conflict-action');
-                revealButton.setAttribute('aria-label', `${reveal.title}: ${title}`);
-            }
+            action.title = actionTitle;
+            action.setAttribute('aria-label', `${actionTitle}: ${title}`);
+            setIcon(action.createSpan({ attr: { 'aria-hidden': 'true' } }), 'external-link');
             if (textPreview) {
                 const code = panel.createEl('pre', { cls: 'crate-conflict-code', attr: { tabindex: '0', 'aria-label': title } });
                 for (const row of diff!.rows) renderConflictDiffLine(code, row[version], version);
@@ -107,7 +100,7 @@ export class ConflictReviewModal extends SharedModal {
                 code.addEventListener('scroll', () => {
                     for (const other of previews) if (other !== code && other.scrollTop !== code.scrollTop) other.scrollTop = code.scrollTop;
                 });
-            } else panel.createEl('p', { text: `${Math.ceil(size / 1024)} KB · Select the title to open this file.` });
+            } else panel.createEl('p', { text: `${Math.ceil(size / 1024)} KB · ${reveal ? `Select the title to ${reveal.title.toLowerCase()}.` : 'Select the title to open this file.'}` });
         }
         const manual = body.createDiv({ cls: 'crate-conflict-manual' });
         manual.createEl('h3', { text: 'Custom result' });
