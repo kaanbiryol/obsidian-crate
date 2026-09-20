@@ -1,0 +1,50 @@
+@use "../../ui/shared/styles/sync-review";
+
+.modal.crate-shared-modal.crate-file-history-modal.crate-vault-history-modal:not(.is-mobile) {
+    width: min(1120px, calc(100vw - 48px));
+    max-width: 1120px;
+}
+
+.crate-reminders-ui {
+    .crate-history-timeline-toolbar {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        min-height: 44px; margin-bottom: 6px; padding: 0 10px;
+        .crate-history-day-label { margin: 0; min-width: 0; }
+        .crate-activity-action { margin-left: auto; flex-shrink: 0; }
+    }
+
+}
+
+.crate-reminders-ui .crate-file-history.crate-history-browser {
+    &[hidden] { display: none; }
+    container-type: inline-size;
+    padding: 0 16px 16px;
+    overflow: hidden;
+    scrollbar-gutter: auto;
+    gap: 12px;
+    .crate-history-browser-workspace { display: grid; grid-template-columns: minmax(160px, 20%) minmax(160px, 20%) minmax(0, 1fr); flex: 1; min-height: 0; }
+    .crate-history-syncs, .crate-history-event-files, .crate-history-preview-pane { min-width: 0; min-height: 0; overflow: auto; padding: 8px 12px; overscroll-behavior: contain; }
+    .crate-history-syncs, .crate-history-event-files { border-right: 1px solid sync-review.$pane-divider; }
+    .crate-history-syncs { padding-left: 0; }
+    .crate-history-preview-pane { display: block; padding-right: 0; }
+    .crate-history-group { margin-top: 8px; }
+    .crate-history-description { margin: 8px 0 12px; overflow-wrap: anywhere; }
+    .crate-history-pane-back { display: none; align-items: center; gap: 6px; margin-bottom: 12px; svg { display: block; width: 14px; height: 14px; } }
+    .crate-history-preview-header h3:focus, .crate-history-event-files h3:focus { outline: none; }
+    .crate-history-comparison { margin-bottom: 0; }
+    .crate-history-preview-output { overflow: visible; }
+    .crate-history-browser-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid sync-review.$pane-divider; }
+    .crate-history-browser-footer:empty { display: none; }
+    .crate-history-browser-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+    .crate-diff-code:focus-visible { outline-color: var(--interactive-accent); }
+    @container (max-width: 800px) {
+        .crate-history-browser-workspace { display: block; position: relative; }
+        .crate-history-syncs, .crate-history-event-files, .crate-history-preview-pane { display: none; position: absolute; inset: 0; height: auto; border: 0; padding: 8px 0; }
+        &[data-pane="history"] .crate-history-syncs,
+        &[data-pane="files"] .crate-history-event-files,
+        &[data-pane="diff"] .crate-history-preview-pane { display: block; }
+        .crate-history-pane-back { display: inline-flex; }
+        button, button.crate-activity-action { min-height: 44px; }
+        .crate-history-browser-footer > .crate-history-hint { display: none; }
+    }
+}

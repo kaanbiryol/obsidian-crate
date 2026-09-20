@@ -140,7 +140,7 @@
 .crate-reminders-ui .crate-activity-modal button.crate-activity-action,
 .crate-reminders-ui button.crate-sync-primary-action,
 .modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
-.modal.crate-history-restore-modal .crate-reminders-ui button.crate-activity-action,
+.modal.crate-vault-history-modal .crate-reminders-ui button.crate-activity-action,
 .crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
 .modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
     @include action.styles;
@@ -611,12 +611,6 @@
 
 .crate-history-details:not([open]) > .crate-history-files {
     display: none;
-}
-
-.crate-history-state-actions {
-    margin: 0 10px 12px 32px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-small);
 }
 
 // Respond to the sheet's width, including narrow desktop windows.
