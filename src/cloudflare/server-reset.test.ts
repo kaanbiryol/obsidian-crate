@@ -159,6 +159,20 @@ describe('Crate server reset boundaries', () => {
 		expect(api.deleteR2Objects).not.toHaveBeenCalled();
 	});
 
+	it('retains the inactive safety namespace while retiring reminder state', async () => {
+		const { input, api, metadata, worker } = harness();
+		api.listDurableObjectNamespaces.mockImplementation(async () => [
+			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },
+			...(worker.bindings?.some(binding => binding.type === 'durable_object_namespace')
+				? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
+		]);
+		await resetCrateServer(input);
+		expect(api.retireCrateWorker).toHaveBeenCalledOnce();
+		expect(await api.listDurableObjectNamespaces()).toEqual([
+			{ id: 'd'.repeat(32), script: metadata.workerName, class: 'CloudSafety' },
+		]);
+	});
+
 	it('blocks an additional non-Crate Durable Object class owned by the same Worker', async () => {
 		const { input, api, metadata } = harness();
 		api.listDurableObjectNamespaces.mockResolvedValue([

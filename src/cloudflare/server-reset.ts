@@ -91,7 +91,7 @@ export async function resetCrateServer(input: {
 		}
 		if (!retired || bucket && !latestWorker.bindings?.some(binding => binding.name === 'CRATE_RESET_ID' && binding.text === checkpoint.id)) {
 			// Cloudflare refuses the deleted-class export if another Worker binds the
-			// namespace. The stub has no DO class and cannot serve or mutate vault data.
+			// namespace. The stub retains only the inactive safety class and cannot serve vault data.
 			input.onProgress?.('Taking the server offline and removing reminder alarms…');
 			await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, retired);
 		}

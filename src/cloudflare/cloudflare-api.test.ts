@@ -13,6 +13,14 @@ const artifacts = {
 };
 
 describe('CloudflareApiClient', () => {
+	it('preserves the experimental safety namespace without binding it to active requests', () => {
+		const body = new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
+			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef' }).body);
+		expect(body).toContain('"CloudSafety":{"type":"durable-object","storage":"sqlite","state":"created"}');
+		expect(body).not.toContain('"class_name":"CloudSafety"');
+		expect(body).not.toContain('"state":"deleted"');
+	});
+
 	it('reads address activation and preview settings without mutating them', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: { enabled: true, previews_enabled: false } }) }));
 		await expect(new CloudflareApiClient('token', transport).getWorkerSubdomain('account', 'crate worker')).resolves.toEqual({ enabled: true, previews_enabled: false });
@@ -34,7 +42,9 @@ describe('CloudflareApiClient', () => {
 	it('retires only ReminderAlarm and installs the authenticated cleanup Worker', () => {
 		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body);
 		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","state":"deleted"}');
-		expect(body).not.toContain('export class');
+		expect(body).toContain('export class CloudSafety');
+		expect(body).not.toContain('export class ReminderAlarm');
+		expect(body).toContain('"CloudSafety":{"type":"durable-object","storage":"sqlite","state":"created"}');
 		expect(body).not.toContain('"force":true');
 		expect(body).toContain('status: 503');
 		expect(body).toContain('Crate reset reset-id');

@@ -30,6 +30,7 @@
 		]
 	},
 	"exports": {
+		"CloudSafety": { "type": "durable-object", "storage": "sqlite" },
 		"ReminderAlarm": {
 			"type": "durable-object",
 			"storage": "sqlite"

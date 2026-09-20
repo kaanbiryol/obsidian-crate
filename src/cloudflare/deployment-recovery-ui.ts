@@ -40,7 +40,7 @@ export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> 
         progress.fail('Could not check the server', error instanceof CloudflareReauthorizationRequired
             ? 'Your Cloudflare login needs renewing. Reconnect your Cloudflare account in settings, then select Check and recover update again.'
             : error instanceof DeploymentRecoveryRequiredError
-            ? 'The published update could not be verified. Its lock remains held. Review the technical details before checking again.'
+            ? 'The interrupted update could not be completed. Its lock remains held. Review the technical details before checking again.'
             : 'The check could not finish. Reconnect to the network and check again. If a recovery request reached Cloudflare, the next check will inspect its result.',
         undefined, { technicalDetails: error instanceof Error ? error.message : 'Unknown recovery error' });
     }

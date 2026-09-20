@@ -502,3 +502,28 @@ it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_
   expect((await held())!.value).toBe(original);
   expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });
+
+ it('replaces a rejected upload with a corrected artifact while preserving the fence and vault data', async () => {
+  const h = await harness();
+  await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('retained-test', 'retained')").run();
+  h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('orphaned_provisioned_namespace', 400, 100));
+  await expect(h.deploy()).rejects.toThrow('orphaned_provisioned_namespace');
+  const rejected = (await held())!.value;
+  expect(JSON.parse(rejected)).toMatchObject({ step: 'upload-worker', stepState: 'rejected', verificationPending: true });
+  const fixed = artifact('0.1.0', 'e'.repeat(64));
+  const recovery = await recoverDeployment(h.api, h.metadata, fixed.fingerprint);
+  expect(recovery.status).toBe('resume');
+  expect((await held())!.value).toBe(rejected);
+  const upload = h.api.uploadWorker.getMockImplementation()!;
+  h.api.uploadWorker.mockImplementation(async input => {
+    const owned = JSON.parse((await held())!.value) as { owner: string };
+    expect(owned.owner).not.toBe((JSON.parse(rejected) as { owner: string }).owner);
+    expect(owned).toMatchObject({ fingerprint: fixed.fingerprint, verificationPending: true });
+    await upload(input);
+  });
+  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+    artifacts: fixed, resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+  expect(await held()).toBeNull();
+  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'retained-test'").first()).toEqual({ value: 'retained' });
+  expect(h.api.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
+ });

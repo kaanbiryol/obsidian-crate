@@ -24,7 +24,7 @@ Wire protocol ranges, capabilities, parser versions and browser/local storage en
 5. Read back the live artifact and bindings, query the database version, and probe the Worker metadata endpoint for the exact fingerprint, revision and schema version. The probe never sends the Cloudflare management token to the Worker.
 6. Record the deployed release, persist successful verification and release the fence. Preserve file contents, hashes, revisions and local sync authority.
 
-A failed check keeps writers fenced. **Check and recover update** resumes a confirmed or definitively rejected step with the exact same artifact, replacing ownership conditionally without an unlocked interval. Old updaters cannot advance once their ownership has been replaced. A first installation that has not yet created a Worker is recoverable too.
+A failed check keeps writers fenced. **Check and recover update** resumes a confirmed or definitively rejected step with the exact same artifact, replacing ownership conditionally without an unlocked interval. Old updaters cannot advance once their ownership has been replaced. A definitively rejected Worker upload can also be replaced by a corrected build: recovery retains the fence, conditionally takes ownership, and reruns storage, schema and release checks before publication. Confirmed, settled or uncertain uploads still require their existing recovery paths. A first installation that has not yet created a Worker is recoverable too.
 
 Acquiring or taking over the fence atomically records a confirmed acquisition checkpoint. Closing the app or losing the response immediately afterward remains recoverable, including repeated interruptions during recovery. The next provider mutation must first conditionally advance that exact ownership record; recovering a paused acquisition prevents the old owner from dispatching it.
 
@@ -53,3 +53,11 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 CI selects the complete comparison automatically: the PR base, the previous push tip, or the default branch for a new branch. Tag and manual release checks compare with the previous reachable release tag, falling back to the parent commit for the first release. Both workflows fetch full Git history. Missing references fail the check. A baseline predating the first release manifest is treated as its initial introduction. Revision decreases, schema edits without a schema version increase, and edits or removal of released migrations also fail.
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.
+
+## Experimental cloud safety compatibility
+
+Revision 59 preserves the experimental `CloudSafety` SQLite namespace as an inactive
+export, including in the reset Worker. No application binding calls it and it does
+not schedule alarms or modify its stored ledger. This permits updates from the
+experimental safety build without deleting its namespace. Cloud safety enforcement
+is not enabled by this compatibility export.

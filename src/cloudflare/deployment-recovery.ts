@@ -1,5 +1,5 @@
 import { SERVER_RELEASE } from './database-upgrades';
-import { DEPLOYMENT_FENCE_KEY, isPendingAddressActivation } from './deployment-fence';
+import { DEPLOYMENT_FENCE_KEY, isPendingAddressActivation, isRejectedWorkerUpload } from './deployment-fence';
 import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from './cloudflare-api';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 
@@ -98,6 +98,9 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
             return { ...result('verify', 'The published update can be verified under new ownership.'), resumeValue: value };
         }
         if (pendingAddress) return result('blocked', 'The pending address activation belongs to a different published build. No lock was cleared.');
+        if (fingerprint && isRejectedWorkerUpload(record)) {
+            return { ...result('resume', 'The rejected upload can be replaced by this build under new ownership.'), resumeValue: value };
+        }
         if (!fingerprint || fingerprint !== record.fingerprint) return result('blocked', 'Resume this update with the exact plugin build that started it. No lock was cleared.');
         return { ...result('resume', 'The confirmed update can resume under new ownership.'), resumeValue: value };
     }
