@@ -709,6 +709,7 @@ body.reduce-motion .crate-activity-modal {
     // File cards already contribute 5px of top padding.
     padding-top: sync-review.$section-heading-gap - 5px;
 }
+.crate-conflict-row-folder { color: var(--text-muted); font-weight: normal; }
 .crate-conflict-row {
     display: flex;
     align-items: center;
@@ -746,7 +747,8 @@ body.reduce-motion .crate-activity-modal {
 .modal.crate-conflict-review-modal .reminder-modal-header { border-bottom: 0; }
 .crate-conflict-intro { display: flex; align-items: center; gap: 12px; }
 .crate-conflict-file-heading { min-width: 0; }
-.crate-conflict-review-path { margin: 0 0 4px; @include sync-review.title; overflow-wrap: anywhere; }
+.crate-conflict-review-path { margin: 0; @include sync-review.title; overflow-wrap: anywhere; }
+.crate-conflict-review-folder { color: var(--text-muted); font-weight: normal; }
 .crate-conflict-review-help { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; overflow-wrap: anywhere; }
 .crate-conflict-load-error {
     display: flex;
