@@ -89,9 +89,36 @@ Official references:
 - [Cloudflare memberships API](https://developers.cloudflare.com/api/resources/memberships/methods/list/)
 - [GitHub Pages custom domains](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)
 
+## Activate R2 before connecting
+
+Crate currently requires an active R2 subscription in the Cloudflare account that owns the server. This is a one-time account setup, including when you intend to stay within the free allowance. Cloudflare requires a valid payment method during checkout. Enter payment details only in Cloudflare; Crate does not collect them or activate the subscription through its OAuth connection. See Cloudflare's [R2 prerequisites](https://developers.cloudflare.com/r2/get-started/#before-you-begin) and [billing setup](https://developers.cloudflare.com/billing/get-started/create-billing-profile/).
+
+1. Sign in to the [Cloudflare dashboard](https://dash.cloudflare.com/) and select the account you will authorize in Crate.
+2. Open **Storage & databases → R2 → Overview**.
+3. Complete the R2 checkout flow, reviewing its terms and adding a payment method if requested.
+4. Once R2 is active, return to **Settings → Crate** in Obsidian and select **Connect with Cloudflare**. Authorize the same account.
+
+Crate creates its own bucket, database, Worker, and reminder resources. You do not need to create those resources or generate an API token manually. Other devices connecting to this server reuse the account's active R2 subscription.
+
+### R2 free allowance and billing
+
+R2 Standard currently includes 10 GB-month of storage, 1 million Class A operations (such as writes and listings), and 10 million Class B operations (such as reads) per month, with free outbound data transfer. The free allowance is shared across the account; it is not a separate allowance for every vault or bucket. Infrequent Access storage is excluded from the free tier. Usage above the allowance is billed, so free usage does not remove the payment-method requirement. Check [Cloudflare's current R2 pricing](https://developers.cloudflare.com/r2/pricing/) before activating it.
+
+Stored data includes retained file versions as well as current vault files. Other Cloudflare services have their own limits and pricing. Crate's **Cloudflare usage** panel provides estimates, not a spending cap. The current server cannot complete setup without R2 activation.
+
+### R2 activation error
+
+If Crate shows **R2 is not active for this Cloudflare account** (Cloudflare error `10042`):
+
+1. Follow the [activation steps above](#activate-r2-before-connecting) for the account selected during authorization. Adding a payment method alone does not complete R2 activation; finish the R2 checkout flow.
+2. Return to Crate and select **Connect with Cloudflare** again, authorizing that same account.
+3. If the error persists even though R2 is active, check the selected account and its R2 subscription status in Cloudflare. Contact Cloudflare support if it still rejects access to an active subscription.
+
+Crate saves resource names and Cloudflare IDs so retries can reuse the deployment. You do not need to delete the server or reset your vault to resolve this prerequisite.
+
 ## OAuth connection and deployment
 
-1. Enable R2 in the target Cloudflare account. Cloudflare may require accepting the R2 subscription before its API permits bucket creation.
+1. [Activate R2](#activate-r2-before-connecting) in the target Cloudflare account, including its checkout and payment-method requirements.
 2. Install the Client-ID-configured Crate build.
 3. Open **Settings → Crate → Configuration** and select **Connect with Cloudflare**.
 4. In Cloudflare, select exactly one account, review the five permissions, and authorize Crate.
@@ -101,7 +128,7 @@ Official references:
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then saves the OAuth access and refresh tokens in Obsidian secret storage for usage. Failed operations revoke and discard their tokens. Existing installations can reconnect once from the usage panel.
 9. Connection does not transfer vault files. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
-If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or schema artifacts, **Update server** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
+If the Cloudflare API returns R2 error `10042`, follow [R2 activation error](#r2-activation-error). When the installed plugin contains different Worker, web app, or schema artifacts, **Update server** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
 
 Server updates use the saved Cloudflare login and renew it when needed. **Update server** opens Cloudflare authorization only when credentials are missing, revoked, cannot be renewed, or lack required permissions. Network and server errors are shown in Obsidian without starting another login. Reconnect, repair, reset, and deletion also reuse the saved login. Reset and deletion retain their destructive-action confirmations and resource checks. First-time setup and new devices sign in through Cloudflare.
 
