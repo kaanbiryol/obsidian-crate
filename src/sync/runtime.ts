@@ -595,13 +595,14 @@ export class SyncRuntime {
         };
         const after = await load(entry);
         let before: HistorySnapshot | undefined;
-        let notice = 'No earlier saved state is available. Showing saved contents.';
+        let notice = 'No earlier state to compare.';
+        let retryable = false;
         if (previous) {
             try { before = await load(previous); }
-            catch { verify(); notice = 'The earlier saved state could not be loaded. Showing saved contents; retry to compare.'; }
+            catch { verify(); retryable = true; notice = 'The earlier saved state could not be loaded. Showing saved contents.'; }
         }
         const comparison = compareHistorySnapshots(after, before, before ? undefined : notice);
-        return { ...comparison, preview: async (path: string) => {
+        return { ...comparison, retryable, preview: async (path: string) => {
             verify();
             const preview = await comparison.preview(path);
             verify();

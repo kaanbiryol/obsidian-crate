@@ -7,17 +7,15 @@
 		width: 16px;
 		height: 16px;
 		--sync-indicator-color: var(--text-muted);
-		--sync-indicator-color-duration: 900ms;
+		--sync-indicator-color-duration: 150ms;
 		color: var(--sync-indicator-color);
 
 		// Keep sync colors consistent across Obsidian themes and the PWA.
-		&[data-visual-state="synced"],
-		&[data-visual-state="settling"] {
+		&[data-sync-state="synced"] {
 			--sync-indicator-color: #22c55e;
-			--sync-indicator-color-duration: 1600ms;
 		}
-		&[data-visual-state="syncing"] { --sync-indicator-color: #f59e0b; }
-		&[data-visual-state="error"] { --sync-indicator-color: var(--text-error); }
+		&[data-sync-state="syncing"] { --sync-indicator-color: #f59e0b; }
+		&[data-sync-state="error"] { --sync-indicator-color: var(--text-error); }
 	}
 
 	#{$selector}__dot {

@@ -92,6 +92,9 @@ export class HistoryBrowser {
                 const button = this.syncs.createEl('button', { cls: 'crate-history-version', attr: { type: 'button', 'data-history-key': key, 'aria-current': String(key === (this.selected && historyEntryKey(this.selected))) } });
                 button.createSpan({ text: describeHistory(entry, count), cls: 'crate-history-file-name' });
                 button.createSpan({ text: `${entry.type === 'initial' ? 'Initial sync · ' : entry.type === 'force' ? 'Full sync · ' : ''}${historyTime(entry)}`, cls: 'crate-history-file-folder', attr: { title: new Date(entry.timestamp).toLocaleString() } });
+                if (entry.checkpointFileCount !== undefined) {
+                    button.createSpan({ text: 'Sync details unavailable on this device', cls: 'crate-history-file-folder' });
+                }
                 button.addEventListener('click', () => {
                     for (const row of Array.from(this.syncs.querySelectorAll('[aria-current]'))) row.setAttribute('aria-current', String(row === button));
                     void this.select(this.entries.find(saved => historyEntryKey(saved) === key)!, true);
@@ -120,7 +123,7 @@ export class HistoryBrowser {
             if (this.disposed || revision !== this.revision) return;
             this.comparison = comparison;
             this.items = comparison.items.map(item => ({ ...item, action: { added: 'Added', modified: 'Modified', deleted: 'Deleted', saved: 'Saved' }[item.action] }));
-            this.renderFiles(comparison.notice);
+            this.renderFiles(comparison.notice, comparison.retryable);
             if (this.items[0]) void this.selectFile(this.items[0].path, false);
             else {
                 this.preview.empty();
@@ -130,14 +133,14 @@ export class HistoryBrowser {
         } catch (error) {
             if (this.disposed || revision !== this.revision) return;
             const message = error instanceof Error ? error.message : 'Could not load this sync.';
-            this.renderFiles(message);
+            this.renderFiles(message, true);
             this.preview.empty();
             this.back(this.preview, 'Files', 'files');
             this.preview.createEl('p', { text: message, cls: 'crate-history-description', attr: { role: 'status' } });
         }
     }
 
-    private renderFiles(notice?: string, retryable = true): void {
+    private renderFiles(notice?: string, retryable = false): void {
         const scrollTop = this.files.scrollTop;
         const focusHeader = this.files.querySelector('h3') === this.files.ownerDocument.activeElement;
         this.files.empty();
@@ -145,9 +148,10 @@ export class HistoryBrowser {
         const heading = this.files.createEl('h3', { text: `${this.comparison && !this.comparison.compared ? 'Saved files' : 'Files'} · ${this.items.length}`, cls: 'crate-history-group', attr: { tabindex: '-1' } });
         if (focusHeader) heading.focus({ preventScroll: true });
         if (notice) {
-            this.files.createEl('p', { text: notice, cls: 'crate-history-description', attr: { role: 'status' } });
+            const status = this.files.createDiv({ cls: 'crate-history-state-notice' });
+            status.createEl('p', { text: notice, cls: 'crate-history-description', attr: { role: 'status' } });
             if (retryable && (this.selected?.sharedCheckpoint || this.selected?.historyCheckpoint)) {
-                const retry = this.files.createEl('button', { text: 'Reload sync', cls: 'crate-activity-action', attr: { type: 'button' } });
+                const retry = status.createEl('button', { text: 'Retry loading', cls: 'crate-activity-action', attr: { type: 'button' } });
                 retry.addEventListener('click', () => { void this.select(this.selected!, false); });
             }
         }
@@ -163,7 +167,7 @@ export class HistoryBrowser {
         }
         if (this.items.length > this.fileLimit) {
             const more = this.files.createEl('button', { text: 'More files', cls: 'crate-activity-action', attr: { type: 'button' } });
-            more.addEventListener('click', () => { this.fileLimit += 200; this.renderFiles(this.comparison?.notice); });
+            more.addEventListener('click', () => { this.fileLimit += 200; this.renderFiles(this.comparison?.notice, this.comparison?.retryable); });
         }
         this.files.scrollTop = scrollTop;
     }

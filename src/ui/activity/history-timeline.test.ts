@@ -129,3 +129,23 @@ it('keeps vault restore actions out of individual sync entries', () => {
     expect(container.collectText()).not.toContain('Review restore point');
     expect(container.collectText()).not.toContain('Restore to this point');
 });
+
+
+it('hides server-only restore points while keeping sync activity and restore metadata', () => {
+    const checkpoint = { ...entry, uploaded: 0, uploadedPaths: [], sharedCheckpoint: 'server-point', checkpointFileCount: 27 };
+    const local = { ...entry, sharedCheckpoint: 'local-point' };
+    const history = [checkpoint, local];
+    const container = new FakeElement('div');
+    renderHistoryPanel(container as unknown as HTMLElement, history);
+    expect(container.collectText()).toContain('Uploaded 1 file');
+    expect(container.collectText()).not.toContain('27 files');
+    expect(container.collectText()).not.toContain('No changes');
+    expect(history).toEqual([checkpoint, local]);
+    expect(history[0]?.sharedCheckpoint).toBe('server-point');
+});
+
+it('shows an empty activity state when only server restore points exist', () => {
+    const container = render({ uploaded: 0, uploadedPaths: [], checkpointFileCount: 27 });
+    expect(container.collectText()).toContain('No activity yet');
+    expect(find(container, 'crate-activity-timeline')).toBeUndefined();
+});

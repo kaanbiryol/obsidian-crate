@@ -34,6 +34,7 @@ it('falls back to saved contents when the previous snapshot cannot be loaded', a
     const comparison = await h.runtime.loadHistoryComparison(point('after'), point('before'));
     expect(comparison.compared).toBe(false);
     expect(comparison.notice).toContain('earlier saved state could not be loaded');
+    expect(comparison.retryable).toBe(true);
     expect(await comparison.preview('note.md')).toEqual({ current: '', saved: 'after' });
 });
 it('does not substitute live contents for an expired selected snapshot', async () => {
@@ -48,4 +49,11 @@ it('rejects preview after the connection changes', async () => {
     setSyncEngine(h.runtime, { ...h.engine });
     await expect(comparison.preview('note.md')).rejects.toThrow('connection changed');
     expect(h.read).not.toHaveBeenCalled();
+});
+
+it('does not offer retry when no earlier state exists', async () => {
+    const h = await harness();
+    const comparison = await h.runtime.loadHistoryComparison(point('after'));
+    expect(comparison.notice).toBe('No earlier state to compare.');
+    expect(comparison.retryable).toBe(false);
 });
