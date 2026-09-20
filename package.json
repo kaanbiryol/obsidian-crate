@@ -71,7 +71,7 @@
 		"check:server-revision": "npm run build:worker && node scripts/check-server-revision.mjs",
 		"test:server-revision": "node --test scripts/check-server-revision.test.mjs",
 		"test:file-history-browser": "node scripts/file-history-test.mjs",
-		"test:activity-browser": "node scripts/activity-diff-test.mjs && node scripts/conflict-review-test.mjs",
+		"test:activity-browser": "node scripts/activity-empty-layout-test.mjs && node scripts/activity-diff-test.mjs && node scripts/conflict-review-test.mjs",
 		"test:editor-compat": "node scripts/editor-contract-compare.mjs",
 		"test:editor-contract": "node scripts/editor-contract-compare.mjs current",
 		"typecheck:editor-contract": "tsc -p tests/editor-contract/tsconfig.json",
