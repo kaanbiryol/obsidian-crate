@@ -28,8 +28,8 @@ const { outputFiles } = await build({
             window.syncFailure = false;
             const actions = {
                 fileActions: path => [
-                    { title: 'Open in Obsidian', icon: 'file', run: async () => { window.openedPath = path; } },
-                    { title: 'Reveal in Finder', icon: 'folder-open', run: async () => { window.revealedPath = path; } },
+                    { id: 'open', title: 'Open in Obsidian', icon: 'file', run: async () => { window.openedPath = path; } },
+                    { id: 'reveal', title: 'Reveal in Finder', icon: 'folder-open', run: async () => { window.revealedPath = path; } },
                 ],
                 syncSelected: async keys => { if (window.syncFailure) throw new Error('Sync unavailable'); window.syncKeys = keys; },
                 discard: keys => {
@@ -291,6 +291,12 @@ for (const browserType of [chromium, webkit]) {
                 await first.click({ button: 'right' });
                 await page.getByRole('menuitem', { name: 'Open in Obsidian', exact: true }).click();
                 assert.equal(await page.evaluate(() => window.openedPath), '.obsidian/appearance.json');
+                if (!isMobile) {
+                    await page.evaluate(() => { window.openedPath = undefined; });
+                    await page.getByRole('button', { name: 'Review changes for .obsidian/appearance.json', exact: true }).dblclick();
+                    assert.equal(await page.evaluate(() => window.openedPath), '.obsidian/appearance.json');
+                }
+
                 await first.click({ button: 'right' });
                 await page.getByRole('menuitem', { name: 'Reveal in Finder', exact: true }).click();
                 assert.equal(await page.evaluate(() => window.revealedPath), '.obsidian/appearance.json');

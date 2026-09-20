@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/preview-format';
 import { buildDiff } from './diff-model';
@@ -155,6 +155,12 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         button.addEventListener('click', event => {
             rowSelection.choose(index, event);
             void select(index, !event.shiftKey && !event.metaKey && !event.ctrlKey);
+        });
+        button.addEventListener('dblclick', () => {
+            const action = actions?.fileActions?.(path).find(action => action.id === 'open');
+            if (action) void action.run().catch((error: unknown) => {
+                new Notice(error instanceof Error ? error.message : 'Could not open this file.');
+            });
         });
         button.addEventListener('keyup', event => {
             if (selection && event.key === ' ') event.preventDefault();
