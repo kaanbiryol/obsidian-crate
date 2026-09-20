@@ -160,7 +160,7 @@ async function renewalAndProviderChanges(browser) {
     const previousAttempts = attempts.length;
     await retry(page).click();
     await expect.poll(() => attempts.length).toBe(previousAttempts + 1);
-    await page.getByText('Checking…', { exact: true }).waitFor();
+    await page.getByRole('region', { name: 'Notifications', exact: true }).getByText('Checking…', { exact: true }).waitFor();
     await provider(page, { endpoint: nextEndpoint });
     release();
     await retry(page).waitFor();
@@ -192,7 +192,7 @@ async function logoutDuringConfirmation(browser) {
     control.holdToken = previewAuthToken;
     await open();
     await expect.poll(() => attempts.length).toBe(1);
-    await page.getByText('Checking…', { exact: true }).waitFor();
+    await page.getByRole('region', { name: 'Notifications', exact: true }).getByText('Checking…', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
     await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBe(null);
     const peer = await context.newPage();

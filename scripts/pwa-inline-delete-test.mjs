@@ -29,11 +29,25 @@ for (const type of [chromium, webkit]) {
    await expect(page.locator('.pwa-modal-sheet')).toHaveCount(1);
    await waitForStageOpen();
    if (type === webkit) await page.screenshot({ path: '/tmp/crate-inline-delete.png' });
-   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap();
-   await expect(confirmation).toBeVisible();
-   await expect(page.locator('.pwa-reminder-sheet-screen--editor')).toHaveCSS('opacity', '0');
-   await expect(title).toBeFocused();
-   await expect(confirmation).toHaveCount(0);
+   const dismissConfirmation = async action => {
+    // Sample inside the browser so automation latency cannot skip the closing frames.
+    await page.evaluate(() => {
+     window.deleteClosingFrames = [];
+     const sample = () => {
+      if (!document.querySelector('[role="alertdialog"]')) return;
+      window.deleteClosingFrames.push(getComputedStyle(document.querySelector('.pwa-reminder-sheet-screen--editor')).opacity);
+      requestAnimationFrame(sample);
+     };
+     sample();
+    });
+    await action();
+    await expect(confirmation).toHaveCount(0);
+    const frames = await page.evaluate(() => window.deleteClosingFrames);
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.every(opacity => opacity === '0')).toBe(true);
+    await expect(title).toBeFocused();
+   };
+   await dismissConfirmation(() => confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap());
    await expect(title).toBeVisible();
    await waitForStageOpen();
    await expect(title).toBeFocused();
@@ -42,12 +56,9 @@ for (const type of [chromium, webkit]) {
     await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
     await expect(confirmation).toBeVisible();
     await waitForStageOpen();
-    if (dismiss === 'close') await confirmation.getByRole('button', { name: 'Cancel deletion', exact: true }).tap();
-    else await confirmation.press('Escape');
-    await expect(confirmation).toBeVisible();
-    await expect(page.locator('.pwa-reminder-sheet-screen--editor')).toHaveCSS('opacity', '0');
-    await expect(title, `${type.name()}: ${dismiss} restores title focus`).toBeFocused();
-    await expect(confirmation).toHaveCount(0);
+    await dismissConfirmation(() => dismiss === 'close'
+     ? confirmation.getByRole('button', { name: 'Cancel deletion', exact: true }).tap()
+     : confirmation.press('Escape'));
     await waitForStageOpen();
     await expect(title).toBeFocused();
     await expect(title).toHaveText('My preserved draft');

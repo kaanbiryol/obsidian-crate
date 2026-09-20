@@ -32,7 +32,7 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 						height: Number.parseFloat(popup.style.getPropertyValue('--pwa-editor-content-height')),
 						expectedHeight: rows.reduce((sum, selector) => sum + popup.querySelector(selector).offsetHeight, 2),
 						descriptionHeight: description.offsetHeight,
-						description: description.value,
+						description: description.textContent,
 					});
 				}
 				if (started === undefined || performance.now() - started < 650) requestAnimationFrame(sample);
