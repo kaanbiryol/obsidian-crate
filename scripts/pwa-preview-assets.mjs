@@ -28,15 +28,17 @@ export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 		// Build distinct, content-hashed app versions for real update tests.
 		pwaClient = { ...await bundlePwaClient(assetVersion, process.cwd()), version: assetVersion };
 	} else {
-		const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
-			cwd: process.cwd(),
-			stdio: 'inherit',
-		});
+		if (process.env.CRATE_PWA_PREBUILT !== '1') {
+			const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
+				cwd: process.cwd(),
+				stdio: 'inherit',
+			});
 
-		if (buildResult.status !== 0) {
-			const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
-			error.status = buildResult.status ?? 1;
-			throw error;
+			if (buildResult.status !== 0) {
+				const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
+				error.status = buildResult.status ?? 1;
+				throw error;
+			}
 		}
 		pwaClient = await readGeneratedPwaClient();
 	}

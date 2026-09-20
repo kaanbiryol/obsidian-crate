@@ -1,0 +1,181 @@
+name: Release verification
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to verify (defaults to the caller's commit)
+        type: string
+        default: ""
+      release-tag:
+        description: Release tag, also used to select the server revision baseline
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  # Caller workflow env is not inherited by reusable workflows.
+  RELEASE_TAG: ${{ inputs.release-tag }}
+
+jobs:
+  checks:
+    name: Source checks and release artifacts
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Check dependencies and source security
+        run: npm run security:check
+      - name: Check source, server revision and unit tests
+        run: npm run check:source
+      - name: Check visual and editor types
+        run: npm run typecheck:visual
+      - name: Build plugin
+        run: npm run build:plugin
+      - name: Smoke test built PWA
+        env:
+          CRATE_PWA_PREBUILT: '1'
+        run: npm run test:pwa-preview
+      - name: Verify release artifacts
+        run: npm run check:css-scope && npm run size-check && npm run verify:release-artifacts
+      - name: Record candidate
+        run: npm run release:candidate
+      - name: Prepare release assets
+        if: inputs.release-tag != ''
+        run: |
+          mkdir release
+          cp dist/main.js dist/styles.css manifest.json THIRD_PARTY_NOTICES.md release/
+      - name: Upload release assets for gated publishing
+        if: inputs.release-tag != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  worker:
+    name: Worker integration tests
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:worker-runtime
+
+  visual:
+    name: Visual tests (${{ matrix.shard }}/2)
+    # Keep the reviewed snapshot platform; system fonts differ on Linux.
+    runs-on: macos-26
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm run build
+      - name: Compare shared UI screenshots
+        run: npx playwright test --shard=${{ matrix.shard }}/2
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: visual-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          include-hidden-files: true
+          retention-days: 7
+
+  editor:
+    name: Editor and activity browser tests
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+      - run: npm run build
+      - name: Check editor contracts
+        run: npx playwright test --config tests/editor-contract/playwright.config.ts
+      - name: Check activity browser behavior
+        run: npm run test:activity-browser
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: editor-activity
+          path: |
+            .generated/editor-contract/current/
+            .generated/activity-diff/
+            .generated/conflict-review/
+          include-hidden-files: true
+          retention-days: 7
+
+  pwa:
+    name: PWA browser tests (${{ matrix.shard }}/4)
+    runs-on: macos-26
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+      - name: Run browser group
+        run: npm run test:pwa-browser -- --shard=${{ matrix.shard }}/4
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pwa-failures-${{ matrix.shard }}
+          path: .generated/browser-failures/
+          include-hidden-files: true
+          retention-days: 7

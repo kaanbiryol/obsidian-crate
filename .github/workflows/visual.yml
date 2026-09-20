@@ -1,9 +1,7 @@
 name: Shared UI visual checks
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
+  # Automatic comparisons are part of verify.yml; keep manual baseline review.
   workflow_dispatch:
     inputs:
       update_baselines:
@@ -35,7 +33,7 @@ jobs:
         run: npm run test:visual
       - name: Generate candidate baselines
         if: inputs.update_baselines == true
-        run: npm run test:visual -- --update-snapshots
+        run: npx playwright test --update-snapshots
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
