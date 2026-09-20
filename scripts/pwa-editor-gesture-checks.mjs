@@ -41,7 +41,9 @@ export async function checkNativeEditorGestures(page, title) {
 
 	// Exercise browser hit-testing, not a hand-written selection-reset handler.
 	const point = await title.evaluate(element => {
-		const text = element.firstChild;
+		// Lexical wraps the editable text in paragraph and formatting elements.
+		const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode();
+		if (!text || text.textContent.length < 16) throw new Error('Gesture fixture requires at least 16 text characters');
 		const selection = document.getSelection();
 		selection.setBaseAndExtent(text, 0, text, 4);
 		const caret = document.createRange();

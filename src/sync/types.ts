@@ -1,4 +1,4 @@
-export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
+type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
 export interface SyncWork {
 	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving' | 'reminders';
