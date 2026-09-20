@@ -31,13 +31,11 @@ async function harness(initial: Record<string, ArrayBuffer>, server: Record<stri
         trash: (file: { path: string }) => trash(file.path),
     };
     const entry = async (path: string): Promise<FileEntry> => ({ hash: await computeHash(remote.get(path)!), revision: 'v1', size: remote.get(path)!.byteLength, modified: '2026-09-16' });
-    const api = {
-        getFileMetadata: vi.fn(async (paths: string[]): Promise<{ files: Record<string, FileEntry> }> => ({ files: Object.fromEntries(await Promise.all(paths.filter(path => remote.has(path)).map(async path => [path, await entry(path)] as const))) })),
-        downloadFile: vi.fn(async (path: string) => ({ ...await entry(path), content: remote.get(path)!, contentType: 'text/plain' })),
-    };
+    const baselines = new Map(await Promise.all([...remote.keys()].map(async path => [path, await entry(path)] as const)));
+    const readBase = vi.fn(async (path: string) => remote.get(path) ?? null);
     const applied = vi.fn(async () => {});
-    const context = { vault: vault as never, api, backupRoot: '.obsidian/plugins/crate/discard-recovery', verify: vi.fn(), beforeBinaryReplace: vi.fn(async () => {}), applied };
-    return { files, remote, adapter, vault, api, applied, context, trash };
+    const context = { vault: vault as never, getBaseline: (path: string) => baselines.get(path), readBase, backupRoot: '.obsidian/plugins/crate/discard-recovery', verify: vi.fn(), beforeBinaryReplace: vi.fn(async () => {}), applied };
+    return { files, remote, adapter, vault, baselines, readBase, applied, context, trash };
 }
 
 describe('pending discard', () => {
@@ -79,10 +77,11 @@ describe('pending discard', () => {
         expect(h.files.get(path)).toEqual(remote);
         expect(h.files.get(`.trash/${path}`)).toEqual(original);
     });
-    it.each(['local', 'remote'])('refuses stale %s versions before changing any selected file', async side => {
+    it.each(['local', 'baseline'])('refuses stale %s versions before changing any selected file', async side => {
         const h = await harness({ 'a.md': bytes('a'), 'b.md': bytes('b') }, { 'a.md': bytes('server a'), 'b.md': bytes('server b') });
         const review = await createPendingDiscard(h.context, ['a.md', 'b.md']);
-        (side === 'local' ? h.files : h.remote).set('b.md', bytes('new edit'));
+        if (side === 'local') h.files.set('b.md', bytes('new edit'));
+        else h.baselines.set('b.md', { ...h.baselines.get('b.md')!, hash: 'changed' });
         await expect(review.discard()).rejects.toThrow('b.md changed');
         expect(h.files.get('a.md')).toEqual(bytes('a'));
         expect(h.applied).not.toHaveBeenCalled();
@@ -112,22 +111,25 @@ describe('pending discard', () => {
     it('reports a partial failure without repeating completed files', async () => {
         const h = await harness({ 'a.md': bytes('a'), 'b.md': bytes('b') }, { 'a.md': bytes('server a'), 'b.md': bytes('server b') });
         const review = await createPendingDiscard(h.context, ['a.md', 'b.md']);
-        const originalDownload = h.api.downloadFile.getMockImplementation()!;
-        h.api.downloadFile.mockImplementation(async path => {
-            if (path === 'b.md') throw new Error('Offline');
-            return originalDownload(path);
+        const originalRead = h.readBase.getMockImplementation()!;
+        h.readBase.mockImplementation(async path => {
+            if (path === 'b.md') throw new Error('Disk read failed');
+            return originalRead(path);
         });
-        await expect(review.discard()).rejects.toThrow('Offline');
+        await expect(review.discard()).rejects.toThrow('Disk read failed');
         expect(h.files.get('a.md')).toEqual(bytes('server a'));
         expect(h.files.get('b.md')).toEqual(bytes('b'));
         expect(h.applied).toHaveBeenCalledTimes(1);
+        h.readBase.mockImplementation(originalRead);
         expect((await createPendingDiscard(h.context, ['a.md', 'b.md'])).items).toEqual([{ path: 'b.md', action: 'restore' }]);
     });
-    it('refuses a download whose bytes differ from its declared hash', async () => {
-        const h = await harness({ 'note.md': bytes('local') }, { 'note.md': bytes('server') });
-        const response = await h.api.downloadFile('note.md');
-        h.api.downloadFile.mockResolvedValueOnce({ ...response, content: bytes('broken') });
-        await expect((await createPendingDiscard(h.context, ['note.md'])).discard()).rejects.toThrow('hash mismatch');
+    it.each(['missing', 'corrupt'])('keeps every selected file when a baseline is %s', async state => {
+        const h = await harness({ 'new.md': bytes('new'), 'note.md': bytes('local') }, { 'note.md': bytes('baseline') });
+        if (state === 'missing') h.remote.delete('note.md');
+        else h.remote.set('note.md', bytes('broken'));
+        await expect(createPendingDiscard(h.context, ['new.md', 'note.md'])).rejects.toThrow('not available on this device');
         expect(h.files.get('note.md')).toEqual(bytes('local'));
+        expect(h.files.get('new.md')).toEqual(bytes('new'));
+        expect(h.trash).not.toHaveBeenCalled();
     });
 });

@@ -34,10 +34,12 @@ const { outputFiles } = await build({
                 syncSelected: async keys => { if (window.syncFailure) throw new Error('Sync unavailable'); window.syncKeys = keys; },
                 discard: keys => {
                     window.discardKeys = keys;
-                    new PendingDiscardModal({}, async () => ({
+                    new PendingDiscardModal({}, async () => {
+                        if (window.delayDiscardReview) await new Promise(resolve => { window.releaseDiscardReview = resolve; });
+                        return ({
                         items: keys.filter(key => window.allChanged || key.endsWith('appearance.json') || key.startsWith('delete:')).map(key => ({ path: key.replace(/^delete:/, ''), action: 'restore' })),
                         unchangedCount: keys.filter(key => !window.allChanged && !key.endsWith('appearance.json') && !key.startsWith('delete:')).length, discard: async () => { window.discarded++; },
-                    }), () => {}).open();
+                    }); }, () => {}, keys.map(key => key.replace(/^delete:/, ''))).open();
                 },
             };
             window.fail = false;
@@ -233,7 +235,12 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.getByRole('menuitem', { name: 'Select all', exact: true })).toHaveCount(0);
                 await expect(all).not.toBeChecked();
                 await expect(highlighted).toHaveCount(6);
+                await page.evaluate(() => { window.delayDiscardReview = true; });
                 await page.getByRole('menuitem', { name: 'Discard 6 items…', exact: true }).click();
+                await expect(page.locator('.crate-discard-path')).toHaveCount(6);
+                await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeDisabled();
+                assert.equal(await page.evaluate(() => window.discarded), 0);
+                await page.evaluate(() => { window.delayDiscardReview = false; window.releaseDiscardReview(); });
                 await expect(page.getByRole('button', { name: 'Discard changes (2)' })).toBeEnabled();
                 await expect(page.getByText('4 unchanged files will be kept.', { exact: true })).toBeVisible();
                 assert.equal((await page.evaluate(() => window.discardKeys)).length, 6);

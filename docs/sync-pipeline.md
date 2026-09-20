@@ -245,3 +245,18 @@ Implementation: `manifest.ts:LocalManifest`
 - **Large files:** files > 25 MB are skipped with error message, not crashed
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
+
+## Discarding local changes
+
+Sync Activity discard compares selected files with the local manifest and restores
+last-synced bytes from the on-device Markdown base cache. It does not fetch server
+metadata or contents, upload changes, or advance the remote sync cursor. Files
+absent from the local manifest move to local trash; unchanged files are kept.
+Missing or corrupt cached copies block review without changing the selection.
+Existing non-Markdown files currently have no cached baseline and cannot be
+restored through local discard.
+
+Confirmation rechecks local contents and manifest versions before applying changes.
+Recovery copies are verified before replacing files, and edits arriving during
+application are preserved. Restored files retain their last-synced revision, so
+newer server changes are still discovered by the next normal sync.

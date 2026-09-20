@@ -4,19 +4,33 @@ import { SharedModal } from '../shared/SharedModal';
 
 export class PendingDiscardModal extends SharedModal {
     private active = true;
-    constructor(app: App, private load: () => Promise<PendingDiscardReview>, private onDiscarded: () => void) { super(app); }
+    constructor(app: App, private load: () => Promise<PendingDiscardReview>, private onDiscarded: () => void, private paths: string[]) { super(app); }
     onOpen(): void {
         this.openLayout('Discard changes?');
         this.modalEl.addClass('crate-pending-discard-modal');
         void this.render();
     }
     private async render(): Promise<void> {
-        this.bodyEl.setText('Checking selected files…');
+        this.bodyEl.empty();
+        this.bodyEl.createEl('p', { text: 'Restore the last-synced copies stored on this device. New local files move to trash.' });
+        const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list', attr: { 'aria-busy': 'true' } });
+        for (const path of this.paths) {
+            const row = list.createDiv({ cls: 'crate-discard-file' });
+            row.createSpan({ text: path, cls: 'crate-discard-path' });
+            row.createSpan({ text: 'Checking…', cls: 'crate-discard-action' });
+        }
+        this.bodyEl.createEl('p', { text: 'Recovery copies of replaced files are saved on this device.', cls: 'crate-discard-help' });
+        this.bodyEl.createDiv({ text: 'Checking selected files…', attr: { role: 'status' } });
+        const buttons = this.bodyEl.createDiv({ cls: 'crate-discard-buttons' });
+        const cancel = buttons.createEl('button', { text: 'Cancel', cls: 'crate-activity-action', attr: { type: 'button' } });
+        cancel.addEventListener('click', () => this.close());
+        const confirm = buttons.createEl('button', { text: 'Discard changes', cls: 'crate-activity-action crate-activity-action-danger', attr: { type: 'button' } });
+        confirm.disabled = true;
         try {
             const review = await this.load();
             if (!this.active) return;
             this.bodyEl.empty();
-            this.bodyEl.createEl('p', { text: 'Restore the server versions of these files. Files added only on this device move to trash.' });
+            this.bodyEl.createEl('p', { text: 'Restore the last-synced copies stored on this device. New local files move to trash.' });
             const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list' });
             for (const item of review.items) {
                 const row = list.createDiv({ cls: 'crate-discard-file' });

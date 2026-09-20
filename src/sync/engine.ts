@@ -53,7 +53,6 @@ import { reconcileQueuePaths } from './reconcile-paths';
 import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
 import { createPendingDiscard } from './pending-discard';
 import { readLocalFileEntry } from './local-file-entry';
-import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
@@ -288,7 +287,9 @@ export class SyncEngine {
     async createPendingDiscard(keys: string[]) {
         this.assertPendingSelection(keys);
         const review = await createPendingDiscard({
-            vault: this.vault, api: this.api,
+            vault: this.vault,
+            getBaseline: path => this.localManifest.getEntry(path),
+            readBase: (path, hash) => this.markdownBaseCache.readBase(path, hash),
             backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
             verify: () => {
                 this.lifecycle.throwIfDestroyed();
@@ -300,7 +301,10 @@ export class SyncEngine {
                 await this.localManifest.save();
             },
             applied: async (path, remote, content) => {
-                if (remote && content) await recordAppliedContent(this.contexts.transfer(), path, content, remote.revision);
+                if (remote && content) {
+                    const local = await readLocalFileEntry(this.vault, path);
+                    this.localManifest.setEntry(path, { ...remote, modified: local?.hash === remote.hash ? local.modified : 'unverified' });
+                }
                 else this.localManifest.removeEntry(path);
                 await this.localManifest.save();
                 const revisions = this.queueController.snapshotPendingRevisions();
