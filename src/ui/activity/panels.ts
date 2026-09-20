@@ -12,10 +12,11 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
         loading.setAttribute('aria-live', 'polite');
         const spinner = loading.createSpan({ cls: 'crate-activity-spinner' });
         spinner.setAttribute('aria-hidden', 'true');
+        const text = formatSyncProgress(progress, state?.work);
         loading.createSpan({
             cls: 'crate-activity-loading-label',
-            text: formatSyncProgress(progress, state?.work),
-        });
+            text,
+        }).setAttribute('title', text);
         return;
 	}
 	if (paths.length === 0) {

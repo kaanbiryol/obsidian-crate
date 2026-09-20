@@ -87,7 +87,9 @@ export class ActivityModal extends BaseUiModal {
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress)) {
             // Keep the spinner mounted through frequent progress updates.
-            loadingLabel.textContent = formatSyncProgress(progress, state.work);
+            const text = formatSyncProgress(progress, state.work);
+            if (loadingLabel.textContent !== text) loadingLabel.textContent = text;
+            loadingLabel.setAttribute('title', text);
             return;
         }
         this.pendingBrowserState.dispose?.();
@@ -212,7 +214,7 @@ export class ActivityModal extends BaseUiModal {
         const pending = this.deps.getPendingPaths().length;
         const needsAttention = status === 'error' || status === 'offline';
         const text = syncing
-            ? formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
+            ? 'Syncing…'
             : needsAttention ? label
             : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
         if (this.subtitleLabelEl.textContent !== text) this.subtitleLabelEl.setText(text);
