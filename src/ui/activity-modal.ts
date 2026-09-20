@@ -55,6 +55,7 @@ export class ActivityModal extends BaseUiModal {
     private activityHistory?: ActivityHistory;
     private sharedCheckpoints?: SharedCheckpoint[];
     private sharedHistoryLoading = false;
+    private sharedHistoryReady = false;
     private sharedHistoryReload = false;
 	private subtitleEl!: HTMLSpanElement;
 	private subtitleLabelEl!: HTMLSpanElement;
@@ -292,7 +293,14 @@ export class ActivityModal extends BaseUiModal {
 
     private renderHistory(): void {
         const deps = this.deps;
+        if (deps.listSharedCheckpoints && !this.sharedHistoryReady) {
+            if (!this.historyPanel.firstChild) {
+                this.historyPanel.createEl('p', { text: 'Loading history…', cls: 'crate-history-description', attr: { role: 'status' } });
+            }
+            return;
+        }
         if (!this.activityHistory) {
+            this.historyPanel.empty();
             const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.loadCurrentSyncedPreview ? {
                 loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
                 listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
@@ -321,6 +329,9 @@ export class ActivityModal extends BaseUiModal {
         } finally {
             this.sharedHistoryLoading = false;
             if (this.historyActive) {
+                // Render the initial list once, after merging server and local history.
+                // A failed request still reveals local history and can retry later.
+                this.sharedHistoryReady = true;
                 this.refresh();
                 if (this.sharedHistoryReload) { this.sharedHistoryReload = false; void this.loadSharedHistory(); }
             }
