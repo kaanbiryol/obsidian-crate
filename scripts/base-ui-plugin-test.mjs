@@ -21,6 +21,7 @@ const { outputFiles } = await build({
     import { createRoot } from 'react-dom/client';
     import { Button } from './src/ui/shared/Button';
     import { AddReminderModal } from './src/reminders/ui/reminder-modal/AddReminderModal';
+    import { PluginContext } from './src/reminders/ui/reminders-context';
     import { BaseUiModal } from './src/ui/shared/BaseUiModal';
     import { BaseModal } from './src/reminders/components/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
@@ -75,7 +76,8 @@ const { outputFiles } = await build({
         {open === 'exclusion' && <ExclusionSheet onClose={() => setOpen(null)} onMount={el => {el.textContent='Mounted exclusions';}} />}
       </>;
     }
-    const root = createRoot(mount); root.render(<Harness />);
+    const plugin = { syncRuntime: { getApiClient: () => null } };
+    const root = createRoot(mount); root.render(<PluginContext.Provider value={plugin}><Harness /></PluginContext.Provider>);
     window.unmount = () => {root.unmount();hostShell.close()};
   ` },
   plugins: [{ name:'obsidian', setup(builder) {
