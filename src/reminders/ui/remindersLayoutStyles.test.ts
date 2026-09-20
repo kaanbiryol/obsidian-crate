@@ -134,8 +134,9 @@ describe('plugin reminder layout styles', () => {
     expect(submitButton).toContain('height: var(--reminder-modal-header-control-size)');
     expect(submitButton).toContain('font-weight: var(--reminder-font-weight-medium)');
     expect(submitButton).toContain('background: transparent');
-    expect(submitButton).toContain('color: var(--crate-accent-text)');
-    expect(submitButton).toContain('color-mix(in srgb, var(--crate-accent-text) 9%, transparent)');
+    expect(submitButton).toContain('color: var(--text-normal)');
+    expect(submitButton).toContain('background: var(--crate-control-hover-bg)');
+    expect(submitButton).toContain('background: var(--crate-control-active-bg)');
   });
 
   it('keeps reminder descriptions visually subordinate to their titles', async () => {
@@ -168,11 +169,15 @@ describe('plugin reminder layout styles', () => {
 
   it('uses the same restrained selected and focus states across pickers', async () => {
     const styles = await readEditorStyles();
-    for (const name of ['project-picker-row', 'recurrence-frequency-button', 'recurrence-day-button']) {
+    for (const name of ['project-picker-row', 'recurrence-day-button']) {
       const rule = styles.match(new RegExp(`^\\.${name} \\{([\\s\\S]*?)^\\}`, 'm'))?.[1];
       expect(rule).toContain('background: var(--picker-selected-bg)');
       expect(rule).not.toContain('box-shadow: 0');
     }
+    const frequencySelection = styles.match(/^\.reminder-picker \.recurrence-frequency-button\.is-selected \{([\s\S]*?)^\}/m)?.[1];
+    expect(frequencySelection).toContain('background: color-mix(in srgb, var(--text-normal) 10%, transparent)');
+    expect(frequencySelection).toContain('color: var(--text-normal)');
+    expect(frequencySelection).not.toContain('box-shadow: 0');
     expect(styles).toContain('outline: 2px solid var(--crate-focus-ring)');
     expect(styles).toContain('outline-offset: -2px');
     expect(styles).toContain('background: var(--crate-control-hover-bg)');
