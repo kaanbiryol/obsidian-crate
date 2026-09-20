@@ -3,9 +3,16 @@ import { chromium } from '@playwright/test';
 
 // Chromium receives native touch input. Desktop WebKit has no touch-drag API;
 // dispatch its TouchEvents to cover the drawer's gesture arbitration there.
-export async function swipe(page, target, distance = 120, duration = 80) {
+export async function swipe(page, target, distance, duration = 80) {
 	const box = await target.boundingBox();
 	assert.ok(box);
+	if (distance === undefined) {
+		// A dismissal crosses the half-height threshold without depending on
+		// CDP round-trip latency to produce a fast enough flick on CI.
+		const height = await target.evaluate(element => element.closest('[role="dialog"], [role="alertdialog"]')?.getBoundingClientRect().height);
+		assert.ok(height, 'A dismissal gesture must target a drawer');
+		distance = height * 0.7;
+	}
 	const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 	const session = page.context().browser().browserType() === chromium
 		? await page.context().newCDPSession(page) : null;
