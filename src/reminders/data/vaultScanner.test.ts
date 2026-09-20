@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
 import { TFile, TFolder, type App } from 'obsidian';
+import { createReminderIndex } from './reminder-index';
 
 // String fixtures model bytes explicitly; production never falls back to read().
 function withBinaryReads(app: App): App {
@@ -226,4 +227,34 @@ describe('vaultScanner', () => {
       error: 'read failed',
     });
   });
+});
+
+
+it.each([
+  'Reminders/Work (conflict 2026-09-19 10-31-00 c3d4).md',
+  `Reminders/Work (conflict remote ${'a'.repeat(64)}).md`,
+])('loads live reminders without reading or rewriting conflict copy %s', async conflictPath => {
+  const live = makeMockFile('Reminders/Work.md');
+  const conflict = makeMockFile(conflictPath);
+  const folder = Object.assign(new TFolder(), { path: 'Reminders', children: [live, conflict] });
+  const read = vi.fn(async () => '- [ ] Task <!-- crate-id:rem-1 -->');
+  const process = vi.fn();
+  const app = withBinaryReads({ vault: {
+    getAbstractFileByPath: (path: string) => path === 'Reminders' ? folder : path === live.path ? live : conflict,
+    read, process,
+  } } as unknown as App);
+  // Collision repair cannot proceed offline or before sync verification.
+  const index = createReminderIndex(app, 'Reminders', undefined, () => false, () => true);
+  await index.load();
+  expect(index.isInitialLoadComplete).toBe(true);
+  expect(index.isComplete).toBe(true);
+  expect(index.getAll().map(item => [item.id, item.filePath])).toEqual([['rem-1', live.path]]);
+  expect(index.getProjects()).toEqual(['Work']);
+  expect(index.isReminderFile(conflictPath)).toBe(false);
+  await index.rescanFile(conflict, true);
+  await scanFile(app, conflict, 'Reminders');
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(process).not.toHaveBeenCalled();
+  // Explicitly renaming a reviewed copy back to a regular note makes it eligible.
+  expect(index.isReminderFile('Reminders/Reviewed work.md')).toBe(true);
 });
