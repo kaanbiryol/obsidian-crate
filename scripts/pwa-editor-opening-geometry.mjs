@@ -18,10 +18,13 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 			});
 			Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
 			let started;
-			document.addEventListener('click', () => { started = performance.now(); }, { capture: true, once: true });
 			const sample = () => {
 				const popup = document.querySelector('.pwa-modal-sheet__container');
-				if (popup && started !== undefined) {
+				if (popup) {
+					// Lazy editor loading is not part of the entrance animation.
+					// Start capturing when it mounts so a cold load cannot consume
+					// the entire observation window before any geometry exists.
+					started ??= performance.now();
 					const description = popup.querySelector('.reminder-description-input');
 					const rows = ['.reminder-modal-header', '.reminder-editor-fields', '.reminder-action-chips'];
 					const surface = popup.querySelector('.pwa-reminder-sheet-stage');
@@ -43,7 +46,8 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		await card.tap();
 		await page.waitForFunction(() => window.editorOpeningComplete);
 		const frames = await page.evaluate(() => window.editorOpeningFrames);
-		assert.ok(frames.length > 3, 'record the entrance, not just its final frame');
+		assert.ok(frames.length > (reducedMotion === 'reduce' ? 0 : 3),
+			`record editor geometry after mounting (${reducedMotion}: ${frames.length} frames)`);
 		for (const frame of frames) {
 			assert.ok(frame.travel <= frame.surfaceHeight + 33,
 				`A compact sheet must travel by its visible height, not by the full-screen positioning frame (${frame.travel} vs ${frame.surfaceHeight})`);
