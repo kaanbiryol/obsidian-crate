@@ -87,7 +87,10 @@
 }
 
 .crate-activity-subtitle {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
     align-self: center;
     flex: 0 0 220px;
     width: 220px;
@@ -102,34 +105,24 @@
     font-weight: 400;
     color: var(--text-normal);
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.crate-activity-subtitle::before {
-    content: '';
-    display: inline-block;
-    margin-right: 8px;
-    vertical-align: middle;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
+.crate-activity-subtitle-indicator {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
 }
-// Match the shared sync indicator's connected green.
-.crate-activity-subtitle[data-state='synced']::before { background: #22c55e; }
-.crate-activity-subtitle[data-state='syncing']::before {
-    background: transparent;
-    border: 1px solid currentColor;
-    border-right-color: transparent;
-    animation: crate-spin 1s linear infinite;
+
+.crate-activity-subtitle-label {
+    min-width: 0;
+    // Match the other header labels: center the font's cap-to-baseline box.
+    text-box: trim-both cap alphabetic;
+    // Preserve accents and descenders when long labels are clipped for ellipsis.
+    padding-block: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-@media (prefers-reduced-motion: reduce) {
-    .crate-activity-subtitle[data-state='syncing']::before { animation: none; }
-}
-body.reduce-motion .crate-activity-subtitle[data-state='syncing']::before { animation: none; }
-.crate-activity-subtitle[data-state='attention']::before { background: var(--text-warning); }
 
 .modal.crate-conflict-review-modal .crate-reminders-ui .crate-conflict-choices label {
     height: 28px;

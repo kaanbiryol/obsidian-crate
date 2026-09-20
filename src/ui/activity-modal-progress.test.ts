@@ -96,9 +96,10 @@ it.each([
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
     const subtitle = new FakeElement('span');
     const internal = modal as unknown as {
-        subtitleEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
+        subtitleEl: HTMLElement; subtitleLabelEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
     };
     internal.subtitleEl = subtitle as unknown as HTMLElement;
+    internal.subtitleLabelEl = subtitle.createSpan({ cls: 'crate-activity-subtitle-label' }) as unknown as HTMLElement;
     internal.conflictsPanel = new FakeElement('div') as unknown as HTMLElement;
     internal.updateSyncStatusText();
     expect(subtitle.collectText()).toBe(text);
@@ -115,9 +116,10 @@ it('updates phase text while retaining the syncing indicator', () => {
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
     const subtitle = new FakeElement('span');
     const internal = modal as unknown as {
-        subtitleEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
+        subtitleEl: HTMLElement; subtitleLabelEl: HTMLElement; conflictsPanel: HTMLElement; updateSyncStatusText(): void;
     };
     internal.subtitleEl = subtitle as unknown as HTMLElement;
+    internal.subtitleLabelEl = subtitle.createSpan({ cls: 'crate-activity-subtitle-label' }) as unknown as HTMLElement;
     internal.conflictsPanel = new FakeElement('div') as unknown as HTMLElement;
     for (const [phase, label] of [
         ['server', 'Loading server changes…'],
