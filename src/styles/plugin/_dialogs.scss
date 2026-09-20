@@ -111,11 +111,19 @@
 			gap: 8px;
 		}
 		button {
-			min-height: 32px;
-			height: auto;
-			padding: 6px 12px;
-			font-size: var(--font-ui-small);
-			white-space: normal;
+			@include action.styles;
+			min-width: 72px;
+			padding: 0 var(--size-4-3, 12px);
+			&.mod-cta {
+				background: var(--interactive-accent);
+				color: var(--text-on-accent);
+				&:hover:not(:disabled) { background: var(--interactive-accent-hover); }
+			}
+			&.mod-warning {
+				background: var(--crate-danger);
+				color: var(--crate-on-accent);
+				&:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+			}
 		}
 	}
 }
