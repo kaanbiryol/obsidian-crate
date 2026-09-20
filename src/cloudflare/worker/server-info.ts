@@ -1,3 +1,4 @@
+import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import release from '../server-release.json';
 import type { Env } from './types';
@@ -23,6 +24,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	pwaAssetVersion: PWA_ASSET_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
+        SHARED_CHECKPOINT_CAPABILITY,
     INITIAL_IMPORT_CAPABILITY,
 		BATCH_ASSET_UPLOAD_CAPABILITY,
 		BULK_NEW_UPLOAD_CAPABILITY,

@@ -1,4 +1,6 @@
 import { loadPendingDiff } from './pending-diff';
+import { HistoryCheckpoints } from './history-checkpoint';
+import { createHistoryRestore } from './history-restore';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
@@ -210,6 +212,8 @@ export class SyncEngine {
 
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
+		try { await this.historyCheckpoints().prune(this.settings.syncHistory.flatMap(entry => entry.historyCheckpoint ? [entry.historyCheckpoint] : [])); }
+		catch (error) { logger.warn('Could not prune old history checkpoints:', errorMessage(error)); }
 		this.lifecycle.throwIfDestroyed();
 		await this.conflictStore.load();
 		this.lifecycle.throwIfDestroyed();
@@ -269,6 +273,62 @@ export class SyncEngine {
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
 	}
+
+    private historyCheckpoints(): HistoryCheckpoints {
+        return new HistoryCheckpoints(this.vault.adapter, `${this.plugin.manifest.dir}/history-checkpoints`, normalizeWorkerUrl(this.settings.workerUrl));
+    }
+
+    async saveSharedHistoryCheckpoint() {
+        if (this.lifecycle.isDestroyed || this.state.status === 'syncing' || this.getActiveConflicts().length
+            || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) return undefined;
+        return this.api.sharedHistory.save();
+    }
+
+    async saveHistoryCheckpoint(): Promise<string | undefined> {
+        if (this.lifecycle.isDestroyed || this.state.status === 'syncing' || this.getActiveConflicts().length
+            || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) return undefined;
+        // Clone synchronously, before another sync can advance the baseline.
+        const files = Object.fromEntries(Object.entries(this.localManifest.getManifest().files)
+            .filter(([path]) => !this.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }]));
+        return this.historyCheckpoints().save(files, [...this.settings.ignorePatterns]);
+    }
+
+    async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
+        return this.runHistoryOperation(async () => {
+            const scope = JSON.stringify(this.settings.ignorePatterns);
+            const verify = () => {
+                this.lifecycle.throwIfDestroyed();
+                if (scope !== JSON.stringify(this.settings.ignorePatterns)) throw new Error('Sync exclusions changed. Review the restore again.');
+                if (this.getActiveConflicts().length || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) {
+                    throw new Error('Finish pending uploads, file restores, and conflict reviews before returning to this state.');
+                }
+            };
+            verify();
+            const snapshot = shared ? await this.api.sharedHistory.load(checkpoint) : await this.historyCheckpoints().load(checkpoint, this.settings.ignorePatterns);
+            const review = await createHistoryRestore({
+                vault: this.vault, api: this.api, target: snapshot.files,
+                baseline: this.localManifest.getManifest().files,
+                ...(shared ? { readTarget: (path: string, file: FileEntry) => this.api.sharedHistory.download(checkpoint, path, file) } : {}),
+                recoveryRoot: `${this.plugin.manifest.dir}/state-recovery`,
+                shouldIgnore: path => this.shouldIgnore(path), verify, beforeApply,
+                applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
+            });
+            return { ...review,
+                restore: () => this.runHistoryOperation(() => review.restore()),
+                verifySynced: () => this.runHistoryOperation(() => review.verifySynced()),
+            };
+        });
+    }
+
+    private async runHistoryOperation<T>(operation: () => Promise<T>): Promise<T> {
+        this.lifecycle.throwIfDestroyed();
+        if (this.state.status === 'syncing') throw new Error('Wait for sync to finish, then try again.');
+        this.updateState({ status: 'syncing' });
+        return this.trackWork(async () => {
+            try { return await operation(); }
+            finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
+        });
+    }
 
     async syncSelected(keys: string[]): Promise<SyncResult> {
         this.assertPendingSelection(keys);

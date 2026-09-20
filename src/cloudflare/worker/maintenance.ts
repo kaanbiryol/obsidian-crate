@@ -1,3 +1,4 @@
+import { pruneSharedCheckpoints } from './history-checkpoints';
 import { cleanStagedUploads } from './maintenance/staged-upload-cleanup';
 import { cleanStagedBatches } from './maintenance/staged-batch-cleanup';
 import { pruneChangelog } from './db';
@@ -12,6 +13,7 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 	const errors: string[] = [];
   let removedObjects = 0;
 	const tasks: Array<[string, () => Promise<unknown>]> = [
+        ['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
 		['prune changelog', () => pruneChangelog(env.DB)],

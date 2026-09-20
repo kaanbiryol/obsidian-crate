@@ -27,6 +27,10 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 3 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 4 files) |
+| `GET` | `/sync/checkpoints` | List up to 20 unexpired shared checkpoints |
+| `POST` | `/sync/checkpoints` | Capture the authoritative server inventory; unchanged generations reuse their checkpoint |
+| `GET` | `/sync/checkpoint?id=<id>` | Read the complete inventory of a live shared checkpoint |
+| `GET` | `/sync/checkpoint-file?id=<id>&path=<path>&revision=<revision>` | Stream an exact current/retained file revision while the checkpoint remains live; vault scope only |
 | `GET` | `/sync/versions?path=<path>&search=<text>&cursor=<cursor>` | Page through unexpired recoverable file versions (100 per page) |
 | `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
 | `GET` | `/diagnostics` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
@@ -350,3 +354,15 @@ Vault-authenticated, read-only access to one unexpired retained version. Query p
 File history decodes text locally and compares the saved version with a snapshot of the current local file. Binary/large files can still be restored without a preview. Older servers may not support previews; browsing and existing durable restore operations remain available. Deploy server revision 46 or later to enable previews.
 
 The **History** view groups retained update/deletion versions by day, rather than presenting whole-vault snapshots or inferring restore events. **Files** reads the existing paginated manifest and replays subsequent changes to list current synced files, including those with no retained versions. Its current preview reads targeted metadata and downloads the remote copy only for text files up to 256 KB, verifying the size, hash and revision before display. It never substitutes unsynced local contents. The file list renders in batches of 200; **Refresh files** refreshes the remote inventory. Historical comparisons continue to use the local snapshot and never modify the sync manifest or queue.
+
+### Shared history checkpoints
+
+Protocol 11 advertises `shared-history-checkpoints-v1`; safe ordinary protocol-7
+writes remain supported. Checkpoints store metadata in R2, not extra copies of vault
+files. Creation snapshots the complete server inventory, not a client-supplied list.
+The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
+Expired or evicted IDs receive 410. Captures are bounded to 20,000 files and 8 MiB of
+metadata (413 beyond that limit), and in-progress initial imports receive 409.
+All routes require vault credentials and return private, non-cacheable responses.
+See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
+retention, cleanup, restore validation, and older-server behavior.

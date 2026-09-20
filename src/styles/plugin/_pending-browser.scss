@@ -224,7 +224,8 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
 }
 
 .crate-browser-action-status { order: 3; flex-basis: 100%; color: var(--text-error); font-size: 12px; line-height: 1.4; &:empty { display: none; } }
-.crate-pending-discard-modal {
+.crate-pending-discard-modal,
+.crate-history-restore-modal {
     .crate-modal-body > p:first-child { margin-block-start: 0; }
     .crate-discard-file-list { max-height: 40vh; overflow: auto; margin-block: 16px; }
     .crate-discard-file { display: flex; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }

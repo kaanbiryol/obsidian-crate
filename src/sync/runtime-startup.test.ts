@@ -11,11 +11,18 @@ import { SyncRuntime } from './runtime';
 import type { SyncResult } from './types';
 import {
 	createDeferred,
-	createRuntimeHarness,
+	createRuntimeHarness as createUntrackedRuntimeHarness,
 	flushMicrotasks,
 	isAcceptingEvents,
 	type Deferred,
 } from './runtime-test-harness';
+
+const runtimes: SyncRuntime[] = [];
+function createRuntimeHarness(...args: Parameters<typeof createUntrackedRuntimeHarness>) {
+	const harness = createUntrackedRuntimeHarness(...args);
+	runtimes.push(harness.runtime);
+	return harness;
+}
 
 describe('SyncRuntime startup event handling', () => {
 	let startupSync: Deferred<SyncResult>;
@@ -26,12 +33,17 @@ describe('SyncRuntime startup event handling', () => {
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
 		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(false);
+		vi.spyOn(SyncEngine.prototype, 'saveHistoryCheckpoint').mockResolvedValue(undefined);
+        vi.spyOn(SyncEngine.prototype, 'saveSharedHistoryCheckpoint').mockResolvedValue(undefined);
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
 	afterEach(async () => {
 		startupSync.resolve(createEmptySyncResult());
-		await flushMicrotasks();
+		for (const runtime of runtimes.splice(0)) {
+			await runtime.waitForStartupSync();
+			runtime.destroy();
+		}
 		vi.restoreAllMocks();
 	});
 

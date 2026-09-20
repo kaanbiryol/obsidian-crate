@@ -3,7 +3,7 @@ import { groupHistory } from './history-groups';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 
-export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void): void {
+export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void, restoreState?: (entry: SyncHistoryEntry) => void): void {
 	if (history.length === 0) {
 		renderEmptyState(container, 'clock', 'No activity yet', 'Sync history will appear here.');
 		return;
@@ -17,11 +17,20 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 			const entryEl = section.createDiv({ cls: 'crate-history-entry' });
 			if (!entry.success) entryEl.addClass('is-error');
 
-			if (hasFilePaths(entry) || entry.errorCount > 0) {
+			if (hasFilePaths(entry) || entry.errorCount > 0 || (entry.historyCheckpoint || entry.sharedCheckpoint) && restoreState) {
 				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
 				const summary = details.createEl('summary', { cls: 'crate-history-card' });
-				renderHistoryHeader(summary, entry, true);
+				renderHistoryHeader(summary, entry, true, count);
 				renderHistoryFiles(details, entry, openFileHistory);
+				if (restoreState) {
+					const actions = details.createDiv({ cls: 'crate-history-state-actions' });
+					if (entry.historyCheckpoint || entry.sharedCheckpoint) {
+						const button = actions.createEl('button', { text: 'Return to this state', cls: 'crate-activity-action', attr: { type: 'button' } });
+						button.addEventListener('click', () => restoreState(entry));
+					} else {
+						actions.createSpan({ text: 'This entry has no available vault checkpoint.', cls: 'crate-discard-help' });
+					}
+				}
 			} else {
 				const card = entryEl.createDiv({ cls: 'crate-history-card' });
 				renderHistoryHeader(card, entry, false, count);
@@ -106,6 +115,10 @@ function formatTimestamp(iso: string): string {
 
 function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, count: number): void {
     const summary = header.createDiv({ cls: 'crate-history-summary' });
+    if (entry.checkpointFileCount !== undefined) {
+        summary.createSpan({ text: `Vault checkpoint · ${entry.checkpointFileCount.toLocaleString()} files` });
+        return;
+    }
     if (!entry.success) {
         summary.createSpan({
             text: `Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`,

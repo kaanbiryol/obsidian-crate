@@ -123,3 +123,17 @@ it('keeps single-file failures expandable', () => {
     expect(find(container, 'crate-history-details')).toBeDefined();
     expect(container.collectText()).toContain('Failed to finish');
 });
+
+it('offers a checkpoint restore independently of truncated file lists', () => {
+    const container = new FakeElement('div');
+    renderHistoryPanel(container as unknown as HTMLElement, [{ ...entry, uploaded: 400, uploadedPaths: [], historyCheckpoint: 'a'.repeat(64) }], undefined, vi.fn());
+    expect(find(container, 'crate-history-details')).toBeDefined();
+    expect(container.collectText()).toContain('Return to this state');
+});
+
+it('explains why older entries cannot restore the whole vault', () => {
+    const container = new FakeElement('div');
+    renderHistoryPanel(container as unknown as HTMLElement, [entry], undefined, vi.fn());
+    expect(container.collectText()).toContain('This entry has no available vault checkpoint');
+    expect(container.collectText()).not.toContain('Return to this state');
+});
