@@ -106,7 +106,7 @@ it.each([
     expect(subtitle.getAttribute('data-state')).toBe(indicator);
 });
 
-it('updates phase text while retaining the syncing indicator', () => {
+it('keeps the header stable while detailed sync phases change', () => {
     const state = { status: 'syncing', work: { phase: 'scanning' } } as SyncState;
     const deps = {
         getState: () => state,
@@ -121,15 +121,11 @@ it('updates phase text while retaining the syncing indicator', () => {
     internal.subtitleEl = subtitle as unknown as HTMLElement;
     internal.subtitleLabelEl = subtitle.createSpan({ cls: 'crate-activity-subtitle-label' }) as unknown as HTMLElement;
     internal.conflictsPanel = new FakeElement('div') as unknown as HTMLElement;
-    for (const [phase, label] of [
-        ['server', 'Loading server changes…'],
-        ['scanning', 'Scanning and comparing vault files…'],
-        ['saving', 'Saving sync progress…'],
-    ] as const) {
+    for (const phase of ['server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving', 'reminders'] as const) {
         state.work = { phase };
         internal.updateSyncStatusText();
-        expect(subtitle.collectText()).toBe(label);
-        expect(subtitle.getAttribute('title')).toBe(label);
+        expect(subtitle.collectText()).toBe('Syncing…');
+        expect(subtitle.getAttribute('title')).toBe('Syncing…');
         expect(subtitle.getAttribute('data-state')).toBe('syncing');
     }
 });

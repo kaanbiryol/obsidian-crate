@@ -9,7 +9,7 @@ afterEach(() => vi.clearAllMocks());
 it('shows active initial upload with an empty pending queue', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, [], false, false, { type: 'initial', current: 12, total: 20 });
-    expect(element.collectText()).toContain('Preparing files for upload: 12/20');
+    expect(element.collectText()).toContain('Preparing files: 12/20');
     expect(element.children[0]?.attributes.get('role')).toBe('status');
     expect(element.collectText()).not.toContain('All synced');
 });
@@ -27,6 +27,15 @@ it('shows the normal empty state after syncing finishes', () => {
     expect(element.collectText()).toContain('All synced');
     expect(element.collectText()).toContain('Synced just now');
     expect(element.collectText()).not.toContain('Your vault is up to date.');
+});
+
+it('shows runtime saving progress after the engine finishes an unchanged sync', () => {
+    const element = new FakeElement('div');
+    renderPendingPanel(element as never, [], false, false, {
+        type: 'sync', current: 0, total: 0, work: { phase: 'saving' },
+    }, '', { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
+    expect(element.collectText()).toBe('Saving sync progress…');
+    expect(element.children[0]?.attributes.get('role')).toBe('status');
 });
 
 it('replaces the pending file list with a loading indicator during sync', () => {
@@ -61,8 +70,7 @@ it.each([
 it('shows change progress independently of the pending queue size', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, ['queued.md'], false, true, { type: 'sync', current: 3, total: 12 });
-    expect(element.collectText()).toContain('Processing changes: 3/12');
-    expect(element.collectText()).toContain('Unchanged files are skipped.');
+    expect(element.collectText()).toBe('Processing changes: 3/12');
 });
 
 it('shows one spinner with the file count during uploads', () => {

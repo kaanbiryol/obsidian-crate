@@ -66,6 +66,14 @@ const { outputFiles } = await build({
                     }, state, actions);
             };
             window.mount();
+            window.showSyncProgress = work => {
+                state.dispose?.();
+                const panel = document.querySelector('.crate-activity-panel');
+                panel.empty();
+                renderPendingPanel(panel, [], false, true, null, '', {
+                    status: 'syncing', work, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
+                });
+            };
         `,
     },
     plugins: [{ name: 'obsidian-fixture', setup(builder) {
@@ -456,6 +464,28 @@ for (const browserType of [chromium, webkit]) {
                 await rows.first().click();
                 await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 assert.equal(await page.evaluate(() => window.calls), 2, 'Selecting a binary file loads its details on demand');
+                // Short phases, growing counters, and long setup messages keep
+                // the same label bounds and spinner position, including on mobile.
+                let progressBounds;
+                for (const work of [
+                    { phase: 'server' }, { phase: 'scanning' },
+                    { phase: 'uploading', current: 9, total: 1986 },
+                    { phase: 'uploading', current: 1000, total: 1986 },
+                    { phase: 'applying' }, { phase: 'saving' },
+                    { phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 20000, remainingSchedules: 100000 } },
+                ]) {
+                    await page.evaluate(work => window.showSyncProgress(work), work);
+                    const bounds = await page.evaluate(() => {
+                        const label = document.querySelector('.crate-activity-loading-label');
+                        const box = el => { const { x, y, width, height } = el.getBoundingClientRect(); return { x, y, width, height }; };
+                        return { label: box(label), spinner: box(document.querySelector('.crate-activity-spinner')) };
+                    });
+                    if (progressBounds) assert.deepEqual(bounds, progressBounds, 'Phase updates must not shift the progress layout');
+                    else progressBounds = bounds;
+                    const label = page.locator('.crate-activity-loading-label');
+                    assert.equal(await label.getAttribute('title'), await label.textContent());
+                }
+                await page.screenshot({ path: `.generated/activity-diff/${browserType.name()}-${width}-${theme}-progress.png` });
                 assert.deepEqual(errors, []);
                 await page.close();
             }

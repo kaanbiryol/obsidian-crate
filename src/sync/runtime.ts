@@ -515,7 +515,7 @@ export class SyncRuntime {
 			logger.info(logMessage);
 		}
 
-		const active = { type, current: 0, total: 0 };
+		const active: SyncActivityProgress = { type, current: 0, total: 0 };
 		this.activityProgress = active;
 		emitSyncProgress(this.progressListeners, 0, 0);
 		const wrappedCallback = (current: number, total: number) => {
@@ -531,6 +531,10 @@ export class SyncRuntime {
 		try {
 			const result = await operation(engine, wrappedCallback);
 			if (this.syncEngine !== engine) return result;
+			// The engine is finished, but checkpoint and settings persistence can
+			// still take time. Keep that work visible after the engine clears its phase.
+			active.work = { phase: 'saving' };
+			emitSyncProgress(this.progressListeners, active.current, active.total);
 			if (type === 'sync') {
 				this.lastForegroundSyncAt = Date.now();
 			}

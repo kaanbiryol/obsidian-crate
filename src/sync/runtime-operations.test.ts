@@ -4,7 +4,9 @@ import type { SyncResult } from './types';
 import { createEmptySyncResult } from './sync-result';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { SyncRuntime } from './runtime';
+import { formatSyncProgress } from '../ui/activity/progress-label';
 import {
+	createDeferred,
 	createRuntimeHarness,
 	setApiClient,
 	setStatusBar,
@@ -12,6 +14,36 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime operation wrappers', () => {
+	it.each(['sync', 'initialSync', 'forceFullSync'] as const)('shows saving progress until %s history and settings are persisted', async method => {
+		const { runtime, persistSettings } = createRuntimeHarness();
+		const checkpoint = createDeferred<undefined>();
+		const persistence = createDeferred<void>();
+		const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as const;
+		const sync = vi.fn(async () => createEmptySyncResult());
+		const engine = {
+			getState: () => state, sync, initialSync: sync, forceFullSync: sync,
+			saveSharedHistoryCheckpoint: vi.fn(() => checkpoint.promise),
+		};
+		setSyncEngine(runtime, engine);
+		persistSettings.mockImplementation(() => persistence.promise);
+		const labels: string[] = [];
+		runtime.addProgressListener(() => {
+			if (runtime.getActivityProgress()) labels.push(formatSyncProgress(runtime.getActivityProgress(), runtime.getState().work));
+		});
+
+		const operation = runtime[method]();
+		await vi.waitFor(() => expect(engine.saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
+		expect(labels.at(-1)).toBe('Saving sync progress…');
+		expect(formatSyncProgress(runtime.getActivityProgress(), runtime.getState().work)).toBe('Saving sync progress…');
+
+		checkpoint.resolve(undefined);
+		await vi.waitFor(() => expect(persistSettings).toHaveBeenCalledOnce());
+		expect(formatSyncProgress(runtime.getActivityProgress(), runtime.getState().work)).toBe('Saving sync progress…');
+		persistence.resolve();
+		await operation;
+		expect(runtime.getActivityProgress()).toBeNull();
+	});
+
 	it.each([
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.sync(callback), historyType: 'sync' as const },
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.initialSync(callback), historyType: 'initial' as const },

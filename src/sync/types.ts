@@ -133,4 +133,5 @@ export interface SyncActivityProgress {
 	type: SyncHistoryEntry['type'];
 	current: number;
 	total: number;
+	work?: SyncWork;
 }
