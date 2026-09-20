@@ -59,7 +59,7 @@ Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
 
 ## Prerequisites
 
-- A Cloudflare account with R2 enabled
+- A Cloudflare account with R2 enabled and a valid payment method on file, even when usage stays within R2's free allowance. See [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting).
 - Obsidian 1.13.0 or newer
 
 Building from source additionally requires Node.js 26.8.2+ (26.x) and npm; `.nvmrc` pins the version used by every CI workflow.
@@ -115,6 +115,8 @@ To stop a running sync, select **Pause sync** in sync activity or **Stop sync** 
 
 ## Cloudflare Setup
 
+**Before connecting:** activate R2 once in the Cloudflare account that will own your server. Cloudflare requires checkout and a payment method; Crate does not activate the subscription or collect payment details. R2 Standard includes free monthly usage, with charges for usage above the allowance. Follow [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting), then return here. Crate creates the bucket, database, and server automatically after authorization.
+
 After installing the plugin, open the Crate settings tab in Obsidian:
 
 1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
@@ -122,6 +124,8 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
 5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
+
+If setup shows **R2 is not active for this Cloudflare account**, follow [the R2 activation error steps](docs/deployment.md#r2-activation-error) and retry with the same account.
 
 The OAuth deployment uses the build-time Worker and current schema included in the installed plugin. Unsupported databases are rejected without modification; see the [recovery runbook](docs/recovery.md) before changing deployments. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
