@@ -385,15 +385,28 @@
 }
 
 /* Empty states */
+.crate-activity-panel:not([hidden]):has(.crate-activity-empty-state) {
+	display: flex;
+	flex-direction: column;
+	padding-block: 0;
+}
+
+// History has a toolbar and a separate content wrapper. Give that wrapper
+// the remaining panel space so its empty state has a real centering area.
+.crate-history-timeline-content:has(> .crate-activity-empty-state) {
+	display: flex;
+	flex-direction: column;
+	flex: 1 0 auto;
+}
+
 .crate-activity-empty-state {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	min-height: 100%;
+	flex: 1 0 auto;
 	gap: 14px;
 	padding: 32px 20px;
-    padding-bottom: calc(32px + 12cqh);
 	box-sizing: border-box;
 }
 

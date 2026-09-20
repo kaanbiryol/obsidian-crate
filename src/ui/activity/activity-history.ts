@@ -19,7 +19,7 @@ export class ActivityHistory {
         this.toolbar = panel.createDiv({ cls: 'crate-history-timeline-toolbar' });
         this.browse = this.toolbar.createEl('button', { text: 'Browse vault history', cls: 'crate-activity-action', attr: { type: 'button' } });
         this.browse.addEventListener('click', () => this.show());
-        this.timeline = panel.createDiv();
+        this.timeline = panel.createDiv({ cls: 'crate-history-timeline-content' });
     }
 
     update(history: SyncHistoryEntry[]): void {
