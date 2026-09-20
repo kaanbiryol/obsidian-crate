@@ -7,7 +7,7 @@ import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
 import { deployedArtifact } from './deployment-discovery';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
-import { withDeploymentFence, type DeploymentFence } from './deployment-fence';
+import { withDeploymentFence, isRejectedWorkerUpload, type DeploymentFence } from './deployment-fence';
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -128,7 +128,7 @@ export async function provisionCloudflareDeployment(input: {
   if (input.resumeUpdateValue) {
     const record = JSON.parse(input.resumeUpdateValue) as Record<string, unknown>;
     if (record.kind !== 'update' || record.worker !== input.metadata.workerName
-      || record.fingerprint !== input.artifacts.fingerprint || record.recoveryProtocol !== 1
+      || (record.fingerprint !== input.artifacts.fingerprint && !isRejectedWorkerUpload(record)) || record.recoveryProtocol !== 1
       || !['confirmed', 'rejected', 'settled'].includes(String(record.stepState))) throw new Error('This update cannot be safely resumed by this build.');
   }
 	const previousVaultName = input.metadata.vaultName;

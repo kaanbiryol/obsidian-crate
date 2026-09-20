@@ -40,6 +40,14 @@ export function isPendingAddressActivation(record: {
         && record.step === 'enable-server-address' && record.stepState === 'started';
 }
 
+/** A definitive provider rejection cannot later publish the rejected artifact.
+ * A replacement still takes ownership by CAS and revalidates storage and schema. */
+export function isRejectedWorkerUpload(record: Record<string, unknown>): boolean {
+    return record.kind === 'update' && record.recoveryProtocol === 1
+        && record.verificationPending === true && record.step === 'upload-worker'
+        && record.stepState === 'rejected';
+}
+
 export class DeploymentFence {
 	private uncertain = false;
   private verificationPending = false;

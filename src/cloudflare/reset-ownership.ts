@@ -94,7 +94,10 @@ export async function assertOwnedNamespace(api: ResetApi, accountId: string, wor
 	if (namespaces.some(namespace => !namespace.id || !namespace.script || !namespace.class)) {
 		throw new Error('Reset blocked: could not verify Durable Object ownership.');
 	}
-	const owned = namespaces.filter(namespace => namespace.script === workerName || namespace.id === namespaceId);
+	// The inactive safety ledger is retained across reset; only reminder state is retired.
+	const retained = namespaces.filter(namespace => namespace.script === workerName && namespace.class === 'CloudSafety');
+	if (retained.length > 1 || retained.some(namespace => namespace.id === namespaceId)) throw new Error('Reset blocked: invalid retained safety namespace.');
+	const owned = namespaces.filter(namespace => (namespace.script === workerName || namespace.id === namespaceId) && !retained.includes(namespace));
 	if (retired ? owned.length !== 0 : owned.length !== 1 || owned[0]?.id !== namespaceId
 		|| owned[0]?.script !== workerName || owned[0]?.class !== 'ReminderAlarm') {
 		throw new Error('Reset blocked: unexpected Durable Object namespaces belong to this Worker, or reminder state has not been removed.');

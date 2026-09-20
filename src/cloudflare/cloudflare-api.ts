@@ -1,5 +1,6 @@
 import { normalizeVaultName, VAULT_NAME_BINDING } from './vault-name';
 import { verifyWorkerDeployment } from './verify-worker-deployment';
+import cloudSafetyCompatSource from './worker/cloud-safety-compat.js?raw';
 import resetWorkerSource from './worker/reset-worker.js?raw';
 import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
@@ -134,6 +135,7 @@ export function buildWorkerMultipartBody(input: {
 			],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			CloudSafety: { type: 'durable-object', storage: 'sqlite', state: 'created' },
 		},
 	};
 	return buildWorkerModule(metadata, input.artifacts.workerBundle);
@@ -145,8 +147,11 @@ export function buildResetWorkerMultipartBody(resetId: string, databaseId: strin
 		annotations: { 'workers/message': `Crate reset ${resetId}`, 'workers/tag': 'crate' },
 		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
-		...(!alreadyRetired ? { exports: { ReminderAlarm: { type: 'durable-object', state: 'deleted' } } } : {}),
-	}, resetWorkerSource);
+		exports: {
+			CloudSafety: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			...(!alreadyRetired ? { ReminderAlarm: { type: 'durable-object', state: 'deleted' } } : {}),
+		},
+	}, `${resetWorkerSource}\n${cloudSafetyCompatSource}`);
 }
 
 function buildWorkerModule(metadata: Record<string, unknown>, workerBundle: string): { body: ArrayBuffer; contentType: string } {
