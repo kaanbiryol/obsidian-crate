@@ -845,7 +845,14 @@ body.reduce-motion .crate-activity-modal {
 
     input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 }
-.crate-conflict-manual { margin-top: 16px; font-size: var(--font-ui-small); }
+.crate-conflict-manual {
+    min-width: 0;
+    margin-top: 16px;
+    font-size: var(--font-ui-small);
+    h3 { margin: 0; @include sync-review.title; }
+    p { margin: 8px 0 12px; }
+    label { display: block; }
+}
 .crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.6; resize: vertical; }
 @media (max-width: sync-review.$compact-width) {
     .modal.crate-shared-modal.crate-conflict-review-modal .crate-modal-body { padding: 16px; }

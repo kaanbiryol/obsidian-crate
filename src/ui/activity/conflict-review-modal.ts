@@ -2,6 +2,7 @@ import { Notice, Platform, setIcon, type App } from 'obsidian';
 import type { ConflictRecord } from '../../sync/types';
 import type { ConflictChoice, ConflictReview } from '../../sync/conflict-review';
 import { buildConflictDiff, renderConflictDiffLine } from './conflict-diff';
+import { getPendingFileActions } from './file-actions';
 import { SharedModal } from '../shared/SharedModal';
 
 export class ConflictReviewModal extends SharedModal {
@@ -9,6 +10,7 @@ export class ConflictReviewModal extends SharedModal {
     private busy = false;
     private revision = 0;
     private draft: string | undefined;
+    private selected: ConflictChoice | undefined;
     private awaitingExternal = false;
     private readonly returnToReview = () => {
         if (this.awaitingExternal && !this.busy) {
@@ -56,7 +58,7 @@ export class ConflictReviewModal extends SharedModal {
         fileInfo.createSpan({ text: parts.join('/') || 'Vault root', cls: 'crate-conflict-review-help' });
         body.createEl('p', { text: 'Choose which version to keep, or edit a combined result.', cls: 'crate-conflict-review-help' });
         const status = body.createDiv({ cls: 'crate-conflict-review-help', attr: { role: 'status', 'aria-live': 'polite' } });
-        if (returning) status.setText('Versions refreshed. Review the latest content and choose a result. Your inline draft, if any, is preserved.');
+        if (returning) status.setText('Versions refreshed. Review the latest content and choose a result. Your result draft, if any, is preserved.');
         const controls: Array<HTMLButtonElement | HTMLInputElement> = [];
         const button = (parent: HTMLElement, text: string, action: () => void) => {
             const el = parent.createEl('button', { text, attr: { type: 'button' } });
@@ -85,6 +87,19 @@ export class ConflictReviewModal extends SharedModal {
             });
             open.title = Platform.isDesktopApp ? 'Open in the default system application' : 'Open file in Obsidian';
             setIcon(open.createSpan({ attr: { 'aria-hidden': 'true' } }), 'external-link');
+            const path = version === 'current' ? this.record.originalPath : this.record.conflictPath;
+            const reveal = getPendingFileActions(this.app, path, () => {}).find(action => action.id === 'reveal');
+            if (reveal) {
+                const revealButton = button(panel, reveal.title, () => {
+                    this.awaitingExternal = true;
+                    void reveal.run().catch((error: unknown) => {
+                        this.awaitingExternal = false;
+                        status.setText(error instanceof Error ? error.message : String(error));
+                    });
+                });
+                revealButton.addClass('crate-conflict-action');
+                revealButton.setAttribute('aria-label', `${reveal.title}: ${title}`);
+            }
             if (textPreview) {
                 const code = panel.createEl('pre', { cls: 'crate-conflict-code', attr: { tabindex: '0', 'aria-label': title } });
                 for (const row of diff!.rows) renderConflictDiffLine(code, row[version], version);
@@ -95,15 +110,20 @@ export class ConflictReviewModal extends SharedModal {
             } else panel.createEl('p', { text: `${Math.ceil(size / 1024)} KB · Select the title to open this file.` });
         }
         const manual = body.createDiv({ cls: 'crate-conflict-manual' });
-        manual.hide();
-        const label = manual.createEl('label', { text: 'Result — saved to the original file' });
+        manual.createEl('h3', { text: 'Custom result' });
+        const draftHelp = manual.createEl('p', { text: 'This draft starts with the current file’s text. Edit it to combine both versions, then save with ', cls: 'crate-conflict-review-help' });
+        draftHelp.createEl('strong', { text: 'Resolve conflict' });
+        draftHelp.append('.');
+        const label = manual.createEl('label', { text: 'Result text' });
         const editor = label.createEl('textarea', { cls: 'crate-conflict-editor', attr: { 'aria-label': 'Result text', spellcheck: 'false' } });
         editor.value = this.draft ?? review.currentText ?? '';
         editor.addEventListener('input', () => { this.draft = editor.value; });
         const actions = this.contentEl.createDiv({ cls: 'crate-conflict-actions' });
         const choices = actions.createEl('fieldset', { cls: 'crate-conflict-choices' });
         choices.createEl('legend', { text: 'Resolution' });
-        let selected: ConflictChoice | undefined;
+        if (!textPreview && this.selected === 'manual') this.selected = undefined;
+        const showResult = () => manual.toggle(this.selected === 'manual');
+        showResult();
         const explanations = {
             current: 'Keep the current file. A recovery copy of the saved version is kept.',
             saved: 'Replace the current file with the saved copy. Recovery copies of both versions are kept.',
@@ -113,25 +133,27 @@ export class ConflictReviewModal extends SharedModal {
         const explanation = actions.createEl('p', { cls: 'crate-conflict-review-help crate-conflict-resolution-help' });
         const modes: Array<[ConflictChoice, string]> = [
             ['current', 'Keep current'], ['saved', 'Use saved copy'], ['both', 'Keep both'],
-            ...(textPreview ? [['manual', 'Edit result'] as [ConflictChoice, string]] : []),
+            ...(textPreview ? [['manual', 'Custom result'] as [ConflictChoice, string]] : []),
         ];
-        explanation.setText('Select a resolution, then confirm. Recovery copies are kept on this device.');
+        explanation.setText(this.selected ? explanations[this.selected] : 'Select a resolution, then confirm. Recovery copies are kept on this device.');
         for (const [value, text] of modes) {
             const label = choices.createEl('label', { attr: { title: explanations[value] } });
             const radio = label.createEl('input', { attr: { type: 'radio', name: `resolution-${this.record.conflictPath}`, value } });
             label.createSpan({ cls: 'crate-conflict-choice-check', attr: { 'aria-hidden': 'true' } });
-            const caption = label.createSpan({ text });
+            label.createSpan({ text });
+            radio.checked = this.selected === value;
             controls.push(radio);
             radio.addEventListener('change', () => {
-                selected = value;
-                manual.toggle(value === 'manual');
+                this.selected = value;
+                if (value === 'manual') this.draft ??= editor.value;
+                showResult();
                 primary.disabled = false;
                 explanation.setText(explanations[value]);
-                if (value === 'manual') { caption.setText('Custom result'); editor.focus(); }
+                if (value === 'manual') editor.focus();
             });
         }
-        const primary = button(actions, 'Resolve conflict', () => { if (selected) void resolve(selected); });
-        primary.addClass('crate-conflict-primary-action', 'crate-sync-primary-action'); primary.disabled = true;
+        const primary = button(actions, 'Resolve conflict', () => { if (this.selected) void resolve(this.selected); });
+        primary.addClass('crate-conflict-primary-action', 'crate-sync-primary-action'); primary.disabled = !this.selected;
         const resolve = async (choice: ConflictChoice) => {
             this.busy = true; controls.forEach(el => { el.disabled = true; }); editor.disabled = true;
             status.setText('Saving your choice…');
