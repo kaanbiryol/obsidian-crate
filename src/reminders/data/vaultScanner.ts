@@ -23,6 +23,7 @@ import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import type { ReminderSourceIssue } from './reminder-source-issues';
+import { isConflictFile } from '@/sync/conflict';
 
 const log = createLogger('VaultScanner');
 
@@ -103,6 +104,7 @@ export function normalizeReminderIds(
  */
 export function isInRemindersFolder(filePath: string, remindersFolderPath: string): boolean {
   const normalizedFile = normalizePath(filePath);
+  if (isConflictFile(normalizedFile)) return false;
   const normalizedFolder = normalizePath(remindersFolderPath);
   return normalizedFile.startsWith(normalizedFolder + "/") || normalizedFile === normalizedFolder;
 }
@@ -160,7 +162,9 @@ export async function scanFile(
 ): Promise<FileScanResult> {
   const filePath = file.path;
   const cancelled = { filePath, reminders: [], lineCount: 0 };
-  if (signal?.aborted) return cancelled;
+  // Conflict copies preserve alternate bytes for review, not active reminders.
+  // Never normalize their duplicated IDs or let them claim live identities.
+  if (signal?.aborted || isConflictFile(filePath)) return cancelled;
 
   try {
     const originalContent = await readVaultMarkdown(app, file);
@@ -243,7 +247,8 @@ export async function scanVault(
   let totalLines = 0;
 
   // Only get markdown files within the reminders folder tree
-  const reminderFiles = collectMarkdownFilesInFolder(app, remindersFolderPath);
+  const reminderFiles = collectMarkdownFilesInFolder(app, remindersFolderPath)
+    .filter(file => !isConflictFile(file.path));
 
   log.info(
     ` Found ${reminderFiles.length} files in ${remindersFolderPath || "vault root"}`
