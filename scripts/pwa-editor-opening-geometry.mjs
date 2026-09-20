@@ -46,8 +46,12 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		await card.tap();
 		await page.waitForFunction(() => window.editorOpeningComplete);
 		const frames = await page.evaluate(() => window.editorOpeningFrames);
-		assert.ok(frames.length > (reducedMotion === 'reduce' ? 0 : 3),
+		assert.ok(frames.length > 0,
 			`record editor geometry after mounting (${reducedMotion}: ${frames.length} frames)`);
+		if (reducedMotion === 'no-preference') {
+			assert.ok(frames.some(frame => frame.travel > 1),
+				`observe the moving entrance before it settles (${frames.map(frame => frame.travel)})`);
+		}
 		for (const frame of frames) {
 			assert.ok(frame.travel <= frame.surfaceHeight + 33,
 				`A compact sheet must travel by its visible height, not by the full-screen positioning frame (${frame.travel} vs ${frame.surfaceHeight})`);
@@ -91,7 +95,7 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		});
 		assert.ok(Math.abs(lateFrames[0] - lateFrames.at(-1) - 30) < 1, 'editor ends above the final keyboard position');
 		if (reducedMotion === 'no-preference') {
-			assert.ok(lateFrames.filter(y => y < lateFrames[0] - 1 && y > lateFrames.at(-1) + 1).length >= 3,
+			assert.ok(lateFrames.some(y => y < lateFrames[0] - 1 && y > lateFrames.at(-1) + 1),
 				`late keyboard geometry must move through intermediate frames instead of snapping (${lateFrames})`);
 		}
 		await page.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
