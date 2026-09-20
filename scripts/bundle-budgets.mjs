@@ -9,10 +9,10 @@ export const bundleBudgets = {
 	},
 	{
 		path: 'dist/styles.css',
-		// Base UI controls: about 170 KB raw / 24 KB gzip, including the shared React UI
-		// and sync file browser. Keep a small margin for subsequent changes.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '172000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '24500', 10),
+		// 0.3.0 shared controls, sync/conflict review and file history:
+		// about 212 KB raw / 28 KB gzip. Keep a small margin for subsequent changes.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '225000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '30000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -24,9 +24,9 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Includes React DOM and shared Base UI controls; about 336 KB raw / 106 KB gzip.
+		// Includes React DOM and shared Base UI controls; about 343 KB raw / 109 KB gzip.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '345000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '108000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '110000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,

@@ -95,6 +95,8 @@ test('edits a link label without changing its URL', async ({ page }, info) => {
   const { editor, output } = await open(page, info.project.metadata.host, 'Read [docs](https://example.com) now');
   await range(editor, 7); await page.keyboard.type('NEW');
   await expect(output).toHaveText('Read [doNEWcs](https://example.com) now');
+  // The active link exposes Markdown; blur restores its rendered anchor.
+  await page.getByRole('button', { name: 'Blur editor', exact: true }).click();
   await expect(editor.locator('a')).toHaveAttribute('href', 'https://example.com');
 });
 test('deletes an entire link and restores it with undo', async ({ page }, info) => {
