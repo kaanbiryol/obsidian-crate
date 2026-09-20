@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement } from '../test/fakes/obsidian-ui';
 import { ActivityModal } from './activity-modal';
-import { renderHistoryPanel } from './activity/history';
 import { recordSyncHistory } from '../sync/runtime-history';
 import { createEmptySyncResult } from '../sync/sync-result';
 import { DEFAULT_SETTINGS } from '../plugin/settings-types';
@@ -26,13 +25,10 @@ describe('activity modal completion progress', () => {
             pendingPanel: HTMLElement; onProgress(): void; refresh(): void;
         };
         internal.pendingPanel = panel as unknown as HTMLElement;
-        const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {
-            panel.empty();
-            renderHistoryPanel(panel as unknown as HTMLElement, settings.syncHistory);
-        });
+        const refresh = vi.spyOn(internal, 'refresh').mockImplementation(() => {});
         recordSyncHistory(settings, 'sync', createEmptySyncResult());
         internal.refresh(); // Engine's final state arrives before the result is recorded.
-        expect(panel.collectText()).toContain('No changes');
+        expect(settings.syncHistory[0]).toMatchObject({ uploaded: 0 });
         const uploadedPaths = Array.from({ length: 53 }, (_, index) => `.obsidian/plugins/plugin-${index}/data.json`);
         recordSyncHistory(settings, 'sync', { ...createEmptySyncResult(), uploaded: 53, uploadedPaths });
         refresh.mockClear();
@@ -40,9 +36,7 @@ describe('activity modal completion progress', () => {
         internal.onProgress(); // Runtime completion event follows history persistence.
 
         expect(refresh).toHaveBeenCalledOnce();
-        expect(panel.collectText()).toContain('53 uploaded');
-        expect(panel.collectText()).toContain('data.json .obsidian/plugins/plugin-49');
-        expect(panel.collectText()).toContain('Showing 50 of 53 uploaded files.');
+        expect(settings.syncHistory[0]).toMatchObject({ uploaded: 53, uploadedPaths: uploadedPaths.slice(0, 50) });
     });
 });
 

@@ -17,7 +17,8 @@ import { StatusBarIndicator } from './StatusBarIndicator';
 import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
-import { renderHistoryPanel } from './activity/history';
+import { ActivityHistory } from './activity/activity-history';
+import type { HistoryComparison } from '../sync/history-comparison';
 import { HistoryRestoreModal } from './activity/history-restore-modal';
 import type { HistoryRestoreReview } from '../sync/history-restore';
 import type { SyncHistoryEntry } from '../sync/types';
@@ -25,6 +26,7 @@ import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
 
 export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
+    loadHistoryComparison?(entry: SyncHistoryEntry, previous?: SyncHistoryEntry): Promise<HistoryComparison>;
     listSharedCheckpoints?(): Promise<SharedCheckpoint[]>;
     createHistoryRestore?(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
 	loadPendingDiff?: PendingDiffLoader;
@@ -50,6 +52,7 @@ export class ActivityModal extends BaseUiModal {
 	private tabsRoot: Root | undefined;
 	private currentTabIndex = 0;
     private historyActive = false;
+    private activityHistory?: ActivityHistory;
     private sharedCheckpoints?: SharedCheckpoint[];
     private sharedHistoryLoading = false;
     private sharedHistoryReload = false;
@@ -136,11 +139,11 @@ export class ActivityModal extends BaseUiModal {
 			// Obsidian's separate Settings window is active.
 			animationsEnabled: this.contentEl.win === window,
 			onClose: () => this.close(),
-			onMount: (container, close, header) => this.renderActivity(container, close, header),
+			onMount: (container, _close, header) => this.renderActivity(container, header),
 		}));
 	}
 
-	private renderActivity(contentEl: HTMLDivElement, close: () => void, headerEl: HTMLDivElement): void {
+	private renderActivity(contentEl: HTMLDivElement, headerEl: HTMLDivElement): void {
 
 		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
 
@@ -201,7 +204,7 @@ export class ActivityModal extends BaseUiModal {
 		if (index === 0) this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
-        if (index === 2) void this.loadSharedHistory();
+        if (index === 2) { this.renderHistory(); void this.loadSharedHistory(); }
         this.updateSyncBtn();
         this.updateSyncStatusText();
 	}
@@ -275,8 +278,6 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private refresh(): void {
-		const scrollContainer = this.historyPanel;
-		const scrollTop = scrollContainer?.scrollTop ?? 0;
 		this.updateSyncBtn();
 		this.updateSyncErrorNotice();
 		this.updateSyncStatusText();
@@ -286,25 +287,27 @@ export class ActivityModal extends BaseUiModal {
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.isCheckingConflicts(), this.deps.createConflictReview ? conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
 		} : undefined);
-		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
-			.map((entry) => entry.getAttribute('data-history-key')));
-		this.historyPanel.empty();
-		const deps = this.deps;
-		const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.loadCurrentSyncedPreview ? {
-			loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
-			listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
-			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
-		} : undefined;
-		renderHistoryPanel(this.historyPanel, this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? [], historyRuntime ? path => {
-			openRemoteRecoveryModal(this.app, historyRuntime, path);
-		} : undefined, deps.createHistoryRestore ? entry => {
-			new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
-		} : undefined);
-		this.historyPanel.querySelectorAll('details').forEach((entry) => {
-			entry.open = expanded.has(entry.getAttribute('data-history-key'));
-		});
-		if (scrollContainer) scrollContainer.scrollTop = scrollTop;
-	}
+        if (this.currentTabIndex === 2) this.renderHistory();
+    }
+
+    private renderHistory(): void {
+        const deps = this.deps;
+        if (!this.activityHistory) {
+            const historyRuntime = deps.listRecentFileVersions && deps.getPendingRestores && deps.loadFileHistoryPreview && deps.restoreRecentFileVersion && deps.loadCurrentSyncedPreview ? {
+                loadCurrentSyncedPreview: deps.loadCurrentSyncedPreview.bind(deps),
+                listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
+                loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
+            } : undefined;
+            this.activityHistory = new ActivityHistory(this.app, this.historyPanel, {
+                load: deps.loadHistoryComparison?.bind(deps),
+                openFile: historyRuntime ? path => openRemoteRecoveryModal(this.app, historyRuntime, path) : undefined,
+                restore: deps.createHistoryRestore ? entry => {
+                    new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
+                } : undefined,
+            });
+        }
+        this.activityHistory.update(this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? []);
+    }
 
     private async loadSharedHistory(): Promise<void> {
         if (!this.historyActive || !this.historyPanel || !this.deps.listSharedCheckpoints) return;
@@ -342,6 +345,8 @@ export class ActivityModal extends BaseUiModal {
 
 	onClose(): void {
         this.historyActive = false;
+        this.activityHistory?.dispose();
+        this.activityHistory = undefined;
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);
