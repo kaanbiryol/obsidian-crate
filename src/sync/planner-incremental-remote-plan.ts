@@ -121,6 +121,7 @@ export async function planIncrementalRemoteChanges(
 
 			if (!decision) {
 				context.localManifest.setEntry(path, { ...localEntry, revision: entry.revision });
+				result.settledPaths.push(path);
 			} else if (decision.action === 'upload') {
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);

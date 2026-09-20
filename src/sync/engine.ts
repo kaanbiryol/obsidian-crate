@@ -669,12 +669,36 @@ export class SyncEngine {
             } finally {
                 this.contexts.clearPlannedContent();
             }
-			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}
 			return result;
 		});
+	}
+
+	private async clearSyncedPendingPaths(result: SyncResult, revisions: ReadonlyMap<string, number>): Promise<void> {
+		this.queueController.clearSyncedPendingPaths(result, revisions);
+		if (!result.success) return;
+		// Applying remote bytes emits vault events too. Verify those events against
+		// the committed baseline instead of requiring another sync to clear them.
+		const applied = new Set([...result.downloadedPaths, ...result.mergedPaths, ...result.deletedPaths, ...result.conflicts]);
+		const snapshot = this.queueController.snapshotPendingRevisions();
+		const settled = createEmptySyncResult();
+		for (const key of this.queueController.getPendingPaths()) {
+			const path = key.startsWith('delete:') ? key.substring(7) : key;
+			if (!applied.has(path)) continue;
+			const baseline = this.localManifest.getEntry(path);
+			try {
+				const local = await readLocalFileEntry(this.vault, path);
+				if (this.localManifest.getEntry(path) !== baseline) continue;
+				if (local?.hash === baseline?.hash) settled.settledPaths.push(key);
+			} catch {
+				// Unreadable files remain pending for the next sync.
+			}
+		}
+		// Events arriving during verification must still remain pending.
+		this.queueController.clearSyncedPendingPaths(settled, snapshot);
 	}
 
 	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
@@ -684,7 +708,7 @@ export class SyncEngine {
 			this.updateState({ status: 'syncing' });
 			try {
 				const result = await this.reconcilePaths(queueKeys, !selectedOnly);
-				this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+				await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 				if (result.success) {
 					if (!selectedOnly) await this.contexts.finishInitialSetup();
 					const lastSync = new Date().toISOString();
@@ -762,7 +786,7 @@ export class SyncEngine {
 			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback);
-			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}
@@ -775,7 +799,7 @@ export class SyncEngine {
 			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback);
-			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}
