@@ -57,7 +57,8 @@ describe('reminder editor chrome', () => {
         expect(modal).toContain('const focusDelayMs = 0');
         expect(presentation).toContain("currentView !== 'main'");
         expect(presentation).toContain('window.requestAnimationFrame');
-        expect(presentation).toContain('richTextInputRef.current?.focus()');
+        expect(presentation).toContain('isObsidianOverlayActive(element)');
+        expect(presentation).toContain('input.focus()');
         expect(presentation).toContain('window.cancelAnimationFrame(frame)');
     });
 
