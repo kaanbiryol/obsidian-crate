@@ -17,6 +17,7 @@ import {
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { PluginReminderSourceNotice } from '../plugin/PluginReminderSourceNotice';
 import { RemindersLoading } from "../RemindersLoading";
+import { CRATE_ICON_ID } from "@/ui/crate-icon";
 import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -42,7 +43,7 @@ export class RemindersView extends ItemView {
     }
 
     getIcon(): string {
-        return "check-circle";
+        return CRATE_ICON_ID;
     }
 
     /**

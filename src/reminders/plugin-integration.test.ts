@@ -78,6 +78,7 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadPluginIntegrationModule() {
 	vi.doMock('obsidian', () => ({
+		addIcon: vi.fn(),
 		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
 		Notice: class {},
 	}));
@@ -237,7 +238,7 @@ describe('initializeReminders', () => {
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
-		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('check-circle', 'Open reminders', expect.any(Function));
+		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open reminders', expect.any(Function));
 		expect(registerReminderCommands).toHaveBeenCalledWith(plugin);
 		expect(plugin.addCommand).toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-view',

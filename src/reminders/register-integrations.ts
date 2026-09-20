@@ -1,4 +1,4 @@
-import type { MarkdownPostProcessorContext } from 'obsidian';
+import { addIcon, type MarkdownPostProcessorContext } from 'obsidian';
 import type CratePlugin from '../main';
 import { registerReminderCommands } from './commands';
 import { ReminderQueryInjector } from './query/injector';
@@ -6,6 +6,7 @@ import { createRemindersBlockExtension } from './query/remindersBlockLivePreview
 import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/adapters/reminders-view';
 import { createLogger } from './utils/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
 
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
@@ -41,11 +42,12 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 	} catch (error) {
 		remindersLogger.error('Failed to register reminder block extension:', error);
 	}
+	addIcon(CRATE_ICON_ID, CRATE_ICON_SVG);
 	plugin.registerView(
 		VIEW_TYPE_REMINDERS,
 		(leaf) => new RemindersView(leaf, plugin),
 	);
-	plugin.addRibbonIcon('check-circle', 'Open reminders', () => {
+	plugin.addRibbonIcon(CRATE_ICON_ID, 'Open reminders', () => {
 		void plugin.activateRemindersView();
 	});
 
