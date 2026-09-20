@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, ExternalLink, RefreshCw, Link2Off, WifiOff } from 'lucide-react';
+import { Folder, ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from 'lucide-react';
 import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
@@ -57,27 +57,30 @@ export function EmptyAuthState({ config }: { config: StoredConfig }) {
 }
 
 export function ErrorState({ error, config, onRetry }: { error: string; config: StoredConfig; onRetry: () => void }) {
+	const needsCleanup = /clear this site[’']s data|remote cleanup could not finish/i.test(error);
 	const needsLink = /enrollment token|session expired|not authenticated|unauthorized|missing auth token/i.test(error);
 	return (
 		<AuthLayout
-			title={needsLink ? 'Reconnect to Crate' : 'Unable to connect'}
-			description={needsLink
+			title={needsCleanup ? 'Cleanup needs attention' : needsLink ? 'Reconnect to Crate' : 'Unable to connect'}
+			description={needsCleanup
+				? 'Some data or session access could not be removed. Follow the steps below to finish cleanup.'
+				: needsLink
 				? 'Open Crate in Obsidian and send a new app link to reconnect.'
 				: 'Check your internet connection and try again.'}
 			notice={
 				<div className="auth-card__notice" role="alert">
-					{needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
+					{needsCleanup ? <TriangleAlert size={20} aria-hidden="true" /> : needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
 					<div>
-						<strong>{needsLink ? 'A new app link is needed' : 'Crate couldn’t be reached'}</strong>
-						<p>{needsLink
-							? 'Your link or session has expired or is no longer valid.'
-							: 'If this keeps happening, open Crate in Obsidian and send a new app link.'}</p>
+						<strong>{needsCleanup ? 'Cleanup is incomplete' : needsLink ? 'A new app link is needed' : 'Crate couldn’t be reached'}</strong>
+						<p>{error}</p>
 					</div>
 				</div>
 			}
 			config={config}
 		>
-			{needsLink ? (
+			{needsCleanup ? (
+				<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+			) : needsLink ? (
 				<>
 					<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 					<Button className="secondary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
