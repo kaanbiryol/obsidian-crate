@@ -319,13 +319,22 @@ Whole-vault history restore is covered by `src/sync/history-restore.test.ts`,
 `src/cloudflare/worker/history-state-restore.integration.ts`. The file-history browser
 harness also checks the checkpoint action, per-file preview, cancellation, busy
 controls, unavailable versions, and retry in both engines and viewport sizes.
-History rows show second-level timestamps; restore-point IDs appear in the review. Browser checks
+History rows show second-level timestamps; restore-point IDs appear in the confirmation. Browser checks
 cover selecting same-minute points, exact-point text diffs, addition/removal
 previews, escaped text, and ignoring stale previews when switching files.
-The restore review reuses the file-history split layout: files on the left and a
-diff on the right, with list/detail navigation on mobile and a fixed action footer.
-Browser checks cover pane layout, keyboard focus return, and cancelling the final
-restore confirmation without changing files.
+The History tab retains expandable sync entries and per-file history actions. One
+**Browse vault history** button opens the dedicated three-pane screen. The harness
+checks file actions, expanded rows and focus across refresh, lazy loading,
+stacked dialog dismissal and focus return to the preserved activity list, desktop
+columns, mobile pane navigation, selected restore targets,
+saved-only previews without a predecessor, load retry, stale sync requests, and
+selection stability during refresh. `history-comparison.test.ts` and
+`runtime-history-comparison.test.ts` cover complete-inventory comparisons, missing
+saved states, byte verification, preview limits, and connection changes.
+Restore opens a compact confirmation directly from Vault history. Browser checks
+cover transparent footer actions, current-file counts, cancellation during preflight,
+unavailable versions, unchanged states, busy dismissal guards, and failed-restore
+retry with a fresh preflight. No extra diff review or second confirmation appears.
 For native Obsidian acceptance, verify dismissal is blocked while restoring,
 restore an edit/deletion/rename/addition checkpoint in a disposable synced vault,
 and confirm another device converges. Interrupt a restore and restart Obsidian to

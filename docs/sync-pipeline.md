@@ -294,8 +294,22 @@ remain bound to their original server and exclusion rules. Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current
 excluded files and rejects exclusion changes during review.
 
-**History → Return to this state** previews reverted, restored, and removed files,
-including local unsynced edits. Excluded files remain untouched. The current server
+The History tab keeps expandable sync summaries with uploaded, downloaded, merged,
+and deleted files. Each file offers **File history**. A single
+**Browse vault history** button opens a dedicated Vault history dialog above Sync
+activity. Closing it returns to the unchanged activity list and its previous scroll
+position. The wider
+screen combines sync selection, files, and saved-state previews in three panes
+(History → Files → Diff on narrow screens). Saved contents load only when this
+screen opens. A selected checkpoint is compared
+with the preceding available checkpoint, using complete inventories and verified
+saved bytes, never current local contents. Without an available predecessor, the
+browser shows saved contents instead of presenting every file as an addition.
+Entries without checkpoints retain recorded paths and errors; they cannot provide
+an exact saved-state preview. File previews retain the 256 KB text limit.
+
+**Vault history → Restore to this point** opens one compact confirmation with the
+number of current files that will change, including local unsynced edits. Excluded files remain untouched. The current server
 inventory must match the device's baseline before reviewing. Every required version
 must still be available from the server's current files or 30-day retained history.
 Confirmation rechecks the complete local and remote inventories, stages and verifies
