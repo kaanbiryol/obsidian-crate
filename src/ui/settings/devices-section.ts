@@ -69,7 +69,9 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 						message: `${label} will lose ${webSession ? 'access to reminders' : 'sync access'}.`,
 						details: [webSession
 							? 'Open a fresh app link from Crate in Obsidian to reconnect.'
-							: 'Sign in with Cloudflare on that device to reconnect.'],
+							: plugin.settings.cloudflareDeployment
+								? 'Sign in with Cloudflare on that device to reconnect.'
+								: 'Generate a new access token on your server to reconnect that device.'],
 						confirmText: webSession ? 'Remove session' : 'Remove device',
 						warning: true,
 					});

@@ -18,6 +18,16 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime teardown and reinitialization', () => {
+	it('rejects a stale address update before stopping or changing a newer connection', async () => {
+		const { runtime, settings, persistSettings } = createRuntimeHarness({ lastSeq: 42 });
+		const destroy = vi.spyOn(runtime, 'destroy');
+		await expect(runtime.applyInfrastructureConfig({ workerUrl: 'https://next.trycloudflare.com', authToken: 'token' }, undefined,
+			{ workerUrl: 'https://obsolete.trycloudflare.com', authToken: 'token' })).rejects.toThrow('connection changed');
+		expect(settings.workerUrl).toBe('https://worker.example');
+		expect(settings.lastSeq).toBe(42);
+		expect(destroy).not.toHaveBeenCalled();
+		expect(persistSettings).not.toHaveBeenCalled();
+	});
 	let startupSyncs: Deferred<SyncResult>[];
 	let queuedStartupSyncs: Deferred<SyncResult>[];
 

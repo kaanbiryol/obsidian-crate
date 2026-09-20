@@ -39,6 +39,26 @@ handling are tested there as well as in the PWA's document.
 
 ## Infrastructure Stack
 
+The same Worker can run locally through `scripts/local-server.mjs`. Miniflare
+provides D1, R2, and Durable Objects backed by a persistent data directory. A
+Node HTTP listener forwards only application requests; Miniflare's own listener
+stays on loopback. Schema and runtime compatibility are checked before Durable
+Objects start. Local administration issues hashed per-device credentials
+without Cloudflare OAuth. See [self-hosting](self-hosting.md).
+
+`Dockerfile` packages that same standalone runtime and a pinned tunnel connector.
+`compose.yaml` owns container lifecycle and the persistent `/data` volume. Its
+entrypoint holds a kernel lease across the CLI and its children, allowing crash
+recovery without two containers opening the database. Application behavior stays
+in the shared Worker and local launcher.
+
+The local gateway also owns single-use device pairing and an instance-specific
+public readiness probe. Pairing administration uses a private local socket and
+secret; only redemption is exposed through the tunnel. Verified backup/restore
+operates on stopped storage and validates checksums, compatibility, and the
+restored database before publishing its metadata. These features do not add
+enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
+
 | Service | Role |
 |---|---|
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
@@ -87,7 +107,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 
 ### Device authorization
 
-Cloudflare account authorization is the sole authority for adding a vault-sync device. A fresh device signs in through OAuth, discovers matching `crate-<deployment-id>` Workers and their D1/R2 bindings, and chooses a server only when the account contains more than one. Crate then inserts or rotates that device's hashed bearer token directly through the Cloudflare D1 API.
+For Cloudflare deployments, Cloudflare account authorization is the authority for adding a vault-sync device. A fresh device signs in through OAuth and registers its hashed bearer token through the Cloudflare D1 API. For local servers, the operator issues a device token using the host CLI while the server is stopped. The plugin validates vault access and protocol compatibility before saving the connection. Both hosting modes use the same Worker authentication and revocation endpoints.
 
 Disconnecting locally preserves non-secret deployment metadata so reconnecting the same vault converges on the same Worker.
 

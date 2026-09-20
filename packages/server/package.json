@@ -1,0 +1,40 @@
+{
+  "name": "@kaanbiryol/crate-server",
+  "version": "0.1.0",
+  "description": "Run Crate sync and its reminders PWA on your computer with automatic remote access.",
+  "type": "module",
+  "license": "0BSD",
+  "author": "Kaan Biryol",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaanbiryol/obsidian-crate.git"
+  },
+  "bin": {
+    "crate-server": "scripts/crate-server.mjs"
+  },
+  "engines": {
+    "node": "^26.8.2"
+  },
+  "files": [
+    "scripts/",
+    "assets/",
+    "npm-shrinkwrap.json",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "vendor/"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "crateServerAssets": true,
+  "dependencies": {
+    "@cspotcode/source-map-support": "0.8.1",
+    "sharp": "0.35.4",
+    "undici": "7.29.0",
+    "workerd": "1.20260908.1",
+    "ws": "8.21.0",
+    "youch": "4.1.0-beta.10"
+  },
+  "crateServerRuntime": "5.20260908.0-alpha"
+}

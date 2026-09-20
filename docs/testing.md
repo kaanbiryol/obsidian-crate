@@ -15,6 +15,33 @@ npx vitest run src/sync/planner-full.test.ts   # single test file
 
 `vitest.cloudflare.config.ts` uses Cloudflare's Vitest plugin with `wrangler.jsonc`. The runtime suite applies the initial schema to an isolated D1 database and exercises real D1, R2, and Durable Object bindings locally.
 
+`npm run test:local-server` exercises the standalone launcher through real HTTP
+and persistent storage. It checks credentials, transaction rollback, file bytes,
+upload receipt replay and an overdue Durable Object alarm across shutdown/restart,
+plus exclusive directory ownership and schema rejection. It uses temporary data.
+Remote setup tests run the real launcher and workerd with a fake `cloudflared`
+executable; they cover saved launches, DNS failure recovery, tunnel shutdown,
+credential permissions, and missing credentials. They create no public resources.
+Quick Tunnel tests also cover hostname discovery, startup failure, timeout cleanup,
+and rejection of downloads with an invalid checksum. `npm run test:server-package`
+installs a packed artifact through npx in an isolated cache and exercises real
+HTTP and storage across changing public URLs, using a fake connector.
+Pairing tests cover expiry, concurrent redemption, and hash-only credential
+storage. Readiness tests reject stale instance identities and retry DNS failures.
+Backup tests restore R2 data, device credentials, and a real scheduled Durable
+Object alarm into a new directory, reject damaged backups and non-empty targets,
+and verify that incompatible upgrade checks leave metadata unchanged.
+`npm run test:docker` requires a running Docker engine and Compose. It builds the
+image, runs the production Compose settings in an isolated project with networking
+disabled and a fake tunnel connector, verifies authenticated upload/download and
+the PWA, tests graceful restart and forced process death, checks that a second
+container cannot open the volume, and exercises offline device creation. Its test
+containers and volume are removed afterward. CI runs this on native Linux AMD64
+and ARM64 runners. Public tunnel reachability still requires a live manual check.
+Manual acceptance should connect two Obsidian devices and the PWA through trusted
+HTTPS, exercise initial sync and reminder editing, and verify real push delivery
+after a host restart.
+
 `sync-engine.integration.ts` runs separate real sync engines through the authenticated Worker API. Each simulated device retains its own files, settings and disk checkpoints across restarts. It checks three-device offline merging, edit/delete ordering, rename/edit races, interrupted uploads after the server commits, binary conflict preservation, and filenames such as `__proto__`. Only the Obsidian filesystem/UI surface is simulated; planning, transfer, HTTP serialization, authentication, D1 and R2 use production code.
 
 ## Reminder capacity measurements

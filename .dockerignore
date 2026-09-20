@@ -1,0 +1,20 @@
+# Only send server build inputs; never include vaults, credentials or host binaries.
+**
+!package.json
+!package-lock.json
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!tsconfig.json
+!postcss.config.js
+!scripts/
+!scripts/**
+!src/
+!src/**
+!packages/
+!packages/server/
+!packages/server/**
+**/node_modules
+**/.env*
+**/.dev.vars*
+**/*.test.*
+**/__pycache__

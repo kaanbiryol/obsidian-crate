@@ -1,5 +1,9 @@
 # Deploying and operating the server
 
+For persistent local D1, R2, and Durable Objects, follow [self-hosting](self-hosting.md).
+The Cloudflare account, R2 activation and OAuth instructions below apply only
+to Cloudflare-hosted deployments.
+
 Crate deploys its Cloudflare server from inside Obsidian with OAuth Authorization Code + PKCE. The callback at `crate.kaanbiryol.com` is a static GitHub Pages handoff; it does not exchange tokens or provision infrastructure.
 
 ## One-time GitHub Pages setup

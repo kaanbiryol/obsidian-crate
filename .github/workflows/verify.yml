@@ -80,6 +80,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:worker-runtime
+      - name: Verify persistent local hosting
+        run: node --test scripts/local-server.test.mjs scripts/local-server-tunnel.test.mjs scripts/local-server-quick.test.mjs scripts/local-server-pairing.test.mjs scripts/local-server-backup.test.mjs
+      - name: Verify standalone npx server package
+        run: npm run test:server-package
+
+  docker:
+    name: Docker server (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+      - name: Build and verify persistent Docker hosting
+        run: npm run test:docker
 
   visual:
     name: Visual tests (${{ matrix.shard }}/2)

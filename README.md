@@ -2,11 +2,31 @@
 
 Self-hosted Obsidian vault sync and reminders using Cloudflare R2, Workers, D1, and push notifications.
 
-Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. You bring a Cloudflare account, the deploy flow provisions the required resources, and your vault files sync through your own Worker and R2 bucket.
+Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. Deploy into your own Cloudflare account, or run the same Worker on your own computer with Miniflare and persistent local storage.
 
 Crate is not a hosted service and does not require a Crate account.
 
 [Deployment and OAuth setup](docs/deployment.md)
+
+[Run on your own computer](docs/self-hosting.md) — local setup, remote access, device tokens, backups, and updates.
+
+With Docker running, use `docker compose up -d --build` from this checkout.
+Then run `docker compose logs -f crate` to get the HTTPS address and first single-use
+pairing code. Docker includes Node and the tunnel tool, keeps storage in a named volume,
+and restarts Crate automatically. No host Node installation is needed.
+See [Docker setup](docs/self-hosting.md#run-with-docker).
+
+After `npm ci`, run `npm run server -- setup`. It initializes local storage,
+downloads a verified `cloudflared` binary if needed, and prints a public HTTPS
+address and the first pairing code. No Cloudflare account or domain is needed.
+Quick Tunnel addresses change on restart; update the address in Obsidian and
+re-enroll the PWA. For a stable address, use `setup --hostname crate.example.com`
+with your own Cloudflare domain.
+
+`npm run pack:server` builds a standalone npm package with the Worker included.
+It can be tested locally with `npx ./dist/kaanbiryol-crate-server-0.1.0.tgz`.
+The intended public command is `npx @kaanbiryol/crate-server`; it becomes available
+after the package is published. Building or packing does not publish anything.
 
 ## Status
 
@@ -34,24 +54,27 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, sync metadata and parsed reminder caches in D1, and reminder notification alarms in Durable Objects.
 
-Deployment and device connection use Cloudflare OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and saves the Cloudflare login in Obsidian secret storage for usage access.
+Cloudflare deployment and device connection use OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and saves the Cloudflare login in Obsidian secret storage for usage access. For local hosting, Miniflare runs the same storage API on your computer; the operator generates per-device access tokens using the local server CLI.
 
 ## Privacy and Security
 
 - Vault files are sent to your Worker and stored in your R2 bucket.
 - Sync metadata, registered device records, and parsed reminder caches are stored in your D1 database.
+- In local hosting mode, these D1/R2 resources and reminder alarm state are stored on the host's disk. Selecting **Connect to your server** sends sync requests to the address you provide. Miniflare telemetry is disabled.
+- Running `server -- setup` opts into a public Cloudflare Quick Tunnel. Cloudflare terminates public HTTPS and handles traffic passing through the tunnel; data access still requires Crate credentials. The server's persistent storage remains on your computer. If `cloudflared` is missing, the CLI downloads a pinned release from Cloudflare's GitHub repository, verifies its SHA-256 checksum, and caches it in `~/.crate/bin`.
+- Choosing `setup --hostname` creates a named tunnel and DNS route through your Cloudflare account instead. That mode saves tunnel credentials in a private directory beside the server data; Cloudflare's browser login saves its management certificate in `~/.cloudflared`.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
 - The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 1, preserves existing schema-1 databases, and rejects unsupported schemas without modification. Deployment code is never fetched at runtime.
-- Vault devices can be authorized only through the Cloudflare account that owns the server.
+- Cloudflare-hosted vault devices are authorized through the owning Cloudflare account. Locally hosted vault devices use tokens issued by the server operator.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
 - Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
 - The reminders web app stores its scoped session and pending reminder changes in browser local storage, and caches confirmed reminder and project content in IndexedDB for offline use. Signing out clears both.
 - Remote code is not fetched or evaluated at runtime.
 - Pasting a web URL into a reminder title or description automatically requests its page title through your Crate server and uses it as the link label. The server contacts the pasted website without your cookies or authorization headers. Selected text keeps its own label. Offline, blocked, slow, or untitled pages keep the URL label. This requires an updated plugin/web app and Crate server.
-- Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
+- Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker, or the operator of your local server, can access the synced data.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate. The [paired D1/R2 recovery CLI](docs/recovery.md) creates verified remote archives and restores them into isolated resources.
 - Remote deletions always move local files into the vault's `.trash` folder, even if Obsidian is set to delete permanently. Check that folder when recovering an edit made during sync. Crate never syncs `.trash`.
 
@@ -59,7 +82,7 @@ Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
 
 ## Prerequisites
 
-- A Cloudflare account with R2 enabled and a valid payment method on file, even when usage stays within R2's free allowance. See [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting).
+- Either a computer running the [local server](docs/self-hosting.md), or a Cloudflare account with R2 enabled and a valid payment method on file, even when usage stays within R2's free allowance. See [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting).
 - Obsidian 1.13.0 or newer
 
 Building from source additionally requires Node.js 26.8.2+ (26.x) and npm; `.nvmrc` pins the version used by every CI workflow.
