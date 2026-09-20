@@ -2,6 +2,7 @@ import { setIcon } from 'obsidian';
 import { groupHistory } from './history-groups';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
+import { historyEntryKey, historyPointLabel } from './history-point';
 
 export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void, restoreState?: (entry: SyncHistoryEntry) => void): void {
 	if (history.length === 0) {
@@ -18,14 +19,14 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 			if (!entry.success) entryEl.addClass('is-error');
 
 			if (hasFilePaths(entry) || entry.errorCount > 0 || (entry.historyCheckpoint || entry.sharedCheckpoint) && restoreState) {
-				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
+				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': historyEntryKey(entry) } });
 				const summary = details.createEl('summary', { cls: 'crate-history-card' });
 				renderHistoryHeader(summary, entry, true, count);
 				renderHistoryFiles(details, entry, openFileHistory);
 				if (restoreState) {
-					const actions = details.createDiv({ cls: 'crate-history-state-actions' });
+					const actions = entryEl.createDiv({ cls: 'crate-history-state-actions' });
 					if (entry.historyCheckpoint || entry.sharedCheckpoint) {
-						const button = actions.createEl('button', { text: 'Return to this state', cls: 'crate-activity-action', attr: { type: 'button' } });
+						const button = actions.createEl('button', { text: 'Review restore point', cls: 'crate-activity-action', attr: { type: 'button', 'aria-label': `Review ${historyPointLabel(entry).toLowerCase()}` } });
 						button.addEventListener('click', () => restoreState(entry));
 					} else {
 						actions.createSpan({ text: 'This entry has no available vault checkpoint.', cls: 'crate-discard-help' });
@@ -109,7 +110,7 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	return new Intl.DateTimeFormat(undefined, {
-        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
     }).format(date);
 }
 

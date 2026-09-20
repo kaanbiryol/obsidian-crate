@@ -594,7 +594,12 @@ export class SyncRuntime {
             verify();
         }, Boolean(entry.sharedCheckpoint));
         verify();
-        return { items: review.items, unchangedCount: review.unchangedCount, restore: async () => {
+        return { items: review.items, unchangedCount: review.unchangedCount, preview: async (path: string) => {
+            verify();
+            const preview = await review.preview(path);
+            verify();
+            return preview;
+        }, restore: async () => {
             verify();
             await review.restore();
             verify();

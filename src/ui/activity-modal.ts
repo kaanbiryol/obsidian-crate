@@ -298,7 +298,7 @@ export class ActivityModal extends BaseUiModal {
 		renderHistoryPanel(this.historyPanel, this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? [], historyRuntime ? path => {
 			openRemoteRecoveryModal(this.app, historyRuntime, path);
 		} : undefined, deps.createHistoryRestore ? entry => {
-			new HistoryRestoreModal(this.app, entry.timestamp, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
+			new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
 		} : undefined);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));

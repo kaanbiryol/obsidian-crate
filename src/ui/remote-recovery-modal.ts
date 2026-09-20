@@ -3,7 +3,8 @@ import { SharedModal } from './shared/SharedModal';
 import type { FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
 import type { SyncRuntime } from '../sync/runtime';
 import type { FileHistoryPreview } from '../sync/file-history-preview';
-import { buildDiff, type DiffLine } from './activity/diff-model';
+import { buildDiff } from './activity/diff-model';
+import { renderFileText } from './activity/history-text';
 import { renderDiffLines } from './activity/diff-renderer';
 import { openConfirmationModal } from './confirmation-modal';
 
@@ -20,24 +21,6 @@ function action(container: HTMLElement, text: string, run: () => void, cls = '')
 	const button = container.createEl('button', { text, cls, attr: { type: 'button' } });
 	button.addEventListener('click', run);
 	return button;
-}
-/** Keep internal IDs intact for copying and comparison, but visually secondary. */
-function renderFileText(container: HTMLElement, text: string, words?: DiffLine['words']): void {
-	const markers = [...text.matchAll(/<!--\s*crate-id:[^\r\n]*?-->/g)].map(match => ({ start: match.index, end: match.index + match[0].length }));
-	let offset = 0;
-	const changes = (words ?? []).flatMap(word => {
-		const start = offset; offset += word.text.length;
-		return word.changed ? [{ start, end: offset }] : [];
-	});
-	const boundaries = [...new Set([0, text.length, ...[...markers, ...changes].flatMap(range => [range.start, range.end])])].sort((a, b) => a - b);
-	for (let i = 0; i < boundaries.length - 1; i++) {
-		const start = boundaries[i]!, end = boundaries[i + 1]!;
-		const cls = [
-			markers.some(range => start >= range.start && start < range.end) ? 'crate-history-internal-marker' : '',
-			changes.some(range => start >= range.start && start < range.end) ? 'crate-diff-word' : '',
-		].filter(Boolean).join(' ');
-		container.createSpan({ cls, text: text.slice(start, end) });
-	}
 }
 function filePreview(container: HTMLElement, text: string, label: string): void {
 	const pre = container.createEl('pre', { attr: { tabindex: '0', 'aria-label': label } });

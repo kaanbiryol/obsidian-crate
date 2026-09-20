@@ -140,6 +140,7 @@
 .crate-reminders-ui .crate-activity-modal button.crate-activity-action,
 .crate-reminders-ui button.crate-sync-primary-action,
 .modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
+.modal.crate-history-restore-modal .crate-reminders-ui button.crate-activity-action,
 .crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
 .modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
     @include action.styles;
@@ -618,8 +619,6 @@
     font-size: var(--font-ui-small);
 }
 
-.crate-history-details:not([open]) > .crate-history-state-actions { display: none; }
-
 // Respond to the sheet's width, including narrow desktop windows.
 @container (max-width: #{sync-review.$compact-width}) {
     .crate-activity-subtitle { display: none; }
@@ -636,6 +635,7 @@
         gap: 4px 8px;
         white-space: normal;
     }
+
 }
 
 @media (max-width: 480px) {

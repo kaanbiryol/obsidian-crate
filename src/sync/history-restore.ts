@@ -9,12 +9,14 @@ import { readLocalFileEntry } from './local-file-entry';
 import { computeHash } from './hasher';
 import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
+import { loadHistoryRestorePreview, type HistoryRestorePreview } from './history-restore-preview';
 
 type Files = Record<string, FileEntry>;
 interface HistoryRestoreItem { path: string; action: 'revert' | 'restore' | 'remove' }
 export interface HistoryRestoreReview {
     items: HistoryRestoreItem[];
     unchangedCount: number;
+    preview(path: string): Promise<HistoryRestorePreview>;
     restore(): Promise<void>;
 }
 interface Context {
@@ -67,6 +69,15 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
     };
     return {
         items, unchangedCount: paths.length - items.length,
+        preview: async path => {
+            context.verify();
+            if (used) throw new Error('Reopen the restore point to review its files.');
+            if (!items.some(item => item.path === path)) throw new Error('This file is not part of the restore review.');
+            const preview = await loadHistoryRestorePreview(path, local[path], target[path],
+                () => vault.adapter.readBinary(path), () => sources.get(path)!());
+            context.verify();
+            return preview;
+        },
         verifySynced: async () => {
             context.verify();
             if (!sameFiles(target, filter((await api.getManifest()).files)) || !sameFiles(target, await scanLocal(context))) {

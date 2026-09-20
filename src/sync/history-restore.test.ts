@@ -55,6 +55,43 @@ async function harness(initial: Record<string, string>, historical: Record<strin
 }
 
 describe('whole synced vault restore', () => {
+    it('previews exact checkpoint edits, additions and removals without writing or applying', async () => {
+        const h = await harness({ 'edit.md': 'new', 'later.md': 'added' }, { 'edit.md': 'old', 'deleted.md': 'saved' });
+        const review = await createHistoryRestore(h.context);
+        expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+        expect(await review.preview('edit.md')).toEqual({ current: 'new', saved: 'old' });
+        expect(await review.preview('deleted.md')).toEqual({ current: '', saved: 'saved' });
+        expect(await review.preview('later.md')).toEqual({ current: 'added', saved: '' });
+        expect(h.api.previewFileVersion).toHaveBeenCalledTimes(2);
+        await expect(review.preview('../outside.md')).rejects.toThrow('not part');
+        expect(h.adapter.writeBinary).not.toHaveBeenCalled();
+        expect(h.adapter.write).not.toHaveBeenCalled();
+        expect(h.trash).not.toHaveBeenCalled();
+        expect(h.context.beforeApply).not.toHaveBeenCalled();
+        await review.restore();
+        await expect(review.preview('edit.md')).rejects.toThrow('Reopen');
+    });
+
+    it.each(['local', 'saved'])('rejects changed %s bytes rather than previewing the wrong state', async source => {
+        const h = await harness({ 'edit.md': 'new' }, { 'edit.md': 'old' });
+        const review = await createHistoryRestore(h.context);
+        if (source === 'local') h.files.set('edit.md', bytes('another edit'));
+        else h.api.previewFileVersion.mockResolvedValue(bytes('wrong saved file'));
+        await expect(review.preview('edit.md')).rejects.toThrow('changed');
+        expect(h.adapter.writeBinary).not.toHaveBeenCalled();
+    });
+
+    it.each(['binary', 'large', 'invalid text'])('keeps %s files restorable without a text preview', async kind => {
+        const path = kind === 'binary' ? 'image.png' : 'note.md';
+        const content = kind === 'large' ? 'x'.repeat(256_001) : kind === 'invalid text' ? 'old\u0000bytes' : 'old';
+        const h = await harness({ [path]: 'new' }, { [path]: content });
+        const review = await createHistoryRestore(h.context);
+        expect(await review.preview(path)).toHaveProperty('unavailable');
+        if (kind !== 'invalid text') expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+        await review.restore();
+        expect(h.files.get(path)).toEqual(bytes(content));
+    });
+
     it('previews and restores edits, deletions, later additions and renames, preserving exclusions and originals', async () => {
         const h = await harness({ 'edit.md': 'new', 'same.md': 'same', 'later.md': 'added', 'renamed.md': 'moved', 'excluded/keep.md': 'private' },
             { 'edit.md': 'old', 'same.md': 'same', 'deleted.md': 'restored', 'original.md': 'moved' });
