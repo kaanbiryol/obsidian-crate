@@ -186,7 +186,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                             {/* Due date / recurrence pill */}
                             {(dueDate || reminder.recurrence) && (
                                 <span
-                                    className={`premium-pill ${isOverdue && !reminder.recurrence ? 'is-overdue' : ''}`}
+                                    className={`premium-pill ${isOverdue ? 'is-overdue' : ''}`}
                                 >
                                     {reminder.recurrence ? (
                                         <ThemeIcon size="xs" id="repeat" />
