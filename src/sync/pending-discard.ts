@@ -1,13 +1,11 @@
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import type { SyncApiClient } from './api';
 import { computeHash } from './hasher';
 import { assertLocalSyncPath } from './local-path-safety';
 import { isHiddenPath } from './file-discovery';
 import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
-import { validateDownloadedContent } from './transfer-download';
 
 interface DiscardItem {
     path: string;
@@ -20,7 +18,8 @@ export interface PendingDiscardReview {
 }
 interface DiscardContext {
     vault: Vault;
-    api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile'>;
+    getBaseline(path: string): FileEntry | undefined;
+    readBase(path: string, hash: string): Promise<ArrayBuffer | null>;
     backupRoot: string;
     verify(): void;
     beforeBinaryReplace(path: string): Promise<void>;
@@ -33,14 +32,14 @@ export async function createPendingDiscard(context: DiscardContext, keys: string
     const paths = [...new Set(keys.map(key => key.startsWith('delete:') ? key.slice(7) : key))];
     for (const path of paths) assertLocalSyncPath(path);
     context.verify();
-    const metadata = await context.api.getFileMetadata(paths);
     const snapshots: DiscardSnapshot[] = [];
     for (const path of paths) {
         const localHash = await readHash(context.vault, path);
-        const remote = metadata.files[path];
+        const remote = context.getBaseline(path);
         if (localHash === (remote?.hash ?? null)) continue;
         if ((remote?.size ?? 0) > MAX_FILE_SIZE_BYTES) throw new Error(`${path}: file is too large to restore.`);
-        snapshots.push({ path, localHash, remote, action: remote ? 'restore' : 'trash' });
+        if (remote) await readBaseline(context, path, remote);
+        snapshots.push({ path, localHash, remote: remote ? { ...remote } : undefined, action: remote ? 'restore' : 'trash' });
     }
     context.verify();
     let used = false;
@@ -72,9 +71,8 @@ async function readHash(vault: Vault, path: string): Promise<string | null> {
 async function verifySnapshots(context: DiscardContext, snapshots: DiscardSnapshot[]): Promise<void> {
     context.verify();
     if (!snapshots.length) return;
-    const metadata = await context.api.getFileMetadata(snapshots.map(item => item.path));
     for (const item of snapshots) {
-        const remote = metadata.files[item.path];
+        const remote = context.getBaseline(item.path);
         if ((remote?.hash ?? null) !== (item.remote?.hash ?? null) || remote?.revision !== item.remote?.revision
             || await readHash(context.vault, item.path) !== item.localHash) {
             throw new Error(`${item.path} changed. Reopen discard to review the latest version.`);
@@ -84,13 +82,10 @@ async function verifySnapshots(context: DiscardContext, snapshots: DiscardSnapsh
 }
 
 async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promise<void> {
-    const { vault, api } = context;
+    const { vault } = context;
     let content: ArrayBuffer | undefined;
     if (item.remote) {
-        const response = await api.downloadFile(item.path);
-        if (response.revision !== item.remote.revision) throw new Error(`${item.path}: the server version changed. Reopen discard.`);
-        await validateDownloadedContent(item.path, response.content, response.size, response.hash, item.remote.hash);
-        content = response.content;
+        content = await readBaseline(context, item.path, item.remote);
     }
     // Keep recoverable local bytes even if an interrupted restore needs retrying.
     let original: ArrayBuffer | undefined;
@@ -140,4 +135,12 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
 function isUtf8(bytes: ArrayBuffer): boolean {
     try { new TextDecoder('utf-8', { fatal: true }).decode(bytes); return true; }
     catch { return false; }
+}
+
+async function readBaseline(context: DiscardContext, path: string, baseline: FileEntry): Promise<ArrayBuffer> {
+    const content = await context.readBase(path, baseline.hash);
+    if (!content || content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== baseline.hash) {
+        throw new Error(`${path}: the last-synced copy is not available on this device. Local changes were kept.`);
+    }
+    return content;
 }

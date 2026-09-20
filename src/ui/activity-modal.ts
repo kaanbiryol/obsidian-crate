@@ -88,7 +88,7 @@ export class ActivityModal extends BaseUiModal {
                     catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
                 },
                 fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
-                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(key => this.deps.getPendingPaths().includes(key))), () => this.refresh()).open(),
+                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(key => this.deps.getPendingPaths().includes(key))), () => this.refresh(), keys.map(key => key.startsWith('delete:') ? key.slice(7) : key)).open(),
             } : undefined);
         this.updateSyncBtn();
 	}
