@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { isObsidianOverlayActive } from '../../components/useObsidianOverlayActive';
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 
 interface UseReminderModalPresentationOptions {
@@ -38,7 +39,9 @@ export function useReminderModalPresentation({
 		}
 
 		const frame = window.requestAnimationFrame(() => {
-			richTextInputRef.current?.focus();
+			const input = richTextInputRef.current;
+			const element = input?.getElement();
+			if (input && element && isObsidianOverlayActive(element)) input.focus();
 		});
 		return () => window.cancelAnimationFrame(frame);
 	}, [allowAutoFocus, currentView, isClosing, richTextInputRef, showModal]);
@@ -69,7 +72,9 @@ export function useReminderModalPresentation({
 	const closePickerModal = useCallback(() => {
 		setCurrentView('main');
 		queueMicrotask(() => {
-			richTextInputRef.current?.focus();
+			const input = richTextInputRef.current;
+			const element = input?.getElement();
+			if (input && element && isObsidianOverlayActive(element)) input.focus();
 		});
 	}, [richTextInputRef]);
 
