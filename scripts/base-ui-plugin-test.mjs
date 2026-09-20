@@ -17,12 +17,13 @@ const css = compileString('@use "src/styles/plugin-ui/modal"; .crate-reminders-u
 `;
 const { outputFiles } = await build({
   stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
-    import React, { useEffect, useState } from 'react';
+    import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
     import { createRoot } from 'react-dom/client';
     import { Button } from './src/ui/shared/Button';
     import { AddReminderModal } from './src/reminders/ui/reminder-modal/AddReminderModal';
     import { PluginContext } from './src/reminders/ui/reminders-context';
     import { BaseUiModal } from './src/ui/shared/BaseUiModal';
+    import { useReminderModalPresentation } from './src/reminders/ui/reminder-modal/useReminderModalPresentation';
     import { BaseModal } from './src/reminders/components/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';
@@ -34,6 +35,18 @@ const { outputFiles } = await build({
     const style = document.createElement('style'); style.textContent = ${JSON.stringify(css)};
     const mount = document.createElement('div'); mount.className = 'crate-reminders-ui'; shadow.append(style, mount);
     const reminder = {id:'one',content:'Keep this draft',description:'Existing description',project:'Inbox',priority:4,completed:false};
+    function DeferredFocusFixture() {
+      const input = useRef(null);
+      const handle = useRef({ getElement: () => input.current, focus: () => input.current?.focus(), blur: () => input.current?.blur() });
+      useReminderModalPresentation({ focusDelayMs: 0, onClose: () => {}, richTextInputRef: handle });
+      useLayoutEffect(() => {
+        const overlay = document.createElement('div'); overlay.className = 'menu';
+        const button = document.createElement('button'); button.textContent = 'Deferred native action';
+        overlay.append(button); document.body.append(overlay); button.focus();
+        return () => overlay.remove();
+      }, []);
+      return <input ref={input} aria-label="Deferred editor" />;
+    }
     function Harness() {
       const [open,setOpen] = useState(null);
       const [mode,setMode] = useState('centered');
@@ -55,7 +68,10 @@ const { outputFiles } = await build({
         window.setSyncState = state => manager.update({ status:'idle', lastSync:null, lastError:null, pendingChanges:0, conflictCount:0, ...state });
         return () => manager.destroy();
       }, []);
+      window.closeFocusFixture = () => setOpen(null);
       return <>
+        <Button onClick={() => setOpen('focus-race')}>Deferred focus fixture</Button>
+        {open === 'focus-race' && <DeferredFocusFixture />}
         <Button onClick={() => {setMode('centered');setOpen('editor')}}>Desktop editor</Button>
         <Button onClick={() => {setMode('bottom-sheet');setOpen('editor')}}>Mobile editor</Button>
         <Button onClick={event => {event.currentTarget.blur();setMode('centered');setOpen('editor')}}>Editor without focused opener</Button>
@@ -275,6 +291,11 @@ for (const browserType of [chromium, webkit]) {
   await page.getByRole('button',{name:'Mobile editor',exact:true}).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', {name:'Deferred focus fixture',exact:true}).click();
+  await page.getByRole('textbox', {name:'Deferred editor',exact:true}).waitFor();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await expect(page.getByRole('button', {name:'Deferred native action',exact:true})).toBeFocused();
+  await page.evaluate(() => window.closeFocusFixture());
   await page.getByRole('button',{name:'Mobile editor',exact:true}).click();
   await page.evaluate(() => window.unmount());
   await expect(page.getByRole('dialog')).toHaveCount(0);

@@ -11,6 +11,15 @@ function nativeModal(element: HTMLElement): Element | null {
     return null;
 }
 
+/** Read live DOM state before deferred work can move focus behind a native overlay. */
+export function isObsidianOverlayActive(container: HTMLElement): boolean {
+    const host = nativeModal(container);
+    if (!host) return true;
+    const document = container.ownerDocument;
+    const modals = document.querySelectorAll('.modal-container');
+    return modals[modals.length - 1] === host && !document.querySelector('.menu, .suggestion-container');
+}
+
 /** Yield the focus trap to native Obsidian menus and dialogs opened above this sheet. */
 export function useObsidianOverlayActive(container: HTMLElement | null): boolean {
     const [active, setActive] = useState(true);
@@ -20,8 +29,7 @@ export function useObsidianOverlayActive(container: HTMLElement | null): boolean
         if (!host) return;
         const document = container.ownerDocument;
         const update = () => {
-            const modals = document.querySelectorAll('.modal-container');
-            setActive(modals[modals.length - 1] === host && !document.querySelector('.menu, .suggestion-container'));
+            setActive(isObsidianOverlayActive(container));
         };
         const observer = new MutationObserver(update);
         observer.observe(document.body, { childList: true });
