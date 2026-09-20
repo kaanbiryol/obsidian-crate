@@ -11,6 +11,7 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './activity/ActivitySheet';
 import { ActivityTabs } from './activity/ActivityTabs';
+import { StatusBarIndicator } from './StatusBarIndicator';
 import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
@@ -42,6 +43,8 @@ export class ActivityModal extends BaseUiModal {
 	private tabsRoot: Root | undefined;
 	private currentTabIndex = 0;
 	private subtitleEl!: HTMLSpanElement;
+	private subtitleLabelEl!: HTMLSpanElement;
+	private subtitleIndicatorRoot: Root | undefined;
 	private errorNoticeEl!: HTMLDivElement;
 	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
@@ -124,6 +127,8 @@ export class ActivityModal extends BaseUiModal {
 		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
 
 		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
+		this.subtitleIndicatorRoot = createRoot(this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-indicator' }));
+		this.subtitleLabelEl = this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-label' });
 		this.syncBtn = header.createEl('button', {
 			cls: 'crate-sync-now-btn crate-sync-primary-action reminder-modal-header-action',
 			attr: { type: 'button', 'aria-label': 'Sync vault', title: 'Sync all local and remote changes, including unchecked files.' },
@@ -184,15 +189,19 @@ export class ActivityModal extends BaseUiModal {
 
     private updateSyncStatusText(): void {
         const label = this.formatLastSync();
-        const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
-        const status = this.deps.getState().status;
+        const state = this.deps.getState();
+        const syncing = state.status === 'syncing' || !!this.deps.getActivityProgress?.();
+        const status = state.status;
         const pending = this.deps.getPendingPaths().length;
         const needsAttention = status === 'error' || status === 'offline';
         const text = syncing
             ? formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
             : needsAttention ? label
             : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
-        if (this.subtitleEl.textContent !== text) this.subtitleEl.setText(text);
+        if (this.subtitleLabelEl.textContent !== text) this.subtitleLabelEl.setText(text);
+        this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, {
+            state: syncing ? { ...state, status: 'syncing' } : state,
+        }));
         this.subtitleEl.setAttribute('title', text);
         this.subtitleEl.setAttribute('data-state', syncing ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle');
         if (this.deps.getActiveConflicts().length === 0) {
@@ -296,6 +305,8 @@ export class ActivityModal extends BaseUiModal {
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);
+		this.subtitleIndicatorRoot?.unmount();
+		this.subtitleIndicatorRoot = undefined;
 		this.tabsRoot?.unmount();
 		this.tabsRoot = undefined;
 		this.root?.unmount();
