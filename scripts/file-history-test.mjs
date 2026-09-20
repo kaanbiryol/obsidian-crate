@@ -6,6 +6,9 @@ import { chromium, webkit, expect } from '@playwright/test';
 const { outputFiles } = await build({
  stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
  import { openRemoteRecoveryModal } from './src/ui/remote-recovery-modal';
+ import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
+ import { renderHistoryPanel } from './src/ui/activity/history';
+ import { mergeSharedHistory } from './src/ui/activity/shared-history';
  HTMLElement.prototype.createEl = function(tag, options = {}) {
   const el = document.createElement(tag); if (options.cls) el.className = options.cls;
   if (options.text) el.textContent = options.text;
@@ -40,6 +43,18 @@ const { outputFiles } = await build({
   restoreRecentFileVersion: async version => {window.restores.push(version.storage_key);return {success:true,errors:[]};}
  };
  const localFiles=Object.keys(currentFiles).map(path=>({path,extension:'md',stat:{size:100,mtime:Date.now()}}));
+ window.stateRestores = 0;
+ window.mountStateHistory = () => {
+  document.querySelectorAll('.modal, #history-fixture').forEach(el => el.remove());
+  const container = document.body.createDiv({cls:'crate-reminders-ui'}); container.id='history-fixture';
+  const entry = {timestamp:'2026-09-20T10:18:00Z',type:'sync',success:true,uploaded:1,downloaded:0,merged:0,deleted:0,conflictCount:0,errorCount:0,uploadedPaths:['Notes/Plan.md'],historyCheckpoint:'a'.repeat(64)};
+  const shared = [{id:'12345678-1234-1234-1234-123456789012',sequence:1,timestamp:entry.timestamp,expiresAt:Date.parse('2026-10-20T10:18:00Z'),fileCount:15}];
+  renderHistoryPanel(container, mergeSharedHistory([], shared), undefined, entry => new HistoryRestoreModal({}, entry.timestamp, async () => {
+   if (window.statePreviewError) throw new Error('This version is no longer available. No files were changed.');
+   return {items:[{path:'Notes/Plan.md',action:'revert'},{path:'Archive/Deleted.md',action:'restore'},{path:'Notes/Added later.md',action:'remove'}],unchangedCount:12,
+    restore:async () => {window.stateRestores++; await new Promise(resolve => window.finishStateRestore=resolve);}};
+  }, () => {}).open());
+ };
  window.mount = (path = 'Reminders/Inbox.md') => { document.querySelectorAll('.modal').forEach(el => el.remove()); openRemoteRecoveryModal({vault:{getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}},runtime,path); };
  ` },
  plugins: [{name:'obsidian',setup(builder) {
@@ -79,7 +94,7 @@ for(const browserType of [chromium,webkit]) {
    button{justify-content:center}
    :root{--background-primary:#fff;--background-secondary:#f5f5f5;--background-modifier-border:#ddd;--background-modifier-hover:#eee;--text-normal:#242424;--text-muted:#666;--text-accent:#7057b8;--interactive-accent:#7057b8;--text-on-accent:white;--interactive-normal:#eee;--text-success:#26763d;--text-error:#c33636;--font-ui-small:14px;--font-ui-smaller:12px;--font-ui-medium:16px;--radius-m:8px;--radius-s:4px;--font-interface:system-ui}
    ${theme==='dark'?':root{--background-primary:#161616;--background-secondary:#222;--background-modifier-border:#333;--background-modifier-hover:#303030;--text-normal:#ddd;--text-muted:#999;--interactive-normal:#292929;--text-success:#87c693;--text-error:#ed9696;}':''}
-   *{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:14px system-ui;display:flex;align-items:center;justify-content:center;height:100vh}button,input{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button.mod-cta{background:var(--interactive-accent);color:white}.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}.modal.crate-confirmation-modal{position:fixed;z-index:10;box-shadow:0 0 0 200vmax #0008}.setting-item{display:flex}.setting-item-control{display:flex;gap:8px}
+   *{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:14px system-ui;display:flex;align-items:center;justify-content:center;height:100vh}button,input{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button.mod-cta{background:var(--interactive-accent);color:white}.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}.modal.crate-confirmation-modal,.modal.crate-history-restore-modal{position:fixed;z-index:10;box-shadow:0 0 0 200vmax #0008}.setting-item{display:flex}.setting-item-control{display:flex;gap:8px}
    </style><style>${css}</style>`);
    await page.addScriptTag({content:outputFiles[0].text});await page.evaluate(()=>window.mount());
    await expect(page.locator('.reminder-modal-header-title')).toBeFocused();
@@ -153,6 +168,34 @@ for(const browserType of [chromium,webkit]) {
    await openFile('Archive/Deleted.md');
    await page.locator('[data-version-key=deleted]').click();
    await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toBeVisible();
+   await page.evaluate(()=>window.mountStateHistory());
+   await expect(page.locator('#history-fixture')).toContainText('Vault checkpoint · 15 files');
+   await page.locator('#history-fixture summary').click();
+   await page.locator('#history-fixture').getByRole('button',{name:'Return to this state'}).click();
+   const stateModal = page.locator('.crate-history-restore-modal');
+   await expect(stateModal).toContainText('1 reverted · 1 restored · 1 removed');
+   await expect(stateModal).toContainText('Files excluded from sync stay untouched.');
+   await expect(stateModal.locator('.crate-discard-file')).toHaveCount(3);
+   assert.equal(await page.evaluate(()=>window.stateRestores),0);
+   assert.equal(await stateModal.evaluate(el=>el.scrollWidth>el.clientWidth),false);
+   await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-state-restore.png'});
+   await stateModal.getByRole('button',{name:'Cancel',exact:true}).click();
+   await expect(stateModal).toHaveCount(0);
+   assert.equal(await page.evaluate(()=>window.stateRestores),0);
+   await page.locator('#history-fixture').getByRole('button',{name:'Return to this state'}).click();
+   await stateModal.getByRole('button',{name:'Return to this state',exact:true}).click();
+   await expect(stateModal.getByRole('button',{name:'Cancel',exact:true})).toBeDisabled();
+   await expect(stateModal.getByRole('button',{name:'Return to this state',exact:true})).toBeDisabled();
+   assert.equal(await page.evaluate(()=>window.stateRestores),1);
+   await page.evaluate(()=>window.finishStateRestore());
+   await expect(stateModal).toHaveCount(0);
+   await page.evaluate(()=>{window.statePreviewError=true;});
+   await page.locator('#history-fixture').getByRole('button',{name:'Return to this state'}).click();
+   await expect(stateModal).toContainText('This version is no longer available');
+   await expect(stateModal.getByRole('button',{name:'Return to this state',exact:true})).toHaveCount(0);
+   await page.evaluate(()=>{window.statePreviewError=false;});
+   await stateModal.getByRole('button',{name:'Review again',exact:true}).click();
+   await expect(stateModal).toContainText('1 reverted · 1 restored · 1 removed');
    assert.deepEqual(errors,[]);await page.close();
   }
  } finally {await browser.close();}

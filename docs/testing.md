@@ -294,3 +294,21 @@ that file changes. For concurrent work, build the gallery once with
 `npx vite build --config vite.visual.config.mts --outDir /tmp/crate-title-gallery`,
 serve that snapshot with `npx vite preview --config vite.visual.config.mts --outDir /tmp/crate-title-gallery --host 127.0.0.1 --port 8790`,
 and run the Playwright command against that existing server.
+
+Whole-vault history restore is covered by `src/sync/history-restore.test.ts`,
+`src/sync/runtime-history-restore.test.ts`, and
+`src/cloudflare/worker/history-state-restore.integration.ts`. The file-history browser
+harness also checks the checkpoint action, per-file preview, cancellation, busy
+controls, unavailable versions, and retry in both engines and viewport sizes.
+For native Obsidian acceptance, verify dismissal is blocked while restoring,
+restore an edit/deletion/rename/addition checkpoint in a disposable synced vault,
+and confirm another device converges. Interrupt a restore and restart Obsidian to
+verify automatic sync stays off and the local recovery copies remain available.
+
+Shared-checkpoint coverage also exercises a second device discovering and restoring
+another device's checkpoint without its local history, retained attachments over
+256 KB, concurrent publication, lost index-write responses, page-generation races,
+20-entry limits, expiry, metadata cleanup, and vault-token authorization. Run
+`npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/history-state-restore.integration.ts`
+for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
+updating the server and plugin on both devices and restoring from the second one.

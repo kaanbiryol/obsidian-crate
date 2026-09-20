@@ -1,6 +1,6 @@
 # Protocol contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 10 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 11 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -88,3 +88,14 @@ setup is pending, allowing a restarted client to resume without retransfers.
 Local corrections sync before this acknowledgement so a failed reminder source
 can be repaired. The client shows completion only after readiness is acknowledged. A cancelled
 wait or the three-hour foreground wait bound leaves all progress intact.
+
+## Shared history checkpoints
+
+Protocol 11 adds `shared-history-checkpoints-v1` without retiring ordinary protocol-7
+writers. Server-authored inventories are stored in R2 with a conditional shared
+index, capped at 20 states and 30 days. Creation rejects a changing inventory;
+publication retries deduplicate by monotonic server generation. No database schema
+change or duplicate file-content storage is introduced. Retained-version expiry is
+computed no earlier than 30 days after the D1 commit, preventing an older request
+start time from expiring bytes before a checkpoint. New clients connected to older
+servers retain local checkpoints and show an update message for shared history.

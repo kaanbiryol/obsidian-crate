@@ -1,3 +1,4 @@
+import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../history-checkpoints';
 import { withD1Usage } from '../d1-usage';
 import { drainNotificationJobs } from '../notification-outbox';
 import { uploadInitialFiles } from '../initial-import-upload';
@@ -96,6 +97,9 @@ export class ReminderAlarm implements DurableObject {
         return new Response(null, { status: 204 });
       });
     }
+    if (new URL(request.url).pathname === '/history-checkpoint-create' && request.method === 'POST') return this.withStateLock(() => createSharedCheckpoint(env.BUCKET, env.DB));
+    if (new URL(request.url).pathname === '/history-checkpoint' && request.method === 'GET') return this.withStateLock(() => getSharedCheckpoint(request, env.BUCKET));
+    if (new URL(request.url).pathname === '/history-checkpoint-file' && request.method === 'GET') return this.withStateLock(() => downloadCheckpointFile(request, env.BUCKET, env.DB));
     if (new URL(request.url).pathname === '/batch-download' && request.method === 'POST') {
       return this.withStateLock(() => handleBatchDownload(request, env.BUCKET, env.DB));
     }

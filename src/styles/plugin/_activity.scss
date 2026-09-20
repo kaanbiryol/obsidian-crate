@@ -612,6 +612,14 @@
     display: none;
 }
 
+.crate-history-state-actions {
+    margin: 0 10px 12px 32px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.crate-history-details:not([open]) > .crate-history-state-actions { display: none; }
+
 // Respond to the sheet's width, including narrow desktop windows.
 @container (max-width: #{sync-review.$compact-width}) {
     .crate-activity-subtitle { display: none; }

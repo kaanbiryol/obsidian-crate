@@ -56,6 +56,9 @@ export interface ResolvedSyncRace {
 }
 
 export interface SyncHistoryEntry {
+    sharedCheckpoint?: string;
+    checkpointFileCount?: number;
+	historyCheckpoint?: string;
 	timings?: import('./timings').SyncTimings;
 	requestDiagnostics?: import('./request-diagnostics').RequestDiagnostics;
 	timestamp: string;

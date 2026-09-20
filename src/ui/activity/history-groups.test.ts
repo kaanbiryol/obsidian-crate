@@ -33,3 +33,8 @@ describe('history grouping', () => {
         expect(groups[0]?.rows).toHaveLength(3);
     });
 });
+
+it('does not merge no-change entries with different restore checkpoints', () => {
+    const groups = groupHistory([entry(19, 14, { historyCheckpoint: 'a'.repeat(64) }), entry(19, 13, { historyCheckpoint: 'b'.repeat(64) })], now);
+    expect(groups[0]?.rows).toHaveLength(2);
+});

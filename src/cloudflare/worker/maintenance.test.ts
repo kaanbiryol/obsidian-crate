@@ -32,7 +32,7 @@ describe('scheduled Worker maintenance', () => {
 			batch: vi.fn(async (batchStatements: Array<{ run(): Promise<unknown> }>) =>
 				Promise.all(batchStatements.map(statement => statement.run()))),
 		};
-		const bucket = { delete: vi.fn(async () => {}) };
+		const bucket = { delete: vi.fn(async () => {}), get: vi.fn(async () => null), list: vi.fn(async () => ({ objects: [], truncated: false })) };
 
 		await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never);
 

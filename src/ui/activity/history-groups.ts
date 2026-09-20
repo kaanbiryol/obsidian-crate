@@ -30,7 +30,7 @@ export function groupHistory(history: SyncHistoryEntry[], now = new Date()): His
             groups.push(group);
         }
         const previous = group.rows.at(-1);
-        if (previous && previous.entry.type === entry.type && isNoChange(previous.entry) && isNoChange(entry)) {
+        if (previous && previous.entry.type === entry.type && previous.entry.historyCheckpoint === entry.historyCheckpoint && previous.entry.sharedCheckpoint === entry.sharedCheckpoint && isNoChange(previous.entry) && isNoChange(entry)) {
             previous.count++;
         } else {
             group.rows.push({ entry, count: 1 });

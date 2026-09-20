@@ -1,3 +1,5 @@
+import type { SharedCheckpoint } from '../protocol/history-checkpoints';
+import { mergeSharedHistory } from './activity/shared-history';
 import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
 import { BaseUiModal } from './shared/BaseUiModal';
 import { getPendingFileActions } from './activity/file-actions';
@@ -16,10 +18,15 @@ import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell'
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
 import { renderHistoryPanel } from './activity/history';
+import { HistoryRestoreModal } from './activity/history-restore-modal';
+import type { HistoryRestoreReview } from '../sync/history-restore';
+import type { SyncHistoryEntry } from '../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
 
 export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
+    listSharedCheckpoints?(): Promise<SharedCheckpoint[]>;
+    createHistoryRestore?(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
 	loadPendingDiff?: PendingDiffLoader;
     syncSelected?(keys: string[]): Promise<unknown>;
     createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
@@ -42,6 +49,10 @@ export class ActivityModal extends BaseUiModal {
 	private readonly deps: ActivityModalDeps;
 	private tabsRoot: Root | undefined;
 	private currentTabIndex = 0;
+    private historyActive = false;
+    private sharedCheckpoints?: SharedCheckpoint[];
+    private sharedHistoryLoading = false;
+    private sharedHistoryReload = false;
 	private subtitleEl!: HTMLSpanElement;
 	private subtitleLabelEl!: HTMLSpanElement;
 	private subtitleIndicatorRoot: Root | undefined;
@@ -62,6 +73,7 @@ export class ActivityModal extends BaseUiModal {
 		// Its completion progress event must refresh history as well as pending files.
 		if (this.deps.getState().status !== 'syncing' && !this.deps.getActivityProgress?.()) {
 			this.refresh();
+            if (this.currentTabIndex === 2) void this.loadSharedHistory();
 			return;
 		}
 		this.updateSyncBtn();
@@ -97,7 +109,10 @@ export class ActivityModal extends BaseUiModal {
 	}
 	private readonly onStateChange = () => {
 		if (this.deps.getState().status === 'syncing' && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
-		else this.refresh();
+		else {
+            this.refresh();
+            if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.loadSharedHistory();
+        }
 	};
 
 	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'conflicts' | 'history' = 'pending') {
@@ -107,6 +122,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	onOpen(): void {
+        this.historyActive = true;
 		this.modalEl.addClass('crate-reminder-editor-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
 		hideNativeModalCloseButton(this.modalEl);
@@ -183,6 +199,7 @@ export class ActivityModal extends BaseUiModal {
 		if (index === 0) this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
+        if (index === 2) void this.loadSharedHistory();
         this.updateSyncBtn();
         this.updateSyncStatusText();
 	}
@@ -276,14 +293,34 @@ export class ActivityModal extends BaseUiModal {
 			listRecentFileVersions: deps.listRecentFileVersions.bind(deps), getPendingRestores: deps.getPendingRestores.bind(deps),
 			loadFileHistoryPreview: deps.loadFileHistoryPreview.bind(deps), restoreRecentFileVersion: deps.restoreRecentFileVersion.bind(deps),
 		} : undefined;
-		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? [], historyRuntime ? path => {
+		renderHistoryPanel(this.historyPanel, this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? [], historyRuntime ? path => {
 			openRemoteRecoveryModal(this.app, historyRuntime, path);
+		} : undefined, deps.createHistoryRestore ? entry => {
+			new HistoryRestoreModal(this.app, entry.timestamp, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
 		} : undefined);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));
 		});
 		if (scrollContainer) scrollContainer.scrollTop = scrollTop;
 	}
+
+    private async loadSharedHistory(): Promise<void> {
+        if (!this.historyActive || !this.historyPanel || !this.deps.listSharedCheckpoints) return;
+        if (this.sharedHistoryLoading) { this.sharedHistoryReload = true; return; }
+        this.sharedHistoryLoading = true;
+        try {
+            const entries = await this.deps.listSharedCheckpoints();
+            if (this.historyActive) this.sharedCheckpoints = entries;
+        } catch {
+            // Keep the available history when background loading fails; retry on the next refresh.
+        } finally {
+            this.sharedHistoryLoading = false;
+            if (this.historyActive) {
+                this.refresh();
+                if (this.sharedHistoryReload) { this.sharedHistoryReload = false; void this.loadSharedHistory(); }
+            }
+        }
+    }
 
 	private formatLastSync(): string {
 		if (this.deps.getActivityProgress?.()?.type === 'initial') return 'Uploading vault…';
@@ -302,6 +339,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	onClose(): void {
+        this.historyActive = false;
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);

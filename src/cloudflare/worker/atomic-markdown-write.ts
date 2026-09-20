@@ -100,7 +100,7 @@ function retainVersionStatement(
 ): D1PreparedStatement {
 	return db.prepare(`INSERT OR IGNORE INTO file_versions
 		(storage_key, path, hash, size, reason, expires_at)
-		SELECT ?, ?, ?, ?, 'replaced', ?
+		SELECT ?, ?, ?, ?, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})
 		WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
 		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
 		.bind(

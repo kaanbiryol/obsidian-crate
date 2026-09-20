@@ -1,3 +1,4 @@
+import type { SharedCheckpoint } from '../protocol/history-checkpoints';
 import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
 import type { CrateServerInfo } from '../protocol';
 import { createConflictReview } from './conflict-review';
@@ -23,7 +24,7 @@ import {
 } from './runtime-config';
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
-import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
+import { createSyncFailureResult, mergeSyncResults, SYNC_ERROR_MESSAGES } from './sync-result';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
@@ -463,11 +464,19 @@ export class SyncRuntime {
 		}
 	}
 
-	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
+	private async recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
 		recordSyncHistory(this.settings, type, result);
 		const latest = this.settings.syncHistory[0];
 		if (latest && this.syncEngine) latest.timings = this.syncEngine.getTimings?.();
 		if (latest && this.apiClient) latest.requestDiagnostics = this.apiClient.getRequestDiagnostics();
+		if (latest && result.success && !result.conflicts.length && this.syncEngine) {
+			try {
+                const shared = await this.syncEngine.saveSharedHistoryCheckpoint?.();
+                if (shared) latest.sharedCheckpoint = shared.id;
+                else latest.historyCheckpoint = await this.syncEngine.saveHistoryCheckpoint?.();
+            }
+			catch (error) { logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
+		}
 	}
 
 	private emitCurrentState(): void {
@@ -483,7 +492,7 @@ export class SyncRuntime {
 		if (result.success && state.lastSync) {
 			this.settings.lastSync = state.lastSync;
 		}
-		this.recordSyncResult('sync', result);
+		await this.recordSyncResult('sync', result);
 		this.emitCurrentState();
 		try {
 			await this.persistSettings();
@@ -525,7 +534,7 @@ export class SyncRuntime {
 			if (type === 'sync') {
 				this.lastForegroundSyncAt = Date.now();
 			}
-			this.recordSyncResult(type, result);
+			await this.recordSyncResult(type, result);
 			await this.persistSettings();
 			return result;
 		} finally {
@@ -553,6 +562,65 @@ export class SyncRuntime {
     async createPendingDiscard(keys: string[]) {
         if (!this.syncEngine) throw new Error('Sync is not configured.');
         return this.syncEngine.createPendingDiscard(keys);
+    }
+
+    async listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
+        const api = this.apiClient;
+        if (!api) throw new Error('Sync is not configured.');
+        const checkpoints = await api.sharedHistory.list();
+        if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
+        return checkpoints;
+    }
+
+    async createHistoryRestore(entry: SyncHistoryEntry) {
+        const engine = this.syncEngine;
+        if (!engine || !entry.sharedCheckpoint && (!entry.historyCheckpoint || !this.settings.syncHistory.some(saved => saved.timestamp === entry.timestamp && saved.type === entry.type && saved.historyCheckpoint === entry.historyCheckpoint))) throw new Error('This history entry has no complete vault checkpoint.');
+        let automaticSync = false;
+        const verify = () => {
+            if (this.syncEngine !== engine) throw new Error('Sync connection changed. Reopen history.');
+        };
+        const review = await engine.createHistoryRestore(entry.sharedCheckpoint ?? entry.historyCheckpoint!, async () => {
+            verify();
+            automaticSync = this.settings.automaticSync;
+            // Persist the pause before changing files, including across a crash.
+            this.settings.automaticSync = false;
+            this.clearForegroundSyncTimer();
+            engine.updateSettings(this.settings);
+            await this.persistSettings({ automaticSync: false });
+            verify();
+        }, Boolean(entry.sharedCheckpoint));
+        verify();
+        return { items: review.items, unchangedCount: review.unchangedCount, restore: async () => {
+            verify();
+            await review.restore();
+            verify();
+            if (!review.items.length) return;
+            const result = await this.runSyncOperation('sync', async (current, progress) => {
+                const removed = new Set(review.items.filter(item => item.action === 'remove').map(item => item.path));
+                const keys = removed.size ? current.getPendingPaths().filter(key => removed.has(key.startsWith('delete:') ? key.slice(7) : key)) : [];
+                // The verified local recovery copies allow explicit removals to
+                // settle first, freeing paths for historical file/folder renames.
+                const deletions = keys.length ? await current.syncSelected(keys) : undefined;
+                if (deletions && (!deletions.success || deletions.conflicts.length)) return deletions;
+                const synced = await current.sync(progress);
+                if (deletions) mergeSyncResults(synced, deletions);
+                return synced;
+            });
+            verify();
+            if (!result.success || result.conflicts.length) throw new Error('Restore needs attention during sync. Automatic sync is off; review Pending and Conflicts before continuing.');
+            await review.verifySynced();
+            verify();
+            try {
+                await this.persistSettings({ automaticSync });
+            } catch (error) {
+                this.settings.automaticSync = false;
+                engine.updateSettings(this.settings);
+                throw error;
+            }
+            verify();
+            this.settings.automaticSync = automaticSync;
+            engine.updateSettings(this.settings);
+        } };
     }
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {

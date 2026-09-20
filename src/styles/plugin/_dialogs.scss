@@ -184,6 +184,11 @@
 	max-width: 520px;
 }
 
+.modal.crate-history-restore-modal {
+	width: min(560px, calc(100vw - 32px));
+	max-width: 560px;
+}
+
 .crate-cloudflare-server-picker-description {
 	margin-top: 0;
 	color: var(--text-muted);

@@ -1,3 +1,4 @@
+import { SharedHistoryApi } from './worker-api/history-checkpoints';
 import type { RequestDiagnostics } from './request-diagnostics';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import { normalizeWorkerUrl } from './worker-url';
@@ -58,6 +59,7 @@ export class SyncApiClient {
 	}
 	private readonly http: WorkerApiHttpClient;
 	private readonly syncApi: SyncWorkerApi;
+    readonly sharedHistory: SharedHistoryApi;
 	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
 	private readonly notificationsApi: NotificationsWorkerApi;
@@ -66,6 +68,7 @@ export class SyncApiClient {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
     this.initialImport = new InitialImportApi(this.http);
 		this.syncApi = new SyncWorkerApi(this.http);
+        this.sharedHistory = new SharedHistoryApi(this.http);
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);
 		this.notificationsApi = new NotificationsWorkerApi(this.http);

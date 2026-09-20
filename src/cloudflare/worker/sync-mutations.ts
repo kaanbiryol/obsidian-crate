@@ -104,7 +104,7 @@ export async function commitStagedFile(
 			)`).bind(params.path, params.hash, params.size, params.objectKey, ...filePathArgs(params.path), params.objectKey),
 		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
-			SELECT ?, ?, ?, ?, 'replaced', ? WHERE EXISTS (
+			SELECT ?, ?, ?, ?, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS}) WHERE EXISTS (
 				SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?
 			)`).bind(
 			key,
@@ -185,7 +185,7 @@ export async function commitFileDelete(
 			.bind(revision, ...predicateArgs),
 		db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ? FROM files WHERE ${expectedPredicate}`)
+			SELECT storage_key, path, hash, size, 'deleted', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS}) FROM files WHERE ${expectedPredicate}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),

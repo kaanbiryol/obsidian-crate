@@ -260,3 +260,54 @@ Confirmation rechecks local contents and manifest versions before applying chang
 Recovery copies are verified before replacing files, and edits arriving during
 application are preserved. Restored files retain their last-synced revision, so
 newer server changes are still discovered by the next normal sync.
+
+## Returning to a history checkpoint
+
+Successful syncs without unresolved conflicts or pending restore/upload intents ask
+servers advertising `shared-history-checkpoints-v1` to save a complete server file
+inventory. R2 holds the inventories and an ETag-protected index; no file contents
+are duplicated and no D1 schema migration is required. Checkpoints are visible on
+all connected devices, including devices without local activity history. The index
+keeps the newest 20 distinct server generations for at most 30 days. Repeated or
+concurrent saves of the same generation resolve to the same checkpoint.
+
+The server reads the inventory in bounded pages and verifies the monotonic changelog
+generation before and after capture. An incomplete initial import or concurrent
+mutation rejects capture. Current limits are 20,000 files and 8 MiB of metadata;
+exceeding them never publishes a partial inventory. The small shared index is
+published conditionally only after its immutable inventory exists. Uncertain writes
+retain their possible committed objects; a bounded, cursor-based maintenance sweep
+removes unreferenced metadata after a one-day grace period.
+
+Expiry uses server time. Replaced/deleted versions retain at least 30 days from the
+D1 commit time, so a checkpoint expires no later than its required retained bytes.
+The server rejects expired or evicted checkpoint reads. Checkpoint file downloads
+check the live index and exact current/retained D1 path and revision ownership; the
+client verifies size and SHA-256 against the checkpoint before staging. Unlike text
+previews, these reads support the full 25 MiB sync-file limit.
+
+Older servers keep the local `history-checkpoints/` fallback and History explains
+that an update is needed for sharing. Existing local-only checkpoints stay local;
+new shared checkpoints begin after the server update and a successful sync.
+Unreferenced local inventories are pruned at startup. Local legacy checkpoints
+remain bound to their original server and exclusion rules. Shared checkpoints
+contain the full remote inventory; each restoring device preserves its current
+excluded files and rejects exclusion changes during review.
+
+**History → Return to this state** previews reverted, restored, and removed files,
+including local unsynced edits. Excluded files remain untouched. The current server
+inventory must match the device's baseline before reviewing. Every required version
+must still be available from the server's current files or 30-day retained history.
+Confirmation rechecks the complete local and remote inventories, stages and verifies
+all required bytes and originals under `state-recovery/`, then persistently pauses
+automatic sync before applying changes. Replacements use atomic text comparison or
+local trash and checked creation; deleted files always go to local trash.
+
+Explicit removals sync before restored uploads to support file/folder namespace
+changes. The final full sync and inventory verification must both succeed before
+restoring the previous automatic-sync preference. This is a recoverable multi-file
+operation, not an atomic server transaction: an interruption can leave some files
+restored. Automatic sync remains off on failure, including after restart; reopen
+the checkpoint to review and finish, or recover original bytes using the saved
+`recovery.json` inventory. Concurrent edits are preserved or surfaced for review,
+and a mismatching final inventory is never reported as a successful restore.

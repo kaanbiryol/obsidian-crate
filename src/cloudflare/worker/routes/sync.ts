@@ -1,3 +1,4 @@
+import { listSharedCheckpoints } from '../history-checkpoints';
 import { handleFileVersionPreview } from '../file-version-preview';
 import {
 	handleBatchDelete,
@@ -35,6 +36,10 @@ export async function handleSyncRoute(
 	const db = env.DB;
   if (path === '/notifications/retry' && method === 'POST') return retryPausedNotifications(db);
 	const bucket = env.BUCKET;
+    if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
+    if (path === '/sync/checkpoints' && method === 'POST') return forwardTransferRequest(request, env, '/history-checkpoint-create');
+    if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint');
+    if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint-file');
   if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
     const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
     const response = await coordinator.fetch('https://do/project', { method: 'POST' });
