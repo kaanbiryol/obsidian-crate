@@ -6,13 +6,15 @@ import { historyEntryKey } from './history-point';
 import { historyTime } from './history';
 
 export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void): void {
-	if (history.length === 0) {
+    // Server-only restore points have no local sync activity to display.
+    const activity = history.filter(entry => entry.checkpointFileCount === undefined);
+	if (activity.length === 0) {
 		renderEmptyState(container, 'clock', 'No activity yet', 'Sync history will appear here.');
 		return;
 	}
 
 	const timeline = container.createDiv({ cls: 'crate-activity-timeline' });
-	for (const group of groupHistory(history)) {
+	for (const group of groupHistory(activity)) {
         const section = timeline.createEl('section', { cls: 'crate-history-day' });
         section.createEl('h3', { text: group.label, cls: 'crate-history-day-label' });
         for (const { entry, count } of group.rows) {
@@ -102,10 +104,6 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 
 function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, count: number): void {
     const summary = header.createDiv({ cls: 'crate-history-summary' });
-    if (entry.checkpointFileCount !== undefined) {
-        summary.createSpan({ text: `Vault checkpoint · ${entry.checkpointFileCount.toLocaleString()} files` });
-        return;
-    }
     if (!entry.success) {
         summary.createSpan({
             text: `Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`,

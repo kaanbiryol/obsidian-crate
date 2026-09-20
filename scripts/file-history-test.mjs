@@ -80,7 +80,7 @@ const { outputFiles } = await build({
     if(window.historyDelay) {window.historyDelay=false;await new Promise(resolve=>window.releaseHistory=resolve);}
     if(window.historyError) throw new Error('History is offline');
     return {compared:!!previous,items:[{path:'Today.md',action:previous?'modified':'saved'},{path:'Upcoming.md',action:previous?'added':'saved'}],
-     notice:previous?undefined:'No earlier saved state is available. Showing saved contents.',
+     notice:previous?undefined:'No earlier state to compare.',
      preview:async path => {
       if(window.historyPreviewDelay) {window.historyPreviewDelay=false;await new Promise(resolve=>window.releaseHistoryPreview=resolve);}
       if(window.historyPreviewError) throw new Error('Historical preview is offline');
@@ -286,6 +286,7 @@ for(const browserType of [chromium,webkit]) {
    await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
    await expect(historyRoot.getByLabel('Saved file contents')).toContainText('# Earliest Today.md');
    await expect(historyRoot.getByRole('region')).toHaveCount(0);
+   await expect(historyRoot.getByRole('button',{name:'Retry loading',exact:true})).toHaveCount(0);
    await page.evaluate(()=>{window.historyDelay=true;});
    await selectPoint('12345678');
    await selectPoint('abcdef12');
@@ -296,7 +297,7 @@ for(const browserType of [chromium,webkit]) {
    await selectPoint('12345678');
    await expect(historyRoot.locator('.crate-history-event-files')).toContainText('History is offline');
    await page.evaluate(()=>{window.historyError=false;});
-   await historyRoot.getByRole('button',{name:'Reload sync',exact:true}).click();
+   await historyRoot.getByRole('button',{name:'Retry loading',exact:true}).click();
    await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
    await expect(historyRoot.getByRole('region')).toContainText('# After Today.md');
    const selectHistoryFile = async path => {

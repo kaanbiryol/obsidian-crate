@@ -10,6 +10,7 @@ export interface HistoryComparison {
     items: HistoryFileChange[];
     compared: boolean;
     notice?: string;
+    retryable?: boolean;
     preview(path: string): Promise<HistoryRestorePreview>;
 }
 

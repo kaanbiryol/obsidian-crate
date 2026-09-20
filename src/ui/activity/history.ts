@@ -1,7 +1,7 @@
 import type { SyncHistoryEntry } from '../../sync/types';
 
 export function describeHistory(entry: SyncHistoryEntry, count = 1): string {
-    if (entry.checkpointFileCount !== undefined) return `Saved state · ${entry.checkpointFileCount.toLocaleString()} files`;
+    if (entry.checkpointFileCount !== undefined) return `Restore point · ${entry.checkpointFileCount.toLocaleString()} files`;
     const metrics = [
         [entry.uploaded, 'Uploaded'], [entry.downloaded, 'Downloaded'], [entry.merged, 'Merged'], [entry.deleted, 'Deleted'],
         [entry.conflictCount, 'Conflicts'], [entry.resolvedRaceCount ?? 0, 'Races resolved'],

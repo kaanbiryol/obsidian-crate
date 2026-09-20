@@ -16,7 +16,7 @@ it('keeps errors, conflicts and resolved races visible', () => {
         .toBe('Failed (2 errors) · Uploaded 2 · Conflicts 1 · Races resolved 1');
 });
 it('labels shared states and repeated no-change checks', () => {
-    expect(describeHistory({ ...entry, checkpointFileCount: 120 })).toBe('Saved state · 120 files');
+    expect(describeHistory({ ...entry, checkpointFileCount: 120 })).toBe('Restore point · 120 files');
     expect(describeHistory({ ...entry, uploaded: 0 })).toBe('No changes');
     expect(describeHistory({ ...entry, uploaded: 0 }, 3)).toBe('No changes · 3 checks');
 });

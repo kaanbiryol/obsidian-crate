@@ -132,13 +132,10 @@
 		}
 		.setting-item-control button {
 			@include action.styles;
-			min-height: 36px;
 			height: auto;
-			min-width: 72px;
 			max-width: 100%;
 			white-space: normal;
 			overflow-wrap: anywhere;
-			padding: 8px var(--size-4-3, 12px);
 			&.mod-cta {
 				background: var(--interactive-accent);
 				color: var(--text-on-accent);
