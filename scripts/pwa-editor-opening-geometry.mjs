@@ -54,6 +54,12 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		}
 		await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toBeFocused();
 		const stage = page.locator('.pwa-reminder-sheet-stage');
+		// The capture window measures entrance frames; it does not guarantee
+		// the entrance has finished on a busy runner. Settle before measuring
+		// the baseline for the independent keyboard-resize assertion.
+		await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
+		await expect(stage).toHaveCSS('transform', 'none');
+		await stage.tap({ trial: true });
 		const original = await stage.boundingBox();
 		await page.evaluate(() => {
 			window.editorKeyboardHeight = 532;
