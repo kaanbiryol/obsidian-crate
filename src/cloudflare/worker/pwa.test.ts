@@ -184,7 +184,8 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px');
 		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:none!important');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider-track {');
-		expect(html).toContain('inset: 6px 8px;');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider-track{inset:4px 0}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider{margin:0 6px}');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider {');
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('padding:0!important;transform:none!important');

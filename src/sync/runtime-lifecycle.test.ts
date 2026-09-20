@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('react-dom/client', () => ({
+	createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }),
+}));
 import { SyncEngine } from './engine';
 import { SyncApiClient } from './api';
 import { SyncQueueController } from './queue-controller';
