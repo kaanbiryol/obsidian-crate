@@ -12,7 +12,11 @@ async function tapBackdropAbove(page, dialog) {
 	await expect(page.locator('.pwa-modal-sheet__backdrop')).toBeVisible();
 	await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
 	if (await sheet.count()) await expect(sheet).toHaveCSS('transform', 'none');
-	const bounds = await (await sheet.count() ? sheet : dialog).boundingBox();
+	const surface = await sheet.count() ? sheet : dialog;
+	// Picker tabs animate sheet height as well as transform. Wait for stable
+	// geometry before choosing a coordinate just outside the visible content.
+	await surface.tap({ trial: true });
+	const bounds = await surface.boundingBox();
 	assert.ok(bounds && bounds.y > 24, 'The sheet must leave a visible backdrop');
 	const point = { x: bounds.x + bounds.width / 2, y: bounds.y - 24 };
 	assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('pwa-modal-sheet__backdrop'), point),
