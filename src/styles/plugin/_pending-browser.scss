@@ -231,7 +231,10 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
     .crate-discard-path { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .crate-discard-action { flex-shrink: 0; color: var(--text-muted); }
     .crate-discard-help { font-size: var(--font-ui-smaller); color: var(--text-muted); }
-    .crate-discard-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .crate-discard-buttons {
+        display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 20px;
+
+    }
 }
 
 .crate-browser-actions[hidden], .crate-browser-actions button[hidden] { display: none; }
@@ -241,3 +244,13 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
 
 .crate-browser-list-heading { flex-wrap: wrap; gap: 8px; }
 .crate-browser-selection-count { white-space: nowrap; }
+
+.modal.crate-pending-discard-modal .crate-reminders-ui .crate-discard-buttons button.crate-activity-action {
+    min-height: 36px;
+    height: auto;
+    max-width: 100%;
+    padding-block: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    @media (pointer: coarse) { min-height: 44px; flex: 1; }
+}

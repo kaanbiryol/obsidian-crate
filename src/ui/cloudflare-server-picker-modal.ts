@@ -17,10 +17,18 @@ class CloudflareServerPickerModal extends SharedModal {
 
 	onOpen(): void {
 		this.modalEl.addClass('crate-cloudflare-server-picker-modal');
-		this.openLayout(this.missingServer ? 'Your previous server is no longer available' : this.deployments.length ? 'Choose a server' : 'Create a server');
+		this.openLayout(this.missingServer ? 'Server unavailable' : this.deployments.length ? 'Choose a server' : 'Create a server');
 		this.bodyEl.createEl('p', {
-			text: this.deployments.length === 0 ? `${this.missingServer ? 'Your previous server is gone. ' : ''}Create a Cloudflare server for this vault. Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.` : (this.missingServer ? 'Your previous server is gone. Choose another server or create a new one. ' : 'Select a server for this vault or create a new one. ') + ' Local files are kept. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.',
+			text: this.missingServer
+				? 'Your previous server is no longer available. Choose another server or create a new one.'
+				: this.deployments.length ? 'Select a server for this vault or create a new one.' : 'Create a Cloudflare server for this vault.',
 			cls: 'crate-cloudflare-server-picker-description',
+		});
+		this.bodyEl.createEl('p', {
+			text: this.deployments.length
+				? 'Local files stay unchanged during setup. Syncing combines local and remote files and may update matching paths. Review both before syncing.'
+				: 'Local files stay unchanged during setup. When ready, run Crate: Sync now from the command palette.',
+			cls: 'crate-cloudflare-server-picker-help',
 		});
 
 		for (const deployment of this.deployments) {
@@ -36,9 +44,12 @@ class CloudflareServerPickerModal extends SharedModal {
 					.onClick(() => this.finish(deployment)));
 		}
 		new Setting(this.bodyEl)
-			.setName('Create server')
+			.setName('New server')
 			.setDesc('Create a separate Crate server in this account. Cloudflare usage charges may apply.')
-			.addButton(button => button.setButtonText('Create server').onClick(() => this.finish('create')));
+			.addButton(button => {
+				button.setButtonText('Create server').onClick(() => this.finish('create'));
+				if (!this.deployments.length) button.setCta();
+			});
 	}
 
 	onClose(): void {

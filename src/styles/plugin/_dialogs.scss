@@ -81,6 +81,8 @@
 	min-height: 0;
 	padding: 0;
 
+	.crate-confirmation-body { padding: 20px; }
+
 	.crate-confirmation-message {
 		margin: 0;
 		font-size: var(--font-ui-medium);
@@ -96,7 +98,25 @@
 		overflow-wrap: anywhere;
 	}
 
-	ul.crate-confirmation-details { padding-left: 18px; }
+	ul.crate-confirmation-details {
+		padding-left: 18px;
+		li + li { margin-top: 8px; }
+	}
+
+	.crate-confirmation-option {
+		margin-top: 16px;
+		padding: 12px;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: var(--radius-m, 8px);
+		background: var(--background-secondary);
+		gap: 12px;
+		align-items: center;
+
+		.setting-item-info { margin: 0; min-width: 0; }
+		.setting-item-name { font-size: var(--font-ui-small); line-height: 1.4; }
+		.setting-item-description { margin-top: 4px; font-size: var(--font-ui-smaller); line-height: 1.4; }
+		.setting-item-control { flex: 0 0 auto; padding: 0; }
+	}
 
 	.crate-confirmation-actions {
 		margin-top: 20px;
@@ -110,21 +130,33 @@
 			flex-wrap: wrap;
 			gap: 8px;
 		}
-		button {
+		.setting-item-control button {
 			@include action.styles;
+			min-height: 36px;
+			height: auto;
 			min-width: 72px;
-			padding: 0 var(--size-4-3, 12px);
+			max-width: 100%;
+			white-space: normal;
+			overflow-wrap: anywhere;
+			padding: 8px var(--size-4-3, 12px);
 			&.mod-cta {
 				background: var(--interactive-accent);
 				color: var(--text-on-accent);
 				&:hover:not(:disabled) { background: var(--interactive-accent-hover); }
 			}
 			&.mod-warning {
-				background: var(--crate-danger);
-				color: var(--crate-on-accent);
-				&:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+				background: var(--crate-danger, var(--text-error));
+				color: var(--crate-on-accent, var(--text-on-accent));
+				&:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger, var(--text-error)) 88%, black); }
 			}
 		}
+	}
+}
+
+@media (pointer: coarse) {
+	.modal.crate-confirmation-modal .crate-confirmation-actions .setting-item-control button {
+		min-height: 44px;
+		flex: 1;
 	}
 }
 
@@ -180,13 +212,25 @@
 }
 
 
-.crate-cloudflare-server-picker-modal {
-	max-width: 520px;
+.modal.crate-cloudflare-server-picker-modal {
+	width: min(480px, calc(100vw - 32px));
+	max-width: 480px;
+
+	.crate-cloudflare-server-picker-description { margin: 0; line-height: 1.5; }
+	.crate-cloudflare-server-picker-help {
+		margin: 8px 0 20px;
+		color: var(--text-muted);
+		font-size: var(--font-ui-small);
+		line-height: 1.5;
+	}
+	.setting-item { gap: 12px; }
+	.setting-item-info { min-width: 0; overflow-wrap: anywhere; }
+	.setting-item-control { flex-shrink: 0; }
+	.setting-item-control button { min-height: 36px; height: auto; white-space: normal; }
 }
 
-.crate-cloudflare-server-picker-description {
-	margin-top: 0;
-	color: var(--text-muted);
+@media (pointer: coarse) {
+	.modal.crate-cloudflare-server-picker-modal .setting-item-control button { min-height: 44px; }
 }
 
 .modal.crate-shared-modal.crate-file-history-modal {
