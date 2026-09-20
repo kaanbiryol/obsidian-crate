@@ -1,4 +1,5 @@
 import type { Vault } from 'obsidian';
+import { findHistorySource } from './history-source';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { assertPortablePaths } from '../protocol/portable-path';
@@ -57,7 +58,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
         if (wanted.size > MAX_FILE_SIZE_BYTES) throw new Error(`${item.path}: file is too large to restore.`);
         sources.set(item.path, local[item.path]?.hash === wanted.hash
             ? () => vault.adapter.readBinary(item.path)
-            : context.readTarget ? () => context.readTarget!(item.path, wanted) : await findSource(api, item.path, wanted, remote[item.path]));
+            : context.readTarget ? () => context.readTarget!(item.path, wanted) : await findHistorySource(api, item.path, wanted, remote[item.path]));
     }
     context.verify();
     let used = false;
@@ -167,21 +168,6 @@ function sameFiles(left: Files, right: Files, revisions = false): boolean {
         file.hash === right[path]?.hash && (!revisions || file.revision === right[path]?.revision));
 }
 
-async function findSource(api: Context['api'], path: string, wanted: FileEntry, current?: FileEntry): Promise<() => Promise<ArrayBuffer>> {
-    if (current?.hash === wanted.hash) return async () => (await api.downloadFile(path)).content;
-    let cursor: string | undefined;
-    const seen = new Set<string>();
-    do {
-        const page = await api.listFileVersions({ path, ...(cursor ? { cursor } : {}) });
-        const version = page.versions.find(version => version.path === path && version.hash === wanted.hash);
-        if (version) return () => api.previewFileVersion(version);
-        if (!page.hasMore) break;
-        if (!page.nextCursor || seen.has(page.nextCursor)) throw new Error('File history did not advance. Try again.');
-        cursor = page.nextCursor;
-        seen.add(cursor);
-    } while (cursor);
-    throw new Error(`${path}: this version is no longer available. Older versions are kept for 30 days. No files were changed.`);
-}
 
 async function stage(vault: Vault, path: string, bytes: ArrayBuffer, hash: string): Promise<void> {
     if (bytes.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(bytes) !== hash) throw new Error('A file changed or its saved version is damaged. No files were changed.');
