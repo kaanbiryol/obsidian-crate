@@ -1,3 +1,4 @@
+import { compareHistorySnapshots, type HistorySnapshot } from './history-comparison';
 import type { SharedCheckpoint } from '../protocol/history-checkpoints';
 import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
 import type { CrateServerInfo } from '../protocol';
@@ -574,6 +575,35 @@ export class SyncRuntime {
         const checkpoints = await api.sharedHistory.list();
         if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
         return checkpoints;
+    }
+
+    async loadHistoryComparison(entry: SyncHistoryEntry, previous?: SyncHistoryEntry) {
+        const engine = this.syncEngine;
+        if (!engine) throw new Error('Sync is not configured.');
+        const verify = () => {
+            if (engine !== this.syncEngine) throw new Error('Sync connection changed. Reopen history.');
+        };
+        const load = async (point: SyncHistoryEntry) => {
+            const id = point.sharedCheckpoint ?? point.historyCheckpoint;
+            if (!id) throw new Error('This sync has no saved state to preview.');
+            const snapshot = await engine.loadHistorySnapshot(id, !!point.sharedCheckpoint);
+            verify();
+            return snapshot;
+        };
+        const after = await load(entry);
+        let before: HistorySnapshot | undefined;
+        let notice = 'No earlier saved state is available. Showing saved contents.';
+        if (previous) {
+            try { before = await load(previous); }
+            catch { verify(); notice = 'The earlier saved state could not be loaded. Showing saved contents; retry to compare.'; }
+        }
+        const comparison = compareHistorySnapshots(after, before, before ? undefined : notice);
+        return { ...comparison, preview: async (path: string) => {
+            verify();
+            const preview = await comparison.preview(path);
+            verify();
+            return preview;
+        } };
     }
 
     async createHistoryRestore(entry: SyncHistoryEntry) {

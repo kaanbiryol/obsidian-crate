@@ -1,6 +1,8 @@
 import { loadPendingDiff } from './pending-diff';
 import { HistoryCheckpoints } from './history-checkpoint';
 import { createHistoryRestore } from './history-restore';
+import { findHistorySource } from './history-source';
+import type { HistorySnapshot } from './history-comparison';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
@@ -291,6 +293,20 @@ export class SyncEngine {
         const files = Object.fromEntries(Object.entries(this.localManifest.getManifest().files)
             .filter(([path]) => !this.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }]));
         return this.historyCheckpoints().save(files, [...this.settings.ignorePatterns]);
+    }
+
+    async loadHistorySnapshot(checkpoint: string, shared = false): Promise<HistorySnapshot> {
+        this.lifecycle.throwIfDestroyed();
+        const snapshot = shared ? await this.api.sharedHistory.load(checkpoint) : await this.historyCheckpoints().load(checkpoint, this.settings.ignorePatterns);
+        this.lifecycle.throwIfDestroyed();
+        return { files: snapshot.files, read: async (path, file) => {
+            this.lifecycle.throwIfDestroyed();
+            if (snapshot.files[path] !== file) throw new Error('This file is not in the selected sync.');
+            const bytes = shared ? await this.api.sharedHistory.download(checkpoint, path, file)
+                : await (await findHistorySource(this.api, path, file, (await this.api.getManifest()).files[path]))();
+            this.lifecycle.throwIfDestroyed();
+            return bytes;
+        } };
     }
 
     async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
