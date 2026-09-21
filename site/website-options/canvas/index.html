@@ -5,61 +5,179 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="Sync your Obsidian vault through your own Cloudflare account, with optional reminders for your notes and phone.">
+  <meta name="description" content="Sync your Obsidian vault and reminders through your own Cloudflare account or a server you host.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
   <title>Crate — Sync and reminders for Obsidian</title>
   <link rel="icon" href="../../assets/logo.png">
   <link rel="stylesheet" href="../studies.css">
-  <link rel="stylesheet" href="style.css?v=e0134e24">
-  <link rel="stylesheet" href="sections.css?v=41cb5082">
-  <script src="../../assets/canvas.js?v=d2983ffd" defer></script>
+  <link rel="stylesheet" href="style.css?v=dialog-crops-11">
+  <link rel="stylesheet" href="sections.css?v=dialog-crops-11">
+  <script src="../../assets/canvas.js?v=original-images-9" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="canvas-header"><header class="site-nav wrap">
 <a class="wordmark" href="#main" aria-label="Crate home"><span class="brand-tile"><img src="../../assets/logo.png" width="25" height="25" alt=""></span>Crate</a>
 <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-navigation">Menu <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#chevron"></use></svg></button>
-<nav class="nav-links" id="main-navigation" aria-label="Main navigation"><a href="#sync">Sync</a><a href="#reminders">Reminders</a><a href="#mobile">Mobile</a><a href="#how-it-works">How it works</a></nav>
+<nav class="nav-links" id="main-navigation" aria-label="Main navigation"><a href="#sync">Sync</a><a href="#reminders">Reminders</a><a href="#mobile">Mobile</a><a href="#how-it-works">How it works</a><a href="#self-hosting">Self-hosting</a></nav>
 <a class="header-github" href="https://github.com/kaanbiryol/obsidian-crate" aria-label="View Crate source code on GitHub" title="View source on GitHub"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 19 4.77 5.07 5.07 0 0 0 18.91 1S17.73.65 15 2.48a13.38 13.38 0 0 0-7 0C5.27.65 4.09 1 4.09 1A5.07 5.07 0 0 0 4 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 8 18.13V22"></path></svg></a>
-<a class="header-action" href="#setup">Install Crate <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a>
+<a class="header-action" href="#setup">Install beta <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a>
 </header></div>
 <main id="main">
 <section class="hero-band"><div class="hero-grid wrap">
 <div class="hero-copy">
-<h1>Your notes in sync. Your reminders with you.</h1>
-<p class="body-copy">Sync your vault between Obsidian devices. Plan your day in Obsidian, then add, edit, and finish reminders in the companion mobile app.</p>
+<h1><span>Your notes in sync.</span> <span>Your reminders with you.</span></h1>
+<p class="body-copy">Sync your Obsidian vault. Plan your day with reminders on desktop and mobile.</p>
 <div class="actions"><a class="button" href="#setup"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#download"></use></svg> Install beta</a></div>
+<p class="release-note">Beta release · Installs with BRAT</p>
+<nav class="hero-feature-links" aria-label="Feature highlights"><a href="#conflict-management">Conflict management <span aria-hidden="true">↗</span></a><a href="#history-recovery">Version recovery <span aria-hidden="true">↗</span></a><a href="#self-hosting">Self-hosting <span aria-hidden="true">↗</span></a></nav>
 </div>
 <figure class="hero-visual hero-devices" id="markdown-example">
 
-<div class="hero-screenshot"><img id="hero-screenshot" src="../../assets/screenshots/plugin-today-inbox.png?v=1e08600d" width="2800" height="1766" fetchpriority="high" alt="Crate’s Today note with scheduled reminders and the Inbox sidebar in Obsidian."></div><a class="hero-phone phone-device" href="#mobile" aria-label="Explore the companion mobile app"><img src="../../assets/screenshots/pwa-reminders-inbox.png" width="1179" height="2556" alt="Crate’s companion mobile app showing the reminder inbox."></a></figure>
+<div class="product-image hero-screenshot"><img decoding="async" id="hero-screenshot" src="../../assets/screenshots/plugin-today-inbox.png" width="2698" height="1772" fetchpriority="high" alt="Crate’s Today note with scheduled reminders and the Inbox sidebar in Obsidian."></div><div class="product-image hero-phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-inbox.png" width="1179" height="2556" alt="Crate’s companion mobile app showing the reminder inbox."></div></figure>
 </div></section>
 <section class="section sync-showcase wrap" id="sync" aria-label="Sync"><span id="sync-activity"></span>
-<figure class="reminder-recording"><figcaption><h2>Your notes, on every device.</h2><p>Keep writing in Obsidian on desktop or mobile. Crate syncs your vault between devices through your own Cloudflare account.</p></figcaption><div class="recording-media"><video controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="crate-note-sync" controls muted playsinline preload="none" width="2748" height="1714" poster="../../assets/screenshots/plugin-sync-poster.jpg?v=14880dd3" aria-label="Your notes sync automatically."><source src="../../assets/videos/plugin-sync.mp4" type="video/mp4"></video>
+<figure class="reminder-recording sync-intro"><figcaption><h2>Your notes, on every device.</h2><p>Keep writing in Obsidian on desktop or mobile. Crate syncs your vault through a server in your Cloudflare account or on your own hardware.</p></figcaption><div class="recording-media"><video controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="crate-note-sync" controls muted playsinline preload="none" width="2748" height="1714" poster="../../assets/screenshots/plugin-sync-poster.jpg?v=14880dd3" aria-label="Your notes sync automatically."><source src="../../assets/videos/plugin-sync.mp4" type="video/mp4"></video>
 </div></figure>
-<div class="subscreens sync-subscreens"><div class="subscreens-grid"><figure class="subscreen"><div class="desktop-crop"><img src="../../assets/screenshots/plugin-sync-pending-changes.png?v=ba7601e0" width="3024" height="1898" loading="lazy" alt="Pending sync activity with selected files and a preview of added and removed text."></div><figcaption><h3>Pending changes</h3><p>Compare edits and choose which files to sync.</p></figcaption></figure><figure class="subscreen"><div class="desktop-crop"><img src="../../assets/screenshots/plugin-sync-conflicts.png?v=a82b522d" width="1878" height="1322" loading="lazy" alt="The Conflicts tab listing three saved conflict copies with Review buttons."></div><figcaption><h3>Conflicts</h3><p>See which files need your attention and open them for review.</p></figcaption></figure><figure class="subscreen"><div class="desktop-crop"><img src="../../assets/screenshots/plugin-sync-conflict-resolution.png?v=6a12bdd2" width="2078" height="1273" loading="lazy" alt="Conflict review comparing the current file with a saved copy and showing resolution options."></div><figcaption><h3>Resolve conflicts</h3><p>Compare versions side by side. Keep one, keep both, or edit a combined result.</p></figcaption></figure><figure class="subscreen"><div class="desktop-crop"><img src="../../assets/screenshots/plugin-sync-history.png?v=d0b472a2" width="3024" height="1898" loading="lazy" alt="Sync history showing recent uploads and an expanded file entry."></div><figcaption><h3>Sync history</h3><p>Check recent transfers and the files included in each sync.</p></figcaption></figure><figure class="subscreen"><div class="desktop-crop"><img src="../../assets/screenshots/plugin-file-history.png?v=f4b816ef" width="3024" height="1898" loading="lazy" alt="File history comparing a saved version of Copenhagen weekend with the current local file."></div><figcaption><h3>File history</h3><p>Compare earlier versions with your current file and restore a saved copy.</p></figcaption></figure></div></div><aside class="recovery-feature"><div class="recovery-window" aria-label="30-day recovery window"><strong>30</strong><span>days to recover</span></div><div><h3>Recover an earlier copy.</h3><p>Remote files replaced or deleted by sync are kept for 30 days. Open <strong>Restore remote file</strong> in Crate settings to recover a copy.</p><p class="recovery-note">Sync is not a backup. Keep a separate backup of your vault.</p></div></aside></section>
+<section class="feature-group" id="conflict-management" aria-labelledby="conflict-management-title">
+<header class="feature-group-heading"><h3 id="conflict-management-title">Conflict management</h3><p>Edited the same note on two devices? Compare both versions and choose what to keep.</p></header>
+<div class="feature-preview-grid feature-preview-grid--conflicts">
+<figure class="feature-preview">
+<figcaption><h4>Review conflicting notes.</h4><p>Conflicting copies are kept for review. See the affected notes together, then open a comparison.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog"><img decoding="async" src="../../assets/screenshots/crate-conflicts.png" width="2698" height="1772" loading="lazy" alt="Saved conflict copies of Reading notes, Copenhagen weekend, and Launch plan, ready for review."></div></div>
+</figure>
+<figure class="feature-preview">
+<figcaption><h4>Choose what to keep.</h4><p>See exactly what changed. Keep either version, keep both, or combine your edits into a custom result.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog"><img decoding="async" src="../../assets/screenshots/crate-conflict-review-shopping.png" width="2698" height="1772" loading="lazy" alt="A shopping-list conflict shown side by side: one version checks off coffee and adds apples; the other checks off oat milk and adds bananas and tea. Removed and added text is highlighted."></div></div>
+</figure>
+</div>
+</section>
+<section class="feature-group" id="sync-details" aria-labelledby="sync-details-title">
+<header class="feature-group-heading"><h3 id="sync-details-title">Sync activity</h3><p>See what’s changing before you sync, and what was included afterward.</p></header>
+<div class="feature-preview-grid">
+<figure class="feature-preview">
+<figcaption><h4>Pending changes</h4><p>Compare edits and choose which files to sync.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog"><img decoding="async" src="../../assets/screenshots/crate-sync-pending.png" width="2698" height="1772" loading="lazy" alt="Pending sync activity with selected files and a preview of added and removed text."></div></div>
+</figure>
+<figure class="feature-preview">
+<figcaption><h4>Sync history</h4><p>Check recent transfers and the files included in each sync.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog"><img decoding="async" src="../../assets/screenshots/crate-sync-history.png" width="2698" height="1772" loading="lazy" alt="Sync history showing recent uploads and an expanded file entry."></div></div>
+</figure>
+</div>
+</section>
+<section class="feature-group" id="history-recovery" aria-labelledby="history-recovery-title">
+<header class="feature-group-heading"><h3 id="history-recovery-title">History and recovery</h3><p>Revisit an earlier file or a saved state of your vault.</p></header>
+<div class="feature-preview-grid recovery-grid">
+<figure class="feature-preview">
+<figcaption><h4>File history</h4><p>Compare earlier versions with your current file and restore a saved copy.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog"><img decoding="async" src="../../assets/screenshots/crate-file-history.png" width="2698" height="1772" loading="lazy" alt="File history comparing a saved version of Copenhagen weekend with the current local file."></div></div>
+</figure>
+<figure class="feature-preview">
+<figcaption><h4>Vault history</h4><p>Browse saved sync points, inspect changed files, and restore an earlier state.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--dialog product-image--vault"><img decoding="async" src="../../assets/screenshots/crate-vault-history.png" width="2698" height="1772" loading="lazy" alt="Vault history with saved sync points, changed files, and a preview of the selected file’s changes."></div></div>
+</figure>
+</div>
+</section>
+<aside class="recovery-feature"><div class="recovery-window" aria-label="30-day recovery window"><strong>30</strong><span>days to recover</span></div><div><h3>Recover an earlier copy.</h3><p>Remote files replaced or deleted by sync are kept for 30 days. Open <strong>Restore remote file</strong> in Crate settings to recover a copy.</p><p class="recovery-note">Sync is not a backup. Keep a separate backup of your vault.</p></div></aside></section>
 
 <section class="section sync-showcase wrap" id="reminders">
 <figure class="reminder-recording"><figcaption><h2>Write it down. Come back to it.</h2><p>Add reminders while you work in Obsidian. Write “tomorrow at 12” and use # to choose a project.</p></figcaption><div class="recording-media"><video controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="crate-reminder-entry" controls muted playsinline preload="none" width="2704" height="1684" poster="../../assets/screenshots/plugin-reminders-natural-language-poster.jpg?v=fbbcd1fd" aria-label="Add reminders in natural language."><source src="../../assets/videos/plugin-reminders-natural-language.mp4" type="video/mp4"></video>
 </div></figure>
-<figure class="reminder-composer-screenshot"><img src="../../assets/screenshots/plugin-reminders-new.png" width="1915" height="821" loading="lazy" alt="New reminder dialog with a linked article title, scheduled for tomorrow at 10:00 in the Reading project."><figcaption><h3>Keep links in your reminders.</h3><p>Add a Markdown link to an article, document, or webpage. Open it straight from your reminder when you’re ready.</p></figcaption></figure>
-<div class="embedded-reminders"><header class="embed-heading"><h3>Your reminders, inside any note.</h3><p>Keep a live reminder list beside your writing in a daily note, project page, or dashboard.</p></header><div class="embed-demo"><div class="embedded-note-image"><img src="../../assets/screenshots/plugin-reminders-embedded-note.png" width="1756" height="1922" loading="lazy" alt="An Obsidian note titled Copenhagen weekend with travel plans and three embedded Travel reminders under Before we go."></div><div class="embed-example"><h4>Add this to your note</h4><pre><code>```reminders
+<figure class="reminder-link-story">
+<figcaption><h3>Keep links in your reminders.</h3><p>Save an article or webpage to revisit when you’re ready. Open it straight from your reminder.</p></figcaption>
+<div class="product-image product-image--dialog product-image--reminder"><img decoding="async" src="../../assets/screenshots/crate-reminder-in-note.png" width="2698" height="1772" loading="lazy" alt="New reminder with a linked article title and controls for date, project, priority, and repeat."></div>
+</figure>
+<div class="embedded-reminders"><header class="embed-heading"><h3>Your reminders, inside any note.</h3><p>Keep a live reminder list beside your writing in a daily note, project page, or dashboard.</p></header><div class="embed-demo"><div class="product-image embedded-note-image"><img decoding="async" src="../../assets/screenshots/plugin-reminders-embedded-note.png" width="1756" height="1922" loading="lazy" alt="An Obsidian note titled Copenhagen weekend with travel plans and three embedded Travel reminders under Before we go."></div><div class="embed-example"><h4>Add this to your note</h4><pre><code>```reminders
 project: Travel
 show-completed: false
-```</code></pre><p class="embed-help">Shows unfinished reminders from your Travel project. Switch to Reading view or Live Preview to see the list.</p></div></div><div class="embed-reference"><table><caption>Choose a block type</caption><thead><tr><th scope="col">Block</th><th scope="col">Shows</th></tr></thead><tbody><tr><td><code>reminders</code></td><td>Your reminder list</td></tr><tr><td><code>reminders-today</code></td><td>Today’s reminders</td></tr><tr><td><code>reminders-upcoming</code></td><td>Upcoming reminders</td></tr></tbody></table><p class="embed-help"><a href="https://github.com/kaanbiryol/obsidian-crate/blob/main/docs/embedded-reminders.md">Block options and examples →</a></p></div></div>
+```</code></pre><p class="embed-help">Shows unfinished reminders from your Travel project. Switch to Reading view or Live Preview to see the list.</p></div></div><p class="embed-help embed-documentation"><a href="https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/embedded-reminders.md">Explore block types and options <span aria-hidden="true">↗</span></a></p></div>
 </section>
-<section class="section sync-showcase wrap" id="mobile"><figure class="reminder-recording plugin-notification-demo mobile-intro"><figcaption><h2>A reminder, even with your phone locked.</h2><p>Get a nudge when it’s due. Enable notifications to see reminders on your lock screen.</p><p class="mobile-intro-secondary">Plan your day and update reminders on mobile. Changes sync back to your notes in Obsidian.</p></figcaption><div class="recording-media"><video controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="plugin-notifications" data-replay-delay="3000" controls muted playsinline preload="none" width="922" height="1822" poster="../../assets/screenshots/plugin-notifications-poster.png" aria-label="A reminder notification arriving on the phone lock screen"><source src="../../assets/videos/plugin-notifications-transparent.webm" type="video/webm"><source src="../../assets/videos/plugin-notifications.mp4" type="video/mp4"></video></div></figure><div class="mobile-features"><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-inbox.png" width="1179" height="2556" loading="lazy" alt="Crate mobile app Inbox with four reminders and one overdue item."></div><figcaption><h3>Inbox</h3><p>Capture reminders in one place.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-edit.png" width="1179" height="2556" loading="lazy" alt="Crate mobile app reminder editor with date, project, priority, and repeat controls."></div><figcaption><h3>Today</h3><p>Review and update today’s reminders.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-upcoming.png" width="1179" height="2556" loading="lazy" alt="The mobile app Upcoming view showing tomorrow’s reminders."></div><figcaption><h3>Upcoming</h3><p>See what’s due next.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-projects.png" width="1179" height="2556" loading="lazy" alt="The mobile app Projects view with completion counts and nested Finance and Health projects."></div><figcaption><h3>Projects</h3><p>Organize related reminders and track progress.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-schedule.png" width="1179" height="2556" loading="lazy" alt="The mobile app Schedule sheet with quick dates and custom date and time fields."></div><figcaption><h3>Schedule</h3><p>Set a date and time.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-project-picker.png" width="1179" height="2556" loading="lazy" alt="The mobile app Project picker showing Inbox, Home, and nested Personal projects."></div><figcaption><h3>Choose a project</h3><p>Move a reminder into the right project.</p></figcaption></figure><figure class="mobile-feature"><div class="mobile-feature-image phone-device"><img src="../../assets/screenshots/pwa-reminders-repeat.png" width="1179" height="2556" loading="lazy" alt="The mobile app Repeat sheet configured for a daily reminder at 09:00."></div><figcaption><h3>Repeat</h3><p>Repeat daily, weekly, or monthly.</p></figcaption></figure></div></section>
-<section class="ownership-band" id="how-it-works"><div class="section wrap ownership-grid"><div><h2>Your account. Your data.</h2><p class="body-copy">Your vault and reminders sync through your own Cloudflare account. No Crate account required.</p>
-</div><div class="sync-map">
-<div class="sync-map-hub"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#cloud"></use></svg><span>Your Cloudflare account</span><small>Storage and sync, owned by you</small></div>
+<section class="section sync-showcase wrap" id="mobile"><figure class="reminder-recording plugin-notification-demo mobile-intro"><figcaption><h2>A reminder, even with your phone locked.</h2><p>Get a nudge when it’s due. Enable notifications to see reminders on your lock screen.</p><p class="mobile-intro-secondary">Plan your day and update reminders on mobile. Changes sync back to your notes in Obsidian.</p></figcaption><div class="recording-media"><video controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="plugin-notifications" data-replay-delay="3000" controls muted playsinline preload="none" width="922" height="1822" poster="../../assets/screenshots/plugin-notifications-poster.png" aria-label="A reminder notification arriving on the phone lock screen"><source src="../../assets/videos/plugin-notifications-transparent.webm" type="video/webm"><source src="../../assets/videos/plugin-notifications.mp4" type="video/mp4"></video></div></figure><section class="feature-group" id="mobile-plan" aria-labelledby="mobile-plan-title">
+<header class="feature-group-heading"><h3 id="mobile-plan-title">Plan your day</h3><p>Capture what’s on your mind and see what’s coming next.</p></header>
+<div class="feature-preview-grid">
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Inbox</h4><p>Capture reminders in one place.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-inbox.png" width="1179" height="2556" loading="lazy" alt="Crate mobile app Inbox with four reminders and one overdue item."></div></div>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Upcoming</h4><p>See what’s due next.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-upcoming.png" width="1179" height="2556" loading="lazy" alt="The mobile app Upcoming view showing tomorrow’s reminders."></div></div>
+</figure>
+</div>
+</section>
+<section class="feature-group" id="mobile-organize" aria-labelledby="mobile-organize-title">
+<header class="feature-group-heading"><h3 id="mobile-organize-title">Organize your reminders</h3><p>Keep related tasks together, wherever you are.</p></header>
+<div class="feature-preview-grid">
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Projects</h4><p>Organize related reminders and track progress.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-projects.png" width="1179" height="2556" loading="lazy" alt="The mobile app Projects view with completion counts and nested Finance and Health projects."></div></div>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Choose a project</h4><p>Move a reminder into the right project.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-project-picker.png" width="1179" height="2556" loading="lazy" alt="The mobile app Project picker showing Inbox, Home, and nested Personal projects."></div></div>
+</figure>
+</div>
+</section>
+<section class="feature-group" id="mobile-schedule" aria-labelledby="mobile-schedule-title">
+<header class="feature-group-heading"><h3 id="mobile-schedule-title">Edit and schedule</h3><p>Add details, choose a time, and make space for routines.</p></header>
+<div class="feature-preview-grid schedule-grid">
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Edit a reminder</h4><p>Update its title, date, project, or priority in one place.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-edit.png" width="1179" height="2556" loading="lazy" alt="Crate mobile app reminder editor with date, project, priority, and repeat controls."></div></div>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Schedule</h4><p>Set a date and time.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-schedule.png" width="1179" height="2556" loading="lazy" alt="The mobile app Schedule sheet with quick dates and custom date and time fields."></div></div>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<figcaption><h4>Repeat</h4><p>Repeat daily, weekly, or monthly.</p></figcaption>
+<div class="feature-preview-media"><div class="product-image product-image--phone"><img decoding="async" src="../../assets/screenshots/pwa-reminders-repeat.png" width="1179" height="2556" loading="lazy" alt="The mobile app Repeat sheet configured for a daily reminder at 09:00."></div></div>
+</figure>
+</div>
+</section>
+</section>
+<section class="ownership-band" id="how-it-works" aria-labelledby="hosting-title">
+<div class="section wrap ownership-grid">
+<div><h2 id="hosting-title">Your server. Your choice.</h2><p class="body-copy">The same vault sync and reminders, with two ways to host them. No separate Crate account.</p>
+<dl class="hosting-options"><div><dt>In your Cloudflare account</dt><dd>Connect your account and Crate prepares the services. R2 must be enabled; usage charges may apply.</dd></div><div><dt>On your own server</dt><dd>Run Crate with Docker. No Cloudflare account or domain required for the default setup. <a href="#self-hosting">Explore self-hosting <span aria-hidden="true">↗</span></a></dd></div></dl></div>
+<div class="sync-map"><div class="sync-map-hub"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#cloud"></use></svg><span>Your Crate server</span><small>Cloudflare or your own hardware</small></div>
 <div class="sync-map-branches" aria-hidden="true"><span>↕</span><span>↕</span></div>
 <div class="sync-map-devices"><div><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#desktop"></use></svg><strong>Obsidian</strong><span>Your vault, on each device</span></div><div><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#phone"></use></svg><strong>Mobile</strong><span>Your reminders, on the go</span></div></div>
-
-<p class="sync-map-note">Your synced files are stored in your Cloudflare account. Crate doesn’t provide end-to-end encryption. Keep a separate backup.</p>
+<p class="sync-map-note">Your server can access synced content. Crate doesn’t provide end-to-end encryption. Keep a separate backup.</p>
 </div></div></section>
-<section class="section wrap install-section" id="setup"><div class="section-heading"><div><p class="section-index">Get started</p><h2>Install Crate.</h2></div><p class="body-copy">Crate is currently in beta. Install it through BRAT, then connect your Cloudflare account.</p></div>
-<div class="install-grid"><div class="download-card"><span class="brand-tile"><img src="../../assets/logo.png" width="25" height="25" alt=""></span><h3>Crate beta</h3><p>Install and keep up to date with BRAT.</p><a class="button" href="https://community.obsidian.md/plugins/obsidian42-brat">Get BRAT <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#external"></use></svg></a><p class="install-note">Requires Obsidian 1.13.0+ and Cloudflare with R2 enabled. Cloudflare usage charges may apply.</p></div>
-<ol class="install-steps"><li><span>1</span><div><h3>Install BRAT</h3><p>Find <a href="https://community.obsidian.md/plugins/obsidian42-brat">BRAT</a> in <b>Settings → Community plugins</b>. Install and enable it.</p></div></li><li><span>2</span><div><h3>Add Crate</h3><p>Open BRAT’s settings and add a beta plugin. Enter <code>kaanbiryol/obsidian-crate</code>, select the beta release, and install. Enable Crate in Community plugins.</p></div></li><li><span>3</span><div><h3>Connect Cloudflare</h3><p>Open <b>Settings → Crate → Connect with Cloudflare</b>. Sign in and create or select your sync server.</p></div></li><li><span>4</span><div><h3>Connect your other devices</h3><p>Install Crate through BRAT on each Obsidian device and connect to the same server. Enable reminders to use the mobile app too.</p></div></li></ol></div></section>
+<section class="section wrap self-hosting-section" id="self-hosting" aria-labelledby="self-hosting-title">
+<div class="self-hosting-layout">
+<div class="self-hosting-copy"><p class="self-hosting-label">Self-hosting</p><h2 id="self-hosting-title">Hosted by you.</h2><p class="self-hosting-description">Run vault sync and reminders on your own hardware with Docker. No Cloudflare account or domain required.</p><a class="self-hosting-link" href="https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/self-hosting.md#run-with-docker">Set up with Docker <span aria-hidden="true">↗</span></a></div>
+<div class="self-hosting-console" data-copy-container><div class="self-hosting-console-bar"><span class="self-hosting-terminal-title"><svg class="icon" aria-hidden="true" viewBox="0 0 16 16"><path d="m3 4 4 4-4 4M9 12h4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg> Terminal</span><div class="self-hosting-console-actions"><span>Docker Compose</span><button type="button" class="copy-button" data-copy-target="docker-commands" aria-label="Copy Docker commands" hidden>Copy commands</button></div></div><div class="self-hosting-console-body"><p>Run from your Crate repository checkout</p><pre aria-label="Docker setup commands"><code id="docker-commands">docker compose up -d --build
+docker compose logs -f crate</code></pre><p class="copy-feedback" data-copy-status role="status"></p></div><div class="self-hosting-console-footer"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg><p>Use the address and pairing code in your logs to connect Obsidian.</p></div></div>
+</div>
+<dl class="self-hosting-details"><div><dt>Stored on your host</dt><dd>Persistent Docker storage. You manage backups.</dd></div><div><dt>Reachable from anywhere</dt><dd>HTTPS included. The default address changes on restart.</dd></div><div><dt>An always-on setup</dt><dd>Keep your computer awake and Docker running.</dd></div></dl>
+</section>
+<section class="section wrap install-section" id="setup" aria-labelledby="installation-title">
+<header class="install-intro"><p class="section-index">Get started</p><h2 id="installation-title">Install the beta.</h2><p class="body-copy">Install Crate in Obsidian, then connect your Cloudflare account or your own server.</p><p class="install-note">Requires Obsidian 1.13.0+ and a Crate server.</p></header>
+<ol class="install-steps" id="installation-steps">
+<li><span aria-hidden="true">1</span><div><h3>Install BRAT</h3><p>BRAT installs and updates beta plugins in Obsidian. Find <a href="https://community.obsidian.md/plugins/obsidian42-brat">BRAT</a> in <b>Settings → Community plugins</b>. Install and enable it.</p><p class="install-help"><a href="https://tfthacker.com/brat-quick-guide">BRAT’s installation guide <span aria-hidden="true">↗</span></a></p></div></li>
+<li><span aria-hidden="true">2</span><div><h3>Add Crate</h3><p>In <b>Settings → BRAT</b>, select <b>Add beta plugin</b>. Paste this repository, choose the latest release, and add the plugin. Then enable <b>Crate</b> in <b>Community plugins</b>.</p><div class="repository-copy" data-copy-container><div class="copy-field"><code id="crate-repository">kaanbiryol/obsidian-crate</code><button type="button" class="copy-button" data-copy-target="crate-repository" aria-label="Copy repository name" hidden>Copy</button></div><p class="copy-feedback" data-copy-status role="status"></p></div></div></li>
+<li><span aria-hidden="true">3</span><div><h3>Connect your server</h3><p>Open <b>Settings → Crate → Connect with Cloudflare</b> to create or select a cloud server. For self-hosting, select <b>Connect to your server</b> and enter your server address and pairing code.</p></div></li>
+<li><span aria-hidden="true">4</span><div><h3>Connect your other devices</h3><p>Install Crate through BRAT on each Obsidian device and connect to the same server. Enable reminders to use the mobile app too.</p></div></li>
+</ol>
+</section>
+
+<section class="section wrap faq-section" id="faq" aria-labelledby="faq-title">
+<header><p class="section-index">A few practical details</p><h2 id="faq-title">Before you get started.</h2><p class="faq-intro">What you need to know about cost, hosting, and your data.</p></header>
+<dl class="faq-list">
+<div><dt>Is Crate free?</dt><dd>Crate is free and open source. You cover the hosting: Cloudflare usage charges may apply, or you can run it on hardware you manage.</dd></div>
+<div><dt>Do I need a server?</dt><dd>Yes, for syncing between devices and using the reminders app. Choose your own Cloudflare account or a Docker server. The default Docker setup needs no Cloudflare account or domain. <a href="#self-hosting">See self-hosting <span aria-hidden="true">↗</span></a></dd></div>
+<div><dt>What works offline?</dt><dd>Keep reading and editing your local notes in Obsidian, then sync when connected. The mobile app lets you browse previously cached reminders offline; reconnect to add or change them.</dd></div>
+<div><dt>Are my notes end-to-end encrypted?</dt><dd>No. Your Cloudflare account and Worker, or the operator of your own server, can access synced content. Keep a separate backup of your vault. <a href="../../privacy/">Read the privacy details <span aria-hidden="true">↗</span></a></dd></div>
+</dl>
+</section>
+
+<section class="closing-section wrap" aria-labelledby="closing-title">
+<h2 id="closing-title">Bring your notes together.</h2>
+<div class="actions"><a class="button" href="#setup">Install beta <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a><a class="closing-source" href="https://github.com/kaanbiryol/obsidian-crate">View source <span aria-hidden="true">↗</span></a></div>
+</section>
 
 </main><footer class="site-footer wrap"><a class="wordmark" href="#main"><span class="brand-tile"><img src="../../assets/logo.png" width="25" height="25" alt=""></span>Crate</a><span>Sync and reminders for Obsidian.</span><nav aria-label="Footer"><a href="../../privacy/">Privacy</a><a href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav></footer>
+
 </body></html>
