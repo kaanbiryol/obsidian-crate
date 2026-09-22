@@ -8,6 +8,7 @@ export function pwaStartSearchFromUrl(requestUrl?: string): string {
 	if (!requestUrl) return '';
 
 	const source = new URL(requestUrl).searchParams;
+  if (source.get('section') === 'reading') return '?section=reading';
 	const params = new URLSearchParams();
 	for (const key of PWA_START_PARAM_KEYS) {
 		const value = source.get(key)?.trim();

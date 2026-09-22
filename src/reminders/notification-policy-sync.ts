@@ -3,6 +3,7 @@ import type { SyncApiClient } from '../sync/api';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';
 import { createLogger } from './utils/logger';
+import { validateReadingFolder } from '../reading/settings';
 
 const logger = createLogger('Reminders');
 interface PolicySyncState {
@@ -29,6 +30,7 @@ function pendingFolder(plugin: CratePlugin, workerUrl: string) {
 /** Folder and retry intent share one local save, before any network request. */
 export async function changeReminderFolder(plugin: CratePlugin, folderPath: string): Promise<void> {
 	const folder = normalizeRemindersFolderPath(folderPath);
+	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folder, plugin.app.vault.configDir);
 	await plugin.writeRemindersSettings({ remindersFolderPath: folder,
 		pendingServerFolder: plugin.settings.workerUrl
 			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });

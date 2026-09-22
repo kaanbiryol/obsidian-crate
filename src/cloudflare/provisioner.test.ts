@@ -43,7 +43,7 @@ function createApi() {
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: 1, created_version: 1 }] }] : [])),
+		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: 2, created_version: 2 }] }] : [])),
 		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
     verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
@@ -134,7 +134,7 @@ describe('provisionCloudflareDeployment', () => {
 	it.each([
 		{ tables: ['files'], version: 999 },
 		{ tables: ['crate_schema'], version: 999 },
-		...[2, 3, 4, 5, 6].map(version => ({ tables: ['crate_schema'], version })),
+		...[3, 4, 5, 6].map(version => ({ tables: ['crate_schema'], version })),
 	])('rejects an unsupported existing database before uploading: %j', async ({ tables, version }) => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: tables.map(name => ({ name })) }]);

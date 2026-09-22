@@ -10,9 +10,16 @@ import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { pruneReminderOccurrences, pruneReminderOperations } from './maintenance/reminder-history';
 
 export async function runScheduledMaintenance(env: Env): Promise<number> {
+  if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return 0;
 	const errors: string[] = [];
   let removedObjects = 0;
 	const tasks: Array<[string, () => Promise<unknown>]> = [
+    ['recover Reading work', async () => {
+      if (await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
+        const result = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/project', { method: 'POST' });
+        if (!result.ok) throw new Error('Reading coordinator unavailable');
+      }
+    }],
         ['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],

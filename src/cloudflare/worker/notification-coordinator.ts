@@ -1,3 +1,4 @@
+import { scheduleReading } from './reading/extraction/jobs';
 import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './notification-queue';
 import { getNotificationPolicy } from './notification-policy';
 import type { Env } from './types';
@@ -7,14 +8,14 @@ import { revalidateReminderSources } from './reminder-source-migration';
 
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
-  let sourceWork = false;
+  let sourceWork = await scheduleReading(env);
   let hasPolicy = false;
   try {
     // Source verification and projection share this budget. Dispatch has its own
     // invocation so a reminder backlog does not compete with source scans.
     const policy = await getNotificationPolicy(env.DB);
     hasPolicy = Boolean(policy);
-    sourceWork = await revalidateReminderSources(env, 2, { folder: policy?.folderPath ?? null });
+    sourceWork = (await revalidateReminderSources(env, 2, { folder: policy?.folderPath ?? null })) || sourceWork;
     if (hasPolicy) {
       await drainNotificationProjections(env, 1);
       await dispatchNotificationJobs(env);

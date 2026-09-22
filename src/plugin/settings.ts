@@ -1,4 +1,5 @@
 import { normalizeVaultName } from '../cloudflare/vault-name';
+import { normalizeReadingSettings } from '../reading/settings';
 import { normalizeSyncTimings } from '../sync/timings';
 /**
  * Settings helpers for Crate.
@@ -213,6 +214,7 @@ export function normalizeCrateSettings(
 ): CrateSettings {
 	return {
 		...DEFAULT_SETTINGS,
+		reading: normalizeReadingSettings(value?.reading),
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),

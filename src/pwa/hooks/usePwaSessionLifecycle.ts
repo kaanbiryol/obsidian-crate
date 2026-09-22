@@ -1,3 +1,4 @@
+import { clearReadingData, readingSession } from '../reading/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
@@ -25,7 +26,10 @@ export async function performPwaLogout({
 	const start = (operation: () => Promise<unknown>) => {
 		try { return Promise.resolve(operation()); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
 	};
+	let reading: ReturnType<typeof readingSession> = null;
+  try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { /* Corrupt credentials must not prevent clearing local data. */ }
 	const cleanup = Promise.allSettled([
+    ...(reading ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '11' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
 		start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');
@@ -89,6 +93,7 @@ export function usePwaSessionLifecycle({
 		if (discardPrivateData && !clearReminderDrafts()) reportCleanupFailure('Drafts could not be cleared. Clear this site’s data in browser settings.');
 		try { if (discardPrivateData) clearReminderOutbox(); }
 		catch { reportCleanupFailure('Could not clear pending changes from this device. Clear this site’s data in browser settings.'); }
+		if (discardPrivateData) { try { await clearReadingData(); } catch { reportCleanupFailure('Reading data could not be cleared. Clear this site’s data in browser settings.'); } }
 		if (!await clearCachedReminderSnapshots().catch(() => false)) {
 			reportCleanupFailure('Offline data could not be cleared. Close other Crate tabs, then clear this site’s data in browser settings.');
 		}

@@ -11,7 +11,7 @@ export interface DeploymentRecoveryResult {
     message: string;
     diagnostics: string;
 }
-const confirmedSteps = new Set(['acquire-deployment', 'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
+const confirmedSteps = new Set(['freeze-upgrade-data', 'verify-upgrade-checkpoint', 'resume-upgraded-server', 'acquire-deployment', 'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
 
 /** A confirmed checkpoint can be removed conditionally: the old updater must CAS
  * it to "started" before dispatching its next mutation. Pending address activation
@@ -93,7 +93,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
     }
     if (record.verificationPending === true) {
         if (build?.[2] === record.fingerprint && build?.[1] === record.version
-            && (pendingAddress || record.stepState === 'confirmed' && ['enable-server-address', 'record-release', 'verify-deployment'].includes(String(record.step))
+            && (pendingAddress || record.stepState === 'confirmed' && ['resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'].includes(String(record.step))
                 || record.completionOnly === true && ['acquire-deployment', 'record-release', 'verify-deployment'].includes(String(record.step)))) {
             return { ...result('verify', 'The published update can be verified under new ownership.'), resumeValue: value };
         }

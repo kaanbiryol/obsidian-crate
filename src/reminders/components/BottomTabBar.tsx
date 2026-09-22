@@ -1,101 +1,17 @@
 import React, { memo } from 'react';
-import { motion } from 'motion/react';
-import { TABS, SPRING_CONFIG, type TabId } from '../ui/layoutConstants';
-import { ShadowDOMNativeButton } from './ShadowDOMNativeButton';
-import { ThemeIcon } from './theme-icon';
-import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { NavigationBar } from '../../ui/shared/NavigationBar';
+import { TABS, type TabId } from '../ui/layoutConstants';
 
-interface TabButtonProps {
-  tab: typeof TABS[number];
-  isActive: boolean;
-  onTabChange: (id: TabId) => void;
-}
+const items = TABS.map(tab => ({ ...tab, dataTab: tab.id === 'browse' ? 'projects' : tab.id }));
 
-/**
- * Individual tab button component
- * Uses the shared Base UI button in both host environments.
- */
-const TabButton = memo(function TabButton({
-  tab,
-  isActive,
-  onTabChange,
-}: TabButtonProps) {
-  return (
-    <ShadowDOMNativeButton
-      onClick={() => onTabChange(tab.id)}
-      className={`bottom-tab-button${isActive ? ' is-active' : ''}`}
-      data-action="switch-tab"
-      data-tab={tab.id === 'browse' ? 'projects' : tab.id}
-      aria-current={isActive ? 'page' : undefined}
-    >
-      <div className="bottom-tab-content">
-        <div className="bottom-tab-icon">
-          <ThemeIcon size="l" id={tab.iconName} />
-        </div>
-        <span className="bottom-tab-label">
-          {tab.label}
-        </span>
-      </div>
-    </ShadowDOMNativeButton>
-  );
-});
-
-interface BottomTabBarProps {
+/** Reminder destinations use the same navigation as Reading. */
+export const BottomTabBar = memo(function BottomTabBar(props: {
   inert?: boolean;
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   position?: 'top' | 'bottom';
   className?: string;
   animateActiveIndicator?: boolean;
-}
-
-/**
- * Shared bottom tab bar component for navigation.
- */
-export const BottomTabBar = memo(function BottomTabBar({
-  activeTab,
-  onTabChange,
-  position = 'bottom',
-  className = '',
-  animateActiveIndicator = true,
-  inert = false,
-}: BottomTabBarProps) {
-  const reduceMotion = useObsidianReducedMotion();
-  const shouldAnimateIndicator = animateActiveIndicator && !reduceMotion;
-  const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
-
-  return (
-    <nav
-      inert={inert}
-      className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`}
-      aria-label="Reminder views"
-    >
-      <div className="bottom-tab-items">
-        <div className="bottom-tab-slider-track" aria-hidden="true">
-          {shouldAnimateIndicator ? (
-            <motion.div
-              layout
-              initial={false}
-              className="bottom-tab-slider"
-              style={{ gridColumn: activeIndex + 1 }}
-              transition={{ type: 'spring', ...SPRING_CONFIG }}
-            />
-          ) : (
-            <div
-              className="bottom-tab-slider"
-              style={{ gridColumn: activeIndex + 1 }}
-            />
-          )}
-        </div>
-        {TABS.map((tab) => (
-          <TabButton
-            key={tab.id}
-            tab={tab}
-            isActive={activeTab === tab.id}
-            onTabChange={onTabChange}
-          />
-        ))}
-      </div>
-    </nav>
-  );
+}) {
+  return <NavigationBar {...props} items={items} label="Reminder views" />;
 });

@@ -1,0 +1,95 @@
+// Shared Base UI dialog/drawer geometry, surface, and motion for both hosts.
+@mixin styles {
+.base-modal-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.base-modal-portal { display: contents; }
+.base-modal-viewport {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.base-modal-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.base-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--background-modifier-cover, rgba(0, 0, 0, .45));
+  pointer-events: auto;
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+  transition: opacity 260ms var(--crate-motion-easing);
+  &[data-starting-style], &[data-ending-style] { opacity: 0; }
+  &[data-swiping] { transition: none; }
+}
+.base-modal-backdrop.modal-backdrop { pointer-events: auto; }
+
+.base-modal-surface {
+  position: relative;
+  pointer-events: auto;
+  outline: none;
+  transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease;
+  &[data-ending-style] { transition-duration: 220ms; }
+  &.is-bottom-sheet {
+    &[data-starting-style], &[data-ending-style] { transform: translateY(100%); }
+    &[data-swiping] { transform: translateY(var(--drawer-swipe-movement-y)); transition: none; }
+  }
+  &.is-centered {
+    &[data-starting-style] { opacity: 0; transform: scale(1.05); }
+    &[data-ending-style] { opacity: 0; transform: scale(0.95); }
+  }
+  overflow: hidden;
+  border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
+  background: var(--crate-modal-bg);
+  backdrop-filter: var(--crate-modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--crate-modal-backdrop-filter);
+  box-shadow: var(--crate-elevation-sheet);
+  color: var(--text-normal);
+  font-family: var(--reminder-font-ui);
+  font-size: var(--reminder-font-base);
+  will-change: transform, opacity;
+
+  &.is-centered {
+    padding-bottom: 20px;
+    border-radius: var(--crate-radius-sheet);
+  }
+
+  &.is-bottom-sheet {
+    max-height: 90dvh;
+    padding-bottom: max(env(safe-area-inset-bottom), 18px);
+    border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0;
+  }
+}
+
+.base-modal-drag-region {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  touch-action: none;
+}
+
+.base-modal-drag-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--text-faint);
+  opacity: 0.45;
+}
+
+[data-no-animation] :is(.base-modal-surface, .base-modal-backdrop) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .base-modal-surface, .base-modal-backdrop { transition: none; }
+}
+
+}

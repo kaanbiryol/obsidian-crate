@@ -1,3 +1,4 @@
+import { migrateLocalDatabase } from './local-server-migrations.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -16,7 +17,7 @@ export async function localBuildInfo() {
 		readFile(join(root, packaged ? 'assets/server-release.json' : 'src/cloudflare/server-release.json'), 'utf8'),
 	]);
 	return { runtimeVersion: packageInfo.crateServerRuntime ?? packageInfo.devDependencies.miniflare,
-		schemaHash: digest(schema), serverRevision: JSON.parse(release).revision };
+		schemaHash: digest(schema), serverRevision: JSON.parse(release).revision, previousSchemas: JSON.parse(release).previousSchemas ?? [] };
 }
 
 export function assertCompatibleLocalMetadata(previous, expected) {
@@ -53,7 +54,7 @@ export async function lockLocalData(dataDir) {
 	return () => unlink(path);
 }
 
-export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true }) {
+export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup }) {
 	dataDir = resolve(dataDir);
 	origin = normalizeLocalOrigin(origin);
 	const packageInfo = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
@@ -89,7 +90,18 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			throw error;
 		});
 		const previous = previousText === null ? null : JSON.parse(previousText);
-		if (previousText !== null) assertCompatibleLocalMetadata(previous, { schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision });
+
+    const expected = { schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision };
+    if (previousText !== null) {
+      if (!upgradeBackup) assertCompatibleLocalMetadata(previous, expected);
+      else {
+        if (previous.schemaHash !== expected.schemaHash && !release.previousSchemas?.some(item => item.sha256 === previous.schemaHash)) throw new Error('No tested migration exists for this data directory.');
+        assertCompatibleLocalMetadata({ ...previous, schemaHash: expected.schemaHash }, expected);
+        const { backupLocalServer } = await import('./local-server-backup.mjs');
+        await backupLocalServer(dataDir, upgradeBackup, true);
+      }
+    }
+
 		if (previousText === null && (await readdir(dataDir)).some(name => !['server.lock', '.DS_Store'].includes(name))) {
 			throw new Error('This directory contains data without server.json. Restore a complete backup or choose a new empty directory.');
 		}
@@ -98,6 +110,8 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		const options = {
 			name: 'crate-local', modules: true, script: worker,
 			compatibilityDate: '2026-08-18',
+      compatibilityFlags: ['global_fetch_strictly_public'],
+      serviceBindings: { READING_FETCH: { network: { allow: ['public'], deny: ['private', 'local', '100.64.0.0/10', '198.18.0.0/15', '192.0.0.0/24', '240.0.0.0/4'], tlsOptions: { trustBrowserCas: true } } } },
 			host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
 			resourcePersistencePath: join(dataDir, 'resources'),
 			isolatedResourcePersistencePath: join(dataDir, 'isolated'),
@@ -122,7 +136,8 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		} else {
 			if (!tables.some(table => table.name === 'crate_schema')) throw new Error('Refusing to initialize a non-empty, unrecognized database.');
 			const marker = await db.prepare('SELECT version FROM crate_schema WHERE id = 1').first();
-			if (marker?.version !== release.schemaVersion) throw new Error('Unsupported local database schema.');
+			if (upgradeBackup) await migrateLocalDatabase(db, root, packaged, release);
+ else if (marker?.version !== release.schemaVersion) throw new Error('Unsupported local database schema. Run the stopped-server upgrade command with a new backup directory.');
 		}
 		await writePrivateJson(metadataPath, metadata);
 		if (!administrative) {

@@ -7,7 +7,8 @@
 		"scripts/*.mjs",
 		"tests/editor-contract/fixture.tsx",
 		"tests/editor-contract/*.spec.ts",
-		"tests/editor-contract/*.config.{ts,mts}"
+		"tests/editor-contract/*.config.{ts,mts}",
+		"tests/reading-extraction/*.ts"
 	],
 	"project": [
 		"tests/visual/**/*.{ts,tsx}",
@@ -16,7 +17,8 @@
 		"scripts/*.mjs",
 		"*.{js,mjs,mts,ts}",
 		"!src/**/*-test-harness.ts!",
-		"!src/test/**!"
+		"!src/test/**!",
+		"tests/reading-extraction/*.ts"
 	],
 	"ignoreFiles": [
 		"src/cloudflare/worker/notifications/web-push-library.d.ts",
@@ -32,6 +34,8 @@
 	],
 	"ignoreBinaries": [
 		"tar",
-		"python3"
+		"python3",
+		"plutil",
+		"shortcuts"
 	]
 }

@@ -1,4 +1,6 @@
 import { Notice } from "obsidian";
+import { registerReading } from '../reading/register-integrations';
+import { stopReading } from '../reading/runtime';
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "./logger";
 import { CrateSettingTab } from "../ui/settings-tab";
@@ -35,6 +37,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
   registerCheckpointBackupCleanup(plugin, signal);
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
+  registerReading(plugin);
   if (plugin.remindersSettings.enabled) {
     await initializePluginReminders(plugin, signal);
   }
@@ -49,6 +52,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 
 export function shutdownPlugin(plugin: CratePlugin): void {
   endPluginLifecycle(plugin);
+  stopReading(plugin);
   plugin.syncRuntime?.destroy();
   plugin.cloudflareDeploymentService?.destroy();
   plugin.remindersVaultWatcher?.unregister();

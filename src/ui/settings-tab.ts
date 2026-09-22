@@ -14,6 +14,7 @@ import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
+import { renderReadingSettings } from '../reading/ui/settings-section';
 import { getSettingsTabSections } from './settings/settings-tab-model';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -78,6 +79,8 @@ export class CrateSettingTab extends PluginSettingTab {
 				}));
 			}
 		}
+
+		renderReadingSettings(containerEl, this.plugin, () => this.update());
 
 		if (isConfigured) {
 			const accountEl = createSettingsDisclosure(containerEl, 'Account and devices');

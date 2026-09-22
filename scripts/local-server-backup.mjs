@@ -33,18 +33,19 @@ async function copyInventory(source, target, files) {
 export async function checkLocalUpgrade(dataDir) {
 	const current = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
 	const next = await localBuildInfo();
-	assertCompatibleLocalMetadata(current, next);
-	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion };
+	const migration = next.previousSchemas.some(item => item.sha256 === current.schemaHash);
+  assertCompatibleLocalMetadata(migration ? { ...current, schemaHash: next.schemaHash } : current, next);
+	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
 }
 
-export async function backupLocalServer(dataDir, output) {
+export async function backupLocalServer(dataDir, output, alreadyLocked = false) {
 	dataDir = await realpath(dataDir);
 	output = resolve(output);
 	await mkdir(dirname(output), { recursive: true, mode: 0o700 });
 	output = join(await realpath(dirname(output)), basename(output));
 	if (inside(dataDir, output) || inside(`${dataDir}.remote`, output)) throw new Error('Choose a backup location outside the server data and remote directories.');
 	if (await lstat(output).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) throw new Error('The backup destination already exists. Choose a new directory.');
-	const unlock = await lockLocalData(dataDir);
+	const unlock = alreadyLocked ? async () => {} : await lockLocalData(dataDir);
 	const staging = `${output}.tmp-${randomUUID()}`;
 	try {
 		const metadata = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));

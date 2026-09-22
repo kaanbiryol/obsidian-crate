@@ -26,6 +26,8 @@ import fixtureStyles from './fixture.css?raw';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 
 import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
+import { ReadingFixture } from './ReadingFixture';
+import { ReadingThemeIcon } from '@/pwa/reading/ReadingThemeIcon';
 import { LexicalTrial } from './lexical/LexicalTrial';
 import lexicalStyles from './lexical/trial.css?raw';
 
@@ -43,6 +45,7 @@ style.textContent = (host === 'plugin' ? pluginStyles : PWA_STYLES + (isDark ? '
 document.head.append(style);
 
 function GalleryIcon(props: ThemeIconProps) {
+  if (scene === 'reading') return <ReadingThemeIcon {...props} />;
   if (props.id === 'loader-circle') return <LoaderCircle size={18} aria-hidden="true" />;
   return props.id === 'triangle-alert' ? <TriangleAlert size={18} aria-hidden="true" /> : <PwaThemeIcon {...props} />;
 }
@@ -76,6 +79,7 @@ function Gallery() {
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} /></div>;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture />;
+  else if (scene === 'reading') content = <ReadingFixture onAdd={() => setResult('Save link opened')} />;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server rebuild failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish rebuilding your Cloudflare server." details={['In Crate settings → Recovery and troubleshooting → Troubleshooting, select “Resume server rebuild” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
@@ -90,11 +94,11 @@ function Gallery() {
   else if (scene === 'cards') content = <div className="reminders-view is-primary"><ReminderCard reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
   else content = <DatePickerContent currentDate={date ? new Date(`${date}T09:30:00`) : null} hasTime isDark={isDark} commitDateOnChange={host === 'pwa'} onClose={noop} onSelectPreset={preset => setResult(preset)} onDateChange={value => { setDate(value); setResult(value); }} onTimeChange={(hour, minute) => setResult(`${hour}:${minute}`)} onTimeClear={() => setResult('Cleared time')} onRemove={() => setResult('Removed')} />;
   if (scene === 'loading' || scene === 'loading-block') content = <RemindersLoading compact={scene === 'loading-block'} />;
-  return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? ['editor', 'metadata'].includes(scene) ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
+  return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${scene === 'reading' ? `reading-gallery${host === 'pwa' ? ' pwa-reading-root' : ''}` : ''} ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? ['editor', 'metadata'].includes(scene) ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'source' || (host === 'plugin' && (scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
+const useShadow = scene === 'source' || (host === 'plugin' && (scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

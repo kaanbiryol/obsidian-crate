@@ -90,7 +90,8 @@ def prepare_restore_sql(directory, restored_at=None):
         for table in ('auth_tokens', 'push_subscriptions', 'web_enrollment_tokens',
                       'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache',
                       'object_cleanup_queue', 'staged_uploads', 'staged_upload_batches',
-                      'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state'):
+                      'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state',
+                      'reading_sources', 'reading_jobs', 'reading_enrollments', 'reading_handoffs'):
             db.execute(f'DELETE FROM "{table}"')
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at

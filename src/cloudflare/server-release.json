@@ -1,6 +1,20 @@
 {
-  "revision": 59,
-  "schemaVersion": 1,
+  "revision": 65,
+  "schemaVersion": 2,
   "minimumSchemaVersion": 1,
-  "migrations": []
+  "migrations": [
+    {
+      "id": "002-reading",
+      "file": "002-reading.sql",
+      "from": 1,
+      "to": 2,
+      "checksum": "6934f8e848c38c3d49987e0eb3ed1be99ee050779eb12c4129051113a5536051"
+    }
+  ],
+  "previousSchemas": [
+    {
+      "version": 1,
+      "sha256": "48e0f580e038ec8a0e2c06464a6d7d3626c928670207a1f0d8b6de52f6fbf76e"
+    }
+  ]
 }

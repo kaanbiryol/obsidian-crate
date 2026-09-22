@@ -1,3 +1,4 @@
+import { upgradeGuards, removeUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { DEPLOYMENT_FENCE_KEY, type DeploymentFence } from './deployment-fence';
@@ -50,7 +51,7 @@ export async function prepareDeploymentDatabase(input: DeploymentDatabase, versi
     await beforeUpgrade(migrations);
     fence.requireVerification();
     for (const migration of migrations) {
-      const sql = await migrationTransaction(migration);
+      const sql = `${removeUpgradeGuards('auth_tokens')}\n${await migrationTransaction(migration)}\n${upgradeGuards('auth_tokens')}`;
       await fence.mutate(() => input.api.queryD1(input.accountId, input.databaseId, sql), `migrate-${migration.id}`);
     }
   } else if (version === null) {

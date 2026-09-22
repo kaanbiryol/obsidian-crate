@@ -43,7 +43,7 @@ export function IconButton({
 			data-tone={tone}
 			data-variant={variant}
 		>
-			<ThemeIcon size={iconSize} id={icon} />
+			<ThemeIcon size={iconSize} id={icon} aria-hidden="true" />
 		</Button>
 	);
 }

@@ -46,7 +46,7 @@
 		"verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
 		"notices:generate": "node scripts/generate-third-party-notices.mjs",
 		"notices:check": "node scripts/generate-third-party-notices.mjs --check",
-		"release:check": "npm run security:check && npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run typecheck:visual && npm run test:visual && npm run test:activity-browser && npm run test:pwa-browser && npm run release:candidate",
+		"release:check": "npm run security:check && npm run check && npm run test:pwa-preview && npm run test:reading && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run typecheck:visual && npm run test:visual && npm run test:activity-browser && npm run test:pwa-browser && npm run release:candidate",
 		"deploy:plugin": "node scripts/deploy.mjs",
 		"deploy:plugin:configure": "node scripts/deploy.mjs --configure",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
@@ -76,7 +76,11 @@
 		"test:editor-contract": "node scripts/editor-contract-compare.mjs current",
 		"typecheck:editor-contract": "tsc -p tests/editor-contract/tsconfig.json",
 		"test:page-titles": "npm run build && vitest run src/cloudflare/worker/link-title.test.ts src/sync/page-title.test.ts src/pwa/page-title-api.test.ts && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/link-title.integration.ts && playwright test tests/visual/page-titles.spec.ts tests/visual/lexical-trial.spec.ts --workers=2",
-		"test:lexical": "vitest run src/reminders/components/lexical/reminderDocument.test.ts && playwright test tests/visual/lexical-trial.spec.ts tests/visual/page-titles.spec.ts --workers=2 && playwright test --config tests/editor-contract/playwright.config.ts && node scripts/pwa-editor-contract-test.mjs && node scripts/pwa-editor-selection-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-draft-recovery-test.mjs && node scripts/pwa-update-test.mjs"
+		"test:lexical": "vitest run src/reminders/components/lexical/reminderDocument.test.ts && playwright test tests/visual/lexical-trial.spec.ts tests/visual/page-titles.spec.ts --workers=2 && playwright test --config tests/editor-contract/playwright.config.ts && node scripts/pwa-editor-contract-test.mjs && node scripts/pwa-editor-selection-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-draft-recovery-test.mjs && node scripts/pwa-update-test.mjs",
+		"test:reading-extraction": "tsc -p tests/reading-extraction/tsconfig.json --noEmit && node --test scripts/reading-extraction.test.mjs",
+		"test:reading": "npm run build:worker && npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-browser.test.mjs",
+		"build:reading-shortcut": "node scripts/sign-reading-shortcut.mjs",
+		"preview:reading": "npm run build:worker && node scripts/reading-preview.mjs"
 	},
 	"keywords": [
 		"obsidian",
@@ -132,10 +136,14 @@
 		"chrono-node": "^2.9.0",
 		"classnames": "^2.5.1",
 		"date-fns": "^4.1.0",
+		"defuddle": "0.19.4",
 		"diff": "^9.0.0",
+		"dompurify": "3.4.15",
 		"idb": "^8.0.3",
 		"lexical": "0.50.0",
+		"linkedom": "0.18.12",
 		"lucide-react": "^0.562.0",
+		"marked": "16.3.0",
 		"motion": "^12.38.0",
 		"qrcode-generator": "^2.0.4",
 		"react": "^19.2.0",
@@ -143,6 +151,7 @@
 		"valibot": "^1.5.0",
 		"web-push": "3.6.7",
 		"web-push-browser": "^1.4.2",
+		"yaml": "2.9.1",
 		"zustand": "^5.0.6"
 	},
 	"overrides": {

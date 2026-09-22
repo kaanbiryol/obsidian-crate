@@ -1,5 +1,8 @@
 import {
   Calendar,
+  BookOpen,
+  ListTodo,
+  Settings,
   CalendarPlus,
   Sun,
   Sunrise,
@@ -31,6 +34,9 @@ import {
 import type { ThemeIconProps, ThemeIconSize } from '@/reminders/components/theme-icon';
 
 const ICONS: Record<string, LucideIcon> = {
+  'book-open': BookOpen,
+  'list-todo': ListTodo,
+  settings: Settings,
   folder: FolderOpen,
   'trash-2': Trash2,
   x: X,

@@ -27,7 +27,7 @@ interface ModalHeaderProps {
 }
 
 /**
- * Shared chrome for reminder editor and picker dialogs.
+ * Shared chrome for Crate editors, settings, and picker dialogs.
  *
  * Screens own their actions; this component owns the repeated structure,
  * accessibility, and visual hierarchy of the header itself.

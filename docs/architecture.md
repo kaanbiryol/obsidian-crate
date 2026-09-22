@@ -138,6 +138,11 @@ The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML,
 
 The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome. Both hosts compile the same semantic theme tokens and reminder-card styles; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
 
+Reading and Reminders share the feature-independent view header, navigation bar,
+buttons, icon buttons, and modal header under `src/ui/shared/`. Feature adapters
+provide destinations, actions, data, and lifecycle behavior. Reading owns its
+article layout and typography, while common controls use the same host tokens.
+
 The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The first-release schema records version 1 in `crate_schema`. Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.

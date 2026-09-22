@@ -1,8 +1,10 @@
 import type { UsageSnapshot } from '../cloudflare/usage-snapshot';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
 import type { SyncHistoryEntry } from '../sync/types';
+import { DEFAULT_READING_SETTINGS, type ReadingSettings } from '../reading/settings';
 
 export interface CrateSettings {
+	reading: ReadingSettings;
 	usageSnapshot?: UsageSnapshot | null;
 	automaticSync: boolean;
 	workerUrl: string;
@@ -33,6 +35,7 @@ export interface SharedSettings {
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
+	reading: { ...DEFAULT_READING_SETTINGS },
 	usageSnapshot: null,
 	automaticSync: true,
 	workerUrl: '',

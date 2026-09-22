@@ -246,7 +246,7 @@ it('preserves existing file references and never reapplies fresh DDL during an u
   await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/École.md', 'notes/école.md', 'existing-key')").run();
   await h.deploy();
   expect(await held()).toBeNull();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 1 });
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 2 });
   expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
   expect(h.api.queryD1.mock.calls.some(call => call[2] === schema)).toBe(false);
   expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();

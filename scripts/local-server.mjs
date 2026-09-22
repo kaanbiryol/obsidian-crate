@@ -22,6 +22,7 @@ npm run server -- start --local [--port 8787] [--host 127.0.0.1] [--origin https
 npm run server -- add-device --name "My Mac" [--data-dir PATH]
 npm run server -- pair --name "My phone" [--data-dir PATH]
 npm run server -- backup --output PATH [--data-dir PATH]
+npm run server -- upgrade --output NEW_BACKUP_PATH [--data-dir PATH]
 npm run server -- restore --backup PATH --data-dir EMPTY_PATH
 npm run server -- check-upgrade [--data-dir PATH]
 
@@ -76,7 +77,7 @@ try {
 	let command = positionals[0];
 	if (values.help || !command) console.log(help);
 	else {
-		if (positionals.length !== 1 || !['start', 'setup', 'add-device', 'pair', 'backup', 'restore', 'check-upgrade'].includes(command)) throw new Error('Unknown command. Use --help for usage.');
+		if (positionals.length !== 1 || !['start', 'setup', 'add-device', 'pair', 'backup', 'restore', 'check-upgrade', 'upgrade'].includes(command)) throw new Error('Unknown command. Use --help for usage.');
 		if (command === 'setup' && (values.local || values.host || values.origin)) throw new Error('Setup uses a loopback listener and --hostname for the public address.');
 		if (values.quick && (values.hostname || values.local || values.origin || values.host || command === 'add-device')) throw new Error('--quick cannot be combined with hostname, local, origin, host, or add-device.');
 		if (command !== 'setup' && values.hostname) throw new Error('--hostname belongs to setup. Use --origin for an external reverse proxy.');
@@ -87,6 +88,11 @@ try {
 		if (command === 'backup') {
 			if (!values.output) throw new Error('Provide --output with a new backup directory. Stop the server before backing up.');
 			console.log(`Backup verified: ${await backupLocalServer(dataDir, values.output)}`);
+		} else if (command === 'upgrade') {
+ if (!values.output) throw new Error('Stop the server and provide --output with a new backup directory.');
+ const upgraded = await openLocalRuntime({ dataDir, administrative: true, upgradeBackup: values.output });
+ await upgraded.close();
+ console.log('Server data upgraded. The verified backup is at ' + resolve(values.output));
 		} else if (command === 'restore') {
 			if (!values.backup) throw new Error('Provide --backup with a verified backup directory. Restore into an empty data directory.');
 			await restoreLocalServer(dataDir, values.backup);

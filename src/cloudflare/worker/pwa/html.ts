@@ -35,7 +35,7 @@ html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
 <link rel="manifest" href="${manifestHref}">
 <link rel="icon" type="image/png" sizes="256x256" href="/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}">
-<title>Crate Reminders</title>
+<title>Crate</title>
 ${PWA_STARTUP_ASSETS.filter(name => name !== 'app.js').map(name => `<link rel="modulepreload" href="/notifications/assets/${name}">`).join('\n')}
 <style>
 ${PWA_STYLES}

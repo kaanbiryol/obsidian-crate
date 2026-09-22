@@ -1,3 +1,4 @@
+import { createUpgradeCheckpoint, releaseUpgradeGuards } from './upgrade-checkpoint';
 import { readVaultName } from './vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './deployment-database';
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
@@ -158,7 +159,10 @@ export async function provisionCloudflareDeployment(input: {
 		const schemaVersion = await inspectDeploymentDatabase(schemaInput);
 		input.onProgress?.('Preparing the remote file bucket…');
 		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, schemaVersion === null, fence);
-		await prepareDeploymentDatabase(schemaInput, schemaVersion, fence, input.beforeDatabaseUpgrade);
+		await prepareDeploymentDatabase(schemaInput, schemaVersion, fence, async migrations => {
+ await createUpgradeCheckpoint({ api: input.api, accountId: input.accountId, databaseId, bucketName: input.metadata.r2BucketName, fence, onProgress: input.onProgress });
+ await input.beforeDatabaseUpgrade?.(migrations);
+ });
     await fence.checkpoint('prepare-database');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
@@ -200,6 +204,7 @@ export async function provisionCloudflareDeployment(input: {
     if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
     await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
     await input.api.verifyWorkerDeployment(`https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`, input.artifacts.fingerprint);
+    await releaseUpgradeGuards(input.api, input.accountId, databaseId, fence);
     await recordDeploymentRelease(schemaInput, fence);
     await fence.completeVerification();
 

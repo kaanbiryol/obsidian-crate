@@ -1,3 +1,4 @@
+import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
@@ -13,7 +14,7 @@ export async function completePublishedDeployment(
 	value: string,
 ): Promise<void> {
 	const record = JSON.parse(value) as DeploymentFenceRecord;
-	const finalStep = record.stepState === 'confirmed' && ['enable-server-address', 'record-release', 'verify-deployment'].includes(record.step ?? '');
+	const finalStep = record.stepState === 'confirmed' && ['resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'].includes(record.step ?? '');
 	const retry = record.completionOnly === true && ['confirmed', 'rejected', 'settled'].includes(record.stepState ?? '')
 		&& ['acquire-deployment', 'record-release', 'verify-deployment'].includes(record.step ?? '');
 	if (!target.accountId || !target.d1DatabaseId || target.reset || record.kind !== 'update'
@@ -60,6 +61,7 @@ export async function completePublishedDeployment(
 			|| releases.some(saved => Number(saved.revision) > live.revision || saved.revision === live.revision && saved.fingerprint !== fingerprint)) {
 			throw new Error('The published release conflicts with the saved database release. Recovery stopped.');
 		}
+		await releaseUpgradeGuards(api, accountId, databaseId, fence);
 		await recordDeploymentRelease(schema, fence, live.revision);
 		await fence.completeVerification();
 	});

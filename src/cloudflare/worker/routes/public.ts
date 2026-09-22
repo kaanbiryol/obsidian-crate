@@ -1,3 +1,5 @@
+import { readingShareFallback } from '../reading/share-target';
+import { readingSavePage, readingSaveScript } from '../reading/save-page';
 import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
@@ -30,6 +32,9 @@ export async function handlePublicRoute(
 	method: RouteMethod,
 ): Promise<Response | null> {
 	const db = env.DB;
+ if (path === '/notifications/share/reading' && method === 'POST') return readingShareFallback(request);
+ if (path === '/notifications/save-reading' && method === 'GET') return readingSavePage();
+ if (path === '/notifications/save-reading.js' && method === 'GET') return readingSaveScript();
 	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo(env);
 	if (path === '/' && method === 'GET') return handleServerInfo(env);
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);

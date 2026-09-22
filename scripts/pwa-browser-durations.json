@@ -1,5 +1,8 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/35513593114",
+  "additionalSources": {
+    "scripts/pwa-feature-switcher-test.mjs": "local chromium/webkit run on 2026-09-22: 6.78 seconds"
+  },
   "seconds": {
     "scripts/react-shadow-dom-test.mjs": 5,
     "scripts/base-ui-plugin-test.mjs": 40,
@@ -13,6 +16,7 @@
     "scripts/pwa-operation-expiry-test.mjs": 8,
     "scripts/pwa-safe-area-test.mjs": 22,
     "scripts/pwa-focus-test.mjs": 22,
+    "scripts/pwa-feature-switcher-test.mjs": 7,
     "scripts/pwa-editor-contract-test.mjs": 12,
     "scripts/pwa-editor-selection-test.mjs": 26,
     "scripts/pwa-sheet-interaction-test.mjs": 44,

@@ -180,7 +180,7 @@ it('reapplying the baseline schema preserves existing vault rows', async () => {
 	await env.DB.prepare('DROP TABLE file_deletion_receipts').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(); await applySchema();
-	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 1, created_version: 1 });
+	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 2, created_version: 2 });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);
 	expect(await receipts()).toHaveLength(1);
