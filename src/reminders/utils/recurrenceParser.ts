@@ -1,202 +1,140 @@
 import type { RecurrenceFrequency, RecurrenceRule } from '../types/reminder';
 import { normalizeRecurrenceRule } from './recurrenceRule';
+import { parseRecurrenceTime } from './reminderTime';
 
 const DAY_NAME_MAP: Record<string, number> = {
   sunday: 0, sun: 0,
   monday: 1, mon: 1,
   tuesday: 2, tue: 2,
   wednesday: 3, wed: 3,
-  thursday: 4, thu: 4,
+  thursday: 4, thu: 4, thur: 4,
   friday: 5, fri: 5,
   saturday: 6, sat: 6,
 };
 
+const weekday = `(?:${Object.keys(DAY_NAME_MAP).join('|')})s?\\b\\.?`;
+const weekdayRangeSeparator = '(?:\\s+(?:to|through|until|till)\\s+|\\s*[-–—]\\s*)';
+const weekdayPart = `(?:weekdays?\\b|weekends?\\b|${weekday}(?:${weekdayRangeSeparator}${weekday})?)`;
+// A separator belongs to the schedule only when another complete day follows.
+const weekdays = `${weekdayPart}(?:(?:\\s*,\\s*(?:and\\s+)?|\\s+and\\s+)${weekdayPart})*`;
+const intervalPattern = '(?:other|-?\\d+(?:\\.\\d+)?)';
+const numberWord = '(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)';
+const wordInterval = `${numberWord}(?:[\\s-]${numberWord})*`;
+const namedTime = '(?:morning|afternoon|evening|night|noon|midday|midnight)';
+const monthDay = '(?:\\s+on\\s+(?:the\\s+)?(?<day>\\d+(?:st|nd|rd|th)?|last\\s+day)\\b)?';
+
+function frequencyPattern(unit: string, frequency: RecurrenceFrequency): string {
+  return `(?:every\\s+(?<interval>${intervalPattern})\\s+${unit}s?|every\\s*${unit}|${frequency})\\b`;
+}
+
+const patterns: { frequency: RecurrenceFrequency; expression: RegExp; error?: string }[] = [
+  {
+    frequency: 'daily',
+    expression: new RegExp(`\\bevery\\s+(?:(?<interval>${intervalPattern})\\s+)?(?<period>${namedTime})\\b`, 'gi'),
+  },
+  {
+    frequency: 'daily',
+    expression: new RegExp(`\\b${frequencyPattern('day', 'daily')}`, 'gi'),
+  },
+  {
+    frequency: 'weekly',
+    expression: new RegExp(`\\b${frequencyPattern('week', 'weekly')}(?:\\s+(?:on\\s+)?(?<days>${weekdays}))?`, 'gi'),
+  },
+  {
+    frequency: 'weekly',
+    expression: new RegExp(`\\bevery\\s+(?:(?<interval>${intervalPattern})\\s+)?(?<days>${weekdays})`, 'gi'),
+  },
+  {
+    frequency: 'monthly',
+    expression: new RegExp(`\\b${frequencyPattern('month', 'monthly')}${monthDay}`, 'gi'),
+  },
+  {
+    // Recognize the whole unsupported cadence before Chrono can reinterpret
+    // just its weekday or clock as a one-off reminder. Ordinary "every item"
+    // prose is outside this deliberately narrow schedule grammar.
+    frequency: 'daily',
+    expression: new RegExp(`\\bevery\\s+${wordInterval}\\s+(?:days?|weeks?|months?|${weekdays}|${namedTime}s?)\\b(?:\\s+(?:on\\s+)?${weekdays})?${monthDay}`, 'gi'),
+    error: 'Use digits for repeat intervals, such as every 2 weeks.',
+  },
+];
+
 function parseWeekdays(text: string): number[] {
-  const matches = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi) ?? [];
-  const days = matches
-    .map(day => DAY_NAME_MAP[day.toLowerCase()])
-    .filter((day): day is number => day !== undefined);
+  const days: number[] = [];
+  const dayNumber = (day: string) => DAY_NAME_MAP[day.toLowerCase().replace(/\.$/, '').replace(/s$/, '')]!;
+  const parts = new RegExp(`(?<group>weekdays?|weekends?)\\b|(?<start>${weekday})(?:${weekdayRangeSeparator}(?<end>${weekday}))?`, 'gi');
+  for (const match of text.matchAll(parts)) {
+    const { group, start, end } = match.groups!;
+    if (group) days.push(...(/^weekdays?$/i.test(group) ? [1, 2, 3, 4, 5] : [0, 6]));
+    else {
+      const first = dayNumber(start!);
+      const length = end ? (dayNumber(end) - first + 7) % 7 + 1 : 1;
+      for (let offset = 0; offset < length; offset++) days.push((first + offset) % 7);
+    }
+  }
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
-function parseTimeString(timeStr: string): { hour: number; minute: number } | null {
-  if (!timeStr) return null;
-
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-	const [, hourText, minuteText] = match;
-	if (hourText === undefined || minuteText === undefined) return null;
-
-  const hour = parseInt(hourText, 10);
-  const minute = parseInt(minuteText, 10);
-
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-
-  return { hour, minute };
-}
-
-function applyTime(rule: RecurrenceRule, timeText: string | undefined): void {
-  if (!timeText) return;
-
-  const time = parseTimeString(timeText);
-  if (!time) return;
-
-  rule.hour = time.hour;
-  rule.minute = time.minute;
-}
-
 /**
- * Parse recurrence patterns from content string.
- *
- * Supported patterns:
- * - "every day" or "daily" (optionally with time: "daily 12:00")
- * - "every week" or "weekly" (optionally with time: "weekly 14:00")
- * - "every month" or "monthly" (optionally with time: "monthly 09:00")
- * - "every Monday" or "every Mon" (specific day, optionally with time)
- * - "every Monday and Wednesday" or "every Mon, Wed, Fri" (multiple days)
- * - "every 2 weeks" or "every 3 days" (intervals, optionally with time)
- * - "every 2 weeks on Mon, Wed" (weekly interval with specific days)
- * - "every 2 months on the 15th" (monthly interval with a specific day)
- * - "monthly on 15th" or "monthly on the 1st" (specific day of month, optionally with time)
- *
- * @returns Object with matched string and parsed rule, or null if no match
+ * Find a complete recurrence, including its optional weekday/month day and time.
+ * Weekly forms accept "every Monday", "every week Monday", "weekly on Mon, Wed"
+ * and "every 2 weeks on Mon, Wed". Monthly forms accept "monthly on the 15th"
+ * and intervals. Times accept clocks or named periods such as "morning";
+ * "every morning" and other named periods imply a daily repeat.
+ * Invalid qualifiers remain part of the candidate so the editor can reject them.
  */
-export function parseRecurrenceFromContent(content: string): { matched: string; rule: RecurrenceRule } | null {
-  // Optional time pattern: matches " HH:MM" or " H:MM" at the end
-  const timePattern = '(?:\\s+(\\d{1,2}:\\d{2}))?';
+export interface RecurrenceCandidate {
+  index: number;
+  matched: string;
+  rule: RecurrenceRule;
+  error?: string;
+}
 
-  // Pattern 1a: "every N weeks on Mon, Wed" (with optional time)
-  const weeklyIntervalDaysPattern = /\bevery\s+(\d+)\s+weeks?\s+on\s+((?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*(?:,|and)\s*)?)+)(?:\s+(\d{1,2}:\d{2}))?\b/i;
-  const weeklyIntervalDaysMatch = content.match(weeklyIntervalDaysPattern);
-  if (weeklyIntervalDaysMatch) {
-    const intervalText = weeklyIntervalDaysMatch[1];
-    const daysText = weeklyIntervalDaysMatch[2];
-    if (intervalText && daysText) {
-      const interval = parseInt(intervalText, 10);
-      const daysOfWeek = parseWeekdays(daysText);
-      if (daysOfWeek.length === 0) return null;
-      const rule = normalizeRecurrenceRule({
-        frequency: 'weekly',
-        interval: interval > 1 ? interval : undefined,
-        daysOfWeek,
-      });
-      applyTime(rule, weeklyIntervalDaysMatch[3]);
-      return {
-        matched: weeklyIntervalDaysMatch[0],
-        rule,
-      };
-    }
-  }
-
-  // Pattern 1b: "every N months on the 15th" (with optional time)
-  const monthlyIntervalDayPattern = /\bevery\s+(\d+)\s+months?\s+on\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{1,2}:\d{2}))?\b/i;
-  const monthlyIntervalDayMatch = content.match(monthlyIntervalDayPattern);
-  if (monthlyIntervalDayMatch) {
-    const intervalText = monthlyIntervalDayMatch[1];
-    const dayText = monthlyIntervalDayMatch[2];
-    if (!intervalText || !dayText) return null;
-    const interval = parseInt(intervalText, 10);
-    const dayOfMonth = parseInt(dayText, 10);
-    if (dayOfMonth >= 1 && dayOfMonth <= 31) {
-      const rule = normalizeRecurrenceRule({
-        frequency: 'monthly',
-        interval: interval > 1 ? interval : undefined,
-        dayOfMonth,
-      });
-      applyTime(rule, monthlyIntervalDayMatch[3]);
-      return {
-        matched: monthlyIntervalDayMatch[0],
-        rule,
-      };
-    }
-  }
-
-  // Pattern 1: "every N days/weeks/months" (with interval, optionally with time)
-  const intervalMatch = content.match(new RegExp(`\\bevery\\s+(\\d+)\\s+(day|week|month)s?${timePattern}\\b`, 'i'));
-  if (intervalMatch) {
-    const intervalText = intervalMatch[1];
-    const unitText = intervalMatch[2];
-    if (!intervalText || !unitText) return null;
-    const interval = parseInt(intervalText, 10);
-    const unit = unitText.toLowerCase();
-    const frequencyMap: Record<string, RecurrenceFrequency> = {
-      day: 'daily',
-      week: 'weekly',
-      month: 'monthly',
-    };
-    const frequency = frequencyMap[unit];
-    if (!frequency) return null;
-    const rule = normalizeRecurrenceRule({
-      frequency,
-      interval: interval > 1 ? interval : undefined,
-    });
-    applyTime(rule, intervalMatch[3]);
-    return {
-      matched: intervalMatch[0],
-      rule,
-    };
-  }
-
-  // Pattern 2: "every day" or "daily" (optionally with time)
-  const dailyMatch = content.match(new RegExp(`\\b(?:every\\s*day|daily)${timePattern}\\b`, 'i'));
-  if (dailyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'daily' });
-    applyTime(rule, dailyMatch[1]);
-    return {
-      matched: dailyMatch[0],
-      rule,
-    };
-  }
-
-  // Pattern 3: "every week" or "weekly" (optionally with time)
-  const weeklyMatch = content.match(new RegExp(`\\b(?:every\\s*week|weekly)${timePattern}\\b`, 'i'));
-  if (weeklyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'weekly' });
-    applyTime(rule, weeklyMatch[1]);
-    return {
-      matched: weeklyMatch[0],
-      rule,
-    };
-  }
-
-  // Pattern 4: "every month" or "monthly" (optionally with day and/or time)
-  const monthlyMatch = content.match(new RegExp(`\\b(?:every\\s*month|monthly)(?:\\s+on\\s+(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?)?${timePattern}\\b`, 'i'));
-  if (monthlyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'monthly' });
-    if (monthlyMatch[1]) {
-      const dayOfMonth = parseInt(monthlyMatch[1], 10);
-      if (dayOfMonth >= 1 && dayOfMonth <= 31) {
-        rule.dayOfMonth = dayOfMonth;
+/** Invalid qualifiers stay attached to their recurrence for editor validation. */
+export function findRecurrenceCandidates(content: string, sourceText = content, referenceDate = new Date()): RecurrenceCandidate[] {
+  const candidates: RecurrenceCandidate[] = [];
+  for (const { frequency, expression, error: patternError } of patterns) {
+    for (const match of content.matchAll(expression)) {
+      const groups = match.groups!;
+      const interval = groups.interval === undefined ? 1 : /^other$/i.test(groups.interval) ? 2 : Number(groups.interval);
+      const rule = normalizeRecurrenceRule({ frequency });
+      let error = patternError;
+      if (!Number.isSafeInteger(interval) || interval < 1) error = 'Repeat intervals must be positive whole numbers.';
+      if (interval > 1) rule.interval = interval;
+      if (groups.days) rule.daysOfWeek = parseWeekdays(groups.days);
+      // "Every other weekday" means alternating business days, not every
+      // weekday in alternating weeks. Keep the whole phrase invalid.
+      if (interval > 1 && /^every\s+(?:other|\d+)\s+weekdays?\b/i.test(match[0])) {
+        error = 'Use every weekday, or specify a weekly interval and days.';
       }
-    }
-    applyTime(rule, monthlyMatch[2]);
-    return {
-      matched: monthlyMatch[0],
-      rule,
-    };
-  }
-
-  // Pattern 5: "every Monday" or "every Mon, Wed, Fri" (specific weekdays)
-  // Also captures optional time: "every Friday 12:00"
-  // Matches: "every Monday", "every Mon", "every Monday and Wednesday", "every Mon, Wed, Fri", "every Friday 12:00"
-  const weekdayPattern = /\bevery\s+((?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*(?:,|and)\s*)?)+)(?:\s+(\d{1,2}:\d{2}))?\b/i;
-  const weekdayMatch = content.match(weekdayPattern);
-  if (weekdayMatch) {
-    const daysText = weekdayMatch[1];
-    if (daysText) {
-      const daysOfWeek = parseWeekdays(daysText);
-      if (daysOfWeek.length === 0) return null;
-      const rule = normalizeRecurrenceRule({
-        frequency: 'weekly',
-        daysOfWeek,
-      });
-      applyTime(rule, weekdayMatch[2]);
-      return {
-        matched: weekdayMatch[0],
-        rule,
-      };
+      // The weekly calculator groups days in Sunday-based weeks; a multiweek
+      // weekend would split Saturday and Sunday across different cycles.
+      if (interval > 1 && /\bweekends?\b/i.test(groups.days ?? '')) {
+        error = 'Use every weekend, or choose specific weekdays for a longer repeat interval.';
+      }
+      if (groups.day) {
+        // Monthly day 31 is already clamped to each month's final day by the
+        // recurrence calculator, including February in leap years.
+        const day = /^last\s+day$/i.test(groups.day) ? 31 : Number.parseInt(groups.day, 10);
+        if (!Number.isInteger(day) || day < 1 || day > 31) error = 'Choose a monthly day from 1 to 31.';
+        else rule.dayOfMonth = day;
+      }
+      const timeIndex = match.index + match[0].length - (groups.period?.length ?? 0);
+      let time = parseRecurrenceTime(content.slice(timeIndex), sourceText.slice(timeIndex), referenceDate);
+      // "Every morning tomorrow" still has a complete daily cadence before
+      // the later one-off date. Do not reduce it to a bare "every" token.
+      if (groups.period && !time.text) time = parseRecurrenceTime(groups.period, groups.period, referenceDate);
+      if (time.hour !== undefined) { rule.hour = time.hour; rule.minute = time.minute; }
+      if (time.second !== undefined) rule.second = time.second;
+      if (time.millisecond !== undefined) rule.millisecond = time.millisecond;
+      if (time.timezone) rule.timezone = time.timezone;
+      if (time.error) error = time.error;
+      candidates.push({ index: match.index, matched: sourceText.slice(match.index, timeIndex + time.text.length), rule, ...(error ? { error } : {}) });
     }
   }
+  return candidates.sort((a, b) => a.index - b.index);
+}
 
-  return null;
+export function parseRecurrenceFromContent(content: string): { matched: string; rule: RecurrenceRule } | null {
+  const selected = findRecurrenceCandidates(content).find(candidate => !candidate.error);
+  return selected ? { matched: selected.matched, rule: selected.rule } : null;
 }

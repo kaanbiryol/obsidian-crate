@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { findAllMatches } from './richTextMatchers';
 import { buildRichTextSegments } from './richTextRenderer';
 import { parseReminderEditorContent } from './reminderEditorParsing';
-import { commitReminderMarkers } from './reminderEditorEdits';
 
 const projects = ['Home', 'Home Office', 'Tomorrow', 'Every Monday'];
 const markers = ['#Home', '#Home Office', '#Tomorrow', '#Every Monday',
@@ -33,10 +32,10 @@ describe('reminder marker boundaries', () => {
         let previous = `tomorrow 12:00 #${project} `;
         for (const letter of 'pizza ') {
             const text = previous + letter;
-            const next = commitReminderMarkers(text, text.length, projects, false, previous);
-            expect(next).toEqual({ text, cursor: text.length });
-            expect(parseReminderEditorContent(next.text, projects).project).toBe(project);
-            previous = next.text;
+            const rendered = buildRichTextSegments(text, projects).map(segment => segment.kind === 'link' ? segment.source : segment.text).join('');
+            expect(rendered).toBe(text);
+            expect(parseReminderEditorContent(text, projects).project).toBe(project);
+            previous = text;
         }
     });
 });

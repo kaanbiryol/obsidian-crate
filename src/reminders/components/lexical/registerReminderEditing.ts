@@ -1,6 +1,5 @@
 import { $addUpdateTag, HISTORY_MERGE_TAG, $getRoot, $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, SELECTION_CHANGE_COMMAND, BLUR_COMMAND, COMPOSITION_END_COMMAND, PASTE_COMMAND, RootNode, type LexicalEditor } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
-import { commitReminderMarkers } from '../../utils/reminderEditorEdits';
 import { findLinkMatches } from '../../utils/richTextMatchers';
 import { isSafeUrl } from '../../utils/markdownLinks';
 import { $decorateReminder, $readReminder, $writeReminder } from './reminderDocument';
@@ -8,12 +7,10 @@ import { $restoreOffsets, $selectionOffsets } from './selection';
 import { normalizePageTitle, type PageTitleResolver } from './pageTitles';
 
 export function registerReminderEditing(editor: LexicalEditor, projects: () => string[], markers: () => boolean = () => true, titleResolver: () => PageTitleResolver | undefined = () => undefined) {
-  let committed = editor.getEditorState().read($readReminder);
-  let pasting = false;
   let revealedLink: number | undefined;
   let pendingTitle: { url: string; markdown: string; start: number; resolve: PageTitleResolver } | undefined;
   let revision = 0;
-  let lastText = committed;
+  let lastText = editor.getEditorState().read($readReminder);
   let disposed = false;
   const refreshLinks = (text: string, nextOffsets: ReturnType<typeof $selectionOffsets>) => {
     const root = editor.getRootElement();
@@ -65,7 +62,6 @@ export function registerReminderEditing(editor: LexicalEditor, projects: () => s
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event.preventDefault();
-      pasting = true;
       let text = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
       const url = text.trim();
       const offsets = $selectionOffsets(true);
@@ -89,24 +85,11 @@ export function registerReminderEditing(editor: LexicalEditor, projects: () => s
     }, COMMAND_PRIORITY_HIGH),
     editor.registerNodeTransform(RootNode, () => {
       if (editor.isComposing()) return;
-      let text = $readReminder();
-      const offsets = $selectionOffsets(true);
-      const selection = $getSelection();
-      let nextOffsets = offsets;
-      if (markers() && offsets && $isRangeSelection(selection) && selection.isCollapsed()) {
-        const next = commitReminderMarkers(text, offsets.focus, projects(), pasting, committed);
-        if (pasting || /\s/.test(text[offsets.focus - 1] ?? '')) committed = next.text;
-        if (next.text !== text) {
-          text = next.text;
-          nextOffsets = { anchor: next.cursor, focus: next.cursor };
-        }
-      }
-      pasting = false;
-      refreshLinks(text, nextOffsets);
+      // Recognition only decorates text; typing and paste never remove markers.
+      refreshLinks($readReminder(), $selectionOffsets(true));
       if (markers()) $decorateReminder(projects());
     }),
     editor.registerUpdateListener(({ editorState, tags }) => {
-      if (tags.has('external-value') || tags.has('historic')) committed = editorState.read($readReminder);
       const text = editorState.read($readReminder);
       if (text !== lastText || tags.has('external-value') || tags.has('historic')) revision++;
       lastText = text;

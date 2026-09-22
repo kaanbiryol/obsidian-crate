@@ -81,7 +81,9 @@ export function $decorateReminder(projects: string[]): void {
     if (!(node instanceof ReminderTextNode) || !node.isAttached()) continue;
     let next = node.getNextSibling();
     while (next instanceof ReminderTextNode && next.getKind() === node.getKind()) {
-      node.mergeWithSibling(next);
+      // mergeWithSibling reads the receiver's own text. After the first merge
+      // this snapshot can be stale, so each merge must use the latest receiver.
+      node.getLatest().mergeWithSibling(next);
       next = node.getNextSibling();
     }
   }

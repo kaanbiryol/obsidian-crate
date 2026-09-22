@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { toReminderCursorOffset } from '@/reminders/utils/reminderEditorEdits';
+import { replaceReminderProject, toReminderCursorOffset } from '@/reminders/utils/reminderEditorEdits';
+import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
+import { ReminderDraftFixture, ReminderModalFixture } from './reminder-draft-fixture';
 import css from '@/styles/main.scss?inline';
 
 const params = new URLSearchParams(location.search);
@@ -25,14 +27,15 @@ function Fixture() {
       onAutocompleteKeyDown={event => {
         if (event.key !== 'Tab' || query !== 'Wo') return false;
         event.preventDefault();
-        const next = value.replace(/#Wo$/, '#Work ');
-        ref.current?.setCursorPosition(toReminderCursorOffset(next, next.length));
-        setValue(next);
+        const next = replaceReminderProject(value, value.lastIndexOf('#Wo'), 3, 'Work', projects);
+        ref.current?.setCursorPosition(toReminderCursorOffset(next.text, next.cursor));
+        setValue(next.text);
         setQuery(null);
         return true;
       }}
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); ref.current?.blur(); } }} />
     <pre data-testid="value">{value}</pre><output data-testid="query">{query === null ? '(none)' : query}</output>
+    <pre data-testid="parsed">{JSON.stringify(parseReminderEditorContent(value, projects))}</pre>
     <input aria-label="External value" value={replacement} onChange={event => setReplacement(event.target.value)} />
     <button onMouseDown={preserveFocus} onClick={() => setValue(replacement)}>Apply external value</button>
     <button onMouseDown={preserveFocus} onClick={() => { ref.current?.setCursorPosition(2); setValue(replacement); }}>Apply at offset two</button>
@@ -50,7 +53,13 @@ function Fixture() {
 const container = document.getElementById('app')!;
 const root = params.get('host') === 'plugin' ? container.attachShadow({ mode: 'open' }) : container;
 const style = document.createElement('style');
-style.textContent = css + '\n.rich-text-input-editor {min-height: 40px; white-space: pre-wrap;} main {max-width: 500px;}';
+// This Sass-only harness does not generate Tailwind's modal positioning utilities.
+style.textContent = css + `
+  .rich-text-input-editor {min-height: 40px; white-space: pre-wrap;} main {max-width: 500px;}
+  .base-modal-container {inset: 0; display: flex; flex-direction: column; justify-content: flex-end;}
+  .base-modal-backdrop {position: absolute; inset: 0;}
+`;
 const mount = document.createElement('div');
 root.append(style, mount);
-createRoot(mount).render(<Fixture />);
+createRoot(mount).render(params.get('fixture') === 'modal' ? <ReminderModalFixture />
+  : params.get('fixture') === 'draft' ? <ReminderDraftFixture /> : <Fixture />);

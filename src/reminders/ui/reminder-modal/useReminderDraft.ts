@@ -60,13 +60,13 @@ export function useReminderDraft({
 		draftRef.current = { content, dueDate, recurrence, project, priority, hasTime };
 	}, [content, dueDate, hasTime, priority, project, recurrence]);
 
-	const initialContentHadDate = useMemo(() => {
+	const initialContentHadSchedule = useMemo(() => {
 		const metadata = deriveReminderDraftContentMetadata(
 			initialContent,
 			projects,
 			resolvedDefaultProject,
 		);
-		return metadata.dueDate !== null;
+		return metadata.dueDate !== null || metadata.recurrence !== undefined;
 	}, [initialContent, projects, resolvedDefaultProject]);
 
 	const applyContentUpdate = useCallback((patch: ReminderDraftContentPatch) => {
@@ -86,13 +86,14 @@ export function useReminderDraft({
 		return next.content;
 	}, [projects, resolvedDefaultProject, setContentIfChanged]);
 
-	useEffect(() => {
-		const metadata = deriveReminderDraftContentMetadata(
-			content,
-			projects,
-			resolvedDefaultProject,
-		);
+	// Resolve relative dates once per text change. Re-parsing after setting the
+	// resulting due date would move "in 5 minutes" forward on every render.
+	const metadata = useMemo(
+		() => deriveReminderDraftContentMetadata(content, projects, resolvedDefaultProject),
+		[content, projects, resolvedDefaultProject],
+	);
 
+	useEffect(() => {
 		if (metadata.priority !== priority) {
 			setPriority(metadata.priority);
 		}
@@ -128,13 +129,13 @@ export function useReminderDraft({
 			!detectedDueDate &&
 			!detectedRecurrence &&
 			dueDate &&
-			(initialContentHadDate || dueDateSetFromText.current)
+			(initialContentHadSchedule || dueDateSetFromText.current)
 		) {
 			setDueDate(null);
 			setHasTime(false);
 			dueDateSetFromText.current = false;
 		}
-	}, [content, dueDate, hasTime, initialContentHadDate, priority, project, projects, recurrence, resolvedDefaultProject, setContentIfChanged]);
+	}, [dueDate, hasTime, initialContentHadSchedule, metadata, priority, project, recurrence]);
 
 	const applyDateSelection = useCallback((nextDate: string | null, nextHasTime?: boolean) => {
 		dueDateSetFromText.current = false;
@@ -150,12 +151,8 @@ export function useReminderDraft({
 	}, [applyContentUpdate]);
 
 	const applyRecurrenceSelection = useCallback((rule: RecurrenceRule | null) => {
-		if (!rule) {
-			applyContentUpdate({ recurrence: null });
-			return;
-		}
 		dueDateSetFromText.current = false;
-		applyContentUpdate({ recurrence: rule, dueDate: null });
+		applyContentUpdate({ recurrence: rule, dueDate: null, hasTime: false });
 	}, [applyContentUpdate]);
 
 	const togglePriority = useCallback(() => {

@@ -86,7 +86,7 @@ and can be revoked in connected devices.
 
 See the [setup and testing guide](docs/read-it-later-testing.md),
 [implementation status](docs/read-it-later-plan.md#implementation-status), and
-[feature spec](docs/read-it-later-spec.md). Server revision 60 includes a schema
+[feature spec](docs/read-it-later-spec.md). Server revision 66 includes a schema
 upgrade with a verified backup; self-hosted users must run the stopped-server
 upgrade command before starting existing data with the new build.
 
@@ -106,7 +106,7 @@ Cloudflare deployment and device connection use OAuth Authorization Code + PKCE.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 1, preserves existing schema-1 databases, and rejects unsupported schemas without modification. Deployment code is never fetched at runtime.
+- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 2 and upgrades supported schema-1 databases through a verified backup and migration. Unsupported schemas are rejected without modification. Deployment code is never fetched at runtime.
 - Cloudflare-hosted vault devices are authorized through the owning Cloudflare account. Locally hosted vault devices use tokens issued by the server operator.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
@@ -267,7 +267,7 @@ Crate automatically removes retired upload backups (`upload-*.previous-*` in its
 
 New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. Uncommitted requests from older clients also require review after upgrading. See the [retry and retention policy](docs/reminder-retention.md).
 
-Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 1. Existing schema-1 databases receive no implicit schema changes; the migration registry is empty. Other schemas are rejected without modification. Current recovery tools archive and restore schema 1 into isolated resources while preserving the source archive. See the [compatibility matrix and rollback policy](docs/compatibility.md).
+Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 1 or 2. Schema-1 databases upgrade through the declared Reading migration after a verified paired D1/R2 checkpoint; existing schema-2 databases receive no implicit DDL. Self-hosted upgrades require the explicit stopped-server upgrade command. Other schemas are rejected without modification. Recovery tools preserve source archives and restore supported schemas into isolated resources. See the [compatibility matrix and rollback policy](docs/compatibility.md).
 
 ## Development
 

@@ -181,8 +181,8 @@ function applyRuleTime(
   return value.set({
     hour: source?.hour ?? 0,
     minute: source?.minute ?? 0,
-    second: 0,
-    millisecond: 0,
+    second: rule.second ?? 0,
+    millisecond: rule.millisecond ?? 0,
   });
 }
 

@@ -28,7 +28,7 @@ document.addEventListener('click', (event) => {
 });
 
 navLinks.forEach((link) => link.addEventListener('click', closeMenu));
-window.matchMedia('(min-width: 601px)').addEventListener('change', closeMenu);
+window.matchMedia('(min-width: 851px)').addEventListener('change', closeMenu);
 
 let scrollPending = false;
 function updateNavigation() {
@@ -117,48 +117,31 @@ document.querySelectorAll('.reminder-recording video').forEach((recording) => {
   updatePlayback();
 });
 
-// Keep every screenshot readable without JavaScript; enhance to keyboard-accessible tabs.
-document.querySelectorAll('[data-gallery]').forEach((gallery, galleryIndex) => {
-  const panels = Array.from(gallery.querySelectorAll(':scope > figure'));
-  const tabs = document.createElement('div');
-  tabs.className = 'gallery-tabs';
-  tabs.setAttribute('role', 'tablist');
-  tabs.setAttribute('aria-label', gallery.dataset.gallery);
-  const buttons = panels.map((panel, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = panel.dataset.label;
-    button.id = `gallery-${galleryIndex}-tab-${index}`;
-    panel.id = `gallery-${galleryIndex}-panel-${index}`;
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-controls', panel.id);
-    panel.setAttribute('role', 'tabpanel');
-    panel.setAttribute('aria-labelledby', button.id);
-    tabs.append(button);
-    return button;
+// Copy only the displayed setup text; keep it selectable if the clipboard is blocked.
+document.querySelectorAll('[data-copy-target]').forEach((button) => {
+  const target = document.getElementById(button.dataset.copyTarget);
+  if (!target || !navigator.clipboard?.writeText) return;
+  const feedback = button.closest('[data-copy-container]').querySelector('[data-copy-status]');
+  const label = button.textContent;
+  let resetTimer;
+  button.hidden = false;
+  button.addEventListener('click', async () => {
+    window.clearTimeout(resetTimer);
+    button.disabled = true;
+    feedback.textContent = '';
+    try {
+      await navigator.clipboard.writeText(target.textContent.trim());
+      button.textContent = 'Copied';
+      feedback.textContent = 'Copied to clipboard.';
+    } catch {
+      button.textContent = label;
+      feedback.textContent = 'Copy unavailable. Select the text and copy it manually.';
+    } finally {
+      button.disabled = false;
+      resetTimer = window.setTimeout(() => {
+        button.textContent = label;
+        feedback.textContent = '';
+      }, 4000);
+    }
   });
-  function select(index, focus = false) {
-    panels.forEach((panel, i) => {
-      panel.hidden = i !== index;
-      buttons[i].setAttribute('aria-selected', String(i === index));
-      buttons[i].tabIndex = i === index ? 0 : -1;
-    });
-    if (focus) buttons[index].focus();
-  }
-  buttons.forEach((button, index) => {
-    button.addEventListener('click', () => select(index));
-    button.addEventListener('keydown', (event) => {
-      let next;
-      if (event.key === 'ArrowRight') next = (index + 1) % panels.length;
-      if (event.key === 'ArrowLeft') next = (index - 1 + panels.length) % panels.length;
-      if (event.key === 'Home') next = 0;
-      if (event.key === 'End') next = panels.length - 1;
-      if (next === undefined) return;
-      event.preventDefault();
-      select(next, true);
-    });
-  });
-  gallery.prepend(tabs);
-  gallery.classList.add('is-enhanced');
-  select(0);
 });

@@ -19,6 +19,18 @@ function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
 }
 
 describe('reminder draft content helpers', () => {
+    it('keeps an explicit Inbox selection when the default project is Work', () => {
+        const projects = ['Inbox', 'Work'];
+        const initial = { content: 'Task', project: 'Work', dueDate: null, recurrence: undefined, priority: 4 as const, hasTime: false };
+        const selected = applyReminderDraftContentUpdate(initial, { project: 'Inbox' }, projects, 'Work');
+        expect(selected.content.trim()).toBe('Task #Inbox');
+        expect(deriveReminderDraftContentMetadata(selected.content, projects, 'Work').project).toBe('Inbox');
+        const important = applyReminderDraftContentUpdate(selected, { priority: 1 }, projects, 'Work');
+        expect(deriveReminderDraftContentMetadata(important.content, projects, 'Work')).toMatchObject({ project: 'Inbox', priority: 1 });
+        expect(buildInitialReminderContent(makeReminder(), 'Work')).toBe('Task #Inbox');
+        expect(buildInitialReminderContent(makeReminder(), 'Inbox')).toBe('Task');
+    });
+
 	it('rebuilds existing reminder content with date, project, and priority', () => {
 		const content = buildInitialReminderContent(
 			makeReminder({
@@ -148,4 +160,12 @@ describe('reminder draft content helpers', () => {
 		expect(updated.content).toContain('daily 09:00');
 		expect(updated.content).not.toContain('Apr 3, 2026');
 	});
+});
+
+it.each(['Inbox', 'Work'])('keeps earlier project mentions when reopening in the default project %s', project => {
+    const content = buildInitialReminderContent({ id: 'one', content: 'Compare #Home with', project, priority: 4, completed: false }, project);
+    expect(content).toBe(`Compare #Home with #${project}`);
+    expect(deriveReminderDraftContentMetadata(content, ['Inbox', 'Home', 'Work'], project)).toMatchObject({
+        cleanContent: 'Compare #Home with', project,
+    });
 });

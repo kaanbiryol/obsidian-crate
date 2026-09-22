@@ -61,7 +61,8 @@ export function buildReminderSubmission({
 	}
 
 	const parsed = parseReminderEditorContent(content, projects);
-	const finalContent = parsed.cleanContent?.trim() || content.trim();
+	if (parsed.dateError) throw new Error(parsed.dateError);
+	const finalContent = parsed.cleanContent.trim();
 	if (!finalContent) {
 		return null;
 	}
@@ -70,10 +71,12 @@ export function buildReminderSubmission({
 	const finalProject = parsed.project || project;
 	const chosenRecurrence = preserveRecurrenceMetadata(parsed.recurrence, recurrence) || (parsed.dueDate ? undefined : recurrence);
   const finalRecurrence = normalizeRecurrenceRule(chosenRecurrence);
-	const finalDueDate = finalRecurrence ? (reminder && chosenRecurrence === recurrence ? reminder.dueDatetime || reminder.dueDate : undefined) : parsed.dueDate
+	// The draft clears its occurrence when a repeat rule changes. Do not restore
+	// the original reminder's occurrence after that edit.
+	const finalDueDate = finalRecurrence ? (reminder && chosenRecurrence === recurrence ? dueDate ?? undefined : undefined) : parsed.dueDate
 		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
 		: dueDate ?? undefined;
-	const finalHasTime = finalRecurrence ? Boolean(finalDueDate && reminder?.dueDatetime) : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
+	const finalHasTime = finalRecurrence ? Boolean(finalDueDate && hasTime) : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
 	const storedDates = buildStoredReminderDates(
 		parseReminderDateValue(finalDueDate, finalHasTime),
 		finalHasTime,
@@ -98,7 +101,7 @@ export function buildReminderSubmission({
 			description: finalDescription,
 			project: finalProject,
 			priority: finalPriority,
-			dueDatetime: preserveReminderInstant(storedDates.dueDatetime, reminder.dueDatetime),
+			dueDatetime: preserveReminderInstant(storedDates.dueDatetime, reminder.dueDatetime, Boolean(parsed.dueDate)),
 			dueDate: storedDates.dueDate,
 			recurrence: finalRecurrence,
 		};

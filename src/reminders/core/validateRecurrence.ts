@@ -8,6 +8,7 @@ export function validateRecurrence(value: unknown): { rule: RecurrenceRule } | {
 	const rule: RecurrenceRule = { frequency: raw.frequency };
 	for (const [field, min, max] of [
 		['interval', 1, 365], ['dayOfMonth', 1, 31], ['hour', 0, 23], ['minute', 0, 59],
+		['second', 0, 59], ['millisecond', 0, 999],
 		['count', 1, Number.MAX_SAFE_INTEGER], ['completedCount', 0, Number.MAX_SAFE_INTEGER],
 	] as const) {
 		const number = raw[field];

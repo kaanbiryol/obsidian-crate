@@ -1,7 +1,7 @@
 import { RecurrencePickerContent } from './RecurrencePickerContent';
 import { ThemeIconProvider } from '../../components/theme-icon';
 import { ObsidianIcon } from '../../components/obsidian-icon';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
 import type { AnimationConfig } from '../animations';
@@ -9,6 +9,8 @@ import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
 import {
+	buildRecurrencePickerState,
+	isRecurrencePickerStateUnchanged,
 	recurrenceRuleFromPickerState,
 } from './recurrencePickerShared';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
@@ -38,32 +40,18 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const modalProps = getPickerModalProps(pickerMode);
 
-    const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(recurrence?.frequency || 'daily');
-    const [interval, setInterval] = useState<number>(recurrence?.interval || 1);
-    const [selectedDays, setSelectedDays] = useState<number[]>(recurrence?.daysOfWeek || []);
-    const [dayOfMonth, setDayOfMonth] = useState<number>(recurrence?.dayOfMonth || 1);
-    const [hour, setHour] = useState<number>(recurrence?.hour ?? 9);
-    const [minute, setMinute] = useState<number>(recurrence?.minute ?? 0);
+    const initialState = useMemo(() => buildRecurrencePickerState(recurrence, 1), [recurrence]);
+    const [state, setState] = useState(initialState);
 
     useEffect(() => {
         if (!isOpen) return;
-        setFrequency(recurrence?.frequency || 'daily');
-        setInterval(recurrence?.interval || 1);
-        setSelectedDays(recurrence?.daysOfWeek || []);
-        setDayOfMonth(recurrence?.dayOfMonth || 1);
-        setHour(recurrence?.hour ?? 9);
-        setMinute(recurrence?.minute ?? 0);
-    }, [isOpen, recurrence]);
+        setState(initialState);
+    }, [isOpen, initialState]);
 
     const handleDone = () => {
-        onApply(recurrenceRuleFromPickerState({
-            frequency,
-            interval,
-            daysOfWeek: selectedDays,
-            dayOfMonth,
-            hour,
-            minute,
-        }));
+        if (!recurrence || !isRecurrencePickerStateUnchanged(state, initialState)) {
+            onApply(recurrenceRuleFromPickerState(state, recurrence?.timezone));
+        }
         onClose();
     };
 
@@ -84,15 +72,10 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         >
             <ThemeIconProvider renderer={ObsidianIcon}>
                 <RecurrencePickerContent
-                    state={{ frequency, interval, daysOfWeek: selectedDays, dayOfMonth, hour, minute }}
-                    onChange={(patch) => {
-                        if (patch.frequency !== undefined) setFrequency(patch.frequency);
-                        if (patch.interval !== undefined) setInterval(patch.interval);
-                        if (patch.daysOfWeek !== undefined) setSelectedDays(patch.daysOfWeek);
-                        if (patch.dayOfMonth !== undefined) setDayOfMonth(patch.dayOfMonth);
-                        if (patch.hour !== undefined) setHour(patch.hour);
-                        if (patch.minute !== undefined) setMinute(patch.minute);
-                    }}
+                    state={state}
+                    onChange={(patch) => setState(current => ({ ...current, ...patch,
+                        ...(patch.hour !== undefined || patch.minute !== undefined ? { second: undefined, millisecond: undefined } : {}),
+                    }))}
                     isDark={isDark} animationsEnabled={animationsEnabled} canRemove={Boolean(recurrence)}
                     onClose={onClose} onDone={handleDone} onRemove={handleRemoveRepeat}
                 />

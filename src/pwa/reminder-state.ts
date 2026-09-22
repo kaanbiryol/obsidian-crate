@@ -73,7 +73,7 @@ export function applyReminderTextUpdate(
 		{
 			content: draft.content,
 			dueDate: metadata.dueDate ?? getDraftDueValue(draft),
-			recurrence: normalizeRecurrenceRule(metadata.recurrence ?? draft.recurrence),
+			recurrence: normalizeRecurrenceRule(preserveRecurrenceMetadata(metadata.recurrence, draft.recurrence) ?? draft.recurrence),
 			project: metadata.hasProject ? metadata.project : (draft.project || draft.defaultProject),
 			priority: metadata.hasPriorityMarker ? metadata.priority : draft.priority,
 			hasTime: metadata.dueDate ? metadata.hasTime : draftHasTime(draft),
