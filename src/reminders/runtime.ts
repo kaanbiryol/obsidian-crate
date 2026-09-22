@@ -6,6 +6,7 @@ import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { Notice } from 'obsidian';
+import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
 
 const remindersLogger = createLogger('Reminders');
@@ -27,6 +28,7 @@ export function stopReminderBackend(plugin: CratePlugin): void {
 }
 
 export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<boolean> {
+	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folderPath, plugin.app.vault.configDir);
 	const lifetime = getPluginLifecycleSignal(plugin);
 	if (lifetime.aborted) return false;
 	backends.get(plugin)?.abort();

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 2, 2);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,8 +36,9 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	last_seen_at TEXT,
 	folder_path TEXT,
-	scope TEXT NOT NULL DEFAULT 'vault' CHECK (scope IN ('vault', 'reminders')),
-	expires_at INTEGER
+	scope TEXT NOT NULL DEFAULT 'vault' CHECK (scope IN ('vault', 'reminders', 'reading', 'reading_capture')),
+	expires_at INTEGER,
+ reading_generation TEXT
 );
 
 CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx ON auth_tokens(expires_at);
@@ -255,4 +256,34 @@ CREATE TABLE IF NOT EXISTS crate_migrations (
  id TEXT PRIMARY KEY,
  checksum TEXT NOT NULL,
  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS reading_policy (
+ id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL,
+ folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reading_sources (
+ path TEXT PRIMARY KEY, revision TEXT NOT NULL, generation TEXT NOT NULL,
+ item_id TEXT, url_identity TEXT, metadata_json TEXT, error TEXT
+);
+CREATE INDEX IF NOT EXISTS reading_sources_id_idx ON reading_sources(item_id);
+CREATE INDEX IF NOT EXISTS reading_sources_url_idx ON reading_sources(url_identity);
+CREATE TABLE IF NOT EXISTS reading_jobs (
+ path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,
+ source_revision TEXT NOT NULL, block_hash TEXT NOT NULL, url TEXT NOT NULL,
+ attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reading_jobs_due_idx ON reading_jobs(available_at);
+CREATE TABLE IF NOT EXISTS reading_operations (
+ operation_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
+ request_hash TEXT NOT NULL, response_json TEXT NOT NULL, day INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reading_operations_day_idx ON reading_operations(day);
+CREATE TABLE IF NOT EXISTS reading_enrollments (
+ token_hash TEXT PRIMARY KEY, generation TEXT NOT NULL, scope TEXT NOT NULL,
+ expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reading_handoffs (
+ token_hash TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
+ body TEXT NOT NULL, expires_at INTEGER NOT NULL
 );

@@ -63,6 +63,7 @@ export function createDeferred<T>(): Deferred<T> {
 
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
+		reading: { enabled: false, folderPath: 'Reading' },
 		workerUrl: 'https://worker.example',
 		cloudflareDeployment: null,
 		lastSync: null,

@@ -75,6 +75,10 @@ export function useKeyboardHeight(enabled: boolean = true): number {
     };
 
     const measure = () => {
+      // Focus moves within a shadow root can be retargeted to the same host and
+      // never reach the document listener. Read the actual focused control when
+      // the viewport changes instead of relying only on focus events.
+      hasEditableFocusRef.current = isEditableElement(getDeepActiveElement());
       // Blur starts the native keyboard animation. Keep following the viewport
       // until the measured keyboard closes instead of dropping the sheet early.
       if ((!hasEditableFocusRef.current && keyboardInsetRef.current === 0) || !window.visualViewport) {

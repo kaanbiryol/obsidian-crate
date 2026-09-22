@@ -57,6 +57,7 @@ describe('PWA activation metadata', () => {
 		expect(manifest.categories).toEqual(['productivity', 'utilities']);
 		expect(manifest.launch_handler.client_mode).toBe('navigate-existing');
 		expect(manifest.shortcuts.map((shortcut) => [shortcut.name, shortcut.url])).toEqual([
+			['Reading', '/notifications?section=reading'],
 			['Inbox', '/notifications'],
 			['Today', '/notifications?tab=today'],
 			['Upcoming', '/notifications?tab=upcoming'],

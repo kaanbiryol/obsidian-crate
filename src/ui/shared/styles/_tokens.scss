@@ -33,6 +33,11 @@
   --crate-radius-sheet: var(--modal-radius, var(--radius-l, 12px));
   --crate-radius-icon: var(--clickable-icon-radius, var(--crate-radius-control));
   --crate-icon-button-size: var(--clickable-icon-size, var(--input-height, 36px));
+  --crate-view-title-size: var(--reminder-font-title);
+  --crate-view-title-weight: var(--reminder-font-weight-semibold);
+  --crate-view-title-spacing: normal;
+  --crate-view-title-leading: 1.2;
+  --crate-view-header-padding: 14px 16px 10px;
   --crate-elevation-card: var(--shadow-s, none);
   --crate-elevation-sheet: var(--shadow-l, none);
   --crate-modal-border-width: var(--modal-border-width, 1px);

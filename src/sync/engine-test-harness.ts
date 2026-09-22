@@ -148,6 +148,7 @@ export function spyOnPrepareUploadsFromVaultFiles(
 
 function createSettings(): CrateSettings {
 	return {
+		reading: { enabled: false, folderPath: 'Reading' },
 		workerUrl: 'https://worker.example',
 		cloudflareDeployment: null,
 		lastSync: null,

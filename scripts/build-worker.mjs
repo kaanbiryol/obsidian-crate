@@ -7,6 +7,7 @@ import { rawTextPlugin } from './raw-text-plugin.mjs';
 import { createPwaAssetVersion } from './pwa-asset-version.mjs';
 import { bundlePwaClient } from './pwa-client-build.mjs';
 import { collectServerInputs } from './server-build-inputs.mjs';
+import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -51,7 +52,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
 		},
-		plugins: [rawTextPlugin(path => rawInputs.add(path))],
+		plugins: [rawTextPlugin(path => rawInputs.add(path)), readingExtractionPlugin()],
 	});
 
 	const code = result.outputFiles[0].text;

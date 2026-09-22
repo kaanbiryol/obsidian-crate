@@ -3,6 +3,11 @@ import { corsResponse } from './cors';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const actions = new Map([
+  ['POST /notifications/share/reading', 30],
+  ['POST /reading/exchange', 10], ['POST /reading/handoff', 30],
+  ['POST /reading/prepare', 30], ['POST /reading/capture', 30],
+  ['POST /reading/update', 60], ['POST /reading/retry', 10],
+  ['POST /reading/access', 10], ['POST /reading/policy', 10],
 	['POST /notifications/reminders-exchange', 10],
 	['POST /notifications/reminders-enrollment-token', 10],
 	['POST /notifications/subscribe', 30],
@@ -16,7 +21,7 @@ const denied = () => corsResponse({ error: 'Too many notification requests. Try 
 
 export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
 	const url = new URL(request.url);
-	if (!url.pathname.startsWith('/notifications/') || ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return null;
+	if (!['/notifications/', '/reading/'].some(prefix => url.pathname.startsWith(prefix)) || ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return null;
 	const action = `${request.method} ${url.pathname}`;
 	const limit = actions.get(action);
 	// Reject invented routes before authentication or any D1 operation.
@@ -44,14 +49,15 @@ export async function limitNotificationAction(request: Request, db: D1Database, 
 	if (!limit) return null;
 	const now = Date.now();
 	const midnight = (Math.floor(now / 86_400_000) + 1) * 86_400_000;
-	const dailyKey = url.pathname === '/notifications/reminders-exchange' ? 'notification-exchange-daily' : 'notification-daily';
+	const dailyKey = url.pathname.startsWith('/reading/') ? `reading-daily:${await sha256Hex(actor)}` : url.pathname === '/notifications/reminders-exchange' ? 'notification-exchange-daily' : 'notification-daily';
+	const dailyLimit = url.pathname.startsWith('/reading/') ? 500 : 1000;
 	const key = await sha256Hex(`${actor}\0${action}`);
 	const results = await db.batch<{ results: Array<{ count: number }> }>([
 		db.prepare(`INSERT INTO request_rate_limits (key, count, expires_at)
 			SELECT ?, 1, ? WHERE NOT EXISTS (SELECT 1 FROM request_rate_limits WHERE key = ? AND expires_at > ? AND count >= ?)
 			ON CONFLICT(key) DO UPDATE SET count = CASE WHEN expires_at <= ? THEN 1 ELSE count + 1 END,
 				expires_at = CASE WHEN expires_at <= ? THEN excluded.expires_at ELSE expires_at END
-			WHERE expires_at <= ? OR count < 1000 RETURNING count`).bind(dailyKey, midnight, key, now, limit, now, now, now),
+			WHERE expires_at <= ? OR count < ${dailyLimit} RETURNING count`).bind(dailyKey, midnight, key, now, limit, now, now, now),
 		db.prepare(`INSERT INTO request_rate_limits (key, count, expires_at)
 			SELECT ?, 1, ? WHERE changes() = 1
 			ON CONFLICT(key) DO UPDATE SET count = CASE WHEN expires_at <= ? THEN 1 ELSE count + 1 END,
@@ -59,7 +65,7 @@ export async function limitNotificationAction(request: Request, db: D1Database, 
 	]);
 	if (results[0]?.results.length) return null;
 	const daily = await db.prepare('SELECT count, expires_at FROM request_rate_limits WHERE key = ?').bind(dailyKey).first<{count: number; expires_at: number}>();
-	if (daily && daily.expires_at > now && daily.count >= 1000) {
+	if (daily && daily.expires_at > now && daily.count >= dailyLimit) {
 		return corsResponse({ error: 'The daily notification request budget is exhausted. Try again tomorrow.' }, 429,
 			{ 'Retry-After': String(Math.ceil((midnight - now) / 1000)) });
 	}

@@ -4,10 +4,10 @@ import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from 
 export function createManifestJson(requestUrl?: string): string {
 	return JSON.stringify({
 		id: '/notifications',
-		name: 'Crate Reminders',
+		name: 'Crate',
 		short_name: 'Crate',
-		description: 'Manage Crate reminders without opening Obsidian.',
-		start_url: `/notifications${pwaStartSearchFromUrl(requestUrl)}`,
+		description: 'Your reminders and reading, wherever you are.',
+		start_url: requestUrl && new URL(requestUrl).searchParams.get('section') === 'reading' ? '/notifications?section=reading' : `/notifications${pwaStartSearchFromUrl(requestUrl)}`,
 		scope: '/notifications',
 		display: 'standalone',
 		display_override: ['standalone', 'minimal-ui'],
@@ -22,7 +22,9 @@ export function createManifestJson(requestUrl?: string): string {
 		launch_handler: {
 			client_mode: 'navigate-existing',
 		},
+		share_target: { action: '/notifications/share/reading', method: 'POST', enctype: 'application/x-www-form-urlencoded', params: { title: 'title', text: 'text', url: 'url' } },
 		shortcuts: [
+ { name: 'Reading', url: '/notifications?section=reading' },
 			{
 				name: 'Inbox',
 				short_name: 'Inbox',

@@ -1,3 +1,4 @@
+import { validateReadingFolder } from '@/reading/settings';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import { changedRows } from './db';
@@ -21,6 +22,8 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
     return corsResponse({ error: 'Valid folderPath, timezone and allDayTime required' }, 400);
   }
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }); } catch { return corsResponse({ error: 'Invalid timezone' }, 400); }
+  const reading = await db.prepare('SELECT folder_path FROM reading_policy WHERE id=1').first<{ folder_path: string }>();
+  if (reading) { try { validateReadingFolder(reading.folder_path, folder); } catch { return corsResponse({ error: 'Choose separate Reading and reminders folders.' }, 400); } }
   const revision = crypto.randomUUID();
   const mutation = request.method === 'POST'
     ? db.prepare('INSERT INTO notification_policy (id, folder_path, timezone, all_day_time, revision, enabled) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0)

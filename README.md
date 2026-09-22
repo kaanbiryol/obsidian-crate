@@ -50,6 +50,46 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 - Schedule reminder push notifications through your own Worker
 - Enroll phones with short-lived web app links or QR codes
 
+## Reading
+
+Enable **Settings → Crate → Reading → Enable reading on this device**. Use
+**Crate: Add reading link** to save a URL and **Crate: Open reading** for your
+inbox, favorites, archive, tags, and search. Reading metadata and article text
+live in ordinary Markdown notes, carried by normal vault sync.
+
+On a compatible server, select **Enable server reading** and **Open web reading**.
+The web app has a **Reminders / Reading** switch and works without Obsidian open.
+The server saves the bookmark first, then extracts article text with Defuddle.
+Your server contacts the saved website without browser cookies or Crate credentials;
+there is no third-party extraction service. Failed or restricted pages remain saved
+links. Requests, extraction jobs, database operations, and files use your hosting resources.
+
+For desktop capture, select **Copy template**, import it in Obsidian Web Clipper,
+and save using **Crate Reading** into the intended vault. Crate adopts explicitly
+marked clips, preserves their body and filename, and syncs them. It never re-extracts
+clips or adopts unrelated notes. Changing the Reading folder does not move files.
+
+On iPhone, **Set up shortcut** pairs a capture-only **Save to Crate** shortcut.
+The iOS 27 variant installs without questions; run it once from Shortcuts to enter
+your endpoint and Authorization header. Later shares reuse that setup.
+**Share → Save to Crate** presents a branded confirmation in an iOS browser sheet; **Saved** means the
+bookmark is committed on your server. Android browsers supporting Web Share Target
+can use **Share → Crate** after installing the web app. Pasting a link works in
+both the plugin and web library.
+
+Opened article text is cached offline, up to 50 articles or 20 MB. The web app
+keeps offline saves and edits pending until the server confirms them. Export
+pending work before clearing browser data. The iPhone shortcut requires a connection.
+Readers suppress remote images and active HTML; **Open note** uses Obsidian's normal
+rendering rules. Browser and capture credentials are separate, expire after 90 days,
+and can be revoked in connected devices.
+
+See the [setup and testing guide](docs/read-it-later-testing.md),
+[implementation status](docs/read-it-later-plan.md#implementation-status), and
+[feature spec](docs/read-it-later-spec.md). Server revision 60 includes a schema
+upgrade with a verified backup; self-hosted users must run the stopped-server
+upgrade command before starting existing data with the new build.
+
 ## How It Works
 
 The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, sync metadata and parsed reminder caches in D1, and reminder notification alarms in Durable Objects.

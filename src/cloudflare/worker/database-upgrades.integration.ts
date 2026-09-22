@@ -2,7 +2,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
-import schema from '../schema.sql?raw';
+import schema from '../migrations/schema-v1.sql?raw';
 import { migrationTransaction } from '../database-upgrades';
 import { sha256Hex } from '../deployment-artifacts';
 

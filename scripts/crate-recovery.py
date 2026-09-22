@@ -6,17 +6,19 @@ import sys
 from pathlib import Path
 from recovery.archive import verify
 from recovery.backup import backup
+from recovery.download_checkpoint import download_checkpoint
 from recovery.restore import restore
 from recovery.cloudflare import Cloudflare
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['backup', 'verify', 'restore'])
+    parser.add_argument('action', choices=['backup', 'verify', 'restore', 'download-checkpoint'])
     parser.add_argument('directory', type=Path)
     parser.add_argument('--account')
     parser.add_argument('--database')
     parser.add_argument('--bucket')
+    parser.add_argument('--prefix')
     args = parser.parse_args()
     os.umask(0o077)
     if args.action == 'verify':
@@ -27,7 +29,12 @@ def main():
     if not all((args.account, args.database, args.bucket)):
         parser.error('--account, --database, and --bucket are required')
     remote = Cloudflare(args.account, args.database, args.bucket)
-    if args.action == 'backup':
+    if args.action == 'download-checkpoint':
+        if not args.prefix:
+            parser.error('--prefix is required for download-checkpoint')
+        manifest = download_checkpoint(remote, args.directory, args.prefix)
+        print(f'Verified upgrade checkpoint: {len(manifest["objects"])} objects')
+    elif args.action == 'backup':
         manifest = backup(remote, args.directory)
         print(f'Complete archive: {len(manifest["objects"])} verified objects')
     else:

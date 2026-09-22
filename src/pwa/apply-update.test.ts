@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPwaAssetVersion } from './api';
 import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
 
+vi.mock('./reading/update-guard', () => ({ hasUnsettledReading: vi.fn(async () => false) }));
 vi.mock('./api', () => ({ fetchPwaAssetVersion: vi.fn() }));
 
 class UpdateWorker extends EventTarget {

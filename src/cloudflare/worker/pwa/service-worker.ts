@@ -1,3 +1,4 @@
+import { READING_SHARE_SW } from '../reading/share-target';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_CLIENT_ASSETS } from '../pwa-client-bundle';
 
@@ -6,6 +7,8 @@ const pwaClientChunkUrls = Object.keys(PWA_CLIENT_ASSETS)
 	.map(fileName => `/notifications/assets/${fileName}`);
 
 export const SERVICE_WORKER_JS = `
+${READING_SHARE_SW}
+
 const PWA_SHELL_CACHE = 'crate-reminders-shell-${PWA_ASSET_VERSION}';
 const PWA_SHELL_URL = '/notifications';
 const PWA_PRECACHE_URLS = [
@@ -52,6 +55,7 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+	if (event.request.method === 'POST' && new URL(event.request.url).origin === self.location.origin && new URL(event.request.url).pathname === '/notifications/share/reading') { event.respondWith(receiveReadingShare(event.request)); return; }
 	if (event.request.method !== 'GET') return;
 
 	var url = new URL(event.request.url);

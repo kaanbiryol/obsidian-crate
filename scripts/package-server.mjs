@@ -40,4 +40,5 @@ await chmod(join(destination, 'scripts/crate-server.mjs'), 0o755);
 await copyFile(join(root, '.generated/cloudflare/worker.mjs'), join(destination, 'assets/worker.mjs'));
 await copyFile(join(root, 'src/cloudflare/schema.sql'), join(destination, 'assets/schema.sql'));
 await copyFile(join(root, 'src/cloudflare/server-release.json'), join(destination, 'assets/server-release.json'));
+await cp(join(root, 'src/cloudflare/migrations'), join(destination, 'assets/migrations'), { recursive: true });
 console.log(`Standalone server package prepared in ${destination}`);

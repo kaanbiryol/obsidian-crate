@@ -3,12 +3,13 @@ import { sha256Hex } from './auth';
 import { parseOptionalString } from './utils';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../protocol/web-session';
 
-type AuthScope = 'vault' | 'reminders';
+type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
 
 export interface AuthPrincipal {
 	tokenId: string;
 	scope: AuthScope;
 	folderPath?: string;
+ readingGeneration?: string;
 }
 
 export type AuthenticationResult =
@@ -41,14 +42,14 @@ export async function authenticateWorkerRequest(
 
 	try {
 		const tokenHash = await sha256Hex(token);
-		const row = await db.prepare(`SELECT id, scope, folder_path FROM auth_tokens
+		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation FROM auth_tokens
 			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
 			.bind(tokenHash, Date.now())
-			.first<{ id: string; scope?: string | null; folder_path?: string | null }>();
+			.first<{ id: string; scope?: string | null; folder_path?: string | null; reading_generation?: string | null }>();
 		if (!row?.id) {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
-		if (row.scope !== 'vault' && row.scope !== 'reminders') {
+		if (row.scope !== 'vault' && row.scope !== 'reminders' && row.scope !== 'reading' && row.scope !== 'reading_capture') {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
 
@@ -67,6 +68,7 @@ export async function authenticateWorkerRequest(
 		return {
 			principal: {
 				tokenId: row.id,
+ ...(row.reading_generation ? { readingGeneration: row.reading_generation } : {}),
 				scope: row.scope,
 				...(row.folder_path ? { folderPath: row.folder_path } : {}),
 			},

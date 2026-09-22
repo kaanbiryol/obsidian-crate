@@ -16,7 +16,7 @@ class FutureSchemaTests(unittest.TestCase):
         (root / 'migrations').mkdir()
         self.db = sqlite3.connect(':memory:')
         self.addCleanup(self.db.close)
-        self.db.executescript((schema.SOURCE / 'schema.sql').read_text())
+        self.db.executescript((schema.SOURCE / 'migrations/schema-v1.sql').read_text())
         self.db.execute("INSERT INTO files(path, portable_path, storage_key) VALUES ('A.md', 'a.md', 'original')")
         self.db.commit()
         self.sql = 'CREATE TABLE example(id TEXT PRIMARY KEY);'

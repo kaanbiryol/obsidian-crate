@@ -8,20 +8,22 @@
       --reminder-font-xxs: 13px;
     }
 
-    .pwa-reminders-view.is-primary {
+    .pwa-reminders-view.is-primary, &.pwa-reading-root, &.reading-gallery {
       --reminder-font-base: 16px;
       --reminder-font-sm: 15px;
       --reminder-font-xs: 14px;
       --reminder-font-xxs: 13px;
       --reminder-font-title: 32px;
+      --crate-view-title-size: 32px;
+      --crate-view-title-spacing: -.035em;
       --crate-radius-card: 16px;
       --checkbox-size: 22px;
       --icon-l: 24px;
 
       .view-header-title {
-        font-size: 32px;
-        font-weight: 700;
-        letter-spacing: -.035em;
+        font-size: var(--crate-view-title-size);
+        font-weight: var(--crate-view-title-weight);
+        letter-spacing: var(--crate-view-title-spacing);
       }
 
       .view-header-meta {

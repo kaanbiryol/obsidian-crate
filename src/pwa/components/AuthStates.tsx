@@ -4,6 +4,7 @@ import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
 import type { StoredConfig } from '../types';
+import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 
 const brandMarkSrc = `/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}`;
 
@@ -24,7 +25,7 @@ function AuthLayout({ title, description, notice, config, children }: {
 }) {
 	return (
 		<main className="auth-card">
-			<header className="auth-card__brand"><AuthBrandMark /><span>Crate</span></header>
+			<header className="auth-card__brand"><AuthBrandMark /><span>Crate</span><FeatureSwitcherButton /></header>
 			<section className="auth-card__content" aria-labelledby="auth-title">
 				<div className="auth-card__heading">
 					<h1 id="auth-title">{title}</h1>

@@ -120,6 +120,7 @@ export function buildWorkerMultipartBody(input: {
 	const metadata = {
 		main_module: 'worker.mjs',
 		compatibility_date: '2026-08-18',
+    compatibility_flags: ['global_fetch_strictly_public'],
 		annotations: {
 			'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}`,
 			'workers/tag': input.uploadTag ?? 'crate',
@@ -144,6 +145,7 @@ export function buildWorkerMultipartBody(input: {
 export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): { body: ArrayBuffer; contentType: string } {
 	return buildWorkerModule({
 		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
+    compatibility_flags: ['global_fetch_strictly_public'],
 		annotations: { 'workers/message': `Crate reset ${resetId}`, 'workers/tag': 'crate' },
 		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
 			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
@@ -301,6 +303,20 @@ export class CloudflareApiClient {
 		// is optional; an absent/empty cursor ends the listing.
 		return { keys: response.result.map(object => object.key!), ...(next ? { cursor: next } : {}) };
 	}
+
+  async getRecoveryObject(accountId: string, bucketName: string, key: string): Promise<Uint8Array> {
+    const response = await this.transport(`${API_BASE_URL}/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
+    });
+    if (response.status !== 200 || !response.arrayBuffer) throw new Error(`Recovery object unavailable (${response.status})`);
+    return new Uint8Array(response.arrayBuffer);
+  }
+  async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
+    if (!key.startsWith('__crate__/backups/')) throw new Error('Invalid checkpoint destination');
+    await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
+    });
+  }
 
 	async deleteR2Objects(origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
 		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);

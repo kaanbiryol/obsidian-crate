@@ -1,3 +1,4 @@
+import { FeatureShell } from './FeatureShell';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,7 +28,6 @@ import { DeferredNotice } from './components/DeferredNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
-import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
 import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
@@ -62,7 +62,6 @@ const ReminderQuarantineNotice = lazy(() => import('./components/ReminderQuarant
 	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 function App() {
-	usePwaInputModality();
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authSession, setAuthSession] = useState(() => ({ token: localStorage.getItem(AUTH_TOKEN_KEY) }));
@@ -505,4 +504,4 @@ function App() {
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root');
-createRoot(root).render(<App />);
+createRoot(root).render(<FeatureShell reminders={<App />} />);

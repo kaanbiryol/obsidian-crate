@@ -1,3 +1,4 @@
+import { handleReadingRoute } from './reading/routes';
 import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
@@ -46,7 +47,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 	const db = env.DB;
 
 	try {
-		if (isCrateMutation(path, method)) {
+		if (isCrateMutation(path, method) && path !== '/notifications/share/reading') {
 			const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
 			if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 				return withRequestId(corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428), requestId, started);
@@ -54,6 +55,13 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 		}
 		const rateLimited = coordinatorState ? null : await limitNotificationRequest(request, db, env.NOTIFICATION_REQUEST_LIMITER);
 		if (rateLimited) return withRequestId(rateLimited, requestId, started);
+		if (path.startsWith('/reading/') && !coordinatorState) {
+ const forwarded = new Request(request); forwarded.headers.set('X-Crate-Internal-Mutation', '1');
+ return env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded);
+ }
+ if (coordinatorState && path.startsWith('/reading/')) {
+ if (path === '/reading/exchange' || path === '/reading/handoff') return handleReadingRoute(request, env, undefined, coordinatorState);
+ }
 		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {
 			return withRequestId(publicResponse, requestId, started);
@@ -66,6 +74,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 
     if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);
 		const mutation = isCrateMutation(path, method);
+    if (coordinatorState && path.startsWith('/reading/')) await armNotificationCoordinator(coordinatorState);
     const notificationMutation = await affectsNotifications(request);
 		if (notificationMutation && !coordinatorState) {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));

@@ -4,11 +4,12 @@ import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
 	Download,
-	Settings,
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
 import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
+import { FeatureSwitcherButton } from './FeatureSwitcherButton';
+import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({
 	settingsOpen,
@@ -18,16 +19,15 @@ function PwaSettingsButton({
 	onToggleSettings: () => void;
 }) {
 	return (
-		<BaseButton
+		<IconButton
+			icon="settings" size="large" iconSize="l"
 			className={`pwa-header-settings-button${settingsOpen ? ' is-active' : ''}`}
 			type="button"
 			data-action="toggle-settings"
-			aria-label={settingsOpen ? 'Close settings' : 'Open settings'}
+			label={settingsOpen ? 'Close settings' : 'Open settings'}
 			aria-pressed={settingsOpen}
 			onClick={onToggleSettings}
-		>
-			<Settings size={20} strokeWidth={1.8} />
-		</BaseButton>
+		/>
 	);
 }
 
@@ -42,7 +42,8 @@ export function PwaHeaderActions({
 }) {
 	if (!showSettings) return null;
 	return (
-		<div className="pwa-header-actions">
+		<div className="pwa-header-actions crate-view-header-actions">
+			<FeatureSwitcherButton />
 			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
 		</div>
 	);

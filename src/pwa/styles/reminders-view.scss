@@ -23,6 +23,11 @@
 
 .crate-reminders-ui {
 	@include tokens.styles;
+	--crate-view-title-size: 30px;
+	--crate-view-title-weight: 700;
+	--crate-view-title-spacing: -.04em;
+	--crate-view-title-leading: 1.12;
+	--crate-view-header-padding: 17px 18px 11px;
 	@include controls.styles;
 	@include modal-header.styles;
 	@include modal-layout.styles;
@@ -45,7 +50,7 @@
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 
-	&.pwa-shadow-root {
+	&.pwa-shadow-root, &.pwa-reading-root {
 		--crate-tab-active-color: var(--text-accent, var(--interactive-accent));
 		--crate-tab-active-bg: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
 	}

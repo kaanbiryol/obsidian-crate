@@ -3,23 +3,26 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Lexical editor, embedded Worker/PWA and three-pane history: about 2.40 MB raw / 1.19 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '2420000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1220000', 10),
+		// Reading includes the local library, safe reader and compressed server extraction:
+		// about 3.16 MB raw / 1.67 MB gzip, including Defuddle's full Markdown bundle.
+		// Defuddle/DOM code runs only on the server.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3250000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1720000', 10),
 	},
 	{
 		path: 'dist/styles.css',
-		// 0.3.0 shared controls, sync/conflict review and file history:
-		// about 212 KB raw / 28 KB gzip. Keep a small margin for subsequent changes.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '225000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '30000', 10),
+		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
+		// about 244 KB raw / 32 KB gzip. The same styles ship to both hosts.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '250000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '33000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
 		// The deployable Worker embeds the complete reminders PWA assets.
-		// Lexical PWA baseline: about 1.914 MB raw / 780 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1950000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '800000', 10),
+		// Reading with Defuddle's upstream Markdown/math support and the PWA:
+		// about 3.20 MB raw / 1.17 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3300000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1210000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -30,16 +33,16 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Startup graph with Lexical: about 963 KB raw / 318 KB gzip.
+		// Startup graph with Lexical and shared Reading modal primitives: about 983 KB raw / 326 KB gzip.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '985000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '326000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '328000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Lexical baseline: about 1.012 MB raw / 336 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1040000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '345000', 10),
+		// Reading is deferred; all offline assets total about 1.122 MB raw / 376 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1150000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '385000', 10),
 	}],
 };

@@ -1,3 +1,4 @@
+import { runReadingExtraction, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../history-checkpoints';
 import { withD1Usage } from '../d1-usage';
 import { drainNotificationJobs } from '../notification-outbox';
@@ -91,6 +92,15 @@ export class ReminderAlarm implements DurableObject {
   }
 
   private async fetchMeasured(request: Request, env: Env): Promise<Response> {
+    if (new URL(request.url).pathname === '/reading-wake' && request.method === 'POST') return this.withStateLock(async () => {
+ await this.state.storage.put('readingCoordinator', true);
+ if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(Date.now() + 100);
+ return new Response(null, { status: 204 });
+ });
+ if (new URL(request.url).pathname === '/reading-publish' && request.method === 'POST') return this.withStateLock(async () => {
+ await publishExtraction(env, await request.json() as Publication);
+ return new Response(null, { status: 204 });
+ });
     if (new URL(request.url).pathname === '/dispatch-jobs' && request.method === 'POST') {
       return this.withStateLock(async () => {
         await drainNotificationJobs(env);
@@ -231,6 +241,7 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async handleAlarm(): Promise<void> {
+ if (await this.state.storage.get<boolean>('readingCoordinator')) { await runReadingExtraction(this.state, this.env as Env); return; }
 		if (await this.state.storage.get<boolean>('maintenanceCoordinator')) {
 			await this.withStateLock(() => runMaintenanceEpisode(this.state, this.env as Env));
 			return;

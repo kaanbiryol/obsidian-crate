@@ -1,3 +1,6 @@
+import readingStyles from '../../../reading/ui/reading.scss?raw-css';
+import readingWebStyles from '../../../pwa/reading/web.scss?raw-css';
+import featureSwitcherStyles from '../../../pwa/styles/feature-switcher.scss?raw-css';
 import baseStyles from './styles/base.css?raw-css';
 import drawerStyles from './styles/drawer.css?raw-css';
 import editorStyles from './styles/editor.css?raw-css';
@@ -12,6 +15,7 @@ export const PWA_LIGHT_THEME_STYLES = lightThemeStyles;
 
 export const PWA_STYLES = [
 	baseStyles,
+ readingStyles, readingWebStyles,
 	pwaRemindersViewStyles,
 	remindersViewStyles,
 	editorStyles,
@@ -19,4 +23,5 @@ export const PWA_STYLES = [
 	responsiveStyles,
 	themeStyles,
 	focusStyles,
+	featureSwitcherStyles,
 ].join('');

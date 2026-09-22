@@ -20,6 +20,9 @@ export async function pruneReminderOccurrences(db: D1Database): Promise<void> {
 export async function pruneReminderOperations(db: D1Database): Promise<void> {
 	const prefix = `'e1_' || printf('%08d', ${REMINDER_OPERATION_FLOOR}) || '_'`;
 	await db.batch([
+ db.prepare(`DELETE FROM reading_operations WHERE day < ${REMINDER_OPERATION_FLOOR}`),
+ db.prepare('DELETE FROM reading_handoffs WHERE expires_at < ?').bind(Date.now()),
+ db.prepare('DELETE FROM reading_enrollments WHERE expires_at < ?').bind(Date.now()),
 		db.prepare(`INSERT INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', ${REMINDER_OPERATION_FLOOR})
 			ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`),
 		db.prepare(`DELETE FROM reminder_operations WHERE operation_id IN (

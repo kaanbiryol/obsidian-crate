@@ -17,6 +17,7 @@ export const browserScripts = [
 	'scripts/pwa-operation-expiry-test.mjs',
 	'scripts/pwa-safe-area-test.mjs',
 	'scripts/pwa-focus-test.mjs',
+	'scripts/pwa-feature-switcher-test.mjs',
 	'scripts/pwa-editor-contract-test.mjs',
 	'scripts/pwa-editor-selection-test.mjs',
 	'scripts/pwa-sheet-interaction-test.mjs',

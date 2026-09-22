@@ -129,3 +129,52 @@ across mount/unmount cycles.
 Knip ignores the `tailwindcss` dependency because its direct import is the Sass
 `@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.
 Keep that dependency while the stylesheet imports its theme.
+
+## Reading workspace
+
+`src/reading/ui/ReadingLibrary.tsx`, `Reader.tsx`, `ReadingDialog.tsx`, and
+`SaveLinkForm.tsx` are shared by the Reading PWA and the Obsidian view. The Sass
+under `src/reading/ui/styles/` uses the same semantic Crate tokens as reminders.
+Both features use `src/ui/shared/ViewHeader.tsx`, `NavigationBar.tsx`,
+`IconButton.tsx`, `Button.tsx`, and `ModalHeader.tsx`. Reminder destinations remain
+in the reminder adapter; Reading supplies its own destinations to the same
+navigation component. Mobile capture uses the same floating action button.
+Headers, icon sizes, selection, focus, and action variants belong to these shared
+controls. Keep article typography and library layout in Reading rather than
+overriding every button or dialog there. Native text fields retain browser editing
+and selection behavior; composite search fields draw one focus cue around the
+whole control.
+Base UI provides buttons, toggles, dialogs, and drawers. Obsidian supplies the
+icon renderer in the plugin; the PWA loads article-only icons with Reading. Input
+modality belongs to the PWA feature shell so keyboard focus works before either
+feature has been opened. Each feature retains its existing persistence and modal
+lifecycle adapter.
+Container queries select a three-pane desktop workspace, a two-pane compact
+workspace, or phone navigation; a narrow Obsidian pane behaves like the phone UI.
+The library and reader own separate scroll containers, so opening an article
+preserves filters and list position. Browser history remains in the PWA adapter.
+
+Article HTML still passes through the existing sanitizer. Source badges are local
+letter marks; rendering a list makes no favicon or tracking requests. Appearance,
+tags, and capture use the existing Base UI modal primitive with portals in the
+current host document. Device/session controls live under **Reading settings**.
+The shared `src/ui/shared/styles/_base-modal.scss` mixin provides dialog geometry
+in both hosts. Reading and reminder sheets share the PWA modal header layout.
+Phone sheets follow the visual viewport while an input is focused,
+including focus inside the plugin's Shadow DOM.
+The capture form preserves its draft on dismissal; only successful capture clears
+it. The PWA retains the existing durable capture and metadata outbox.
+
+The PWA's app switch is a single icon in each feature's existing header. Reading
+shows a checklist icon for **Switch to Reminders**; Reminders shows a book for
+**Switch to Reading**. One activation changes sections immediately.
+`FeatureShell.tsx` preserves mounted feature state and navigation, and restores
+keyboard focus to the destination's switch after its initial loading completes.
+The same switch is available on both connection screens.
+
+Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark
+surfaces, mobile and desktop widths, safe rendering, article actions, capture,
+and appearance controls. `scripts/reading-browser.test.mjs` exercises the built
+PWA against real local storage and Worker bindings, including offline reading and
+replay of a save whose response was lost. iPhone keyboard, native sharing, and
+installed-app safe areas still require physical-device acceptance.
