@@ -1,6 +1,7 @@
 import { recurrenceToText } from './rruleConverter';
 import type { RecurrenceRule } from '../types/reminder';
 import { timezone as getLocalTimeZone } from './time';
+import { canonicalReminderTimezone } from './reminderTimezone';
 
 export function getRecurrenceTimeZone(rule: RecurrenceRule | undefined): string {
   return rule?.timezone || getLocalTimeZone();
@@ -30,5 +31,6 @@ export function normalizeRecurrenceRule(
 
 /** NLP describes visible recurrence fields; keep non-visible metadata on title edits. */
 export function preserveRecurrenceMetadata(parsed: RecurrenceRule | undefined, previous: RecurrenceRule | undefined): RecurrenceRule | undefined {
-  return parsed && previous && recurrenceToText(parsed) === recurrenceToText(previous) ? previous : parsed;
+  return parsed && previous && recurrenceToText(parsed) === recurrenceToText(previous)
+    && canonicalReminderTimezone(getRecurrenceTimeZone(parsed)) === canonicalReminderTimezone(getRecurrenceTimeZone(previous)) ? previous : parsed;
 }

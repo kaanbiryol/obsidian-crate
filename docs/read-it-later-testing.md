@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, Web Clipper template, and iPhone/Android capture flows. Server revision 60 upgrades schema 1 to schema 2; protocol 11 stays compatible.
+This branch contains the plugin, server, web library, background extraction, Web Clipper template, and iPhone/Android capture flows. Server revision 66 upgrades schema 1 to schema 2; protocol 11 stays compatible.
 
 ## Try the browser now
 

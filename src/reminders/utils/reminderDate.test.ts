@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { format } from 'date-fns';
-import { formatReminderDateText } from './reminderDate';
+import { formatReminderDateText, parseLocalDateKey, formatLocalDateKey } from './reminderDate';
 import { parseReminderEditorContent } from './reminderEditorParsing';
 
 describe('fixed reminder date text', () => {
+    it.each(['2026-02-30', '2026-02-29', '2026-13-01', '2026-00-10', '2026-01-00', '2026-04-31'])('rejects impossible calendar dates: %s', text => {
+        expect(Number.isNaN(parseLocalDateKey(text).getTime())).toBe(true);
+    });
+
+    it.each(['2028-02-29', '2000-02-29', '0099-01-01', '0001-01-01'])('retains valid leap days and small years: %s', text => {
+        const date = parseLocalDateKey(text);
+        expect(Number.isNaN(date.getTime())).toBe(false);
+        expect(formatLocalDateKey(date).padStart(10, '0')).toBe(text);
+    });
+
 	it('preserves the existing date and 24-hour editor syntax across months and times', () => {
 		for (const year of [1, 99, 2024, 2026]) {
 			for (let month = 0; month < 12; month++) {

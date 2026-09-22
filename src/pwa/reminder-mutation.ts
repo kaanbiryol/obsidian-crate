@@ -22,6 +22,7 @@ export function buildReminderMutationBody({
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const rawContent = draft.content.replace(/\s+/g, ' ').trim();
 	const parsed = parseReminderEditorContent(rawContent, projectOptions);
+	if (parsed.dateError) throw new Error(parsed.dateError);
 	const project = parsed.project || draft.project.trim() || createDefaultProject;
 	const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
 	const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
@@ -41,7 +42,7 @@ export function buildReminderMutationBody({
 		else if (rawDate) dueDate = rawDate;
 	}
 
-  if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime) ?? null;
+  if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime, Boolean(parsed.dueDate)) ?? null;
 	const body = {
 		folderPath: config.folderPath,
 		content,

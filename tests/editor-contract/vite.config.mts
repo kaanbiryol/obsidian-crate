@@ -5,6 +5,6 @@ export default defineConfig({
   root: resolve('tests/editor-contract'),
   plugins: [react()],
   css: { postcss: { plugins: [] } },
-  resolve: { alias: { '@': resolve('src') } },
+  resolve: { alias: { '@': resolve('src'), obsidian: resolve('src/test/mocks/obsidian.ts') } },
   server: { host: '127.0.0.1', port: 8791, strictPort: true, fs: { allow: [process.cwd()] } },
 });

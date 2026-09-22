@@ -5,6 +5,35 @@ import { parseReminderEditorContent } from './reminderEditorParsing';
 import { parseCheckboxLine, rebuildCheckboxLine } from './checkboxParser';
 
 describe('reminder editor metadata', () => {
+    it.each([
+        ['Compare Monday with Friday', 'Compare Monday with', 'Friday'],
+        ['Review weekly report tomorrow', 'Review weekly report', 'tomorrow'],
+        ['Task every Monday Friday', 'Task every Monday', 'Friday'],
+        ['Task Tuesday Tuesday', 'Task Tuesday', 'Tuesday'],
+    ])('keeps earlier schedule text when the last schedule wins: %s', (text, cleanContent, datePart) => {
+        expect(parseReminderEditorContent(text)).toMatchObject({ cleanContent, datePart, recurrence: undefined });
+        expect(buildRichTextSegments(text).filter(segment => segment.kind === 'chip')).toEqual([
+            { kind: 'chip', type: 'date', text: datePart },
+        ]);
+    });
+
+    it.each(['2026-02-30', '2026-02-29 09:00', 'February 30 at 9 in the morning'])('keeps the earlier Chrono date when later text has no match: %s', date => {
+        const text = `Task tomorrow ${date}`;
+        expect(parseReminderEditorContent(text)).toMatchObject({
+            cleanContent: `Task ${date}`, datePart: 'tomorrow', dateError: undefined,
+        });
+        expect(buildRichTextSegments(text)).toEqual([
+            { kind: 'text', text: 'Task ' }, { kind: 'chip', type: 'date', text: 'tomorrow' }, { kind: 'text', text: ` ${date}` },
+        ]);
+    });
+
+    it.each(['Café', 'Cafe\u0301', '日本語'])('keeps the full project name and removes no title letters: %s', project => {
+        expect(parseReminderEditorContent(`Task #${project}`)).toMatchObject({ cleanContent: 'Task', project });
+        expect(buildRichTextSegments(`Task #${project}`)).toEqual([
+            { kind: 'text', text: 'Task ' }, { kind: 'chip', type: 'project', text: `#${project}` },
+        ]);
+    });
+
     it.each(['p', 'pm', 'a', 'am', 'pizza'])('preserves a project between a time and typed text: %s', suffix => {
         const text = `tomorrow 12:00 #Home ${suffix}`;
         expect(buildRichTextSegments(text, ['Home'])).toEqual([
@@ -42,7 +71,7 @@ describe('reminder editor metadata', () => {
             { kind: 'chip', type: 'date', text: 'every week' },
         ]);
         expect(parseReminderEditorContent(text)).toMatchObject({
-            cleanContent: 'Task Tuesday', project: 'Personal/Health', priority: 1,
+            cleanContent: 'Task #Personal/Health #pomla Tuesday weekly !', project: 'Personal/Health', priority: 1,
             recurrence: { frequency: 'weekly' }, dueDate: undefined,
         });
     });
@@ -57,10 +86,17 @@ describe('reminder editor metadata', () => {
     });
 
     it.each([
+        'every week Monday 09:00',
+        'every Monday at noon',
+        'daily at midnight',
+        'weekly on Monday at 09:00',
+        'every 2 weeks Monday, Wednesday, and Friday 09:00',
+        'daily at 9pm',
+        'monthly on the 15th at 09:00',
         'every Monday and Wednesday 09:00',
         'every 2 weeks on Mon, Wed 09:00',
         'every 2 months on the 15th 09:00',
-        '2026-04-03T15:30:00.000Z',
+        '2026-04-03 15:30',
     ])('keeps a complete schedule in one chip: %s', schedule => {
         expect(buildRichTextSegments(`Task ${schedule}`)).toEqual([
             { kind: 'text', text: 'Task ' },
@@ -87,5 +123,11 @@ describe('reminder editor metadata', () => {
         const reloaded = parseCheckboxLine(line)?.parsed;
         expect(reloaded?.cleanContent).toBe(`Compare ${mention} with`);
         expect(reloaded?.dueDate).toEqual(parsed.dueDate);
+    });
+});
+
+it('consumes only the final project and priority markers', () => {
+    expect(parseReminderEditorContent('Compare #Home with #Work ! !')).toMatchObject({
+        cleanContent: 'Compare #Home with !', project: 'Work', priority: 1,
     });
 });

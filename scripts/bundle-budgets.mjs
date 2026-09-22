@@ -33,10 +33,10 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Startup graph with Lexical and shared Reading modal primitives: about 983 KB raw / 326 KB gzip.
+		// Reading plus the current reminder schedule parser measures about 989 KB raw / 329 KB gzip.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '985000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '328000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '995000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '332000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

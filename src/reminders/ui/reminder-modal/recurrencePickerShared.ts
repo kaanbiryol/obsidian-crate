@@ -46,6 +46,8 @@ export interface RecurrencePickerState {
 	dayOfMonth: number;
 	hour: number;
 	minute: number;
+	second?: number;
+	millisecond?: number;
 }
 
 export interface RecurrencePickerDraft {
@@ -54,6 +56,8 @@ export interface RecurrencePickerDraft {
 	daysOfWeek: number[];
 	dayOfMonth: number;
 	time: string;
+	second?: number;
+	millisecond?: number;
 }
 
 export function getOrdinalSuffix(value: number): string {
@@ -63,21 +67,49 @@ export function getOrdinalSuffix(value: number): string {
 	return `${value}${endings[(mod - 20) % 10] || endings[mod] || endings[0]}`;
 }
 
-export function buildRecurrencePickerDraft(rule: RecurrenceRule | undefined): RecurrencePickerDraft {
+export function buildRecurrencePickerState(
+	rule: RecurrenceRule | undefined,
+	defaultDayOfMonth = new Date().getDate(),
+): RecurrencePickerState {
 	return {
 		frequency: rule?.frequency ?? 'daily',
 		interval: rule?.interval ?? 1,
 		daysOfWeek: rule?.daysOfWeek ?? [],
-		dayOfMonth: rule?.dayOfMonth ?? new Date().getDate(),
-		time: `${String(rule?.hour ?? 9).padStart(2, '0')}:${String(rule?.minute ?? 0).padStart(2, '0')}`,
+		dayOfMonth: rule?.dayOfMonth ?? defaultDayOfMonth,
+		hour: rule?.hour ?? 9,
+		minute: rule?.minute ?? 0,
+		...(rule?.second ? { second: rule.second } : {}),
+		...(rule?.millisecond ? { millisecond: rule.millisecond } : {}),
 	};
 }
 
-export function recurrenceRuleFromPickerState(state: RecurrencePickerState): RecurrenceRule {
+export function buildRecurrencePickerDraft(rule: RecurrenceRule | undefined): RecurrencePickerDraft {
+	const { hour, minute, ...state } = buildRecurrencePickerState(rule);
+	return { ...state, time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` };
+}
+
+/** Compare only the controls that affect the selected frequency. */
+export function isRecurrencePickerStateUnchanged(current: RecurrencePickerState, initial: RecurrencePickerState): boolean {
+	if (current.frequency !== initial.frequency || current.interval !== initial.interval
+		|| current.hour !== initial.hour || current.minute !== initial.minute
+		|| (current.second ?? 0) !== (initial.second ?? 0)
+		|| (current.millisecond ?? 0) !== (initial.millisecond ?? 0)) return false;
+	if (current.frequency === 'monthly') return current.dayOfMonth === initial.dayOfMonth;
+	if (current.frequency === 'weekly') {
+		return current.daysOfWeek.length === initial.daysOfWeek.length
+			&& current.daysOfWeek.every(day => initial.daysOfWeek.includes(day));
+	}
+	return true;
+}
+
+export function recurrenceRuleFromPickerState(state: RecurrencePickerState, timezone?: string): RecurrenceRule {
 	const rule: RecurrenceRule = {
 		frequency: state.frequency,
 		hour: state.hour,
 		minute: state.minute,
+		...(state.second ? { second: state.second } : {}),
+		...(state.millisecond ? { millisecond: state.millisecond } : {}),
+		...(timezone ? { timezone } : {}),
 	};
 	if (state.interval > 1) rule.interval = state.interval;
 	if (state.frequency === 'weekly' && state.daysOfWeek.length > 0) {
@@ -89,7 +121,7 @@ export function recurrenceRuleFromPickerState(state: RecurrencePickerState): Rec
 	return normalizeRecurrenceRule(rule) ?? rule;
 }
 
-export function recurrenceRuleFromPickerDraft(draft: RecurrencePickerDraft): RecurrenceRule {
+export function recurrenceRuleFromPickerDraft(draft: RecurrencePickerDraft, timezone?: string): RecurrenceRule {
 	const [rawHour = 9, rawMinute = 0] = draft.time.split(':').map(Number);
 	const hour = Number.isInteger(rawHour) ? Math.min(23, Math.max(0, rawHour)) : 9;
 	const minute = Number.isInteger(rawMinute) ? Math.min(59, Math.max(0, rawMinute)) : 0;
@@ -100,7 +132,9 @@ export function recurrenceRuleFromPickerDraft(draft: RecurrencePickerDraft): Rec
 		dayOfMonth: Math.min(31, Math.max(1, draft.dayOfMonth)),
 		hour,
 		minute,
-	});
+		second: draft.second,
+		millisecond: draft.millisecond,
+	}, timezone);
 }
 
 export function summarizeRecurrencePickerState(

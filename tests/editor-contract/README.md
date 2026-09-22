@@ -5,7 +5,7 @@ This suite was written against the original editor at commit
 Lexical. The original source stays unchanged in a temporary Git archive. The
 working checkout keeps the Lexical implementation and all uncommitted work.
 Both runs share the installed dependency versions to isolate application code.
-Only the test harness and built-PWA test script are copied into the old archive.
+Only the test harness, built-PWA test script and preview data fixtures are copied into the old archive.
 
 Run with the repository's Node version after `npm install`:
 
@@ -22,8 +22,18 @@ suite remains separate, under `tests/visual/lexical-trial.spec.ts`.
 
 ## What is compared
 
-There are 26 scenarios, each run in Chromium and WebKit, in ordinary DOM and
-plugin Shadow DOM: 104 cases per implementation. They exercise public editor
+The original baseline covered 26 scenarios in Chromium and WebKit, in ordinary
+DOM and plugin Shadow DOM: 104 cases per implementation. The current suite also
+covers recurrence recognition and validation, local date/time pairs, final-token
+selection, and preservation of earlier date, project and priority mentions. A draft fixture
+also combines the plugin's production draft hook, editor fields and submission builder
+to cover recurrence changes/removal, title-only edits, Inbox selection from another project,
+and unsupported recurrence and timezone errors. Address and filename cases retain literal text while
+recognizing a separate schedule.
+The actual modal and built PWA also cover one-off Chrono timezones, recurring
+named zones and fractional offsets, invalid suffixes, and preservation of the
+zone and stored occurrence through reopening, priority, project and picker edits.
+They exercise public editor
 props/handles, native keyboard/selection operations, plain-text clipboard events,
 and emitted Markdown. They never inspect a Lexical node, editor model, private
 property, or implementation marker.
@@ -31,7 +41,7 @@ property, or implementation marker.
 Coverage includes initial content and remounts; whitespace, Unicode and multiline
 text; caret insertion at the beginning/middle/end; forward and backward selection
 across links and chips; link label edits and full deletion; editable project
-markers; plain-text paste and HTML rejection; duplicate-marker normalization;
+markers; plain-text paste and HTML rejection; duplicate-marker preservation;
 Enter and Backspace; autocomplete following links; parent keyboard handling;
 external value/caret updates; read-only changes; focus requests; separate editor
 histories; fresh history on remount; select-all deletion; typed Markdown links;

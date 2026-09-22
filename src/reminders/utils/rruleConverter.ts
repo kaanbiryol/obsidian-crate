@@ -1,12 +1,15 @@
 import type { RecurrenceRule } from '../types/reminder';
+import { timezone as getLocalTimeZone } from './time';
+import { canonicalReminderTimezone } from './reminderTimezone';
+import { formatReminderTime } from './reminderDate';
 
-/**
- * Format time as HH:MM in 24-hour format
- */
-function formatTime(hour: number, minute: number): string {
-  const hourStr = hour.toString().padStart(2, '0');
-  const minuteStr = minute.toString().padStart(2, '0');
-  return `${hourStr}:${minuteStr}`;
+/** Show a non-local rule's zone when editing; durable Markdown keeps its existing format. */
+export function recurrenceToEditorText(rule: RecurrenceRule): string {
+  // Stored IANA aliases (e.g. CET) may have a different meaning from Chrono's
+  // typed abbreviations. Display their canonical name to preserve the rule.
+  const timezone = rule.timezone && canonicalReminderTimezone(rule.timezone);
+  const zone = timezone && timezone !== canonicalReminderTimezone(getLocalTimeZone()) ? ` ${timezone}` : '';
+  return recurrenceToText(rule) + zone;
 }
 
 /**
@@ -27,7 +30,7 @@ export function formatRecurrence(rule: RecurrenceRule): string {
   const interval = rule.interval || 1;
   const { hour, minute } = rule;
   const timeStr = hour !== undefined && minute !== undefined
-    ? ` at ${formatTime(hour, minute)}`
+    ? ` at ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
     : '';
 
   if (rule.frequency === 'daily') {
@@ -65,15 +68,6 @@ function getOrdinalSuffix(n: number): string {
 }
 
 /**
- * Format time as HH:MM in 24-hour format for natural language (parsing-friendly)
- */
-function formatTime24(hour: number, minute: number): string {
-  const hourStr = hour.toString().padStart(2, '0');
-  const minuteStr = minute.toString().padStart(2, '0');
-  return `${hourStr}:${minuteStr}`;
-}
-
-/**
  * Convert a RecurrenceRule to natural language text that can be parsed by the NLP parser.
  * This is different from formatRecurrence() which is for display purposes.
  *
@@ -94,7 +88,7 @@ export function recurrenceToText(rule: RecurrenceRule): string {
   const interval = rule.interval || 1;
   const { hour, minute } = rule;
   const timeStr = hour !== undefined && minute !== undefined
-    ? ` ${formatTime24(hour, minute)}`
+    ? ` ${formatReminderTime(hour, minute, rule.second, rule.millisecond)}`
     : '';
 
   if (rule.frequency === 'daily') {

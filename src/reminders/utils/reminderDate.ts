@@ -1,13 +1,21 @@
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ENGLISH_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** Keep the precision that Chrono recognized when reconstructing editor text. */
+export function formatReminderTime(hour: number, minute: number, second = 0, millisecond = 0): string {
+  const clock = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const seconds = second || millisecond ? `:${String(second).padStart(2, '0')}` : '';
+  const fraction = millisecond ? `.${String(millisecond).padStart(3, '0')}` : '';
+  return clock + seconds + fraction;
+}
+
 /** Fixed English syntax for the reminder parser, independent of the UI locale. */
 export function formatReminderDateText(date: Date, hasTime = false): string {
   if (!Number.isFinite(date.getTime())) throw new RangeError('Invalid time value');
   const year = date.getFullYear();
   const day = `${ENGLISH_MONTHS[date.getMonth()]} ${date.getDate()}, ${String(year > 0 ? year : 1 - year).padStart(4, '0')}`;
   if (!hasTime) return day;
-  return `${day} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${day} ${formatReminderTime(date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds())}`;
 }
 
 export function isDateOnlyString(value: string | null | undefined): value is string {
@@ -39,7 +47,12 @@ export function parseLocalDateKey(value: string): Date {
   }
 
   const [, year, month, day] = match;
-  return new Date(Number(year), Number(month) - 1, Number(day));
+  const date = new Date(0);
+  date.setFullYear(Number(year), Number(month) - 1, Number(day));
+  date.setHours(0, 0, 0, 0);
+  // Date constructors roll February 30 and month 13 into another valid day.
+  return date.getFullYear() === Number(year) && date.getMonth() === Number(month) - 1
+    && date.getDate() === Number(day) ? date : new Date(NaN);
 }
 
 export function inferHasTimeFromDate(date: Date | undefined): boolean {
