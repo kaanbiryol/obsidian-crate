@@ -1,7 +1,8 @@
 import type { Priority, Reminder, RecurrenceRule } from '../types';
-import { recurrenceToText } from '../utils/rruleConverter';
+import { recurrenceToEditorText } from '../utils/rruleConverter';
 import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
 import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
+import { findProjectMatches } from '../utils/richTextMatchers';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -72,7 +73,7 @@ export function buildInitialReminderContent(
 
 	let reconstructed = reminder.content || '';
 	if (reminder.recurrence) {
-		reconstructed += ` ${recurrenceToText(reminder.recurrence)}`;
+		reconstructed += ` ${recurrenceToEditorText(reminder.recurrence)}`;
 	} else {
 		const effectiveDate = reminder.dueDatetime || reminder.dueDate || initialDueDate;
 		if (effectiveDate) {
@@ -87,8 +88,8 @@ export function buildInitialReminderContent(
 	const resolvedDefaultProject = getDefaultProject(defaultProject);
 	if (
 		reminder.project &&
-		reminder.project !== resolvedDefaultProject &&
-		reminder.project !== 'Inbox'
+		(reminder.project !== resolvedDefaultProject
+			|| findProjectMatches(reminder.content).length > 0)
 	) {
 		reconstructed += ` #${reminder.project}`;
 	}
@@ -112,7 +113,7 @@ export function rebuildReminderContent(
 	let result = cleanText.trim();
 
 	if (recurrence) {
-		result += ` ${recurrenceToText(recurrence)}`;
+		result += ` ${recurrenceToEditorText(recurrence)}`;
 	} else if (date) {
 		const parsedDate = parseReminderDateValue(date, hasTime);
 		if (parsedDate) {
@@ -121,7 +122,7 @@ export function rebuildReminderContent(
 	}
 
 	const resolvedDefaultProject = getDefaultProject(defaultProject);
-	if (project && project !== resolvedDefaultProject && project !== 'Inbox') {
+	if (project && (project !== resolvedDefaultProject || findProjectMatches(cleanText).length > 0)) {
 		result += ` #${project}`;
 	}
 

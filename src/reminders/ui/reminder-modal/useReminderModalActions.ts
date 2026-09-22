@@ -50,17 +50,23 @@ export function useReminderModalActions({
 
 	const handleSubmit = useCallback(async () => {
 		if (pending.current) return;
-		const submission = buildReminderSubmission({
-			content,
-			description,
-			projects,
-			priority,
-			project,
-			dueDate,
-			hasTime,
-			recurrence,
-			reminder,
-		});
+		let submission: ReturnType<typeof buildReminderSubmission>;
+		try {
+			submission = buildReminderSubmission({
+				content,
+				description,
+				projects,
+				priority,
+				project,
+				dueDate,
+				hasTime,
+				recurrence,
+				reminder,
+			});
+		} catch (error) {
+			onError?.(error instanceof Error ? error : new Error(String(error)));
+			return;
+		}
 		if (!submission) return;
 		pending.current = true;
 

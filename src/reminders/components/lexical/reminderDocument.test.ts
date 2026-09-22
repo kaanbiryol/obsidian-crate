@@ -22,6 +22,24 @@ const examples = [
 ];
 
 describe('Lexical Markdown boundary', () => {
+  it.each([
+    ['Compare Monday with ', 'Friday'],
+    ['Review weekly report ', 'tomorrow'],
+    ['Task tomorrow ', '2026-02-30'],
+    ['Task #Work and ', '#Home'],
+    ['Task ! and ', '!'],
+  ])('preserves text when a former chip merges with both neighbors: %s + %s', (before, added) => {
+    const editor = makeEditor(before);
+    editor.update(() => {
+      $getRoot().selectEnd();
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) throw new Error('Expected a text selection');
+      selection.insertText(added);
+      $decorateReminder(projects);
+    }, { discrete: true });
+    expect(editor.getEditorState().read($readReminder)).toBe(before + added);
+  });
+
   it('keeps description metadata as prose', () => {
     const editor = makeEditor('');
     const value = 'Tomorrow #Work ! #Home ! https://example.com';

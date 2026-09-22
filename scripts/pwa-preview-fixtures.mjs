@@ -117,6 +117,7 @@ export function parseMutationReminder(body) {
 		description: body.description ? String(body.description) : '',
 		dueDate: body.dueDate || undefined,
 		dueDatetime: body.dueDatetime || undefined,
+		recurrence: body.recurrence || undefined,
 		priority: Number.parseInt(String(body.priority || '4'), 10) === 1 ? 1 : 4,
 		completed: Boolean(body.completed),
 		project,

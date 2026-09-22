@@ -11,6 +11,7 @@ import { importInventoryHash, INITIAL_IMPORT_MAX_FILES } from '@/protocol/initia
 import { meterD1Writes } from './d1-write-meter-test-harness';
 import { handleGetChanges, handleGetManifest } from './sync-metadata-handlers';
 import { revalidateReminderSources } from './reminder-source-migration';
+import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 import { drainNotificationProjections } from './notification-projection';
 import { handleNotificationPolicy } from './notification-policy';
 import { SyncTestDevice } from './sync-engine-test-harness';
@@ -91,7 +92,8 @@ it('does not enter import mode for an existing or previously emptied vault', asy
 it('scans only the selected folder after import, and changing folders never parses old or unrelated notes', async () => {
   await handleNotificationPolicy(jsonRequest({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: null }), env.DB);
   await revalidateReminderSources(env, 4);
-  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan_portable_v9:Reminders'").first()).toEqual({ value: '' });
+  expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?')
+    .bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:Reminders`).first()).toEqual({ value: '' });
   const token = await start(); const id = '11111111-1111-4111-8111-111111111111';
   const content = `- [ ] Due @2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`;
   await send(token, [await file('Reminders/work.md', content), await file('Notes/unrelated.md', content), await file('Reminders-old/no.md', content), await file('Tasks/work.md', content)]);

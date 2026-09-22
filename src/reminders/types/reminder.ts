@@ -13,7 +13,9 @@ export interface RecurrenceRule {
   completedCount?: number;     // persisted completed occurrences within this rule
   hour?: number;               // 0-23, time of day for recurring reminder
   minute?: number;             // 0-59, time of day for recurring reminder
-  timezone?: string;           // IANA timezone for local wall-clock recurrence semantics
+  second?: number;             // 0-59, when supplied by Chrono
+  millisecond?: number;        // 0-999, when supplied by Chrono
+  timezone?: string;           // IANA timezone or fixed ±HH:MM offset for wall-clock recurrence semantics
 }
 
 export interface Reminder {

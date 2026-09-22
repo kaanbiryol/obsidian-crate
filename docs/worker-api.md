@@ -224,7 +224,7 @@ Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder 
 
 Creates a reminder in the selected project Markdown file, creating that file if needed.
 
-Request includes a versioned `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, and required `id` equal to `operationId`. Obtain the UTC operation day from server metadata and encode it as specified in the [retry policy](reminder-retention.md).
+Request includes a versioned `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, and required `id` equal to `operationId`. Recurrence time fields include optional `second` (0–59) and `millisecond` (0–999), alongside `hour` and `minute`. Obtain the UTC operation day from server metadata and encode it as specified in the [retry policy](reminder-retention.md).
 
 Response: `{ success: true, notificationWarning? }`
 

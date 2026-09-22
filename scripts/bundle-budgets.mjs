@@ -3,8 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Lexical editor, embedded Worker/PWA and three-pane history: about 2.40 MB raw / 1.19 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '2420000', 10),
+		// Shared schedule validation/timezones, Lexical and embedded Worker/PWA:
+		// about 2.43 MB raw / 1.20 MB gzip. The compressed budget is unchanged.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '2440000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1220000', 10),
 	},
 	{

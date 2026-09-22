@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useMemo } from 'react';
 
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 import { BaseModal } from '../../components/BaseModal';
@@ -12,6 +12,7 @@ import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { Reminder, RecurrenceRule } from '../../types';
+import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 
 interface AddReminderModalProps {
     onClose: () => void;
@@ -79,6 +80,10 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         defaultProject,
         initialDueDate,
     });
+    const hasTitle = useMemo(
+        () => Boolean(parseReminderEditorContent(content, projects).cleanContent.trim()),
+        [content, projects],
+    );
     const {
         currentView,
         isClosing,
@@ -203,7 +208,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         >
             <AddReminderModalHeader
                 isEditing={isEditing}
-                canSubmit={!!content.trim() && !isSaving && !isDeleting}
+                canSubmit={hasTitle && !isSaving && !isDeleting}
                 busy={isSaving || isDeleting}
                 onDelete={handleDeleteClick}
                 onClose={handleClose}

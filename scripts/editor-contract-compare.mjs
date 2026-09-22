@@ -39,7 +39,9 @@ if (mode !== 'current') {
   execFileSync('tar', ['-x', '-C', directory], { input: archive });
   symlinkSync(join(root, 'node_modules'), join(directory, 'node_modules'), 'dir');
   cpSync(join(root, 'tests/editor-contract'), join(directory, 'tests/editor-contract'), { recursive: true });
-  cpSync(join(root, 'scripts/pwa-editor-contract-test.mjs'), join(directory, 'scripts/pwa-editor-contract-test.mjs'));
+  for (const file of ['pwa-editor-contract-test.mjs', 'pwa-preview-fixtures.mjs']) {
+    cpSync(join(root, 'scripts', file), join(directory, 'scripts', file));
+  }
   writeFileSync(join(reports, 'baseline.json'), JSON.stringify({ commit: baseline, directory, dependencySource: root }, null, 2));
   console.log(`Testing unchanged baseline ${baseline} in ${directory}`);
   oldStatus = run('baseline', directory);
