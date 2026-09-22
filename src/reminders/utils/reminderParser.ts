@@ -1,7 +1,4 @@
-import * as chrono from 'chrono-node';
 import type { Priority, RecurrenceRule } from '../types/reminder';
-import { parseRecurrenceFromContent } from './recurrenceParser';
-import { parseLocalDateKey } from './reminderDate';
 import { findAllMatches } from './richTextMatchers';
 
 export interface ParsedReminder {
@@ -14,6 +11,7 @@ export interface ParsedReminder {
   priority: Priority;
   project?: string; // Project tag (e.g., "project1", "work")
   recurrence?: RecurrenceRule; // Parsed recurrence rule
+  dateError?: string;
 }
 
 export class UnresolvedReminderScheduleError extends Error {
@@ -33,7 +31,7 @@ export class UnresolvedReminderScheduleError extends Error {
  * @param content - The reminder content to parse
  * @param knownProjects - Optional list of known project names to enable matching projects with spaces
  */
-export function parseReminderContent(content: string, knownProjects?: string[], options: { persisted?: boolean } = {}): ParsedReminder {
+export function parseReminderContent(content: string, knownProjects?: string[], options: { persisted?: boolean; storedRecurrence?: boolean; preserveProjects?: boolean } = {}): ParsedReminder {
   if (!content || !content.trim()) {
     return {
       cleanContent: '',
@@ -54,82 +52,25 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
   // reader's clock. Draft parsing continues to resolve natural language now.
   const referenceDate = options.persisted ? new Date(2000, 0, 1, 12) : new Date();
 
-  // IMPORTANT: Extract recurrence patterns FIRST (before date extraction)
-  // This ensures "every Friday 12:00" is captured as recurrence, not just as a date
   const matches = findAllMatches(taskContent, knownProjects, referenceDate);
+  const lastSchedule = matches.filter(match => match.type === 'date').at(-1);
+  const activeSchedules = matches.filter(match => match.type === 'date' && (options.storedRecurrence || match === lastSchedule));
   const removed: Array<{ index: number; length: number }> = [];
-  const recurrenceMatch = matches
-    .filter(match => match.type === 'date' && parseRecurrenceFromContent(match.text)).at(-1);
-  const recurrenceResult = recurrenceMatch && parseRecurrenceFromContent(recurrenceMatch.text);
-  if (recurrenceResult && recurrenceMatch) {
-    recurrence = recurrenceResult.rule;
-    recurrencePart = recurrenceResult.matched;
+  const recurrenceMatch = activeSchedules.filter(match => match.schedule?.kind === 'recurrence').at(-1);
+  if (recurrenceMatch?.schedule?.kind === 'recurrence') {
+    recurrence = recurrenceMatch.schedule.rule;
+    recurrencePart = recurrenceMatch.text;
     removed.push(recurrenceMatch);
-
-    // If the recurrence matched a day+time (e.g., "every Friday 12:00"),
-    // also extract the date for the first occurrence
-    if (!options.persisted && !dueDate && recurrencePart) {
-      const parsed = chrono.parse(recurrencePart, referenceDate, { forwardDate: true });
-      const firstResult = parsed[0];
-      if (firstResult) {
-        dueDate = firstResult.start.date();
-        hasTime = firstResult.start.isCertain('hour');
-        if (!hasTime) {
-          dueDate.setHours(0, 0, 0, 0);
-        }
-        datePart = recurrencePart; // The date is part of the recurrence pattern
-      }
-    }
   }
-
-  // Try to extract ISO format date: 2025-11-02T14:00 or 2025-11-02 (@ prefix optional)
-  // Also handle seconds/milliseconds + timezone suffix (e.g., 2025-11-02T14:00:00.000Z)
-  // Stored reminder lines append their authoritative date after the title. Keep
-  // earlier date mentions in the title when the editor saves and reloads them.
-  const dateMatch = matches
-    .filter(match => match.type === 'date' && !parseRecurrenceFromContent(match.text)).at(-1);
-  const dateParseContent = dateMatch?.text ?? '';
-  const removeDate = (offset: number, length: number) => {
-    if (!dateMatch) return;
-    const index = dateMatch.index + offset;
-    removed.push({ index, length });
-  };
-  const isoDateMatch = dateParseContent.match(
-    /@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/
-  );
-  if (isoDateMatch) {
-    const isoDateText = isoDateMatch[1];
-    if (!isoDateText) return { cleanContent: taskContent.trim(), priority };
-    hasTime = isoDateText.includes('T');
-    if (options.persisted && hasTime && !/(?:Z|[+-]\d{2}:\d{2})$/.test(isoDateText)) throw new UnresolvedReminderScheduleError();
-    dueDate = hasTime ? new Date(isoDateText) : parseLocalDateKey(isoDateText);
-    if (isNaN(dueDate.getTime())) {
-      dueDate = undefined;
-      hasTime = undefined;
-    } else {
-      datePart = isoDateMatch[0]; // Keep the full match (with @ if present)
-      removeDate(isoDateMatch.index ?? 0, isoDateMatch[0].length);
-    }
-  } else {
-    // Use chrono-node to naturally find and parse dates in the content
-    // Chrono handles: tomorrow, today, next Monday, in 2 hours, Jul 25 2026, etc.
-    const parsed = chrono.parse(dateParseContent, referenceDate, { forwardDate: true });
-
-    const result = parsed[0];
-    if (result) {
-      if (options.persisted && (!/\b\d{4}\b/.test(result.text)
-        || !(['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))
-        || result.start.isCertain('hour') && !result.start.isCertain('timezoneOffset'))) throw new UnresolvedReminderScheduleError();
-      if (taskContent.includes(result.text)) {
-        dueDate = result.start.date();
-        hasTime = result.start.isCertain('hour');
-        if (!hasTime) {
-          dueDate.setHours(0, 0, 0, 0);
-        }
-        datePart = result.text;
-        removeDate(result.index, result.text.length);
-      }
-    }
+  const dateMatch = activeSchedules.filter(match => match.invalid || match.schedule?.kind === 'date').at(-1);
+  if (options.persisted && (dateMatch?.invalid || dateMatch?.schedule?.kind === 'date' && !dateMatch.schedule.absolute)) {
+    throw new UnresolvedReminderScheduleError();
+  }
+  if (dateMatch?.schedule?.kind === 'date') {
+    dueDate = dateMatch.schedule.dueDate;
+    hasTime = dateMatch.schedule.hasTime;
+    datePart = dateMatch.text;
+    removed.push(dateMatch);
   }
 
   // Use the same protected, indexed matches as the editor. Removing text by
@@ -139,7 +80,8 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
     const name = projectMatch.text.slice(1);
     project = knownProjects?.find(value => value.toLowerCase() === name.toLowerCase()) ?? name;
   }
-  const markers = matches.filter(match => match.type === 'priority' || match === projectMatch);
+  const priorityMatch = matches.filter(match => match.type === 'priority').at(-1);
+  const markers = matches.filter(match => match === priorityMatch || !options.preserveProjects && match === projectMatch);
   removed.push(...markers);
   if (markers.some(match => match.type === 'priority')) {
     priority = 1;
@@ -162,5 +104,6 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
     priority,
     project,
     recurrence,
+    dateError: dateMatch?.invalid ? dateMatch.error ?? `Invalid date: ${dateMatch.text}.` : undefined,
   };
 }

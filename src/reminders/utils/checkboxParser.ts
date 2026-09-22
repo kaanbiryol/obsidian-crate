@@ -60,7 +60,11 @@ export function parseCheckboxLine(line: string, options: { persisted?: boolean }
   const reminderId = extractReminderId(rawContentWithMetadata);
   const metadata = readRecurrenceMetadata(stripReminderIdMarker(rawContentWithMetadata), options);
   const rawContent = metadata.content;
-  const parsed = parseReminderContent(rawContent, undefined, options);
+  // Stored recurrence metadata distinguishes an explicit repeat rule plus its
+  // next occurrence from earlier repeat words retained as literal title text.
+  const parsed = parseReminderContent(rawContent, undefined, {
+    ...options, storedRecurrence: /<!-- crate-rule:/.test(rawContentWithMetadata), preserveProjects: true,
+  });
   const matchingRecurrence = metadata.recurrence && parsed.recurrencePart?.toLowerCase() === recurrenceToText(metadata.recurrence).toLowerCase();
   if (matchingRecurrence) parsed.recurrence = metadata.recurrence;
   if (options.persisted && parsed.recurrence && (!matchingRecurrence || !parsed.dueDate)) throw new UnresolvedReminderScheduleError();

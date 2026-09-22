@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": { "types": ["vite/client", "node"], "noEmit": true },
-  "include": ["*.ts", "*.tsx", "*.mts"],
+  "include": ["*.ts", "*.tsx", "*.mts", "../../src/cloudflare/virtual-cloudflare-artifacts.d.ts"],
   "exclude": []
 }

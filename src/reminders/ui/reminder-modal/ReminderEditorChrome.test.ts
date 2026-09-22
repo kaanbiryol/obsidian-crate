@@ -8,6 +8,7 @@ import { DatePickerModal } from './DatePickerModal';
 import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
+import { ReminderEditorFields } from './ReminderEditorFields';
 import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
@@ -22,6 +23,26 @@ vi.mock('../../components/BaseModal', () => ({
 }));
 
 describe('reminder editor chrome', () => {
+    it.each([
+        ['monthly on the 32nd', 'Choose a monthly day from 1 to 31'],
+        ['every 0 days', 'Repeat intervals must be positive'],
+    ])('shows an invalid schedule as an editor error: %s', (schedule, error) => {
+        const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
+            content: `Task ${schedule}`, onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
+            allowAutoFocus: false, projects: [], textareaRef: { current: null }, richTextInputRef: { current: null },
+        }));
+        expect(markup).toContain('role="alert"');
+        expect(markup).toContain(error);
+    });
+
+    it('shows no calendar error when Chrono leaves a phrase as text', () => {
+        const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
+            content: 'Task February 30 at 9 in the morning', onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
+            allowAutoFocus: false, projects: [], textareaRef: { current: null }, richTextInputRef: { current: null },
+        }));
+        expect(markup).not.toContain('role="alert"');
+    });
+
     it.each([' ', '\u00a0'])('previews the occurrence when typing a time into a repeat rule (%j)', space => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));

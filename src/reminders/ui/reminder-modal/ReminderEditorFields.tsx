@@ -49,7 +49,9 @@ export function ReminderEditorFields({
     const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
     const inputError = useMemo(() => {
         try {
-            assertReminderMutationInput({ content: content.trim() ? parseReminderEditorContent(content, projects).cleanContent || content : undefined, description }, 'update');
+            const parsed = parseReminderEditorContent(content, projects);
+            if (parsed.dateError) return parsed.dateError;
+            assertReminderMutationInput({ content: content.trim() ? parsed.cleanContent || content : undefined, description }, 'update');
             return null;
         } catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
     }, [content, description, projects]);

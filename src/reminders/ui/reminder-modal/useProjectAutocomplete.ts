@@ -75,7 +75,7 @@ export function useProjectAutocomplete({
         richTextInputRef.current?.setCursorPosition(toReminderCursorOffset(next.text, next.cursor));
         onContentChange(next.text);
         dismiss();
-    }, [projects, richTextInputRef, onContentChange, dismiss]);
+    }, [richTextInputRef, onContentChange, dismiss, projects]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent): boolean => {
         if (!isOpen) return false;

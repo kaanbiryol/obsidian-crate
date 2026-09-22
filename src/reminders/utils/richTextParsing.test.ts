@@ -3,6 +3,16 @@ import { getPlainText } from './richTextPlainText';
 import { findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches } from './richTextMatchers';
 
 describe('findProjectMatches', () => {
+    it.each(['Café', 'Cafe\u0301', '日本語', 'İş', '家/買い物', 'Café/2026'])('matches the entire Unicode project %s', project => {
+        expect(findProjectMatches(`Task #${project}`)).toEqual([
+            { text: `#${project}`, index: 5, length: project.length + 1, type: 'project' },
+        ]);
+    });
+
+    it.each(['Learn C#development', 'Task \\#Work'])('requires a project token boundary: %s', text => {
+        expect(findProjectMatches(text, ['development', 'Work'])).toEqual([]);
+    });
+
     it('matches single-word project tags', () => {
         const matches = findProjectMatches('buy milk #forge');
         expect(matches).toHaveLength(1);

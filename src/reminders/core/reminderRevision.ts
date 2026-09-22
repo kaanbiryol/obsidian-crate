@@ -9,7 +9,9 @@ export async function reminderRevision(reminder: Reminder & { filePath?: string 
 		reminder.completed, reminder.project ?? 'Inbox',
 		rule ? [rule.frequency, rule.interval ?? 1, [...(rule.daysOfWeek ?? [])].sort(), rule.dayOfMonth ?? null,
 			rule.endDate ?? null, rule.count ?? null, rule.completedCount ?? 0,
-			rule.hour ?? null, rule.minute ?? null, rule.timezone ?? null] : null,
+			rule.hour ?? null, rule.minute ?? null, rule.timezone ?? null,
+			// Preserve existing revisions for minute-precision rules.
+			...(rule.second || rule.millisecond ? [rule.second ?? 0, rule.millisecond ?? 0] : [])] : null,
 	]);
 	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
 	return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');

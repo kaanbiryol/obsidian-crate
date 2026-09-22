@@ -1,9 +1,7 @@
-import * as chrono from 'chrono-node';
 import { parseMarkdownLinks, isSafeUrl } from './markdownLinks';
 import { findStandalonePriorityMarkerIndexes } from './priorityMarker';
 import type { TextMatch } from './richTextTypes';
-import { parseRecurrenceFromContent } from './recurrenceParser';
-import { parseLocalDateKey } from './reminderDate';
+import { findReminderScheduleMatches } from './reminderSchedule';
 
 /**
  * Find all important marker matches in text (! with space before, or standalone)
@@ -50,7 +48,7 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
             // Escape special regex characters in project name
             const escapedProject = knownProject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             // Match #projectName followed by space, end of string, or another special char
-            const projectRegex = new RegExp(`#${escapedProject}(?=\\s|$|@|!|#)`, 'gi');
+            const projectRegex = new RegExp(`(?<!\\S)#${escapedProject}(?=\\s|$|@|!|#)`, 'gi');
             let match: RegExpExecArray | null;
             while ((match = projectRegex.exec(text)) !== null) {
                 const matchIndex = match.index;
@@ -80,10 +78,10 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
 
     // Fallback to single-word regex (excluding already matched ranges)
     // Find project tags that:
-    // 1. Start with # followed by at least one letter (not purely numeric)
-    // 2. Can contain letters, numbers, underscores, hyphens, slashes (for nested tags)
+    // 1. Start at a token boundary with # and a Unicode letter (not purely numeric)
+    // 2. Include combining accents, numbers, underscores, hyphens and nested paths
     // e.g., #work, #Project/Reminders, #work/meetings
-    const projectMatches = [...text.matchAll(/#([a-zA-Z][a-zA-Z0-9_/-]*)/g)];
+    const projectMatches = [...text.matchAll(/(?<!\S)#(\p{L}[\p{L}\p{M}\p{N}_/-]*)/gu)];
     projectMatches.forEach(match => {
         if (match.index !== undefined) {
             const matchIndex = match.index;
@@ -107,42 +105,6 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
             }
         }
     });
-    return matches;
-};
-
-/** Find complete schedules with the same recurrence grammar used when saving. */
-const findDateMatches = (text: string, referenceDate: Date): TextMatch[] => {
-    const matches: TextMatch[] = [];
-    let remaining = text;
-    const mask = (index: number, length: number) => {
-        remaining = remaining.slice(0, index) + '\uFFFC'.repeat(length) + remaining.slice(index + length);
-    };
-
-    // Protect entire links and project names, including names such as #Tomorrow.
-    for (const link of parseMarkdownLinks(text)) mask(link.index, link.fullMatch.length);
-    for (const url of remaining.matchAll(/\bhttps?:\/\/[^\s)]+/gi)) mask(url.index, url[0].length);
-
-    let recurrence = parseRecurrenceFromContent(remaining);
-    while (recurrence) {
-        const index = remaining.indexOf(recurrence.matched);
-        matches.push({ text: recurrence.matched, index, length: recurrence.matched.length, type: 'date' });
-        mask(index, recurrence.matched.length);
-        recurrence = parseRecurrenceFromContent(remaining);
-    }
-
-    // Chrono does not reliably cover the whole ISO timestamp, especially its timezone.
-    for (const iso of remaining.matchAll(/@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/g)) {
-        const dateText = iso[1]!;
-        const date = dateText.includes('T') ? new Date(dateText) : parseLocalDateKey(dateText);
-        if (!Number.isNaN(date.getTime())) {
-            matches.push({ text: iso[0], index: iso.index, length: iso[0].length, type: 'date' });
-        }
-        mask(iso.index, iso[0].length);
-    }
-
-    for (const result of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
-        matches.push({ text: result.text, index: result.index, length: result.text.length, type: 'date' });
-    }
     return matches;
 };
 
@@ -180,7 +142,7 @@ export const findAllMatches = (text: string, knownProjects?: string[], reference
         ...findLinkMatches(text),
         ...findPriorityMatches(text),
         ...projects,
-        ...findDateMatches(dateText, referenceDate)
+        ...findReminderScheduleMatches(dateText, referenceDate)
     ];
 
     // Sort by position and remove overlapping matches
