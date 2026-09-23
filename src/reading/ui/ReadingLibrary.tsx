@@ -10,6 +10,7 @@ import { FloatingActionButton } from '../../reminders/components/FloatingActionB
 import type { ReadingChanges, ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
 import { filterReadingItems, groupReadingItems, readingSections, readingSource, type ReadingSection } from './reading-presentation';
+import { ReadingListSkeleton } from './ReadingListSkeleton';
 
 export interface ReadingLibraryProps {
 	snapshot: ReadingSnapshot;
@@ -76,7 +77,7 @@ export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefre
 					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={!!busy} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><Hash size={14} />{tag}<X size={14} /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}
-					{snapshot.loading ? <div className="crate-reading__loading" role="status"><span>Loading your reading…</span>{[0, 1, 2, 3].map(i => <div key={i} aria-hidden="true" />)}</div> : <>
+					{snapshot.loading ? <ReadingListSkeleton /> : <>
 						{items.length === 0 && <div className="crate-reading__empty"><BookOpen size={36} strokeWidth={1.3} aria-hidden="true" /><h2>{query || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}</h2><p>{query || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}</p>{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><Plus size={17} />Save your first link</Button>}</div>}
 						{groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
 							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${item.title}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} disabled={!!busy} onClick={() => run(item.crate_reading_id, () => onOpen(item))}>

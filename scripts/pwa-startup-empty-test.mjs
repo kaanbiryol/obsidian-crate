@@ -1,4 +1,5 @@
 import { chromium, webkit, expect } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { previewEnrollmentToken } from './pwa-preview-fixtures.mjs';
@@ -8,8 +9,24 @@ const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
 try {
  for (const engine of [chromium, webkit]) {
-  const browser = await engine.launch();
+ const browser = await engine.launch();
+ try {
+  const firstLoad = await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});
+  let releaseFirstLoad;
+  const heldFirstLoad = new Promise(resolve => { releaseFirstLoad = resolve; });
+  await firstLoad.route('**/reminders/list?*', async route => { await heldFirstLoad; await route.continue(); });
+  await firstLoad.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=inbox`);
   try {
+   await expect(firstLoad.locator('.pwa-reminders-opening')).toBeVisible();
+   await expect(firstLoad.getByRole('status',{name:'Loading reminders'})).toBeVisible();
+   await expect(firstLoad.locator('.pwa-reminders-skeleton__card')).toHaveCount(3);
+   await mkdir('test-results/startup-skeleton',{recursive:true});
+   await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening.png`});
+   await firstLoad.emulateMedia({colorScheme:'dark'});
+   await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening-dark.png`});
+  } finally { releaseFirstLoad(); }
+  await expect(firstLoad.locator('.pwa-reminders-view')).toBeVisible();
+  await firstLoad.close();
    for (const tab of ['today', 'inbox', 'upcoming', 'browse']) {
    const page = await browser.newPage({ serviceWorkers: 'block' });
    await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${tab}`);
@@ -48,7 +65,17 @@ try {
    await page.reload();
    try {
     await expect(page.locator('.pwa-reminders-view')).toBeVisible();
-    await expect(page.locator('.reminders-empty-state-title')).toHaveText('Loading reminders…');
+    await expect(page.getByRole('status', { name: 'Loading reminders' })).toBeVisible();
+    await expect(page.locator('.pwa-reminders-skeleton__card')).toHaveCount(3);
+    await expect(page.locator('.reminders-empty-state')).toHaveCount(0);
+    if (tab === 'inbox') {
+     await expect(page.locator('.view-header-meta')).toHaveClass(/is-reserved/);
+     const viewport = page.viewportSize();
+     await page.setViewportSize({width:390,height:844});
+     await mkdir('test-results/startup-skeleton',{recursive:true});
+     await page.screenshot({path:`test-results/startup-skeleton/${engine.name()}-reminders.png`});
+     if (viewport) await page.setViewportSize(viewport);
+    }
     expect(await page.evaluate(() => window.startupEmptyMessages)).toEqual([]);
    } finally { release(); }
    await expect(page.locator('.reminders-empty-state')).toHaveCount(0);

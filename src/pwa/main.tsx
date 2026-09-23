@@ -22,6 +22,7 @@ import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
 import { PwaSyncIndicator } from './components/PwaSyncIndicator';
+import { PwaRemindersOpening } from './components/PwaRemindersOpening';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
 import { DeferredNotice } from './components/DeferredNotice';
@@ -367,6 +368,7 @@ function App() {
 	), [editReminder, toggleReminderCompleted]);
 
 	if (!initialContentReady || launchPending) {
+		if (!launchPending && authToken) return <PwaRemindersOpening tab={startTab} project={selectedProject} />;
 		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
 	}
 
@@ -391,6 +393,7 @@ function App() {
 				projects={visibleProjects}
 				incomplete={issues.length > 0}
 				checkingReminders={loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
+				showLoadingSkeleton={sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error))}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
