@@ -2,7 +2,7 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
 import { assertReadingSession, readingDatabase, readingLock, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
-class ReadingApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+export class ReadingApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 export async function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
   if (session) assertReadingSession(session);
   const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),

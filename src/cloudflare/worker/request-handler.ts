@@ -60,7 +60,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
  return env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded);
  }
  if (coordinatorState && path.startsWith('/reading/')) {
- if (path === '/reading/exchange' || path === '/reading/handoff') return handleReadingRoute(request, env, undefined, coordinatorState);
+ if (path === '/reading/exchange' || path === '/reading/handoff' || path === '/reading/shortcut-exchange') return handleReadingRoute(request, env, undefined, coordinatorState);
  }
 		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {

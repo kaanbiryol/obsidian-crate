@@ -79,3 +79,38 @@ nativeTest('confirmation uses the prepared handoff in a web sheet without openin
     assert.equal(token(show.WFWorkflowActionParameters.WFURL).OutputUUID, handoff.UUID);
   }
 });
+
+nativeTest('PWA pairing sends a single-use code in JSON and stores only validated capture access', () => {
+  const workflow = readingShortcutWithFirstRunSetup(template, { pairing: true });
+  const actions = workflow.WFWorkflowActions;
+  assert.deepEqual(workflow.WFWorkflowImportQuestions, []);
+  assert.equal(actions.filter(action => identifier(action) === 'ask').length, 1);
+  assert.deepEqual(actions.slice(-4), template.WFWorkflowActions.slice(3));
+  const seen = new Set();
+  const check = value => {
+    if (!value || typeof value !== 'object') return;
+    if (value.Type === 'ActionOutput') assert.ok(seen.has(value.OutputUUID), `Unresolved output: ${value.OutputUUID}`);
+    Object.values(value).forEach(check);
+  };
+  for (const action of actions) { check(action); assert.ok(!seen.has(action.WFWorkflowActionParameters.UUID)); seen.add(action.WFWorkflowActionParameters.UUID); }
+  const validation = actions.filter(action => identifier(action) === 'text.match');
+  const pattern = new RegExp(validation[0].WFWorkflowActionParameters.WFMatchTextPattern);
+  const code = `https://crate.example/reading/shortcut-exchange#${'a'.repeat(64)}`;
+  assert.ok(pattern.test(code));
+  for (const invalid of [code.replace('https:', 'http:'), code.replace('crate.example', 'user@crate.example'), code.replace('#', '?token='), code + 'extra']) assert.ok(!pattern.test(invalid));
+  const request = actions.find(action => identifier(action) === 'downloadurl').WFWorkflowActionParameters;
+  assert.equal(request.WFHTTPMethod, 'POST');
+  assert.equal(request.WFHTTPBodyType, 'JSON');
+  const urlAction = actions.find(action => action.WFWorkflowActionParameters.UUID === token(request.WFURL).OutputUUID).WFWorkflowActionParameters;
+  assert.equal(code.replace(new RegExp(urlAction.WFReplaceTextFind), urlAction.WFReplaceTextReplace), 'https://crate.example/reading/shortcut-exchange');
+  const fields = request.WFJSONValues.Value.WFDictionaryFieldValueItems;
+  assert.deepEqual(fields.map(field => field.WFKey), ['token']);
+  assert.deepEqual(request.WFHTTPHeaders.Value.WFDictionaryFieldValueItems.map(field => field.WFKey), ['X-Crate-Protocol']);
+  const storeIndex = actions.findIndex(action => identifier(action) === 'setstoredcontent');
+  const headerCheckIndex = actions.indexOf(validation[1]);
+  assert.ok(storeIndex > headerCheckIndex);
+  assert.ok(actions.slice(headerCheckIndex, storeIndex).some(action => identifier(action) === 'exit'));
+  const values = actions.find(action => identifier(action) === 'dictionary').WFWorkflowActionParameters.WFItems;
+  assert.deepEqual(values.Value.WFDictionaryFieldValueItems.map(field => field.WFKey), ['endpoint', 'authorization']);
+  assert.ok(!JSON.stringify(workflow).includes('YOUR-CAPTURE-CREDENTIAL'));
+});

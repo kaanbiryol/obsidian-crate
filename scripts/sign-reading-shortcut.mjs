@@ -6,7 +6,8 @@ import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.m
 
 if (process.platform !== 'darwin') throw new Error('Sign this release asset on macOS with Apple Shortcuts installed.');
 const manualSetup = process.argv.includes('--manual-setup');
-const firstRunSetup = process.argv.includes('--first-run-setup');
+const pairing = process.argv.includes('--pairing');
+const firstRunSetup = pairing || process.argv.includes('--first-run-setup');
 if (manualSetup && firstRunSetup) throw new Error('Choose one setup variant.');
 const name = firstRunSetup ? 'Save to Crate (iOS 27)' : manualSetup ? 'Save to Crate (manual setup)' : 'Save to Crate';
 const temporary = await mkdtemp(join(tmpdir(), 'crate-shortcut-'));
@@ -19,7 +20,7 @@ try {
   if (manualSetup) execFileSync('plutil', ['-remove', 'WFWorkflowImportQuestions', input], { stdio: 'inherit' });
   if (firstRunSetup) {
     const template = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', input], { encoding: 'utf8' }));
-    const workflow = readingShortcutWithFirstRunSetup(template);
+    const workflow = readingShortcutWithFirstRunSetup(template, { pairing });
     await writeFile(input, JSON.stringify(workflow));
     // Retain the exact readable source alongside the signed test artifact.
     execFileSync('plutil', ['-convert', 'xml1', '-o', resolve(`dist/${name}.plist`), input], { stdio: 'inherit' });

@@ -1,3 +1,4 @@
+import { ShortcutSetup } from './ShortcutSetup';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
 import { logoutReadingApp } from './logout';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
@@ -31,7 +32,8 @@ function ReadingAppContent() {
   const [reader, setReader] = useState<{ item: ReadingItem; markdown: string } | null>(null);
   const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [title, setTitle] = useState(''), [saving, setSaving] = useState(false);
   const [share, setShare] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
+  const [shortcutOpen, setShortcutOpen] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
   const [requestedItem, setRequestedItem] = useState(new URL(location.href).searchParams.get('item'));
   const [recovery, setRecovery] = useState(false);
   const alive = useRef(true), refreshing = useRef(false), savingRef = useRef(false);
@@ -143,7 +145,7 @@ function ReadingAppContent() {
       <ReadingLibraryPanel snapshot={{ items: cache?.items ?? [], issues: cache?.issues ?? [], loading: !cache && !error, error: !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={() => { setError(null); setAdding(true); }} onOpen={open} onUpdate={update} onRefresh={refresh} onSettings={() => setSettingsOpen(true)} headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id}
         reader={reader && <ReadingReader item={reader.item} markdown={reader.markdown} status="Available offline" notice={notices} onBack={() => history.back()} onUpdate={changes => update(reader.item, changes)} onRetry={async () => { await queueReading(session, 'retry', { id: reader.item.crate_reading_id }); await refresh(); setStatus('Article extraction requested.'); }} />} />
       {adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} title={title} onUrl={setUrl} onTitle={setTitle} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => void run(save)} /></ReadingDialog>}
-      {settingsOpen && <ReadingDialog title="Reading settings" onClose={() => setSettingsOpen(false)}><div className="crate-reading-settings"><p>Your opened articles are available offline. This device keeps up to 50 articles or 20 MB.</p><Button variant="outline" onClick={() => { setSettingsOpen(false); void run(() => refresh()); }}>Refresh library</Button><Button variant="outline" onClick={() => void run(exportReadingData)}>Export Reading data</Button><Button variant="outline" onClick={() => void run(async () => { await applyPwaUpdate(); })}>Update app</Button><Button variant="outline" onClick={() => { setSettingsOpen(false); setSession(null); setCache(null); setReader(null); void run(async () => { setError(await logoutReadingApp()); }); }}>Log out and clear device data</Button></div></ReadingDialog>}
+      {settingsOpen && <ReadingDialog className="crate-reading-settings-dialog" title={shortcutOpen ? "Set up iPhone shortcut" : "Reading settings"} onClose={() => { setSettingsOpen(false); setShortcutOpen(false); }}><div className="crate-reading-settings">{shortcutOpen ? <><Button variant="outline" onClick={() => setShortcutOpen(false)}>Back to settings</Button><ShortcutSetup session={session} /></> : <><Button variant="outline" onClick={() => setShortcutOpen(true)}>Set up iPhone shortcut</Button><p>Your opened articles are available offline. This device keeps up to 50 articles or 20 MB.</p><Button variant="outline" onClick={() => { setSettingsOpen(false); void run(() => refresh()); }}>Refresh library</Button><Button variant="outline" onClick={() => void run(exportReadingData)}>Export Reading data</Button><Button variant="outline" onClick={() => void run(async () => { await applyPwaUpdate(); })}>Update app</Button><Button variant="outline" onClick={() => { setSettingsOpen(false); setSession(null); setCache(null); setReader(null); void run(async () => { setError(await logoutReadingApp()); }); }}>Log out and clear device data</Button></>}</div></ReadingDialog>}
     </>}
   </main>;
 }

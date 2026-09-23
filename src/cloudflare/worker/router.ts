@@ -37,7 +37,7 @@ export function isAuthenticatedRouteAllowed(
 	if (principal.scope === 'vault') return true;
  if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`);
  if (principal.scope === 'reading_capture') return ['POST /reading/capture', 'POST /reading/prepare'].includes(`${method} ${path}`);
- if (principal.scope === 'reading') return ['GET /reading/session', 'GET /reading/list', 'GET /reading/item', 'POST /reading/capture', 'POST /reading/prepare', 'POST /reading/update', 'POST /reading/retry', 'DELETE /auth/session'].includes(`${method} ${path}`);
+ if (principal.scope === 'reading') return ['POST /reading/shortcut-pairing', 'GET /reading/session', 'GET /reading/list', 'GET /reading/item', 'POST /reading/capture', 'POST /reading/prepare', 'POST /reading/update', 'POST /reading/retry', 'DELETE /auth/session'].includes(`${method} ${path}`);
  return false;
 }
 

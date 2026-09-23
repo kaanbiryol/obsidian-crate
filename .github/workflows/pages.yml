@@ -8,6 +8,10 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
+      - "scripts/sign-reading-shortcut.mjs"
+      - "scripts/reading-shortcut-first-run.mjs"
+      - "scripts/reading-shortcut.test.mjs"
+      - "docs/shortcuts/save-to-crate.plist"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -37,6 +41,12 @@ jobs:
         run: npm run security:check
       - name: Build site styles
         run: npm run build:site
+      - name: Verify and sign the public iPhone shortcut
+        run: |
+          node --test scripts/reading-shortcut.test.mjs
+          npm run build:reading-shortcut -- --pairing
+          mkdir -p site/shortcuts/v1
+          cp "dist/Save to Crate (iOS 27).shortcut" "site/shortcuts/v1/Save to Crate (iOS 27).shortcut"
       - name: Upload static site
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:

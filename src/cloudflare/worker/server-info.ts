@@ -38,6 +38,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 		'devices-v1',
 		'reminders-v1',
  'reading-v1',
+ 'reading-shortcut-pairing-v1',
 		'notifications-v1',
 	]),
 });

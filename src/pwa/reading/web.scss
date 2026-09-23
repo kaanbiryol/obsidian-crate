@@ -11,3 +11,16 @@
 .crate-reminders-ui .crate-reading-settings { display: grid; gap: 10px; }
 .crate-reminders-ui .crate-reading-settings p { font-size: 14px; color: var(--text-muted); margin: 0 0 12px; line-height: 1.7; }
 .crate-reminders-ui .crate-reading-settings button { justify-content: flex-start; }
+
+.crate-reminders-ui .crate-reading-shortcut { min-width: 0; }
+.crate-reminders-ui .crate-reading-shortcut ol { padding-left: 24px; margin: 0; }
+.crate-reminders-ui .crate-reading-shortcut li { padding-left: 4px; margin-bottom: 24px; }
+.crate-reminders-ui .crate-reading-shortcut h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.crate-reminders-ui .crate-reading-shortcut .crate-action-button { min-height: 44px; white-space: normal; }
+.crate-reminders-ui .crate-reading-shortcut__code { display: grid; gap: 10px; margin-top: 16px; }
+.crate-reminders-ui .crate-reading-shortcut__code label { display: grid; gap: 8px; font-size: 14px; }
+.crate-reminders-ui .crate-reading-shortcut__code textarea { width: 100%; box-sizing: border-box; resize: vertical; font-size: 16px; line-height: 1.5; padding: 10px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+
+.crate-reminders-ui .crate-reading-settings-dialog { display: flex; flex-direction: column; overflow: hidden; }
+.crate-reminders-ui .crate-reading-settings-dialog .crate-modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.crate-reminders-ui .crate-reading-settings-dialog :is(.reminder-modal-header, .base-modal-drag-region) { flex-shrink: 0; }

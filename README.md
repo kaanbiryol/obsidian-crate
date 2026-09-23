@@ -69,9 +69,13 @@ and save using **Crate Reading** into the intended vault. Crate adopts explicitl
 marked clips, preserves their body and filename, and syncs them. It never re-extracts
 clips or adopts unrelated notes. Changing the Reading folder does not move files.
 
-On iPhone, **Set up shortcut** pairs a capture-only **Save to Crate** shortcut.
-The iOS 27 variant installs without questions; run it once from Shortcuts to enter
-your endpoint and Authorization header. Later shares reuse that setup.
+On iPhone with iOS 27 or later, open the web app’s **Reading settings → Set up
+iPhone shortcut**. Download **Save to Crate**, select **Add Shortcut**, then create
+and copy a pairing code. Run the shortcut from its library and paste the code;
+it connects to this server and remembers its own capture-only access. Codes work
+once and expire after 10 minutes. The download comes from Crate’s public website
+and contains no credentials; pairing stays on your server. In Obsidian, **Set up
+shortcut → Copy phone setup link** opens this flow on a newly connected phone.
 **Share → Save to Crate** presents a branded confirmation in an iOS browser sheet; **Saved** means the
 bookmark is committed on your server. Android browsers supporting Web Share Target
 can use **Share → Crate** after installing the web app. Pasting a link works in
@@ -81,7 +85,7 @@ Opened article text is cached offline, up to 50 articles or 20 MB. The web app
 keeps offline saves and edits pending until the server confirms them. Export
 pending work before clearing browser data. The iPhone shortcut requires a connection.
 Readers suppress remote images and active HTML; **Open note** uses Obsidian's normal
-rendering rules. Browser and capture credentials are separate, expire after 90 days,
+rendering rules. Browser and capture credentials are separate, last up to 90 days,
 and can be revoked in connected devices.
 
 See the [setup and testing guide](docs/read-it-later-testing.md),

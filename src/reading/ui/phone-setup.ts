@@ -8,10 +8,22 @@ export class ReadingPhoneSetup extends Modal {
   constructor(private plugin: CratePlugin) { super(plugin.app); }
   onOpen() {
     this.titleEl.setText('Save to Crate on iPhone');
+    this.contentEl.createEl('p', { text: 'On iOS 27 or later, use the web app on your iPhone to download and pair the shortcut.' });
+    new Setting(this.contentEl).setName('Set up in the web app').setDesc('Copy this setup link to your iPhone. It connects reading and opens shortcut setup; use it within 10 minutes.')
+      .addButton(button => button.setButtonText('Copy phone setup link').setCta().onClick(async () => {
+        button.setDisabled(true);
+        try {
+          const access = await readingServerRequest<{ url: string }>(this.plugin, '/reading/access', { kind: 'reading' });
+          const url = new URL(access.url); url.searchParams.set('setup', 'shortcut');
+          await navigator.clipboard.writeText(url.href); new Notice('Phone setup link copied. Open it on your iPhone.');
+        } catch (error) { new Notice(error instanceof Error ? error.message : 'Could not create a phone setup link.'); }
+        finally { button.setDisabled(false); }
+      }));
+    this.contentEl.createEl('h3', { text: 'Manual setup for older shortcuts' });
     const setup = this.contentEl.createEl('p');
-    setup.appendText('On iOS 27, install ');
+    setup.appendText('For an existing manual-setup copy of ');
     setup.createEl('strong', { text: 'Save to Crate (iOS 27)' });
-    setup.appendText(', then run it once from your shortcut library. Paste the endpoint and authorization header when asked. It remembers them for future shares; run it from your library again to change the setup. The older template asks for these values during installation. The capture credential can save links but cannot read your vault or reading library.');
+    setup.appendText(', run it once from your shortcut library. Paste the endpoint and authorization header when asked. It remembers them for future shares; run it from your library again to change the setup. The older template asks for these values during installation. The capture credential can save links but cannot read your vault or reading library.');
     this.contentEl.createEl('p', { text: 'To build your own shortcut, follow these steps and enable it in the share sheet for URLs and web pages.' });
     const steps = this.contentEl.createEl('ol');
     for (const text of [
