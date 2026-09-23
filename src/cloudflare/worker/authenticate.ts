@@ -10,6 +10,7 @@ export interface AuthPrincipal {
 	scope: AuthScope;
 	folderPath?: string;
  readingGeneration?: string;
+	expiresAt?: number;
 }
 
 export type AuthenticationResult =
@@ -42,10 +43,10 @@ export async function authenticateWorkerRequest(
 
 	try {
 		const tokenHash = await sha256Hex(token);
-		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation FROM auth_tokens
+		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation, expires_at FROM auth_tokens
 			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
 			.bind(tokenHash, Date.now())
-			.first<{ id: string; scope?: string | null; folder_path?: string | null; reading_generation?: string | null }>();
+			.first<{ id: string; scope?: string | null; folder_path?: string | null; reading_generation?: string | null; expires_at?: number | null }>();
 		if (!row?.id) {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
@@ -69,6 +70,7 @@ export async function authenticateWorkerRequest(
 			principal: {
 				tokenId: row.id,
  ...(row.reading_generation ? { readingGeneration: row.reading_generation } : {}),
+				...(row.expires_at ? { expiresAt: row.expires_at } : {}),
 				scope: row.scope,
 				...(row.folder_path ? { folderPath: row.folder_path } : {}),
 			},

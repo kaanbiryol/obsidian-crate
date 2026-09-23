@@ -29,15 +29,26 @@ const REMINDERS_SCOPE_ROUTES = new Set([
 	'DELETE /auth/session',
 ]);
 
+const READING_LIBRARY_ROUTES = new Set([
+	'POST /reading/shortcut-pairing',
+	'GET /reading/session',
+	'GET /reading/list',
+	'GET /reading/item',
+	'POST /reading/capture',
+	'POST /reading/prepare',
+	'POST /reading/update',
+	'POST /reading/retry',
+]);
+
 export function isAuthenticatedRouteAllowed(
 	principal: AuthPrincipal,
 	path: string,
 	method: RouteMethod,
 ): boolean {
 	if (principal.scope === 'vault') return true;
- if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`);
+ if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`) || READING_LIBRARY_ROUTES.has(`${method} ${path}`);
  if (principal.scope === 'reading_capture') return ['POST /reading/capture', 'POST /reading/prepare'].includes(`${method} ${path}`);
- if (principal.scope === 'reading') return ['POST /reading/shortcut-pairing', 'GET /reading/session', 'GET /reading/list', 'GET /reading/item', 'POST /reading/capture', 'POST /reading/prepare', 'POST /reading/update', 'POST /reading/retry', 'DELETE /auth/session'].includes(`${method} ${path}`);
+ if (principal.scope === 'reading') return READING_LIBRARY_ROUTES.has(`${method} ${path}`) || `${method} ${path}` === 'DELETE /auth/session';
  return false;
 }
 

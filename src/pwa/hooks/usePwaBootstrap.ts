@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
 	AUTH_TOKEN_KEY,
+	PWA_AUTH_CHANGED_EVENT,
 	PWA_LOGOUT_KEY,
 	applyConfigFromUrl,
 	finishEnrollment,
@@ -108,6 +109,7 @@ export function usePwaBootstrap({
 							// Other tabs read config on the auth storage event.
 							saveConfig(nextConfig);
 							localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+							window.dispatchEvent(new Event(PWA_AUTH_CHANGED_EVENT));
 							sessionCurrent = capturePwaSession();
 							setAuthToken(nextToken);
 						}

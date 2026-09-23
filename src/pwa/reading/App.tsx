@@ -2,6 +2,7 @@ import { ShortcutSetup } from './ShortcutSetup';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
 import { logoutReadingApp } from './logout';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
+import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT } from '../config';
 import { applyPwaUpdate } from '../apply-update';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
@@ -16,7 +17,7 @@ import { ReadingThemeIcon } from './ReadingThemeIcon';
 import { registerPwaServiceWorker } from '../api';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
-import { drainReading, loadReading, queueReading, readingRequest } from './api';
+import { connectReadingFromReminders, drainReading, loadReading, queueReading, readingRequest } from './api';
 import { READING_SESSION_KEY, readingSession, pendingReading, readValue, writeValue, cacheReadingArticle, exportReadingData,
   readingDatabase, type ReadingSession, type ReadingCache, type PendingReading } from './storage';
 
@@ -36,9 +37,32 @@ function ReadingAppContent() {
   const [shortcutOpen, setShortcutOpen] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
   const [requestedItem, setRequestedItem] = useState(new URL(location.href).searchParams.get('item'));
   const [recovery, setRecovery] = useState(false);
-  const alive = useRef(true), refreshing = useRef(false), savingRef = useRef(false);
+  const [connecting, setConnecting] = useState(false);
+  const alive = useRef(true), refreshing = useRef(false), savingRef = useRef(false), connectingRef = useRef(false);
   const navigation = useRef(0);
   const run = useCallback(async (action: () => Promise<void>) => { try { await action(); } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Reading is unavailable.'); } }, []);
+  const connect = useCallback(async () => {
+    if (connectingRef.current || !navigator.onLine || !localStorage.getItem(AUTH_TOKEN_KEY)) return;
+    connectingRef.current = true; setConnecting(true);
+    try {
+      const next = await connectReadingFromReminders();
+      if (!alive.current || !next) return;
+      const saved = await readValue<ReadingCache>(`list:${next.id}`);
+      if (saved) saved.items.forEach(item => validateReadingMetadata({ ...item }));
+      const work = await pendingReading(next);
+      const draft = await readValue<{ url: string; title: string }>(`draft:${next.id}`);
+      const db = await readingDatabase();
+      let hasEarlierChanges = false;
+      for (const key of (await db.getAllKeys('values')).filter(key => key.startsWith('pending:') && key !== `pending:${next.id}`)) {
+        const value = await db.get('values', key); if (!Array.isArray(value) || value.length) { hasEarlierChanges = true; break; }
+      }
+      if (!alive.current || readingSession()?.id !== next.id) return;
+      setCache(saved ?? null); setPending(work); setRecovery(hasEarlierChanges);
+      if (draft?.url || draft?.title) { setUrl(draft.url); setTitle(draft.title); setAdding(true); }
+      setSession(next); setError(null);
+    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Reading is unavailable.'); }
+    finally { connectingRef.current = false; if (alive.current) setConnecting(false); }
+  }, []);
   const refresh = useCallback(async (current = session) => {
     if (!current || refreshing.current) return; refreshing.current = true;
     try {
@@ -90,14 +114,35 @@ function ReadingAppContent() {
     return () => { alive.current = false; };
   }, [run]);
   useEffect(() => {
+    if (!ready || session) return;
+    const changed = (event: StorageEvent) => { if (event.key === AUTH_TOKEN_KEY || event.key === READING_SESSION_KEY || event.key === null) void connect(); };
+    const retry = () => { void connect(); };
+    const resume = () => { if (document.visibilityState === 'visible') retry(); };
+    window.addEventListener('online', retry);
+    window.addEventListener('pageshow', retry);
+    window.addEventListener('storage', changed);
+    window.addEventListener(PWA_AUTH_CHANGED_EVENT, retry);
+    document.addEventListener('visibilitychange', resume);
+    retry();
+    return () => { window.removeEventListener('online', retry); window.removeEventListener('pageshow', retry); window.removeEventListener('storage', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, retry); document.removeEventListener('visibilitychange', resume); };
+  }, [ready, session, connect]);
+  useEffect(() => {
     if (!session || !ready) return;
-    void run(() => refresh(session));
-    const reload = () => { if (document.visibilityState === 'visible') void run(() => refresh(session)); };
-    const changed = () => { if (readingSession()?.id !== session.id) { navigation.current++; setSession(null); setCache(null); setReader(null); } else reload(); };
+    const reload = () => { if (document.visibilityState === 'visible') void run(async () => {
+      if (session.source === 'reminders' && navigator.onLine) {
+        const current = await connectReadingFromReminders();
+        if (!current || current.id !== session.id || current.generation !== session.generation) {
+          navigation.current++; setSession(null); setCache(null); setReader(null); setPending([]); return;
+        }
+      }
+      await refresh(session);
+    }); };
+    const changed = () => { const current = readingSession(); if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) { navigation.current++; setSession(null); setCache(null); setReader(null); setPending([]); if (!share) { setUrl(''); setTitle(''); setAdding(false); } } else reload(); };
+    reload();
     const timer = window.setInterval(reload, 30_000);
-    window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); document.addEventListener('visibilitychange', reload);
-    return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); document.removeEventListener('visibilitychange', reload); };
-  }, [session, ready, refresh, run]);
+    window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
+    return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
+  }, [session, ready, refresh, run, share]);
   useEffect(() => { if (session && ready) void run(() => writeValue(`draft:${session.id}`, { url, title }, session)); }, [session, ready, url, title, run]);
   const open = useCallback(async (item: ReadingItem) => {
     if (!session) return;
@@ -135,13 +180,14 @@ function ReadingAppContent() {
       setStatus('Link kept on this device until the server confirms it.'); await refresh();
     } finally { savingRef.current = false; setSaving(false); }
   };
-  if (!ready) return <main className="crate-reading" role="status">Opening Reading…</main>;
+  if (!ready || (connecting && !session)) return <main className="crate-reading" role="status">Opening Reading…</main>;
+  const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
-    {error && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => void run(() => refresh())}>Retry</Button></p>}
+    {error && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(() => refresh()); else void connect(); }}>Retry</Button></p>}
     {status && status !== 'Available offline' && <p className="crate-reading__notice" role="status">{status}</p>}
     {pending.length > 0 && <details className="crate-reading__notice" open><summary>{pending.length} pending {pending.length === 1 ? 'change' : 'changes'}</summary><ul>{pending.map(op => <li key={op.id}>{op.action === 'capture' ? String(op.intent.url) : 'Reading update'} — {op.error ?? 'Waiting for server confirmation'}{op.review ? ' · Review required' : ''}</li>)}</ul><Button variant="outline" onClick={() => void run(() => refresh())}>Retry saved changes</Button><Button variant="outline" onClick={() => void run(exportReadingData)}>Export pending work</Button></details>}</>;
   return <main className="crate-reading-web">
-    {!session ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>In Obsidian, open Crate settings → Reading → Open web reading to connect this browser.</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}<p>To install on iPhone, open your Reading setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>{notices}</section> : <>
+    {!session ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>{remindersConnected ? 'Reading uses this app’s existing connection. In Obsidian, enable server reading in Crate settings.' : 'In Obsidian, open Crate settings → Reading → Open web reading to connect this browser.'}</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}{!remindersConnected && <p>To install on iPhone, open your Reading setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>}{notices}</section> : <>
       <ReadingLibraryPanel snapshot={{ items: cache?.items ?? [], issues: cache?.issues ?? [], loading: !cache && !error, error: !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={() => { setError(null); setAdding(true); }} onOpen={open} onUpdate={update} onRefresh={refresh} onSettings={() => setSettingsOpen(true)} headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id}
         reader={reader && <ReadingReader item={reader.item} markdown={reader.markdown} status="Available offline" notice={notices} onBack={() => history.back()} onUpdate={changes => update(reader.item, changes)} onRetry={async () => { await queueReading(session, 'retry', { id: reader.item.crate_reading_id }); await refresh(); setStatus('Article extraction requested.'); }} />} />
       {adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} title={title} onUrl={setUrl} onTitle={setTitle} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => void run(save)} /></ReadingDialog>}

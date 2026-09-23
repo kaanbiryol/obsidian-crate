@@ -22,6 +22,17 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     };
     await request('/reading/policy', vault.token, { enabled: true, folderPath: 'Reading', revision: null });
     const session = await browser();
+    const remindersExpiry = Date.now() + 60_000;
+    await runtime.db.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,expires_at) VALUES ('reminders-browser',?,'reminders','Reminders',?)")
+      .bind(hash('reminders-browser'), remindersExpiry).run();
+    const remindersPair = await request('/reading/shortcut-pairing', 'reminders-browser');
+    assert.equal(remindersPair.status, 200);
+    const remindersGrant = { token: new URL(remindersPair.body.pairingCode).hash.slice(1) };
+    const remindersCapture = await request('/reading/shortcut-exchange', '', remindersGrant);
+    assert.equal(remindersCapture.status, 200);
+    const remindersCredential = await runtime.db.prepare('SELECT expires_at FROM auth_tokens WHERE token_hash=?')
+      .bind(hash(remindersCapture.body.authorization.slice('Bearer '.length))).first();
+    assert.ok(remindersCredential.expires_at <= remindersExpiry);
     const pair = async (owner = session) => {
       const result = await request('/reading/shortcut-pairing', owner.token);
       assert.equal(result.status, 200, JSON.stringify(result)); assert.equal(result.cache, 'no-store');
@@ -71,6 +82,6 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     // Pairing does not save files or leak into an article handoff.
     assert.equal((await request('/reading/handoff', grant.token)).status, 401);
     assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 0);
-    assert.equal((await runtime.db.prepare("SELECT count(*) AS count FROM auth_tokens WHERE scope='reading_capture'").first()).count, 1);
+    assert.equal((await runtime.db.prepare("SELECT count(*) AS count FROM auth_tokens WHERE scope='reading_capture'").first()).count, 2);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });

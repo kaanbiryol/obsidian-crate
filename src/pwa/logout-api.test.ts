@@ -2,6 +2,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { afterEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
 import { AUTH_TOKEN_KEY } from './config';
+import { READING_SESSION_KEY } from './reading/storage';
 import { invalidatePwaSession } from './session-generation';
 import { performPwaLogout } from './hooks/usePwaSessionLifecycle';
 
@@ -28,4 +29,24 @@ it('dispatches the captured revocation after local logout while fencing ordinary
 	expect(network.mock.calls.filter(([path]) => path === '/auth/session')).toHaveLength(1);
 	expect(network.mock.calls.some(([path]) => path === '/reminders/create')).toBe(false);
 	await expect(apiFetch('/auth/session', { method: 'DELETE' })).rejects.toThrow('Session changed');
+});
+
+it('revokes a shared reminders and Reading credential once', async () => {
+	const token = 'shared-token';
+	const values = new Map([
+		[AUTH_TOKEN_KEY, token],
+		[READING_SESSION_KEY, JSON.stringify({ token, id: 'reminders:one:generation', folderPath: 'Reading', generation: 'generation', expiresAt: Date.now() + 60_000, source: 'reminders' })],
+	]);
+	vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null });
+	const network = vi.fn(async (path: string) => path === '/auth/session'
+		? new Response(null, { status: 204 })
+		: new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })));
+	vi.stubGlobal('fetch', network);
+	const failed = await performPwaLogout({
+		apiFetch: makeApiFetch(token, vi.fn()),
+		disablePushNotifications: async () => {},
+		clearLocalSession: () => { invalidatePwaSession(); values.delete(AUTH_TOKEN_KEY); },
+	});
+	expect(failed).toBe(false);
+	expect(network.mock.calls.filter(([path]) => path === '/auth/session')).toHaveLength(1);
 });
