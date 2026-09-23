@@ -17,6 +17,10 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/subscribe', 'POST')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/session', 'DELETE')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/links/title', 'POST')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/session', 'GET')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/list', 'GET')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/capture', 'POST')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/shortcut-pairing', 'POST')).toBe(true);
 	});
 
 	it('blocks reminder PWA tokens from vault and device-management APIs', () => {
@@ -28,5 +32,7 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/tokens', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/test', 'POST')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/reminders-enrollment-token', 'POST')).toBe(false);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/access', 'POST')).toBe(false);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/policy', 'POST')).toBe(false);
 	});
 });

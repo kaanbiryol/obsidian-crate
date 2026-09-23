@@ -1,7 +1,8 @@
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ReadingItem } from '@/reading/core/model';
+import { AUTH_TOKEN_KEY } from '../config';
 export const READING_SESSION_KEY = 'crate-reading-session-v1';
-export interface ReadingSession { token: string; id: string; folderPath: string; generation: string; expiresAt: number }
+export interface ReadingSession { token: string; id: string; folderPath: string; generation: string; expiresAt: number; source?: 'reminders' }
 export interface PendingReading { id: string; sessionId: string; action: 'capture' | 'update' | 'retry'; intent: Record<string, unknown>; body?: string; error?: string; review?: boolean }
 export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number }
 interface ReadingDatabase extends DBSchema { values: { key: string; value: unknown } }
@@ -24,10 +25,13 @@ export function readingSession(): ReadingSession | null {
   if (!raw) return null;
   const value = JSON.parse(raw) as ReadingSession;
   if (!value.token || !value.id || !value.folderPath || !value.generation || !Number.isFinite(value.expiresAt)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
+  if (value.source && value.source !== 'reminders') throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
+  if (value.source === 'reminders' && localStorage.getItem(AUTH_TOKEN_KEY) !== value.token) return null;
   return value;
 }
 export function assertReadingSession(session: ReadingSession) {
-  if (readingSession()?.id !== session.id) throw new Error('Reading sign-in changed. Reload this page.');
+  const current = readingSession();
+  if (current?.id !== session.id || current.token !== session.token || current.generation !== session.generation) throw new Error('Reading sign-in changed. Reload this page.');
 }
 export async function readValue<T>(key: string): Promise<T | undefined> { return (await readingDatabase()).get('values', key) as Promise<T | undefined>; }
 export async function writeValue(key: string, value: unknown, session?: ReadingSession): Promise<void> {

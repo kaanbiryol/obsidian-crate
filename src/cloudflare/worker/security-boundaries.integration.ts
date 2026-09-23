@@ -12,6 +12,7 @@ import { writeCommittedMarkdownFile } from './storage';
 import { makeApiFetch } from '@/pwa/api';
 import { performPwaLogout } from '@/pwa/hooks/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/session-generation';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
@@ -38,6 +39,31 @@ it('binds reads, source edits, and enrollment permissions to the original folder
   expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env)).status).toBe(200);
   await token('unbound', 'reminders', null);
   expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
+});
+it('uses an enrolled reminders session for Reading only while server Reading is enabled', async () => {
+  await token('browser'); await token('vault', 'vault', null);
+  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
+  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: null }), env)).status).toBe(200);
+  const session = await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env);
+  expect(session.status).toBe(200);
+  const sessionData = await session.json() as { id: string; folderPath: string; expiresAt: number };
+  expect(sessionData.id).toBe('browser');
+  expect(sessionData.folderPath).toBe('Reading');
+  expect(sessionData.expiresAt).toBeGreaterThan(Date.now());
+  expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+  const capture = await worker.fetch(request('/reading/capture', 'browser', {
+    url: 'https://example.invalid/shared-pwa', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+  }), env);
+  expect(capture.status).toBe(200);
+  const saved = await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/%'").first<{ path: string }>();
+  expect(saved?.path).toMatch(/^Reading\//);
+  expect((await worker.fetch(request('/reading/access', 'browser', { kind: 'reading' }), env)).status).toBe(403);
+  expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
+  const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
+  expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
+  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
+  expect((await worker.fetch(request('/auth/session', 'browser', undefined, 'DELETE'), env)).status).toBe(200);
+  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(401);
 });
 it('cannot replace or unsubscribe another session’s endpoint and revokes owned push on logout', async () => {
   await token('one'); await token('two');

@@ -9,7 +9,7 @@ import { CRATE_PROTOCOL_HEADER, CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 export async function logoutReadingApp(): Promise<string | null> {
   const reading = readingSession(), reminders = localStorage.getItem(AUTH_TOKEN_KEY);
   invalidatePwaSession();
-  const remote = Promise.allSettled([reading?.token, reminders].filter((token): token is string => !!token).map(async token => {
+  const remote = Promise.allSettled([...new Set([reading?.token, reminders].filter((token): token is string => !!token))].map(async token => {
     const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10_000), headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
     if (!response.ok) throw new Error('Session revocation failed');
   }));

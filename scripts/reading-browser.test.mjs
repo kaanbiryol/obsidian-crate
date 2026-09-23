@@ -111,6 +111,27 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')),null);
+    // An already enrolled Reminders PWA opens Reading with the same browser credential.
+    await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
+    const remindersEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+    await page.goto(`${origin}/notifications?browserToken=${remindersEnrollment.browserToken}`);
+    await page.waitForFunction(() => !!localStorage.getItem('crate-reminders-auth-token'));
+    await page.goto(`${origin}/notifications?section=reading`);
+    await page.getByText('Reading is disabled. Enable it in Crate settings.', { exact: false }).waitFor();
+    await runtime.db.prepare('UPDATE reading_policy SET enabled=1').run();
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.getByRole('heading',{name:'Reading',exact:true}).waitFor();
+    const linked = await page.evaluate(() => ({ reading: JSON.parse(localStorage.getItem('crate-reading-session-v1')), reminders: localStorage.getItem('crate-reminders-auth-token') }));
+    assert.equal(linked.reading.source, 'reminders'); assert.equal(linked.reading.token, linked.reminders);
+    await page.getByRole('button',{name:'Switch to Reminders',exact:true}).click();
+    await page.getByRole('button',{name:'Switch to Reading',exact:true}).click();
+    await page.getByRole('heading',{name:'Reading',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Reading settings'}).click();
+    await page.getByRole('button',{name:'Log out and clear device data'}).click();
+    await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
+    assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reminders-auth-token')), null);
+    assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')), null);
+    assert.equal((await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status, 401);
     assert.deepEqual(errors,[]);
   } catch (error) { await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
 });

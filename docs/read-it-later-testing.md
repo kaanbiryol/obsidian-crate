@@ -13,7 +13,7 @@ Save a public article, wait for extraction, open it, favorite it, add tags, arch
 1. Build with `npm run build`. Copy `dist/main.js`, `dist/styles.css`, and `manifest.json` into a test vault's `.obsidian/plugins/crate/` directory. Reload the plugin.
 2. In **Settings → Crate → Reading**, enable Reading on this device. Use **Crate: Add reading link** and **Crate: Open reading**. These work locally before connecting a server.
 3. Connect the test vault to a server built from this branch. For a fresh local server, use `npm run server -- start --local --data-dir ./test-results/reading-server`. For phone access, use the existing HTTPS server/tunnel setup described in the README.
-4. Select **Enable server reading**, then **Open web reading**. Use **Copy setup link** for a different browser or phone. Setup links expire after 10 minutes and are single use.
+4. Select **Enable server reading**. An already enrolled Reminders web app should open Reading through its feature switch without another setup link. For a browser without a Reminders connection, select **Open web reading** or use **Copy setup link** on another device. Setup links expire after 10 minutes and are single use.
 5. Select **Copy template**, import it from the clipboard in Obsidian Web Clipper, and save with **Crate Reading** into the test vault. Crate preserves the clip's body and filename; it appears in the web library after normal sync. With automatic sync off, select **Crate: Sync now**.
 
 The reader suppresses remote images and active HTML. **Open note** uses Obsidian's normal Markdown rendering. Unmarked notes are not adopted. Changes to Reading metadata preserve personal notes and unknown YAML properties.

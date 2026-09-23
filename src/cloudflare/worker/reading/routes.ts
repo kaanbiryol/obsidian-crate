@@ -37,7 +37,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     if (path === '/reading/prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
     if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
     if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);
-    if (path === '/reading/session' && request.method === 'GET') return readingResponse({ folderPath: current.folder_path, generation: current.generation, day: Math.floor(Date.now() / 86400_000) });
+    if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });
     if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
     if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
     if (!await projectReading(env, current)) throw new ReadingError('Your Reading library is being indexed. Try refreshing shortly.', 503);

@@ -10,7 +10,7 @@ const invalidPairing = () => new ReadingError('This pairing code expired or was 
 // Enrollment scopes name the issuer so revoking it also invalidates unredeemed
 // codes. Existing library/install exchanges explicitly reject these scopes.
 export async function issueShortcutPairing(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, origin: string) {
-  if (principal.scope !== 'reading' && principal.scope !== 'vault') throw new ReadingError('Reading access is required.', 403);
+  if (principal.scope !== 'reading' && principal.scope !== 'reminders' && principal.scope !== 'vault') throw new ReadingError('Reading access is required.', 403);
   if (!origin.startsWith('https://')) throw new ReadingError('Open Crate over HTTPS to connect an iPhone shortcut.');
   const token = secret(), expiresAt = Date.now() + 10 * 60_000;
   const scope = `reading_capture:${principal.tokenId}`;
@@ -31,7 +31,8 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
     JOIN auth_tokens a ON e.scope='reading_capture:' || a.id
     JOIN reading_policy p ON p.id=1 AND p.enabled=1 AND p.generation=e.generation
     WHERE e.token_hash=? AND e.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)
-      AND (a.scope='vault' OR (a.scope='reading' AND a.folder_path=p.folder_path AND a.reading_generation=p.generation))`;
+      AND (a.scope='vault' OR (a.scope='reminders' AND a.folder_path IS NOT NULL)
+        OR (a.scope='reading' AND a.folder_path=p.folder_path AND a.reading_generation=p.generation))`;
   const now = Date.now();
   const grant = await db.prepare(`SELECT a.id ${grantSql}`).bind(hash, now, now).first<{ id: string }>();
   if (!grant) throw invalidPairing();

@@ -4,7 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
 import { clearReminderDrafts } from '../reminder-drafts';
 import { clearReminderOutbox } from '../reminder-outbox-storage';
-import { AUTH_TOKEN_KEY, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
+import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast, StoredConfig } from '../types';
 
@@ -29,7 +29,7 @@ export async function performPwaLogout({
 	let reading: ReturnType<typeof readingSession> = null;
   try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { /* Corrupt credentials must not prevent clearing local data. */ }
 	const cleanup = Promise.allSettled([
-    ...(reading ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '11' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
+    ...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '11' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
 		start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');
@@ -90,6 +90,7 @@ export function usePwaSessionLifecycle({
 		// Revoke in-memory authority before touching fallible browser storage.
 		try { if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY); }
 		catch { reportCleanupFailure('The saved sign-in could not be removed. Clear this site’s data in browser settings and revoke this browser session in Obsidian.'); }
+		window.dispatchEvent(new Event(PWA_AUTH_CHANGED_EVENT));
 		if (discardPrivateData && !clearReminderDrafts()) reportCleanupFailure('Drafts could not be cleared. Clear this site’s data in browser settings.');
 		try { if (discardPrivateData) clearReminderOutbox(); }
 		catch { reportCleanupFailure('Could not clear pending changes from this device. Clear this site’s data in browser settings.'); }

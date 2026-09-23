@@ -57,8 +57,11 @@ Enable **Settings → Crate → Reading → Enable reading on this device**. Use
 inbox, favorites, archive, tags, and search. Reading metadata and article text
 live in ordinary Markdown notes, carried by normal vault sync.
 
-On a compatible server, select **Enable server reading** and **Open web reading**.
-The web app has a **Reminders / Reading** switch and works without Obsidian open.
+On a compatible server, select **Enable server reading**. A web app already
+connected for Reminders opens Reading with the same connection; select Reading
+in its **Reminders / Reading** switch. For a new browser without a Reminders
+connection, select **Open web reading** or **Copy setup link** in Obsidian.
+The web app works without Obsidian open.
 The server saves the bookmark first, then extracts article text with Defuddle.
 Your server contacts the saved website without browser cookies or Crate credentials;
 there is no third-party extraction service. Failed or restricted pages remain saved

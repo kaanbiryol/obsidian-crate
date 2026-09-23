@@ -1,8 +1,33 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
-import { assertReadingSession, readingDatabase, readingLock, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
+import { AUTH_TOKEN_KEY } from '../config';
+import { capturePwaSession } from '../session-generation';
+import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingLock, readingSession, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
 export class ReadingApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+
+export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) return null;
+  const sessionCurrent = capturePwaSession();
+  const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
+    headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
+  const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string };
+  if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) return readingSession();
+  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status);
+  if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
+    || typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
+    throw new Error('Update your Crate server to use Reading with this app.');
+  }
+  const existing = readingSession();
+  if (existing && existing.source !== 'reminders') return existing;
+  if (existing?.token === token && existing.generation === data.generation) return existing;
+  const next: ReadingSession = { token, id: `reminders:${data.id}:${data.generation}`, folderPath: data.folderPath,
+    generation: data.generation, expiresAt: data.expiresAt, source: 'reminders' };
+  localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event('crate-reading-change'));
+  return next;
+}
 export async function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
   if (session) assertReadingSession(session);
   const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),

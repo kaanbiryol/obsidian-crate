@@ -17,7 +17,7 @@ export async function policy(db: D1Database): Promise<ReadingPolicy | null> {
 export async function authority(db: D1Database, principal: AuthPrincipal): Promise<ReadingPolicy> {
   const current = await policy(db);
   if (!current?.enabled) throw new ReadingError('Reading is disabled. Enable it in Crate settings.', 403);
-  if (principal.scope !== 'vault' && (principal.folderPath !== current.folder_path || principal.readingGeneration !== current.generation)) {
+  if (principal.scope !== 'vault' && principal.scope !== 'reminders' && (principal.folderPath !== current.folder_path || principal.readingGeneration !== current.generation)) {
     throw new ReadingError('Open a fresh Reading setup link from Crate settings.', 401);
   }
   return current;
