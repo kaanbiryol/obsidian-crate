@@ -8,6 +8,7 @@ import remindersViewStyles from './styles/reminders-view.css?raw-css';
 import responsiveStyles from './styles/responsive.css?raw-css';
 import themeStyles from './styles/theme.css?raw-css';
 import lightThemeStyles from './styles/theme-light.css?raw-css';
+import buttonFeedbackStyles from '../../../pwa/styles/button-feedback.scss?raw-css';
 import focusStyles from './styles/focus.css?raw-css';
 import pwaRemindersViewStyles from '../../../pwa/styles/reminders-view.scss?raw-css';
 
@@ -24,4 +25,5 @@ export const PWA_STYLES = [
 	themeStyles,
 	focusStyles,
 	featureSwitcherStyles,
+	buttonFeedbackStyles,
 ].join('');

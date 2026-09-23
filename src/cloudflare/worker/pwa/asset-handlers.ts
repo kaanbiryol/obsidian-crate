@@ -17,7 +17,7 @@ import {
 } from '../pwa';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 
-function htmlSecurityHeaders(): Record<string, string> {
+function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 	return {
 		'Cache-Control': 'no-store',
 		'Referrer-Policy': 'no-referrer',
@@ -27,7 +27,7 @@ function htmlSecurityHeaders(): Record<string, string> {
 		'Content-Security-Policy': [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
-			"script-src 'self'",
+			`script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''}`,
 			"connect-src 'self'",
 			"img-src 'self' data:",
 			"manifest-src 'self'",
@@ -60,10 +60,11 @@ function versionedAssetHeaders(request: Request): Record<string, string> {
 }
 
 export function handleNotificationsPage(request: Request): Response {
-	return new Response(createPwaHtml(request.url), {
+	const nonce = crypto.randomUUID();
+	return new Response(createPwaHtml(request.url, nonce), {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8',
-			...htmlSecurityHeaders(),
+			...htmlSecurityHeaders(nonce),
 			...corsHeaders(),
 		},
 	});

@@ -21,7 +21,7 @@ export function PwaRemindersSkeletonRows() {
 export function PwaRemindersOpening({ tab, project }: { tab: StartTab; project: string | null }) {
 	return <main className="pwa-mode-opening pwa-reminders-opening">
 		<header className="pwa-mode-opening__header">
-			<div className="pwa-mode-opening__heading"><h1>{project ?? TITLES[tab]}</h1><span className="pwa-mode-opening__meta pwa-mode-opening__shape" aria-hidden="true" /></div>
+			<div className="pwa-mode-opening__heading"><div className="view-header-title-row"><h1 className="view-header-title">{project ?? TITLES[tab]}</h1></div><div className="pwa-reminders-opening__meta"><span className="pwa-mode-opening__meta pwa-mode-opening__shape" aria-hidden="true" /></div></div>
 			<div className="pwa-mode-opening__actions"><span className="pwa-mode-opening__action pwa-mode-opening__shape" aria-hidden="true" /><FeatureSwitcherButton /></div>
 		</header>
 		<div className="pwa-mode-opening__content"><PwaRemindersSkeletonRows /></div>

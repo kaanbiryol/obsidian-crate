@@ -1,0 +1,19 @@
+// Momentary actions use press feedback; focus and touch-emulated hover must not
+// turn them into selected cards. Real choices retain their selected styling.
+.crate-reminders-ui .crate-icon-button[data-variant="ghost"]:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transition: opacity 120ms ease;
+  &:hover { background: transparent; border-color: transparent; box-shadow: none; }
+  &:active { opacity: .5; }
+}
+@media (hover: none) {
+  .crate-reminders-ui .crate-icon-button[data-variant="ghost"][data-tone="neutral"]:hover { color: var(--text-muted); }
+  .crate-reminders-ui .pwa-sync-indicator__button:hover { background: transparent; }
+  .crate-reminders-ui :is(.crate-action-button, .pwa-sync-indicator__button):not(:disabled):active { opacity: .5; }
+  .crate-reminders-ui .crate-action-button[data-variant="outline"]:not(:disabled):hover { background: transparent; }
+  .crate-reminders-ui .crate-action-button[data-variant="primary"]:not(:disabled):hover { background: var(--crate-picker-primary-bg); }
+}
+// A modal makes the source screen inert; it must not retain pressed feedback.
+.crate-reminders-ui [inert] .crate-icon-button:not(:disabled):active { opacity: 1; }

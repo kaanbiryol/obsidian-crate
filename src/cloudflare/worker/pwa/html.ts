@@ -1,3 +1,4 @@
+import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
@@ -9,7 +10,7 @@ import {
 	PWA_THEME_COLOR_META_ID,
 } from '../../../pwa/theme';
 
-export function createPwaHtml(requestUrl?: string): string {
+export function createPwaHtml(requestUrl?: string, nonce: string = crypto.randomUUID()): string {
 	const manifestHref = manifestHrefForUrl(requestUrl);
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -17,11 +18,7 @@ export function createPwaHtml(requestUrl?: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<style>
-:root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
-html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
-@media ${PWA_LIGHT_SCHEME_MEDIA}{:root{--pwa-launch-bg:${PWA_LIGHT_CHROME_COLOR};color-scheme:light}html,body,#app{background-color:${PWA_LIGHT_CHROME_COLOR};color-scheme:light}}
-</style>
+
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
 <!-- Let sheet backdrops cover the status bar; content reserves its top safe area. -->
@@ -30,6 +27,12 @@ html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
 <meta name="mobile-web-app-capable" content="yes">
 <meta id="${PWA_THEME_COLOR_META_ID}" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="${PWA_LIGHT_CHROME_COLOR}" media="${PWA_LIGHT_SCHEME_MEDIA}">
+<script nonce="${nonce}" id="pwa-theme-init">${PWA_THEME_INIT_JS}</script>
+<style>
+:root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
+html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
+@media ${PWA_LIGHT_SCHEME_MEDIA}{:root{--pwa-launch-bg:${PWA_LIGHT_CHROME_COLOR};color-scheme:light}}
+</style>
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="${manifestHref}">
@@ -43,7 +46,7 @@ ${PWA_STYLES}
 <style id="${PWA_LIGHT_THEME_STYLE_ID}" media="${PWA_LIGHT_SCHEME_MEDIA}">
 ${PWA_LIGHT_THEME_STYLES}
 </style>
-	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
+	<script nonce="${nonce}" id="pwa-theme-styles">${PWA_THEME_STYLES_JS}</script>
 </head>
 <body>
 	<div id="pwa-update-transition" role="status" aria-live="polite">${PWA_UPDATE_SCREEN_HTML}</div>

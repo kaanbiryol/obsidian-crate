@@ -49,6 +49,44 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByLabel('Title (optional)').fill('A browser article');
     await page.getByRole('button',{name:'Save link',exact:true}).click();
     await page.getByRole('button',{name:/example.invalid A browser article/}).waitFor();
+    // Exercise the real populated library and authenticated Reminders together,
+    // in a separate device session so this test's logout/recovery flow is unchanged.
+    const modeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+    try {
+      const modePage = await modeContext.newPage();
+      const modeEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+      await modePage.goto(`${origin}/notifications?browserToken=${modeEnrollment.browserToken}`);
+      await expect(modePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
+      await modePage.getByRole('button', { name: 'Switch to Reading', exact: true }).tap();
+      await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
+      for (const destination of ['Reminders', 'Reading']) {
+        await modePage.waitForFunction(() => !document.querySelector('[data-leaving="true"]'));
+        await modePage.evaluate(() => {
+          window.__modeFrames = [];
+          const root = document.querySelector('.crate-feature-shell');
+          const observer = new MutationObserver(() => {
+            if (!root.querySelector('[data-entering="true"]')) return;
+            observer.disconnect();
+            const started = performance.now();
+            const frame = () => {
+              const panels = [...root.querySelectorAll('.crate-feature-panel')];
+              window.__modeFrames.push(panels.map(el => Number(getComputedStyle(el).opacity)));
+              if (performance.now() - started < 260) requestAnimationFrame(frame);
+              else window.__modeDone = true;
+            };
+            window.__modeDone = false;
+            requestAnimationFrame(frame);
+          });
+          observer.observe(root, { attributes: true, subtree: true, attributeFilter: ['data-entering'] });
+        });
+        await modePage.getByRole('button', { name: `Switch to ${destination}`, exact: true }).tap();
+        await modePage.waitForFunction(() => window.__modeDone === true);
+        const frames = await modePage.evaluate(() => window.__modeFrames);
+        assert.ok(frames.filter(values => values.every(value => value > .05 && value < .95)).length >= 2, `${name}: populated mode fade to ${destination}: ${JSON.stringify(frames)}`);
+      }
+      await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
+      console.log(`${name}: connected Reminders and populated Reading fade in both directions with touch taps`);
+    } finally { await modeContext.close(); }
     await page.getByRole('button',{name:/example.invalid A browser article/}).click();
     await page.getByText('Available offline',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();

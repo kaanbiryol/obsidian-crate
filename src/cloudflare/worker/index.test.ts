@@ -305,10 +305,13 @@ describe('worker entrypoint', () => {
 			createEnv() as never,
 		);
 
-		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self';");
+		const pageHtml = await pageResponse.text();
+		const nonce = /<script nonce="([^"]+)"/.exec(pageHtml)?.[1];
+		expect(nonce).toBeTruthy();
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}';`);
 		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");
 		expect(handoffResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
-		expect(await pageResponse.text()).not.toContain('<script>');
+		expect(pageHtml).not.toContain('<script>');
 		expect(await handoffResponse.text()).not.toContain('<script>');
 		expect(themeScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
 		expect(handoffScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');

@@ -4,10 +4,11 @@ import { ThemeIconProvider } from '@/reminders/components/theme-icon';
 import { PwaThemeIcon } from './components/PwaThemeIcon';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { ReadingOpening } from './reading/ReadingOpening';
+import { usePwaBackGesture } from './hooks/usePwaBackGesture';
 
 const Reading = lazy(() => import('./reading/App'));
 const currentSection = (): CrateSection => new URL(location.href).searchParams.get('section') === 'reading' ? 'reading' : 'reminders';
-const MODE_TRANSITION_MS = 200;
+const MODE_TRANSITION_FALLBACK_MS = 1_000;
 
 export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 	usePwaInputModality();
@@ -15,6 +16,7 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
 	const [visited, setVisited] = useState(() => new Set([section]));
 	const root = useRef<HTMLDivElement>(null), restoreFocus = useRef(false);
+	usePwaBackGesture(root);
 	const sectionRef = useRef(section);
 	const locations = useRef<Record<CrateSection, { url: string; state: unknown }>>({
 		reading: { url: '/notifications?section=reading', state: null }, reminders: { url: '/notifications', state: null },
@@ -33,7 +35,9 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 	}, [showSection]);
 	useEffect(() => {
 		if (!leavingSection) return;
-		const timeout = window.setTimeout(() => setLeavingSection(null), MODE_TRANSITION_MS);
+		// Only recover if the browser cancels/suppresses animation events. Normal
+		// completion follows the rendered animation, not an independent 200ms clock.
+		const timeout = window.setTimeout(() => setLeavingSection(null), MODE_TRANSITION_FALLBACK_MS);
 		return () => window.clearTimeout(timeout);
 	}, [leavingSection, section]);
 	useEffect(() => {
@@ -79,7 +83,10 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 		restoreFocus.current = true;
 		showSection(next);
 	};
-	return <ThemeIconProvider renderer={PwaThemeIcon}><div ref={root} className="crate-feature-shell">
+	return <ThemeIconProvider renderer={PwaThemeIcon}><div ref={root} className="crate-feature-shell" onAnimationEnd={event => {
+		const panel = event.target as HTMLElement;
+		if (event.animationName === 'crate-mode-fade-in' && panel.dataset.crateSection === sectionRef.current) setLeavingSection(null);
+	}}>
 		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading'} aria-hidden={section !== 'reading'}><FeatureNavigationContext.Provider value={{ section: 'reading', toggle }}>{visited.has('reading') && <Suspense fallback={<ReadingOpening />}><Reading /></Suspense>}</FeatureNavigationContext.Provider></div>
 		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders'} aria-hidden={section !== 'reminders'}><FeatureNavigationContext.Provider value={{ section: 'reminders', toggle }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
 	</div></ThemeIconProvider>;

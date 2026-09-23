@@ -3,7 +3,6 @@
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .crate-reminders-ui .pwa-reading-opening { padding-top: var(--pwa-safe-area-top); }
-.crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__header { padding-top: 17px; }
 .crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: 44px; margin: 16px 18px 20px; border-radius: 10px; }
 .crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
 .crate-reminders-ui .crate-reading-welcome { position: relative; max-width: 440px; margin: 0 auto; padding: 80px 28px 40px; overflow-y: auto; max-height: 100%; }
@@ -25,3 +24,11 @@
 .crate-reminders-ui .crate-reading-settings-dialog { display: flex; flex-direction: column; overflow: hidden; }
 .crate-reminders-ui .crate-reading-settings-dialog .crate-modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .crate-reminders-ui .crate-reading-settings-dialog :is(.reminder-modal-header, .base-modal-drag-region) { flex-shrink: 0; }
+
+// Use the library's real header tracks while the Reading module/session loads.
+.crate-reminders-ui .pwa-reading-opening__header .view-header-count { display: none; }
+.crate-reminders-ui .pwa-reading-opening__header .pwa-mode-opening__meta { margin-top: 0; }
+.crate-reminders-ui .pwa-reading-opening__sync { width: 44px; height: 44px; flex-shrink: 0; }
+.crate-reminders-ui.pwa-reading-root .crate-reading__header .view-header-title-row { min-height: 44px; }
+.crate-reminders-ui.pwa-reading-root .crate-reading__header .view-header-title-row > h1 { text-box: normal; margin-block: 0; padding-block: 0; }
+.crate-reminders-ui.pwa-reading-root .crate-reading__header .view-header-meta { height: 28px; min-height: 28px; }

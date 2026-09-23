@@ -50,6 +50,17 @@
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 
+	.pwa-reminders-view.is-primary {
+		.view-header-title {
+			font-size: var(--crate-view-title-size);
+			font-weight: var(--crate-view-title-weight);
+			letter-spacing: var(--crate-view-title-spacing);
+			line-height: var(--crate-view-title-leading);
+		}
+
+		.view-header-meta { height: 28px; min-height: 28px; margin-top: 6px; }
+	}
+
 	&.pwa-shadow-root, &.pwa-reading-root {
 		--crate-tab-active-color: var(--text-accent, var(--interactive-accent));
 		--crate-tab-active-bg: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
@@ -60,3 +71,16 @@
 		background: transparent;
 	}
 }
+
+// Reserve the same title and metadata tracks before and after hydration. The
+// loaded title includes a 44px sync target. Keep its line box identical to the skeleton.
+.crate-reminders-ui :is(.pwa-reminders-view .view-header-title-row, .pwa-reminders-opening .view-header-title-row) { min-height: 44px; }
+.crate-reminders-ui .pwa-reminders-opening__meta { display: flex; align-items: center; height: 28px; margin-top: 6px; }
+.crate-reminders-ui .pwa-reminders-opening__meta .pwa-mode-opening__meta { margin-top: 0; }
+.pwa-reminders-opening .pwa-mode-opening__header { flex-shrink: 0; }
+@media (min-width: 760px) { .pwa-reminders-opening .pwa-mode-opening__header { padding-inline: 40px; } }
+
+.crate-reminders-ui :is(.pwa-reminders-view, .pwa-reminders-opening) .view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
+
+.crate-reminders-ui .pwa-reminders-opening .view-header-title { font-size: 30px; font-weight: 700; line-height: 1.12; letter-spacing: -.04em; }
+@media (max-width: 759px) { .crate-reminders-ui .pwa-reminders-opening .view-header-title { font-size: 32px; letter-spacing: -.035em; } }
