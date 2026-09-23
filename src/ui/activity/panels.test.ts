@@ -59,7 +59,7 @@ it.each([false, true])('shows a conflict state without a duplicate sync subtitle
 
 it.each([
  { status: 'idle' as const, lastSync: null, title: 'No completed sync yet' },
- { status: 'offline' as const, lastSync: '2026-09-12T10:00:00Z', title: 'You’re offline' },
+ { status: 'offline' as const, lastSync: '2026-09-12T10:00:00Z', title: 'Server unavailable' },
 ])('does not claim completion for $title', ({ status, lastSync, title }) => {
  const element = new FakeElement('div');
  renderPendingPanel(element as never, [], false, false, null, '', { status, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 });

@@ -23,7 +23,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 		if (hasError) {
 			renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
 		} else if (state?.status === 'offline') {
-			renderEmptyState(container, 'wifi-off', 'You’re offline', 'Connect to the internet to check for changes.');
+			renderEmptyState(container, 'wifi-off', 'Server unavailable', 'Check the server connection above, then try again.');
 		} else if (state && !state.lastSync) {
 			renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'No successful sync is recorded on this device.');
 		} else {

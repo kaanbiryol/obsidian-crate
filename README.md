@@ -206,7 +206,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Sync Scope and Limits
 
-- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
+- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not scan or transfer vault files. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
 - Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.
