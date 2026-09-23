@@ -11,6 +11,7 @@ import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
+import { PwaRemindersSkeletonRows } from './PwaRemindersOpening';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import {
 	getCurrentHeaderData,
@@ -51,6 +52,7 @@ interface PwaRemindersAppShellProps {
 	backgroundInert?: boolean;
 	incomplete?: boolean;
 	checkingReminders?: boolean;
+	showLoadingSkeleton?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
@@ -81,6 +83,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	backgroundInert = false,
 	incomplete = false,
 	checkingReminders = false,
+	showLoadingSkeleton = false,
 	renderCard,
 	onAdd,
 	onReorder,
@@ -220,7 +223,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 										{...currentHeader}
 										countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 										large
-										showMeta
+										showMeta={!showLoadingSkeleton}
+										reserveMetaSpace={showLoadingSkeleton}
 										titleContent={headerTitleContent}
 										metaContent={headerMetaContent}
 										rightContent={headerRightContent?.(false)}
@@ -235,7 +239,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 							)}
 
 							<div className="reminders-content">
-								{viewPanels}
+								{showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : viewPanels}
 							</div>
 
 						</PwaNavigationScreen>

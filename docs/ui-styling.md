@@ -167,9 +167,19 @@ it. The PWA retains the existing durable capture and metadata outbox.
 
 The PWA's app switch is a single icon in each feature's existing header. Reading
 shows a checklist icon for **Switch to Reminders**; Reminders shows a book for
-**Switch to Reading**. One activation changes sections immediately.
-`FeatureShell.tsx` preserves mounted feature state and navigation, and restores
-keyboard focus to the destination's switch after its initial loading completes.
+**Switch to Reading**. The modes crossfade over roughly 200 ms. Scrolling content
+shrinks by 1.5% as it leaves and settles from 1.5% larger as it enters. The
+header, switch button, FAB, and bottom-bar geometry stay fixed; the titles,
+metadata, and bottom-bar items crossfade with their panels. The button icon
+rotates subtly and its surface pulses when the new mode appears. Reduced-motion
+users switch without animation. `FeatureShell.tsx` preserves mounted feature state
+and navigation, keeps the inactive panel inert, and restores keyboard focus to the
+destination's switch after its initial loading completes.
+Both PWA modes show layout-matched skeletons while their first usable data is
+loading. Reading uses the same row skeleton when the library has no cached data;
+Reminders uses card skeletons while a cached empty list is being checked. Neither
+shows a zero count until that empty result is confirmed, and background refreshes
+keep existing items visible.
 The same switch is available on both connection screens.
 
 Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark

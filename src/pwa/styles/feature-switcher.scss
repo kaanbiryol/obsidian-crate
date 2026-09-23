@@ -1,3 +1,108 @@
-.crate-feature-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; }
+.crate-feature-shell { position: relative; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden; background: var(--background-primary); }
+.crate-feature-panel {
+	position: absolute;
+	inset: 0;
+	min-height: 0;
+	overflow: hidden;
+	visibility: hidden;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 110ms ease, visibility 0s linear 200ms;
+}
+.crate-feature-panel > .pwa-shadow-root { height: 100%; }
+.crate-feature-panel[data-crate-section="reading"] { z-index: 1; background: var(--crate-app-bg); }
+.crate-feature-panel[data-active="true"] {
+	z-index: 2;
+	visibility: visible;
+	opacity: 1;
+	pointer-events: auto;
+	transition: opacity 140ms ease 60ms, visibility 0s;
+}
+
+// Only the scrolling content gets depth. Headers, switch buttons, FABs, and
+// bottom-bar surfaces stay in the same place while the panels crossfade.
+.crate-feature-panel :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) {
+	scale: 1.015;
+	transition: scale 200ms cubic-bezier(.2, .8, .2, 1);
+}
+.crate-feature-panel[data-leaving="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { scale: .985; }
+.crate-feature-panel[data-active="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { scale: 1; }
+
+.crate-feature-panel .pwa-feature-switch-button {
+	background: transparent;
+	border-color: transparent;
+	border-radius: 12px;
+	transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+.crate-feature-panel[data-active="true"] .pwa-feature-switch-button { background: var(--crate-panel-bg); border-color: var(--crate-divider); }
+.crate-feature-panel .pwa-feature-switch-button:active { transform: scale(.92); }
+.crate-feature-panel[data-entering="true"] .pwa-feature-switch-button { animation: crate-mode-switch-pulse 200ms ease-out; }
+.crate-feature-panel .pwa-feature-switch-button svg {
+	opacity: .4;
+	transform: rotate(-10deg) scale(.86);
+	transition: opacity 160ms ease, transform 200ms cubic-bezier(.2, .8, .2, 1);
+}
+.crate-feature-panel[data-active="true"] .pwa-feature-switch-button svg { opacity: 1; transform: rotate(0) scale(1); transition-delay: 20ms; }
+
+@keyframes crate-mode-switch-pulse {
+	from { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), .18); }
+	to { box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0); }
+}
+
+.pwa-mode-opening {
+	--pwa-tabbar-content-height: 64px;
+	--pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom));
+	--reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area));
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	height: 100%;
+	width: 100%;
+	background: var(--background-primary);
+}
+.pwa-mode-opening__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+	min-height: 80px;
+	padding: calc(var(--pwa-safe-area-top) + 17px) 18px 11px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.pwa-mode-opening__heading { min-width: 0; }
+.pwa-mode-opening__heading h1 { overflow: hidden; margin: 0; color: var(--text-normal); font-size: var(--crate-view-title-size, 30px); font-weight: var(--crate-view-title-weight, 700); line-height: 1.12; letter-spacing: var(--crate-view-title-spacing, -.04em); text-overflow: ellipsis; white-space: nowrap; }
+.pwa-mode-opening__meta { width: 82px; height: 10px; margin-top: 10px; border-radius: 5px; }
+.pwa-mode-opening__actions { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.pwa-mode-opening__action { width: 44px; height: 44px; border-radius: 12px; }
+.pwa-mode-opening__shape { display: block; background: color-mix(in srgb, var(--text-muted) 16%, transparent); animation: crate-skeleton-breathe 1.4s ease-in-out infinite alternate; }
+.pwa-mode-opening__content { flex: 1; min-height: 0; overflow: hidden; }
+.pwa-reminders-opening .pwa-mode-opening__content { padding: 16px; }
+.pwa-reminders-skeleton { width: 100%; height: 100%; padding: 16px; }
+.pwa-reminders-opening .pwa-reminders-skeleton { padding: 0; }
+.pwa-reminders-skeleton__card { display: flex; align-items: flex-start; gap: 12px; min-height: 86px; margin-bottom: 10px; padding: 17px 16px; border: 1px solid var(--background-modifier-border); border-radius: var(--crate-radius-card, 16px); background: var(--crate-panel-bg, var(--background-primary-alt)); }
+.pwa-reminders-skeleton__check { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; }
+.pwa-reminders-skeleton__copy { display: flex; flex: 1; flex-direction: column; gap: 11px; min-width: 0; padding-top: 2px; }
+.pwa-reminders-skeleton__title { width: 72%; height: 15px; border-radius: 7px; }
+.pwa-reminders-skeleton__card:nth-child(2) .pwa-reminders-skeleton__title { width: 56%; }
+.pwa-reminders-skeleton__detail { width: 38%; height: 10px; border-radius: 5px; }
+.pwa-mode-opening__fab { position: absolute; right: 18px; bottom: calc(var(--reminders-tabbar-height) + 16px); width: 56px; height: 56px; border-radius: 50%; background: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-primary)); }
+.pwa-mode-opening__nav { display: flex; align-items: center; flex-shrink: 0; height: var(--reminders-tabbar-height); padding-bottom: var(--pwa-tabbar-safe-area); box-sizing: border-box; background: var(--pwa-tabbar-surface); box-shadow: inset 0 1px 0 var(--background-modifier-border); }
+.pwa-mode-opening__nav-item { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-width: 0; height: var(--pwa-tabbar-content-height); }
+.pwa-mode-opening__nav-icon { width: 23px; height: 23px; border-radius: 6px; }
+.pwa-mode-opening__nav-label { width: 42px; height: 8px; border-radius: 4px; }
+.pwa-mode-opening__nav-item:nth-child(2) .pwa-mode-opening__nav-label { width: 34px; }
+
+@media (min-width: 760px) { .pwa-mode-opening__fab { width: 48px; height: 48px; } }
+
+@media (prefers-reduced-motion: reduce) {
+	.crate-feature-panel, .crate-feature-panel[data-active="true"],
+	.crate-feature-panel :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content),
+	.crate-feature-panel .pwa-feature-switch-button,
+	.crate-feature-panel .pwa-feature-switch-button svg { transition: none; }
+	.crate-feature-panel .pwa-feature-switch-button { animation: none; }
+	.crate-feature-panel .pwa-feature-switch-button:active { transform: none; }
+	.pwa-mode-opening__shape { animation: none; }
+}
 .auth-card__brand > .pwa-feature-switch-button { margin-left: auto; }
 .pwa-feature-welcome-action { position: absolute; top: 16px; right: 20px; }

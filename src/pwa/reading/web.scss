@@ -1,10 +1,11 @@
 @use "../../ui/shared/styles/base-modal";
 .crate-reminders-ui { @include base-modal.styles; }
-.crate-feature-panel { flex: 1; min-height: 0; overflow: hidden; }
-.crate-feature-panel[hidden] { display: none; }
-.crate-feature-panel > .pwa-shadow-root { height: 100%; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+.crate-reminders-ui .pwa-reading-opening { padding-top: var(--pwa-safe-area-top); }
+.crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__header { padding-top: 17px; }
+.crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: 44px; margin: 16px 18px 20px; border-radius: 10px; }
+.crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
 .crate-reminders-ui .crate-reading-welcome { position: relative; max-width: 440px; margin: 0 auto; padding: 80px 28px 40px; overflow-y: auto; max-height: 100%; }
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
 .crate-reminders-ui .crate-reading-welcome p { color: var(--text-muted); line-height: 1.8; font-size: 14px; }

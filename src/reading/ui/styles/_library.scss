@@ -55,9 +55,20 @@
 	&__reader-empty p { font-size: 14px; line-height: 1.85; margin: 14px 0; }
 	&__more { display: flex; margin: 16px auto; }
 	&__tag-filter { margin: 0 12px 14px; font-size: 12px; }
-	&__loading { padding: 16px; color: var(--text-muted); font-size: 13px; }
-	&__loading div { height: 62px; margin-top: 18px; border-radius: 10px; background: var(--crate-panel-bg); }
+	&__loading { padding: 4px 12px 28px; }
+	&__loading-content { width: 100%; }
+	&__loading-shape { display: block; background: color-mix(in srgb, var(--text-muted) 16%, transparent); animation: crate-skeleton-breathe 1.4s ease-in-out infinite alternate; }
+	&__loading-group { width: 54px; height: 11px; margin: 4px 0 15px; border-radius: 5px; }
+	&__loading-row { display: flex; align-items: center; gap: 14px; min-height: 88px; }
+	&__loading-source { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 8px; }
+	&__loading-copy { display: flex; flex: 1; flex-direction: column; gap: 9px; min-width: 0; }
+	&__loading-title { width: 70%; height: 15px; border-radius: 7px; }
+	&__loading-row:nth-child(3) &__loading-title { width: 53%; }
+	&__loading-meta { width: 38%; height: 10px; border-radius: 5px; }
+	&__loading-action { width: 19px; height: 19px; flex: 0 0 19px; border-radius: 6px; }
 }
+@keyframes crate-skeleton-breathe { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .crate-reminders-ui .crate-reading__loading-shape { animation: none; } }
 @container reading (max-width: 1099px) {
 	.crate-reminders-ui .crate-reading {
 		&__layout { grid-template-columns: 310px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
