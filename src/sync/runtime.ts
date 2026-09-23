@@ -26,10 +26,13 @@ import {
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, mergeSyncResults, SYNC_ERROR_MESSAGES } from './sync-result';
+import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from './server-reachability';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
 export const FOREGROUND_SYNC_COOLDOWN_MS = 30_000;
+const SERVER_CHECK_DELAY_MS = 2_000;
+const SERVER_CHECK_COOLDOWN_MS = 60_000;
 
 export type ForegroundSyncReason = 'focus' | 'visible' | 'online';
 
@@ -48,6 +51,10 @@ export class SyncRuntime {
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+	private serverCheckTimer: ReturnType<typeof setTimeout> | null = null;
+	private serverCheckController: AbortController | null = null;
+	private lastServerCheckAt: number | null = null;
+	private connectionIssue: string | null = null;
 
 	async loadCurrentSyncedPreview(path: string) {
 		const api = this.apiClient;
@@ -98,7 +105,10 @@ export class SyncRuntime {
 
 	getState(): SyncState {
 		if (this.syncEngine) {
-			return this.syncEngine.getState();
+			const state = this.syncEngine.getState();
+			return this.connectionIssue && state.status === 'idle'
+				? { ...state, status: 'offline', lastError: this.connectionIssue }
+				: state;
 		}
 		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0 };
 	}
@@ -205,6 +215,9 @@ export class SyncRuntime {
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
+		this.clearServerCheck();
+		this.connectionIssue = null;
+		this.lastServerCheckAt = null;
 
 		this.stopEngine();
 		this.statusBar?.destroy();
@@ -225,9 +238,8 @@ export class SyncRuntime {
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
 			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
-			emitStateChange(this.stateChangeListeners, state, (nextState) => {
-				this.statusBar?.update(nextState);
-			});
+			if (state.status === 'syncing') this.connectionIssue = null;
+			this.emitCurrentState();
 		});
 
 		try {
@@ -278,6 +290,7 @@ export class SyncRuntime {
 		}
 
 		this.acceptingEvents = true;
+		if (!this.settings.automaticSync) this.scheduleServerCheck();
 	}
 
 	destroy(): void {
@@ -285,6 +298,8 @@ export class SyncRuntime {
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
+		this.clearServerCheck();
+		this.connectionIssue = null;
 		this.stopEngine();
 		this.statusBar?.destroy();
 		this.syncEngine = null;
@@ -354,7 +369,10 @@ export class SyncRuntime {
 	}
 
 	triggerForegroundSync(reason: ForegroundSyncReason): void {
-		if (!this.settings.automaticSync) return;
+		if (!this.settings.automaticSync) {
+			this.scheduleServerCheck();
+			return;
+		}
 		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
 		if (this.syncEngine.getState().status === 'syncing') return;
 		if (this.foregroundSyncTimer) return;
@@ -419,6 +437,8 @@ export class SyncRuntime {
 
 	updateSyncSettings(): void {
 		this.syncEngine?.updateSettings(this.settings);
+		if (this.settings.automaticSync) this.clearServerCheck();
+		else this.scheduleServerCheck();
 	}
 
 	async pushSharedSettingsBestEffort(): Promise<boolean> {
@@ -443,6 +463,49 @@ export class SyncRuntime {
 		if (this.foregroundSyncTimer) {
 			clearTimeout(this.foregroundSyncTimer);
 			this.foregroundSyncTimer = null;
+		}
+	}
+
+	private clearServerCheck(): void {
+		if (this.serverCheckTimer) clearTimeout(this.serverCheckTimer);
+		this.serverCheckTimer = null;
+		this.serverCheckController?.abort();
+		this.serverCheckController = null;
+	}
+
+	private scheduleServerCheck(): void {
+		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine || this.serverCheckTimer || this.serverCheckController) return;
+		if (this.lastServerCheckAt !== null && Date.now() - this.lastServerCheckAt < SERVER_CHECK_COOLDOWN_MS) return;
+		this.serverCheckTimer = setTimeout(() => {
+			this.serverCheckTimer = null;
+			void this.checkServer();
+		}, SERVER_CHECK_DELAY_MS);
+	}
+
+	private async checkServer(): Promise<void> {
+		const engine = this.syncEngine;
+		if (!engine || engine.getState().status !== 'idle') return;
+		const controller = new AbortController();
+		this.serverCheckController = controller;
+		this.lastServerCheckAt = Date.now();
+		const revision = this.initializationRevision;
+		const lastSync = engine.getState().lastSync;
+		let timedOut = false;
+		const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, SERVER_CHECK_TIMEOUT_MS);
+		try {
+			const result = await checkServerReachability(this.settings.workerUrl, controller.signal);
+			if ((controller.signal.aborted && !timedOut) || this.serverCheckController !== controller || this.initializationRevision !== revision || this.syncEngine !== engine) return;
+			if (engine.getState().status !== 'idle' || engine.getState().lastSync !== lastSync) return;
+			const issue = timedOut ? 'The sync server took too long to respond. Check that it is running.' : result;
+			if (this.connectionIssue !== issue) {
+				this.connectionIssue = issue;
+				this.emitCurrentState();
+			}
+		} catch (error) {
+			if (!controller.signal.aborted) logger.warn('Server check failed:', errorMessage(error));
+		} finally {
+			clearTimeout(timeout);
+			if (this.serverCheckController === controller) this.serverCheckController = null;
 		}
 	}
 
@@ -485,7 +548,7 @@ export class SyncRuntime {
 
 	private emitCurrentState(): void {
 		if (!this.syncEngine) return;
-		emitStateChange(this.stateChangeListeners, this.syncEngine.getState(), (nextState) => {
+		emitStateChange(this.stateChangeListeners, this.getState(), (nextState) => {
 			this.statusBar?.update(nextState);
 		});
 	}

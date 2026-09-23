@@ -4,6 +4,7 @@ import { ActivityModal } from '../activity-modal';
 import { notifyConflicts } from '../../sync/conflict';
 import { showSyncErrorNotice } from '../sync-error-notice';
 import { errorMessage } from '../../plugin/logger';
+import { syncConnectionFailureMessage } from './self-hosted-errors';
 
 export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePlugin): () => void {
 	const runtime = plugin.syncRuntime;
@@ -11,11 +12,14 @@ export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePl
 	const render = () => {
 		const state = runtime.getState();
 		const status = state.status === 'syncing' ? 'Syncing…'
-			: state.status === 'offline' ? 'Offline'
+			: state.status === 'offline' ? 'Server unavailable'
 				: state.status === 'error' ? 'Sync failed'
 					: state.pendingChanges ? `${state.pendingChanges} pending changes` : state.lastSync ? 'Up to date' : 'Not synced yet';
 		const lastSync = state.lastSync ? new Date(state.lastSync).toLocaleString() : 'Never';
-		setting.setDesc(`${status} · Last successful sync: ${lastSync}${state.lastError ? ` · ${state.lastError}` : ''}`);
+		const issue = state.lastError && state.status === 'error'
+			? syncConnectionFailureMessage(state.lastError, plugin.settings.workerUrl) ?? state.lastError
+			: state.lastError;
+		setting.setDesc(`${status} · Last successful sync: ${lastSync}${issue ? ` · ${issue}` : ''}`);
 	};
 	setting.addButton(button => button.setButtonText('Sync now').onClick(async () => {
 		button.setDisabled(true);

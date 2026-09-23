@@ -42,6 +42,10 @@ describe('connection status', () => {
 		listener();
 		expect(setting.descEl.textContent).toContain('Sync failed');
 		expect(setting.descEl.textContent).toContain('Connection failed');
+		state = { ...state, status: 'offline', lastError: 'Cannot reach the temporary tunnel address.' };
+		listener();
+		expect(setting.descEl.textContent).toContain('Server unavailable');
+		expect(setting.descEl.textContent).toContain('temporary tunnel address');
 		cleanup();
 		expect(removeStateChangeListener).toHaveBeenCalledExactlyOnceWith(listener);
 	});

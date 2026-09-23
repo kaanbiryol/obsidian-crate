@@ -28,7 +28,7 @@ export function renderSyncSection(context: SyncSectionContext): void {
 
 	new Setting(containerEl)
 		.setName('Automatic sync')
-		.setDesc('This device · sync on startup, on resume, after file changes, and at regular intervals. Turn off to sync only from the command palette or sync activity. A running sync will finish.')
+		.setDesc('This device · sync on startup, on resume, after file changes, and at regular intervals. Turn off to sync only from the command palette or sync activity. Crate still checks if your saved server is reachable. A running sync will finish.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.automaticSync)
 			.onChange(async automaticSync => {

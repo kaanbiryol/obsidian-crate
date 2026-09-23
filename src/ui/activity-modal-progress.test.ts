@@ -79,7 +79,7 @@ it.each([
     ['idle', 2, '2 changes pending', 'pending'],
     ['idle', 0, 'Synced just now', 'synced'],
     ['error', 1, 'Last sync had errors', 'attention'],
-    ['offline', 1, 'Offline', 'attention'],
+    ['offline', 1, 'Server unavailable', 'attention'],
 ] as const)('describes %s with %i pending files in the header', (status, count, text, indicator) => {
     const deps = {
         getState: () => ({ status, lastSync: new Date().toISOString() } as SyncState),
@@ -98,6 +98,27 @@ it.each([
     internal.updateSyncStatusText();
     expect(subtitle.collectText()).toBe(text);
     expect(subtitle.getAttribute('data-state')).toBe(indicator);
+});
+
+it('shows the reachability warning without treating it as a failed sync', () => {
+    const state: SyncState = {
+        status: 'offline', lastSync: null, lastError: 'Cannot reach the temporary tunnel address.',
+        pendingChanges: 0, conflictCount: 0,
+    };
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
+        getState: () => state, getPendingPaths: () => [], getActiveConflicts: () => [],
+        sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+    });
+    const internal = modal as unknown as {
+        errorNoticeEl: HTMLElement; errorTitleEl: HTMLElement; errorMessageEl: HTMLElement;
+        updateSyncErrorNotice(): void;
+    };
+    internal.errorNoticeEl = new FakeElement('div') as unknown as HTMLElement;
+    internal.errorTitleEl = new FakeElement('span') as unknown as HTMLElement;
+    internal.errorMessageEl = new FakeElement('span') as unknown as HTMLElement;
+    internal.updateSyncErrorNotice();
+    expect(internal.errorTitleEl.textContent).toBe('Server unavailable');
+    expect(internal.errorMessageEl.textContent).toContain('temporary tunnel address');
 });
 
 it('keeps the header stable while detailed sync phases change', () => {

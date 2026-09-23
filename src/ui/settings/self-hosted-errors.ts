@@ -69,3 +69,10 @@ export function selfHostedConnectionMessage(error: unknown, address: string): st
 	if (/abort|cancel/i.test(message)) return 'Connection cancelled. Try again when Crate is ready.';
 	return 'Could not connect to Crate. Check that the server is running and that its address and device access token are correct, then try again.';
 }
+
+/** Keep useful network guidance in sync surfaces without replacing unrelated errors. */
+export function syncConnectionFailureMessage(error: string, address: string): string | null {
+	return /ERR_NAME_NOT_RESOLVED|ENOTFOUND|EAI_AGAIN|could not resolve|ERR_CONNECTION_REFUSED|ECONNREFUSED|ERR_CONNECTION_TIMED_OUT|ETIMEDOUT|timed?\s*out|ERR_CERT_|ERR_SSL_/i.test(error)
+		? selfHostedConnectionMessage(error, address)
+		: null;
+}

@@ -25,6 +25,18 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 	plugin.syncRuntime.setStatusBarClickHandler(() => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 	});
+	let serverUnavailable = false;
+	plugin.syncRuntime.addStateChangeListener(state => {
+		if (state.status !== 'offline') { serverUnavailable = false; return; }
+		if (serverUnavailable) return;
+		serverUnavailable = true;
+		const fragment = new DocumentFragment();
+		fragment.createSpan({ text: `Crate server unavailable. ${state.lastError ?? 'Check your server connection.'} ` });
+		const link = fragment.createEl('a', { text: 'Open Crate settings' });
+		link.addEventListener('click', () => plugin.openSettingsTab());
+		if (!plugin.settings.cloudflareDeployment) fragment.createSpan({ text: ' → Server details → Update server address.' });
+		new Notice(fragment, 12_000);
+	});
 }
 
 export function registerSyncCommands(plugin: CratePlugin): void {

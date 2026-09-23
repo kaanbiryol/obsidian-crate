@@ -131,8 +131,8 @@ export class StatusBarManager {
 
 			case 'offline':
 				return {
-					text: 'Offline',
-					tooltip: 'Cannot connect to sync server',
+					text: 'Server unavailable',
+					tooltip: state.lastError || 'Cannot connect to sync server',
 				};
 
 			case 'idle':

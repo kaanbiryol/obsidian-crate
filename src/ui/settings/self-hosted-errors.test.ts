@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selfHostedConnectionMessage } from './self-hosted-errors';
+import { selfHostedConnectionMessage, syncConnectionFailureMessage } from './self-hosted-errors';
 
 describe('self-hosted connection messages', () => {
 	it('explains the connection-refused error and Docker address choice', () => {
@@ -43,4 +43,9 @@ describe('self-hosted connection messages', () => {
 			expect(message).not.toContain('secret');
 		}
 	});
+});
+
+it('explains DNS sync errors without hiding unrelated sync failures', () => {
+	expect(syncConnectionFailureMessage('net::ERR_NAME_NOT_RESOLVED', 'https://old.trycloudflare.com')).toContain('latest HTTPS address');
+	expect(syncConnectionFailureMessage('Could not apply remote changes', 'https://old.trycloudflare.com')).toBeNull();
 });
