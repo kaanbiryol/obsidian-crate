@@ -23,7 +23,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   fence.requireVerification();
   await fence.mutate(() => api.queryD1(accountId, databaseId, tables.map(upgradeGuards).join('\n')), 'freeze-upgrade-data');
   const prefix = `__crate__/backups/schema-upgrade-${crypto.randomUUID()}`;
-  input.onProgress?.('Creating and verifying the database and file backup…');
+  input.onProgress?.('Backing up the server database. Large servers can take several minutes…');
   let sql = 'PRAGMA foreign_keys=OFF;\n';
   for (const row of definitions.filter(row => row.type === 'table')) {
     const table = String(row.name); sql += `${String(row.sql)};\n`;
@@ -43,19 +43,38 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   const verifiedSql = await api.getRecoveryObject(accountId, bucketName, `${prefix}/database.sql`);
   if (await hash(verifiedSql) !== databaseSha256) throw new Error('Database checkpoint verification failed');
   const objects: Array<{ key: string; sha256: string; size: number; contentType: string }> = [];
+  input.onProgress?.('Counting files and history for the backup…');
   const refs = await rows('SELECT storage_key, hash, size FROM files UNION SELECT storage_key, hash, size FROM file_versions;');
-  const seen = new Map<string, string>();
+  const uniqueRefs = new Map<string, (typeof refs)[number]>();
   for (const row of refs) {
     const key = String(row.storage_key);
-    if (seen.has(key)) { if (seen.get(key) !== `${String(row.hash)}:${String(row.size)}`) throw new Error('Conflicting file references in checkpoint'); continue; }
-    seen.set(key, `${String(row.hash)}:${String(row.size)}`);
+    const previous = uniqueRefs.get(key);
+    if (previous) {
+      if (`${String(previous.hash)}:${String(previous.size)}` !== `${String(row.hash)}:${String(row.size)}`) throw new Error('Conflicting file references in checkpoint');
+      continue;
+    }
+    uniqueRefs.set(key, row);
+  }
+  const total = uniqueRefs.size;
+  let lastReportedAt = 0;
+  const reportFiles = (verified: number) => {
+    const now = Date.now();
+    // The dialog announces status changes to screen readers; avoid announcing every file in a large vault.
+    if (verified > 0 && verified < total && now - lastReportedAt < 5_000) return;
+    lastReportedAt = now;
+    input.onProgress?.(`Backing up files and history: ${verified.toLocaleString()} of ${total.toLocaleString()} verified. This may take several minutes…`);
+  };
+  if (total) reportFiles(0);
+  for (const [key, row] of uniqueRefs) {
     const bytes = await api.getRecoveryObject(accountId, bucketName, key);
     if (bytes.byteLength !== row.size || await hash(bytes) !== row.hash) throw new Error('A server file could not be verified. Upgrade has not started.');
     const backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
     await api.putRecoveryObject(accountId, bucketName, backupKey, bytes);
     if (await hash(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== row.hash) throw new Error('File checkpoint verification failed');
     objects.push({ key, sha256: String(row.hash), size: bytes.byteLength, contentType: 'application/octet-stream' });
+    reportFiles(objects.length);
   }
+  input.onProgress?.('Finishing and verifying the backup archive…');
   try {
     const key = '__crate__/settings.json', bytes = await api.getRecoveryObject(accountId, bucketName, key);
     const sha = await hash(bytes), backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
