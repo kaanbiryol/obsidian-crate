@@ -45,7 +45,7 @@ try {
 	}
 	if (!pageHtml.includes('<div id="app"><div class="pwa-launch-splash"')) throw new Error('PWA page is missing the launch splash');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
-	if (!pageHtml.includes('/notifications/theme-bootstrap.js?v=')) throw new Error('PWA page is missing the theme bootstrap script');
+	if (!pageHtml.includes('<script nonce=') || !pageHtml.includes('id="pwa-theme-init"') || !pageHtml.includes('id="pwa-theme-styles"')) throw new Error('PWA page is missing its immediate theme bootstrap');
 	if (pageHtml.includes('<script>')) throw new Error('PWA page contains an inline script');
 	const homeScreenHtml = await (await fetchOk(`${origin}/notifications?folder=Reminders`)).text();
 	const sessionScriptIndex = homeScreenHtml.indexOf('<script src="/notifications/preview-session.js"></script>');
@@ -65,7 +65,7 @@ try {
 	if (manifest.start_url !== '/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7') {
 		throw new Error(`Unexpected manifest start_url: ${manifest.start_url}`);
 	}
-	if (manifest.background_color !== '#f7f7f8' || manifest.color_scheme_dark?.background_color !== '#0b0b0d') {
+	if (manifest.background_color !== '#f7f7f8' || manifest.color_scheme_dark?.background_color !== '#0d0d0f') {
 		throw new Error('PWA manifest is missing light and dark launch colors');
 	}
 

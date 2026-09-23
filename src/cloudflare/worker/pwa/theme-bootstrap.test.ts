@@ -31,8 +31,8 @@ function bootstrap(marker: string | null, storageUnavailable = false) {
 describe('PWA update startup', () => {
 	it('restores the update curtain with the saved theme before app startup', () => {
 		const { root, lightTheme, storage } = bootstrap(String(now - 100));
-		expect(root.dataset).toEqual({ pwaColorScheme: 'dark', pwaUpdating: 'restore' });
-		expect(root.style.background).toBe('#0b0b0d');
+		expect(root.dataset).toEqual({ pwaThemePreference: 'dark', pwaColorScheme: 'dark', pwaUpdating: 'restore' });
+		expect(root.style.background).toBe('#0d0d0f');
 		expect(lightTheme.media).toBe('not all');
 		expect(storage.removeItem).toHaveBeenCalledWith(PWA_UPDATE_TRANSITION_KEY);
 	});
@@ -47,6 +47,6 @@ describe('PWA update startup', () => {
 
 	it('still applies the theme when session storage is unavailable', () => {
 		const { root } = bootstrap(null, true);
-		expect(root.dataset).toEqual({ pwaColorScheme: 'dark' });
+		expect(root.dataset).toEqual({ pwaThemePreference: 'dark', pwaColorScheme: 'dark' });
 	});
 });

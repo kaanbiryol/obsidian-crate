@@ -24,7 +24,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 /* Preserve browser scrolling and accessibility zoom. */
 html,body{touch-action:auto}
-html,body{margin:0;padding:0;background:radial-gradient(circle at 82% -12%,rgba(var(--accent-rgb),.09),transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
+html,body{margin:0;padding:0;background:var(--pwa-launch-bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
 body{min-height:100%;min-height:100dvh;overflow:hidden}
 /* Freeze the document while preserving native scrolling inside modal fields. */
 body.pwa-sheet-scroll-locked{position:fixed!important;width:100%!important;overflow:hidden!important}

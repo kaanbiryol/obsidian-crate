@@ -1,3 +1,4 @@
+import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -11,7 +12,7 @@ try {
     const browser = await engine.launch({headless:true});
     try {
       for (const theme of ['light','dark']) {
-        const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce' });
+        const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce', hasTouch:true });
         const page = await context.newPage(); const errors=[]; page.on('pageerror',error=>errors.push(error.message));
         await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
         await page.getByRole('button',{name:'Open settings',exact:true}).waitFor();
@@ -21,11 +22,18 @@ try {
         await mkdir('test-results/feature-switcher',{recursive:true});
         const toReading = page.getByRole('button',{name:'Switch to Reading',exact:true});
         const toReminders = page.getByRole('button',{name:'Switch to Reminders',exact:true});
+        await toReading.hover();
+        await expect(toReading).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(toReading).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
         const switchBounds = await toReading.boundingBox();
+        const historyLength = await page.evaluate(() => history.length);
+        await checkBackGesture(page, '[data-crate-section="reminders"]');
         await expect(toReading).not.toHaveAttribute('aria-haspopup');
         await toReading.click();
         await page.getByRole('heading',{name:'Your reading, everywhere',exact:true}).waitFor();
         const readingBounds = await toReminders.boundingBox();
+        await checkBackGesture(page, '[data-crate-section="reading"]');
+        assert.equal(await page.evaluate(() => history.length), historyLength);
         assert.ok(switchBounds && readingBounds && Math.abs(switchBounds.x - readingBounds.x) < 5 && Math.abs(switchBounds.y - readingBounds.y) < 5,
           JSON.stringify({ switchBounds, readingBounds }));
         await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -34,8 +42,13 @@ try {
         await expect(page.locator('.view-header-title')).toHaveText(visibleTitle);
         await expect(toReading).toBeFocused();
         await page.screenshot({path:`test-results/feature-switcher/${name}-${theme}-reminders.png`});
-        await page.getByRole('button',{name:'Open settings',exact:true}).click();
+        await page.getByRole('button',{name:'Open settings',exact:true}).tap();
         await page.getByRole('dialog',{name:'Settings',exact:true}).waitFor();
+        const settingsTrigger = page.locator('.pwa-header-settings-button');
+        await expect(settingsTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(settingsTrigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await expect(settingsTrigger).toHaveCSS('opacity', '1');
+        await expect(settingsTrigger).not.toHaveAttribute('aria-pressed');
         await page.getByRole('button',{name:'Close settings',exact:true}).click();
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await page.setViewportSize({width:844,height:320});
@@ -54,6 +67,7 @@ try {
         const page = await context.newPage();
         await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
         await page.getByRole('button',{name:'Switch to Reading',exact:true}).waitFor();
+        await page.locator('.reminders-content').waitFor();
         let releaseReading;
         const heldReading = new Promise(resolve => { releaseReading = resolve; });
         await page.route('**/notifications/assets/*', async route => { await heldReading; await route.continue(); });
@@ -78,10 +92,9 @@ try {
           });
           switcher.click();
           await activated;
-          const timing = { entering: getComputedStyle(reading).transitionDuration.split(',')[0],
-            entryDelay: getComputedStyle(reading).transitionDelay.split(',')[0],
-            leaving: getComputedStyle(reminders).transitionDuration.split(',')[0],
-            hideDelay: getComputedStyle(reminders).transitionDelay.split(',')[1].trim(),
+          const timing = { entering: getComputedStyle(reading).animationDuration,
+            entryDelay: getComputedStyle(reading).animationDelay,
+            leaving: getComputedStyle(reminders).animationDuration,
             settle: getComputedStyle(reminders.querySelector('.reminders-content')).transitionDuration };
           await pause(40);
           const first = state();
@@ -89,10 +102,9 @@ try {
           const second = state();
           return { first, second, timing };
         });
-        assert.equal(motion.timing.entering, '0.14s');
-        assert.equal(motion.timing.entryDelay, '0.06s');
-        assert.equal(motion.timing.leaving, '0.11s');
-        assert.equal(motion.timing.hideDelay, '0.2s');
+        assert.equal(motion.timing.entering, '0.2s');
+        assert.equal(motion.timing.entryDelay, '0s');
+        assert.equal(motion.timing.leaving, '0.2s');
         assert.equal(motion.timing.settle, '0.2s');
         assert.ok(motion.second.reading > motion.first.reading, JSON.stringify(motion));
         assert.ok(motion.second.reminders < motion.first.reminders, JSON.stringify(motion));
@@ -150,7 +162,48 @@ try {
         await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('data-active', 'true');
         await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'hidden');
         await expect(page.getByRole('button',{name:'Switch to Reading',exact:true})).toBeFocused();
+        const delayed = await page.evaluate(async () => {
+          document.querySelector('[data-crate-section="reminders"] .pwa-feature-switch-button').click();
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          const entering = document.querySelector('[data-entering="true"]');
+          const animations = entering.getAnimations().filter(animation => animation.animationName === 'crate-mode-fade-in');
+          animations.forEach(animation => animation.pause());
+          await new Promise(resolve => setTimeout(resolve, 320));
+          const retained = entering.dataset.entering === 'true';
+          animations.forEach(animation => animation.play());
+          return { retained, count: animations.length };
+        });
+        assert.deepEqual(delayed, { retained: true, count: 1 }, 'A delayed fade must survive beyond the old cleanup timer');
+        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('visibility', 'hidden');
       } finally { await context.close(); }
+      for (const reducedMotion of ['no-preference', 'reduce']) {
+      const readingFirst = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion, serviceWorkers: 'block' });
+      try {
+        const page = await readingFirst.newPage();
+        await page.goto(`${origin}/notifications?section=reading`);
+        await page.getByRole('heading', { name: 'Your reading, everywhere', exact: true }).waitFor();
+        const frames = await page.evaluate(async () => {
+          const reading = document.querySelector('[data-crate-section="reading"]');
+          const reminders = document.querySelector('[data-crate-section="reminders"]');
+          reading.querySelector('.pwa-feature-switch-button').click();
+          const samples = [];
+          const started = performance.now();
+          while (performance.now() - started < 250) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const content = reminders.querySelector('.reminders-content, .pwa-mode-opening__content');
+            samples.push({ reading: Number(getComputedStyle(reading).opacity), reminders: Number(getComputedStyle(reminders).opacity),
+              scale: content ? Number(getComputedStyle(content).scale) : null });
+          }
+          return samples;
+        });
+        assert.ok(frames.filter(frame => frame.reading > .1 && frame.reading < .9 && frame.reminders > .1 && frame.reminders < .9).length >= 2, JSON.stringify(frames));
+        if (reducedMotion === 'reduce') assert.ok(frames.every(frame => frame.scale === null || Number.isNaN(frame.scale)), JSON.stringify(frames));
+        else assert.ok(frames.some(frame => frame.scale > 1.001), JSON.stringify(frames));
+        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('opacity', '1');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'hidden');
+        await page.getByRole('button', { name: 'Switch to Reading', exact: true }).waitFor();
+      } finally { await readingFirst.close(); }
+      }
       console.log(`${name}: staged mode fade, aligned switch button and icon morph, reduced motion, retained screen state, keyboard focus, and settings passed in light/dark at phone, short-screen, and desktop sizes.`);
     } finally { await browser.close(); }
   }

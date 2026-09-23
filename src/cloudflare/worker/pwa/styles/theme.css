@@ -25,7 +25,7 @@
 	--checkbox-color:var(--interactive-accent);
 	--checkbox-color-hover:var(--interactive-accent-hover);
 	--checkbox-marker-color:var(--text-on-accent);
-	--pwa-launch-bg:#0b0b0d;
+	--pwa-launch-bg:#0d0d0f;
 	--pwa-tabbar-surface:rgba(13,13,15,.9);
 	/* Keep content below translucent native chrome, while backdrops fill the viewport. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));

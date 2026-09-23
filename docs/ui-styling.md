@@ -84,6 +84,17 @@ instead of introducing a separate palette or button style for each screen.
    metadata in light/dark themes at narrow and wide widths. Also check embedded
    plugin cards and keyboard focus when changing card styles.
 
+## Launch appearance
+
+The PWA resolves its saved theme in a nonce-authorized inline script before the
+stylesheets are parsed, then applies the light palette before the body appears.
+The document, launch screen, update curtain, and app use matching surface colors;
+the page backdrop has no gradient that can show through during mounting.
+`scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
+and data in both engines, including saved themes opposite to the system theme.
+Home Screen cold launches and the OS-owned launch snapshot still require a
+physical iPhone check.
+
 ## Validation and caching
 
 Run `npm run build`, `npm run lint`, `npm run check:css-scope`,
@@ -171,8 +182,11 @@ shows a checklist icon for **Switch to Reminders**; Reminders shows a book for
 shrinks by 1.5% as it leaves and settles from 1.5% larger as it enters. The
 header, switch button, FAB, and bottom-bar geometry stay fixed; the titles,
 metadata, and bottom-bar items crossfade with their panels. The button icon
-rotates subtly and its surface pulses when the new mode appears. Reduced-motion
-users switch without animation. `FeatureShell.tsx` preserves mounted feature state
+rotates subtly as the new mode appears. Panel opacity uses one keyframe animation;
+cleanup follows animation completion with a fallback for canceled events. Reduced-motion
+users retain the fade without scaling or rotation. Momentary icon actions use brief
+press feedback without persistent hover cards. Loading headers reserve the same
+title and metadata tracks as their loaded counterparts. `FeatureShell.tsx` preserves mounted feature state
 and navigation, keeps the inactive panel inert, and restores keyboard focus to the
 destination's switch after its initial loading completes.
 Both PWA modes show layout-matched skeletons while their first usable data is
@@ -180,7 +194,9 @@ loading. Reading uses the same row skeleton when the library has no cached data;
 Reminders uses card skeletons while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
-The same switch is available on both connection screens.
+The same switch is available on both connection screens. Top-level modes suppress
+single-finger back gestures starting within 20px of the left edge; an open Reading
+article retains native back navigation to its library.
 
 Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark
 surfaces, mobile and desktop widths, safe rendering, article actions, capture,

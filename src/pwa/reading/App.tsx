@@ -1,3 +1,4 @@
+import { ReadingOpening } from './ReadingOpening';
 import { ShortcutSetup } from './ShortcutSetup';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
 import { logoutReadingApp } from './logout';
@@ -180,7 +181,7 @@ function ReadingAppContent() {
       setStatus('Link kept on this device until the server confirms it.'); await refresh();
     } finally { savingRef.current = false; setSaving(false); }
   };
-  if (!ready || (connecting && !session)) return <main className="crate-reading" role="status">Opening Reading…</main>;
+  if (!ready || (connecting && !session)) return <ReadingOpening />;
   const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
     {error && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(() => refresh()); else void connect(); }}>Retry</Button></p>}

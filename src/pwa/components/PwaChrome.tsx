@@ -21,11 +21,12 @@ function PwaSettingsButton({
 	return (
 		<IconButton
 			icon="settings" size="large" iconSize="l"
-			className={`pwa-header-settings-button${settingsOpen ? ' is-active' : ''}`}
+			className="pwa-header-settings-button"
 			type="button"
 			data-action="toggle-settings"
 			label={settingsOpen ? 'Close settings' : 'Open settings'}
-			aria-pressed={settingsOpen}
+			aria-haspopup="dialog"
+			aria-expanded={settingsOpen}
 			onClick={onToggleSettings}
 		/>
 	);
@@ -43,8 +44,8 @@ export function PwaHeaderActions({
 	if (!showSettings) return null;
 	return (
 		<div className="pwa-header-actions crate-view-header-actions">
-			<FeatureSwitcherButton />
 			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
+			<FeatureSwitcherButton />
 		</div>
 	);
 }

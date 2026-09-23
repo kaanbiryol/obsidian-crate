@@ -1,3 +1,4 @@
+import { checkLaunchThemes } from './pwa-launch-theme-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -11,21 +12,32 @@ try {
  for (const engine of [chromium, webkit]) {
  const browser = await engine.launch();
  try {
+  await checkLaunchThemes(browser, origin);
   const firstLoad = await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});
   let releaseFirstLoad;
   const heldFirstLoad = new Promise(resolve => { releaseFirstLoad = resolve; });
   await firstLoad.route('**/reminders/list?*', async route => { await heldFirstLoad; await route.continue(); });
-  await firstLoad.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=inbox`);
+  await firstLoad.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=today`);
+  let openingGeometry;
   try {
    await expect(firstLoad.locator('.pwa-reminders-opening')).toBeVisible();
    await expect(firstLoad.getByRole('status',{name:'Loading reminders'})).toBeVisible();
    await expect(firstLoad.locator('.pwa-reminders-skeleton__card')).toHaveCount(3);
+   openingGeometry = { title: await firstLoad.locator('.pwa-reminders-opening h1').boundingBox(), header: await firstLoad.locator('.pwa-mode-opening__header').boundingBox() };
    await mkdir('test-results/startup-skeleton',{recursive:true});
    await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening.png`});
    await firstLoad.emulateMedia({colorScheme:'dark'});
    await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening-dark.png`});
   } finally { releaseFirstLoad(); }
   await expect(firstLoad.locator('.pwa-reminders-view')).toBeVisible();
+  const loadedTitle = await firstLoad.locator('.view-header-title').boundingBox();
+  const loadedHeader = await firstLoad.locator('.view-header').boundingBox();
+  expect(Math.abs(loadedTitle.y - openingGeometry.title.y)).toBeLessThan(1);
+  expect(Math.abs(loadedTitle.height - openingGeometry.title.height)).toBeLessThan(1);
+  expect(Math.abs(loadedHeader.height - openingGeometry.header.height)).toBeLessThan(1);
+  await firstLoad.locator('.view-header-overdue').evaluateAll(badges => badges.forEach(badge => badge.remove()));
+  const withoutOverdue = await firstLoad.locator('.view-header').boundingBox();
+  expect(Math.abs(withoutOverdue.height - loadedHeader.height)).toBeLessThan(1);
   await firstLoad.close();
    for (const tab of ['today', 'inbox', 'upcoming', 'browse']) {
    const page = await browser.newPage({ serviceWorkers: 'block' });

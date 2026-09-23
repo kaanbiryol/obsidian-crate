@@ -35,8 +35,8 @@
 	--reminders-fab-gap:16px;
 	--reminders-fab-size:48px;
 }
-html,body{background:var(--background-primary);font-family:var(--font-interface);color:var(--text-normal)}
-#app{background:radial-gradient(circle at 84% -10%,rgba(var(--accent-rgb),.075),transparent 33%),var(--background-primary)}
+html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);color:var(--text-normal)}
+#app{background:var(--pwa-launch-bg)}
 .app-shell{background:transparent;--reminders-tabbar-overlay:0px;--reminders-safe-area:0px}
 .app-header{padding:calc(var(--pwa-safe-area-top) + 17px) 18px 11px;background:rgba(13,13,15,.84);backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);border-bottom:1px solid rgba(255,255,255,.06)}
 .app-header__row{align-items:flex-start;gap:12px}
