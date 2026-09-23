@@ -80,6 +80,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:worker-runtime
+      - name: Verify shortcut pairing and template
+        run: node --test scripts/reading-shortcut-server.test.mjs scripts/reading-shortcut.test.mjs
       - name: Verify persistent local hosting
         run: node --test scripts/local-server.test.mjs scripts/local-server-tunnel.test.mjs scripts/local-server-quick.test.mjs scripts/local-server-pairing.test.mjs scripts/local-server-backup.test.mjs
       - name: Verify standalone npx server package
@@ -194,11 +196,16 @@ jobs:
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Run browser group
         run: npm run test:pwa-browser -- --shard=${{ matrix.shard }}/4
+      - name: Verify iPhone shortcut setup
+        if: matrix.shard == 1
+        run: node --test scripts/reading-shortcut-browser.test.mjs
       - name: Upload browser failure diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pwa-failures-${{ matrix.shard }}
-          path: .generated/browser-failures/
+          path: |
+            .generated/browser-failures/
+            test-results/reading/
           include-hidden-files: true
           retention-days: 7

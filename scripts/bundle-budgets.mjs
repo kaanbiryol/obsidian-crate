@@ -41,8 +41,8 @@ export const bundleBudgets = {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Reading is deferred; all offline assets total about 1.122 MB raw / 376 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1150000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '385000', 10),
+		// Reading and its phone pairing screen are deferred; all offline assets total about 1.153 MB raw / 387 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1160000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '390000', 10),
 	}],
 };

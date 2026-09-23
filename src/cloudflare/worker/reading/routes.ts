@@ -1,3 +1,4 @@
+import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { armNotificationCoordinator } from '../notification-lifecycle';
 import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
@@ -15,6 +16,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, 24_576);
     if (!parsed.ok) return parsed.response;
     const body = parsed.value;
+    if (path === '/reading/shortcut-exchange' && request.method === 'POST') return await exchangeShortcutPairing(env.DB, body, request);
     if (path === '/reading/exchange' && request.method === 'POST') return await exchangeReadingAccess(env.DB, body, request);
     if (path === '/reading/handoff' && request.method === 'POST') {
       const handoff = await handoffAuthority(env.DB, request);
@@ -30,6 +32,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       if (request.method === 'POST') return await updatePolicy(env.DB, body);
     }
     const current = await authority(env.DB, principal);
+    if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
     if (path === '/reading/access' && request.method === 'POST' && principal.scope === 'vault') return await issueReadingAccess(env.DB, current, body, url.origin);
     if (path === '/reading/prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
     if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');

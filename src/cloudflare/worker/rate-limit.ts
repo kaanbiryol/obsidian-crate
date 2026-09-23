@@ -3,6 +3,7 @@ import { corsResponse } from './cors';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const actions = new Map([
+  ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut-exchange', 10],
   ['POST /notifications/share/reading', 30],
   ['POST /reading/exchange', 10], ['POST /reading/handoff', 30],
   ['POST /reading/prepare', 30], ['POST /reading/capture', 30],

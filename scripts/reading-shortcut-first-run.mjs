@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 // iOS 27 / macOS 27 provide storage scoped to a shortcut. The distributed
 // template has no credentials or import questions; configuration happens at run time.
-export function readingShortcutWithFirstRunSetup(template) {
+export function readingShortcutWithFirstRunSetup(template, { pairing = false } = {}) {
   const workflow = structuredClone(template);
   const original = workflow.WFWorkflowActions;
   const actions = [];
@@ -26,8 +26,7 @@ export function readingShortcutWithFirstRunSetup(template) {
   const otherwise = group => add('conditional', { GroupingIdentifier: group, WFControlFlowMode: 1 });
   const end = group => add('conditional', { GroupingIdentifier: group, WFControlFlowMode: 2 });
   const alert = (title, message) => add('alert', { WFAlertActionTitle: title, WFAlertActionMessage: message, WFAlertActionCancelButtonShown: false });
-  const ask = (prompt, pattern, message) => {
-    const answer = add('ask', { WFAskActionPrompt: prompt, WFInputType: 'Text' });
+  const validate = (answer, pattern, message) => {
     const trimmed = add('text.replace', { WFReplaceTextFind: '^\\s+|\\s+$', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(answer) });
     const match = add('text.match', { WFMatchTextPattern: pattern, text: text(trimmed) });
     const invalid = whenEmpty(match);
@@ -36,6 +35,8 @@ export function readingShortcutWithFirstRunSetup(template) {
     end(invalid);
     return trimmed;
   };
+  const ask = (prompt, pattern, message) => validate(add('ask', { WFAskActionPrompt: prompt, WFInputType: 'Text' }), pattern, message);
+  const dictionary = entries => ({ WFSerializationType: 'WFDictionaryFieldValue', Value: { WFDictionaryFieldValueItems: entries.map(([key, value]) => ({ WFItemType: 0, WFKey: text(key), WFValue: text(value) })) } });
 
   // A library tap opens setup again, so replacing expired access or changing
   // servers never requires editing actions. Sharing a link reuses saved access.
@@ -48,8 +49,22 @@ export function readingShortcutWithFirstRunSetup(template) {
   end(setupOnly);
 
   const needsSetup = whenEmpty(configuration);
-  const endpoint = ask('Paste the endpoint from Crate → Reading → Set up shortcut. Crate will remember it in this shortcut.', '^https://[^\\s?#]+/reading/prepare$', 'Paste the full HTTPS endpoint ending in /reading/prepare, then run setup again.');
-  const authorization = ask('Paste the complete Authorization header from Crate, including Bearer. It will be saved in this shortcut.', '^Bearer [A-Za-z0-9._~+/-]+=*$', 'Paste the complete Bearer header from Crate, then run setup again.');
+  let endpoint, authorization;
+  if (pairing) {
+    const code = ask('In the Crate web app, open Reading settings → Set up iPhone shortcut. Paste the pairing code here.', '^https://[^\\s/?#@]+/reading/shortcut-exchange#[a-f0-9]{64}$', 'Copy a new pairing code from the Crate web app, then run this shortcut again.');
+    // Split locally: the temporary secret must never appear in a network URL.
+    const exchangeUrl = add('text.replace', { WFReplaceTextFind: '#[a-f0-9]{64}$', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
+    const grant = add('text.replace', { WFReplaceTextFind: '^.*#', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
+    const response = add('downloadurl', { WFURL: text(exchangeUrl), WFHTTPMethod: 'POST', WFHTTPBodyType: 'JSON',
+      WFHTTPHeaders: dictionary([['X-Crate-Protocol', '11']]), WFJSONValues: dictionary([['token', grant]]) });
+    const header = add('getvalueforkey', { WFInput: attachment(response), WFDictionaryKey: 'authorization', WFGetDictionaryValueType: 'Value' });
+    authorization = validate(header, '^Bearer [a-f0-9]{64}$', 'Pairing did not finish. Create a new pairing code in Crate and try again. Your previous setup is unchanged.');
+    // Derive the destination from the validated code, never from remote content.
+    endpoint = add('text.replace', { WFReplaceTextFind: '/reading/shortcut-exchange$', WFReplaceTextReplace: '/reading/prepare', WFReplaceTextRegularExpression: true, WFInput: text(exchangeUrl) });
+  } else {
+    endpoint = ask('Paste the endpoint from Crate → Reading → Set up shortcut. Crate will remember it in this shortcut.', '^https://[^\\s?#]+/reading/prepare$', 'Paste the full HTTPS endpoint ending in /reading/prepare, then run setup again.');
+    authorization = ask('Paste the complete Authorization header from Crate, including Bearer. It will be saved in this shortcut.', '^Bearer [A-Za-z0-9._~+/-]+=*$', 'Paste the complete Bearer header from Crate, then run setup again.');
+  }
   const values = add('dictionary', { WFItems: {
     WFSerializationType: 'WFDictionaryFieldValue',
     Value: { WFDictionaryFieldValueItems: [

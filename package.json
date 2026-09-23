@@ -78,7 +78,7 @@
 		"test:page-titles": "npm run build && vitest run src/cloudflare/worker/link-title.test.ts src/sync/page-title.test.ts src/pwa/page-title-api.test.ts && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/link-title.integration.ts && playwright test tests/visual/page-titles.spec.ts tests/visual/lexical-trial.spec.ts --workers=2",
 		"test:lexical": "vitest run src/reminders/components/lexical/reminderDocument.test.ts && playwright test tests/visual/lexical-trial.spec.ts tests/visual/page-titles.spec.ts --workers=2 && playwright test --config tests/editor-contract/playwright.config.ts && node scripts/pwa-editor-contract-test.mjs && node scripts/pwa-editor-selection-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-draft-recovery-test.mjs && node scripts/pwa-update-test.mjs",
 		"test:reading-extraction": "tsc -p tests/reading-extraction/tsconfig.json --noEmit && node --test scripts/reading-extraction.test.mjs",
-		"test:reading": "npm run build:worker && npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-browser.test.mjs",
+		"test:reading": "npm run build:worker && npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-shortcut-server.test.mjs scripts/reading-browser.test.mjs scripts/reading-shortcut-browser.test.mjs",
 		"build:reading-shortcut": "node scripts/sign-reading-shortcut.mjs",
 		"preview:reading": "npm run build:worker && node scripts/reading-preview.mjs"
 	},
