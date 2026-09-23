@@ -173,6 +173,7 @@ describe('renderConfigSection integration', () => {
 
 	it('offers an in-place server update in the top notice when deployment metadata exists', async () => {
 		const { renderServerUpdateNotice } = await loadConfigSectionModule();
+		const getVersionInfo = vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint }));
 		renderServerUpdateNotice({
 			containerEl: new FakeElement('div') as never,
 			plugin: { manifest: { version: '0.2.0' },
@@ -183,17 +184,19 @@ describe('renderConfigSection integration', () => {
 						lastDeployedFingerprint: 'a'.repeat(64),
 					},
 				},
-				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => true) },
+				syncRuntime: { getVersionInfo, isConfigured: vi.fn(() => true) },
 			} as never,
 			rerender: vi.fn(),
 		});
 
+		expect(getVersionInfo).not.toHaveBeenCalled();
 		getSettingByName('Cloudflare update available').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows an up-to-date status without an authorization action', async () => {
+	it('checks the connected server version only when requested', async () => {
 		const { renderServerSection } = await loadConfigSectionModule();
+		const getVersionInfo = vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint }));
 		renderServerSection({
 			containerEl: new FakeElement('div') as never,
 			plugin: { manifest: { version: '0.2.0' },
@@ -204,15 +207,20 @@ describe('renderConfigSection integration', () => {
 						lastDeployedFingerprint: embeddedArtifact.fingerprint,
 					},
 				},
-				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => true) },
+				syncRuntime: { getVersionInfo, isConfigured: vi.fn(() => true) },
 			} as never,
 			rerender: vi.fn(),
 		});
 
-		await flushMicrotasks();
 		const serverSetting = getSettingByName('Connected server');
+		expect(getVersionInfo).not.toHaveBeenCalled();
+		expect(serverSetting.descEl.textContent).toContain('Select the button');
+		expect(serverSetting.buttons[0]?.buttonEl.textContent).toBe('Check version');
+		serverSetting.buttons[0]?.click();
+		await flushMicrotasks();
+		expect(getVersionInfo).toHaveBeenCalledOnce();
 		expect(serverSetting.descEl.textContent).toBe('Revision 7 · Matches the bundled server.');
-		expect(serverSetting.buttons).toHaveLength(0);
+		expect(serverSetting.buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(false);
 	});
 });
 
@@ -245,11 +253,13 @@ it('keeps the installed version in the server section without duplicating the up
         } as never,
         rerender: vi.fn(),
     });
-    await flushMicrotasks();
-    const server = getSettingByName('Connected server');
-    expect(server.descEl.textContent).toContain('Revision 7');
-    expect(server.buttons).toHaveLength(0);
-    expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare update available')).toBe(false);
+	await flushMicrotasks();
+	const server = getSettingByName('Connected server');
+	expect(server.buttons).toHaveLength(1);
+	server.buttons[0]?.click();
+	await flushMicrotasks();
+	expect(server.descEl.textContent).toContain('Revision 7');
+	expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare update available')).toBe(false);
 });
 
 
@@ -318,6 +328,7 @@ it('keeps a matching live build visible and routes it to recovery when saved dep
         syncRuntime: { isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
     };
     renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+    getSettingByName('Cloudflare update available').buttons[1]?.click();
     await flushMicrotasks();
     const update = getSettingByName('Verify server update');
     expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');
