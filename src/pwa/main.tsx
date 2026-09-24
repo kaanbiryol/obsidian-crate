@@ -23,6 +23,7 @@ import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotic
 import { WebReminderCard } from './components/WebReminderCard';
 import { PwaSyncIndicator } from './components/PwaSyncIndicator';
 import { PwaRemindersOpening } from './components/PwaRemindersOpening';
+import { exportPendingChanges } from './export-pending-changes';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
 import { DeferredNotice } from './components/DeferredNotice';
@@ -433,7 +434,7 @@ function App() {
 						>
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
-							{(changes.length > 0 || storageError) && <DeferredNotice><ReminderSyncNotice
+							{(changes.some(change => change.status !== 'pending') || storageError) && <DeferredNotice><ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
 								storageError={storageError}
@@ -470,6 +471,7 @@ function App() {
 						onClose={requestSettingsClose}
 						onClosed={settingsTransition.finishClose}
 						onEnablePush={enablePushNotifications}
+						onExportPendingChanges={changes.length ? () => exportPendingChanges(changes) : undefined}
 						onThemePreferenceChange={setThemePreference}
 						onLogout={() => void logOut()}
 					/>

@@ -32,6 +32,7 @@ export function SettingsSheet({
 	onClose,
 	onClosed,
 	onEnablePush,
+	onExportPendingChanges,
 	onThemePreferenceChange,
 	onLogout,
 }: {
@@ -46,6 +47,7 @@ export function SettingsSheet({
 	onClose: () => void;
 	onClosed: () => void;
 	onEnablePush: () => void;
+	onExportPendingChanges?: () => void;
 	onThemePreferenceChange: (preference: PwaThemePreference) => void;
 	onLogout: () => void;
 }) {
@@ -181,6 +183,9 @@ export function SettingsSheet({
 						<h3 id="settings-sync-title" className="settings-panel__title">Sync</h3>
 						<div className="settings-group">
 							<DeviceStorageSettings />
+							{onExportPendingChanges && <div className="settings-row">
+								<Button className="settings-action-button" type="button" onClick={onExportPendingChanges}>Export unsynced reminders</Button>
+							</div>}
 							<div className="settings-row settings-row--value">
 								<span>Folder</span>
 								<strong title={config.folderPath}>{config.folderPath}</strong>
