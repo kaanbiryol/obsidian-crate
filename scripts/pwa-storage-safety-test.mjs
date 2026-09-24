@@ -88,8 +88,14 @@ try {
    await page.locator('[data-action="open-create-modal"]').click();
    await page.getByRole('textbox', { name: 'Reminder title', exact: true }).fill('Private offline export');
    await page.locator('[data-action="save-reminder"]').click();
+   await expect(page.locator('.pwa-reminder-sync-error[data-sync-status]')).toBeVisible();
+   await expect(page.getByRole('region', { name: 'Changes on this device', exact: true })).toHaveCount(0);
+   await expect(page.getByText(/^\d+ pending changes?$/)).toHaveCount(0);
+   await page.context().setOffline(true);
+   await expect(page.getByRole('region', { name: 'Changes on this device', exact: true })).toHaveCount(0);
+   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
    const downloadPromise = page.waitForEvent('download');
-   await page.getByRole('button', { name: 'Export pending changes', exact: true }).click();
+   await page.getByRole('button', { name: 'Export unsynced reminders', exact: true }).click();
    const download = await downloadPromise;
    const raw = await readFile(await download.path(), 'utf8');
    const exported = JSON.parse(raw);
@@ -97,11 +103,11 @@ try {
    expect(raw).toContain('Private offline export');
    expect(exported.changes).toHaveLength(1);
    expect(raw).not.toContain(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token')));
-   expect(await page.getByRole('button', { name: 'Export pending changes', exact: true }).count()).toBe(1);
+   expect(await page.getByRole('button', { name: 'Export unsynced reminders', exact: true }).count()).toBe(1);
    // Simulate content enlargement without disabling the viewport's real zoom.
    for (const zoom of [2, 4]) {
     await page.evaluate(zoom => { document.documentElement.style.zoom = String(zoom); }, zoom);
-    await expect(page.getByRole('button', { name: 'Export pending changes', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export unsynced reminders', exact: true })).toBeVisible();
    }
    await page.close();
    console.log(`${type.name()}: failed-storage logout, persistence decisions, pending export and zoom permissions passed`);

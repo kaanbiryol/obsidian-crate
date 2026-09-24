@@ -47,9 +47,11 @@ describe('PWA reminder sync recovery notice', () => {
 		const markup = render([change({ status: 'pending' }), change({ operationId: 'failure' })], true);
 		expect(markup).not.toContain('Waiting for connection');
 		expect(markup).not.toContain('pwa-reminder-sync-progress');
+		expect(markup).not.toContain('Changes on this device');
+		expect(markup).not.toContain('Export pending changes');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Retry: Buy milk"/);
 		expect(render([change({ status: 'pending' })])).toBe('');
-		expect(render([change({ status: 'pending' })], true)).toContain('Export pending changes');
+		expect(render([change({ status: 'pending' })], true)).toBe('');
 		expect(render([])).toBe('');
 	});
 
