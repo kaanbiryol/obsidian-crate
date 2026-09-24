@@ -2,6 +2,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { Modal, Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { readingServerRequest } from '../server';
+import { openExternalBrowserModal } from '../../ui/external-browser-modal';
 
 /** Capture credentials are displayed once and never copied into browser enrollment links. */
 export class ReadingPhoneSetup extends Modal {
@@ -15,7 +16,15 @@ export class ReadingPhoneSetup extends Modal {
         try {
           const access = await readingServerRequest<{ url: string }>(this.plugin, '/reading/access', { kind: 'reading' });
           const url = new URL(access.url); url.searchParams.set('setup', 'shortcut');
-          await navigator.clipboard.writeText(url.href); new Notice('Phone setup link copied. Open it on your iPhone.');
+          try { await navigator.clipboard.writeText(url.href); new Notice('Phone setup link copied. Open it on your iPhone.'); }
+          catch {
+            openExternalBrowserModal(this.plugin.app, url.href, {
+              title: 'Phone setup link',
+              message: 'Select the link to open setup, or select the text to copy it. It expires in 10 minutes.',
+              linkText: 'Open setup',
+              showCopyableUrl: true,
+            });
+          }
         } catch (error) { new Notice(error instanceof Error ? error.message : 'Could not create a phone setup link.'); }
         finally { button.setDisabled(false); }
       }));
@@ -42,9 +51,15 @@ export class ReadingPhoneSetup extends Modal {
           const access = await readingServerRequest<{ token: string; endpoint: string }>(this.plugin, '/reading/access', { kind: 'capture' });
           output.empty();
           new Setting(output).setName('Endpoint').addText(text => { text.setValue(access.endpoint); text.inputEl.readOnly = true; })
-            .addButton(copy => copy.setButtonText('Copy endpoint').onClick(() => { void navigator.clipboard.writeText(access.endpoint); }));
+            .addButton(copy => copy.setButtonText('Copy endpoint').onClick(async () => {
+              try { await navigator.clipboard.writeText(access.endpoint); new Notice('Endpoint copied.'); }
+              catch { new Notice('Could not copy the endpoint. Select the text field to copy it.'); }
+            }));
           new Setting(output).setName('Authorization header').addText(text => { text.setValue(`Bearer ${access.token}`); text.inputEl.type = 'password'; text.inputEl.readOnly = true; })
-            .addButton(copy => copy.setButtonText('Copy header').onClick(() => { void navigator.clipboard.writeText(`Bearer ${access.token}`); }));
+            .addButton(copy => copy.setButtonText('Copy header').onClick(async () => {
+              try { await navigator.clipboard.writeText(`Bearer ${access.token}`); new Notice('Authorization header copied.'); }
+              catch { new Notice('Could not copy the header. Select the text field to copy it.'); }
+            }));
         } catch (error) { new Notice(error instanceof Error ? error.message : 'Could not create shortcut access.'); button.setDisabled(false); }
       }));
   }

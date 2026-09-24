@@ -46,7 +46,7 @@ In the Cloudflare dashboard, select the account that will own the OAuth client, 
 | Allowed CORS origins | Leave empty |
 | Post-logout redirect URLs | Leave empty |
 
-Enable the `refresh_token` grant so the setup login can renew usage access; Cloudflare adds the `offline_access` protocol scope automatically. Do not enable `openid`, Implicit, or any client-secret authentication method. Crate is a desktop public client and uses a fresh PKCE S256 verifier for each authorization.
+Enable the `refresh_token` grant so the setup login can renew usage access; Cloudflare adds the `offline_access` protocol scope automatically. Do not enable `openid`, Implicit, or any client-secret authentication method. Crate is a public client and uses a fresh PKCE S256 verifier for each authorization.
 
 Select these five scopes in the dashboard. Keep all five scopes required. Both deployment and usage explicitly request all five; both also request `offline_access`. Retained usage credentials therefore include server management permissions as well as analytics access. The usage panel uses those credentials only to retrieve usage and renew access.
 
@@ -124,9 +124,9 @@ Crate saves resource names and Cloudflare IDs so retries can reuse the deploymen
 
 1. [Activate R2](#activate-r2-before-connecting) in the target Cloudflare account, including its checkout and payment-method requirements.
 2. Install the Client-ID-configured Crate build.
-3. Open **Settings → Crate → Configuration** and select **Connect with Cloudflare**.
+3. Open **Settings → Crate → Configuration** and select **Connect with Cloudflare**. On mobile, select **Open Cloudflare** in the dialog to open the sign-in page in your browser.
 4. In Cloudflare, select exactly one account, review the five permissions, and authorize Crate.
-5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
+5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`. If Obsidian does not open automatically, select **Open Obsidian** on that page.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
 7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. Joining an existing deployment does not upload code or change schema. Creation initializes the hash-verified current schema. Explicit updates verify the schema marker before installing the new Worker. A newer remote Worker is never downgraded.
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then saves the OAuth access and refresh tokens in Obsidian secret storage for usage. Failed operations revoke and discard their tokens. Existing installations can reconnect once from the usage panel.

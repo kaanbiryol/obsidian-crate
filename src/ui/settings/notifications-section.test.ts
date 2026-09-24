@@ -8,6 +8,7 @@ import {
 } from '../../test/fakes/obsidian-ui';
 
 let lastQrCodeData: string | null = null;
+const openExternalBrowserModal = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
 	for (let i = 0; i < 20; i++) await Promise.resolve();
@@ -23,6 +24,7 @@ async function loadNotificationsSectionModule() {
 			open(): void {}
 		},
 	}));
+	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
 
 	return { ...await import('./notifications-section'), ...await import('./reminders-web-app') };
 }
@@ -39,14 +41,17 @@ describe('renderNotificationsSection', () => {
 	beforeEach(() => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
+		openExternalBrowserModal.mockClear();
     updateNotificationPolicy.mockClear();
 	});
 
 	afterEach(() => {
 		vi.resetModules();
+		vi.unstubAllGlobals();
 		vi.clearAllMocks();
 		vi.doUnmock('obsidian');
-			vi.doUnmock('../qr-modal');
+		vi.doUnmock('../qr-modal');
+		vi.doUnmock('../external-browser-modal');
 	});
 
 	it.each([null, '2026-09-06'])('shows notification enrollment and paused recovery state: %s', async disabled_at => {
@@ -259,6 +264,27 @@ describe('renderNotificationsSection', () => {
 		expect(lastQrCodeData).toBe(
 			'https://active-worker.example.com/notifications?token=install-token&browserToken=browser-token&folder=Reminders&upcomingDays=7&allDayTime=09%3A00',
 		);
+	});
+
+	it('opens the reminders app on the same phone after the enrollment request', async () => {
+		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({}) as unknown as { app: unknown };
+		renderRemindersWebApp(new FakeElement('div') as never, plugin as never);
+		getSettingByName('Reminders web app').buttons[2]?.click();
+		await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
+		expect(openExternalBrowserModal).toHaveBeenCalledWith(plugin.app,
+			expect.stringContaining('/notifications?token=install-token'),
+			expect.objectContaining({ linkText: 'Open reminders' }));
+	});
+
+	it('shows a usable link if mobile clipboard access fails', async () => {
+		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
+		vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard denied')) } });
+		const plugin = createPlugin({});
+		renderRemindersWebApp(new FakeElement('div') as never, plugin);
+		getSettingByName('Reminders web app').buttons[0]?.click();
+		await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
+		expect(noticeMessages).not.toContain('Could not create app link: Clipboard denied');
 	});
 });
 

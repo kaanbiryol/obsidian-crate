@@ -1,6 +1,6 @@
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from './oauth-client';
 import { CloudflareUsageConnection } from './usage-connection';
 import type CratePlugin from '../plugin/CratePlugin';
@@ -13,6 +13,7 @@ import { isSelfHostedConnectionPending } from '../sync/self-hosted-connection';
 import { generateSecureToken, hashToken } from '../sync/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare-deployment-modal';
+import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare-authorization-modal';
 import { selectCloudflareServer } from '../ui/cloudflare-server-picker-modal';
 import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
@@ -30,7 +31,7 @@ export function createCloudflareUsageConnection(plugin: CratePlugin): Cloudflare
 		},
 		accountId: () => plugin.settings.cloudflareDeployment?.accountId,
 		signal: getPluginLifecycleSignal(plugin),
-		openExternal: url => { window.open(url, '_blank', 'noopener,noreferrer'); },
+		openExternal: url => openCloudflareAuthorization(plugin, url),
 	});
 }
 
@@ -43,9 +44,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		onAuthorized: (accountId, tokens) => plugin.cloudflareUsageConnection.acceptAuthorization(accountId, tokens),
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
-		openExternal: url => {
-			window.open(url, '_blank', 'noopener,noreferrer');
-		},
+		openExternal: url => openCloudflareAuthorization(plugin, url),
 		selectDeployment: (deployments, missingServer) => selectCloudflareServer(plugin.app, deployments, missingServer),
 		beforeServerSwitch: async () => {
 			plugin.clearSettingsUiState();
@@ -60,6 +59,14 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 			plugin.refreshSettingsTab();
 		},
 	});
+}
+
+function openCloudflareAuthorization(plugin: CratePlugin, url: string): void {
+	if (Platform.isMobile) {
+		openCloudflareAuthorizationModal(plugin.app, url, getPluginLifecycleSignal(plugin));
+		return;
+	}
+	window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'switch' | 'create' | 'update' | 'reset' | 'delete'): Promise<void> {
@@ -93,6 +100,7 @@ export async function handleCloudflareOAuthProtocol(
 ): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
+	dismissCloudflareAuthorizationModal(plugin.app);
 	plugin.openSettingsTab();
 	if (params.state?.startsWith('usage-')) {
 		try {

@@ -10,6 +10,7 @@ import {
 const openConfirmationModal = vi.fn();
 const startCloudflareDeployment = vi.fn();
 const checkAndRecoverUpdate = vi.fn();
+const openExternalBrowserModal = vi.fn();
 const embeddedArtifact = {
 	version: '0.1.0',
 	fingerprint: 'f'.repeat(64),
@@ -20,14 +21,15 @@ async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
 }
 
-async function loadConfigSectionModule() {
-	vi.doMock('obsidian', () => createObsidianUiModule());
+async function loadConfigSectionModule(mobile = false) {
+	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
 	vi.doMock('../../cloudflare/deployment-recovery-ui', () => ({ checkAndRecoverUpdate }));
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
 	vi.doMock('../../cloudflare/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
+	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
 	vi.doMock('./section-helpers', () => ({ createSettingsSectionHeading: vi.fn(), createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));
 
 	return import('./config-section');
@@ -43,6 +45,7 @@ beforeEach(() => {
 	resetObsidianUiMocks();
 	openConfirmationModal.mockReset();
 	startCloudflareDeployment.mockReset();
+	openExternalBrowserModal.mockReset();
 });
 
 afterEach(() => {
@@ -54,10 +57,27 @@ afterEach(() => {
 	vi.doUnmock('../../cloudflare/deployment-recovery-ui');
 	vi.doUnmock('../../cloudflare/embedded-artifacts');
 	vi.doUnmock('../confirmation-modal');
+	vi.doUnmock('../external-browser-modal');
 	vi.doUnmock('./section-helpers');
 });
 
 describe('renderConfigSection integration', () => {
+	it('offers a tappable dashboard link on mobile', async () => {
+		const { renderServerSection } = await loadConfigSectionModule(true);
+		const plugin = {
+			app: {},
+			manifest: { version: '0.3.0' },
+			settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database', vaultName: 'Vault' }, workerUrl: 'https://worker.example.com' },
+			syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn() },
+		};
+		const openWindow = vi.fn();
+		vi.stubGlobal('window', { open: openWindow });
+		renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		getSettingByName('Cloudflare dashboard').buttons[0]?.click();
+		expect(openExternalBrowserModal).toHaveBeenCalledWith(plugin.app, 'https://dash.cloudflare.com/', expect.objectContaining({ linkText: 'Open Cloudflare' }));
+		expect(openWindow).not.toHaveBeenCalled();
+	});
+
 	it('shows local management guidance without Cloudflare dashboard or update controls', async () => {
 		const { renderServerSection, renderServerUpdateNotice } = await loadConfigSectionModule();
 		const context = {
