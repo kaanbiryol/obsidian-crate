@@ -1,6 +1,6 @@
-import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
-import { SyncIndicator, type SyncIndicatorState } from '../../ui/shared/SyncIndicator';
+import type { SyncIndicatorState } from '../../ui/shared/SyncIndicator';
+import { PwaSyncStatusIndicator } from './PwaSyncStatusIndicator';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { DataMode } from '../types';
 
@@ -36,13 +36,5 @@ function syncStatus({ changes, isOffline, refreshing, loading, dataMode, error, 
 
 /** Stable header space keeps background saves from moving the reminder list. */
 export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
-	const { state, label } = syncStatus(props);
-	return (
-		<div className="pwa-sync-indicator" data-sync-state={state} title={label}>
-			<BaseButton className="pwa-sync-indicator__button" type="button" aria-label={`Sync status: ${label}`} onClick={() => props.onShowStatus(label)}>
-				<SyncIndicator state={state} />
-			</BaseButton>
-			<span className="pwa-sync-indicator__label" role="status" aria-live="polite" aria-atomic="true">{label}</span>
-		</div>
-	);
+	return <PwaSyncStatusIndicator {...syncStatus(props)} onShowStatus={props.onShowStatus} />;
 }

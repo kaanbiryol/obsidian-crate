@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
-import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingLock, readingSession, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
+import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingDrainLock, readingLock, readingSession, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
 export class ReadingApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
@@ -55,41 +55,59 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
 }
 export async function queueReading(session: ReadingSession, action: PendingReading['action'], intent: Record<string, unknown>) {
   if (action === 'capture') readingUrl(intent.url);
-  await readingLock(async () => {
+  return readingLock(async () => {
     assertReadingSession(session); const queue = await pendingReading(session);
     if (queue.length >= 200) throw new Error('Send or review pending Reading changes before adding more.');
     if (action !== 'capture' && queue.some(op => op.intent.id === intent.id)) throw new Error('This item already has a pending change. Send it before editing again.');
     queue.push({ id: crypto.randomUUID(), sessionId: session.id, action, intent });
     await writeValue(`pending:${session.id}`, queue, session);
+    return queue;
   });
 }
-export async function drainReading(session: ReadingSession): Promise<void> {
-  if (!navigator.onLine) return;
-  await readingLock(async () => {
+export async function drainReading(session: ReadingSession): Promise<ReadingCache | undefined> {
+  if (!navigator.onLine) return undefined;
+  return readingDrainLock(async () => {
     assertReadingSession(session);
     const queue = await pendingReading(session);
-    if (!queue.length) return;
+    if (!queue.some(op => !op.review)) return undefined;
     const info = await readingRequest<{ day: number; generation: string }>('/reading/session', session);
     if (info.generation !== session.generation) throw new Error('Reading destination changed. Export and review pending work.');
-    for (const op of [...queue]) {
-      if (op.review) continue;
-      if (!op.body) {
-        op.body = JSON.stringify({ ...op.intent, operationId: createReminderOperationId(info.day) });
-        // Store exact dispatch bytes and ID before making the request.
-        await writeValue(`pending:${session.id}`, queue, session);
-      }
+    const confirmed = new Set<string>();
+    for (const candidate of queue) {
+      if (candidate.review) continue;
+      const op = await readingLock(async () => {
+        const current = await pendingReading(session), next = current.find(entry => entry.id === candidate.id);
+        if (!next || next.review) return null;
+        if (!next.body) {
+          next.body = JSON.stringify({ ...next.intent, operationId: createReminderOperationId(info.day) });
+          // Store exact dispatch bytes and ID before making the request.
+          await writeValue(`pending:${session.id}`, current, session);
+        }
+        return next;
+      });
+      if (!op) continue;
       try {
         await readingRequest(`/reading/${op.action}`, session, op.body);
-        // Confirmed refresh precedes removal. A failed refresh retains the same receipt retry.
-        await loadReading(session);
-        queue.splice(queue.indexOf(op), 1);
-        await writeValue(`pending:${session.id}`, queue, session);
+        confirmed.add(op.id);
       } catch (error) {
-        op.error = error instanceof Error ? error.message : 'Save has not been confirmed. Retry when connected.';
-        op.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
-        await writeValue(`pending:${session.id}`, queue, session); break;
+        await readingLock(async () => {
+          const current = await pendingReading(session), failed = current.find(entry => entry.id === op.id);
+          if (!failed) return;
+          failed.error = error instanceof Error ? error.message : 'Save has not been confirmed. Retry when connected.';
+          failed.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
+          await writeValue(`pending:${session.id}`, current, session);
+        });
+        break;
       }
     }
-    window.dispatchEvent(new Event('crate-reading-change'));
+    if (!confirmed.size) return undefined;
+    // Confirm once for this batch before removing any durable command. Another
+    // tab may have queued more work while the network requests were in flight.
+    const cache = await loadReading(session);
+    await readingLock(async () => {
+      const current = await pendingReading(session);
+      await writeValue(`pending:${session.id}`, current.filter(op => !confirmed.has(op.id)), session);
+    });
+    return cache;
   });
 }

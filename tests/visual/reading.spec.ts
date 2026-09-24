@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+	// Keep the visual gallery deterministic and avoid contacting fixture domains.
+	await page.route(/^https:\/\/[^/]+\/favicon\.ico(?:\?.*)?$/, route => route.abort());
+});
+
 for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for (const width of [390, 1280]) {
 	test(`reading ${host} ${theme} ${width}`, async ({ page }) => {
 		await page.clock.setFixedTime(new Date('2026-09-21T12:00:00Z'));
@@ -29,6 +34,43 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('essays');
 	});
 }
+
+test('reading keeps the selected tab indicator in place when a reader returns immediately', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'no-preference' });
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/?host=pwa&scene=reading&theme=dark&reading-back=1');
+	const article = page.getByRole('button', { name: /A field guide to finding your next favorite place/ });
+	const returnFromReader = async (tab: string) => {
+		const frames = await page.evaluate(async () => {
+			const workspace = document.querySelector<HTMLElement>('.crate-reading-workspace')!;
+			const nav = workspace.querySelector<HTMLElement>('.crate-reading__mobile-nav')!;
+			const sample = () => {
+				const active = nav.querySelector<HTMLElement>('.bottom-tab-button.is-active')!;
+				const slider = nav.querySelector<HTMLElement>('.bottom-tab-slider')!;
+				const buttonRect = active.getBoundingClientRect(), sliderRect = slider.getBoundingClientRect();
+				return { tab: active.dataset.tab, offset: Math.round(sliderRect.left + sliderRect.width / 2 - buttonRect.left - buttonRect.width / 2) };
+			};
+			const frames = [sample()];
+			workspace.querySelector<HTMLButtonElement>('[aria-label="Back to reading"]')!.click();
+			for (let frame = 0; frame < 20; frame++) {
+				await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+				frames.push(sample());
+			}
+			return frames;
+		});
+		expect(frames.every(frame => frame.tab === tab && Math.abs(frame.offset) < 5), JSON.stringify(frames)).toBe(true);
+		await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'false');
+	};
+	await page.getByRole('button', { name: 'Favorites', exact: true }).click();
+	await article.click();
+	await returnFromReader('favorites');
+	await article.click();
+	await page.getByRole('button', { name: 'Archive article', exact: true }).click();
+	await returnFromReader('favorites');
+	await page.getByRole('button', { name: 'Archive', exact: true }).click();
+	await article.click();
+	await returnFromReader('archived');
+});
 
 for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard and safe content in ${host}`, async ({ page }) => {
 	const remote: string[] = [];
@@ -69,7 +111,7 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 		const bounds = element.getBoundingClientRect();
 		let active = document.activeElement;
 		while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
-		return { bottom: Math.round(bounds.bottom), inset: element.closest<HTMLElement>('.base-modal-container')?.style.bottom, active: active?.tagName };
+		return { bottom: Math.round(bounds.bottom), inset: element.closest<HTMLElement>('.base-modal-container, .pwa-modal-sheet__container')?.style.bottom, active: active?.tagName };
 	})).toEqual({ bottom: 484, inset: '360px', active: 'INPUT' });
 });
 

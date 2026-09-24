@@ -12,6 +12,7 @@ export interface ReadingMetadata {
 	capture_method?: 'url' | 'web-clipper';
 	author?: string;
 	resolved_url?: string;
+	favicon_url?: string;
 }
 
 export type ReadingChanges = Partial<Pick<ReadingMetadata, 'reading_status' | 'favorite' | 'tags'>>;
@@ -29,6 +30,20 @@ export function readingUrl(value: unknown): string {
 	if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
 		throw new Error('Use an HTTP or HTTPS link without embedded credentials.');
 	}
+	return url.href;
+}
+
+/** Icons are displayed by both hosts, so never request local or insecure URLs. */
+export function readingFaviconUrl(value: unknown): string {
+	if (typeof value !== 'string' || value.length > 2048) throw new Error('Invalid site icon URL.');
+	let url: URL;
+	try { url = new URL(value.trim()); } catch { throw new Error('Invalid site icon URL.'); }
+	const host = url.hostname.toLowerCase();
+	if (url.protocol !== 'https:' || url.username || url.password || url.port || !host.includes('.')
+		|| host.includes(':') || /^[\d.]+$/.test(host) || /(?:^|\.)(?:localhost|local|internal|invalid|test|onion)$/.test(host)) {
+		throw new Error('Invalid site icon URL.');
+	}
+	url.hash = '';
 	return url.href;
 }
 
@@ -66,5 +81,6 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 		...(value.capture_method === undefined ? {} : { capture_method: value.capture_method }),
 		...(value.author === undefined ? {} : { author: value.author }),
 		...(value.resolved_url === undefined ? {} : { resolved_url: readingUrl(value.resolved_url) }),
+		...(value.favicon_url === undefined ? {} : { favicon_url: readingFaviconUrl(value.favicon_url) }),
 	};
 }

@@ -1,16 +1,47 @@
-@use "../../ui/shared/styles/base-modal";
-.crate-reminders-ui { @include base-modal.styles; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .crate-reminders-ui .pwa-reading-opening { padding-top: var(--pwa-safe-area-top); }
 .crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: 44px; margin: 16px 18px 20px; border-radius: 10px; }
 .crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
+.crate-reminders-ui .pwa-reading-article-opening__body { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--text-muted); text-align: center; }
+.crate-reminders-ui .pwa-reading-article-opening__body p { max-width: 32ch; margin: 0; font-size: 14px; line-height: 1.5; }
+@media (max-width: 719px) {
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar) {
+    // Keep the tab bar's own z-index inside the library layer throughout navigation.
+    z-index: 0;
+    display: flex;
+  }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
+    position: absolute;
+    grid-area: 1 / 1 / -1 / -1;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    visibility: hidden;
+    pointer-events: none;
+    height: 100%;
+    background: var(--crate-app-bg);
+    box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
+    transform: translate3d(100%, 0, 0);
+    transition: transform 320ms cubic-bezier(.32, .72, 0, 1), visibility 0s linear 320ms;
+  }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0);
+    transition: transform 320ms cubic-bezier(.32, .72, 0, 1), visibility 0s;
+  }
+  // Browser history gestures already animate the page; do not replay the slide afterward.
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-motion="none"] .crate-reading__reader-pane { transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
+    .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
+  }
+}
 .crate-reminders-ui .crate-reading-welcome { position: relative; max-width: 440px; margin: 0 auto; padding: 80px 28px 40px; overflow-y: auto; max-height: 100%; }
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
 .crate-reminders-ui .crate-reading-welcome p { color: var(--text-muted); line-height: 1.8; font-size: 14px; }
-.crate-reminders-ui .crate-reading-settings { display: grid; gap: 10px; }
-.crate-reminders-ui .crate-reading-settings p { font-size: 14px; color: var(--text-muted); margin: 0 0 12px; line-height: 1.7; }
-.crate-reminders-ui .crate-reading-settings button { justify-content: flex-start; }
 
 .crate-reminders-ui .crate-reading-shortcut { min-width: 0; }
 .crate-reminders-ui .crate-reading-shortcut ol { padding-left: 24px; margin: 0; }
@@ -21,9 +52,7 @@
 .crate-reminders-ui .crate-reading-shortcut__code label { display: grid; gap: 8px; font-size: 14px; }
 .crate-reminders-ui .crate-reading-shortcut__code textarea { width: 100%; box-sizing: border-box; resize: vertical; font-size: 16px; line-height: 1.5; padding: 10px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; }
 
-.crate-reminders-ui .crate-reading-settings-dialog { display: flex; flex-direction: column; overflow: hidden; }
-.crate-reminders-ui .crate-reading-settings-dialog .crate-modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.crate-reminders-ui .crate-reading-settings-dialog :is(.reminder-modal-header, .base-modal-drag-region) { flex-shrink: 0; }
+.crate-reminders-ui .pwa-reading-sheet > .settings-panel { background: transparent; }
 
 // Use the library's real header tracks while the Reading module/session loads.
 .crate-reminders-ui .pwa-reading-opening__header .view-header-count { display: none; }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { adoptReadingClip, createReadingNote, parseReadingNote, readingImportId, updateReadingNote } from './notes';
-import { readingUrl, readingUrlIdentity } from './model';
+import { readingFaviconUrl, readingUrl, readingUrlIdentity } from './model';
 import { validateReadingFolder } from '../settings';
 
 const id = 'c700b5b4-006c-4d2a-8efb-a99b838d9224';
@@ -65,6 +65,14 @@ describe('reading Markdown', () => {
 	it('keeps URL query identity and rejects credentials and non-web protocols', () => {
 		expect(readingUrlIdentity('HTTPS://EXAMPLE.com:443/read?a=2&a=1#part')).toBe('https://example.com/read?a=2&a=1');
 		for (const url of ['javascript:alert(1)', 'file:///tmp/test', 'https://user:secret@example.com', 'example.com']) expect(() => readingUrl(url)).toThrow();
+	});
+	it('round trips an optional safe favicon URL while keeping older notes valid', () => {
+		expect(parseReadingNote(note())?.favicon_url).toBeUndefined();
+		const withIcon = note().replace('extraction_status: "pending"', 'extraction_status: "pending"\nfavicon_url: "https://cdn.example.com/icon.png#fragment"');
+		expect(parseReadingNote(withIcon)?.favicon_url).toBe('https://cdn.example.com/icon.png');
+		for (const url of ['http://example.com/icon.ico', 'https://localhost/icon.ico', 'https://127.0.0.1/icon.ico', 'https://user:password@example.com/icon.ico', 'data:image/png,AAA']) {
+			expect(() => readingFaviconUrl(url)).toThrow('icon URL');
+		}
 	});
 	it('rejects overlapping, hidden and non-portable folders', () => {
 		for (const folder of ['../Reading', '/Reading', 'Reading//One', '.hidden/Reading', 'Reading/CON', 'Reminders/Sub', 'reminders', 'Tasks']) expect(() => validateReadingFolder(folder, folder === 'Tasks' ? 'Tasks/Reminders' : 'Reminders')).toThrow();

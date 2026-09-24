@@ -26,6 +26,7 @@ export function PwaModalSheet({
 	// Base UI owns focus containment; trap-focus avoids a second document lock.
 	useLayoutEffect(lockSheetDocumentScroll, []);
 	const popupRef = useRef<HTMLDivElement>(null);
+	const anchorRef = useRef<HTMLSpanElement>(null);
 	const setPopupRef = useCallback((popup: HTMLDivElement | null) => {
 		popupRef.current = popup;
 		measureSheetTravel(popup);
@@ -37,10 +38,10 @@ export function PwaModalSheet({
 	}, [isOpen]);
 	const [previousFocus] = useState(() => typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null);
 	const [hasMounted, setHasMounted] = useState(false);
-	const [mountPoint, setMountPoint] = useState(() => typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.pwa-shadow-root'));
+	const [mountPoint, setMountPoint] = useState<HTMLElement | null>(null);
 	useLayoutEffect(() => {
 		// A notification can mount the app root and sheet in the same commit.
-		if (!mountPoint) setMountPoint(document.querySelector<HTMLElement>('.pwa-shadow-root'));
+		if (!mountPoint) setMountPoint(anchorRef.current?.closest<HTMLElement>('.pwa-shadow-root, .crate-feature-panel') ?? null);
 		// Base UI skips entrance transitions when initially open. Open before paint
 		// after mounting its root, retaining synchronous first-tap editor focus.
 		else setHasMounted(true);
@@ -48,9 +49,7 @@ export function PwaModalSheet({
 	useLayoutEffect(() => {
 		if (role === 'alertdialog') popupRef.current?.focus({ preventScroll: true });
 	}, [role, hasMounted]);
-	if (!mountPoint) return null;
-
-	return (
+	return <><span ref={anchorRef} hidden />{mountPoint && (
 		<Drawer.Root open={isOpen && hasMounted} modal="trap-focus" swipeDirection="down"
 			disablePointerDismissal={!dismissible}
 			onOpenChange={(open, details) => {
@@ -82,13 +81,12 @@ export function PwaModalSheet({
 								<Drawer.Backdrop className="pwa-modal-sheet__backdrop" />
 								<Drawer.Popup ref={setPopupRef}
 									className={`pwa-modal-sheet__container pwa-modal-sheet__container--${variant}`}
+									style={variant === 'settings' ? { bottom: keyboardInset, '--pwa-sheet-keyboard-inset': `${keyboardInset}px` } as React.CSSProperties : undefined}
 									role={role} aria-label={label} aria-modal="true" aria-describedby={descriptionId}
 									data-base-ui-swipe-ignore={!dismissible ? '' : undefined}
 									initialFocus={variant === 'reminder' ? false : popupRef}
 									finalFocus={() => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
-										: document.querySelector<HTMLElement>('.pwa-shadow-root .reminder-pagination select:not(:disabled)')
-											?? document.querySelector<HTMLElement>('.pwa-shadow-root .sidebar-reminder-card-wrapper')
-											?? document.querySelector<HTMLElement>('.pwa-shadow-root [data-action="switch-tab"][aria-current="page"]')}
+										: mountPoint.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
 								>
 									<Drawer.Content className="pwa-modal-sheet__content">
 										<div className="pwa-modal-sheet__scroller">{children}</div>
@@ -100,5 +98,5 @@ export function PwaModalSheet({
 				</div>
 			</Drawer.Portal>
 		</Drawer.Root>
-	);
+	)}</>;
 }

@@ -16,7 +16,7 @@ Save a public article, wait for extraction, open it, favorite it, add tags, arch
 4. Select **Enable server reading**. An already enrolled Reminders web app should open Reading through its feature switch without another setup link. For a browser without a Reminders connection, select **Open web reading** or use **Copy setup link** on another device. Setup links expire after 10 minutes and are single use.
 5. Select **Copy template**, import it from the clipboard in Obsidian Web Clipper, and save with **Crate Reading** into the test vault. Crate preserves the clip's body and filename; it appears in the web library after normal sync. With automatic sync off, select **Crate: Sync now**.
 
-The reader suppresses remote images and active HTML. **Open note** uses Obsidian's normal Markdown rendering. Unmarked notes are not adopted. Changes to Reading metadata preserve personal notes and unknown YAML properties.
+The reader suppresses remote article images and active HTML. Source badges may request HTTPS favicons and fall back to letters when offline or unavailable. **Open note** uses Obsidian's normal Markdown rendering. Unmarked notes are not adopted. Changes to Reading metadata preserve personal notes and unknown YAML properties.
 
 ## Test iPhone
 

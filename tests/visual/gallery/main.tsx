@@ -26,8 +26,9 @@ import fixtureStyles from './fixture.css?raw';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 
 import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
+import { ReadingDialogHost } from '@/reading/ui/ReadingDialog';
+import { PwaReadingDialog } from '@/pwa/reading/PwaReadingDialog';
 import { ReadingFixture } from './ReadingFixture';
-import { ReadingThemeIcon } from '@/pwa/reading/ReadingThemeIcon';
 import { LexicalTrial } from './lexical/LexicalTrial';
 import lexicalStyles from './lexical/trial.css?raw';
 
@@ -45,7 +46,6 @@ style.textContent = (host === 'plugin' ? pluginStyles : PWA_STYLES + (isDark ? '
 document.head.append(style);
 
 function GalleryIcon(props: ThemeIconProps) {
-  if (scene === 'reading') return <ReadingThemeIcon {...props} />;
   if (props.id === 'loader-circle') return <LoaderCircle size={18} aria-hidden="true" />;
   return props.id === 'triangle-alert' ? <TriangleAlert size={18} aria-hidden="true" /> : <PwaThemeIcon {...props} />;
 }
@@ -79,7 +79,7 @@ function Gallery() {
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} /></div>;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture />;
-  else if (scene === 'reading') content = <ReadingFixture onAdd={() => setResult('Save link opened')} />;
+  else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : null}><ReadingFixture onAdd={() => setResult('Save link opened')} /></ReadingDialogHost.Provider>;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server rebuild failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish rebuilding your Cloudflare server." details={['In Crate settings → Recovery and troubleshooting → Troubleshooting, select “Resume server rebuild” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;

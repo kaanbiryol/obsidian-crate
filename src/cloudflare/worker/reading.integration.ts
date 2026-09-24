@@ -31,10 +31,10 @@ async function capture() {
 }
 it('publishes extracted text through immutable file versions and ordinary sync changelog', async () => {
   const job = await capture();
-  await publishExtraction(env, { job, result: { markdown: '# Article\n\nUseful saved article text.', title: 'An article', author: 'Author' }, resolvedUrl: job.url });
+  await publishExtraction(env, { job, result: { markdown: '# Article\n\nUseful saved article text.', title: 'An article', author: 'Author', faviconUrl: 'https://cdn.example.com/icon.png' }, resolvedUrl: job.url });
   const saved = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path);
   expect(saved?.content).toContain('Useful saved article text.');
-  expect(parseReadingNote(saved!.content)).toMatchObject({ extraction_status: 'ready', title: 'An article', author: 'Author' });
+  expect(parseReadingNote(saved!.content)).toMatchObject({ extraction_status: 'ready', title: 'An article', author: 'Author', favicon_url: 'https://cdn.example.com/icon.png' });
   expect((await env.DB.prepare('SELECT count(*) AS n FROM changelog WHERE path=?').bind(job.path).first())?.n).toBe(2);
   expect((await env.DB.prepare('SELECT count(*) AS n FROM file_versions').first())?.n).toBe(1);
 });

@@ -43,6 +43,17 @@
 		height: 44px;
 	}
 
+	// Keep the 44px touch target centered on the title without enlarging its row.
+	.view-header-title-row .pwa-sync-indicator {
+		height: 0;
+
+		.pwa-sync-indicator__button {
+			position: absolute;
+			top: 0;
+			translate: 0 -50%;
+		}
+	}
+
 	@include sync-indicator.styles(".crate-sync-indicator");
 
 	@media (prefers-reduced-motion: reduce) {

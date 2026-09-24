@@ -20,7 +20,7 @@
 }
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
-	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
+	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:calc(90dvh - var(--pwa-sheet-keyboard-inset,0px))!important}
 	.pwa-picker-sheet{padding:0 0 calc(16px + env(safe-area-inset-bottom))}
 }
 @media (max-width: 420px){
