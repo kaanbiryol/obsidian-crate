@@ -66,6 +66,12 @@ The server saves the bookmark first, then extracts article text with Defuddle.
 Your server contacts the saved website without browser cookies or Crate credentials;
 there is no third-party extraction service. Failed or restricted pages remain saved
 links. Requests, extraction jobs, database operations, and files use your hosting resources.
+Reading displays website favicons when available. Opening the library can request
+an icon from the saved site or its icon host; that host sees the request, and the
+browser may include its cookies for that host. Crate sends no Reading credential
+or page referrer with the image. Each browser or Obsidian device may cache icons
+independently and may request them again. A letter appears when an icon cannot
+load, including offline. Article images remain suppressed.
 
 For desktop capture, select **Copy template**, import it in Obsidian Web Clipper,
 and save using **Crate Reading** into the intended vault. Crate adopts explicitly
@@ -87,7 +93,7 @@ both the plugin and web library.
 Opened article text is cached offline, up to 50 articles or 20 MB. The web app
 keeps offline saves and edits pending until the server confirms them. Export
 pending work before clearing browser data. The iPhone shortcut requires a connection.
-Readers suppress remote images and active HTML; **Open note** uses Obsidian's normal
+Article bodies suppress remote images and active HTML; **Open note** uses Obsidian's normal
 rendering rules. Browser and capture credentials are separate, last up to 90 days,
 and can be revoked in connected devices.
 
@@ -189,9 +195,9 @@ To stop a running sync, select **Pause sync** in sync activity or **Stop sync** 
 
 After installing the plugin, open the Crate settings tab in Obsidian:
 
-1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
+1. Select **Connect with Cloudflare**. On mobile, select **Open Cloudflare** in the dialog to open the sign-in page in your browser.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. If it does not, select **Open Obsidian** on that page. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
 5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
@@ -249,6 +255,8 @@ Reminder code blocks can be embedded in notes:
 The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Reminders** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
 
 The web app checks browser permission and confirms push registration with the current server session when opened, resumed, or reconnected. **On** appears after confirmation. If registration fails, **Retry** repairs the existing browser subscription; if permission is blocked, allow notifications in browser settings and reopen Crate.
+
+To set up the web app on the same phone as Obsidian, select **Settings → Crate → Reminders web app → Open app**, then select **Open reminders**. For another device, use **Copy app link** or **Show QR code**. If clipboard access fails, Crate shows a link you can open or select and copy.
 
 The reminders web app checks for updates during launch and when brought back to the foreground, including on iPhone Home Screen installs. During launch, it allows up to 2.5 seconds to prepare and safely apply an update before showing the list. If the check or download is slow, fails, or pending work prevents an update, the current app opens normally. Once the list is visible, updates download in the background and wait for you to select **Update**; reading, closing an editor, and returning to the app never trigger an automatic reload. Selecting **Update** shows the updating screen immediately and keeps it visible through download and reload. Its linear indicator advances through update stages and keeps its position across the reload. If the update fails, the screen closes and an error explains that you can retry. Offline launches use the existing app. An already-open editor in another tab is not reloaded.
 

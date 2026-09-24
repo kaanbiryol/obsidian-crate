@@ -188,9 +188,10 @@ Record the Obsidian version, operating-system version, and result for each devic
 - Run at least one pass on Obsidian 1.13.0, the version declared in `manifest.json`. If it is unavailable or any required flow fails, raise `minAppVersion` and the matching `versions.json` entry to the oldest version actually tested.
 - Use a Cloudflare account that is not owned by or a member of the OAuth-client publisher. Confirm the verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, Memberships Read, and Account Analytics Read.
 - Install `main.js`, `manifest.json`, and `styles.css` from the prepared release assets into a clean desktop vault. Complete OAuth, explicit initial upload, restart, reconnect, and server update.
-- On a physical iOS device, join the existing server with **Crate: Sync now** in the command palette. Create, edit, rename, and delete Markdown and binary files; preserve a concurrent-edit conflict; background and resume Obsidian; then disable and re-enable Crate.
-- Repeat the same existing-server flow on a physical Android device.
+- On a physical iOS device, select **Connect with Cloudflare**, then **Open Cloudflare**. Complete authorization in the browser and confirm the callback reopens Obsidian (or **Open Obsidian** does). Join the existing server, then select **Crate: Sync now** in the command palette. Create, edit, rename, and delete Markdown and binary files; preserve a concurrent-edit conflict; background and resume Obsidian; then disable and re-enable Crate.
+- Repeat the same Cloudflare sign-in and existing-server flow on a physical Android device.
 - On both mobile platforms, create, edit, complete, reorder, and delete reminders. Install the reminders web app, enable push, receive both a test notification and a scheduled reminder, verify sign-out, and confirm a signed-out browser cannot use the previous session.
+- On both mobile platforms, exercise the settings tab: sync controls and exclusions, reminder and notification options, web app **Open app**, Reading **Open web reading**, connected devices, Cloudflare usage and dashboard, and recovery dialogs. Check link and clipboard fallbacks from the same phone. If Reading is enabled, test its library and a new browser setup link. Record any settings that cannot be reached or changed.
 - Confirm **Disconnect this device** removes only the local credential, while explicit Cloudflare resource deletion removes the remote copy as documented.
 
 ## Obsidian Mock
