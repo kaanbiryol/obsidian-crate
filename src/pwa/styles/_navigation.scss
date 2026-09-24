@@ -18,9 +18,34 @@
 
   .pwa-navigation-screen--project {
     padding-top: var(--pwa-safe-area-top, 0px);
+    box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
 
     .premium-back-button {
       margin-top: 8px;
     }
+  }
+
+  .pwa-project-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    isolation: isolate;
+    overflow: hidden;
+    pointer-events: none;
+    --reminders-tabbar-overlay: 0px;
+    --reminders-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom));
+
+    &[data-project-open="true"] { pointer-events: auto; }
+
+    .pwa-navigation-screen { pointer-events: auto; }
+
+    .pwa-project-fab {
+      bottom: calc(var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) + 16px);
+    }
+  }
+
+  // The project layer already accounts for the top safe area.
+  .pwa-reminders-view .pwa-navigation-screen--project .premium-back-button {
+    margin-top: 8px;
   }
 }
