@@ -15,7 +15,12 @@ test('filesystem metadata changes neither asset versions nor collected server in
 	try {
 		write('src/cloudflare/worker/pwa/page.ts', 'export const page = "hello";');
 		write('src/cloudflare/worker/pwa/nested/.config', 'real asset');
+		write('src/cloudflare/worker/pwa/styles.ts', [
+			"import reminders from '../../../pwa/styles/reminders-view.scss?raw-css';",
+			"import switcher from '../../../pwa/styles/feature-switcher.scss?raw-css';",
+		].join('\n'));
 		write('src/pwa/styles/reminders-view.scss', '.test { color: red; }');
+		write('src/pwa/styles/feature-switcher.scss', '.switcher { opacity: 1; }');
 		for (const path of ['src/cloudflare/provisioner.ts', 'src/cloudflare/deployment-recovery.ts',
 			'src/cloudflare/server-delete.ts', 'scripts/build-worker.mjs', 'scripts/cloudflare-artifacts-vite-plugin.mjs']) write(path, 'export {};');
 		const assets = { 'app.js': 'app' };
@@ -36,6 +41,9 @@ test('filesystem metadata changes neither asset versions nor collected server in
 		write('src/cloudflare/worker/pwa/page.ts', 'export const page = "hello";');
 		write('src/pwa/styles/reminders-view.scss', '.test { color: blue; }');
 		assert.notEqual(createPwaAssetVersion(assets, root), baseline, 'stylesheet changes must invalidate the version');
+		write('src/pwa/styles/reminders-view.scss', '.test { color: red; }');
+		write('src/pwa/styles/feature-switcher.scss', '.switcher { opacity: .5; }');
+		assert.notEqual(createPwaAssetVersion(assets, root), baseline, 'mode transition styles must invalidate the version');
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

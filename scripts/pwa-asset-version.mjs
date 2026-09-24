@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { compile } from 'sass';
 
 function listFiles(directory) {
@@ -25,8 +26,16 @@ export function createPwaAssetVersion(clientAssets, root, onRead = () => {}) {
 		hash.update(readFileSync(path));
 	}
 
-	// Shared Sass is outside the Worker source tree and is not in the JS bundle.
-	// Hash the compiled stylesheet so every transitive UI import updates the cache.
-	hash.update(compile(resolve(root, 'src/pwa/styles/reminders-view.scss')).css);
+	// Sass imported as Worker text is outside both the Worker source tree and
+	// the client bundle. Hash every compiled entry, including mode transitions.
+	const stylesEntry = resolve(root, 'src/cloudflare/worker/pwa/styles.ts');
+	const imports = readFileSync(stylesEntry, 'utf-8').matchAll(/from\s+['"]([^'"]+\.scss)\?raw-css['"]/g);
+	for (const [, source] of imports) {
+		const path = resolve(dirname(stylesEntry), source);
+		const result = compile(path);
+		hash.update(relative(root, path));
+		hash.update(result.css);
+		for (const url of result.loadedUrls) if (url.protocol === 'file:') onRead(fileURLToPath(url));
+	}
 	return hash.digest('hex').slice(0, 16);
 }

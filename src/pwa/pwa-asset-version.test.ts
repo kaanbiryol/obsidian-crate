@@ -15,7 +15,14 @@ function fixture() {
 		writeFileSync(target, source);
 	};
 	write('src/cloudflare/worker/pwa/styles/theme.css', ':root { --accent: purple; }');
+	write('src/cloudflare/worker/pwa/styles.ts', [
+		"import reminders from '../../../pwa/styles/reminders-view.scss?raw-css';",
+		"import switcher from '../../../pwa/styles/feature-switcher.scss?raw-css';",
+		"import reading from '../../../pwa/reading/web.scss?raw-css';",
+	].join('\n'));
 	write('src/pwa/styles/reminders-view.scss', '@use "../../ui/shared/styles/tokens"; .crate-reminders-ui { @include tokens.styles; }');
+	write('src/pwa/styles/feature-switcher.scss', '.crate-feature-panel { opacity: 1; }');
+	write('src/pwa/reading/web.scss', '.crate-reading-web { color: red; }');
 	write('src/ui/shared/styles/_tokens.scss', '@mixin styles { --crate-radius-card: 10px; }');
 	return { root, write };
 }
@@ -30,6 +37,17 @@ describe('PWA asset version', () => {
 		const assets = { 'app.js': 'same client JavaScript' };
 		const before = createPwaAssetVersion(assets, root);
 		write('src/ui/shared/styles/_tokens.scss', '@mixin styles { --crate-radius-card: 12px; }');
+		expect(createPwaAssetVersion(assets, root)).not.toBe(before);
+	});
+
+	it('invalidates cached HTML when mode switch or Reading styles change', () => {
+		const { root, write } = fixture();
+		const assets = { 'app.js': 'same client JavaScript' };
+		const before = createPwaAssetVersion(assets, root);
+		write('src/pwa/styles/feature-switcher.scss', '.crate-feature-panel { opacity: .5; }');
+		expect(createPwaAssetVersion(assets, root)).not.toBe(before);
+		write('src/pwa/styles/feature-switcher.scss', '.crate-feature-panel { opacity: 1; }');
+		write('src/pwa/reading/web.scss', '.crate-reading-web { color: blue; }');
 		expect(createPwaAssetVersion(assets, root)).not.toBe(before);
 	});
 

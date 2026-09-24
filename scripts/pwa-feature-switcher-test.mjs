@@ -62,12 +62,15 @@ try {
         if(errors.length) throw new Error(errors.join('\n'));
         await context.close();
       }
-      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion:'no-preference', serviceWorkers:'block' });
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor:3, isMobile:true, hasTouch:true, reducedMotion:'no-preference', serviceWorkers:'block' });
       try {
         const page = await context.newPage();
         await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
         await page.getByRole('button',{name:'Switch to Reading',exact:true}).waitFor();
         await page.locator('.reminders-content').waitFor();
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'visible');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('opacity', '0');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveAttribute('inert', '');
         let releaseReading;
         const heldReading = new Promise(resolve => { releaseReading = resolve; });
         await page.route('**/notifications/assets/*', async route => { await heldReading; await route.continue(); });
@@ -119,7 +122,7 @@ try {
         releaseReading();
         await page.waitForTimeout(80);
         await page.screenshot({path:`test-results/feature-switcher/${name}-transition.png`});
-        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('opacity', '0');
         await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
         await page.getByRole('button',{name:'Switch to Reminders',exact:true}).waitFor();
         await page.getByRole('heading',{name:'Your reading, everywhere',exact:true}).waitFor();
@@ -151,7 +154,7 @@ try {
         assert.notEqual(reverse.first.readingIcon, reverse.second.readingIcon, JSON.stringify(reverse));
         assert.notEqual(reverse.first.remindersIcon, reverse.second.remindersIcon, JSON.stringify(reverse));
         await page.screenshot({path:`test-results/feature-switcher/${name}-reverse-mid.png`});
-        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('opacity', '0');
         await expect(page.getByRole('button',{name:'Switch to Reading',exact:true})).toBeFocused();
         await page.evaluate(async () => {
           const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
@@ -160,7 +163,7 @@ try {
           document.querySelector('[data-crate-section="reading"] .pwa-feature-switch-button').click();
         });
         await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('data-active', 'true');
-        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('opacity', '0');
         await expect(page.getByRole('button',{name:'Switch to Reading',exact:true})).toBeFocused();
         const delayed = await page.evaluate(async () => {
           document.querySelector('[data-crate-section="reminders"] .pwa-feature-switch-button').click();
@@ -174,10 +177,33 @@ try {
           return { retained, count: animations.length };
         });
         assert.deepEqual(delayed, { retained: true, count: 1 }, 'A delayed fade must survive beyond the old cleanup timer');
-        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('opacity', '0');
+        const skippedEntrance = await page.evaluate(async () => {
+          const reading = document.querySelector('[data-crate-section="reading"]');
+          const reminders = document.querySelector('[data-crate-section="reminders"]');
+          const activated = new Promise(resolve => {
+            const observer = new MutationObserver(() => {
+              if (reminders.dataset.active !== 'true') return;
+              observer.disconnect(); resolve();
+            });
+            observer.observe(reminders, { attributes: true, attributeFilter: ['data-active'] });
+          });
+          reading.querySelector('.pwa-feature-switch-button').click();
+          await activated;
+          const entering = reminders.getAnimations().find(animation => animation.animationName === 'crate-mode-fade-in');
+          entering?.cancel();
+          await new Promise(resolve => setTimeout(resolve, 80));
+          return { entering: Boolean(entering), outgoingOpacity: Number(getComputedStyle(reading).opacity),
+            outgoingZ: Number(getComputedStyle(reading).zIndex), incomingZ: Number(getComputedStyle(reminders).zIndex),
+            incomingOpacity: Number(getComputedStyle(reminders).opacity) };
+        });
+        assert.equal(skippedEntrance.entering, true);
+        assert.ok(skippedEntrance.outgoingOpacity > 0 && skippedEntrance.outgoingOpacity < 1, JSON.stringify(skippedEntrance));
+        assert.ok(skippedEntrance.outgoingZ > skippedEntrance.incomingZ, JSON.stringify(skippedEntrance));
+        assert.equal(skippedEntrance.incomingOpacity, 1);
       } finally { await context.close(); }
       for (const reducedMotion of ['no-preference', 'reduce']) {
-      const readingFirst = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion, serviceWorkers: 'block' });
+      const readingFirst = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor:3, isMobile:true, hasTouch:true, reducedMotion, serviceWorkers: 'block' });
       try {
         const page = await readingFirst.newPage();
         await page.goto(`${origin}/notifications?section=reading`);
@@ -200,7 +226,7 @@ try {
         if (reducedMotion === 'reduce') assert.ok(frames.every(frame => frame.scale === null || Number.isNaN(frame.scale)), JSON.stringify(frames));
         else assert.ok(frames.some(frame => frame.scale > 1.001), JSON.stringify(frames));
         await expect(page.locator('[data-crate-section="reminders"]')).toHaveCSS('opacity', '1');
-        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('[data-crate-section="reading"]')).toHaveCSS('opacity', '0');
         await page.getByRole('button', { name: 'Switch to Reading', exact: true }).waitFor();
       } finally { await readingFirst.close(); }
       }
