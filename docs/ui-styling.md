@@ -151,7 +151,16 @@ Both features use `src/ui/shared/ViewHeader.tsx`, `NavigationBar.tsx`,
 in the reminder adapter; Reading supplies its own destinations to the same
 navigation component. Mobile capture uses the same floating action button.
 Headers, icon sizes, selection, focus, and action variants belong to these shared
-controls. Keep article typography and library layout in Reading rather than
+controls. Reading dialogs use a host adapter: the PWA reuses Reminders’
+`PwaModalSheet`, `ModalHeader`, sheet transitions, scroll lock, and settings styles.
+All PWA icons use `PwaThemeIcon`. Both PWA headers use the same sync indicator and status toast, driven by
+each feature's own pending work and refresh state. Its touch target does not
+enlarge the title row. Reading shows confirmed sync only after refreshing the
+current session online; cached, offline, and unconfirmed changes stay distinct.
+Reading applies saved local edits immediately and uses the header indicator for
+background sync. There is no pending-change banner in its library or reader;
+failed changes, refresh, and export are available under **Reading settings → Sync**.
+Keep article typography and library layout in Reading rather than
 overriding every button or dialog there. Native text fields retain browser editing
 and selection behavior; composite search fields draw one focus cue around the
 whole control.
@@ -165,8 +174,9 @@ workspace, or phone navigation; a narrow Obsidian pane behaves like the phone UI
 The library and reader own separate scroll containers, so opening an article
 preserves filters and list position. Browser history remains in the PWA adapter.
 
-Article HTML still passes through the existing sanitizer. Source badges are local
-letter marks; rendering a list makes no favicon or tracking requests. Appearance,
+Article HTML still passes through the existing sanitizer. Source badges begin as
+letter marks and load HTTPS favicons when available; an unavailable or offline icon
+leaves the letter in place. Each host uses its own browser image cache. Appearance,
 tags, and capture use the existing Base UI modal primitive with portals in the
 current host document. Device/session controls live under **Reading settings**.
 The shared `src/ui/shared/styles/_base-modal.scss` mixin provides dialog geometry
@@ -182,11 +192,19 @@ shows a checklist icon for **Switch to Reminders**; Reminders shows a book for
 shrinks by 1.5% as it leaves and settles from 1.5% larger as it enters. The
 header, switch button, FAB, and bottom-bar geometry stay fixed; the titles,
 metadata, and bottom-bar items crossfade with their panels. The button icon
-rotates subtly as the new mode appears. Panel opacity uses one keyframe animation;
-cleanup follows animation completion with a fallback for canceled events. Reduced-motion
-users retain the fade without scaling or rotation. Momentary icon actions use brief
-press feedback without persistent hover cards. Loading headers reserve the same
-title and metadata tracks as their loaded counterparts. `FeatureShell.tsx` preserves mounted feature state
+rotates subtly and its surface pulses when the new mode appears. On phones, opening a Reading
+article slides the reader over the stationary library and bottom bar. Both stay
+painted beneath the full-height article, with background controls inert. Toolbar
+Back slides the article out once, then traverses history after the exit ends.
+Native history closes commit the library immediately and let it paint before
+replacing the forward entry, so WebKit cannot record the outgoing reader as the
+library snapshot. Loading and loaded content share one reader component. Detail history slots are
+scoped to the running document; reloads create a fresh library predecessor so Back
+cannot restore an older page instance. Reduced-motion
+users retain the opacity dissolve without scaling, rotation, or the button pulse. Dismissing an article clears its forward-history
+destination and reuses the detail entry on the next open, so a right-edge swipe
+cannot reopen a dismissed article or accumulate article entries.
+`FeatureShell.tsx` preserves mounted feature state
 and navigation, keeps the inactive panel inert, and restores keyboard focus to the
 destination's switch after its initial loading completes.
 Both PWA modes show layout-matched skeletons while their first usable data is
@@ -196,7 +214,8 @@ shows a zero count until that empty result is confirmed, and background refreshe
 keep existing items visible.
 The same switch is available on both connection screens. Top-level modes suppress
 single-finger back gestures starting within 20px of the left edge; an open Reading
-article retains native back navigation to its library.
+article retains native back navigation to its library. Other touch starts and
+multitouch gestures are left to the browser.
 
 Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark
 surfaces, mobile and desktop widths, safe rendering, article actions, capture,

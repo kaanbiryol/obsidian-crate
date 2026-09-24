@@ -39,7 +39,7 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
 			return { status: response.status, result: await response.json() };
 		};
 		const started = performance.now();
-		const article = await extract(`<html><head><title>A small article</title></head><body><article>
+		const article = await extract(`<html><head><title>A small article</title><link rel="icon" href="/assets/favicon.png"></head><body><article>
 		<h1>A small article</h1><p>Here is an article with useful content, enough context, and a <a href="/next">relative link</a>.</p>
 		<h2>日本語の見出し</h2><p>日本語の記事を保存します。 Über die Straße lesen.</p><ul><li>First point</li><li>Second point</li></ul>
 		<pre><code>const answer = 42;</code></pre><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>Answer</td><td>42</td></tr></tbody></table>
@@ -48,6 +48,7 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
 		</article></body></html>`);
 		assert.equal(article.status, 200);
 		assert.equal(article.result.title, 'A small article');
+		assert.equal(article.result.faviconUrl, 'https://example.com/assets/favicon.png');
 		for (const text of ['[relative link](https://example.com/next)', '日本語', 'Über', 'First point', 'const answer = 42;', '| Name', 'The original source.']) assert.ok(article.result.markdown.includes(text), `${text}\n${article.result.markdown}`);
 		assert.match(article.result.markdown, /- +First point/);
 		assert.ok(!article.result.markdown.includes('tracking.test'));

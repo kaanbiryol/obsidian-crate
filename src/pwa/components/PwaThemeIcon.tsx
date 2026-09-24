@@ -1,4 +1,14 @@
 import {
+  Archive,
+  ArchiveRestore,
+  ArrowUpRight,
+  FileText,
+  Link,
+  LogOut,
+  Search,
+  Share2,
+  Star,
+  Type,
   Calendar,
   BookOpen,
   ListTodo,
@@ -34,6 +44,16 @@ import {
 import type { ThemeIconProps, ThemeIconSize } from '@/reminders/components/theme-icon';
 
 const ICONS: Record<string, LucideIcon> = {
+  archive: Archive,
+  'archive-restore': ArchiveRestore,
+  'arrow-up-right': ArrowUpRight,
+  'file-text': FileText,
+  link: Link,
+  'log-out': LogOut,
+  search: Search,
+  'share-2': Share2,
+  star: Star,
+  type: Type,
   'book-open': BookOpen,
   'list-todo': ListTodo,
   settings: Settings,

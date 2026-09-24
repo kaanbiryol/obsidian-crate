@@ -48,6 +48,10 @@ export async function readingLock<T>(action: () => Promise<T>): Promise<T> {
   if (!navigator.locks) throw new Error('This browser cannot safely send Reading changes. Use a current Safari, Chrome, or Firefox.');
   return navigator.locks.request('crate-reading-mutations-v1', action) as Promise<T>;
 }
+export async function readingDrainLock<T>(action: () => Promise<T>): Promise<T> {
+  if (!navigator.locks) throw new Error('This browser cannot safely send Reading changes. Use a current Safari, Chrome, or Firefox.');
+  return navigator.locks.request('crate-reading-drain-v1', action) as Promise<T>;
+}
 export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string) {
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite');

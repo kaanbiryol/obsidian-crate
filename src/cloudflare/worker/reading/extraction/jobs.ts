@@ -27,6 +27,7 @@ export async function publishExtraction(env: Env, publication: Publication): Pro
     content = patchReadingFrontmatter(content, { extraction_status: result ? 'ready' : 'unavailable',
       ...(result?.title && item.title === new URL(item.source_url).hostname ? { title: result.title } : {}),
       ...(result?.author && !item.author ? { author: result.author } : {}),
+      ...(result?.faviconUrl && !item.favicon_url ? { favicon_url: result.faviconUrl } : {}),
       ...(result && publication.resolvedUrl ? { resolved_url: publication.resolvedUrl } : {}) });
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, job.path, content, source.file.hash);
     await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey });

@@ -29,7 +29,7 @@ function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 			"style-src 'unsafe-inline'",
 			`script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''}`,
 			"connect-src 'self'",
-			"img-src 'self' data:",
+			"img-src 'self' data: https:",
 			"manifest-src 'self'",
 			"base-uri 'none'",
 			"form-action 'none'",
