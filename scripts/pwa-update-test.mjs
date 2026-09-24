@@ -157,7 +157,8 @@ async function testUpdate(browser, launchMode) {
     await expect(transition).toHaveCSS('opacity', '1');
     await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', savedTheme);
     await expect(page.locator('html')).toHaveCSS('background-color', themeBackground);
-    expect(await page.locator('script[src*="theme-bootstrap.js"]').evaluate(script => script.defer)).toBe(false);
+    await expect(page.locator('script[nonce]')).toHaveCount(2);
+    await expect(page.locator('script[src*="theme-bootstrap.js"]')).toHaveCount(0);
     expect(await page.evaluate(key => sessionStorage.getItem(key), transitionKey)).toBeNull();
     await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
 

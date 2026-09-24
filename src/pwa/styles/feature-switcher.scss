@@ -4,7 +4,6 @@
 	inset: 0;
 	min-height: 0;
 	overflow: hidden;
-	visibility: hidden;
 	opacity: 0;
 	pointer-events: none;
 }
@@ -12,13 +11,14 @@
 .crate-feature-panel[data-crate-section="reading"] { z-index: 1; background: var(--crate-app-bg); }
 .crate-feature-panel[data-active="true"] {
 	z-index: 2;
-	visibility: visible;
 	opacity: 1;
 	pointer-events: auto;
 }
-// Explicit endpoints also work when WebKit has stopped painting the hidden mode.
+// Keep both modes in the paint tree so iOS can animate a previously inactive
+// panel. The outgoing panel stays above the new one: its fade remains visible
+// even if WebKit skips the incoming animation on a Home Screen app.
 .crate-feature-panel[data-entering="true"] { animation: crate-mode-fade-in 200ms ease both; }
-.crate-feature-panel[data-leaving="true"] { visibility: visible; animation: crate-mode-fade-out 200ms ease both; }
+.crate-feature-panel[data-leaving="true"] { z-index: 3; animation: crate-mode-fade-out 200ms ease both; }
 @keyframes crate-mode-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes crate-mode-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
