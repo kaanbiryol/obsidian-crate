@@ -1,6 +1,6 @@
 import { renderVersionSettings, renderUpdateVersions } from './version-settings';
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
-import { Notice, Setting, type ButtonComponent } from 'obsidian';
+import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
@@ -8,6 +8,7 @@ import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading, createSettingsDisclosure } from './section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
+import { openExternalBrowserModal } from '../external-browser-modal';
 
 export function renderConfigSection(context: ConfigSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
@@ -87,7 +88,13 @@ export function renderServerSection(context: ConfigSectionContext): void {
 	}
 	new Setting(details).setName('Cloudflare dashboard')
 		.addButton(button => button.setButtonText('Open Cloudflare').onClick(() => {
-			window.open('https://dash.cloudflare.com/', '_blank', 'noopener,noreferrer');
+			if (Platform.isMobile) {
+				openExternalBrowserModal(plugin.app, 'https://dash.cloudflare.com/', {
+					title: 'Open Cloudflare',
+					message: 'Select the link below to open your Cloudflare dashboard in your browser.',
+					linkText: 'Open Cloudflare',
+				});
+			} else window.open('https://dash.cloudflare.com/', '_blank', 'noopener,noreferrer');
 		}));
 }
 

@@ -120,6 +120,15 @@ body.reduce-motion .crate-action-progress {
 	flex-wrap: wrap;
 }
 
+.crate-settings .crate-web-app-setting .setting-item-control {
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+@media (pointer: coarse) {
+	.crate-settings .crate-web-app-setting .setting-item-control button { min-height: 44px; }
+}
+
 .crate-settings input[type='number'] {
 	width: 100px;
 }

@@ -1,6 +1,6 @@
 import { readingServerRequest, type ServerReadingPolicy } from '../server';
 import { ReadingPhoneSetup } from './phone-setup';
-import { Notice, Setting } from 'obsidian';
+import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsSectionHeading } from '../../ui/settings/section-helpers';
 import { bindCommittedText } from '../../ui/settings/input-helpers';
@@ -9,6 +9,7 @@ import { openReading } from '../register-integrations';
 import { startReading, stopReading, validateReadingConfiguration } from '../runtime';
 import type { ReadingSettings } from '../settings';
 import { READING_VIEW_TYPE } from './reading-view';
+import { openExternalBrowserModal } from '../../ui/external-browser-modal';
 
 export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): void {
 	createSettingsSectionHeading(container, 'Reading');
@@ -60,10 +61,30 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
     }));
     new Setting(container).setName('Reading on the web').setDesc('An enrolled reminders web app opens reading automatically. Use a setup link for a new browser.')
       .addButton(button => button.setButtonText('Open web reading').onClick(async () => {
-        try { const result = await readingServerRequest<{ url: string }>(plugin, '/reading/access', { kind: 'reading' }); window.open(result.url, '_blank', 'noopener,noreferrer'); }
+        try {
+          const result = await readingServerRequest<{ url: string }>(plugin, '/reading/access', { kind: 'reading' });
+          if (Platform.isMobile) {
+            openExternalBrowserModal(plugin.app, result.url, {
+              title: 'Open web reading',
+              message: 'Select the link below to open Reading in your browser.',
+              linkText: 'Open reading',
+            });
+          } else window.open(result.url, '_blank', 'noopener,noreferrer');
+        }
         catch (error) { new Notice(error instanceof Error ? error.message : 'Could not open Reading.'); }
       })).addButton(button => button.setButtonText('Copy setup link').onClick(async () => {
-        try { const result = await readingServerRequest<{ url: string }>(plugin, '/reading/access', { kind: 'reading' }); await navigator.clipboard.writeText(result.url); new Notice('Reading setup link copied. It expires in 10 minutes.'); }
+        try {
+          const result = await readingServerRequest<{ url: string }>(plugin, '/reading/access', { kind: 'reading' });
+          try { await navigator.clipboard.writeText(result.url); new Notice('Reading setup link copied. It expires in 10 minutes.'); }
+          catch {
+            openExternalBrowserModal(plugin.app, result.url, {
+              title: 'Reading setup link',
+              message: 'Select the link to open Reading, or select the text to copy it. It expires in 10 minutes.',
+              linkText: 'Open reading',
+              showCopyableUrl: true,
+            });
+          }
+        }
         catch (error) { new Notice(error instanceof Error ? error.message : 'Could not copy setup link.'); }
       }));
     new Setting(container).setName('Save from iPhone').setDesc('Set up a share sheet shortcut with the branded Crate confirmation screen.')
