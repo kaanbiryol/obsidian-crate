@@ -54,12 +54,11 @@ it('shows the last saved numbers and their date immediately without another requ
 	expect(MockSetting.instances.find(s => s.nameEl.textContent === 'Saved requests')?.descEl.textContent).toContain('Reported: 79');
 });
 
-it('reveals reconnect when refresh discovers expired authorization', async () => {
-	const { connection, actions } = setup();
-	const reconnect = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Cloudflare connection')!;
-	expect((reconnect.settingEl as unknown as HTMLElement).hidden).toBe(true);
+it('points to the single reconnect action when refresh discovers expired authorization', async () => {
+	const { connection, actions, root } = setup();
+	expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare connection')).toBe(false);
 	fetchUsage.mockImplementation(async () => { connection.needsAuthorization = true; throw new Error('Reconnect Cloudflare'); });
 	actions.buttons[0]!.click();
 	await flush();
-	expect((reconnect.settingEl as unknown as HTMLElement).hidden).toBe(false);
+	expect(root.collectText()).toContain('Select Reconnect under Account and devices');
 });

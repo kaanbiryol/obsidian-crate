@@ -375,3 +375,20 @@ another device's checkpoint without its local history, retained attachments over
 `npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/history-state-restore.integration.ts`
 for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
 updating the server and plugin on both devices and restoring from the second one.
+
+
+## Connection recovery
+
+In **Crate → Account and devices**, select **Reconnect** to check Cloudflare
+access and the device credential together. With a valid device credential, verify
+that reconnect preserves it and does not transfer files or publish a server update.
+With a rejected credential, verify that reconnect registers and checks a replacement
+without requiring **Disconnect this device**. Expired Cloudflare authorization
+should open sign-in and resume reconnect after the callback. Network or verification
+failures must not show success. Self-hosted reconnect should accept a new pairing
+code at the saved address and keep the existing local connection on failure.
+
+Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
+`src/cloudflare/deployment-service.test.ts`,
+`src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
+Browser OAuth handoff and real hosted credentials still require manual acceptance.

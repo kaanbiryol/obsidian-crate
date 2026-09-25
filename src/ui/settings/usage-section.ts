@@ -2,10 +2,9 @@ import { Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import type { UsageMetric } from '../../cloudflare/usage-service';
 import type { UsageSnapshot } from '../../cloudflare/usage-snapshot';
-import { isCloudflareOAuthConfigured } from '../../cloudflare/oauth-config';
 import { createSettingsDisclosure } from './section-helpers';
 
-export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin, connectionContainer?: HTMLElement): () => void {
+export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin): () => void {
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	if (!accountId) return () => {};
 	const container = createSettingsDisclosure(containerEl, 'Cloudflare usage');
@@ -13,19 +12,6 @@ export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin
 	let active = true;
 	const current = () => active && plugin.settings.cloudflareDeployment?.accountId === accountId;
 	container.createEl('p', { cls: 'setting-item-description', text: 'Usage reported by Cloudflare across your account, including other apps. Saved results stay visible until you refresh.' });
-	const reconnect = new Setting(connectionContainer ?? container)
-		.setName('Cloudflare connection')
-		.setDesc('Sign in again to restore Cloudflare access. Saved usage stays visible.')
-		.addButton(button => button.setButtonText('Sign in to Cloudflare again')
-			.setDisabled(!isCloudflareOAuthConfigured()).onClick(async () => {
-				try {
-					await connection.connect();
-					if (current()) status.setText('Finish connecting in your browser.');
-				} catch (error) {
-					if (current()) { reconnect.settingEl.hidden = connection.connected && !connection.needsAuthorization; status.setText(error instanceof Error ? error.message : 'Could not connect usage.'); }
-				}
-			}));
-	reconnect.settingEl.hidden = connection.connected && !connection.needsAuthorization;
 	const controls = new Setting(container).setName('Usage metrics')
 		.addButton(button => button.setButtonText('Refresh').setDisabled(!connection.connected).onClick(async () => {
 			status.setText('Refreshing usage…');
@@ -36,10 +22,9 @@ export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin
 				renderSnapshot(connection.snapshot ?? { accountId, updatedAt: Date.now(), groups });
 				status.empty();
 			} catch (error) {
-				if (current()) { reconnect.settingEl.hidden = connection.connected && !connection.needsAuthorization; status.setText(error instanceof Error ? error.message : 'Unable to refresh. Your saved results are still shown.'); }
+				if (current()) { status.setText(connection.needsAuthorization ? 'Select Reconnect under Account and devices to restore access. Your saved usage is kept.' : error instanceof Error ? error.message : 'Unable to refresh. Your saved results are still shown.'); }
 			} finally {
 				if (current()) {
-					reconnect.settingEl.hidden = connection.connected && !connection.needsAuthorization;
 					button.setDisabled(false).setButtonText('Refresh');
 				}
 			}

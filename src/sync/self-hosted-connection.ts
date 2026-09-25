@@ -39,9 +39,11 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 }
 
 /** Validate the server and vault credential before changing local settings. */
-export async function connectSelfHostedServer(plugin: CratePlugin, address: string, token: string): Promise<void> {
+export async function connectSelfHostedServer(plugin: CratePlugin, address: string, token: string, reconnect = false): Promise<void> {
+	const expected = { workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '' };
 	const assertAvailable = () => {
-		if (plugin.syncRuntime.isConfigured()) throw new Error('Disconnect this device before connecting another server.');
+		if (reconnect && (plugin.settings.workerUrl !== expected.workerUrl || (plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '') !== expected.authToken)) throw new Error('The server connection changed. Reopen settings and try again.');
+		if (!reconnect && plugin.syncRuntime.isConfigured()) throw new Error('Disconnect this device before connecting another server.');
 		if (plugin.settings.cloudflareDeployment) throw new Error('Forget the saved Cloudflare connection before connecting your own server.');
 		if (plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
 			throw new Error('Finish the Cloudflare connection before connecting your own server.');
@@ -50,6 +52,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 	assertAvailable();
 	if (connecting.has(plugin)) throw new Error('A server connection is already in progress.');
 	const workerUrl = requireNormalizedWorkerUrl(address);
+	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new Error('Use Update server address before reconnecting to a different address.');
 	let authToken = token.trim();
 	const pairing = /^crate-pair-[a-f0-9]{64}$/.test(authToken);
 	if (!pairing && !/^[a-f0-9]{64}$/.test(authToken)) throw new Error('Paste a pairing code or device access token generated on your Crate server.');
@@ -69,7 +72,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		signal.throwIfAborted();
 		assertAvailable();
 		plugin.clearSettingsUiState();
-		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken }, signal);
+		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken }, signal, ...(reconnect ? [expected] : []));
 		signal.throwIfAborted();
 		if (shared.settings) {
 			applySharedSettings(plugin.settings, shared.settings);

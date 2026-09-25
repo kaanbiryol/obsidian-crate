@@ -96,3 +96,22 @@ describe('self-hosted server connection', () => {
 		expect(api.testConnection).not.toHaveBeenCalled();
 	});
 });
+
+
+it('repairs a self-hosted connection without disconnecting first', async () => {
+	const owner = plugin();
+	owner.syncRuntime.isConfigured.mockReturnValue(true);
+	await connectSelfHostedServer(owner as unknown as CratePlugin, owner.settings.workerUrl, token, true);
+	expect(api.listTokens).toHaveBeenCalledOnce();
+	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledWith(
+		{ workerUrl: owner.settings.workerUrl, authToken: token }, expect.any(AbortSignal),
+		{ workerUrl: owner.settings.workerUrl, authToken: token });
+});
+
+it('preserves a self-hosted connection when replacement pairing fails', async () => {
+	const owner = plugin();
+	owner.syncRuntime.isConfigured.mockReturnValue(true);
+	exchange.mockRejectedValue(new Error('Pairing code expired'));
+	await expect(connectSelfHostedServer(owner as unknown as CratePlugin, owner.settings.workerUrl, `crate-pair-${'b'.repeat(64)}`, true)).rejects.toThrow('expired');
+	expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+});
