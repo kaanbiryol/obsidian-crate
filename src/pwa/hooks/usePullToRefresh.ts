@@ -4,9 +4,9 @@ import type { PullRefreshState } from '../types';
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
-function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
+function findPullScrollTarget(target: EventTarget | null, selector: string): HTMLElement | null {
 	if (!(target instanceof Element)) return null;
-	const targetScroll = target.closest<HTMLElement>('.pwa-reminders-view .ios-scroll');
+	const targetScroll = target.closest<HTMLElement>(selector);
 	if (targetScroll) return targetScroll;
 	return null;
 }
@@ -15,7 +15,7 @@ function dampenPullDistance(distance: number): number {
 	return PULL_REFRESH_MAX_DISTANCE * distance / (distance + PULL_REFRESH_MAX_DISTANCE);
 }
 
-export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void>): PullRefreshState {
+export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void>, scrollSelector = '.pwa-reminders-view .ios-scroll'): PullRefreshState {
 	const [state, setState] = useState<PullRefreshState>({ distance: 0, progress: 0, ready: false, refreshing: false });
 	const refreshRef = useRef(onRefresh);
 
@@ -62,8 +62,8 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		function handleTouchStart(event: TouchEvent) {
 			if (refreshing || active || event.touches.length !== 1) return;
-			if ((event.target as Element | null)?.closest('.pwa-modal-sheet')) return;
-			const nextScrollTarget = findPullScrollTarget(event.target);
+			if ((event.target as Element | null)?.closest('.pwa-modal-sheet, [inert]')) return;
+			const nextScrollTarget = findPullScrollTarget(event.target, scrollSelector);
 			if (!nextScrollTarget || nextScrollTarget.scrollTop > 0) return;
 
 			const touch = event.touches.item(0);
@@ -151,7 +151,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
 			if (settleTimeout !== null) window.clearTimeout(settleTimeout);
 		};
-	}, [enabled]);
+	}, [enabled, scrollSelector]);
 
 	return state;
 }

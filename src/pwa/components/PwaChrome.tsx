@@ -111,11 +111,13 @@ export function PwaTopNotices({
 export function PwaPullRefreshIndicator({
 	enabled,
 	onRefresh,
+	scrollSelector,
 }: {
 	enabled: boolean;
 	onRefresh: () => Promise<void>;
+	scrollSelector?: string;
 }) {
-	const pullRefresh = usePullToRefresh(enabled, onRefresh);
+	const pullRefresh = usePullToRefresh(enabled, onRefresh, scrollSelector);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
 	const label = pullRefresh.refreshing
 		? 'Refreshing'
