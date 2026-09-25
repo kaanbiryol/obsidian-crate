@@ -119,10 +119,9 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 :is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-bar .bottom-tab-button{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important;transform:none!important}
 :is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-bar .bottom-tab-button>div:last-child{transform:none}
 :is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-slider-track{inset:4px 0}
-:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-slider{margin:0 6px}
 :is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-content{width:100%;height:100%;justify-content:center}
-:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-icon{transition:transform 180ms cubic-bezier(.2,.8,.2,1),color 160ms ease}
-:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-button:active .bottom-tab-icon{transform:scale(.88)}
+:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-icon{transition:color 160ms ease}
+:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-button:active .bottom-tab-icon{color:var(--crate-tab-active-color)}
 @media (prefers-reduced-motion:reduce){:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-icon{transition:none}:is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-button:active .bottom-tab-icon{transform:none}}
 .pwa-reminders-view .reminders-fab{position:absolute;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
 
