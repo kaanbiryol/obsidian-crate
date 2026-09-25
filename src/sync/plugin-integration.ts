@@ -162,6 +162,7 @@ export async function configureCloudflareAuthorizedDevice(
 	plugin: CratePlugin,
 	workerUrl: string,
 	authToken: string,
+	expected?: { workerUrl: string; authToken: string },
 ): Promise<{ success: boolean; error?: string }> {
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
@@ -178,7 +179,7 @@ export async function configureCloudflareAuthorizedDevice(
 	await plugin.syncRuntime.applyInfrastructureConfig({
 		workerUrl,
 		authToken,
-	}, signal);
+	}, signal, ...(expected ? [expected] : []));
 	signal.throwIfAborted();
 
 	void plugin.syncRuntime.pushSharedSettingsBestEffort();

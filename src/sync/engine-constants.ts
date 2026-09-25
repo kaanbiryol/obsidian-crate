@@ -1,7 +1,7 @@
 import { Platform } from 'obsidian';
 import { HttpError } from './api';
 
-export const AUTH_ERROR_MESSAGE = 'Authentication expired - please sign in again in plugin settings';
+export const AUTH_ERROR_MESSAGE = 'This device’s sync access is no longer valid. In Crate settings → Account and devices, select “Reconnect”.';
 export const UPLOAD_CONCURRENCY = 2;
 export const DOWNLOAD_CONCURRENCY = 2;
 export const FORCE_SYNC_CONCURRENCY = 2;

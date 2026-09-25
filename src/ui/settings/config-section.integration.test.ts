@@ -183,6 +183,7 @@ describe('renderConfigSection integration', () => {
 		});
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
+			'Server address', 'Pairing code or access token', 'Reconnect',
 			'Connected to Crate',
 		]);
 		getSettingByName('Connected to Crate').buttons[0]?.click();
@@ -356,4 +357,18 @@ it('keeps a matching live build visible and routes it to recovery when saved dep
     update.buttons[0]?.click();
     expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin);
     expect(startCloudflareDeployment).not.toHaveBeenCalled();
+});
+
+
+it('offers one Cloudflare reconnect action even while configured', async () => {
+	const { renderAccountSection } = await loadConfigSectionModule();
+	const plugin = {
+		settings: { cloudflareDeployment: { accountId: 'account' } },
+		syncRuntime: { isConfigured: () => true },
+	};
+	renderAccountSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	const reconnect = getSettingByName('Connection');
+	reconnect.buttons[0]!.click();
+	await flushMicrotasks();
+	expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin, 'reconnect');
 });

@@ -1,4 +1,7 @@
+import { HttpError } from '../sync/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const reconnectApi = { setAbortSignal: vi.fn(), listTokens: vi.fn(), testConnection: vi.fn() };
 
 const configureCloudflareAuthorizedDevice = vi.fn();
 const generateSecureToken = vi.fn(() => 'device-token');
@@ -19,6 +22,7 @@ const progress = {
 };
 
 async function loadPluginIntegration() {
+	vi.doMock('../sync/api', () => ({ HttpError, SyncApiClient: class { constructor() { return reconnectApi; } } }));
 	vi.doMock('./oauth-config', async () => ({ ...await vi.importActual<object>('./oauth-config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('../sync/plugin-integration', () => ({ configureCloudflareAuthorizedDevice }));
@@ -42,7 +46,8 @@ function createPlugin(configured = false) {
 	);
 	return {
 		app: {},
-		settings: { deviceId: 'device-id', cloudflareDeployment: { accountId: 'account-a' } },
+		secretStorage: { get: vi.fn(() => 'existing-token') },
+		settings: { workerUrl: 'https://crate.example.workers.dev', deviceId: 'device-id', cloudflareDeployment: { accountId: 'account-a' } },
 		cloudflareUsageConnection: { withAuthorization: vi.fn() },
 		syncRuntime: { isConfigured: vi.fn(() => configured), sync },
 		openSettingsTab: vi.fn(),
@@ -51,7 +56,7 @@ function createPlugin(configured = false) {
 		cloudflareDeploymentService: {
 			startDeployment: vi.fn(),
 			deployWithSavedAuthorization: vi.fn(async (..._args: unknown[]) => ({ workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account', deleted: false })),
-			pendingIntent: null as null | 'switch' | 'create' | 'reset' | 'delete',
+			pendingIntent: null as null | 'reconnect' | 'switch' | 'create' | 'reset' | 'delete',
 			handleCallback: vi.fn(async () => ({
 				accountName: 'Example account',
 				workerUrl: 'https://crate.example.workers.dev',
@@ -61,6 +66,8 @@ function createPlugin(configured = false) {
 }
 
 beforeEach(() => {
+	reconnectApi.listTokens.mockReset().mockResolvedValue({ tokens: [] });
+	reconnectApi.testConnection.mockReset().mockResolvedValue({ success: true });
 	platform.isMobile = false;
 	openCloudflareAuthorizationModal.mockReset();
 	dismissCloudflareAuthorizationModal.mockReset();
@@ -79,6 +86,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
+	vi.doUnmock('../sync/api');
 	vi.doUnmock('./oauth-config');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('../sync/device-token');
@@ -365,4 +373,83 @@ it('reveals existing progress instead of starting another server operation', asy
 	expect(revealCloudflareOperation).toHaveBeenCalledWith(plugin.app, undefined);
 	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
 	expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
+});
+
+
+describe('unified reconnect', () => {
+	it('checks Cloudflare and preserves a valid device credential', async () => {
+		const { startCloudflareDeployment } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		await startCloudflareDeployment(plugin as never, 'reconnect');
+		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).toHaveBeenCalledWith('reconnect', expect.any(Function), undefined, expect.any(Function), expect.any(Function));
+		expect(generateSecureToken).not.toHaveBeenCalled();
+		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+		expect(reconnectApi.testConnection).toHaveBeenCalledOnce();
+		expect(progress.succeed).toHaveBeenCalledWith('Connection verified', expect.any(String));
+	});
+
+	it('replaces a rejected device token and verifies it before saving', async () => {
+		const { startCloudflareDeployment } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		reconnectApi.listTokens.mockRejectedValueOnce(new HttpError('Invalid token', 401));
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		await startCloudflareDeployment(plugin as never, 'reconnect');
+		expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[2]).toMatchObject({ tokenHash: 'device-token-hash' });
+		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, plugin.settings.workerUrl, 'device-token', { workerUrl: plugin.settings.workerUrl, authToken: 'existing-token' });
+		expect(reconnectApi.testConnection.mock.invocationCallOrder.at(-1)).toBeLessThan(configureCloudflareAuthorizedDevice.mock.invocationCallOrder[0]!);
+		expect(progress.succeed).toHaveBeenCalled();
+	});
+
+	it('does not rotate credentials or claim success on a network failure', async () => {
+		const { startCloudflareDeployment } = await loadPluginIntegration();
+		reconnectApi.listTokens.mockRejectedValueOnce(new Error('offline'));
+		await startCloudflareDeployment(createPlugin(true) as never, 'reconnect');
+		expect(generateSecureToken).not.toHaveBeenCalled();
+		expect(progress.succeed).not.toHaveBeenCalled();
+		expect(progress.fail).toHaveBeenCalled();
+	});
+
+	it('resumes reconnect after Cloudflare sign-in while already configured', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		plugin.cloudflareDeploymentService.pendingIntent = 'reconnect';
+		reconnectApi.listTokens.mockRejectedValueOnce(new HttpError('Invalid token', 401));
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		await handleCloudflareOAuthProtocol(plugin as never, { state: 'oauth-state', code: 'code' });
+		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalled();
+		expect(progress.succeed).toHaveBeenCalledWith('Connection verified', expect.any(String));
+	});
+
+	it('does not report success when the repaired credential is still rejected', async () => {
+		const { startCloudflareDeployment } = await loadPluginIntegration();
+		reconnectApi.listTokens.mockRejectedValue(new HttpError('Invalid token', 401));
+		await startCloudflareDeployment(createPlugin(true) as never, 'reconnect');
+		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+		expect(progress.succeed).not.toHaveBeenCalled();
+		expect(progress.fail).toHaveBeenCalled();
+	});
+});
+
+
+it('requests Cloudflare sign-in only when saved authorization cannot be renewed', async () => {
+	const { CloudflareReauthorizationRequired } = await import('./oauth-client');
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareReauthorizationRequired());
+	await startCloudflareDeployment(plugin as never, 'reconnect');
+	expect(plugin.cloudflareDeploymentService.startDeployment).toHaveBeenCalledExactlyOnceWith('reconnect');
+	expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+	expect(progress.succeed).not.toHaveBeenCalled();
+});
+
+it('does not report verification for a connection changed during the request', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	reconnectApi.testConnection.mockImplementation(async () => {
+		plugin.settings.workerUrl = 'https://another.example';
+		return { success: true };
+	});
+	await startCloudflareDeployment(plugin as never, 'reconnect');
+	expect(progress.succeed).not.toHaveBeenCalled();
+	expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
 });

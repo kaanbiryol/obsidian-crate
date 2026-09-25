@@ -103,6 +103,15 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 	const isConfigured = plugin.syncRuntime.isConfigured();
 	if (isConfigured) {
 		const deployment = plugin.settings.cloudflareDeployment;
+		if (deployment) {
+			new Setting(containerEl).setName('Connection')
+				.setDesc('Restore Cloudflare access and this device’s sync connection. Sign in only if needed.')
+				.addButton(button => button.setButtonText('Reconnect').onClick(async () => {
+					button.setDisabled(true);
+					try { await startCloudflareDeployment(plugin, 'reconnect'); }
+					finally { button.setDisabled(false); }
+				}));
+		} else renderSelfHostedSetting(context, true);
 		const account = deployment?.accountName?.trim() || deployment?.accountId;
 		new Setting(containerEl)
 			.setName(account || 'Connected to Crate')

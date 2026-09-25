@@ -88,7 +88,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
 			const serverEl = createSettingsDisclosure(containerEl, 'Server and usage');
 			renderServerSection({ containerEl: serverEl, plugin: this.plugin, rerender: () => this.update() });
-			this.cleanupFns.push(renderUsageSection(serverEl, this.plugin, accountEl));
+			this.cleanupFns.push(renderUsageSection(serverEl, this.plugin));
 		}
 
 		if (sections.showInfrastructure) {

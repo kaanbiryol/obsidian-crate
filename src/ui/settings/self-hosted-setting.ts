@@ -28,19 +28,19 @@ export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }
 	errorEl.hidden = true;
 }
 
-export function renderSelfHostedSetting({ containerEl, plugin, rerender }: ConfigSectionContext): void {
-	if (plugin.syncRuntime.isConfigured() || plugin.settings.cloudflareDeployment) return;
-	const container = createSettingsDisclosure(containerEl, 'Connect to your server');
-	let address = '';
+export function renderSelfHostedSetting({ containerEl, plugin, rerender }: ConfigSectionContext, reconnect = false): void {
+	if ((!reconnect && plugin.syncRuntime.isConfigured()) || plugin.settings.cloudflareDeployment) return;
+	const container = createSettingsDisclosure(containerEl, reconnect ? 'Reconnect' : 'Connect to your server');
+	let address = reconnect ? plugin.settings.workerUrl : '';
 	let token = '';
 	let addressInput: TextComponent;
 	let tokenInput: TextComponent;
 	let errorEl: HTMLElement;
 	new Setting(container).setName('Server address')
-		.setDesc('Paste the HTTPS address printed in your server logs. Use localhost only for a local-only server on this device.')
+		.setDesc(reconnect ? 'Your saved server address. Use Update server address in Server details if it has changed.' : 'Paste the HTTPS address printed in your server logs. Use localhost only for a local-only server on this device.')
 		.addText(input => {
 			addressInput = input;
-			input.setValue(address).setPlaceholder('https://crate.example.com').onChange(value => { address = value; });
+			input.setDisabled(reconnect).setValue(address).setPlaceholder('https://crate.example.com').onChange(value => { address = value; });
 		});
 	new Setting(container).setName('Pairing code or access token')
 		.setDesc('Paste the single-use pairing code from your server. An existing device access token also works. Credentials are saved in Obsidian secret storage.')
@@ -50,15 +50,15 @@ export function renderSelfHostedSetting({ containerEl, plugin, rerender }: Confi
 			input.inputEl.autocomplete = 'off';
 			input.onChange(value => { token = value; });
 		});
-	new Setting(container).setName('Connect to your server')
+	new Setting(container).setName(reconnect ? 'Reconnect' : 'Connect to your server')
 		.setDesc('All devices using this server share one vault. Start syncing after connecting.')
-		.addButton(button => button.setButtonText('Connect').setCta().onClick(async () => {
+		.addButton(button => button.setButtonText(reconnect ? 'Reconnect' : 'Connect').setCta().onClick(async () => {
 			errorEl.hidden = true;
 			button.setDisabled(true).setButtonText('Connecting…');
 			addressInput.setDisabled(true);
 			tokenInput.setDisabled(true);
 			try {
-				await connectSelfHostedServer(plugin, address, token);
+				await connectSelfHostedServer(plugin, address, token, reconnect);
 				token = '';
 				tokenInput.setValue('');
 				new Notice('Connected to your server. You can now sync this vault.');
@@ -67,8 +67,8 @@ export function renderSelfHostedSetting({ containerEl, plugin, rerender }: Confi
 				errorEl.setText(selfHostedConnectionMessage(error, address));
 				errorEl.hidden = false;
 			} finally {
-				button.setDisabled(false).setButtonText('Connect');
-				addressInput.setDisabled(false);
+				button.setDisabled(false).setButtonText(reconnect ? 'Reconnect' : 'Connect');
+				addressInput.setDisabled(reconnect);
 				tokenInput.setDisabled(false);
 			}
 		}));

@@ -644,3 +644,23 @@ it.each(['reset', 'delete'] as const)('rejects a changed confirmation target dur
 	expect(resetCrateServer).not.toHaveBeenCalled();
 	expect(deleteCrateServer).not.toHaveBeenCalled();
 });
+
+
+it.each([false, true])('reconnects the saved server without publishing code (new device: %s)', async renew => {
+	const h = resetHarness();
+	await h.service.deployWithSavedAuthorization('reconnect', operation => operation({ accessToken: 'saved' }), renew ? resetDevice : undefined);
+	expect(h.loadArtifacts).not.toHaveBeenCalled();
+	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+	expect(h.selectDeployment).not.toHaveBeenCalled();
+	expect(apiMocks.queryD1.mock.calls.length > 0).toBe(renew);
+});
+
+it('keeps reconnect bound to its saved server across browser authorization', async () => {
+	const h = resetHarness();
+	await h.service.startDeployment('reconnect');
+	const state = firstOpenedUrl(h.opened).searchParams.get('state')!;
+	h.settings.cloudflareDeployment!.workerName = 'another-server';
+	await expect(h.service.handleCallback({ state, code: 'code' }, resetDevice)).rejects.toThrow('Server settings changed');
+	expect(apiMocks.queryD1).not.toHaveBeenCalled();
+	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+});

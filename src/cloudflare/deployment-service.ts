@@ -39,7 +39,7 @@ interface PendingOAuthSession {
 	metadata: CloudflareDeploymentMetadata;
 	discoverExisting: boolean;
 	originalMetadata: string;
-	intent: 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
+	intent: 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
 }
 
 export interface CloudflareDeploymentResult {
@@ -120,7 +120,7 @@ export class CloudflareDeploymentService {
 		return this.pendingSession?.intent ?? null;
 	}
 
-	async startDeployment(intent: 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
+	async startDeployment(intent: 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
 		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
@@ -130,6 +130,7 @@ export class CloudflareDeploymentService {
 		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
 			throw new Error('Connect to a Crate server before resetting its remote data.');
 		}
+		if (intent === 'reconnect' && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) throw new Error('Connect a Cloudflare server first.');
 		const metadata = existingMetadata && intent !== 'switch' && intent !== 'create'
 			? { ...existingMetadata }
 			: createCloudflareDeploymentMetadata(this.options.getVaultName?.());
@@ -224,9 +225,9 @@ export class CloudflareDeploymentService {
 			// OAuth stays outside this guard: even a late exchange must be revoked.
 			const api = new CloudflareApiClient(accessToken, (url, request) =>
 				this.whileActive(async () => {
-					if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
+					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
 					const response = await this.options.transport(url, request);
-					if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
+					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
 					if (savedLogin && (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
 					return response;
 				}));
@@ -235,6 +236,7 @@ export class CloudflareDeploymentService {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
 			}
 			if ((pending.intent === 'switch' || pending.intent === 'create') && pending.originalMetadata !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
+			if (pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
 			let metadata = pending.metadata;
 			let discoveredExisting = false;
 			onProgress?.('Checking your Cloudflare account…');
@@ -261,7 +263,7 @@ export class CloudflareDeploymentService {
 					discoveredExisting = true;
 				}
 			}
-			if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
+			if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
 			onProgress?.('Preparing the selected server…');
 			const previous = this.options.settingsOwner.settings.cloudflareDeployment;
 			const changingServer = previous && (previous.accountId !== account.id || previous.workerName !== metadata.workerName);
@@ -297,7 +299,7 @@ export class CloudflareDeploymentService {
 				}));
 			}
 			let workerUrl: string;
-			if ((pending.intent === 'connect' || pending.intent === 'switch') && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
+			if (pending.intent === 'reconnect' || (pending.intent === 'connect' || pending.intent === 'switch') && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
 				// Registering a replica must never replace shared Worker/PWA code.
 				const subdomain = await this.whileActive(() => api.getWorkersSubdomain(account.id));
 				if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
@@ -351,7 +353,7 @@ export class CloudflareDeploymentService {
 	}
 
 	async deployWithSavedAuthorization(
-		intent: 'connect' | 'update' | 'reset' | 'delete',
+		intent: 'reconnect' | 'connect' | 'update' | 'reset' | 'delete',
 		withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
