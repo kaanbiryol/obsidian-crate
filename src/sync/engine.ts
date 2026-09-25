@@ -109,10 +109,14 @@ export class SyncEngine {
 		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		this.api.configureUploadJournal(this.localManifest, this.vault, this.markdownBaseCache);
+		const latestAttempt = settings.syncHistory[0];
+		const lastError = latestAttempt && !latestAttempt.success
+			? latestAttempt.errors?.[0] || 'The last sync failed. Open sync activity for details, then retry.'
+			: null;
 		this.state = {
-			status: 'idle',
+			status: lastError ? 'error' : 'idle',
 			lastSync: settings.lastSync,
-			lastError: null,
+			lastError,
 			pendingChanges: 0,
 			conflictCount: 0,
 		};
