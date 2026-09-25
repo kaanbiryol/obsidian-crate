@@ -27,6 +27,7 @@ export interface ReadingLibraryProps {
 	readerMotion?: 'slide' | 'none';
 	onReaderClosed?: () => void;
 	notice?: React.ReactNode;
+	beforeListContent?: React.ReactNode;
 	pendingItemIds?: ReadonlySet<string>;
 }
 
@@ -35,7 +36,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
-export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>('inbox');
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
@@ -92,6 +93,7 @@ export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefre
 			<div className="crate-reading__library" aria-busy={!!busy} inert={readerMotion !== undefined && !!reader}>
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} titleContent={headerTitleContent} count={items.length} countUnit="saved link" showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{onSettings && <IconButton size="large" iconSize="l" icon="settings" label="Reading settings" onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" disabled={!!busy} onClick={onAdd} />{headerActions}</div>} />
 				<label className="crate-reading__search"><ThemeIcon id="search" size="m" aria-hidden="true" /><input type="search" placeholder="Search your reading" aria-label="Search reading" value={query} onChange={event => { setQuery(event.target.value); resetList(); }} />{query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />}</label>
+				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={list} tabIndex={-1}>
 					{notice}
 					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={!!busy} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}

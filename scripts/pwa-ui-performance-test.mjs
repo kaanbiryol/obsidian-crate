@@ -21,15 +21,15 @@ const { outputFiles } = await build({
 				const inset = useKeyboardHeight();
 				return <><input aria-label="Keyboard input" /><output id="inset">{inset}</output></>;
 			}
-			function Pull() {
+			function Pull({ reading = false }) {
 				const [refreshes, setRefreshes] = useState(0);
-				return <div className="pwa-reminders-view"><div className="pwa-below-header-content"><PwaPullRefreshIndicator enabled onRefresh={async () => { setRefreshes(value => value + 1); }} /></div><div id="scroll" className="ios-scroll" style={{height: 250, overflow: 'auto'}}><div style={{height: 600}}>Reminders</div></div><output id="refreshes">{refreshes}</output></div>;
+				return <div className={reading ? "crate-reading-web" : "pwa-reminders-view"}><div className="pwa-below-header-content"><PwaPullRefreshIndicator enabled scrollSelector={reading ? ".crate-reading-web .crate-reading__list-scroll" : undefined} onRefresh={async () => { setRefreshes(value => value + 1); }} /></div><div id="scroll" className={reading ? "crate-reading__list-scroll" : "ios-scroll"} style={{height: 250, overflow: 'auto'}}><div style={{height: 600}}>Reminders</div></div><output id="refreshes">{refreshes}</output></div>;
 			}
 			let root;
 			export function mount(kind) {
 				unmount();
 				root = createRoot(document.getElementById('app'));
-				flushSync(() => root.render(kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull />));
+				flushSync(() => root.render(kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull reading={kind === "reading-pull"} />));
 			}
 			export function unmount() { root?.unmount(); root = undefined; }
 		`,
@@ -89,31 +89,52 @@ for (const browserType of [chromium, webkit]) {
 		await editor.evaluate(element => element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '日本語' })));
 		await expect(page.locator('#value')).toHaveText('日本語');
 
-		await page.evaluate(() => window.uiTest.mount('pull'));
-		// Allow passive effects to attach gesture listeners before sending touches.
-		await page.waitForTimeout(150);
-		const before = await page.locator('#scroll').boundingBox();
-		await page.evaluate(() => {
-			const target = document.getElementById('scroll');
-			// Desktop WebKit does not expose a constructible Touch.
-			const dispatch = (type, y) => {
-				const event = new Event(type, { bubbles: true, cancelable: true });
-				Object.defineProperty(event, 'touches', { value: { length: 1, item: () => ({ clientY: y, clientX: 20 }) } });
-				target.dispatchEvent(event);
-			};
-			dispatch('touchstart', 0);
-			dispatch('touchmove', 200);
-		});
-		await expect(page.locator('.pwa-pull-refresh')).toHaveClass(/is-ready/);
-		const pulled = await page.locator('#scroll').boundingBox();
-		const indicator = await page.locator('.pwa-pull-refresh').boundingBox();
-		assert.equal(pulled.width, before.width, 'pull must retain list width');
-		assert.equal(pulled.height, before.height, 'pull must retain list height');
-		assert.ok(Math.abs(pulled.y - before.y - indicator.height) < 1, 'pull should reveal the indicator above the list');
-		await page.evaluate(() => document.getElementById('scroll').dispatchEvent(new Event('touchend', { bubbles: true })));
-		await expect(page.locator('#refreshes')).toHaveText('1');
-		await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
-		await expect.poll(async () => (await page.locator('#scroll').boundingBox()).y).toBe(before.y);
+		for (const kind of ['pull', 'reading-pull']) {
+			await page.evaluate(kind => window.uiTest.mount(kind), kind);
+			// Allow passive effects to attach gesture listeners before sending touches.
+			await page.waitForTimeout(150);
+			const before = await page.locator('#scroll').boundingBox();
+			await page.evaluate(() => {
+				const target = document.getElementById('scroll');
+				// Desktop WebKit does not expose a constructible Touch.
+				const dispatch = (type, y) => {
+					const event = new Event(type, { bubbles: true, cancelable: true });
+					Object.defineProperty(event, 'touches', { value: { length: 1, item: () => ({ clientY: y, clientX: 20 }) } });
+					target.dispatchEvent(event);
+				};
+				dispatch('touchstart', 0);
+				dispatch('touchmove', 200);
+			});
+			await expect(page.locator('.pwa-pull-refresh')).toHaveClass(/is-ready/);
+			const pulled = await page.locator('#scroll').boundingBox();
+			const indicator = await page.locator('.pwa-pull-refresh').boundingBox();
+			assert.equal(pulled.width, before.width, 'pull must retain list width');
+			assert.equal(pulled.height, before.height, 'pull must retain list height');
+			assert.ok(Math.abs(pulled.y - before.y - indicator.height) < 1, 'pull should reveal the indicator above the list');
+			await page.evaluate(() => document.getElementById('scroll').dispatchEvent(new Event('touchend', { bubbles: true })));
+			await expect(page.locator('#refreshes')).toHaveText('1');
+			await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
+			await expect.poll(async () => (await page.locator('#scroll').boundingBox()).y).toBe(before.y);
+			for (const blocked of ['short', 'horizontal', 'scrolled', 'modal', 'inactive', 'other-feature']) {
+				await page.evaluate(blocked => {
+					const list = document.getElementById('scroll');
+					const originalClass = list.className;
+					if (blocked === 'scrolled') list.scrollTop = 50;
+					if (blocked === 'modal') list.classList.add('pwa-modal-sheet');
+					if (blocked === 'inactive') list.setAttribute('inert', '');
+					if (blocked === 'other-feature') list.className = originalClass === 'ios-scroll' ? 'crate-reading__list-scroll' : 'ios-scroll';
+					for (const [type, x, y] of [['touchstart', 30, 0], ['touchmove', blocked === 'horizontal' ? 400 : 30, blocked === 'short' ? 30 : 200], ['touchend', 30, 200]]) {
+						const event = new Event(type, { bubbles: true, cancelable: true });
+						Object.defineProperty(event, 'touches', { value: { length: 1, item: () => ({ clientX: x, clientY: y }) } });
+						list.dispatchEvent(event);
+					}
+					list.scrollTop = 0; list.className = originalClass; list.removeAttribute('inert');
+				}, blocked);
+				await expect(page.locator('#refreshes')).toHaveText('1');
+				await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
+			}
+		}
+
 
 		await page.evaluate(() => {
 			window.viewportReads = 0;
