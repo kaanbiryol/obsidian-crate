@@ -1,22 +1,13 @@
 import type { PendingActions } from './pending-actions';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
-import { renderEmptyState, renderFileMicroCard } from './rendering';
+import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
 	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress);
 	if (syncing || progress) {
-        const loading = container.createDiv({ cls: 'crate-activity-loading' });
-        loading.setAttribute('role', 'status');
-        loading.setAttribute('aria-live', 'polite');
-        const spinner = loading.createSpan({ cls: 'crate-activity-spinner' });
-        spinner.setAttribute('aria-hidden', 'true');
-        const text = formatSyncProgress(progress, state?.work);
-        loading.createSpan({
-            cls: 'crate-activity-loading-label',
-            text,
-        }).setAttribute('title', text);
+        renderLoadingState(container, formatSyncProgress(progress, state?.work));
         return;
 	}
 	if (paths.length === 0) {
