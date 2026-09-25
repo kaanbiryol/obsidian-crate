@@ -23,6 +23,7 @@ import { HistoryRestoreModal } from './activity/history-restore-modal';
 import type { HistoryRestoreReview } from '../sync/history-restore';
 import type { SyncHistoryEntry } from '../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
+import { renderLoadingState } from './activity/rendering';
 import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
 import { syncConnectionFailureMessage } from './settings/self-hosted-errors';
 
@@ -300,7 +301,7 @@ export class ActivityModal extends BaseUiModal {
         const deps = this.deps;
         if (deps.listSharedCheckpoints && !this.sharedHistoryReady) {
             if (!this.historyPanel.firstChild) {
-                this.historyPanel.createEl('p', { text: 'Loading history…', cls: 'crate-history-description', attr: { role: 'status' } });
+                renderLoadingState(this.historyPanel, 'Loading history…');
             }
             return;
         }

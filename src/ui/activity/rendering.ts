@@ -1,5 +1,13 @@
 import { setIcon } from 'obsidian';
 
+export function renderLoadingState(container: HTMLElement, text: string): void {
+    const loading = container.createDiv({ cls: 'crate-activity-loading' });
+    loading.setAttribute('role', 'status');
+    loading.setAttribute('aria-live', 'polite');
+    loading.createSpan({ cls: 'crate-activity-spinner' }).setAttribute('aria-hidden', 'true');
+    loading.createSpan({ cls: 'crate-activity-loading-label', text }).setAttribute('title', text);
+}
+
 export type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
 export type EmptyStateTone = 'accent' | 'success';
 
