@@ -50,3 +50,33 @@ it('treats prototype-like paths as ordinary historical files', async () => {
     expect(comparison.items).toEqual([{ path: '__proto__', action: 'modified' }, { path: 'constructor', action: 'deleted' }]);
     expect(await comparison.preview('constructor')).toEqual({ current: 'gone', saved: '' });
 });
+it('reuses previews when switching files and shares in-flight reads', async () => {
+    const before = await snapshot({ 'a.md': 'old a', 'b.md': 'old b' });
+    const after = await snapshot({ 'a.md': 'new a', 'b.md': 'new b' });
+    const comparison = compareHistorySnapshots(after, before);
+    const [first, concurrent] = await Promise.all([comparison.preview('a.md'), comparison.preview('a.md')]);
+    expect(concurrent).toEqual(first);
+    await comparison.preview('b.md');
+    expect(await comparison.preview('a.md')).toEqual(first);
+    expect(before.read).toHaveBeenCalledTimes(2);
+    expect(after.read).toHaveBeenCalledTimes(2);
+});
+it('retries failed previews instead of caching errors', async () => {
+    const after = await snapshot({ 'a.md': 'saved' });
+    after.read.mockRejectedValueOnce(new Error('Offline'));
+    const comparison = compareHistorySnapshots(after);
+    await expect(comparison.preview('a.md')).rejects.toThrow('Offline');
+    expect(await comparison.preview('a.md')).toEqual({ current: '', saved: 'saved' });
+    expect(after.read).toHaveBeenCalledTimes(2);
+});
+it('bounds preview memory and keeps recently viewed files', async () => {
+    const after = await snapshot(Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`${i}.md`, `${i}`])));
+    const comparison = compareHistorySnapshots(after);
+    for (let i = 0; i < 16; i++) await comparison.preview(`${i}.md`);
+    await comparison.preview('0.md');
+    await comparison.preview('16.md');
+    await comparison.preview('0.md');
+    expect(after.read).toHaveBeenCalledTimes(17);
+    await comparison.preview('1.md');
+    expect(after.read).toHaveBeenCalledTimes(18);
+});

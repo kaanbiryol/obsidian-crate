@@ -22,12 +22,29 @@ export function compareHistorySnapshots(after: HistorySnapshot, before?: History
     const items: HistoryFileChange[] = paths.filter(path => !before || earlier[path]?.hash !== saved[path]?.hash).map(path => ({
         path, action: !before ? 'saved' : !saved[path] ? 'deleted' : !earlier[path] ? 'added' : 'modified',
     }));
+    // Keep recent immutable previews (including in-flight reads) without retaining
+    // an entire vault's contents in memory on mobile.
+    const previews = new Map<string, Promise<HistoryRestorePreview>>();
     return {
         items, compared: !!before, notice,
         preview: async path => {
             if (!items.some(item => item.path === path)) throw new Error('This file is not in the selected sync.');
-            return loadHistoryRestorePreview(path, earlier[path], saved[path],
+            const cached = previews.get(path);
+            if (cached) {
+                previews.delete(path);
+                previews.set(path, cached);
+                return cached;
+            }
+            const preview = loadHistoryRestorePreview(path, earlier[path], saved[path],
                 () => before!.read(path, earlier[path]!), () => after.read(path, saved[path]!));
+            previews.set(path, preview);
+            if (previews.size > 16) previews.delete(previews.keys().next().value!);
+            try {
+                return await preview;
+            } catch (error) {
+                if (previews.get(path) === preview) previews.delete(path);
+                throw error;
+            }
         },
     };
 }
