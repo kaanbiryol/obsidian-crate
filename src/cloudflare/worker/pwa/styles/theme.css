@@ -29,13 +29,13 @@
 	--pwa-tabbar-surface:rgba(13,13,15,.9);
 	/* Keep content below translucent native chrome, while backdrops fill the viewport. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
-	--pwa-safe-area-bottom-floor:0px;
-	--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px));
+	/* Follow the current viewport. Its static maximum can reserve space that
+	   native chrome already occupies outside this viewport. */
+	--pwa-safe-area-bottom:env(safe-area-inset-bottom);
 	--crate-primary-header-padding:calc(var(--pwa-safe-area-top) + 14px) 16px 10px;
 	--crate-project-accent-hover-shadow:none;
 	color-scheme:dark;
 }
-@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}
 .pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}
 .pwa-launch-splash.is-updating{position:relative}
 #pwa-update-transition{position:fixed;inset:0;z-index:10000;background:var(--pwa-launch-bg);color:var(--text-muted);font-size:14px;line-height:1.4;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}

@@ -1,4 +1,5 @@
 import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
+import { PWA_STATUS_BAR_INIT_JS } from './status-bar-bootstrap';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
@@ -21,8 +22,9 @@ export function createPwaHtml(requestUrl?: string, nonce: string = crypto.random
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
-<!-- Let sheet backdrops cover the status bar; content reserves its top safe area. -->
+<!-- Retain translucent chrome except for the iOS 27 workaround applied below. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script nonce="${nonce}" id="pwa-status-bar-init">${PWA_STATUS_BAR_INIT_JS}</script>
 <meta name="application-name" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
 <meta id="${PWA_THEME_COLOR_META_ID}" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">

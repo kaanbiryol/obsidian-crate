@@ -1,0 +1,35 @@
+/* iOS 27 Home Screen apps: give native chrome an opaque, stationary top
+   surface. Other OS versions and ordinary browser layouts keep their styling. */
+html[data-pwa-ios27-standalone="true"] {
+	/* Default status-bar mode owns its own inset. Use only the remaining inset
+	   reported for content, not the maximum from translucent/full-screen mode. */
+	--pwa-safe-area-top:env(safe-area-inset-top);
+}
+/* Installed apps may retain translucent status-bar mode until reinstalled.
+   In that mode, fixed insets and percentages can use the shortened layout
+   viewport too. Recover its top inset, capped at the full CSS viewport; default
+   status-bar mode reports no top inset and keeps the smaller content canvas. */
+html[data-pwa-ios27-standalone="true"],
+html[data-pwa-ios27-standalone="true"] body,
+html[data-pwa-ios27-standalone="true"] #app {
+	height:min(100vh,calc(100dvh + var(--pwa-safe-area-top)));
+	min-height:0;
+}
+html[data-pwa-ios27-standalone="true"] .crate-reminders-ui :is(.view-header,.pwa-mode-opening__header,.crate-reading-reader__nav) {
+	position:sticky;
+	top:0;
+	z-index:6;
+	background:var(--pwa-launch-bg);
+}
+/* Reading already reserves the top inset on its wrapper. Reminders and the
+   opening screens reserve it on their headers; do not add it a second time. */
+html[data-pwa-ios27-standalone="true"] .auth-card__brand {
+	position:sticky;
+	top:0;
+	z-index:6;
+	background:var(--pwa-launch-bg);
+}
+/* Keep the expanding dock menu below the top header even on short screens. */
+html[data-pwa-ios27-standalone="true"] .crate-reminders-ui .pwa-dock__menu {
+	max-height:calc(100dvh - var(--pwa-safe-area-top) - var(--dock-bottom-inset) - 100px);
+}
