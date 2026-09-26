@@ -43,14 +43,33 @@
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
 .crate-reminders-ui .crate-reading-welcome p { color: var(--text-muted); line-height: 1.8; font-size: 14px; }
 
-.crate-reminders-ui .crate-reading-shortcut { min-width: 0; }
-.crate-reminders-ui .crate-reading-shortcut ol { padding-left: 24px; margin: 0; }
-.crate-reminders-ui .crate-reading-shortcut li { padding-left: 4px; margin-bottom: 24px; }
-.crate-reminders-ui .crate-reading-shortcut h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
-.crate-reminders-ui .crate-reading-shortcut .crate-action-button { min-height: 44px; white-space: normal; }
-.crate-reminders-ui .crate-reading-shortcut__code { display: grid; gap: 10px; margin-top: 16px; }
-.crate-reminders-ui .crate-reading-shortcut__code label { display: grid; gap: 8px; font-size: 14px; }
-.crate-reminders-ui .crate-reading-shortcut__code textarea { width: 100%; box-sizing: border-box; resize: vertical; font-size: 16px; line-height: 1.5; padding: 10px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+// A quiet, numbered setup flow, using the same controls and palette as Reading.
+.crate-reminders-ui .crate-reading-shortcut {
+  min-width: 0;
+  padding-top: 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  p { margin: 0 0 14px; color: var(--text-muted); }
+  strong { color: var(--text-normal); font-weight: 500; }
+  &__intro { padding-bottom: 24px; }
+  &__intro p { margin-bottom: 6px; color: var(--text-normal); font-size: 16px; letter-spacing: -.015em; }
+  &__intro span { color: var(--text-muted); font-size: 12px; }
+  ol { list-style: none; padding: 0; margin: 0; }
+  li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; padding: 22px 0; border-top: 1px solid var(--background-modifier-border); }
+  &__number { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--background-modifier-border); border-radius: 50%; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  &__step { min-width: 0; }
+  h3 { margin: 2px 0 8px; color: var(--text-normal); font-size: 14px; line-height: 1.5; font-weight: 600; letter-spacing: -.01em; }
+  .crate-action-button { min-height: 44px; max-width: 100%; white-space: normal; text-align: center; text-decoration: none; }
+  &__code { display: grid; gap: 10px; margin-top: 16px; }
+  &__code label { font-size: 12px; color: var(--text-muted); }
+  &__code textarea { width: 100%; box-sizing: border-box; resize: vertical; font-size: 16px; line-height: 1.5; padding: 10px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+  &__code p { font-size: 12px; }
+  &__privacy { padding: 4px 0 8px; color: var(--text-muted); font-size: 12px; }
+  &__privacy summary { min-height: 44px; align-content: center; cursor: pointer; }
+  &__privacy p { margin: 4px 0 0; }
+  [role="alert"] { margin-top: 12px; color: var(--text-error); }
+  [role="status"] { margin-top: 12px; }
+}
 
 .crate-reminders-ui .pwa-reading-sheet > .settings-panel { background: transparent; }
 

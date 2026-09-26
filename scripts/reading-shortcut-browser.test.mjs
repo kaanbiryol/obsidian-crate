@@ -36,10 +36,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
     await page.goto(setup.href);
     const dialog = page.getByRole('dialog', { name: 'Set up iPhone shortcut' });
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible().catch(async error => { console.error('Setup page:', await page.locator('body').innerText(), errors); throw error; });
     const download = dialog.getByRole('link', { name: 'Download Save to Crate' });
     await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v1/Save%20to%20Crate%20(iOS%2027).shortcut');
     await expect(download).toHaveAttribute('rel', 'noopener noreferrer');
+    await mkdir('test-results/reading', { recursive: true });
+    await page.screenshot({ path: `test-results/reading/${name}-shortcut-start.png`, fullPage: true, animations: 'disabled' });
+    await expect(dialog.getByRole('list', { name: 'Shortcut setup steps' })).toBeVisible();
     await context.setOffline(true);
     await expect(dialog.getByRole('button', { name: 'Create pairing code', exact: true })).toBeDisabled();
     await expect(dialog.getByText('Connect to the internet to pair your shortcut.')).toBeVisible();
@@ -70,7 +73,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         ctx.fillStyle = getComputedStyle(el).color; ctx.fillRect(0, 0, 1, 1);
         return ctx.getImageData(0, 0, 1, 1).data[0];
       })).toBeGreaterThan(colorScheme === 'dark' ? 150 : 0);
-      await page.screenshot({ path: `test-results/reading/${name}-shortcut-${colorScheme}.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/reading/${name}-shortcut-${colorScheme}.png`, fullPage: true, animations: 'disabled' });
       assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     }
     await page.setViewportSize({ width: 320, height: 568 });
@@ -79,7 +82,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     const closeBox = await dialog.getByRole('button', { name: 'Close set up iphone shortcut' }).boundingBox();
     assert.ok(closeBox && closeBox.y >= 0 && closeBox.y + closeBox.height <= 568, 'The close control must stay visible while scrolling');
-    await page.screenshot({ path: `test-results/reading/${name}-shortcut-small.png`, fullPage: true });
+    await page.screenshot({ path: `test-results/reading/${name}-shortcut-small.png`, fullPage: true, animations: 'disabled' });
     await page.clock.setFixedTime(new Date(Date.now() + 11 * 60_000));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await expect(dialog.getByText('This pairing code expired.', { exact: false })).toBeVisible();
