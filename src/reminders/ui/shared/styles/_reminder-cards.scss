@@ -81,8 +81,9 @@
         &:is(.is-long-press-armed, .is-reordering) {
             :is(.premium-reminder-content, .reminder-card__main) {
                 transform: scale(1);
-                background: var(--crate-reminder-card-bg, var(--crate-panel-bg));
-                border-color: var(--crate-reminder-card-border, var(--crate-divider));
+                // Touch movement can clear :active while the card is still held.
+                background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
+                border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
                 box-shadow: var(--crate-reminder-card-shadow, none);
             }
         }
