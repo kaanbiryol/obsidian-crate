@@ -8,7 +8,6 @@ import {
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
 import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
-import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({
@@ -45,7 +44,6 @@ export function PwaHeaderActions({
 	return (
 		<div className="pwa-header-actions crate-view-header-actions">
 			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
-			<FeatureSwitcherButton />
 		</div>
 	);
 }

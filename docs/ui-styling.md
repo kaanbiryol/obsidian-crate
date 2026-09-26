@@ -40,6 +40,15 @@ both hosts together.
   delete confirmation returns to the editor. Explicit editor close still discards
   the draft. Busy operations and screen transitions block dismissal.
 
+  PWA surface motion lives in `src/pwa/motion.ts` and
+  `src/pwa/styles/motion.scss`. Project details and picker entrances use a
+  critically damped Motion spring; CSS-owned drawers and Reading navigation
+  use a sampled spring curve with a cubic fallback. Direct drawer dragging
+  remains unanimated, and CSS transitions resume from the current position.
+  Keep native history gestures immediate, tab changes as stationary fades,
+  and reduced-motion paths free of spatial transitions. Reader content stays
+  mounted until its exit completes; timeout cleanup is only a recovery path.
+
 - `src/reminders/components/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and
   owner document, including Obsidian Shadow DOM and popout windows. Nested
@@ -186,13 +195,44 @@ including focus inside the plugin's Shadow DOM.
 The capture form preserves its draft on dismissal; only successful capture clears
 it. The PWA retains the existing durable capture and metadata outbox.
 
-The PWA's app switch is a single icon in each feature's existing header. Reading
-shows a checklist icon for **Switch to Reminders**; Reminders shows a book for
-**Switch to Reading**. The modes crossfade over roughly 200 ms. Scrolling content
-shrinks by 1.5% as it leaves and settles from 1.5% larger as it enters. The
-header, switch button, FAB, and bottom-bar geometry stay fixed; the titles,
-metadata, and bottom-bar items crossfade with their panels. The button icon
-rotates subtly and its surface pulses when the new mode appears. On phones, opening a Reading
+The PWA uses `src/pwa/components/PwaDock.tsx` for its floating bottom navigation.
+Both sections show Inbox, Today, and Projects as direct reminder destinations,
+followed by a switcher with small up/down chevrons. Its icon follows the remembered
+reading destination: book, star, or archive. The switcher
+remembers the chosen Reading List, Favorites, or Archive view and opens it on tap.
+Holding it for 420 ms or sliding upward reveals those three reading choices inside
+the expanding navigation pill. Upcoming remains a separate reminder view for
+existing launch links; it is not merged into Today or exposed by this picker.
+The feature shell routes explicit tab requests across lazy feature mounts, while
+each feature owns its view, search, and list state. The same controls remain
+available while reading, so returning to a reminder view takes one tap.
+The pill expands with a heavily damped spring, maintaining its height and velocity
+when opening is interrupted or reversed. Its corner radius follows the same
+progress. The translucent surface has a restrained edge highlight, and menu content
+fades in without moving its touch targets. Reduced motion jumps to the final shape;
+increased contrast or reduced transparency uses an opaque surface.
+The compact dropdown has no visible header or close button. Tapping outside or
+pressing Escape dismisses it. A background highlight marks the selected reading
+view, and a muted highlight follows the held finger. Release commits the preview;
+release outside after sliding cancels. A stationary hold leaves it open for a tap.
+Down arrow, Shift+F10, and right-click provide keyboard and pointer access.
+Sideways/downward movement aborts a pending hold; cancellation or app interruption
+cancels the selection. The add button and page layout stay in place.
+Ordinary tab buttons select their view; the sliding highlight follows the active
+reminder tab or the reading switcher. Both feature docks share the indicator
+position, so it slides from the fourth slot when returning to any reminder tab,
+even if that tab was already selected before opening Reading. List changes use a stationary 180 ms opacity
+fade, disabled with reduced motion. Switching between Reminders and Reading uses
+a 200 ms crossfade without translation, scaling, or icon rotation. Settings remains in each feature's header.
+The separate circular add action uses the existing editor/capture flow, including
+on Projects. Insets reserve the home indicator once. Loading shells use matching
+dock geometry.
+The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
+its shared navigation. Wide Reading layouts retain their sidebar and header
+switch, and connection screens retain the header switch for enrollment.
+The feature shell preserves mounted state and browser locations and restores focus to
+its visible navigation control. The modes retain their 200 ms crossfade;
+scrolling content, headers, and docks keep their geometry throughout the dissolve. On phones, opening a Reading
 article slides the reader over the stationary library and bottom bar. Both stay
 painted beneath the full-height article, with background controls inert. Toolbar
 Back slides the article out once, then traverses history after the exit ends.
@@ -200,18 +240,22 @@ Native history closes commit the library immediately and let it paint before
 replacing the forward entry, so WebKit cannot record the outgoing reader as the
 library snapshot. Loading and loaded content share one reader component. Detail history slots are
 scoped to the running document; reloads create a fresh library predecessor so Back
-cannot restore an older page instance. Reduced-motion
-users retain the opacity dissolve without scaling, rotation, or the button pulse. Dismissing an article clears its forward-history
+cannot restore an older page instance. Reduced-motion users retain the section
+dissolve while spatial animations are disabled. Dismissing an article clears its forward-history
 destination and reuses the detail entry on the next open, so a right-edge swipe
 cannot reopen a dismissed article or accumulate article entries.
 `FeatureShell.tsx` preserves mounted feature state
 and navigation, keeps the inactive panel inert, and restores keyboard focus to the
-destination's switch after its initial loading completes.
+destination's visible navigation control after its initial loading completes.
 Both PWA modes show layout-matched skeletons while their first usable data is
 loading. Reading uses the same row skeleton when the library has no cached data;
 Reminders uses card skeletons while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
+Phone headers use a 26px title, a 44px title/action row, and a compact 20px count
+row. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
+Loaded and opening headers share these PWA spacing tokens so hydration does not
+move the title or content. Sync and settings retain 44px touch targets.
 The same switch is available on both connection screens. Top-level modes suppress
 single-finger back gestures starting within 20px of the left edge; an open Reading
 article retains native back navigation to its library. Other touch starts and
@@ -223,3 +267,11 @@ and appearance controls. `scripts/reading-browser.test.mjs` exercises the built
 PWA against real local storage and Worker bindings, including offline reading and
 replay of a save whose response was lost. iPhone keyboard, native sharing, and
 installed-app safe areas still require physical-device acceptance.
+
+`scripts/pwa-dock-test.mjs` exercises the built Worker in Chromium and WebKit:
+section switching, retained tabs/search, directional slides, reduced motion,
+minimum touch targets, stationary dock geometry, focus return, capture/settings
+sheets, and light/dark phone and landscape layouts. Drag-to-select coverage checks
+live highlighting, release outside, and interruption in both engines, plus native
+Chromium touch selection and pointer cancellation. Physical iPhone safe areas, VoiceOver, and Home Screen behavior remain
+device acceptance checks.

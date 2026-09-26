@@ -2,7 +2,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { BottomTabBar } from '@/reminders/components/BottomTabBar';
+import { PwaDock } from './PwaDock';
+import { TABS } from '@/reminders/ui/layoutConstants';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
@@ -168,8 +169,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		return getCurrentHeaderData(viewMode, headerData);
 	}, [headerData, viewMode]);
 
-	const showFab = shouldShowReminderFab(viewMode, selectedProject);
-
 	const handleAdd = useCallback(() => {
 		if (backgroundInert) return;
 		onAdd(getReminderCreateProject(viewMode, selectedProject));
@@ -280,24 +279,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					</PwaNavigationScreen>
 				</div>
 
-				<BottomTabBar
+				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
 					inert={backgroundInert || Boolean(selectedProject) || closingProject.current}
-					activeTab={viewMode}
-					onTabChange={handleViewModeChange}
-					className="animated-tab-bar animated-tab-bar-bottom"
-					animateActiveIndicator={!reduceMotion}
-				/>
-
-				<AnimatePresence initial={false}>
-					{showFab && !selectedProject && !closingProject.current && !suppressFab && (
-						<FloatingActionButton
-							onClick={handleAdd}
-							inert={backgroundInert}
-							className="fab"
-							data-action="open-create-modal"
-						/>
-					)}
-				</AnimatePresence>
+					onAdd={!suppressFab ? handleAdd : undefined} />
 
 				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>

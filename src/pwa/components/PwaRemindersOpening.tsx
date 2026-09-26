@@ -1,6 +1,5 @@
 import React from 'react';
 import type { StartTab } from '../types';
-import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 
 const TITLES: Record<StartTab, string> = { inbox: 'Inbox', today: 'Today', upcoming: 'Upcoming', browse: 'Projects' };
 
@@ -22,10 +21,9 @@ export function PwaRemindersOpening({ tab, project }: { tab: StartTab; project: 
 	return <main className="pwa-mode-opening pwa-reminders-opening">
 		<header className="pwa-mode-opening__header">
 			<div className="pwa-mode-opening__heading"><div className="view-header-title-row"><h1 className="view-header-title">{project ?? TITLES[tab]}</h1></div><div className="pwa-reminders-opening__meta"><span className="pwa-mode-opening__meta pwa-mode-opening__shape" aria-hidden="true" /></div></div>
-			<div className="pwa-mode-opening__actions"><span className="pwa-mode-opening__action pwa-mode-opening__shape" aria-hidden="true" /><FeatureSwitcherButton /></div>
+			<div className="pwa-mode-opening__actions"><span className="pwa-mode-opening__action pwa-mode-opening__shape" aria-hidden="true" /></div>
 		</header>
 		<div className="pwa-mode-opening__content"><PwaRemindersSkeletonRows /></div>
-		<span className="pwa-mode-opening__fab pwa-mode-opening__shape" aria-hidden="true" />
-		<div className="pwa-mode-opening__nav" aria-hidden="true">{Array.from({ length: 4 }, (_, index) => <span className="pwa-mode-opening__nav-item" key={index}><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /><span className="pwa-mode-opening__nav-label pwa-mode-opening__shape" /></span>)}</div>
+		<div className="pwa-dock pwa-dock--opening" aria-hidden="true"><div className="pwa-dock__bar"><span className="pwa-dock__surface" />{Array.from({ length: 4 }, (_, index) => <span key={index} className="pwa-dock__tab"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span>)}</div><span className="pwa-dock__add"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span></div>
 	</main>;
 }

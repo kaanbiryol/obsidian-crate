@@ -14,6 +14,13 @@ window.addEventListener('load', () => {
 		const el = document.querySelector(selector);
 		if (el) el.click();
 	};
+	const selectTab = (tab) => {
+		if (tab === 'upcoming' && new URL(location.href).searchParams.get('tab') !== 'upcoming') {
+			const url = new URL(location.href); url.searchParams.set('tab', 'upcoming'); location.replace(url); return;
+		}
+		const selector = '[data-action="switch-tab"][data-tab="' + tab + '"]';
+		click(selector);
+	};
 	const openProject = () => {
 		const buttons = Array.from(document.querySelectorAll('[data-action="open-project"]'));
 		const match = buttons.find((button) => button.getAttribute('data-project') === project);
@@ -74,10 +81,10 @@ window.addEventListener('load', () => {
 			case 'today':
 			case 'upcoming':
 			case 'projects':
-				click('[data-action="switch-tab"][data-tab="' + action + '"]');
+				selectTab(action);
 				break;
 			case 'project':
-				click('[data-action="switch-tab"][data-tab="projects"]');
+				selectTab('projects');
 				setTimeout(openProject, 120);
 				break;
 			case 'pull':

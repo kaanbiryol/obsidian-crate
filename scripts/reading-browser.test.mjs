@@ -1,3 +1,4 @@
+import { switchFeature, featureNavigationTarget } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -191,13 +192,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.pwa-reading-root .toast')).toHaveText('Reading: All changes synced');
     assert.equal(await page.locator('.crate-feature-nav').count(), 0);
     await page.getByRole('searchbox',{name:'Search reading'}).fill('kept while switching');
-    await page.getByRole('button',{name:'Switch to Reminders',exact:true}).click();
+    await switchFeature(page, 'Reminders');
     await page.getByRole('heading',{name:'Connect to Crate',exact:true}).waitFor();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByRole('button',{name:'Switch to Reading',exact:true})).toBeFocused();
-    await page.getByRole('button',{name:'Switch to Reading',exact:true}).click();
+    await expect(featureNavigationTarget(page)).toBeFocused();
+    await switchFeature(page, 'Reading');
     await expect(page.getByRole('searchbox',{name:'Search reading'})).toHaveValue('kept while switching');
-    await expect(page.getByRole('button',{name:'Switch to Reminders',exact:true})).toBeFocused();
+    await expect(featureNavigationTarget(page)).toBeFocused();
     assert.equal(new URL(page.url()).searchParams.get('section'),'reading');
     await page.getByRole('searchbox',{name:'Search reading'}).fill('');
     await mkdir('test-results/reading',{recursive:true});
@@ -231,7 +232,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const modeEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
       await modePage.goto(`${origin}/notifications?browserToken=${modeEnrollment.browserToken}`);
       await expect(modePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
-      await modePage.getByRole('button', { name: 'Switch to Reading', exact: true }).tap();
+      await switchFeature(modePage, 'Reading');
       await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
       for (const destination of ['Reminders', 'Reading']) {
         await modePage.waitForFunction(() => !document.querySelector('[data-leaving="true"]'));
@@ -253,7 +254,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
           });
           observer.observe(root, { attributes: true, subtree: true, attributeFilter: ['data-entering'] });
         });
-        await modePage.getByRole('button', { name: `Switch to ${destination}`, exact: true }).tap();
+        await switchFeature(modePage, destination);
         await modePage.waitForFunction(() => window.__modeDone === true);
         const frames = await modePage.evaluate(() => window.__modeFrames);
         assert.ok(frames.filter(values => values.every(value => value > .05 && value < .95)).length >= 2, `${name}: populated mode fade to ${destination}: ${JSON.stringify(frames)}`);
@@ -400,7 +401,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
     await expect(page.getByRole('button',{name:/example.invalid A browser article/})).toHaveCount(0);
     await assertNoPendingBanner(page);
-    await page.getByRole('button',{name:'Archive',exact:true}).click();
+    await page.locator('.crate-feature-panel[data-active="true"] [data-dock-switcher]').press('ArrowDown');
+    await page.getByRole('dialog', { name: 'Reading views' }).getByRole('button',{name:'Archive',exact:true}).click();
     await page.getByRole('button',{name:/example.invalid A browser article/}).waitFor();
     archiveReleased.resolve();
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
@@ -408,7 +410,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Move to inbox',exact:true}).click();
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
-    await page.getByRole('button',{name:'Inbox',exact:true}).click();
+    await page.locator('.crate-feature-panel[data-active="true"] [data-dock-switcher]').press('ArrowDown');
+    await page.getByRole('dialog', { name: 'Reading views' }).getByRole('button',{name:'Reading List',exact:true}).click();
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
     // A slow update response must not hold the favorite or the cached reader.
     const updateStarted = Promise.withResolvers(), updateReleased = Promise.withResolvers();
@@ -484,12 +487,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
     const linked = await page.evaluate(() => ({ reading: JSON.parse(localStorage.getItem('crate-reading-session-v1')), reminders: localStorage.getItem('crate-reminders-auth-token') }));
     assert.equal(linked.reading.source, 'reminders'); assert.equal(linked.reading.token, linked.reminders);
-    await page.getByRole('button',{name:'Switch to Reminders',exact:true}).click();
+    await switchFeature(page, 'Reminders');
     await page.getByRole('button',{name:'Open settings',exact:true}).click();
     const reminderSheetAppearance = await sheetAppearance(page);
     await page.getByRole('button',{name:'Close settings',exact:true}).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await page.getByRole('button',{name:'Switch to Reading',exact:true}).click();
+    await switchFeature(page, 'Reading');
     await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
     await page.getByRole('button',{name:'Reading settings'}).click();
     assert.deepEqual(await sheetAppearance(page), reminderSheetAppearance, 'Both modes must share sheet and control styling');

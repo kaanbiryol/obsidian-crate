@@ -18,6 +18,7 @@ try {
   const heldFirstLoad = new Promise(resolve => { releaseFirstLoad = resolve; });
   await firstLoad.route('**/reminders/list?*', async route => { await heldFirstLoad; await route.continue(); });
   await firstLoad.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=today`);
+  await firstLoad.addStyleTag({content:':root{--pwa-safe-area-top:62px;--pwa-safe-area-bottom:34px}'});
   let openingGeometry;
   try {
    await expect(firstLoad.locator('.pwa-reminders-opening')).toBeVisible();
@@ -35,6 +36,8 @@ try {
   expect(Math.abs(loadedTitle.y - openingGeometry.title.y)).toBeLessThan(1);
   expect(Math.abs(loadedTitle.height - openingGeometry.title.height)).toBeLessThan(1);
   expect(Math.abs(loadedHeader.height - openingGeometry.header.height)).toBeLessThan(1);
+  await expect(firstLoad.locator('.pwa-navigation-screen')).toHaveCSS('opacity', '1');
+  await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-loaded-dark.png`});
   await firstLoad.locator('.view-header-overdue').evaluateAll(badges => badges.forEach(badge => badge.remove()));
   const withoutOverdue = await firstLoad.locator('.view-header').boundingBox();
   expect(Math.abs(withoutOverdue.height - loadedHeader.height)).toBeLessThan(1);

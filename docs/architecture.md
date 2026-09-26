@@ -140,7 +140,9 @@ The Obsidian plugin and PWA own separate application shells so viewport, navigat
 
 Reading and Reminders share the feature-independent view header, navigation bar,
 buttons, icon buttons, and modal header under `src/ui/shared/`. Feature adapters
-provide destinations, actions, data, and lifecycle behavior. Reading owns its
+provide destinations, actions, data, and lifecycle behavior. The PWA supplies its
+dock with direct section switching through a Reading navigation adapter and its reminder shell;
+feature switching and per-section state retention stay in the PWA feature shell. Reading owns its
 article layout and typography, while common controls use the same host tokens.
 
 The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The first-release schema records version 1 in `crate_schema`. Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).

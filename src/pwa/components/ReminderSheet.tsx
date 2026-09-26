@@ -17,6 +17,7 @@ import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
+import { PWA_SURFACE_SPRING } from '../motion';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));
 const ReminderPickerSheet = lazy(loadReminderPickerSheet);
@@ -194,7 +195,9 @@ function ReminderEditorSheet({
 						// keyboard. Shorten the wait before the editor appears,
 						// but keep its entrance cadence consistent with other sheets.
 						? { duration: isReturningToEditor ? 0.08 : 0.18, ease: [0.4, 0, 1, 1] }
-						: { duration: 0.42, ease: [0.19, 0, 0, 1] }}
+						// This is new content, swapped below the viewport. Its entrance
+						// must not inherit the previous screen's downward exit velocity.
+						: { ...PWA_SURFACE_SPRING, velocity: 0 }}
 				onAnimationComplete={handleReminderStageAnimationComplete}
 			>
 				<ReminderEditorScreen

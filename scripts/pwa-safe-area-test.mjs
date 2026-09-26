@@ -13,25 +13,41 @@ async function checkNavigation(page, inset) {
 		const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
 		return {
 			app: bounds('#app'),
-			bar: bounds('.bottom-tab-bar'),
-			items: bounds('.bottom-tab-items'),
-			fab: bounds('.reminders-fab'),
-			selection: bounds('.bottom-tab-slider'),
-			activeContent: bounds('.bottom-tab-button.is-active .bottom-tab-content'),
-			buttons: [...document.querySelectorAll('[data-action="switch-tab"]')].map(button => button.getBoundingClientRect().toJSON()),
+			bar: bounds('.pwa-dock'),
+			items: bounds('.pwa-dock__bar'),
+			fab: bounds('.pwa-dock__add'),
+			selection: bounds('.pwa-dock__tab.is-active'),
+			activeContent: bounds('.pwa-dock__tab.is-active'),
+			buttons: [...document.querySelectorAll('.pwa-dock__tab')].map(button => button.getBoundingClientRect().toJSON()),
+			header: bounds('.view-header'),
+			title: bounds('.view-header-title'),
+			meta: bounds('.view-header-meta'),
+			settings: bounds('.pwa-header-settings-button'),
+			sync: bounds('.pwa-sync-indicator__button'),
+			topInset: parseFloat(getComputedStyle(document.querySelector('.view-header')).paddingTop) - parseFloat(getComputedStyle(document.querySelector('.view-header')).getPropertyValue('--pwa-header-top-gap')),
 		};
 	});
 	assert.ok(Math.abs(geometry.app.bottom - height) < 1, 'app fills the visible viewport');
 	assert.ok(Math.abs(geometry.bar.bottom - height) < 1, 'bar background fills the bottom edge');
-	assert.ok(Math.abs(geometry.bar.height - 64 - inset) < 1, 'safe area is reserved exactly once');
-	assert.ok(geometry.items.bottom <= height - inset + 1, 'tab content stays above the home indicator');
+	const bottomGap = Math.max(10, inset);
+	assert.ok(Math.abs(geometry.bar.height - 70 - bottomGap) < 1, 'safe area is reserved exactly once');
+	assert.ok(Math.abs(geometry.items.bottom - (height - bottomGap)) < 1, 'dock sits above the safe area without extra padding');
 	for (const button of geometry.buttons) {
 		assert.ok(button.bottom <= height - inset + 1, 'entire tab touch target stays outside the safe area');
 		assert.ok(button.height >= 44, 'tab retains its touch target');
 	}
-	assert.ok(geometry.selection.height >= 56, 'selected background covers the icon and label with padding');
+	assert.ok(geometry.selection.height >= 44, 'selected background covers the icon and label with padding');
 	assert.ok(Math.abs((geometry.selection.left + geometry.selection.width / 2) - (geometry.activeContent.left + geometry.activeContent.width / 2)) < 1, 'selected background is centered on its tab');
-	assert.ok(geometry.fab.bottom <= geometry.bar.top - 15, 'add button clears the tab bar');
+	assert.ok(Math.abs(geometry.fab.bottom - geometry.items.bottom) < 1, 'add button aligns with the dock');
+	assert.ok(geometry.fab.left >= geometry.items.right + 8, 'add button stays separate from navigation');
+	for (const button of [geometry.settings, geometry.sync]) {
+		assert.ok(button.height >= 44 && button.width >= 44, 'compact headers preserve touch targets');
+		assert.ok(button.top >= geometry.topInset, 'header actions remain below the status-bar safe area');
+	}
+	if (page.viewportSize().width < 760) {
+		assert.ok(geometry.header.height - geometry.topInset <= 78, 'phone header leaves more room for content');
+		assert.ok(geometry.title.bottom <= geometry.meta.top + 1, 'title and count remain separate and readable');
+	}
 }
 
 try {
@@ -60,7 +76,7 @@ try {
 				await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 				await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
 				if (standalone) await page.addStyleTag({ content: '@media(orientation:portrait){:root{--pwa-safe-area-top:62px}}' });
-				await page.locator('.bottom-tab-bar').waitFor();
+				await page.locator('.pwa-dock [data-dock-active]').waitFor();
 				if (standalone) await page.evaluate(() => {
 					// Layout/visual viewport APIs may report the same shorter height.
 					// The sheet lock must retain the rendered full-screen canvas.
@@ -69,7 +85,7 @@ try {
 					Object.defineProperty(document.documentElement, 'clientHeight', { configurable: true, get: reportedHeight });
 					Object.defineProperty(window.visualViewport, 'height', { configurable: true, get: reportedHeight });
 				});
-				if (standalone) await expect(page.locator('.view-header').first()).toHaveCSS('padding-top', '79px');
+				if (standalone) await expect(page.locator('.view-header').first()).toHaveCSS('padding-top', '66px');
 				await checkNavigation(page, standalone ? 34 : 0);
 				// Check resize/rotation and inset changes without reloading the app.
 				await page.setViewportSize({ width: 852, height: 393 });

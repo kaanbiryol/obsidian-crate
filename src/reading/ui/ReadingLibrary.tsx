@@ -3,6 +3,7 @@ import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ToggleButton } from '../../ui/shared/ToggleButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
+import type { NavigationItem } from '../../ui/shared/NavigationBar';
 import { NavigationBar } from '../../ui/shared/NavigationBar';
 import { ThemeIcon } from '../../reminders/components/theme-icon';
 import { FloatingActionButton } from '../../reminders/components/FloatingActionButton';
@@ -14,6 +15,7 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 
 export interface ReadingLibraryProps {
 	snapshot: ReadingSnapshot;
+	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; disabled: boolean }) => React.ReactNode;
 	onAdd: () => void;
 	onOpen: (item: ReadingItem) => Promise<void>;
 	onUpdate: (item: ReadingItem, changes: ReadingChanges) => Promise<void>;
@@ -36,7 +38,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
-export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>('inbox');
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
@@ -62,7 +64,7 @@ export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefre
 		}
 		if (!retainReaderOnClose || !exitingReader) { setExitingReader(null); onReaderClosed?.(); return; }
 		// transitionend owns normal cleanup; this also handles rotation or a cancelled transition.
-		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 400);
+		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
 	const items = useMemo(() => filterReadingItems(snapshot.items, section, query, tag), [snapshot.items, section, query, tag]);
@@ -86,7 +88,7 @@ export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefre
 						return <ToggleButton key={id} aria-label={label} pressed={section === id} onPressedChange={() => selectSection(id)}><ThemeIcon id={sectionIcons[id]} size="l" aria-hidden="true" /><span>{label}</span><span className="crate-reading__nav-count" aria-hidden="true">{count || ''}</span></ToggleButton>;
 					})}
 				</nav>
-				<NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />
+				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, disabled: !!busy }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
 				{tags.length > 0 && <div className="crate-reading__tag-nav"><h2>Tags</h2>{tags.map(value => <Button key={value} aria-pressed={tag === value} onClick={() => { setTag(tag === value ? null : value); resetList(); }}><ThemeIcon id="hash" size="m" aria-hidden="true" /><span>{value}</span></Button>)}</div>}
 				<div className="crate-reading__sidebar-bottom"><ThemeIcon id="book-open" size="s" aria-hidden="true" /><span>A little space to read.</span></div>
 			</aside>
@@ -109,7 +111,7 @@ export function ReadingLibraryPanel({ snapshot, onAdd, onOpen, onUpdate, onRefre
 						{visible < items.length && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
 					</>}
 				</div>
-				<FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" disabled={!!busy} onClick={onAdd} animateOnMount={false} />
+				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" disabled={!!busy} onClick={onAdd} animateOnMount={false} />}
 			</div>
 			<div className="crate-reading__reader-pane" inert={readerMotion !== undefined && !reader} aria-hidden={readerMotion !== undefined && !reader} onTransitionEnd={event => {
 				if (event.target === event.currentTarget && event.propertyName === 'transform' && !reader) { setExitingReader(null); onReaderClosed?.(); }

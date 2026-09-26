@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { FeatureNavigationContext, type CrateSection } from './components/FeatureSwitcherButton';
+import { FeatureNavigationContext, type CrateSection, type DockDestination } from './components/FeatureSwitcherButton';
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
+import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { PwaThemeIcon } from './components/PwaThemeIcon';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { ReadingOpening } from './reading/ReadingOpening';
@@ -13,6 +14,10 @@ const MODE_TRANSITION_FALLBACK_MS = 1_000;
 export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 	usePwaInputModality();
 	const [section, setSection] = useState(currentSection);
+	const [destination, setDestination] = useState<DockDestination | null>(null);
+	const [reminderDockIndex, rememberReminderDockIndex] = useState<number | null>(null);
+	const dockIndex = section === 'reading' ? 3 : reminderDockIndex;
+	const [readingTab, rememberReadingTab] = useState<ReadingSection>('inbox');
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
 	const [visited, setVisited] = useState(() => new Set([section]));
 	const root = useRef<HTMLDivElement>(null), restoreFocus = useRef(false);
@@ -46,7 +51,8 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 		let attempts = 0;
 		let focusedButton: HTMLElement | null = null;
 		const focus = () => {
-			const button = root.current?.querySelector<HTMLElement>(`[data-crate-section="${section}"] .pwa-feature-switch-button`);
+			const panel = root.current?.querySelector(`[data-crate-section="${section}"]`);
+			const button = Array.from(panel?.querySelectorAll<HTMLElement>('[data-dock-active="true"], .pwa-feature-switch-button') ?? []).find(candidate => candidate.getClientRects().length > 0);
 			if (!button) return false;
 			if (!restoreFocus.current && (focusedButton?.isConnected || document.activeElement !== document.body)) return true;
 			button.focus({ preventScroll: true });
@@ -60,7 +66,7 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 			frame = requestAnimationFrame(() => {
 				frame = 0;
 				if (focus()) attempts = 0;
-				else if (attempts++ < 8 && root.current?.querySelector(`[data-crate-section="${section}"] .pwa-feature-switch-button`)) retry();
+				else if (attempts++ < 8 && root.current?.querySelector(`[data-crate-section="${section}"] [data-dock-switcher="true"], [data-crate-section="${section}"] .pwa-feature-switch-button`)) retry();
 			});
 		};
 		// A newly opened panel becomes visible on the next frame. Its app may
@@ -75,19 +81,21 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 		retry();
 		return () => { observer.disconnect(); cancelAnimationFrame(frame); };
 	}, [section]);
-	const toggle = () => {
+	const switchSection = (next: CrateSection) => {
 		const previous = sectionRef.current;
-		const next = previous === 'reading' ? 'reminders' : 'reading';
+		if (next === previous) return;
 		locations.current[previous] = { url: location.pathname + location.search, state: history.state };
 		history.replaceState(locations.current[next].state, '', locations.current[next].url);
 		restoreFocus.current = true;
 		showSection(next);
 	};
+	const navigate = (next: DockDestination) => { setDestination(next); switchSection(next.section); };
+	const toggle = () => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); };
 	return <ThemeIconProvider renderer={PwaThemeIcon}><div ref={root} className="crate-feature-shell" onAnimationEnd={event => {
 		const panel = event.target as HTMLElement;
 		if (event.animationName === 'crate-mode-fade-in' && panel.dataset.crateSection === sectionRef.current) setLeavingSection(null);
 	}}>
-		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading'} aria-hidden={section !== 'reading'}><FeatureNavigationContext.Provider value={{ section: 'reading', toggle }}>{visited.has('reading') && <Suspense fallback={<ReadingOpening />}><Reading /></Suspense>}</FeatureNavigationContext.Provider></div>
-		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders'} aria-hidden={section !== 'reminders'}><FeatureNavigationContext.Provider value={{ section: 'reminders', toggle }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading'} aria-hidden={section !== 'reading'}><FeatureNavigationContext.Provider value={{ section: 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <Suspense fallback={<ReadingOpening />}><Reading /></Suspense>}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders'} aria-hidden={section !== 'reminders'}><FeatureNavigationContext.Provider value={{ section: 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
 	</div></ThemeIconProvider>;
 }

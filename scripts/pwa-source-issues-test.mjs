@@ -138,7 +138,7 @@ async function verify(browser) {
     mode = 'empty';
     await notice(page).getByRole('button', { name: 'Refresh reminders', exact: true }).click();
     await expect(page.getByText('No results from available files', { exact: true })).toBeVisible();
-    for (const tab of ['inbox', 'today', 'upcoming', 'projects']) {
+    for (const tab of ['inbox', 'today', 'projects']) {
       await page.locator(`[data-action="switch-tab"][data-tab="${tab}"]`).click();
       await expect(page.getByText('No results from available files', { exact: true })).toBeVisible();
       await expect(page.getByText(/Your inbox is empty|Nothing due today|Enjoy your free time!/)).toHaveCount(0);

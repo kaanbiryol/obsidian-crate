@@ -1,5 +1,6 @@
 import { motion, useIsPresent, type Variants } from 'motion/react';
 import React from 'react';
+import { PWA_NAVIGATION_SPRING } from '../motion';
 
 export interface PwaNavigationMotion {
 	direction: -1 | 0 | 1;
@@ -15,14 +16,14 @@ const variants: Variants = {
 		x: 0,
 		opacity: 1,
 		zIndex: 1,
-		transition: { duration: reduceMotion ? 0 : direction ? 0.32 : 0.18, ease: [0.32, 0.72, 0, 1] },
+		transition: reduceMotion ? { duration: 0 } : direction ? PWA_NAVIGATION_SPRING : { duration: 0.18, ease: 'easeInOut' },
 	}),
 	exit: ({ direction, reduceMotion }: PwaNavigationMotion) => ({
 		x: reduceMotion || !direction ? 0 : direction === 1 ? '-25%' : '100%',
 		opacity: reduceMotion || !direction ? 0 : 1,
 		// The detail screen passes over the projects screen in both directions.
 		zIndex: direction === -1 ? 2 : 0,
-		transition: { duration: reduceMotion ? 0 : direction ? 0.32 : 0.18, ease: [0.32, 0.72, 0, 1] },
+		transition: reduceMotion ? { duration: 0 } : direction ? PWA_NAVIGATION_SPRING : { duration: 0.18, ease: 'easeInOut' },
 	}),
 };
 

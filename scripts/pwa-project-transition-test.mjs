@@ -44,10 +44,11 @@ try {
       });
       assert.ok(opening.samples.some(x => x > 1 && x < opening.width - 1), 'Project should slide over Projects');
       assert.ok(Math.abs(opening.samples.at(-1)) < 1, 'Project slide should settle at the left edge');
+      assert.ok(opening.samples.every(x => x >= -.5 && x <= opening.width + .5), 'The spring must settle without visible overshoot');
       await expect(page.locator('.reminders-browse-view')).toHaveCount(1);
       await expect(page.locator('.pwa-project-layer')).toHaveAttribute('data-project-open', 'true');
       await expect(page.getByRole('heading', { name: 'Errands', exact: true })).toBeVisible();
-      await expect(page.locator('.bottom-tab-bar')).toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-dock')).toHaveAttribute('inert', '');
       await checkBackGesture(page, '.pwa-project-layer', true);
       await page.locator('.pwa-project-fab').click();
       await expect(page.getByRole('dialog', { name: 'New reminder', exact: true })).toBeVisible();
@@ -57,7 +58,7 @@ try {
       await checkBackGesture(page, '.pwa-project-layer', true);
       const covered = await page.evaluate(() => {
         const screen = document.querySelector('.pwa-navigation-screen--project');
-        const bar = document.querySelector('.bottom-tab-bar');
+        const bar = document.querySelector('.pwa-dock');
         const rect = bar.getBoundingClientRect();
         return screen.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2));
       });
@@ -75,8 +76,33 @@ try {
       await page.locator('.pwa-project-layer .premium-back-button').click();
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
-      await expect(page.locator('.bottom-tab-bar')).not.toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert', '');
       assert.equal(new URL(page.url()).searchParams.has('project'), false);
+      assert.equal(await list.evaluate(scroll => scroll.scrollTop), before.scrollTop);
+      await expect(target).toBeFocused();
+
+      // Back during the entrance must retarget the same surface from its current
+      // position, keeping the list and history intact throughout the reversal.
+      const interrupted = await page.evaluate(async () => {
+        document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const screen = document.querySelector('.pwa-navigation-screen--project');
+        const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;
+        const before = x(), width = screen.getBoundingClientRect().width;
+        screen.querySelector('.premium-back-button').click();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const after = x(), samples = [after], started = performance.now();
+        while (screen.isConnected && performance.now() - started < 900) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          if (screen.isConnected) samples.push(x());
+        }
+        return { before, after, samples, width };
+      });
+      assert.ok(interrupted.before > 1 && interrupted.before < interrupted.width - 1, JSON.stringify(interrupted));
+      assert.ok(Math.abs(interrupted.after - interrupted.before) < interrupted.width * .15, 'Reversing must not reset the detail position');
+      assert.ok(interrupted.samples.every(x => x >= -.5 && x <= interrupted.width + .5), JSON.stringify(interrupted));
+      await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
+      await page.waitForFunction(() => history.state?.reminderProjectList === true);
       assert.equal(await list.evaluate(scroll => scroll.scrollTop), before.scrollTop);
       await expect(target).toBeFocused();
 
@@ -96,7 +122,7 @@ try {
       await page.goBack();
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
-      await expect(page.locator('.bottom-tab-bar')).not.toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert', '');
       console.log(`${type.name()}: project overlay, back navigation, and edge gesture passed`);
     } finally { await browser.close(); }
   }

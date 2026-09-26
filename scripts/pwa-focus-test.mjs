@@ -40,7 +40,7 @@ for (const browserType of [chromium, webkit]) {
 			await page.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
 			await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
 			await expect(page.locator('.pwa-navigation-viewport')).not.toHaveAttribute('inert');
-			await expect(page.locator('.bottom-tab-bar')).not.toHaveAttribute('inert');
+			await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert');
 			const updatedCard = page.getByRole('group', { name: 'Updated article. Press Enter to edit reminder.', exact: true });
 			await updatedCard.waitFor();
 			// Desktop browsers cannot show the software keyboard. Simulate its
@@ -60,7 +60,7 @@ for (const browserType of [chromium, webkit]) {
 			await title.fill('Unsaved deletion draft');
 			await expect(page.locator('body')).toHaveCSS('position', 'fixed');
 			await expect(page.locator('.pwa-navigation-viewport')).toHaveAttribute('inert', '');
-			await expect(page.locator('.bottom-tab-bar')).toHaveAttribute('inert', '');
+			await expect(page.locator('.pwa-dock')).toHaveAttribute('inert', '');
 			await page.evaluate(() => {
 				window.keyboardViewportHeight = 510;
 				window.visualViewport.dispatchEvent(new Event('resize'));

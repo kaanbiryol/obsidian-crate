@@ -111,6 +111,9 @@ try {
 							await expect(page.getByRole('dialog', { name: picker.dialog, exact: true })).toHaveCount(0);
 							await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 							await expect(title).toHaveText('Keep this draft through the first load');
+							// Springs can round to a resting transform before delivering
+							// completion. Follow the interaction gate before the next tap.
+							await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
 						}
 						await page.touchscreen.tap(195, 20);
 						await expect(page.locator('.pwa-modal-sheet')).toHaveCount(0);

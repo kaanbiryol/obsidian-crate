@@ -31,9 +31,6 @@
 	:root{--tabbar-h:64px}
 	.fab{width:46px;height:46px;min-width:46px;right:10px;bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px)}
 }
-@media (max-width: 420px){
-	.pwa-reminders-view .view-header{padding:calc(var(--pwa-safe-area-top) + 17px) 18px 11px!important}
-}
 @media (max-width: 392px){
 	:root{--tabbar-h:72px}
 	.fab{right:14px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:48px;height:48px;min-width:48px;border-radius:50%}

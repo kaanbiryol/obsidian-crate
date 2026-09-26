@@ -1,3 +1,5 @@
+import dockStyles from '../../../pwa/styles/dock.scss?raw-css';
+import motionStyles from '../../../pwa/styles/motion.scss?raw-css';
 import readingStyles from '../../../reading/ui/reading.scss?raw-css';
 import readingWebStyles from '../../../pwa/reading/web.scss?raw-css';
 import featureSwitcherStyles from '../../../pwa/styles/feature-switcher.scss?raw-css';
@@ -26,4 +28,6 @@ export const PWA_STYLES = [
 	focusStyles,
 	featureSwitcherStyles,
 	buttonFeedbackStyles,
+	motionStyles,
+	dockStyles,
 ].join('');
