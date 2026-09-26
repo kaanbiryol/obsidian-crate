@@ -40,20 +40,20 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
     } catch { if (alive.current) setError('Could not copy. Select the pairing code below and copy it manually.'); }
   };
   return <div className="crate-reading-shortcut">
-    <p>Save links from the iPhone share sheet. Requires iOS 27 or later and an internet connection.</p>
-    <ol>
-      <li><h3>Install the shortcut</h3><p>Open the download in Shortcuts and select <strong>Add Shortcut</strong>. If it saves to Files, open it from <strong>Downloads</strong>.</p>
+    <div className="crate-reading-shortcut__intro"><p>From your share sheet to your reading inbox.</p><span>iOS 27+ · Internet connection required</span></div>
+    <ol aria-label="Shortcut setup steps">
+      <li><span className="crate-reading-shortcut__number" aria-hidden="true">1</span><div className="crate-reading-shortcut__step"><h3>Install the shortcut</h3><p>Open the download and select <strong>Add Shortcut</strong>. Saved to Files? Select it in <strong>Downloads</strong>.</p>
         <a className="crate-action-button" data-variant="outline" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Download Save to Crate</a>
-      </li>
-      <li><h3>Connect to this library</h3><p>Create a pairing code, then run <strong>Save to Crate (iOS 27)</strong> from your Shortcuts library and paste it when asked.</p>
+      </div></li>
+      <li><span className="crate-reading-shortcut__number" aria-hidden="true">2</span><div className="crate-reading-shortcut__step"><h3>Connect your library</h3><p>Create a code, run <strong>Save to Crate (iOS 27)</strong> from <strong>All Shortcuts</strong>, and paste when asked.</p>
         <Button variant="primary" disabled={busy || !online} onClick={() => void create()}>{busy ? 'Creating code…' : pairing ? 'Create new pairing code' : 'Create pairing code'}</Button>
         {pairing && !expired && <div className="crate-reading-shortcut__code"><label htmlFor={codeId}>Pairing code</label><textarea id={codeId} readOnly rows={3} value={pairing.pairingCode} autoCapitalize="none" autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /><Button variant="outline" onClick={() => void copy()}>Copy pairing code</Button><p>Use once within {Math.max(1, Math.ceil((pairing.expiresAt - now) / 60_000))} minutes. Keep this code private. Creating a new code replaces the previous one.</p></div>}
         {expired && <p role="status">This pairing code expired. Create a new code to continue.</p>}
         {!online && <p role="status">Connect to the internet to pair your shortcut.</p>}
         {error && <p role="alert">{error}</p>}{message && !expired && <p role="status">{message}</p>}
-      </li>
-      <li><h3>Try it</h3><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong>, then dismiss the sheet.</p></li>
+      </div></li>
+      <li><span className="crate-reading-shortcut__number" aria-hidden="true">3</span><div className="crate-reading-shortcut__step"><h3>Try it</h3><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong>, then dismiss the sheet.</p></div></li>
     </ol>
-    <p>The shortcut can save links but cannot read your library. Access lasts up to 90 days; revoke it in Obsidian’s connected devices. To reconnect, create a new code and run the shortcut from its library again.</p>
+    <details className="crate-reading-shortcut__privacy"><summary>Privacy and access</summary><p>The shortcut can save links but cannot read your library. Access lasts up to 90 days. Revoke it in Obsidian’s connected devices, or run setup again to reconnect.</p></details>
   </div>;
 }
