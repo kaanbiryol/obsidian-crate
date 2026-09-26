@@ -4,6 +4,7 @@ import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
+import { createPwaOpeningDockHtml, PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';
 import { PWA_UPDATE_SCREEN_HTML } from '../../../pwa/update-screen';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,
@@ -18,8 +19,17 @@ export function createPwaHtml(requestUrl?: string, nonce: string = crypto.random
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Paint the themed canvas before native chrome or the rest of the shell is parsed. -->
+<style>
+:root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
+html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
+@media ${PWA_LIGHT_SCHEME_MEDIA}{:root{--pwa-launch-bg:${PWA_LIGHT_CHROME_COLOR};color-scheme:light}}
+</style>
+<meta id="${PWA_THEME_COLOR_META_ID}" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="${PWA_LIGHT_CHROME_COLOR}" media="${PWA_LIGHT_SCHEME_MEDIA}">
+<script nonce="${nonce}" id="pwa-theme-init">${PWA_THEME_INIT_JS}</script>
+<script nonce="${nonce}" id="pwa-dock-init">${PWA_OPENING_DOCK_INIT_JS}</script>
 <meta name="color-scheme" content="light dark">
-
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
 <!-- Retain translucent chrome except for the iOS 27 workaround applied below. -->
@@ -27,14 +37,6 @@ export function createPwaHtml(requestUrl?: string, nonce: string = crypto.random
 <script nonce="${nonce}" id="pwa-status-bar-init">${PWA_STATUS_BAR_INIT_JS}</script>
 <meta name="application-name" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
-<meta id="${PWA_THEME_COLOR_META_ID}" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="${PWA_LIGHT_CHROME_COLOR}" media="${PWA_LIGHT_SCHEME_MEDIA}">
-<script nonce="${nonce}" id="pwa-theme-init">${PWA_THEME_INIT_JS}</script>
-<style>
-:root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
-html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
-@media ${PWA_LIGHT_SCHEME_MEDIA}{:root{--pwa-launch-bg:${PWA_LIGHT_CHROME_COLOR};color-scheme:light}}
-</style>
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="${manifestHref}">
@@ -52,7 +54,7 @@ ${PWA_LIGHT_THEME_STYLES}
 </head>
 <body>
 	<div id="pwa-update-transition" role="status" aria-live="polite">${PWA_UPDATE_SCREEN_HTML}</div>
-	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"></div></div>
+	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningDockHtml()}</div></div>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;

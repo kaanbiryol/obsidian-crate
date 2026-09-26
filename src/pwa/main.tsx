@@ -22,7 +22,6 @@ import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
 import { PwaSyncIndicator } from './components/PwaSyncIndicator';
-import { PwaRemindersOpening } from './components/PwaRemindersOpening';
 import { exportPendingChanges } from './export-pending-changes';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
@@ -368,8 +367,9 @@ function App() {
 		/>
 	), [editReminder, toggleReminderCompleted]);
 
-	if (!initialContentReady || launchPending) {
-		if (!launchPending && authToken) return <PwaRemindersOpening tab={startTab} project={selectedProject} />;
+	// Resolve the launch destination first, then keep the real chrome mounted
+	// while data, pending changes, and notification state finish loading.
+	if (!bootstrapped || launchPending) {
 		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
 	}
 
@@ -390,11 +390,12 @@ function App() {
 		>
 			<PwaRemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
-				reminders={sharedReminders}
-				projects={visibleProjects}
+				initializing={!initialContentReady}
+				reminders={initialContentReady ? sharedReminders : []}
+				projects={initialContentReady ? visibleProjects : []}
 				incomplete={issues.length > 0}
-				checkingReminders={loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
-				showLoadingSkeleton={sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error))}
+				checkingReminders={!initialContentReady || loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
+				showLoadingSkeleton={!initialContentReady || (sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error)))}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
@@ -417,7 +418,7 @@ function App() {
 					error={error}
 					storageError={storageError}
 				/> : undefined}
-				belowHeaderContent={bootstrapped && authToken ? (isProjectDetail) => (
+				belowHeaderContent={initialContentReady && authToken ? (isProjectDetail) => (
 					<>
 						<PwaPullRefreshIndicator
 							enabled={Boolean(!loading && !modal && !settingsOpen && !reorderDragging)}

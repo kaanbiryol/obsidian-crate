@@ -83,14 +83,6 @@
 	}
 }
 
-// Reserve the same title and metadata tracks before and after hydration. The
-// loaded title includes a 44px sync target. Keep its line box identical to the skeleton.
-.crate-reminders-ui :is(.pwa-reminders-view .view-header-title-row, .pwa-reminders-opening .view-header-title-row) { min-height: 44px; }
-.crate-reminders-ui .pwa-reminders-opening__meta { display: flex; align-items: center; height: var(--pwa-header-meta-height); margin-top: var(--pwa-header-meta-gap); }
-.crate-reminders-ui .pwa-reminders-opening__meta .pwa-mode-opening__meta { margin-top: 0; }
-.pwa-reminders-opening .pwa-mode-opening__header { flex-shrink: 0; }
-@media (min-width: 760px) { .pwa-reminders-opening .pwa-mode-opening__header { padding-inline: 40px; } }
-
-.crate-reminders-ui :is(.pwa-reminders-view, .pwa-reminders-opening) .view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
-
-.crate-reminders-ui .pwa-reminders-opening .view-header-title { font-size: var(--crate-view-title-size); font-weight: var(--crate-view-title-weight); line-height: var(--crate-view-title-leading); letter-spacing: var(--crate-view-title-spacing); }
+// Keep the live title and reserved metadata tracks stable while data loads.
+.crate-reminders-ui .pwa-reminders-view .view-header-title-row { min-height: 44px; }
+.crate-reminders-ui .pwa-reminders-view .view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ToggleButton } from '../../ui/shared/ToggleButton';
@@ -16,6 +16,8 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 export interface ReadingLibraryProps {
 	snapshot: ReadingSnapshot;
 	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; disabled: boolean }) => React.ReactNode;
+	/** Host-owned transitions can retain the previous library while changing sections. */
+	renderLibraryContent?: (section: ReadingSection, content: React.ReactNode) => React.ReactNode;
 	onAdd: () => void;
 	onOpen: (item: ReadingItem) => Promise<void>;
 	onUpdate: (item: ReadingItem, changes: ReadingChanges) => Promise<void>;
@@ -38,7 +40,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
-export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>('inbox');
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
@@ -48,15 +50,22 @@ export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen,
 	// A history swipe reveals the PWA tab bar immediately. Keep its indicator
 	// parked at the selected tab while the reader covers an unfinished spring.
 	const animateTabIndicator = readerMotion === undefined || !reader;
-	const pending = useRef(false), list = useRef<HTMLDivElement>(null);
+	const pending = useRef(false), lists = useRef(new Map<ReadingSection, HTMLDivElement>());
+	const setListRef = useCallback((node: HTMLDivElement | null) => {
+		if (node) lists.current.set(section, node);
+		// Retained views can re-enter before unmounting. Keep refs per section so
+		// finishing a previous exit cannot clear the currently visible scroll owner.
+		return () => { if (lists.current.get(section) === node) lists.current.delete(section); };
+	}, [section]);
 	const previousArticle = useRef(activeId);
 	useEffect(() => {
 		if (!activeId && previousArticle.current) {
-			const button = list.current?.querySelector<HTMLButtonElement>(`[data-reading-id="${previousArticle.current}"]`);
-			(button ?? list.current)?.focus({ preventScroll: true });
+			const list = lists.current.get(section);
+			const button = list?.querySelector<HTMLButtonElement>(`[data-reading-id="${previousArticle.current}"]`);
+			(button ?? list)?.focus({ preventScroll: true });
 		}
 		previousArticle.current = activeId;
-	}, [activeId]);
+	}, [activeId, section]);
 	useEffect(() => {
 		if (reader) {
 			if (readerMotion !== undefined) setExitingReader(reader);
@@ -76,8 +85,13 @@ export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen,
 		void action().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not update reading.'))
 			.finally(() => { pending.current = false; setBusy(null); });
 	};
-	const resetList = () => { setVisible(PAGE_SIZE); list.current?.scrollTo({ top: 0 }); };
-	const selectSection = (next: ReadingSection) => { setSection(next); setTag(null); resetList(); };
+	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(section)?.scrollTo({ top: 0 }); };
+	const selectSection = (next: ReadingSection) => {
+		setSection(next); setTag(null);
+		if (renderLibraryContent && next !== section) setVisible(PAGE_SIZE);
+		else resetList();
+	};
+	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(section, content) : content;
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && !!reader}>
@@ -93,10 +107,11 @@ export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen,
 				<div className="crate-reading__sidebar-bottom"><ThemeIcon id="book-open" size="s" aria-hidden="true" /><span>A little space to read.</span></div>
 			</aside>
 			<div className="crate-reading__library" aria-busy={!!busy} inert={readerMotion !== undefined && !!reader}>
+				{renderLibrary(<>
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} titleContent={headerTitleContent} count={items.length} countUnit="saved link" showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{onSettings && <IconButton size="large" iconSize="l" icon="settings" label="Reading settings" onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" disabled={!!busy} onClick={onAdd} />{headerActions}</div>} />
 				<label className="crate-reading__search"><ThemeIcon id="search" size="m" aria-hidden="true" /><input type="search" placeholder="Search your reading" aria-label="Search reading" value={query} onChange={event => { setQuery(event.target.value); resetList(); }} />{query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />}</label>
 				{beforeListContent}
-				<div className="crate-reading__list-scroll" ref={list} tabIndex={-1}>
+				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
 					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={!!busy} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
@@ -112,6 +127,7 @@ export function ReadingLibraryPanel({ renderNavigation, snapshot, onAdd, onOpen,
 					</>}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" disabled={!!busy} onClick={onAdd} animateOnMount={false} />}
+				</>)}
 			</div>
 			<div className="crate-reading__reader-pane" inert={readerMotion !== undefined && !reader} aria-hidden={readerMotion !== undefined && !reader} onTransitionEnd={event => {
 				if (event.target === event.currentTarget && event.propertyName === 'transform' && !reader) { setExitingReader(null); onReaderClosed?.(); }

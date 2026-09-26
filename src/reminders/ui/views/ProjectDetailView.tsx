@@ -22,6 +22,7 @@ export interface ProjectDetailViewProps {
   headerTitleContent?: React.ReactNode;
   headerMetaContent?: React.ReactNode;
   belowHeaderContent?: React.ReactNode;
+  loadingContent?: React.ReactNode;
   reminders: Reminder[];
   onBack: () => void;
   animationConfig?: AnimationConfig;
@@ -51,6 +52,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   headerTitleContent,
   headerMetaContent,
   belowHeaderContent,
+  loadingContent,
   reminders,
   onBack,
   animationConfig = { enabled: true },
@@ -73,7 +75,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
   const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
 
-  const hasContent = active.length > 0 || completed.length > 0;
+  const hasContent = Boolean(loadingContent) || active.length > 0 || completed.length > 0;
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (
@@ -119,7 +121,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         />
       }
     >
-      <ReorderableReminderList
+      {loadingContent ?? <ReorderableReminderList
         reminders={order.displayedOrder}
         onReorder={order.onReorder}
         onReorderCommit={order.onCommit}
@@ -127,7 +129,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         renderCard={cardRenderer}
         interaction={reorderInteraction}
         animationsEnabled={animationConfig.enabled}
-      />
+      />}
     </ReminderListLayout>
   );
 });

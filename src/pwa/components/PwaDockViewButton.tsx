@@ -7,13 +7,14 @@ type Point = { x: number; y: number };
 type Gesture = { pointerId: number; button: HTMLButtonElement; start: Point; choosing: boolean; moved: boolean };
 
 /** Tap selects the remembered view; hold or slide up to choose in one gesture. */
-export function PwaDockViewButton({ label, icon, active, open, disabled, onSelect, onOpen, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
-  label: string; icon: string; active: boolean; open: boolean; disabled: boolean;
+export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, onOpen, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
+  label: string; icon: string; active: boolean; open: boolean; inert: boolean;
   onSelect: () => void; onOpen: () => void;
   onDragStart: () => void; onDragMove: (point: Point) => void;
   onDragEnd: (point: Point, moved: boolean) => void; onDragCancel: () => void;
 }) {
   const description = useId();
+  const initialIcon = useRef(icon);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const suppressClick = useRef(false);
@@ -31,11 +32,11 @@ export function PwaDockViewButton({ label, icon, active, open, disabled, onSelec
     if (choosing) onDragCancel();
   }, [clear, onDragCancel]);
   useEffect(() => {
-    if (disabled) cancel();
+    if (inert) cancel();
     window.addEventListener('blur', cancel);
     document.addEventListener('visibilitychange', cancel);
     return () => { clear(); window.removeEventListener('blur', cancel); document.removeEventListener('visibilitychange', cancel); };
-  }, [cancel, clear, disabled]);
+  }, [cancel, clear, inert]);
   useEffect(() => { if (!open && gesture.current?.choosing) clear(); }, [open, clear]);
   const beginChoosing = () => {
     const current = gesture.current;
@@ -46,12 +47,13 @@ export function PwaDockViewButton({ label, icon, active, open, disabled, onSelec
     suppressClick.current = true;
     onDragStart();
   };
+  // Covered navigation stays painted; inert blocks input without disabled dimming.
   return <>
-    <Button className={`pwa-dock__tab pwa-dock__group${active ? ' is-active' : ''}`} data-dock-group="true" data-dock-switcher="true" data-dock-active={active ? 'true' : undefined} aria-current={active ? 'page' : undefined} aria-label={label} aria-describedby={description} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} title={`${label} · Hold or slide up to switch views`}
+    <Button className={`pwa-dock__tab pwa-dock__group${active ? ' is-active' : ''}`} data-dock-group="true" data-dock-switcher="true" data-dock-active={active ? 'true' : undefined} aria-current={active ? 'page' : undefined} aria-label={label} aria-describedby={description} aria-haspopup="dialog" aria-expanded={open} inert={inert} title={`${label} · Hold or slide up to switch views`}
       onPointerDown={event => {
         cancel();
         suppressClick.current = false;
-        if (!event.isPrimary || event.button !== 0 || disabled) return;
+        if (!event.isPrimary || event.button !== 0 || inert) return;
         const button = event.currentTarget;
         button.setPointerCapture(event.pointerId);
         gesture.current = { pointerId: event.pointerId, button, start: { x: event.clientX, y: event.clientY }, choosing: false, moved: false };
@@ -90,7 +92,7 @@ export function PwaDockViewButton({ label, icon, active, open, disabled, onSelec
         if (event.key === 'ArrowDown' || event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); cancel(); onOpen(); }
         else if (event.key === 'Enter' || event.key === ' ') suppressClick.current = false;
       }}>
-      <ThemeIcon key={icon} id={icon} size="l" className="pwa-dock__view-icon" aria-hidden="true" /><ChevronsUpDown className="pwa-dock__group-hint" size={12} aria-hidden="true" />
+      <ThemeIcon key={icon} id={icon} size="l" className="pwa-dock__view-icon" style={icon === initialIcon.current ? { animation: 'none' } : undefined} aria-hidden="true" /><ChevronsUpDown className="pwa-dock__group-hint" size={12} aria-hidden="true" />
     </Button>
     <span id={description} className="pwa-dock__sr">Tap to open {label}. Hold or slide up, then drag to a view and release to select. Press Down arrow to choose Reading List, Favorites, or Archive.</span>
   </>;

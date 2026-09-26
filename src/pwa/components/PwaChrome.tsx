@@ -1,5 +1,6 @@
 import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
+import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
+import { createPwaOpeningDockHtml } from '../opening-dock';
 import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
@@ -115,7 +117,8 @@ export function PwaPullRefreshIndicator({
 	onRefresh: () => Promise<void>;
 	scrollSelector?: string;
 }) {
-	const pullRefresh = usePullToRefresh(enabled, onRefresh, scrollSelector);
+	const isPresent = useIsPresent();
+	const pullRefresh = usePullToRefresh(enabled && isPresent, onRefresh, scrollSelector);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
 	const label = pullRefresh.refreshing
 		? 'Refreshing'
@@ -154,7 +157,7 @@ export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
 			className={`pwa-launch-splash${updating ? ' is-updating' : ''}`}
 			role="status"
 			aria-label={updating ? 'Updating Crate' : 'Loading Crate'}
-			dangerouslySetInnerHTML={updating ? { __html: PWA_UPDATE_SCREEN_HTML } : undefined}
+			dangerouslySetInnerHTML={{ __html: updating ? PWA_UPDATE_SCREEN_HTML : createPwaOpeningDockHtml() }}
 		/>
 	);
 }

@@ -29,7 +29,6 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
 }) {
   const navigation = useContext(FeatureNavigationContext);
   const container = useRef<HTMLDivElement>(null);
-  const previousTab = useRef(activeTab);
   const [menuHeight, setMenuHeight] = useState(158);
   const measureMenu = useCallback((menu: HTMLDivElement | null) => {
     if (!menu) return;
@@ -83,17 +82,6 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
     return null;
   };
   useEffect(() => { if (inert) closeViews(); }, [inert, closeViews]);
-  useLayoutEffect(() => {
-    const previous = previousTab.current;
-    previousTab.current = activeTab;
-    if (previous === activeTab || inert || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    // Fade the heading and body together, preserving scroll and mounted state.
-    const panel = container.current?.closest('.crate-feature-panel');
-    const content = panel?.querySelector(section === 'reading' ? '.crate-reading__library' : '.pwa-navigation-viewport');
-    if (!content) return;
-    const animation = content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-in-out' });
-    return () => animation.cancel();
-  }, [activeTab, inert, section]);
   return <div ref={container} className={`pwa-dock ${className}`} data-views-open={open ? 'true' : undefined} inert={inert}>
     <Dialog.Root open={open} onOpenChange={value => { if (value) setOpen(true); else closeViews(); }} modal={!dragging}>
       <nav className="pwa-dock__bar" aria-label="Main navigation">
@@ -103,7 +91,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
           if (section === 'reminders') selectLocalTab(item.id);
           else navigation?.navigate({ section: 'reminders', tab: item.id });
         }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button>)}
-        <PwaDockViewButton label={groupItem.label} icon={groupItem.iconName} active={section === 'reading'} open={open} disabled={inert} onSelect={() => selectView(groupItem.id)} onOpen={() => setOpen(true)}
+        <PwaDockViewButton label={groupItem.label} icon={groupItem.iconName} active={section === 'reading'} open={open} inert={inert} onSelect={() => selectView(groupItem.id)} onOpen={() => setOpen(true)}
           onDragStart={() => { setDragging(true); setOpen(true); setPreviewTab(null); }}
           onDragMove={point => setPreviewTab(destinationAt(point))}
           onDragEnd={(point, moved) => {

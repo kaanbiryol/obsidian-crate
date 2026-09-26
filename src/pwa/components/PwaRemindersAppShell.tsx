@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { PwaDock } from './PwaDock';
+import { PwaTabTransition } from './PwaTabTransition';
 import { TABS } from '@/reminders/ui/layoutConstants';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
@@ -12,7 +13,7 @@ import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
-import { PwaRemindersSkeletonRows } from './PwaRemindersOpening';
+import { PwaRemindersSkeletonRows } from './PwaRemindersSkeletonRows';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
 import {
@@ -56,6 +57,7 @@ interface PwaRemindersAppShellProps {
 	incomplete?: boolean;
 	checkingReminders?: boolean;
 	showLoadingSkeleton?: boolean;
+	initializing?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
@@ -87,6 +89,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	incomplete = false,
 	checkingReminders = false,
 	showLoadingSkeleton = false,
+	initializing = false,
 	renderCard,
 	onAdd,
 	onReorder,
@@ -241,6 +244,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
+				data-pwa-opening={initializing || undefined}
+				aria-busy={initializing}
 				className={[
 					'reminders-view',
 					'is-primary',
@@ -253,8 +258,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			>
 				<div className="pwa-navigation-viewport" inert={backgroundInert || Boolean(selectedProject) || closingProject.current}>
 					{/* Keep the Projects list and its scroll position mounted behind detail. */}
-					<PwaNavigationScreen motion={{ direction: 0, reduceMotion }}>
-						<div className="overflow-hidden">
+					<PwaTabTransition viewKey={viewMode}>
+						<div className="overflow-hidden" inert={initializing}>
 							<ViewHeader
 								{...currentHeader}
 								countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
@@ -276,14 +281,14 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						<div className="reminders-content">
 							{showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : viewPanels}
 						</div>
-					</PwaNavigationScreen>
+					</PwaTabTransition>
 				</div>
 
 				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
-					inert={backgroundInert || Boolean(selectedProject) || closingProject.current}
-					onAdd={!suppressFab ? handleAdd : undefined} />
+					inert={initializing || backgroundInert || Boolean(selectedProject) || closingProject.current}
+					onAdd={initializing || !suppressFab ? handleAdd : undefined} />
 
-				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current}>
+				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
 						{selectedProject && <PwaNavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
 							<div className="reminders-content">
@@ -294,6 +299,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									headerRightContent={headerRightContent?.(true)}
 									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
 									reminders={reminders}
+									loadingContent={showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : undefined}
 									onBack={handleBackToProjects}
 									animationConfig={{ enabled: !reduceMotion }}
 									renderCard={panelCardRenderer}

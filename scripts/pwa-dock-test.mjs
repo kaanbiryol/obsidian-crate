@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`PWA dock ${name}: direct switching, motion, capture and compact layouts`, { timeout: 90000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-dock-'));
@@ -13,8 +15,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   try {
     runtime = await openLocalRuntime({ dataDir: dir });
     const vault = await issueLocalDevice(runtime.db, 'Dock test');
+    const reminderFixture = { projects: ['Inbox'], reminders: Array.from({ length: 32 }, (_, index) => ({
+      id: `dock-reminder-${index}`, content: `Dock scroll sample ${index + 1}`, project: 'Inbox',
+      dueDatetime: new Date().toISOString(), priority: 4, completed: false, filePath: 'Reminders/Inbox.md', lineNumber: index + 1,
+    })) };
     server = createServer(async (req, res) => {
       try {
+        // Serve fixtures behind the service worker too; page.route does not intercept its requests.
+        if (new URL(req.url, 'http://localhost').pathname === '/reminders/list') {
+          res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(reminderFixture)); return;
+        }
         const chunks = []; for await (const chunk of req) chunks.push(chunk);
         const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
         res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
@@ -36,6 +46,40 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const geometry = () => dock().locator('.pwa-dock__bar, .pwa-dock__add').evaluateAll(elements => elements.map(el => {
       const { x, y, width, height } = el.getBoundingClientRect(); return { x, y, width, height };
     }));
+    const checkScrollUnderDock = async (selector, screenshot) => {
+      const scroller = page.locator(`.crate-feature-panel[data-active="true"] ${selector}`).filter({ visible: true }).first();
+      const fixtureStyle = await page.addStyleTag({ content: '[data-dock-scroll-fixture] > div { height:72px; margin-bottom:8px; padding:20px; border-radius:16px; background:var(--background-primary-alt); border:1px solid var(--background-modifier-border); color:var(--text-normal); }' });
+      // Populate the real scroll container independently of the feature's empty fixture.
+      await scroller.evaluate(element => {
+        const fixture = document.createElement('div'); fixture.dataset.dockScrollFixture = '';
+        for (let i = 0; i < 30; i++) {
+          const row = document.createElement('div'); row.textContent = `Scroll sample ${i + 1}`;
+          fixture.append(row);
+        }
+        element.append(fixture); element.scrollTop = 450;
+      });
+      try {
+        const geometry = await scroller.evaluate(element => {
+          const panel = element.closest('.crate-feature-panel');
+          const bar = panel.querySelector('.pwa-dock__bar').getBoundingClientRect();
+          const scroll = element.getBoundingClientRect();
+          const hit = document.elementFromPoint(bar.left - 4, bar.top + bar.height / 2);
+          return { bottom: scroll.bottom, panelBottom: panel.getBoundingClientRect().bottom, barTop: bar.top,
+            passesThrough: element.contains(hit), padding: parseFloat(getComputedStyle(element).paddingBottom),
+            clearance: scroll.bottom - bar.top };
+        });
+        assert.ok(Math.abs(geometry.bottom - geometry.panelBottom) < 1, 'List viewport extends behind the dock to the screen bottom');
+        assert.ok(geometry.padding > geometry.clearance, 'End padding clears the dock');
+        assert.equal(geometry.passesThrough, true, 'Space beside the dock passes pointer input to the list');
+        await page.screenshot({ path: screenshot });
+        await scroller.evaluate(element => { element.scrollTop = element.scrollHeight; });
+        const last = await scroller.locator('[data-dock-scroll-fixture] > :last-child').boundingBox();
+        assert.ok(last.y + last.height <= geometry.barTop - 8, 'Last row scrolls fully above the dock');
+      } finally {
+        await scroller.evaluate(element => { element.querySelector('[data-dock-scroll-fixture]').remove(); element.scrollTop = 0; });
+        await fixtureStyle.evaluate(element => element.remove());
+      }
+    };
     const active = async label => {
       await expect(dock().locator('[data-dock-active="true"]')).toHaveAccessibleName(label);
       const icon = { 'Reading List': 'book-open', Favorites: 'star', Archive: 'archive' }[label];
@@ -84,17 +128,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     for (const [index, label] of ['Inbox', 'Today', 'Projects'].entries()) {
       await direct(label);
       await dock().locator('[data-dock-group]').tap(); await closed(); await active('Favorites');
-      const positions = await page.evaluate(async label => {
+      const { positions, coverage } = await page.evaluate(async label => {
         const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
         panel.querySelector(`.pwa-dock [aria-label="${label}"]`).click();
-        const positions = []; const started = performance.now();
+        const positions = [], coverage = []; const started = performance.now();
         while (performance.now() - started < 280) {
           await new Promise(resolve => requestAnimationFrame(resolve));
           const indicators = [...document.querySelectorAll('.crate-feature-panel .pwa-dock__indicator')];
           positions.push(indicators.map(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width));
+          const panels = [...document.querySelectorAll('.crate-feature-panel')];
+          coverage.push(1 - panels.reduce((unpainted, element) => unpainted * (1 - Number(getComputedStyle(element).opacity)), 1));
         }
-        return positions;
+        return { positions, coverage };
       }, label);
+      assert.ok(coverage.every(value => value === 1), 'Section switching must never expose the backdrop');
       assert.ok(positions.some(pair => pair.every(value => value > index + .05 && value < 2.95)), `${name}: fourth-to-${label} must slide: ${JSON.stringify(positions)}`);
       assert.ok(positions.every(pair => Math.abs(pair[0] - pair[1]) < .03), 'Both docks must share one highlight position during the fade');
       assert.ok(positions.at(-1).every(value => Math.abs(value - index) < .01));
@@ -126,50 +173,77 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.ok(interrupted.samples.every((height, i, values) => height >= 60 && (!i || height >= values[i - 1] - .1)), 'Opening must grow without a staged shrink');
     assert.ok(Math.abs(interrupted.before - interrupted.after) < 20, 'Reversing must not jump');
     await closed();
-    // Measure painted opacity, not merely the existence of animation keyframes.
-    // The title and body must share a visible fade while the dock stays solid.
+    // Match the working feature transition: fade the old painted screen over
+    // an opaque incoming screen. A fade-in of replacement content is insufficient.
     const checkScreenFade = async (selector, interruptWith) => {
       const samples = await page.evaluate(async ({ selector, interruptWith }) => {
         const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
-        const screen = panel.querySelector('.pwa-navigation-viewport, .crate-reading__library');
-        const title = screen.querySelector('.view-header-title');
-        const body = screen.querySelector('.reminders-content, .crate-reading__list-scroll');
-        const dock = panel.querySelector('.pwa-dock');
-        const opacity = element => {
-          let result = 1;
-          for (let el = element; el && el !== panel; el = el.parentElement) result *= Number(getComputedStyle(el).opacity);
-          return result;
-        };
+        const container = panel.querySelector('.pwa-tab-transition');
+        let outgoing = container.querySelector('.pwa-tab-panel:not([data-leaving])');
+        const oldTitle = outgoing.querySelector('.view-header-title').textContent;
+        const oldScroll = outgoing.querySelector('.reminders-view-scroll, .crate-reading__list-scroll');
+        if (oldScroll && oldScroll.scrollHeight > oldScroll.clientHeight + 200) oldScroll.scrollTop = 180;
+        const oldScrollTop = oldScroll?.scrollTop;
+        const oldRect = outgoing.getBoundingClientRect();
         const click = target => panel.querySelector(target).click();
         click(selector);
         const samples = []; let started = performance.now();
-        while (performance.now() - started < 380) {
+        while (performance.now() - started < 420) {
           await new Promise(resolve => requestAnimationFrame(resolve));
           if (interruptWith && performance.now() - started > 80) {
+            outgoing = container.querySelector('.pwa-tab-panel:not([data-leaving])');
             click(interruptWith); interruptWith = null; samples.length = 0; started = performance.now();
             continue;
           }
-          const style = getComputedStyle(screen), box = screen.getBoundingClientRect();
-          samples.push({ time: performance.now() - started, title: opacity(title), body: opacity(body), dock: opacity(dock),
-            x: box.x, y: box.y, transform: style.transform, translate: style.translate, scale: style.scale });
+          const layers = [...container.querySelectorAll('.pwa-tab-panel')];
+          const incoming = container.querySelector('.pwa-tab-panel:not([data-leaving])');
+          const style = getComputedStyle(incoming), box = incoming.getBoundingClientRect();
+          samples.push({ time: performance.now() - started,
+            outgoing: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0,
+            retained: outgoing.isConnected, inert: !outgoing.isConnected || outgoing.inert,
+            oldTitle: outgoing.querySelector('.view-header-title').textContent === oldTitle,
+            oldScroll: !outgoing.isConnected || !oldScroll || oldScroll.scrollTop === oldScrollTop,
+            coverage: 1 - layers.reduce((unpainted, el) => unpainted * (1 - Number(getComputedStyle(el).opacity)), 1),
+            incoming: Number(style.opacity), dock: Number(getComputedStyle(panel.querySelector('.pwa-dock')).opacity),
+            x: box.x, y: box.y, oldX: oldRect.x, oldY: oldRect.y,
+            transform: style.transform, translate: style.translate, scale: style.scale,
+            animations: layers.filter(el => el.hasAttribute('data-leaving')).map(el => {
+              const css = getComputedStyle(el); return [css.animationName, css.animationDuration, css.animationTimingFunction];
+            }),
+          });
         }
         return samples;
       }, { selector, interruptWith });
-      assert.ok(samples.some(frame => frame.title < .15 && frame.body < .15), JSON.stringify(samples));
-      const visibleFade = samples.filter(frame => frame.title > .15 && frame.title < .85);
-      assert.ok(visibleFade.length >= 4 && visibleFade.at(-1).time - visibleFade[0].time >= 80, JSON.stringify(samples));
-      assert.ok(samples.every(frame => Math.abs(frame.title - frame.body) < .01 && frame.dock === 1), 'Heading and body must fade together; dock must remain solid');
-      assert.ok(samples.every(frame => frame.x === samples[0].x && frame.y === samples[0].y && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
-      assert.equal(samples.at(-1).title, 1); assert.equal(samples.at(-1).body, 1);
+      const visibleFade = samples.filter(frame => frame.outgoing > .15 && frame.outgoing < .85);
+      assert.ok(visibleFade.length >= 2, JSON.stringify(samples));
+      assert.ok(samples.every(frame => frame.coverage === 1 && frame.incoming === 1 && frame.dock === 1), 'The incoming screen and dock stay opaque; the backdrop never shows through');
+      assert.ok(samples.every(frame => frame.inert), 'Outgoing views cannot receive input');
+      if (!interruptWith) assert.ok(samples.every(frame => frame.oldTitle && frame.oldScroll), 'The outgoing title and scroll position remain painted until the dissolve finishes');
+      assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['crate-mode-fade-out', '0.16s', 'ease-out']))), 'Tabs use the same keyframes, duration, and easing as feature switching');
+      assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
+      assert.equal(samples.at(-1).retained, false);
+      await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
     };
     await checkScreenFade('.pwa-dock [data-tab="projects"]');
     await active('Projects');
     await checkScreenFade('.pwa-dock [data-tab="today"]', '.pwa-dock [data-tab="inbox"]');
     await active('Inbox');
+    for (const tab of ['today', 'projects', 'inbox', 'projects', 'today', 'inbox']) {
+      await checkScreenFade(`.pwa-dock [data-tab="${tab}"]`);
+    }
+    await checkScreenFade('.pwa-dock [data-tab="today"]', '.pwa-dock [data-tab="inbox"]');
+    // Like feature switching, reduced motion retains the stationary dissolve.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await checkScreenFade('.pwa-dock [data-tab="today"]');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await dock().locator('[data-dock-group]').tap(); await closed();
     await openViews();
     await checkScreenFade('[data-dock-destination="archived"]');
     await closed(); await active('Archive');
+    if (process.env.PWA_DOCK_MOTION_ONLY === '1') {
+      assert.deepEqual(errors, []);
+      return;
+    }
     const dragViews = async (input, { immediate = false, ending = 'select' } = {}) => {
       await direct('Today'); await page.mouse.move(-1, -1);
       const start = await center(dock().locator('[data-dock-group]'));
@@ -231,6 +305,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const [reminderBar] = await geometry();
       assert.ok(Math.abs(size.height - reminderBar.y - reminderBar.height - inset) < 1, 'Reminders dock respects the safe area without adding a second gap');
       await page.screenshot({ path: `test-results/dock/${name}-${theme}-${size.width}-closed.png` });
+      await checkScrollUnderDock('.reminders-view-scroll', `test-results/dock/${name}-${theme}-${size.width}-reminders-underlay.png`);
       await openViews();
       assert.equal(await dock().locator('.pwa-dock__surface').evaluate(element => element.getAnimations().length), 0);
       const box = await views.boundingBox();
@@ -242,6 +317,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await expect(dock().locator('.pwa-dock__indicator')).toHaveCSS('transition-duration', '0s');
       await expect(dock().locator('nav > button')).toHaveCount(4);
       assert.ok(await dock().locator('nav > button').evaluateAll(buttons => buttons.every(button => button.getBoundingClientRect().width >= 44)));
+      await checkScrollUnderDock('.crate-reading__list-scroll', `test-results/dock/${name}-${theme}-${size.width}-reading-underlay.png`);
       assert.equal(await page.locator('.crate-reading__library').evaluate(el => el.getAnimations().length), 0);
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await safeArea.evaluate(element => element.remove());
@@ -254,4 +330,46 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await browser?.close(); if (server) await new Promise(resolve => server.close(resolve));
     await runtime?.close(); await rm(dir, { recursive: true, force: true });
   }
+});
+
+
+test('PWA dock indicator settles without repainting', { timeout: 30000 }, async () => {
+  const { server } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
+  await mkdir('test-results/dock', { recursive: true });
+  try {
+    for (const engine of [chromium, webkit]) {
+      const name = engine.name();
+      const browser = await engine.launch();
+      try {
+        const page = await browser.newPage({ viewport: { width: 393, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, colorScheme: 'dark' });
+        await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders`);
+        const dock = () => page.locator('.crate-feature-panel[data-active="true"] .pwa-dock');
+        // DOM bounds miss a fractional-pixel repaint when a transform stops being
+        // composited. Compare the final animated frame with the settled pixels.
+        await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
+        await expect(dock().locator('.pwa-dock__indicator')).toBeVisible();
+        await expect(dock().getByRole('button', { name: 'Projects', exact: true })).toBeVisible();
+        for (const label of ['Projects', 'Today', 'Inbox']) {
+          const animation = await dock().evaluateHandle(async (element, label) => {
+            element.querySelector(`[aria-label="${label}"]`).click();
+            await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+            const slide = element.querySelector('.pwa-dock__indicator').getAnimations().find(animation => animation.transitionProperty === 'transform');
+            if (!slide) throw new Error('Expected a sliding tab indicator');
+            slide.pause(); slide.currentTime = Number(slide.effect.getTiming().duration) - .001;
+            return slide;
+          }, label);
+          // Let the independent screen fade finish while the slide stays paused.
+          await page.waitForTimeout(350);
+          const bar = await dock().locator('.pwa-dock__bar').boundingBox();
+          const clip = { x: Math.floor(bar.x), y: Math.floor(bar.y), width: Math.ceil(bar.width), height: Math.ceil(bar.height) };
+          const moving = await page.screenshot({ clip, path: `test-results/dock/${name}-${label}-moving.png` });
+          await animation.evaluate(slide => slide.finish());
+          await page.waitForTimeout(100);
+          const settled = await page.screenshot({ clip, path: `test-results/dock/${name}-${label}-settled.png` });
+          assert.ok(moving.equals(settled), `${name}: ${label} highlight must not snap when the slide finishes`);
+          await animation.dispose();
+        }
+      } finally { await browser.close(); }
+    }
+  } finally { await new Promise(resolve => server.close(resolve)); }
 });
