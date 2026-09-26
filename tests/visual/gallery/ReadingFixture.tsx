@@ -57,7 +57,7 @@ const reading = ['one good thing', 'another'];
 
 export function ReadingFixture({ onAdd }: { onAdd: () => void }) {
 	const immediateReaderReturn = new URLSearchParams(location.search).has('reading-back');
-	const [items, setItems] = useState(() => new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : initial);
+	const [items, setItems] = useState(() => new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [title, setTitle] = useState('');
 	const update = async (item: ReadingItem, changes: Partial<ReadingItem>) => { setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };

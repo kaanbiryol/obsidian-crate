@@ -1,10 +1,12 @@
 import React, { forwardRef } from 'react';
 import { Button as BaseButton } from '@base-ui/react/button';
 
-type NativeButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> & {
-	onClick?: () => void;
+type NativeButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
 	preventFocusOnPress?: boolean;
-	variant?: 'outline' | 'primary';
+	// Omit variant only for controls with their own presentation (tabs, rows, icons).
+	variant?: 'outline' | 'primary' | 'ghost';
+	tone?: 'neutral' | 'danger';
+	size?: 'compact' | 'touch';
 	children: React.ReactNode;
 };
 
@@ -16,13 +18,15 @@ export const Button = forwardRef<HTMLButtonElement, NativeButtonProps>(function 
 	children,
 	className,
 	variant,
+	tone,
+	size,
 	style,
 	type = 'button',
 	...props
 }, ref) {
 	return (
 		<BaseButton
-			ref={ref} onClick={onClick} className={[variant && 'crate-action-button', className].filter(Boolean).join(' ') || undefined} data-variant={variant} style={style} type={type} {...props}
+			ref={ref} onClick={onClick} className={[variant && 'crate-action-button', className].filter(Boolean).join(' ') || undefined} data-variant={variant} data-tone={tone} data-size={size} style={style} type={type} {...props}
 			onMouseDown={(event) => {
 				if (preventFocusOnPress) event.preventDefault();
 				onMouseDown?.(event);

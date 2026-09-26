@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton as BaseButton } from './PwaButton';
 import React, { useState } from 'react';
 import { discardReviewedReminderDraft, type inspectReminderDraft } from '../reminder-drafts';
 import { ReminderQuarantineNotice } from './ReminderQuarantineNotice';

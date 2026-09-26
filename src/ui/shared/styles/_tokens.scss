@@ -32,6 +32,11 @@
   --crate-radius-button: var(--button-radius, var(--crate-radius-control));
   --crate-radius-sheet: var(--modal-radius, var(--radius-l, 12px));
   --crate-radius-icon: var(--clickable-icon-radius, var(--crate-radius-control));
+  // Standard actions share the quiet Sync vault treatment in both hosts.
+  --crate-action-radius: var(--input-radius, var(--radius-s, 4px));
+  --crate-action-font-size: var(--font-ui-smaller, 12px);
+  --crate-action-border: var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent));
+  --crate-action-text: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
   --crate-icon-button-size: var(--clickable-icon-size, var(--input-height, 36px));
   --crate-view-title-size: var(--reminder-font-title);
   --crate-view-title-weight: var(--reminder-font-weight-semibold);

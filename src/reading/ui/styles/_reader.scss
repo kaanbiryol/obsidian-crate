@@ -35,7 +35,6 @@
 	&__end { text-align: center; padding-top: 42px; color: var(--text-muted); font-size: 12px; }
 	&__end > span { font-size: 22px; color: var(--text-faint, var(--text-muted)); }
 	&__end p { margin: 12px 0 18px; }
-	&__end button { font-size: 13px; }
 }
 .crate-reminders-ui .crate-reading {
 	.crate-reading-reader__preferences { display: grid; gap: 14px; }

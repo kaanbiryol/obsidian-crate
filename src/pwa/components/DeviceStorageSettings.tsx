@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton as BaseButton } from './PwaButton';
 import React, { useEffect, useState } from 'react';
 import { browserStorageStatus, type BrowserStorageStatus } from '../browser-storage';
 

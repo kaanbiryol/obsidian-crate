@@ -8,19 +8,60 @@
   white-space: nowrap;
   padding: 0 8px;
   flex-shrink: 0;
-  border: 1px solid var(--crate-choice-border, color-mix(in srgb, var(--background-modifier-border) 90%, transparent)) !important;
-  border-radius: var(--input-radius, var(--radius-s, 4px));
+  border: 1px solid var(--crate-action-border) !important;
+  border-radius: var(--crate-action-radius);
   background: transparent;
   box-shadow: none;
-  color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
-  font-size: var(--font-ui-smaller, 12px);
+  color: var(--crate-action-text);
+  font-family: var(--font-interface, system-ui, sans-serif);
+  font-size: var(--crate-action-font-size);
   font-weight: 400;
+  line-height: 1.2;
+  touch-action: manipulation;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
   &:not(:disabled) {
     cursor: pointer;
-    &:hover { background: var(--crate-control-hover-bg); }
+    @media (hover: hover) { &:hover { background: var(--crate-control-hover-bg); } }
     &:active { background: var(--crate-control-active-bg); }
   }
-  &:disabled { background: transparent; cursor: default; opacity: 0.5; }
+  &:disabled { cursor: default; opacity: 0.5; }
   &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+// Text actions use compact desktop geometry and comfortable touch targets.
+// Imperative plugin actions can continue to use styles without changing layout.
+@mixin control {
+  @include styles;
+  height: auto;
+  gap: 6px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-decoration: none;
+  svg { flex-shrink: 0; }
+
+  &[data-size="touch"] { min-height: 44px; min-width: 44px; padding: 10px 12px; }
+  // A narrow desktop pane still uses compact controls. Size for input capability,
+  // not viewport width, so the gallery and Obsidian sidebars match Sync vault.
+  @media (pointer: coarse) {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 12px;
+  }
+  &[data-variant="ghost"] { border-color: transparent !important; }
+  &[data-tone="danger"] { color: var(--crate-danger); }
+  &[data-variant="primary"] {
+    color: var(--crate-on-accent);
+    background: var(--crate-accent);
+    border-color: transparent !important;
+    @media (hover: hover) { &:hover:not(:disabled) { background: var(--crate-accent-hover); } }
+    &:active:not(:disabled) { background: var(--crate-accent-hover); }
+    &[data-tone="danger"] {
+      background: var(--crate-danger);
+      &:active:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+      @media (hover: hover) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }
+    }
+  }
 }

@@ -11,9 +11,7 @@
 @media (hover: none) {
   .crate-reminders-ui .crate-icon-button[data-variant="ghost"][data-tone="neutral"]:hover { color: var(--text-muted); }
   .crate-reminders-ui .pwa-sync-indicator__button:hover { background: transparent; }
-  .crate-reminders-ui :is(.crate-action-button, .pwa-sync-indicator__button):not(:disabled):active { opacity: .5; }
-  .crate-reminders-ui .crate-action-button[data-variant="outline"]:not(:disabled):hover { background: transparent; }
-  .crate-reminders-ui .crate-action-button[data-variant="primary"]:not(:disabled):hover { background: var(--crate-picker-primary-bg); }
+  .crate-reminders-ui .pwa-sync-indicator__button:not(:disabled):active { opacity: .5; }
 }
 // A modal makes the source screen inert; it must not retain pressed feedback.
 .crate-reminders-ui [inert] .crate-icon-button:not(:disabled):active { opacity: 1; }

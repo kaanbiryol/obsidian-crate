@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton as BaseButton } from './PwaButton';
 import React from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import { ExpiredReminderChangeActions } from './ExpiredReminderChangeActions';
@@ -47,7 +47,7 @@ export function ReminderSyncNotice({
 						<span role="status">{storageError}</span>
 					</div>
 					{onRetryInitialization && <div className="pwa-reminder-sync-error__actions">
-						<BaseButton type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</BaseButton>
+						<BaseButton variant="ghost" size="touch" type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</BaseButton>
 					</div>}
 				</section>
 			)}
@@ -72,10 +72,10 @@ export function ReminderSyncNotice({
 						</div>
 						<div className="pwa-reminder-sync-error__actions">
 							{change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
-							<BaseButton type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</BaseButton>
-							{failedSave && <BaseButton type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</BaseButton>}
+							<BaseButton variant="ghost" size="touch" type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</BaseButton>
+							{failedSave && <BaseButton variant="ghost" size="touch" type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</BaseButton>}
 							{change.status === 'failed' && (
-								<BaseButton type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
+								<BaseButton variant="ghost" size="touch" type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
 									{failedSave ? 'Discard' : 'Dismiss'}
 								</BaseButton>
 							)}

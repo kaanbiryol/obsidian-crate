@@ -3,19 +3,7 @@
 @mixin styles {
   .crate-view-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
   .crate-action-button {
-    @include action.styles;
-    min-height: 44px;
-    height: auto;
-    padding: 8px 14px;
-    gap: 8px;
-    font-size: var(--reminder-font-base);
-
-    &[data-variant="primary"] {
-      color: var(--crate-picker-primary-color);
-      background: var(--crate-picker-primary-bg);
-      border-color: transparent !important;
-      &:hover:not(:disabled) { background: var(--crate-accent-hover); }
-    }
+    @include action.control;
   }
   .completed-section-panel {
     height: var(--collapsible-panel-height);

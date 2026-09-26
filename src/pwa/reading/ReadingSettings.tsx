@@ -30,6 +30,6 @@ export function ReadingSettings({ pending, onShortcut, onRefresh, onExport, onUp
 			</div>
 		</section>
 		<VersionSettings />
-		<PwaButton className="settings-logout-button" onClick={onLogout}><ThemeIcon id="log-out" size="s" aria-hidden="true" />Log out and clear device data</PwaButton>
+		<PwaButton variant="ghost" tone="danger" className="settings-logout-button" onClick={onLogout}><ThemeIcon id="log-out" size="s" aria-hidden="true" />Log out and clear device data</PwaButton>
 	</>;
 }
