@@ -1,10 +1,12 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/35513593114",
   "additionalSources": {
+    "scripts/pwa-ios27-header-test.mjs": "local chromium/webkit run on 2026-09-26: 6.42 seconds",
     "scripts/pwa-dock-test.mjs": "local chromium/webkit run on 2026-09-26: 21 seconds",
     "scripts/pwa-feature-switcher-test.mjs": "local chromium/webkit run on 2026-09-22: 6.78 seconds"
   },
   "seconds": {
+    "scripts/pwa-ios27-header-test.mjs": 6.42,
     "scripts/pwa-dock-test.mjs": 21,
     "scripts/react-shadow-dom-test.mjs": 5,
     "scripts/base-ui-plugin-test.mjs": 40,
