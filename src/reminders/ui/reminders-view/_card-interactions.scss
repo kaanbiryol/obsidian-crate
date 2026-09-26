@@ -44,7 +44,7 @@
     }
 
     .premium-reminder-card:active .premium-reminder-content,
-    .premium-project-card:active .premium-project-content {
+    .premium-project-card:is([data-pressed], :focus-visible:active) .premium-project-content {
         transform: none;
         background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
         border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));

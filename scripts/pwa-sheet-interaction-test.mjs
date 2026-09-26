@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { checkNativeEditorGestures } from './pwa-editor-gesture-checks.mjs';
+import { checkCheckboxHoverAfterDismissal } from './pwa-checkbox-hover-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
@@ -74,6 +75,7 @@ try {
 	for (const browserType of [chromium, webkit]) {
 		const browser = await browserType.launch();
 		try {
+			await checkCheckboxHoverAfterDismissal(browser, origin);
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
 			// Exercise the library's iOS platform branch even in desktop WebKit.
 			await page.addInitScript(() => {
