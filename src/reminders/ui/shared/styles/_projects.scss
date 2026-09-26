@@ -163,12 +163,21 @@
     transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
-.premium-project-card:hover .premium-project-content {
-    background: var(--crate-control-hover-bg);
-    border-color: var(--crate-divider-strong);
+// Touch browsers retain :hover after a scroll or release. Reserve it for real
+// hover pointers; touch feedback follows the current press instead.
+@media (hover: hover) and (pointer: fine) {
+    .premium-project-card:hover .premium-project-content {
+        background: var(--crate-project-card-hover-bg, var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg)));
+        border-color: var(--crate-project-card-hover-border, var(--crate-reminder-card-hover-border, var(--crate-divider-strong)));
+    }
+
+    .premium-project-card:hover .premium-project-chevron {
+        opacity: 0.7;
+        transform: translateX(2px);
+    }
 }
 
-.premium-project-card:active .premium-project-content {
+.premium-project-card:is([data-pressed], :focus-visible:active) .premium-project-content {
     transform: scale(0.98);
 }
 
@@ -189,10 +198,6 @@
     height: 32px;
     border-radius: 2px;
     transition: box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
-}
-
-.premium-project-card:hover .premium-project-accent {
-    box-shadow: none;
 }
 
 .premium-project-info {
@@ -298,11 +303,6 @@
     color: var(--text-faint);
     opacity: 0.4;
     transition: opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
-}
-
-.premium-project-card:hover .premium-project-chevron {
-    opacity: 0.7;
-    transform: translateX(2px);
 }
 
 }

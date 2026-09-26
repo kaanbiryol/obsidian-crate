@@ -3,6 +3,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
+import { checkProjectMouseFeedback, checkProjectTouchFeedback } from './pwa-project-touch-checks.mjs';
 
 const assets = await buildPwaPreviewAssets();
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
@@ -25,11 +26,17 @@ try {
       const fullHeight = await children.evaluate(element => element.getBoundingClientRect().height);
       for (const colorScheme of ['dark', 'light']) {
         await page.emulateMedia({ colorScheme });
+        await checkProjectTouchFeedback(page);
+        await expect(disclosure.locator('svg[data-icon="chevron-down"]')).toBeVisible();
         await disclosure.tap();
         await expect(children).toBeHidden();
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+        await expect(disclosure.locator('svg[data-icon="chevron-right"]')).toBeVisible();
         assert.equal(await disclosure.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Touch release must clear disclosure feedback');
         await disclosure.tap();
         await expect.poll(() => children.evaluate(element => element.getBoundingClientRect().height)).toBe(fullHeight);
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+        await expect(disclosure.locator('svg[data-icon="chevron-down"]')).toBeVisible();
         assert.equal(await disclosure.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Expanded disclosure must not stay highlighted');
       }
       await page.emulateMedia({ colorScheme: 'dark' });
@@ -178,6 +185,8 @@ try {
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
       await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert', '');
       console.log(`${type.name()}: project overlay, back navigation, and edge gesture passed`);
+      await checkProjectMouseFeedback(browser, `http://127.0.0.1:${server.address().port}`);
+      console.log(`${type.name()}: project touch hover and mouse feedback passed in both themes`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

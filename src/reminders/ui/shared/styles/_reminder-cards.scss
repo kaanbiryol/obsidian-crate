@@ -116,9 +116,13 @@
     justify-content: center;
     cursor: pointer;
 
-    &:hover .premium-checkbox-visual {
-        border-color: var(--checkbox-border-color-hover, var(--text-muted));
-        transform: scale(1.05);
+    // Touch WebKit can transfer sticky hover from a dismissed sheet to the
+    // checkbox underneath it. Only a real hover pointer should brighten it.
+    @media (hover: hover) and (pointer: fine) {
+        &:hover .premium-checkbox-visual {
+            border-color: var(--checkbox-border-color-hover, var(--text-muted));
+            transform: scale(1.05);
+        }
     }
 
     &:active .premium-checkbox-visual {
@@ -139,9 +143,11 @@
         background: var(--checkbox-color, var(--interactive-accent));
         box-shadow: var(--crate-checkbox-checked-shadow, none);
 
-        &:hover {
-            border-color: var(--checkbox-color-hover, var(--interactive-accent-hover));
-            background: var(--checkbox-color-hover, var(--interactive-accent-hover));
+        @media (hover: hover) and (pointer: fine) {
+            &:hover {
+                border-color: var(--checkbox-color-hover, var(--interactive-accent-hover));
+                background: var(--checkbox-color-hover, var(--interactive-accent-hover));
+            }
         }
     }
 
