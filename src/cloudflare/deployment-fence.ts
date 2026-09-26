@@ -148,7 +148,11 @@ export async function withDeploymentFence<T>(input: {
 				: "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
 			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]))
 			.flatMap(result => result.results ?? []);
-	} catch {
+	} catch (error) {
+		// A definite rejection (quota, permissions, or invalid SQL) did not
+		// acquire ownership. Preserve the provider's actionable error instead
+		// of sending users to recovery for a lock that was never created.
+		if (error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) throw error;
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 	}
 	if (acquired.length !== 1 || acquired[0]?.value !== value) {
