@@ -16,7 +16,6 @@ export function ReadingOpening() {
 		/>
 		<div className="pwa-reading-opening__search pwa-mode-opening__shape" aria-hidden="true" />
 		<div className="pwa-mode-opening__content"><ReadingListSkeleton /></div>
-		<span className="pwa-mode-opening__fab pwa-mode-opening__shape" aria-hidden="true" />
-		<div className="pwa-mode-opening__nav" aria-hidden="true">{Array.from({ length: 3 }, (_, index) => <span className="pwa-mode-opening__nav-item" key={index}><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /><span className="pwa-mode-opening__nav-label pwa-mode-opening__shape" /></span>)}</div>
+		<div className="pwa-dock pwa-dock--opening" aria-hidden="true"><div className="pwa-dock__bar"><span className="pwa-dock__surface" />{Array.from({ length: 4 }, (_, index) => <span key={index} className="pwa-dock__tab"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span>)}</div><span className="pwa-dock__add"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span></div>
 	</main>;
 }

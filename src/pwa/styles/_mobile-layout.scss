@@ -8,14 +8,14 @@
       --reminder-font-xxs: 13px;
     }
 
-    .pwa-reminders-view.is-primary, &.pwa-reading-root, &.reading-gallery {
+    .pwa-reminders-view.is-primary, .pwa-reminders-opening, &.pwa-reading-root, &.reading-gallery {
       --reminder-font-base: 16px;
       --reminder-font-sm: 15px;
       --reminder-font-xs: 14px;
       --reminder-font-xxs: 13px;
-      --reminder-font-title: 32px;
-      --crate-view-title-size: 32px;
-      --crate-view-title-spacing: -.035em;
+      --reminder-font-title: 26px;
+      --crate-view-title-size: 26px;
+      --crate-view-title-spacing: -.03em;
       --crate-radius-card: 16px;
       --checkbox-size: 22px;
       --icon-l: 24px;
@@ -27,8 +27,10 @@
       }
 
       .view-header-meta {
-        margin-top: 6px;
+        margin-top: var(--pwa-header-meta-gap);
       }
+
+      .view-header-overdue { padding: 1px 6px; font-size: 12px; line-height: 16px; }
 
       .premium-back-button {
         margin: 8px 16px 4px;

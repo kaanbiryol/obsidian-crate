@@ -17,24 +17,12 @@
 // Keep both modes in the paint tree so iOS can animate a previously inactive
 // panel. The outgoing panel stays above the new one: its fade remains visible
 // even if WebKit skips the incoming animation on a Home Screen app.
-.crate-feature-panel[data-entering="true"] { animation: crate-mode-fade-in 200ms ease both; }
-.crate-feature-panel[data-leaving="true"] { z-index: 3; animation: crate-mode-fade-out 200ms ease both; }
+.crate-feature-panel[data-entering="true"] { animation: crate-mode-fade-in 280ms ease-in-out both; }
+.crate-feature-panel[data-leaving="true"] { z-index: 3; animation: crate-mode-fade-out 280ms ease-in-out both; }
 @keyframes crate-mode-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes crate-mode-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
-// Only the scrolling content gets depth. Headers, switch buttons, FABs, and
-// bottom-bar surfaces stay in the same place while the panels crossfade.
-.crate-feature-panel :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) {
-	scale: 1.015;
-	transition: scale 200ms cubic-bezier(.2, .8, .2, 1);
-}
-.crate-feature-panel[data-leaving="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { scale: .985; }
-.crate-feature-panel[data-active="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { scale: 1; }
-// The destination may mount for the first time (especially when launched in
-// Reading). Keyframes give its new content a starting scale on that first visit.
-.crate-feature-panel[data-entering="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { animation: crate-mode-content-enter 200ms cubic-bezier(.2, .8, .2, 1); }
-@keyframes crate-mode-content-enter { from { scale: 1.015; } to { scale: 1; } }
-
+// Screen changes are a stationary dissolve; content keeps its scroll and geometry.
 .crate-feature-panel .pwa-feature-switch-button {
 	background: transparent;
 	border-color: transparent;
@@ -42,12 +30,7 @@
 	transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
 }
 .crate-feature-panel .pwa-feature-switch-button:active { transform: scale(.92); }
-.crate-feature-panel .pwa-feature-switch-button svg {
-	opacity: .4;
-	transform: rotate(-10deg) scale(.86);
-	transition: opacity 160ms ease, transform 200ms cubic-bezier(.2, .8, .2, 1);
-}
-.crate-feature-panel[data-active="true"] .pwa-feature-switch-button svg { opacity: 1; transform: rotate(0) scale(1); transition-delay: 20ms; }
+
 
 
 .pwa-mode-opening {
@@ -67,8 +50,8 @@
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: 10px;
-	min-height: 80px;
-	padding: calc(var(--pwa-safe-area-top) + 17px) 18px 11px;
+	min-height: 0;
+	padding: calc(var(--pwa-safe-area-top) + var(--pwa-header-top-gap)) 18px var(--pwa-header-bottom-gap);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 .pwa-mode-opening__heading { min-width: 0; }
@@ -97,13 +80,9 @@
 @media (min-width: 760px) { .pwa-mode-opening__fab { width: 48px; height: 48px; } }
 
 @media (prefers-reduced-motion: reduce) {
-	.crate-feature-panel :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content),
 	.crate-feature-panel .pwa-feature-switch-button,
 	.crate-feature-panel .pwa-feature-switch-button svg { transition: none; }
 	.crate-feature-panel .pwa-feature-switch-button { animation: none; }
-	.crate-feature-panel[data-entering="true"] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { animation: none; }
-	.crate-feature-panel[data-active] :is(.reminders-content, .crate-reading__search, .crate-reading__list-scroll, .pwa-mode-opening__content) { scale: none; }
-	.crate-feature-panel[data-active] .pwa-feature-switch-button svg { transform: none; }
 	.crate-feature-panel .pwa-feature-switch-button:active { transform: none; }
 	.pwa-mode-opening__shape { animation: none; }
 }

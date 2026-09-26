@@ -1,0 +1,13 @@
+.crate-reminders-ui {
+  --pwa-motion-surface-duration: 420ms;
+  --pwa-motion-navigation-duration: 380ms;
+  --pwa-motion-surface-ease: cubic-bezier(.2, .8, .2, 1);
+}
+// Sampled critically damped response, normalized at 420ms. CSS-owned surfaces
+// retain Base UI's gesture/lifecycle handling and reverse from their current
+// position. Motion-owned surfaces use a physical spring (pwa/motion.ts).
+@supports (transition-timing-function: linear(0, 1)) {
+  .crate-reminders-ui {
+    --pwa-motion-surface-ease: linear(0, .0756, .2281, .3917, .5383, .6587, .7527, .8236, .8757, .9134, .9403, .9592, .9724, .9816, .9879, .9922, .9951, .9971, .9985, .9994, 1);
+  }
+}

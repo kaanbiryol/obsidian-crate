@@ -20,6 +20,23 @@ try {
 			page.on('pageerror', error => errors.push(error.message));
 			await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 			const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+			await page.getByRole('button', { name: 'Open settings', exact: true }).waitFor();
+			const interrupted = await page.evaluate(async () => {
+				document.querySelector('[aria-label="Open settings"]').click();
+				let sheet;
+				while (!(sheet = document.querySelector('.pwa-modal-sheet__container'))) await new Promise(resolve => requestAnimationFrame(resolve));
+				await new Promise(resolve => setTimeout(resolve, 80));
+				const y = () => new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42;
+				const before = y(), height = sheet.getBoundingClientRect().height;
+				sheet.querySelector('[aria-label="Close settings"]').click();
+				await new Promise(resolve => requestAnimationFrame(resolve));
+				const after = y();
+				return { before, after, height };
+			});
+			assert.ok(interrupted.before > 1 && interrupted.before < interrupted.height - 1, JSON.stringify(interrupted));
+			assert.ok(Math.abs(interrupted.after - interrupted.before) < interrupted.height * .15, 'Closing during entrance must start at the painted position');
+			await expect(settings).toHaveCount(0);
+			await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
 			await page.getByRole('button', { name: 'Open settings', exact: true }).tap();
 			await expect(settings).toHaveCSS('transform', 'none');
 			await swipe(page, settings.getByRole('heading', { name: 'Settings', exact: true }), 16, 400);

@@ -1,0 +1,79 @@
+.crate-reminders-ui {
+  .pwa-dock {
+    --dock-surface: color-mix(in srgb, var(--background-primary-alt) 88%, transparent);
+    --dock-bottom-inset: max(10px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)));
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 10px;
+    padding: 10px 16px var(--dock-bottom-inset);
+    color: var(--text-normal);
+    z-index: 5;
+  }
+  .pwa-dock__surface, .pwa-dock__add {
+    background: var(--dock-surface);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-normal) 5%, transparent), 0 4px 20px #00000012;
+    backdrop-filter: blur(28px) saturate(1.15);
+    -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  }
+  .pwa-dock__surface { background-image: linear-gradient(135deg, color-mix(in srgb, var(--text-normal) 5%, transparent), transparent 45%); }
+  .pwa-dock__bar { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; height: 60px; padding: 4px; border: 1px solid transparent; border-radius: 32px; }
+  // One persistent surface grows upward into the picker without shifting content.
+  .pwa-dock__surface { position: absolute; left: -1px; right: -1px; bottom: -1px; height: 60px; border-radius: 32px; pointer-events: none; transform-origin: bottom right; }
+  .pwa-dock__tab { display: flex; align-items: center; justify-content: center; flex: 1; gap: 5px; min-width: 44px; position: relative; z-index: 1; height: 50px; padding: 0; border: 0; border-radius: 26px; box-shadow: none; background: transparent; color: var(--text-muted); touch-action: manipulation; }
+  .pwa-dock__tab { transition: opacity 140ms ease 80ms; }
+  .pwa-dock[data-views-open="true"] .pwa-dock__tab { opacity: 0; pointer-events: none; transition-delay: 0ms; }
+  .pwa-dock[data-views-open="true"] .pwa-dock__indicator { opacity: 0; }
+  .pwa-dock__tab > svg:first-child { width: 23px; height: 23px; }
+  .pwa-dock__tab.is-active { color: var(--text-normal); }
+  .pwa-dock__indicator { position: absolute; left: 4px; top: 4px; height: 50px; border-radius: 26px; background: color-mix(in srgb, var(--text-normal) 9%, transparent); pointer-events: none; transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 140ms ease; }
+  .pwa-dock__group { gap: 4px; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  .pwa-dock__view-icon { animation: pwa-dock-icon-in 160ms ease-out; }
+  @keyframes pwa-dock-icon-in { from { opacity: .25; } to { opacity: 1; } }
+  .pwa-dock__group-hint { flex: 0 0 12px; color: var(--text-muted); }
+  .pwa-dock__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .pwa-dock__add { display: flex; flex: 0 0 60px; align-items: center; justify-content: center; height: 60px; padding: 0; border-radius: 50%; color: var(--text-normal); touch-action: manipulation; }
+  .pwa-dock__add > svg { width: 25px; height: 25px; }
+  .pwa-dock__add:disabled { opacity: .4; }
+  // An absolute portal keeps the menu out of the dock's flex layout.
+  .pwa-dock__portal { position: absolute; inset: 0; pointer-events: none; }
+  .pwa-dock__portal > * { pointer-events: auto; }
+  .pwa-dock__backdrop { position: fixed; inset: 0; z-index: 19; background: transparent; }
+  .pwa-dock__menu { position: absolute; z-index: 20; left: 16px; right: 86px; bottom: var(--dock-bottom-inset); max-height: calc(100dvh - var(--pwa-safe-area-top, 0px) - var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) - 32px); overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid transparent; border-radius: 28px; background: transparent; transition: opacity 160ms ease 70ms; }
+  .pwa-dock__menu[data-starting-style], .pwa-dock__menu[data-ending-style] { opacity: 0; }
+  .pwa-dock__menu[data-dragging="true"] { user-select: none; -webkit-user-select: none; }
+  .pwa-dock__destination { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 22px; background: transparent; color: var(--text-normal); box-shadow: none; text-align: left; font-size: 15px; touch-action: manipulation; }
+  .pwa-dock__destination > span { flex: 1; }
+  .pwa-dock__menu[data-ending-style] { transition-delay: 0ms; }
+  .pwa-dock__destination[aria-current="page"] { background: color-mix(in srgb, var(--text-normal) 9%, transparent); }
+  .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination { background: transparent; }
+  .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination[data-preview="true"] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
+  .pwa-dock :is(button):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+  .pwa-dock :is(button):active { opacity: .65; }
+  @media (hover: hover) { .pwa-dock :is(button):hover { background-color: color-mix(in srgb, var(--text-normal) 7%, transparent); } }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .pwa-dock__surface, .pwa-dock__add { background: var(--background-primary-alt); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pwa-dock__view-icon { animation: none; } .pwa-dock__surface, .pwa-dock__tab, .pwa-dock__indicator, .pwa-dock__menu { transition: none; } }
+}
+// Desktop Reading retains its sidebar; compact layouts use the PWA dock adapter.
+.crate-reminders-ui .pwa-dock.crate-reading__mobile-nav { display: none; }
+@container reading (max-width: 1099px) {
+  .crate-reminders-ui .pwa-dock.crate-reading__mobile-nav { display: flex; padding-bottom: var(--dock-bottom-inset); }
+  .crate-reminders-ui .crate-reading__header .pwa-feature-switch-button { display: none; }
+}
+.crate-reminders-ui.pwa-reading-root .crate-reading__sidebar:has(.pwa-dock) { overflow: visible; z-index: 1; }
+
+@media (max-width: 1099px) { .crate-reminders-ui .pwa-reading-opening .pwa-feature-switch-button { display: none; } }
+
+
+@media (max-width: 360px) {
+  .crate-reminders-ui .pwa-dock { padding-inline: 12px; gap: 8px; }
+  .crate-reminders-ui .pwa-dock__add { flex-basis: 52px; height: 52px; }
+  .crate-reminders-ui .pwa-dock__menu { left: 12px; right: 72px; }
+}
