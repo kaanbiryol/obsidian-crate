@@ -5,9 +5,10 @@ export const bundleBudgets = {
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
 		// Reading includes the local library, safe reader and compressed server extraction:
 		// about 3.16 MB raw / 1.67 MB gzip, including Defuddle's full Markdown bundle.
-		// Defuddle/DOM code runs only on the server.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3250000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1720000', 10),
+		// Defuddle/DOM code runs only on the server. In-app backup restore adds
+		// about 40 KB raw / 9 KB gzip; the combined plugin is about 3.29 MB / 1.72 MB.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3300000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1725000', 10),
 	},
 	{
 		path: 'dist/styles.css',

@@ -1,3 +1,4 @@
+import { validRestoreState } from '../cloudflare/restore/state';
 import { normalizeVaultName } from '../cloudflare/vault-name';
 import { normalizeReadingSettings } from '../reading/settings';
 import { normalizeSyncTimings } from '../sync/timings';
@@ -218,6 +219,7 @@ export function normalizeCrateSettings(
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
+		cloudflareRestore: validRestoreState(value?.cloudflareRestore) ? structuredClone(value.cloudflareRestore) : null,
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
 		deviceId: DEFAULT_SETTINGS.deviceId,

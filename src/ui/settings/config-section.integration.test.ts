@@ -10,6 +10,7 @@ import {
 const openConfirmationModal = vi.fn();
 const startCloudflareDeployment = vi.fn();
 const checkAndRecoverUpdate = vi.fn();
+const openServerRestore = vi.fn();
 const openExternalBrowserModal = vi.fn();
 const embeddedArtifact = {
 	version: '0.1.0',
@@ -23,6 +24,7 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadConfigSectionModule(mobile = false) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
+	vi.doMock('../../cloudflare/restore/ui', () => ({ openServerRestore }));
 	vi.doMock('../../cloudflare/deployment-recovery-ui', () => ({ checkAndRecoverUpdate }));
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
 	vi.doMock('../../cloudflare/embedded-artifacts', () => ({
@@ -55,6 +57,7 @@ afterEach(() => {
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../cloudflare/plugin-integration');
 	vi.doUnmock('../../cloudflare/deployment-recovery-ui');
+	vi.doUnmock('../../cloudflare/restore/ui');
 	vi.doUnmock('../../cloudflare/embedded-artifacts');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../external-browser-modal');
@@ -126,7 +129,7 @@ describe('renderConfigSection integration', () => {
 			syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false },
 		};
 		renderConfigSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect']);
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect', 'Server backup recovery']);
 		const reconnect = getSettingByName('Reconnect');
 		expect(reconnect.descEl.textContent).toContain('using your saved Cloudflare login');
 		reconnect.buttons[0]!.click();
@@ -371,4 +374,13 @@ it('offers one Cloudflare reconnect action even while configured', async () => {
 	reconnect.buttons[0]!.click();
 	await flushMicrotasks();
 	expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin, 'reconnect');
+});
+
+it.each([undefined, 'copying', 'complete'])('offers restore, resume or review from server settings (%s)', async phase => {
+  const { renderServerSection } = await loadConfigSectionModule();
+  const plugin = { app: {}, manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' }, cloudflareRestore: phase ? { phase } : undefined }, syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn() } };
+  renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+  const button = getSettingByName('Server backup recovery').buttons[0]!;
+  expect(button.buttonEl.textContent).toBe(phase === 'complete' ? 'View restored server' : phase ? 'Resume restore' : 'Restore backup…');
+  button.click(); await vi.waitFor(() => expect(openServerRestore).toHaveBeenCalledWith(plugin));
 });

@@ -1,9 +1,11 @@
+import type { ServerRestoreState } from '../cloudflare/restore/state';
 import type { UsageSnapshot } from '../cloudflare/usage-snapshot';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
 import type { SyncHistoryEntry } from '../sync/types';
 import { DEFAULT_READING_SETTINGS, type ReadingSettings } from '../reading/settings';
 
 export interface CrateSettings {
+	cloudflareRestore?: ServerRestoreState | null;
 	reading: ReadingSettings;
 	usageSnapshot?: UsageSnapshot | null;
 	automaticSync: boolean;
