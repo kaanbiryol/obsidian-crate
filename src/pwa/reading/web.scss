@@ -11,6 +11,7 @@
     z-index: 0;
     display: flex;
   }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__sidebar { z-index: 1; }
   .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
     position: absolute;
     grid-area: 1 / 1 / -1 / -1;

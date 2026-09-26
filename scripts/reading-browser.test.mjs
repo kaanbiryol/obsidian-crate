@@ -1,3 +1,4 @@
+import { dockAppearance } from './pwa-launch-theme-checks.mjs';
 import { switchFeature, featureNavigationTarget } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { test } from 'node:test';
@@ -17,6 +18,7 @@ async function captureReaderMotion(page, action) {
     const pane = workspace.querySelector('.crate-reading__reader-pane');
     const list = workspace.querySelector('.crate-reading__library');
     const bar = workspace.querySelector('.crate-reading__sidebar');
+    const readingTab = bar.querySelector('[data-dock-group]');
     const x = element => { const transform = getComputedStyle(element).transform; return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m41; };
     const state = () => {
       const paneRect = pane.getBoundingClientRect(), barRect = bar.getBoundingClientRect();
@@ -27,7 +29,10 @@ async function captureReaderMotion(page, action) {
       const coversBar = pane.contains(document.elementFromPoint(barRect.right - 8, barRect.y + barRect.height / 2));
       for (const { element, inert } of saved) { element.inert = inert; element.classList.remove('reader-motion-hit-test'); }
       return { reader: x(pane), list: x(list), bar: x(bar), coversBar, bottomGap: barRect.bottom - paneRect.bottom,
-        visible: getComputedStyle(pane).visibility === 'visible', article: !!pane.querySelector('.crate-reading-reader__header h1') };
+        visible: getComputedStyle(pane).visibility === 'visible', article: !!pane.querySelector('.crate-reading-reader__header h1'),
+        tabOpacity: getComputedStyle(readingTab).opacity,
+        iconOpacity: getComputedStyle(readingTab.querySelector('.pwa-dock__view-icon')).opacity,
+        dockInert: !!readingTab.closest('[inert]') };
     };
     const before = state(), width = pane.getBoundingClientRect().width;
     let slides = 0, pops = 0;
@@ -56,6 +61,8 @@ async function captureReaderMotion(page, action) {
 
 function assertReaderSlide(result, action) {
   const { before, width, samples, slides, pops } = result, opening = action === 'open';
+  assertSteadyReadingTab(result);
+  assert.equal(samples.at(-1).dockInert, opening, 'Reader must block the dock until returning to the library');
   assert.equal(slides, 1, JSON.stringify(result));
   assert.equal(pops, opening ? 0 : 1, 'Repeated toolbar taps must only go back once');
   assert.ok(Math.abs(before.reader - (opening ? width : 0)) < 1, JSON.stringify(result));
@@ -74,6 +81,13 @@ function assertReaderSlide(result, action) {
   assert.ok(Math.abs(samples.at(-1).reader - (opening ? 0 : width)) < 1);
   assert.equal(samples.at(-1).visible, opening);
   if (!opening) assert.equal(samples.at(-1).article, false);
+}
+
+function assertSteadyReadingTab({ before, samples }) {
+  for (const sample of [before, ...samples]) {
+    assert.equal(sample.tabOpacity, '1', 'Reading tab must not dim or fade when the reader opens or closes');
+    assert.equal(sample.iconOpacity, '1', 'Reading icon must remain fully painted');
+  }
 }
 
 async function assertArticleStaysDismissed(page, historyLength) {
@@ -165,15 +179,21 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.route('**/reading/exchange', async route => { await exchangeReleased.promise; await route.continue(); });
     await page.goto(enrollment.url);
     await expect(page.locator('.pwa-reading-opening__header')).toBeVisible();
+    await expect(page.locator('.pwa-reading-opening__header [data-icon="settings"]')).toBeVisible();
     const headerGeometry = () => page.locator('.crate-reading__header').evaluate(header => {
       const box = selector => { const r = header.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
-      return { height: header.getBoundingClientRect().height, title: box('.view-header-title'), meta: box('.view-header-meta'), switcher: box('.pwa-feature-switch-button') };
+      const icon = header.querySelector('[data-icon="settings"]'), style = getComputedStyle(icon);
+      return { height: header.getBoundingClientRect().height, title: box('.view-header-title'), meta: box('.view-header-meta'), switcher: box('.pwa-feature-switch-button'),
+        settings: box('[aria-label="Reading settings"]'), settingsIcon: icon.outerHTML, settingsColor: style.color, settingsOpacity: style.opacity };
     });
     const openingHeader = await headerGeometry();
+    await expect(page.locator('.pwa-dock .pwa-mode-opening__shape')).toHaveCount(0);
+    const openingDock = await dockAppearance(page);
     exchangeReleased.resolve();
     await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
     assert.deepEqual(await headerGeometry(), openingHeader, 'Reading header stays fixed when the session loads');
-    const readingSync = page.locator('.pwa-reading-root .pwa-sync-indicator');
+    assert.deepEqual(await dockAppearance(page), openingDock, 'Reading dock is already complete while the session loads');
+    const readingSync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     await listStarted.promise;
     await expect(page.getByRole('status',{name:'Loading Reading'})).toBeVisible();
     await expect(page.locator('.crate-reading__loading-row')).toHaveCount(4);
@@ -257,7 +277,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         await switchFeature(modePage, destination);
         await modePage.waitForFunction(() => window.__modeDone === true);
         const frames = await modePage.evaluate(() => window.__modeFrames);
-        assert.ok(frames.filter(values => values.every(value => value > .05 && value < .95)).length >= 2, `${name}: populated mode fade to ${destination}: ${JSON.stringify(frames)}`);
+        assert.ok(frames.filter(values => values.some(value => value > .05 && value < .95)).length >= 2, `${name}: populated mode dissolve to ${destination}: ${JSON.stringify(frames)}`);
+        assert.ok(frames.every(values => values.some(value => value === 1)), 'The incoming feature stays opaque beneath the outgoing feature');
       }
       await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
       console.log(`${name}: connected Reminders and populated Reading fade in both directions with touch taps`);
@@ -314,6 +335,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
     // Browser Back (including native history gestures) must not start an app exit.
     const nativeBack = await captureReaderMotion(page, 'history-back');
+    assertSteadyReadingTab(nativeBack);
+    assert.equal(nativeBack.before.dockInert, true);
+    assert.ok(nativeBack.samples.every(sample => !sample.dockInert), 'History Back must restore dock interaction immediately');
     assert.equal(nativeBack.slides, 0, JSON.stringify(nativeBack));
     assert.equal(nativeBack.pops, 1); assert.equal(nativeBack.motion, 'none');
     for (const sample of nativeBack.samples) {

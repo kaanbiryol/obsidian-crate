@@ -1,5 +1,7 @@
+import { PwaOpeningDock } from '../components/PwaOpeningDock';
 import React from 'react';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
+import { IconButton } from '@/ui/shared/IconButton';
 import { ViewHeader } from '@/ui/shared/ViewHeader';
 import { ReadingListSkeleton } from '@/reading/ui/ReadingListSkeleton';
 
@@ -12,10 +14,10 @@ export function ReadingOpening() {
 			countUnit="saved link"
 			titleContent={<span className="pwa-reading-opening__sync" aria-hidden="true" />}
 			metaContent={<span className="pwa-mode-opening__meta pwa-mode-opening__shape" aria-hidden="true" />}
-			rightContent={<div className="crate-view-header-actions"><span className="pwa-mode-opening__action pwa-mode-opening__shape" aria-hidden="true" /><FeatureSwitcherButton /></div>}
+			rightContent={<div className="crate-view-header-actions"><span inert aria-hidden="true"><IconButton size="large" iconSize="l" icon="settings" label="Reading settings" onClick={() => {}} /></span><FeatureSwitcherButton /></div>}
 		/>
 		<div className="pwa-reading-opening__search pwa-mode-opening__shape" aria-hidden="true" />
 		<div className="pwa-mode-opening__content"><ReadingListSkeleton /></div>
-		<div className="pwa-dock pwa-dock--opening" aria-hidden="true"><div className="pwa-dock__bar"><span className="pwa-dock__surface" />{Array.from({ length: 4 }, (_, index) => <span key={index} className="pwa-dock__tab"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span>)}</div><span className="pwa-dock__add"><span className="pwa-mode-opening__nav-icon pwa-mode-opening__shape" /></span></div>
+		<PwaOpeningDock tab="reading" />
 	</main>;
 }

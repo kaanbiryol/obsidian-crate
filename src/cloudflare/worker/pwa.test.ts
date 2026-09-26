@@ -151,7 +151,6 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<script nonce="');
 		expect(html).toContain('id="pwa-theme-init"');
 		expect(html).toContain('id="pwa-theme-styles"');
-		expect(html.indexOf('id="pwa-theme-init"')).toBeLessThan(html.indexOf('<style>'));
 		expect(html).not.toContain('src="/notifications/theme-bootstrap.js');
 		expect(html).not.toContain('<script>');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain('localStorage.getItem("crate-reminders-theme")');
@@ -411,10 +410,18 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 
+	it('paints the launch theme before native launcher metadata', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+		// Paint the system-theme fallback first, then apply the saved preference
+		// before native launcher metadata or the app shell can paint.
+		expect(html.indexOf('<style>')).toBeLessThan(html.indexOf('id="pwa-theme-init"'));
+		expect(html.indexOf('id="pwa-theme-init"')).toBeLessThan(html.indexOf('<meta name="application-name"'));
+	});
+
 	it('hands off from the native launch surface to one static app splash', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"></div></div>');
+		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"><div class="crate-reminders-ui pwa-opening-dock"');
 		expect(html).toContain('.pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}');
 		expect(html).not.toContain('pwa-launch-splash__label');
 		expect(html).not.toContain('pwa-bootstrap');
