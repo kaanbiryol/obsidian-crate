@@ -2,9 +2,21 @@
 
 Crate sync is not a backup. Keep independent copies of the vault. A D1 export alone does not contain note bytes: its `storage_key` values point to immutable R2 objects. A complete recovery archive must contain both.
 
+## Restore an automatic upgrade backup in Obsidian
+
+Select **Settings → Crate → Server and usage → Restore backup…** under **Server backup recovery**. On a disconnected device with a remembered Cloudflare server, this action appears beside the connection settings. Sign in to Cloudflare if requested, choose a completed backup by date, and review the confirmation.
+
+Crate verifies the paired database and file checksums, creates a separate D1 database and R2 bucket, and copies files and retained history. After checking the restored data, it publishes and verifies a separate server named after your vault with **(restored)** appended. The original server, backup, current connection, and local vault are retained. The new storage counts toward your Cloudflare usage.
+
+Keep Obsidian open while restoring. If the connection fails or Obsidian closes, select **Resume restore** on the same device. The saved restore fixes the backup checksum, destination identities, restore timestamp, and installed server build. Verified uploads are reused; committed database batches are recognized even when their responses were lost. Mismatched bytes or unrelated destination data stop the restore. Keep the same plugin build until recovery finishes; do not delete or edit its saved restore state or destination resources to force a retry. Uncertain Worker publication uses the existing [deployment recovery checks](server-upgrades.md).
+
+After completion, **View restored server** shows its address and offers **Choose server…**. Back up your device vaults before connecting, select the server marked **(restored)**, and reconnect devices individually. Old device tokens, web sessions, subscriptions, and derived schedules are cleared; retained versions receive a new 30-day window. Review local changes made after the backup before syncing. No device is connected automatically. You can also select **Choose backup…** to create another restored server.
+
+This flow reads completed automatic upgrade backups from the remembered server's original R2 bucket; it cannot recover a deleted backup bucket. It supports registered archive schemas up to the installed build's schema version (through schema 3), emitted by Crate's upgrade backup writer, with a database export up to 128 MiB and generated row statements up to 70,000 bytes. For a downloaded archive or a larger export, use the CLI below. Backup SQL is decoded as literal rows and copied into the bundled current schema; downloaded SQL definitions are never executed.
+
 ## Create and verify a paired archive
 
-The current recovery CLI supports the first-release schema 1. The migration registry is empty. Future registered upgrades use the shared server release manifest and preserve the source archive. Unknown schemas are rejected; see the [compatibility matrix](compatibility.md).
+The recovery CLI supports the schemas registered in the shared server release manifest. Registered upgrades preserve the source archive. Unknown schemas are rejected; see the [compatibility matrix](compatibility.md).
 
 The recovery CLI needs Python 3.9 or newer and a Cloudflare API token authorized for the selected D1 database and R2 bucket. Supply the token through `CLOUDFLARE_API_TOKEN`, never a command-line argument or a committed file. Get the account, database, and bucket identifiers from your deployment settings.
 
@@ -29,7 +41,7 @@ python3 scripts/crate-recovery.py restore /private/backups/crate-2026-09-06 \
   --account ACCOUNT_ID --database NEW_DATABASE_ID --bucket NEW_BUCKET
 ```
 
-The original archive data remains unchanged. The CLI adds a `restore-<destination hash>.json` checkpoint to the archive directory before uploading. The restored database preserves files, retained versions, reminder identities, source ownership, occurrence observations, and mutation receipts. It clears device credentials, subscriptions, parsed caches, expired cleanup intents, and derived alarm state. Retained versions receive a new 30-day recovery window. Every Markdown file is queued for notification projection. Enroll devices again; do not copy old browser sessions or local sync checkpoints to the new deployment.
+The original archive data remains unchanged. The CLI adds a `restore-<destination hash>.json` checkpoint to the archive directory before uploading. The restored database preserves files, retained versions, reminder identities, source ownership, occurrence observations, and mutation receipts. It clears device credentials, subscriptions, parsed caches, expired cleanup intents, and derived alarm state. Retained versions receive a new 30-day recovery window. Markdown files in the saved notification folder are queued for notification projection. Enroll devices again; do not copy old browser sessions or local sync checkpoints to the new deployment.
 
 After an interrupted restore, repeat the same command and keep the destination offline. Its checkpoint binds the archive checksum, destination identifiers, and fixed restore timestamp. Resume verifies every destination object, including uploads whose acknowledgements were lost, and never overwrites mismatched bytes. Unexpected objects or database contents stop the restore. A recorded import bookmark resumes polling; a committed import is recognized by comparing the entire application database with the deterministic restore SQL, without importing again.
 
@@ -37,13 +49,13 @@ If the import acknowledgement was lost before a bookmark was received and the da
 
 Before connecting production devices:
 
-1. Deploy the matching Worker version against the restored resources in a new Worker/DO namespace. Use the matching Worker with the schema-1 target produced by these tools. Unsupported archives are rejected before remote mutation.
+1. Deploy the matching Worker version against the restored resources in a new Worker/DO namespace. Use the matching Worker for the current schema produced by these tools. Unsupported archives are rejected before remote mutation.
 2. Compare the verified file count and hashes with the archive. Test a small disposable vault first, including a reminder edit and a binary file download.
 3. Re-enroll a notification device and confirm the saved folder, timezone, and all-day time. Derived schedules are rebuilt from committed Markdown.
 4. Back up every existing device vault, then connect one at a time. Local changes made after the archive bookmark need explicit review. Keep the old deployment available for comparison.
 5. Retain the source resources and original archive until all devices have been verified.
 
-The automated recovery tests restore a paired archive, check every reference and byte, retain retry receipts, exercise rate limits and interrupted downloads/uploads/imports, and prove corrupt/incomplete archives and unrelated targets are rejected. An independent Cloudflare account restore rehearsal is still a release check; a local test does not establish hosted API, OAuth, or physical-device behavior.
+The automated CLI and in-app recovery tests restore paired archives, check every reference and byte, retain retry receipts, exercise rate limits and interrupted downloads/uploads/imports, and prove corrupt/incomplete archives and unrelated targets are rejected. An independent Cloudflare account restore rehearsal is still a release check; a local test does not establish hosted API, OAuth, or physical-device behavior.
 
 ## Investigate a missing note
 
@@ -54,3 +66,7 @@ Check the vault's `.trash` folder, including after a crash or a failed delete ac
 Collect the server request ID, approximate time, plugin/PWA/Worker versions, operation ID (for web edits), and device ID. Successful mutation logs contain request/session/operation identifiers and opaque file revision keys, without note text or filenames. File changelog revisions identify the committed incarnation; reminder operation receipts identify committed web mutations. Client HTTP errors carry `requestId` for correlation. Debug logs and local histories can contain paths: review them before sharing.
 
 `GET /diagnostics` with a vault credential reports pending and failed notification projections/jobs, terminal delivery failures, oldest failed/overdue delivery times, retained objects, cleanup backlog, mutation receipts, and the last maintenance result. A growing backlog or nonzero failure count needs attention. Repair push enrollment or provider access and reschedule missed reminders to future times; replaying the same exhausted schedule does not reset its retry budget. Oversized reminder notes must be split; their vault bytes remain synced. Do not use force sync, erase local metadata, or restore D1 alone as a first response to a missing-file report.
+
+### In-app restore implementation checks
+
+`src/cloudflare/restore/` owns archive decoding, isolated copy/verification, saved recovery state, and Obsidian dialogs. The deployment service supplies OAuth, operation exclusion, and lifecycle/source fencing. Tests exercise real upgrade-writer archives for each schema supported by the installed build, literal SQL decoding, source preservation, database and object interruptions, and explicit device reconnection. D1 row/checkpoint updates share one [REST query batch](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/); local D1 tests also check rollback and replay. Hosted OAuth, R2 management API, publication, and physical-device restore acceptance require a separate Cloudflare rehearsal.

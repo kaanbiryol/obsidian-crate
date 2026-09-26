@@ -33,6 +33,7 @@ export function renderConfigSection(context: ConfigSectionContext, showHeading =
 					void startCloudflareDeployment(plugin);
 				}));
 		renderSelfHostedSetting(context);
+        renderServerBackupSetting(context);
 	}
 }
 
@@ -78,6 +79,7 @@ export function renderServerSection(context: ConfigSectionContext): void {
             .addButton(button => button.setButtonText('Check and recover update')
                 .onClick(() => { void checkAndRecoverUpdate(plugin); }));
     }
+    renderServerBackupSetting(context);
 	const details = createSettingsDisclosure(containerEl, 'Server details');
 	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');
 	if (!deployment) {
@@ -157,3 +159,14 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 	}
 }
 export type { ConfigSectionContext } from './config-types';
+
+function renderServerBackupSetting({ containerEl, plugin }: ConfigSectionContext): void {
+    const deployment = plugin.settings.cloudflareDeployment;
+    if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset) {
+        const restore = plugin.settings.cloudflareRestore;
+        new Setting(containerEl).setName('Server backup recovery')
+            .setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')
+            .addButton(button => button.setButtonText(restore?.phase === 'complete' ? 'View restored server' : restore ? 'Resume restore' : 'Restore backup…')
+                .onClick(() => { void import('../../cloudflare/restore/ui').then(({ openServerRestore }) => openServerRestore(plugin)); }));
+    }
+}

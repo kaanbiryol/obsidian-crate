@@ -1,3 +1,5 @@
+import type { BackupChoice } from './restore/archive';
+import type { ServerRestoreState } from './restore/state';
 import { normalizeVaultName } from './vault-name';
 import { recoverDeployment, type DeploymentRecoveryResult } from './deployment-recovery';
 import { completePublishedDeployment } from './complete-published-deployment';
@@ -385,6 +387,57 @@ export class CloudflareDeploymentService {
 			return result;
 		} finally { this.handlingCallback = false; }
 	}
+
+    private async restoreBackups<T>(withAuthorization: <R>(operation: (tokens: CloudflareOAuthTokens) => Promise<R>) => Promise<R>,
+        operation: (api: CloudflareApiClient, source: CloudflareDeploymentMetadata) => Promise<T>): Promise<T> {
+        this.lifetime.signal.throwIfAborted();
+        if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
+        const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+        if (!source?.accountId || !source.d1DatabaseId || source.reset) throw new Error('Select the source Cloudflare server and finish any deletion first.');
+        this.handlingCallback = true;
+        try {
+            return await withAuthorization(tokens => operation(new CloudflareApiClient(tokens.accessToken, async (url, request) => {
+                this.lifetime.signal.throwIfAborted(); this.checkSavedTarget(source, 'update');
+                const response = await this.options.transport(url, request);
+                this.lifetime.signal.throwIfAborted(); this.checkSavedTarget(source, 'update');
+                return response;
+            }), source));
+        } finally { this.handlingCallback = false; }
+    }
+
+    async listRestoreBackups(withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>): Promise<BackupChoice[]> {
+        return this.restoreBackups(withAuthorization, async (api, source) => {
+            const { listUpgradeBackups } = await import('./restore/server-restore');
+            return listUpgradeBackups(api, { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName });
+        });
+    }
+
+    async restoreBackup(withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>,
+        choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
+        return this.restoreBackups(withAuthorization, async (api, source) => {
+            const artifacts = await this.whileActive(this.options.loadArtifacts);
+            const saved = this.options.settingsOwner.settings.cloudflareRestore;
+            let state: ServerRestoreState;
+            if (saved && (saved.phase !== 'complete' || !choice)) state = structuredClone(saved);
+            else {
+                if (!choice) throw new Error('Select a backup first');
+                const id = randomHex(8), resourceName = `crate-${id}`;
+                state = { id, source: { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName },
+                    prefix: choice.prefix, archiveHash: choice.hash, fingerprint: artifacts.fingerprint, restoredAt: this.now(), phase: 'copying',
+                    target: { deploymentId: id, vaultName: `${source.vaultName ?? 'Crate'} (restored)`, accountId: source.accountId,
+                        accountName: source.accountName, workerName: resourceName, d1DatabaseName: resourceName, d1DatabaseId: null,
+                        r2BucketName: resourceName, workersSubdomain: source.workersSubdomain, lastDeployedVersion: null, lastDeployedFingerprint: null } };
+            }
+            if (state.source.account !== source.accountId || state.source.database !== source.d1DatabaseId || state.source.bucket !== source.r2BucketName) throw new Error('Reconnect to the backup’s original server before resuming.');
+            const save = () => this.whileActive(() => {
+                this.checkSavedTarget(source, 'update');
+                return this.options.settingsOwner.writeSettings({ cloudflareRestore: structuredClone(state) });
+            });
+            await save(); // Persist destination identity before any remote mutation.
+            const { restoreUpgradeBackup } = await import('./restore/server-restore');
+            return restoreUpgradeBackup({ api, state, artifacts, save, onProgress });
+        });
+    }
 
     async recoverUpdate(withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>): Promise<DeploymentRecoveryResult> {
         this.lifetime.signal.throwIfAborted();

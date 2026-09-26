@@ -128,7 +128,7 @@ Cloudflare deployment and device connection use OAuth Authorization Code + PKCE.
 - Remote code is not fetched or evaluated at runtime.
 - Pasting a web URL into a reminder title or description automatically requests its page title through your Crate server and uses it as the link label. The server contacts the pasted website without your cookies or authorization headers. Selected text keeps its own label. Offline, blocked, slow, or untitled pages keep the URL label. This requires an updated plugin/web app and Crate server.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker, or the operator of your local server, can access the synced data.
-- Sync is not a backup. Keep an independent backup of any vault you use with Crate. The [paired D1/R2 recovery CLI](docs/recovery.md) creates verified remote archives and restores them into isolated resources.
+- Sync is not a backup. Keep an independent backup of any vault you use with Crate. **Server and usage → Restore backup…** restores an automatic upgrade backup into a separate Cloudflare server. The [recovery guide and paired D1/R2 CLI](docs/recovery.md) cover interrupted restores and downloadable archives.
 - Remote deletions always move local files into the vault's `.trash` folder, even if Obsidian is set to delete permanently. Check that folder when recovering an edit made during sync. Crate never syncs `.trash`.
 
 Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).

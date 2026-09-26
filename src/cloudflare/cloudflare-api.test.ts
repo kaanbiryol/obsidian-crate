@@ -270,3 +270,12 @@ it('probes the exact Worker release without forwarding management credentials', 
   expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
   expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
 });
+
+it('writes restored bytes only to a separate Crate bucket and encodes object keys', async () => {
+  const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: {} }) }));
+  const api = new CloudflareApiClient('token', transport), bucket = 'crate-0123456789abcdef';
+  await expect(api.putRestoredObject('account', bucket, bucket, 'file', new Uint8Array([1]))).rejects.toThrow('separate');
+  expect(transport).not.toHaveBeenCalled();
+  await api.putRestoredObject('account', 'original', bucket, 'folder/a?b#c', new Uint8Array([0, 255]));
+  expect(transport).toHaveBeenCalledWith(`https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/${bucket}/objects/folder/a%3Fb%23c`, expect.objectContaining({ method: 'PUT', body: new Uint8Array([0, 255]).buffer }));
+});

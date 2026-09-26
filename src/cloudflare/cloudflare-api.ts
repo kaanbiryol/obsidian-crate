@@ -318,6 +318,14 @@ export class CloudflareApiClient {
     });
   }
 
+  /** Only the isolated restore workflow can write original object keys. */
+  async putRestoredObject(accountId: string, sourceBucket: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
+    if (bucketName === sourceBucket || !/^crate-[a-f0-9]{16}$/.test(bucketName)) throw new Error('Restore requires a separate bucket');
+    await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
+    });
+  }
+
 	async deleteR2Objects(origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
 		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
 	}
