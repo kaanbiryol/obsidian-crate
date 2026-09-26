@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The first supported database is schema 1, with the file inventory, receipts, reminder state and indexes. The current database is schema 2; `002-reading` adds Reading storage and scoped credentials while preserving existing data. Developer databases using previous experimental markers are unsupported; they are never reset or interpreted as empty by the updater.
+The first supported database is schema 1, with the file inventory, receipts, reminder state and indexes. The current database is schema 3; `002-reading` adds Reading storage and scoped credentials, and `003-reading-browser` adds the defaulted `browser_rendering` preference. Both migrations preserve existing data. Schema 3 remains supported even while browser-rendering application code is set aside: a deployed schema and its migration history cannot be rolled back with a source-code stash. Developer databases using previous experimental markers are unsupported; they are never reset or interpreted as empty by the updater.
 
 ## Independent versions
 
@@ -9,7 +9,7 @@ The first supported database is schema 1, with the file inventory, receipts, rem
 - `revision` is a monotonically increasing server release number. Increment it whenever the deployable Worker, PWA, provisioning configuration, schema or migration plan changes for distribution. Never distribute different server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
 - `minimumSchemaVersion` is the oldest supported database source. Keep it at 1 while that baseline is supported. Retiring an old source version never deletes its migration history or invalidates databases already upgraded from it.
-- `migrations` is an ordered, contiguous registry, currently containing `002-reading` from schema 1 to 2. Once released, its IDs, SQL bytes and SHA-256 checksums are immutable.
+- `migrations` is an ordered, contiguous registry, currently containing `002-reading` from schema 1 to 2 and `003-reading-browser` from schema 2 to 3. Once released, its IDs, SQL bytes and SHA-256 checksums are immutable.
 
 The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment.
 

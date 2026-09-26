@@ -146,7 +146,7 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 Protocol 7 is required for writes. Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Only the current prerelease formats are supported.
 
-Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 1. This is the first supported baseline; the historical experimental schema upgrades have been removed. Existing baseline databases receive no implicit DDL. Unsupported schemas and missing saved databases stop without replacing storage.
+Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 3. Schema 1 is the first supported baseline; schemas 1 and 2 upgrade through the registered migrations after a verified recovery checkpoint. Existing schema-3 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
 
 The ordered server revision and schema identity are recorded in D1 after live verification. Different artifacts sharing a server revision cannot replace each other. Updates preserve the database and bucket bindings, file references, history and receipts. The deployment fence stays held until the exact Worker, database version and metadata endpoint are verified.
 

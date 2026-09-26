@@ -80,14 +80,14 @@ test('populated schema 1 upgrades only after a verified stopped backup, preserve
     await writeFile(metadataPath, JSON.stringify(metadata));
     await assert.rejects(openLocalRuntime({ dataDir }), /tested migration/);
     runtime = await openLocalRuntime({ dataDir, administrative: true, upgradeBackup: join(dir, 'backup') });
-    assert.equal((await runtime.db.prepare('SELECT version FROM crate_schema').first()).version, 2);
+    assert.equal((await runtime.db.prepare('SELECT version FROM crate_schema').first()).version, 3);
     assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM auth_tokens').first()).count, 1);
     assert.equal((await runtime.db.prepare('SELECT storage_key FROM files').first()).storage_key, 'old-key');
     assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM web_enrollment_tokens').first()).count, 1);
     await runtime.close(); runtime = null;
     const saved = JSON.parse(await readFile(join(dir, 'backup/data/server.json'), 'utf8')); assert.equal(saved.schemaHash, metadata.schemaHash);
     runtime = await openLocalRuntime({ dataDir, administrative: true });
-    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM crate_migrations').first()).count, 1);
+    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM crate_migrations').first()).count, 2);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
