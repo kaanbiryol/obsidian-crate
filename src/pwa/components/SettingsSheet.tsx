@@ -199,7 +199,7 @@ export function SettingsSheet({
 
 					<VersionSettings />
 
-					<Button className="settings-logout-button" type="button" data-action="logout" isDisabled={loggingOut} onClick={onLogout}>
+					<Button variant="ghost" tone="danger" className="settings-logout-button" type="button" data-action="logout" isDisabled={loggingOut} onClick={onLogout}>
 						<LogOut size={16} /> {loggingOut ? 'Logging out...' : 'Log out'}
 					</Button>
 				</div>

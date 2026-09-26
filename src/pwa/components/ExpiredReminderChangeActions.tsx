@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton as BaseButton } from './PwaButton';
 import React, { useState } from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 
@@ -17,10 +17,10 @@ export function ExpiredReminderChangeActions({ change, onDiscard }: {
 		setExportedChange(JSON.stringify(change)); setReviewed(false);
 	};
 	return <>
-		<BaseButton type="button" onClick={exportChange}>Export expired change</BaseButton>
+		<BaseButton variant="ghost" size="touch" type="button" onClick={exportChange}>Export expired change</BaseButton>
 		{exportedChange !== null && <>
 			<label className="pwa-reminder-recovery-confirm"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.currentTarget.checked)} /> I saved the export and compared current reminders</label>
-			<BaseButton type="button" disabled={!reviewed || exportedChange !== JSON.stringify(change)} onClick={() => onDiscard(change.operationId, exportedChange)}>Remove exported change from device</BaseButton>
+			<BaseButton variant="ghost" size="touch" type="button" disabled={!reviewed || exportedChange !== JSON.stringify(change)} onClick={() => onDiscard(change.operationId, exportedChange)}>Remove exported change from device</BaseButton>
 		</>}
 	</>;
 }

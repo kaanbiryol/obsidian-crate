@@ -93,6 +93,41 @@ instead of introducing a separate palette or button style for each screen.
    metadata in light/dark themes at narrow and wide widths. Also check embedded
    plugin cards and keyboard focus when changing card styles.
 
+### Action controls
+
+`Button` is the shared text-action component. Use `variant="outline"` for normal
+actions (including empty states, retry, settings, and export), `variant="ghost"`
+for lightweight actions, and `variant="primary"` for an emphasized confirmation.
+Add `tone="danger"` for destructive actions. Icon-only actions use `IconButton`
+with a descriptive label. Leave `Button`'s variant unset only for structural
+controls with their own presentation, such as navigation tabs and article rows.
+
+`_action.scss` owns the shared border, typography, corners, and states, using
+Sync vault's quiet outlined treatment. `_tokens.scss` maps the action tokens to
+host theme values. Actions use Sync vault's input radius and smaller UI text
+(4px corners and 12px text in the PWA). Obsidian retains its theme values.
+Compact text actions are at least 28px tall, with 8px horizontal padding, including
+in narrow desktop panes. Coarse pointers use at least 44px targets. `size="touch"`
+retains the larger target at every width. Long labels may wrap. Hover feedback
+requires a hover-capable pointer; disabled actions retain their semantic color,
+and keyboard focus stays visible. Reduced motion removes action transitions.
+
+`PwaButton` delegates to `Button` and defaults to the outline variant. Settings,
+connection, notification, and recovery actions use this adapter; their local
+classes may place the control but must not define another font, fill, or border.
+Reminder modal-header actions retain their existing shared header treatment.
+Reading's typeface previews remain typographic choices rather than text actions.
+
+After building, open `npm run preview:ui` with
+`/?scene=controls&host=pwa&theme=dark` for the control gallery. Switch `host` to
+`plugin` for the Shadow DOM fixture or `theme` to `light`. It includes outlined,
+primary, ghost, danger, disabled, icon, long-label, and host-adapter examples.
+`npx playwright test tests/visual/controls*.spec.ts` checks both browser engines,
+hosts, themes, and widths, including keyboard activation and Reading's empty-state
+capture flow. Screenshots are attached to the report for review, without changing
+approved visual baselines.
+
+
 ## Launch appearance
 
 The PWA resolves its saved theme in a nonce-authorized inline script before the

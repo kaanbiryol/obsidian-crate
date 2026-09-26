@@ -56,7 +56,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 #app{background:var(--pwa-launch-bg)}
 .reminders-shadow-root{background:var(--background-primary);color:var(--text-normal)}
 :is(.pwa-reminders-view,.crate-reading-web) .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);border-color:var(--background-modifier-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
-.secondary-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
 .pwa-top-notices{background:var(--background-primary)}
 .pwa-status-line,.pwa-notification-prompt{background:rgba(255,255,255,.76);border-color:var(--background-modifier-border);color:var(--text-normal)}
 .pwa-status-line.is-live{background:var(--pwa-light-surface-soft)}
@@ -75,9 +74,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 	--crate-divider:#e0e0e0;
 }
 .pwa-picker-sheet.pwa-project-picker-sheet,.pwa-picker-sheet.pwa-date-picker-sheet,.pwa-picker-sheet.pwa-repeat-picker-sheet{background:var(--pwa-sheet-surface)}
-.secondary-button.is-danger,.settings-logout-button{color:var(--pwa-light-danger-text)}
-.settings-action-button{color:var(--pwa-light-accent-text)}
-.settings-logout-button:hover{background:rgba(180,35,24,.07);color:var(--pwa-light-danger-text)}
 .settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
 .settings-row+.settings-row{border-color:var(--pwa-light-border)}
 .crate-progress-meter{background:var(--background-modifier-border)}

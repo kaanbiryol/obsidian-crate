@@ -29,6 +29,7 @@ import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
 import { ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { PwaReadingDialog } from '@/pwa/reading/PwaReadingDialog';
 import { ReadingFixture } from './ReadingFixture';
+import { ControlsFixture } from './ControlsFixture';
 import { LexicalTrial } from './lexical/LexicalTrial';
 import lexicalStyles from './lexical/trial.css?raw';
 
@@ -79,6 +80,7 @@ function Gallery() {
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} /></div>;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture />;
+  else if (scene === 'controls') content = <ControlsFixture host={host} />;
   else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : null}><ReadingFixture onAdd={() => setResult('Save link opened')} /></ReadingDialogHost.Provider>;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
@@ -98,7 +100,7 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'source' || (host === 'plugin' && (scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
+const useShadow = scene === 'source' || (host === 'plugin' && (scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

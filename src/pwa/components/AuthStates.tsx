@@ -52,7 +52,7 @@ export function EmptyAuthState({ config }: { config: StoredConfig }) {
 				: 'Open a new app link from Crate in Obsidian to connect this browser.'}
 			config={config}
 		>
-			<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+			<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 		</AuthLayout>
 	);
 }
@@ -80,15 +80,15 @@ export function ErrorState({ error, config, onRetry }: { error: string; config: 
 			config={config}
 		>
 			{needsCleanup ? (
-				<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+				<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 			) : needsLink ? (
 				<>
-					<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+					<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 					<Button className="secondary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
 				</>
 			) : (
 				<>
-					<Button className="primary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
+					<Button variant="primary" className="primary-button" type="button" onClick={onRetry}><RefreshCw size={16} aria-hidden="true" />Try again</Button>
 					<Button className="secondary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 				</>
 			)}
