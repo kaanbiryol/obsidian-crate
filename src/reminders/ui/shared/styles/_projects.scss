@@ -55,10 +55,28 @@
 .premium-project-children {
     margin: 0;
     padding: 0 12px 0 16px;
+    height: var(--collapsible-panel-height);
+    opacity: 1;
+    overflow: hidden;
+    transition: height 240ms var(--crate-motion-easing), opacity 160ms var(--crate-motion-easing);
+
+    &[data-starting-style],
+    &[data-ending-style] {
+        height: 0;
+        opacity: 0;
+    }
+
+    &[data-no-animation] { transition: none; }
 
     > .premium-project-tree {
         gap: 0;
     }
+}
+
+.is-reduced-motion .premium-project-children { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-project-children { transition: none; }
 }
 
 // A parent and its children share one surface; the disclosure stays inside it.
@@ -91,7 +109,10 @@
         border-radius: var(--crate-radius-button);
         cursor: pointer;
 
-        &:hover { background: var(--crate-control-hover-bg); }
+        @media (hover: hover) and (pointer: fine) {
+            &:hover { background: var(--crate-control-hover-bg); }
+        }
+        &:active { background: var(--crate-control-hover-bg); }
         &:focus-visible {
             outline: 2px solid var(--crate-focus-ring);
             outline-offset: -3px;

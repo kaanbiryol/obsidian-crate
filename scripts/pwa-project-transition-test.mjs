@@ -20,6 +20,60 @@ try {
       await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=browse`);
       const target = page.getByRole('button', { name: 'Open Errands', exact: true });
       await expect(target).toBeVisible();
+      const disclosure = page.locator('.premium-project-expand').first();
+      const children = page.locator('.premium-project-children').first();
+      const fullHeight = await children.evaluate(element => element.getBoundingClientRect().height);
+      for (const colorScheme of ['dark', 'light']) {
+        await page.emulateMedia({ colorScheme });
+        await disclosure.tap();
+        await expect(children).toBeHidden();
+        assert.equal(await disclosure.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Touch release must clear disclosure feedback');
+        await disclosure.tap();
+        await expect.poll(() => children.evaluate(element => element.getBoundingClientRect().height)).toBe(fullHeight);
+        assert.equal(await disclosure.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Expanded disclosure must not stay highlighted');
+      }
+      await page.emulateMedia({ colorScheme: 'dark' });
+      for (const expanding of [false, true]) {
+        const heights = await disclosure.evaluate(async button => {
+          const panel = button.closest('.premium-project-group').querySelector('.premium-project-children');
+          const samples = [];
+          button.click();
+          const start = performance.now();
+          while (performance.now() - start < 400) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            samples.push(panel.getBoundingClientRect().height);
+          }
+          return samples;
+        });
+        assert.ok(heights.some(height => height > 1 && height < fullHeight - 1), `Subprojects must animate ${expanding ? 'open' : 'closed'}: ${heights}`);
+        assert.ok(Math.abs(heights.at(-1) - (expanding ? fullHeight : 0)) < 1, 'Subprojects must settle at the final height');
+      }
+      await disclosure.evaluate(async button => {
+        button.click();
+        await new Promise(resolve => setTimeout(resolve, 70));
+        button.click();
+      });
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+      await expect.poll(() => children.evaluate(element => element.getBoundingClientRect().height)).toBe(fullHeight);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(await children.evaluate(element => getComputedStyle(element).transitionDuration), '0s');
+      await disclosure.tap();
+      await expect(children).toBeHidden();
+      await disclosure.tap();
+      await expect(children).toBeVisible();
+      await page.keyboard.press('Tab');
+      await disclosure.focus();
+      assert.equal(await disclosure.evaluate(element => getComputedStyle(element).outlineStyle), 'solid', 'Keyboard users retain a visible focus cue');
+      await page.keyboard.press('Enter');
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+      await expect(children).toBeHidden();
+      await page.keyboard.press('Space');
+      await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+      await expect(children).toBeVisible();
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      // Let matchMedia subscribers restore navigation motion before sampling it.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      console.log(`${type.name()}: subproject touch feedback, animation, reversal, keyboard, and reduced motion passed`);
       const before = await page.evaluate(() => {
         const elements = [...document.querySelectorAll('.premium-project-group, .premium-project-group .premium-project-content')];
         const borders = elements.map(element => {
