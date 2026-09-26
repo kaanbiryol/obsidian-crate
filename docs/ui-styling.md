@@ -45,7 +45,7 @@ both hosts together.
   critically damped Motion spring; CSS-owned drawers and Reading navigation
   use a sampled spring curve with a cubic fallback. Direct drawer dragging
   remains unanimated, and CSS transitions resume from the current position.
-  Keep native history gestures immediate, tab changes as stationary fades,
+  Keep native history gestures immediate and tab changes as stationary outgoing-screen dissolves over opaque incoming screens,
   and reduced-motion paths free of spatial transitions. Reader content stays
   mounted until its exit completes; timeout cleanup is only a recovery path.
 
@@ -101,6 +101,15 @@ The document, launch screen, update curtain, and app use matching surface colors
 the page backdrop has no gradient that can show through during mounting.
 `scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
 and data in both engines, including saved themes opposite to the system theme.
+The bottom dock paints its real icons and selected destination in the initial
+HTML, then keeps the same appearance through session/data loading. Only content
+uses skeletons. `src/pwa/opening-dock.ts` owns the inert pre-ready markup; browser
+checks compare its icon paths, opacity, colors, and geometry with the interactive
+dock so the handoff cannot introduce pulsing placeholders or an entrance fade.
+Once the launch destination is known, the real Reminders shell stays mounted
+while data loads. Its title, settings icon, and dock keep their DOM nodes and
+geometry; only the content skeleton is replaced. Startup checks assert node
+identity and sample header visibility during delayed fetches in both engines.
 Home Screen cold launches and the OS-owned launch snapshot still require a
 physical iPhone check.
 
@@ -221,17 +230,28 @@ cancels the selection. The add button and page layout stay in place.
 Ordinary tab buttons select their view; the sliding highlight follows the active
 reminder tab or the reading switcher. Both feature docks share the indicator
 position, so it slides from the fourth slot when returning to any reminder tab,
-even if that tab was already selected before opening Reading. List changes use a stationary 180 ms opacity
-fade, disabled with reduced motion. Switching between Reminders and Reading uses
-a 200 ms crossfade without translation, scaling, or icon rotation. Settings remains in each feature's header.
+even if that tab was already selected before opening Reading. Reminder tabs,
+Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
+stationary dissolve and CSS keyframes: the outgoing screen stays mounted above a fully opaque
+incoming screen and fades out. Headers and list content change together, with no
+blank frame or dip in background opacity. The dock stays outside tab transitions.
+Outgoing screens are inert, retain their scroll position, and unmount on animation
+completion; a timeout only recovers cancelled animations. Returning from another
+feature lets the feature shell own the dissolve without adding a second tab fade.
+Reduced motion retains this non-spatial dissolve, matching feature switching.
+Settings remains in each feature's header.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
+The dock overlaps the full-height list viewport so rows scroll behind its blurred
+surface. Scroll containers reserve dock height plus a small gap at the end, keeping
+the final item reachable above the controls. Space around the pill and add button
+passes gestures through to the list; the expanded picker still blocks the backdrop.
 The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
 its shared navigation. Wide Reading layouts retain their sidebar and header
 switch, and connection screens retain the header switch for enrollment.
 The feature shell preserves mounted state and browser locations and restores focus to
-its visible navigation control. The modes retain their 200 ms crossfade;
+its visible navigation control. The modes dissolve the outgoing panel over an opaque incoming panel over 160 ms;
 scrolling content, headers, and docks keep their geometry throughout the dissolve. On phones, opening a Reading
 article slides the reader over the stationary library and bottom bar. Both stay
 painted beneath the full-height article, with background controls inert. Toolbar
@@ -256,6 +276,30 @@ Phone headers use a 26px title, a 44px title/action row, and a compact 20px coun
 row. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
 Loaded and opening headers share these PWA spacing tokens so hydration does not
 move the title or content. Sync and settings retain 44px touch targets.
+On identified iOS/iPadOS 27 Home Screen apps, the head bootstrap selects `default`
+status-bar mode and enables opaque sticky headers for the iOS 27 progressive-blur
+workaround. It accepts a real OS 27 token or Safari 27 on an Apple mobile device
+(including desktop-mode iPads); ambiguous frozen user agents keep the old mode.
+Other versions and ordinary browser layouts retain their existing styling.
+The workaround uses the current top safe-area inset once, without the maximum
+inset fallback. The document and app use `min(100vh, 100dvh + top inset)`:
+existing installations may retain translucent status-bar mode after the metadata
+changes. Both the dynamic viewport and fixed-position containing block can be
+shorter than the drawable canvas. Restore only the reported top inset, capped
+at `100vh`; default status-bar mode has no top inset and keeps its smaller canvas.
+Reading retains its wrapper inset; Reminders retains its header inset. Header
+surfaces use the same theme color as startup chrome. Check launch/resume, rotation,
+light/dark themes, scrolling, and sheets on an installed iOS 27 device: desktop
+WebKit can verify layout and platform gating but cannot reproduce native blur.
+`scripts/pwa-safe-area-test.mjs` covers the inset and viewport geometry;
+`scripts/pwa-ios27-header-test.mjs` covers Reading headers, dock menus, sheets,
+theme changes, rotation, and reload against the built local Worker.
+The dock reserves the current device-reported bottom safe area once, with a 10px
+minimum visual gap (not an additional 10px). Use `safe-area-inset-bottom`, not
+`safe-area-max-inset-bottom`: the static maximum can exceed the clearance needed
+inside the current viewport. Do not impose a fixed 34px inset on phone layouts: devices
+with smaller safe areas must be able to place the dock lower. The menu and dock
+share this bottom offset; the bar's internal padding does not add exterior space.
 The same switch is available on both connection screens. Top-level modes suppress
 single-finger back gestures starting within 20px of the left edge; an open Reading
 article retains native back navigation to its library. Other touch starts and
