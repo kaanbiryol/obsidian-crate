@@ -335,6 +335,18 @@ it('does not open Cloudflare for a network failure', async () => {
 	expect(progress.fail).toHaveBeenCalledOnce();
 });
 
+it('shows a rejected D1 quota error directly without sending the user to lock recovery', async () => {
+    const { startCloudflareDeployment } = await loadPluginIntegration();
+    const { CloudflareApiError } = await import('./cloudflare-api');
+    const plugin = createPlugin(true);
+    const message = "Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.";
+    plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareApiError(message, 400, 7500));
+    await startCloudflareDeployment(plugin as never, 'update');
+    expect(progress.fail).toHaveBeenCalledWith('Could not update your Cloudflare server', message,
+        ['Select “Update server” in Crate settings to try again.']);
+    expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+});
+
 it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
     const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
     const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');

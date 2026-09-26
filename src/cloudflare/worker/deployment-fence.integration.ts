@@ -288,6 +288,45 @@ it('keeps initialization recoverable after a definite upload rejection', async (
   expect(h.api.queryD1.mock.calls.filter(call => call[2] === schema)).toHaveLength(1);
 });
 
+it.each([
+  new CloudflareApiError("Your account has exceeded D1's free tier daily row write limit. Wait until midnight UTC.", 400, 7500),
+  new CloudflareApiError('Permission denied', 403, 10000),
+  new CloudflareApiError('Too many requests', 429, null),
+])('preserves a definite acquisition rejection without inventing a recovery lock: %s', async error => {
+  const h = await harness();
+  const query = h.api.queryD1.getMockImplementation()!;
+  h.api.queryD1.mockImplementation(async (...args) => {
+    if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
+    return query(...args);
+  });
+  await expect(h.deploy()).rejects.toBe(error);
+  expect(await held()).toBeNull();
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
+  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('ready');
+  h.api.queryD1.mockImplementation(query);
+  await h.deploy();
+  expect(await held()).toBeNull();
+  expect(h.api.uploadWorker).toHaveBeenCalledOnce();
+});
+
+it.each([
+  new CloudflareApiError('Request timed out', 408, null),
+  new CloudflareApiError('Cloudflare unavailable', 503, null),
+])('keeps uncertain acquisition failures on the recovery path: %s', async error => {
+  const h = await harness();
+  const query = h.api.queryD1.getMockImplementation()!;
+  h.api.queryD1.mockImplementation(async (...args) => {
+    const result = await query(...args);
+    if (args[2].startsWith('INSERT INTO maintenance_state')) throw error;
+    return result;
+  });
+  await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
+  expect(await held()).not.toBeNull();
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
+});
+
 it.each([false, true])('recovers a lost acquisition response before any provider mutation (empty: %s)', async empty => {
   const h = await harness(empty);
   const query = h.api.queryD1.getMockImplementation()!;
