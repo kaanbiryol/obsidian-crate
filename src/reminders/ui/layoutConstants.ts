@@ -15,15 +15,12 @@ export const EASE_EXPO_OUT: Easing = [0.16, 1, 0.3, 1];
 // Material Design standard easing (used for exits)
 export const EASE_STANDARD: Easing = [0.4, 0, 0.2, 1];
 
-// Unified duration for content transitions
-export const CONTENT_TRANSITION_DURATION = 0.35;
-
 // Page-level transition duration (slightly faster)
 export const PAGE_TRANSITION_DURATION = 0.18;
 
 export const SPRING_CONFIG = {
   stiffness: 500,
-  damping: 35,
+  damping: 40,
   mass: 0.8
 } as const;
 

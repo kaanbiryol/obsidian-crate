@@ -122,7 +122,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
         <Dialog.Backdrop className="pwa-dock__backdrop" />
         <Dialog.Popup ref={measureMenu} className="pwa-dock__menu" data-dragging={dragging ? 'true' : undefined} initialFocus={dragging ? false : undefined} finalFocus={() => container.current?.querySelector<HTMLElement>('[data-dock-group]') ?? false}>
           <Dialog.Title className="pwa-dock__sr">Reading views</Dialog.Title>
-          {readingViews.map(item => <Button key={item.id} className="pwa-dock__destination" data-dock-destination={item.id} data-preview={previewTab === item.id ? 'true' : undefined} data-action="switch-reading-section" data-tab={item.id} aria-current={section === 'reading' && item.id === activeTab ? 'page' : undefined} onClick={() => selectView(item.id)}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /><span>{item.label}</span></Button>)}
+          <div className="pwa-dock__choices">{readingViews.map(item => <Button key={item.id} className="pwa-dock__destination" data-dock-destination={item.id} data-preview={previewTab === item.id ? 'true' : undefined} data-action="switch-reading-section" data-tab={item.id} aria-current={section === 'reading' && item.id === activeTab ? 'page' : undefined} onClick={() => selectView(item.id)}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /><span>{item.label}</span></Button>)}</div>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

@@ -162,17 +162,53 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
       const height = () => parseFloat(getComputedStyle(surface).height);
       dock.querySelector('[data-dock-group]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-      const samples = []; const start = performance.now();
-      while (performance.now() - start < 120) { await frame(); samples.push(height()); }
+      const samples = [], reveals = []; const start = performance.now();
+      while (performance.now() - start < 120) {
+        await frame(); samples.push(height());
+        const menu = dock.querySelector('.pwa-dock__menu');
+        if (menu) {
+          const box = menu.getBoundingClientRect();
+          const inset = parseFloat(getComputedStyle(dock).getPropertyValue('--dock-menu-inset'));
+          reveals.push({ edge: box.top + inset, surface: surface.getBoundingClientRect().top,
+            top: box.top, height: box.height, opacity: Number(getComputedStyle(menu.querySelector('.pwa-dock__choices')).opacity),
+            tabOpacity: Number(getComputedStyle(dock.querySelector('.pwa-dock__tab')).opacity),
+            indicatorOpacity: Number(getComputedStyle(dock.querySelector('.pwa-dock__indicator')).opacity) });
+        }
+      }
       const before = height();
       document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       await frame(); const after = height();
-      return { samples, before, after };
+      return { samples, reveals, before, after };
     });
     assert.ok(interrupted.before > 70, JSON.stringify(interrupted));
+    assert.ok(interrupted.reveals.length > 1);
+    assert.ok(interrupted.reveals.every(frame => frame.tabOpacity === frame.indicatorOpacity), 'The selected highlight and tab icons must disappear together');
+    assert.ok(interrupted.reveals.every(frame => Math.abs(frame.edge - frame.surface) < 1), 'Choices reveal inside the moving surface');
+    assert.ok(interrupted.reveals.every(frame => frame.top === interrupted.reveals[0].top && frame.height === interrupted.reveals[0].height), 'Held-finger targets must stay stationary');
+    assert.ok(interrupted.reveals.some(frame => frame.opacity > 0 && frame.opacity < 1), 'Content should reveal with the spring');
     assert.ok(interrupted.samples.every((height, i, values) => height >= 60 && (!i || height >= values[i - 1] - .1)), 'Opening must grow without a staged shrink');
     assert.ok(Math.abs(interrupted.before - interrupted.after) < 20, 'Reversing must not jump');
     await closed();
+    // Reopen while dismissal is still settling; retain the same surface and
+    // accept a choice immediately, including before its entrance has finished.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await dock().locator('[data-dock-group]').press('ArrowDown');
+      await page.waitForTimeout(50);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(35);
+      await dock().locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
+      await expect(views).toBeVisible();
+      await views.getByRole('button', { name: 'Favorites', exact: true }).evaluate(button => button.click());
+      await closed(); await active('Favorites');
+    }
+    await direct('Reminders');
+    // A live preference change must settle the entire reveal, not only the shell.
+    await dock().locator('[data-dock-group]').press('ArrowDown');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(views).toHaveCSS('opacity', '1');
+    await expect(dock()).toHaveCSS('--dock-menu-inset', '0px');
+    await page.keyboard.press('Escape'); await closed();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     // Match the working feature transition: fade the old painted screen over
     // an opaque incoming screen. A fade-in of replacement content is insufficient.
     const checkScreenFade = async (selector, interruptWith) => {
