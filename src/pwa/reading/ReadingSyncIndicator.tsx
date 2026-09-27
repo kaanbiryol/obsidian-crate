@@ -11,7 +11,7 @@ interface ReadingSyncIndicatorProps {
 	confirmed: boolean;
 	error: string | null;
 	recovery: boolean;
-	onShowStatus: (label: string) => void;
+	onShowStatus: (label: string, state: SyncIndicatorState) => void;
 }
 
 export function readingSyncStatus({ pending, isOffline, loading, refreshing, confirmed, error, recovery }: Omit<ReadingSyncIndicatorProps, 'onShowStatus'>): { state: SyncIndicatorState; label: string } {

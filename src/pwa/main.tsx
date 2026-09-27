@@ -407,7 +407,7 @@ function App() {
 						showSettings={!isProjectDetail}
 					>
 						<PwaSyncIndicator
-							onShowStatus={(label) => showToast('info', `Sync across all projects: ${label}`)}
+							onShowStatus={(label, state) => showToast(state === 'error' ? 'error' : state === 'synced' ? 'success' : 'info', `Sync across all projects: ${label}`, state)}
 							changes={changes}
 							isOffline={isOffline}
 							refreshing={refreshing}

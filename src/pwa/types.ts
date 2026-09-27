@@ -1,3 +1,4 @@
+import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import type { InferOutput } from 'valibot';
 import type { reminderDraftSchema, reminderRecordSchema } from './reminder-storage-validation';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
@@ -9,7 +10,7 @@ export type StartTab = 'inbox' | 'today' | 'upcoming' | 'browse';
 export type DataMode = 'live' | 'cached' | 'error';
 export type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 export type LoadReminders = (options?: { silent?: boolean; maxAgeMs?: number }) => Promise<void>;
-export type ShowToast = (kind: ToastKind, message: string) => void;
+export type ShowToast = (kind: ToastKind, message: string, syncState?: SyncIndicatorState) => void;
 
 export type ReminderRecord = InferOutput<typeof reminderRecordSchema>;
 
@@ -38,6 +39,7 @@ export interface ModalState {
 }
 
 export interface ToastState {
+	syncState?: SyncIndicatorState;
 	kind: ToastKind;
 	message: string;
 }

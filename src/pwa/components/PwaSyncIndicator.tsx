@@ -12,7 +12,7 @@ interface PwaSyncIndicatorProps {
 	dataMode: DataMode;
 	error: string | null;
 	storageError: string | null;
-	onShowStatus: (label: string) => void;
+	onShowStatus: (label: string, state: SyncIndicatorState) => void;
 }
 
 export function reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: Omit<PwaSyncIndicatorProps, 'onShowStatus'>): { state: SyncIndicatorState; label: string } {
