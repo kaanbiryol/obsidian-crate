@@ -1,3 +1,4 @@
+import { checkDetailHistoryFreshness } from './pwa-detail-history-checks.mjs';
 import { dockAppearance } from './pwa-launch-theme-checks.mjs';
 import { checkSaveLinkKeyboard } from './pwa-sheet-field-checks.mjs';
 import { switchFeature, featureNavigationTarget } from './pwa-feature-navigation.mjs';
@@ -19,10 +20,21 @@ async function checkReaderNavigation(page) {
   const nav = reader.getByRole('navigation', { name: 'Article actions' });
   const floating = reader.locator('.crate-reading-reader__floating');
   const highlights = reader.getByRole('button', { name: /^Highlights \(/ });
+  const tags = reader.getByRole('button', { name: 'Edit article tags', exact: true });
+  await expect(tags).toHaveText('');
+  const material = button => button.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.background, border: style.borderColor, shadow: style.boxShadow,
+      blur: style.backdropFilter || style.webkitBackdropFilter, color: style.color };
+  });
+  const appearance = reader.getByRole('button', { name: 'Reading appearance', exact: true });
+  assert.deepEqual(await material(tags), await material(appearance), 'Tags matches the appearance icon');
+  assert.deepEqual(await material(highlights), await material(appearance), 'Highlights uses the same frosted material and icon color');
   await expect(reader.getByRole('group', { name: 'Article view' })).toHaveCount(0);
   await expect(floating).toHaveCSS('height', '0px');
   // Give the short server fixture enough length to exercise real browser scrolling.
-  const length = await page.addStyleTag({ content: '.crate-reading-reader__body { min-height: 3000px; }' });
+  const length = await page.addStyleTag({ content: '.crate-reading-reader__body { min-height: 12000px; }' });
+  await expect(reader.locator('.crate-reading-reader__body')).toBeVisible();
   const scrollTo = async top => {
     await page.evaluate(value => window.scrollTo(0, value), top);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(top);
@@ -32,6 +44,7 @@ async function checkReaderNavigation(page) {
     await expect(nav).toHaveAttribute('data-scroll-hidden', 'false');
     await expect(floating).toHaveAttribute('data-scroll-hidden', 'false');
     await expect(floating).toHaveCSS('opacity', '1');
+    await expect(nav).toHaveCSS('opacity', '1');
     const box = await highlights.boundingBox();
     assert.ok(box && box.y > 0 && box.y + box.height <= page.viewportSize().height, JSON.stringify(box));
     await expect.poll(() => nav.evaluate(element => Math.abs(element.getBoundingClientRect().top))).toBeLessThan(1);
@@ -45,7 +58,8 @@ async function checkReaderNavigation(page) {
     await expect(floating).toHaveAttribute('data-scroll-hidden', 'true');
     await expect(floating).toHaveCSS('opacity', '0');
     await expect(highlights).toHaveCSS('pointer-events', 'none');
-    await expect.poll(() => nav.evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
+    await expect(nav).toHaveCSS('opacity', '0');
+    if (reducedMotion === 'no-preference') await expect.poll(() => nav.evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
     await scrollTo(446); // Tiny reversals should not flicker the header.
     await expect(nav).toHaveAttribute('data-scroll-hidden', 'true');
     await expect(floating).toHaveAttribute('data-scroll-hidden', 'true');
@@ -55,6 +69,8 @@ async function checkReaderNavigation(page) {
     if (reducedMotion === 'no-preference') {
       await expect.poll(() => floating.evaluate(element => Number(getComputedStyle(element).opacity))).toBeGreaterThan(0);
       await expect.poll(() => floating.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
+      await expect.poll(() => nav.evaluate(element => Number(getComputedStyle(element).opacity))).toBeGreaterThan(0);
+      await expect.poll(() => nav.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
     }
     await scrollTo(360);
     await visibleAtTop();
@@ -80,10 +96,27 @@ async function checkReaderNavigation(page) {
     await nav.getByRole('button', { name: 'Back to reading' }).focus();
     await visibleAtTop();
     await nav.getByRole('button', { name: 'Back to reading' }).evaluate(element => element.blur());
+    // Restored controls stay anchored even many viewports into the article.
+    await scrollTo(6300);
+    await expect(nav).toHaveCSS('opacity', '0');
+    await scrollTo(6000);
+    await visibleAtTop();
+    const passageTop = await reader.locator('.crate-reading-reader__body').evaluate(element => element.getBoundingClientRect().top);
+    await page.waitForTimeout(200);
+    assert.equal(await reader.locator('.crate-reading-reader__body').evaluate(element => element.getBoundingClientRect().top), passageTop, 'Chrome transitions must not move the article');
     await scrollTo(0);
     await visibleAtTop();
     if (reducedMotion === 'reduce') await expect(nav).toHaveCSS('transition-duration', '0s');
   }
+  // The pinned actions must remain below the installed app's status-bar inset.
+  const safeArea = await page.addStyleTag({ content: ':root { --pwa-safe-area-top: 47px; }' });
+  await scrollTo(6300);
+  await expect(nav).toHaveCSS('opacity', '0');
+  await scrollTo(6000);
+  await expect(nav).toHaveCSS('opacity', '1');
+  await expect.poll(() => nav.evaluate(element => element.getBoundingClientRect().top)).toBe(47);
+  await safeArea.evaluate(element => element.remove());
+  await scrollTo(0);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await length.evaluate(element => element.remove());
 }
@@ -191,7 +224,6 @@ async function assertNoPendingBanner(page) {
 async function refreshReadingFromSettings(page, expectedError) {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button',{name:'Open settings',exact:true}).click();
-  await page.getByRole('button', { name: /^Sync and device/ }).click();
   if (expectedError) await expect(page.getByRole('dialog').getByText(expectedError,{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Refresh all',exact:true}).click();
   await expect(page.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
@@ -200,8 +232,6 @@ async function refreshReadingFromSettings(page, expectedError) {
 }
 
 async function sheetAppearance(page) {
-  const sync = page.getByRole('button', { name: /^Sync and device/ });
-  if (await sync.getAttribute('aria-expanded') !== 'true') await sync.click();
   await expect(page.getByRole('button', { name: 'Refresh all', exact: true })).toBeVisible();
   return page.getByRole('dialog').evaluate(sheet => {
     const header = sheet.querySelector('.reminder-modal-header');
@@ -318,7 +348,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const sheet = page.getByRole('dialog',{name:'Settings',exact:true});
       await expect(sheet).toHaveClass(/pwa-modal-sheet__container--settings/);
       await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
-      await expect(sheet.locator('.settings-group')).toHaveCount(3);
+      for (const title of ['General', 'Tabs', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
       await page.screenshot({path:`test-results/reading/${name}-settings-${theme}.png`});
       await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}));
@@ -408,7 +438,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assertReaderSlide(await opening, 'open');
     let articleHistoryLength = await page.evaluate(() => history.length);
     const articleUrl = page.url();
-    await expect(page.getByText('Opening article…',{exact:true})).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Loading article', exact: true }).locator('.crate-content-loading__spinner')).toBeVisible();
+    await expect(page.locator('.crate-reading-reader__header')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Back to reading' })).toBeEnabled();
     const originalArticle = await page.locator('.crate-reading__reader-pane article').elementHandle();
     firstArticleReleased.resolve();
     await page.getByText('Available offline',{exact:true}).waitFor();
@@ -417,11 +449,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // After visiting Inbox, another tab must not reuse its native Back snapshot.
     await page.goBack();
     await page.waitForFunction(() => history.state?.readingLibrary === true);
+    await checkDetailHistoryFreshness(page, {
+      open: async () => { await page.locator('.crate-reading__open').first().click(); await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true'); },
+      close: async () => { await page.goBack(); await page.waitForFunction(() => history.state?.readingLibrary === true); },
+      list: page.locator('.crate-reading__library'), stateKey: 'readingStackId', detailKey: 'readingArticle',
+    });
     // Cached text is available during the next slide. It must not trigger
     // parsing, syntax highlighting, or a full article layout while moving.
     const cachedOpening = await captureReaderMotion(page, 'open');
     assertReaderSlide(cachedOpening, 'open');
-    assert.ok(cachedOpening.samples.filter(sample => sample.reader > 1).every(sample => !sample.body), 'Article body waits for the opening slide');
+    assert.ok(cachedOpening.samples.filter(sample => sample.reader > 1).every(sample => !sample.body && !sample.article), 'Article heading and body wait for the opening slide');
+    assert.ok(cachedOpening.samples.every(sample => sample.article === sample.body), 'Article heading and body appear in the same frame');
     await expect(page.locator('.crate-reading-reader__body')).toHaveCount(1);
     await page.goBack();
     await page.waitForFunction(() => history.state?.readingLibrary === true);

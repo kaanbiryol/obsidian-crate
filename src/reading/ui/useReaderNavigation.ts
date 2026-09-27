@@ -15,6 +15,7 @@ export function useReaderNavigation(article: RefObject<HTMLElement | null>, enab
 		let visibility = 1;
 		const setVisibility = (value: number) => {
 			visibility = Math.max(0, Math.min(1, value));
+			navigation.style.setProperty('--reader-navigation-visibility', String(visibility));
 			floating?.style.setProperty('--reader-floating-visibility', String(visibility));
 		};
 		let previous = 0;
@@ -50,6 +51,7 @@ export function useReaderNavigation(article: RefObject<HTMLElement | null>, enab
 			floating?.removeEventListener('focusin', reveal);
 			if (floating) { delete floating.dataset.scrollHidden; floating.style.removeProperty('--reader-floating-visibility'); }
 			delete navigation.dataset.scrollHidden;
+			navigation.style.removeProperty('--reader-navigation-visibility');
 		};
 	}, [article, enabled, articleId]);
 }

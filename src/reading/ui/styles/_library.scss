@@ -33,7 +33,11 @@
 	&__item { position: relative; display: flex; align-items: center; min-width: 0; @include list-item.surface; margin-bottom: 8px; }
 	@media (hover: hover) and (pointer: fine) { &__item:hover { @include list-item.hover; } }
 	&__item:has(button[data-press-active]) { @include list-item.active; }
-	&__item[data-selected="true"] { background: var(--crate-selection-bg); border-color: var(--crate-selection-border); }
+	// Selection identifies the adjacent article in split view. In a stacked
+	// layout it would fade back to rest as Back reveals the library, flashing.
+	@container reading (min-width: 720px) {
+		&__item[data-selected="true"] { background: var(--crate-selection-bg); border-color: var(--crate-selection-border); }
+	}
 	button.crate-reading__open { display: flex; color: var(--text-normal); box-shadow: none; flex: 1; align-items: flex-start; justify-content: flex-start; min-width: 0; @include list-item.primary-spacing; border: 0; padding-right: 0; text-align: left; min-height: 66px; background: transparent; }
 	button.crate-reading__open:disabled { opacity: .5; }
 	button.crate-reading__open:hover:not(:disabled) { background: transparent; }
