@@ -233,10 +233,13 @@ function ReadingAppContent() {
   useEffect(() => { if (session && ready) void run(() => writeValue(`draft:${session.id}`, { url }, session)); }, [session, ready, url, run]);
   const open = useCallback(async (item: ReadingItem, animate = true, section: ReadingSection = 'inbox') => {
     if (!session || appBack.current) return;
-    const request = ++navigation.current;
     const current = () => alive.current && readingSession()?.id === session.id && readingSession()?.token === session.token
       && request === navigation.current && new URL(location.href).searchParams.get('item') === item.crate_reading_id;
-    articleStack.current = openReadingArticleHistory(item.crate_reading_id, section);
+    const stack = await openReadingArticleHistory(item.crate_reading_id, section);
+    if (!stack) return;
+    const request = ++navigation.current;
+    if (!current()) return;
+    articleStack.current = stack;
     setReaderMotion(animate ? 'slide' : 'none');
     if (!item.path) {
       setReader({ item, markdown: '', availableOffline: false }); setError(null);
@@ -423,7 +426,7 @@ function ReadingAppContent() {
     {error && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(() => refresh()); else void connect(); }}>Retry</Button></p>}
     {!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
   </>;
-  return <main className="pwa-screen crate-reading-web">
+  return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
     {!session ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>{remindersConnected ? 'Reading uses this app’s existing connection. In Obsidian, enable server reading in Crate settings.' : 'In Obsidian, open Crate settings → Reading → Open web reading to connect this browser.'}</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}{!remindersConnected && <p>To install on iPhone, open your Reading setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>}{notices}</section> : <>
       <ReadingLibraryPanel initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <PwaTabTransition viewKey={section}>{content}</PwaTabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onUpdate={update} onRefresh={refresh} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} pendingItemIds={blockedItemIds} onReaderClosed={finishReaderClose} readerMotion={phoneReader ? window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(() => refresh())} />}

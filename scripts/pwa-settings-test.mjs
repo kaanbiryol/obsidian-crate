@@ -1,5 +1,7 @@
 import { checkTabSettings } from './pwa-tab-settings-checks.mjs';
+import { checkCompoundFocus, checkSettingsFocus } from './pwa-compound-focus-checks.mjs';
 import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
+import { checkSettingsNavigation } from './pwa-settings-navigation-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -36,6 +38,8 @@ try {
 			await gear.click();
 			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(sheet).toBeVisible();
+			await checkSettingsNavigation(page);
+			await checkSettingsFocus(page, sheet);
 			await checkTabSettings(page, name);
 			// Page presentation fills tall and short phones, rather than stopping
 			// at the desktop height cap. Resizing also exercises the layout lock.
@@ -85,7 +89,8 @@ try {
 			await page.emulateMedia({ colorScheme: 'dark' });
 			await expectTheme(page, 'dark', 'system');
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
-			await sheet.getByRole('combobox', { name: 'Open to' }).selectOption('favorites');
+			await sheet.getByRole('combobox', { name: 'Default tab' }).selectOption('favorites');
+			await checkSettingsFocus(page, sheet);
 			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'] });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
@@ -95,7 +100,9 @@ try {
 
 			await switchFeature(page, 'Reading');
 			await page.getByRole('searchbox', { name: 'Search reading' }).fill('retained query');
+			await checkCompoundFocus(page, page.getByRole('searchbox', { name: 'Search reading' }), page.locator('.crate-feature-panel[data-active="true"] .crate-field--search .crate-field__control'));
 			await gear.click();
+			await checkSettingsFocus(page, sheet);
 			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveValue('17');
 			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
 			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
@@ -112,14 +119,13 @@ try {
 			await page.emulateMedia({ reducedMotion: 'no-preference' });
 			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
 			const retainedScroll = await shortcut.locator('.settings-main').evaluate(element => element.scrollTop);
-			await expect.poll(() => shortcut.locator('.settings-detail').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
+			await expect.poll(() => shortcut.locator('.pwa-push-stack__detail').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
 			await page.keyboard.press('Escape');
 			await expect(sheet).toBeVisible();
 			await expect.poll(() => sheet.locator('.settings-main').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
 			expect(await sheet.locator('.settings-main').evaluate(element => element.scrollTop)).toBe(retainedScroll);
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
 			await page.emulateMedia({ reducedMotion: 'reduce' });
-			await sheet.getByRole('button', { name: /^Sync and device/ }).click();
 			await expect(sheet.getByText('Device storage', { exact: true })).toBeVisible();
 			// Hold refresh open so unrelated controls are checked during real pending work.
 			let releaseRefresh;
@@ -216,7 +222,7 @@ try {
 			await logout.getByRole('button', { name: 'Cancel', exact: true }).click();
 			await expect(sheet.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 			await page.setViewportSize({ width: 320, height: 568 });
-			await expect(sheet.getByRole('combobox', { name: 'Open to' })).toBeVisible();
+			await expect(sheet.getByRole('combobox', { name: 'Default tab' })).toBeVisible();
 			expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 			await page.screenshot({ path: 'test-results/settings/' + name + '-compact.png' });
 			await page.setViewportSize({ width: 1280, height: 900 });
@@ -234,7 +240,6 @@ try {
 			await disabledPage.goto(origin + '/notifications?tab=inbox');
 			await disabledPage.getByRole('button', { name: 'Open settings', exact: true }).click();
 			const disabledSheet = disabledPage.getByRole('dialog', { name: 'Settings', exact: true });
-			await disabledSheet.getByRole('button', { name: 'About', exact: true }).click();
 			await expect(disabledSheet.getByRole('button', { name: 'Update app', exact: true })).toBeEnabled();
 			await expect(disabledSheet.locator('.settings-attention')).toHaveCount(0);
 			await expect(disabledSheet.getByRole('button', { name: 'Set up iPhone shortcut', exact: true })).toBeDisabled();

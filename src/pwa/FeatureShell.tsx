@@ -1,7 +1,9 @@
+import { createPushedScreenHistory } from './pushed-screen-history';
+import { cancelDetailHistoryOpen, installDetailHistory } from './detail-history';
 import { PwaUpdateProvider } from './components/PwaUpdateProvider';
 import { dockDestinationIndex } from './dock-preferences';
 import { usePwaPreferences } from './hooks/usePwaPreferences';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext, type CrateSection, type DockDestination } from './components/FeatureSwitcherButton';
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
@@ -13,7 +15,7 @@ import { usePwaBackGesture } from './hooks/usePwaBackGesture';
 import { loadPwaPreferences } from './preferences';
 import { resolvePwaOpeningDestination } from './opening-destination';
 import { createSettingsStore } from './settings-store';
-import { SettingsContext, useSettingsOpen } from './settings-context';
+import { SettingsContext, useSettingsOpen, useSettingsStore } from './settings-context';
 import { SettingsSheet } from './components/SettingsSheet';
 
 const currentSection = (): CrateSection => new URL(location.href).searchParams.get('section') === 'reading' ? 'reading' : 'reminders';
@@ -25,11 +27,17 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 }
 
 function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
+	useLayoutEffect(installDetailHistory, []);
 	usePwaInputModality();
 	const [launch] = useState(() => resolvePwaOpeningDestination(location.search, loadPwaPreferences().defaultScreen));
 	const [section, setSection] = useState<CrateSection>(() => launch.tab === 'reading' ? 'reading' : 'reminders');
 	const [destination, setDestination] = useState<DockDestination | null>(() => launch.tab === 'reading' ? { section: 'reading', tab: launch.readingTab } : null);
 	const [settingsOpen] = useSettingsOpen();
+	const settings = useSettingsStore();
+	const [settingsNavigation] = useState(() => createPushedScreenHistory(['shortcut', 'logout'] as const));
+	useEffect(() => { if (!settingsOpen) settingsNavigation.reset(); }, [settingsOpen, settingsNavigation]);
+	const [shortcutLaunch] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
+	const openedShortcut = useRef(false);
 	const [reminderDockIndex, rememberReminderDockIndex] = useState<number | null>(null);
 	const { preferences } = usePwaPreferences();
 	const [readingTab, rememberReadingTab] = useState<ReadingSection>(() => launch.tab === 'reading' ? launch.readingTab : 'inbox');
@@ -40,7 +48,13 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		// Initializing the other feature can load and render an entire library.
 		// Keep that work out of the sheet's entrance animation.
 		setVisited(current => current.size === 2 ? current : new Set<CrateSection>(['reading', 'reminders']));
-	}, []);
+		if (shortcutLaunch && !openedShortcut.current) {
+			openedShortcut.current = true;
+			const url = new URL(location.href); url.searchParams.delete('setup');
+			history.replaceState(history.state, '', url);
+			settingsNavigation.push('shortcut');
+		}
+	}, [settingsNavigation, shortcutLaunch]);
 	useEffect(() => {
 		// Keep launch preference resolution consistent with feature history and links.
 		if (launch.tab === 'reading' && currentSection() !== 'reading') {
@@ -62,10 +76,14 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		setVisited(current => new Set([...current, next]));
 		setSection(next);
 	}, []);
+	useLayoutEffect(() => settingsNavigation.install(() => {
+		showSection(currentSection());
+		settings.setOpen(true);
+	}), [settings, settingsNavigation, showSection]);
 	useEffect(() => {
-		const navigate = () => showSection(currentSection());
+		const navigate = () => { settings.setOpen(false); showSection(currentSection()); };
 		window.addEventListener('popstate', navigate); return () => window.removeEventListener('popstate', navigate);
-	}, [showSection]);
+	}, [showSection, settings]);
 	useEffect(() => {
 		if (!leavingSection) return;
 		// Only recover if the browser cancels/suppresses animation events. Normal
@@ -114,6 +132,7 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		if (next === previous) return;
 		locations.current[previous] = { url: location.pathname + location.search, state: history.state };
 		history.replaceState(locations.current[next].state, '', locations.current[next].url);
+		cancelDetailHistoryOpen();
 		restoreFocus.current = true;
 		showSection(next);
 	};
@@ -127,6 +146,6 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
 		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
 		</div>
-		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
+		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet navigation={settingsNavigation} onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
 	</div></PwaUpdateProvider></ThemeIconProvider>;
 }

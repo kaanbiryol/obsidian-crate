@@ -1,3 +1,4 @@
+import { checkDetailHistoryFreshness } from './pwa-detail-history-checks.mjs';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -21,6 +22,11 @@ try {
       await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=browse`);
       const target = page.getByRole('button', { name: 'Open Errands', exact: true });
       await expect(target).toBeVisible();
+      await checkDetailHistoryFreshness(page, {
+        open: async () => { await target.click(); await expect(page.locator('.pwa-project-layer')).toHaveAttribute('data-project-open', 'true'); },
+        close: async () => { await page.goBack(); await page.waitForFunction(() => history.state?.reminderProjectList === true); },
+        list: page.locator('.reminders-browse-view'), stateKey: 'reminderProjectStackId', detailKey: 'reminderProject',
+      });
       const disclosure = page.locator('.premium-project-expand').first();
       const children = page.locator('.premium-project-children').first();
       const fullHeight = await children.evaluate(element => element.getBoundingClientRect().height);
@@ -155,6 +161,8 @@ try {
       // position, keeping the list and history intact throughout the reversal.
       const interrupted = await page.evaluate(async () => {
         document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
+        // Reopening first refreshes browser history; measure from the actual entrance.
+        while (!document.querySelector('.pwa-navigation-screen--project')) await new Promise(resolve => requestAnimationFrame(resolve));
         await new Promise(resolve => setTimeout(resolve, 80));
         const screen = document.querySelector('.pwa-navigation-screen--project');
         const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;

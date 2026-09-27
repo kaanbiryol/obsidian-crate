@@ -1,12 +1,13 @@
 import { useId, type ReactNode } from 'react';
 
-export function SettingsSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+export function SettingsSection({ title, action, description, children }: { title: string; action?: ReactNode; description?: string; children: ReactNode }) {
 	const titleId = useId();
 	return <section className="settings-panel__section" aria-labelledby={titleId}>
 		<div className="settings-panel__heading">
 			<h3 id={titleId} className="settings-panel__title">{title}</h3>
 			{action}
 		</div>
+		{description && <p className="settings-section-description">{description}</p>}
 		<div className="settings-group">{children}</div>
 	</section>;
 }

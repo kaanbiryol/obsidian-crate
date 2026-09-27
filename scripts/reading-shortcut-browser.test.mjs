@@ -77,8 +77,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     }
     await page.setViewportSize({ width: 320, height: 568 });
-    await dialog.getByRole('heading', { name: 'Try it', exact: true }).scrollIntoViewIfNeeded();
-    await expect(dialog.getByRole('heading', { name: 'Try it', exact: true })).toBeVisible();
+    await dialog.getByRole('heading', { name: '3. Save your first article', exact: true }).scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole('heading', { name: '3. Save your first article', exact: true })).toBeVisible();
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     const closeBox = await dialog.getByRole('button', { name: 'Back to settings' }).boundingBox();
     assert.ok(closeBox && closeBox.y >= 0 && closeBox.y + closeBox.height <= 568, 'The close control must stay visible while scrolling');

@@ -1,0 +1,16 @@
+@mixin surface {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+  background: var(--background-primary-alt) !important;
+
+  &:hover:not(:focus-visible) {
+    border-color: color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+    background: var(--background-primary-alt) !important;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary-alt)) !important;
+    }
+  }
+}

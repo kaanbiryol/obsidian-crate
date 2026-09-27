@@ -124,7 +124,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const historyFrame = useRef(0);
 
 	useLayoutEffect(() => {
-		if (initialProject) projectStack.current = openProjectHistory(initialProject);
+		if (initialProject) void openProjectHistory(initialProject).then(stack => { projectStack.current = stack; });
 		return () => cancelAnimationFrame(historyFrame.current);
 	}, [initialProject]);
 
@@ -157,9 +157,11 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		setViewMode(mode);
 	}, [selectedProject]);
 
-	const handleProjectSelect = useCallback((project: string) => {
+	const handleProjectSelect = useCallback(async (project: string) => {
 		if (selectedProject || closingProject.current) return;
-		projectStack.current = openProjectHistory(project);
+		const stack = await openProjectHistory(project);
+		if (!stack || new URL(location.href).searchParams.get('project') !== project) return;
+		projectStack.current = stack;
 		lastProject.current = project;
 		setSkipProjectMotion(false);
 		setDirection(1);
@@ -315,7 +317,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					inert={initializing || backgroundInert || Boolean(selectedProject) || closingProject.current}
 					onAdd={initializing || !suppressFab ? handleAdd : undefined} />
 
-				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current} inert={initializing}>
+				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current} data-pwa-back={Boolean(selectedProject) && !closingProject.current} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
 						{selectedProject && <PwaNavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
 							<div className="reminders-content">

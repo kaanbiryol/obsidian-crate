@@ -1,0 +1,20 @@
+.crate-reminders-ui .pwa-push-stack {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+	isolation: isolate;
+	&__root, &__detail {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+	&__body { flex: 1; min-height: 0; overflow-y: auto; }
+	&__detail[inert] { pointer-events: none; }
+	&__detail {
+		background: var(--pwa-sheet-surface, var(--background-primary));
+		box-shadow: -14px 0 32px rgba(0, 0, 0, 0.1);
+	}
+}
