@@ -110,9 +110,9 @@
         cursor: pointer;
 
         @media (hover: hover) and (pointer: fine) {
-            &:hover { background: var(--crate-control-hover-bg); }
+          &:hover { background: var(--crate-control-hover-bg); }
         }
-        &:active { background: var(--crate-control-hover-bg); }
+        &[data-press-active] { background: var(--crate-control-hover-bg); }
         &:focus-visible {
             outline: 2px solid var(--crate-focus-ring);
             outline-offset: -3px;
@@ -166,18 +166,19 @@
 // Touch browsers retain :hover after a scroll or release. Reserve it for real
 // hover pointers; touch feedback follows the current press instead.
 @media (hover: hover) and (pointer: fine) {
-    .premium-project-card:hover .premium-project-content {
-        background: var(--crate-project-card-hover-bg, var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg)));
-        border-color: var(--crate-project-card-hover-border, var(--crate-reminder-card-hover-border, var(--crate-divider-strong)));
-    }
+  .premium-project-card:hover .premium-project-content {
+    background: var(--crate-project-card-hover-bg, var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg)));
+    border-color: var(--crate-project-card-hover-border, var(--crate-reminder-card-hover-border, var(--crate-divider-strong)));
+  }
 
-    .premium-project-card:hover .premium-project-chevron {
-        opacity: 0.7;
-        transform: translateX(2px);
-    }
+
+  .premium-project-card:hover .premium-project-chevron {
+    opacity: 0.7;
+    transform: translateX(2px);
+  }
 }
 
-.premium-project-card:is([data-pressed], :focus-visible:active) .premium-project-content {
+.premium-project-card[data-press-active] .premium-project-content {
     transform: scale(0.98);
 }
 
@@ -304,5 +305,4 @@
     opacity: 0.4;
     transition: opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
-
 }

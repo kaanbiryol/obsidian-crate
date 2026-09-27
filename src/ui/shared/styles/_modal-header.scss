@@ -18,7 +18,13 @@
   box-shadow: none !important;
   color: var(--text-faint);
 
-  &:hover,
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent) !important;
+      background: var(--crate-control-hover-bg) !important;
+      color: var(--text-normal);
+    }
+  }
   &:focus-visible {
     border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent) !important;
     background: var(--crate-control-hover-bg) !important;
@@ -104,11 +110,13 @@
     color: var(--text-normal);
     cursor: pointer;
 
-    &:hover {
-      background: var(--crate-control-hover-bg);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background: var(--crate-control-hover-bg);
+      }
     }
 
-    &:active {
+    &[data-press-active] {
       background: var(--crate-control-active-bg);
     }
   }

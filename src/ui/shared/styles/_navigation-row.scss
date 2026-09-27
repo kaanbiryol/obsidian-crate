@@ -8,7 +8,9 @@
   text-align: left;
   user-select: none;
   cursor: pointer;
-  &:hover { background: var(--background-modifier-hover); }
+  @media (hover: hover) and (pointer: fine) {
+    &:hover { background: var(--background-modifier-hover); }
+  }
   &[aria-pressed='true'], &[aria-current='true'] { background: var(--background-modifier-hover); }
   &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring, var(--crate-focus-ring)); outline-offset: -2px; }
 }

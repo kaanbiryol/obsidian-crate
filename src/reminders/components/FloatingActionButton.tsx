@@ -42,8 +42,6 @@ export const FloatingActionButton = memo(function FloatingActionButton({
       transition={prefersReducedMotion
         ? { duration: 0 }
         : { type: 'spring', stiffness: 420, damping: 30 }}
-      whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
-      whileHover={prefersReducedMotion ? undefined : { scale: 1.04 }}
       aria-label={ariaLabel}
       data-action={dataAction}
     >

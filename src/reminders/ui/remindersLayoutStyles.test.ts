@@ -374,7 +374,7 @@ describe('plugin reminder layout styles', () => {
       '.reorderable-reminder-item[data-reorder-interaction="drag"]',
     );
     expect(primaryStyles).toContain(
-      '.premium-reminder-card:active .premium-reminder-content {\n        transform: none;',
+      '.premium-reminder-card[data-press-active] .premium-reminder-content {\n        transform: none;',
     );
   });
 

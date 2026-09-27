@@ -23,14 +23,19 @@
     z-index: 50;
     transition: box-shadow var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
-    &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
         box-shadow: var(--shadow-m, var(--crate-fab-shadow));
+      }
     }
 
-    &:active {
+    &[data-press-active] {
+        scale: .94;
         box-shadow: var(--shadow-s, var(--crate-fab-shadow));
     }
 }
+
+@media (prefers-reduced-motion: reduce) { .reminders-fab[data-press-active] { scale: 1; } }
 
 // Extend the desktop sidebar bar behind Obsidian's status bar while lifting the
 // interactive items above it with measured internal padding.

@@ -1,3 +1,5 @@
+@use "../../../../ui/shared/styles/list-item";
+
 // ============================================
 // Shared reminder card presentation
 // ============================================
@@ -28,26 +30,18 @@
     align-items: flex-start;
     gap: 12px;
     padding: 14px 16px;
-    border-radius: var(--crate-radius-card);
     cursor: pointer;
-
-    background: var(--crate-reminder-card-bg);
-    border: 1px solid var(--crate-reminder-card-border);
-    box-shadow: var(--crate-reminder-card-shadow);
-
-    transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    @include list-item.surface;
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .premium-reminder-card:hover .premium-reminder-content {
-        background: var(--crate-reminder-card-hover-bg);
-        border-color: var(--crate-reminder-card-hover-border);
-    }
+  .premium-reminder-card:hover .premium-reminder-content {
+    @include list-item.hover;
+  }
 }
 
-.premium-reminder-card:active .premium-reminder-content {
-    background: var(--crate-reminder-card-active-bg);
-    border-color: var(--crate-reminder-card-active-border);
+.premium-reminder-card[data-press-active] .premium-reminder-content {
+    @include list-item.active;
 }
 
 .premium-reminder-card.is-completed .premium-reminder-content {
@@ -81,7 +75,7 @@
         &:is(.is-long-press-armed, .is-reordering) {
             :is(.premium-reminder-content, .reminder-card__main) {
                 transform: scale(1);
-                // Touch movement can clear :active while the card is still held.
+                // Touch movement can clear [data-press-active] while the card is still held.
                 background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
                 border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
                 box-shadow: var(--crate-reminder-card-shadow, none);
@@ -119,13 +113,13 @@
     // Touch WebKit can transfer sticky hover from a dismissed sheet to the
     // checkbox underneath it. Only a real hover pointer should brighten it.
     @media (hover: hover) and (pointer: fine) {
-        &:hover .premium-checkbox-visual {
-            border-color: var(--checkbox-border-color-hover, var(--text-muted));
-            transform: scale(1.05);
-        }
+      &:hover .premium-checkbox-visual {
+        border-color: var(--checkbox-border-color-hover, var(--text-muted));
+        transform: scale(1.05);
+      }
     }
 
-    &:active .premium-checkbox-visual {
+    &[data-press-active] .premium-checkbox-visual {
         transform: scale(0.95);
     }
 
@@ -144,10 +138,10 @@
         box-shadow: var(--crate-checkbox-checked-shadow, none);
 
         @media (hover: hover) and (pointer: fine) {
-            &:hover {
-                border-color: var(--checkbox-color-hover, var(--interactive-accent-hover));
-                background: var(--checkbox-color-hover, var(--interactive-accent-hover));
-            }
+          &:hover {
+            border-color: var(--checkbox-color-hover, var(--interactive-accent-hover));
+            background: var(--checkbox-color-hover, var(--interactive-accent-hover));
+          }
         }
     }
 
@@ -155,8 +149,10 @@
         border-color: var(--crate-danger);
     }
 
-    &.is-important:not(.is-checked):hover .premium-checkbox-visual {
+    @media (hover: hover) and (pointer: fine) {
+      &.is-important:not(.is-checked):hover .premium-checkbox-visual {
         border-color: var(--crate-danger);
+      }
     }
 }
 
@@ -214,9 +210,7 @@
 
 .premium-reminder-title {
     display: -webkit-box;
-    font-size: var(--reminder-font-base);
-    font-weight: var(--reminder-font-weight-medium);
-    line-height: 1.4;
+    @include list-item.title;
     color: var(--text-normal);
     position: relative;
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
@@ -253,8 +247,10 @@
     border-bottom: 1px solid color-mix(in srgb, var(--interactive-accent) 30%, transparent);
     transition: border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 
-    &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
         border-bottom-color: color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+      }
     }
 
     .is-completed & {
@@ -338,5 +334,4 @@
         opacity: 0.9;
     }
 }
-
 }

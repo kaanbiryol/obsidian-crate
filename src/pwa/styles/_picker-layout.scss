@@ -25,7 +25,7 @@
       pointer-events: none;
     }
 
-    .reminder-picker :is(.picker-date-field, .picker-time-card):not(:active) {
+    .reminder-picker :is(.picker-date-field, .picker-time-card):not([data-press-active]) {
       background: transparent;
     }
   }
@@ -33,7 +33,7 @@
   @media (hover: none) {
     // Touch browsers retain hover and focus after release. Keep feedback tied
     // to the press, while leaving keyboard focus outlines intact.
-    .pwa-repeat-picker-sheet .reminder-picker :is(.picker-control-row, .recurrence-stepper-button):not(:active) {
+    .pwa-repeat-picker-sheet .reminder-picker :is(.picker-control-row, .recurrence-stepper-button):not([data-press-active]) {
       background: transparent;
       border-color: transparent;
     }

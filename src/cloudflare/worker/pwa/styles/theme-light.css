@@ -73,7 +73,9 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .premium-project-chevron{opacity:.65}
 .settings-theme-picker{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border)}
 .settings-theme-option{color:var(--text-muted)}
-.settings-theme-option:hover{background:var(--pwa-light-surface-hover);color:var(--text-normal)}
+@media (hover: hover) and (pointer: fine) {
+  .settings-theme-option:hover {background:var(--pwa-light-surface-hover);color:var(--text-normal)}
+}
 .settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--text-normal);box-shadow:0 1px 3px rgba(24,24,27,.06)}
 .toast{background:rgba(255,255,255,.94);border-color:var(--background-modifier-border);color:var(--text-normal);box-shadow:0 8px 24px rgba(24,24,27,.12)}
 

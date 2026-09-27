@@ -1,3 +1,4 @@
+@use "../../../ui/shared/styles/list-item";
 @use "../../../ui/shared/styles/loading-indicator";
 .crate-reminders-ui .crate-reading-workspace { height: 100%; min-height: 0; container: reading / inline-size; }
 .crate-reminders-ui .crate-reading {
@@ -29,20 +30,22 @@
 	&__group { margin: 0 0 22px; }
 	&__group h3 { color: var(--text-muted); margin: 0; padding: 4px 12px 8px; font-size: 12px; font-weight: 450; }
 	&__list { list-style: none; padding: 0; margin: 0; }
-	&__item { position: relative; display: flex; align-items: center; min-width: 0; border-radius: 10px; margin-bottom: 3px; }
-	&__item[data-selected="true"] { background: var(--crate-selection-bg); }
-	button.crate-reading__open { display: flex; color: var(--text-normal); box-shadow: none; flex: 1; align-items: flex-start; justify-content: flex-start; min-width: 0; gap: 12px; border: 0; padding: 15px 0 15px 12px; text-align: left; min-height: 78px; background: transparent; }
+	&__item { position: relative; display: flex; align-items: center; min-width: 0; @include list-item.surface; margin-bottom: 8px; }
+	@media (hover: hover) and (pointer: fine) { &__item:hover { @include list-item.hover; } }
+	&__item:has(button[data-press-active]) { @include list-item.active; }
+	&__item[data-selected="true"] { background: var(--crate-selection-bg); border-color: var(--crate-selection-border); }
+	button.crate-reading__open { display: flex; color: var(--text-normal); box-shadow: none; flex: 1; align-items: flex-start; justify-content: flex-start; min-width: 0; @include list-item.primary-spacing; border: 0; padding-right: 0; text-align: left; min-height: 66px; background: transparent; }
 	button.crate-reading__open:disabled { opacity: .5; }
 	button.crate-reading__open:hover:not(:disabled) { background: transparent; }
-	&__source-icon { position: relative; overflow: hidden; display: inline-flex; flex: 0 0 26px; align-items: center; justify-content: center; height: 26px; width: 26px; border-radius: 7px; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); color: var(--text-muted); font: 500 13px/1 var(--font-interface, system-ui, sans-serif); }
+	&__source-icon { position: relative; overflow: hidden; display: inline-flex; flex: 0 0 26px; align-items: center; justify-content: center; height: 26px; width: 26px; border-radius: 7px; background: var(--crate-panel-bg); border: 0; color: var(--text-muted); font: 500 13px/1 var(--font-interface, system-ui, sans-serif); }
 	&__source-icon img { position: absolute; inset: 0; box-sizing: border-box; width: 100%; height: 100%; padding: 3px; object-fit: contain; background: var(--crate-panel-bg); opacity: 0; }
 	&__source-icon img[data-loaded='true'] { opacity: 1; }
 	&__item-copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-	&__open strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 15px; font-weight: 550; letter-spacing: -.015em; line-height: 1.45; }
-	&__meta { color: var(--text-muted); font-size: 11px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	&__open strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; @include list-item.title; }
+	&__meta { color: var(--text-muted); font-size: var(--reminder-font-xs); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	button.crate-reading__favorite { align-self: center; margin: 0 2px; color: var(--text-faint, var(--text-muted)); }
 	button.crate-reading__favorite[aria-pressed="true"] { color: var(--text-normal); }
-	@media (hover: hover) { &__item:hover { background: var(--crate-control-hover-bg); } &__item:not(:hover):not(:focus-within) button.crate-reading__favorite[aria-pressed="false"] { opacity: 0; } }
+	@media (hover: hover) and (pointer: fine) { &__item:not(:hover):not(:focus-within) button.crate-reading__favorite[aria-pressed="false"] { opacity: 0; } }
 	&__empty { text-align: center; padding: 64px 20px; color: var(--text-muted); }
 	&__empty > svg { display: block; margin: 0 auto 24px; color: var(--text-faint, var(--text-muted)); }
 	&__empty h2 { font-size: 18px; color: var(--text-normal); font-weight: 500; line-height: 1.4; letter-spacing: -.025em; margin: 0 0 12px; }
@@ -81,11 +84,7 @@
 		&__list-scroll { padding-left: 14px; padding-right: 14px; }
 		&__group { margin-bottom: 28px; }
 		&__group h3 { padding-bottom: 10px; font-size: 13px; }
-		button.crate-reading__open { min-height: 90px; gap: 14px; padding-top: 18px; padding-bottom: 18px; }
 		&__source-icon { width: 28px; height: 28px; flex-basis: 28px; }
-		&__open strong { font-size: 16px; line-height: 1.45; }
-		&__meta { font-size: 12px; }
-		&__item + &__item::before { content: ''; position: absolute; left: 54px; right: 14px; top: -2px; height: 1px; background: color-mix(in srgb, var(--crate-divider) 65%, transparent); }
 		&-workspace[data-reader-open="true"] { .crate-reading__sidebar, .crate-reading__library { display: none; } .crate-reading__reader-pane { display: block; } }
 	}
 }

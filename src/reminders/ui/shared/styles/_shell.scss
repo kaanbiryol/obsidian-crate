@@ -215,8 +215,10 @@
     border-radius: 3px;
 }
 
-.ios-scroll::-webkit-scrollbar-thumb:hover {
+@media (hover: hover) and (pointer: fine) {
+  .ios-scroll::-webkit-scrollbar-thumb:hover {
     background: var(--text-faint);
+  }
 }
 
 .reminders-view-scroll {
@@ -270,8 +272,10 @@
         background: var(--background-modifier-border-hover, var(--background-modifier-border));
         border-radius: 2px;
 
-        &:hover {
+        @media (hover: hover) and (pointer: fine) {
+          &:hover {
             background: var(--text-faint);
+          }
         }
     }
 }
@@ -418,8 +422,10 @@
     cursor: pointer;
     transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), box-shadow var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
-    &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
         background: var(--crate-control-hover-bg);
+      }
     }
 
     &[aria-selected="true"] {
@@ -437,5 +443,4 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
 }

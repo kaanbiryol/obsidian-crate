@@ -24,14 +24,19 @@
     z-index: 50;
     transition: box-shadow 0.2s ease;
 
-    &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
         box-shadow: 0 6px 16px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+      }
     }
 
-    &:active {
+    &[data-press-active] {
+        scale: .94;
         box-shadow: 0 2px 8px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
     }
 }
+
+@media (prefers-reduced-motion: reduce) { .reminders-fab[data-press-active] { scale: 1; } }
 
 // Modal-specific fullscreen adjustments
 .reminders-view.is-modal {

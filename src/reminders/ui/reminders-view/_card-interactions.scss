@@ -37,14 +37,15 @@
         box-shadow: inset 0 0 0 1px var(--crate-focus-ring);
     }
 
-    .premium-reminder-card:hover .premium-reminder-content,
-    .premium-project-card:hover .premium-project-content {
+    @media (hover: hover) and (pointer: fine) {
+      .premium-reminder-card:hover .premium-reminder-content, .premium-project-card:hover .premium-project-content {
         transform: none;
         box-shadow: none;
+      }
     }
 
-    .premium-reminder-card:active .premium-reminder-content,
-    .premium-project-card:is([data-pressed], :focus-visible:active) .premium-project-content {
+    .premium-reminder-card[data-press-active] .premium-reminder-content,
+    .premium-project-card[data-press-active] .premium-project-content {
         transform: none;
         background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
         border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
@@ -64,5 +65,4 @@
         --crate-card-press-duration: 0ms;
     }
 }
-
 }

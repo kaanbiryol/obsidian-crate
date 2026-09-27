@@ -23,14 +23,16 @@
 
       // Touch browsers can retain hover at the old confirmation close button.
       @media (hover: none) {
-        &:hover:not(:focus-visible) {
-          border-color: transparent !important;
-          background: transparent !important;
-          color: var(--text-muted);
+        @media (hover: hover) and (pointer: fine) {
+          &:hover:not(:focus-visible) {
+            border-color: transparent !important;
+            background: transparent !important;
+            color: var(--text-muted);
+          }
         }
       }
 
-      @media (hover: hover) {
+      @media (hover: hover) and (pointer: fine) {
         &:hover:not(:disabled) { color: var(--text-normal); }
       }
       &:focus-visible { color: var(--text-normal); }
@@ -60,5 +62,4 @@
       justify-self: end;
     }
   }
-
 }

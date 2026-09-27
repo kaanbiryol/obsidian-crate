@@ -49,14 +49,22 @@
     color: var(--crate-semantic-color);
   }
 
-  &:hover:not(.is-active) {
-    border-color: var(--crate-divider);
-    background: var(--crate-control-hover-bg);
-    color: var(--text-muted);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-active) {
+      border-color: var(--crate-divider);
+      background: var(--crate-control-hover-bg);
+      color: var(--text-muted);
+    }
   }
 
-  &.is-active:hover,
-  &:active {
+  @media (hover: hover) and (pointer: fine) {
+    &.is-active:hover {
+      border-color: color-mix(in srgb, var(--crate-semantic-color) 26%, transparent);
+      background: color-mix(in srgb, var(--crate-semantic-color) 11%, var(--crate-control-active-bg));
+      color: var(--crate-semantic-color);
+    }
+  }
+  &[data-press-active] {
     border-color: color-mix(in srgb, var(--crate-semantic-color) 26%, transparent);
     background: color-mix(in srgb, var(--crate-semantic-color) 11%, var(--crate-control-active-bg));
     color: var(--crate-semantic-color);
@@ -86,7 +94,6 @@
       }
     }
   }
-
 }
 
 @container (max-width: 420px) {
@@ -118,8 +125,6 @@
       background: var(--crate-semantic-bg);
       box-shadow: none;
     }
-
   }
 }
-
 }

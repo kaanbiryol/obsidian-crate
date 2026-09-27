@@ -74,8 +74,10 @@
   background: var(--crate-danger);
   color: var(--crate-on-accent);
 
-  &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--crate-danger) 88%, black);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--crate-danger) 88%, black);
+    }
   }
 }
 

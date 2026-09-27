@@ -21,8 +21,8 @@
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
   &:not(:disabled) {
     cursor: pointer;
-    @media (hover: hover) { &:hover { background: var(--crate-control-hover-bg); } }
-    &:active { background: var(--crate-control-active-bg); }
+    @media (hover: hover) and (pointer: fine) { &:hover { background: var(--crate-control-hover-bg); } }
+    &[data-press-active] { background: var(--crate-control-active-bg); }
   }
   &:disabled { cursor: default; opacity: 0.5; }
   &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
@@ -56,12 +56,12 @@
     color: var(--crate-on-accent);
     background: var(--crate-accent);
     border-color: transparent !important;
-    @media (hover: hover) { &:hover:not(:disabled) { background: var(--crate-accent-hover); } }
-    &:active:not(:disabled) { background: var(--crate-accent-hover); }
+    @media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-accent-hover); } }
+    &[data-press-active]:not(:disabled) { background: var(--crate-accent-hover); }
     &[data-tone="danger"] {
       background: var(--crate-danger);
-      &:active:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
-      @media (hover: hover) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }
+      &[data-press-active]:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+      @media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }
     }
   }
 }

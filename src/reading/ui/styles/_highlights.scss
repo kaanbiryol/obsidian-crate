@@ -18,8 +18,8 @@
 			font-size: 13px;
 			font-weight: 500;
 			line-height: 1.4;
-			@media (hover: hover) { &:hover:not(:disabled) { color: var(--text-normal); } }
-			&:active:not(:disabled), &:focus-visible { color: var(--text-normal); }
+			@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { color: var(--text-normal); } }
+			&[data-press-active]:not(:disabled), &:focus-visible { color: var(--text-normal); }
 		}
 	}
 }

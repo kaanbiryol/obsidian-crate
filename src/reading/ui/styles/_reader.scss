@@ -6,7 +6,10 @@
 	&__selection-divider { flex: 0 0 1px; height: 18px; margin: 0 2px; background: var(--crate-divider); }
 	&__selection .crate-reading-reader__delete-highlight[data-variant="surface"] {
 		flex: 0 0 44px; color: var(--crate-danger); background: transparent; border-color: transparent; border-radius: 6px; box-shadow: none;
-		&:hover:not(:disabled), &:active:not(:disabled) { color: var(--crate-danger); background: color-mix(in srgb, var(--crate-danger) 10%, transparent); }
+		@media (hover: hover) and (pointer: fine) {
+		  &:hover:not(:disabled) { color: var(--crate-danger); background: color-mix(in srgb, var(--crate-danger) 10%, transparent); }
+		}
+		&[data-press-active]:not(:disabled) { color: var(--crate-danger); background: color-mix(in srgb, var(--crate-danger) 10%, transparent); }
 	}
 	&__highlight-error { position: absolute; z-index: 3; width: min(220px, calc(100% - 24px)); padding: 8px; border: 1px solid var(--crate-divider); border-radius: 10px; background: var(--crate-app-bg); box-shadow: 0 4px 20px rgba(0, 0, 0, .18); }
 	&__highlight-error p { font-size: 12px; margin: 0 0 4px; }
