@@ -52,7 +52,7 @@ for (const browserType of [chromium, webkit]) {
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 		assert.equal(await indicator.locator('.crate-sync-indicator__dot').evaluate(el => getComputedStyle(el).animationName), 'none', 'Initial idle mount must not celebrate');
 
-		for (const project of [false, true]) {
+		for (const project of process.argv.includes('--motion-only') ? [] : [false, true]) {
 			for (const title of ['Today', 'Upcoming', 'Équipe à Berlin', 'A long project title that must truncate']) {
 				await page.evaluate(value => window.setHeaderProps(value), {title,project});
 				await expect(page.getByRole('heading',{level:1})).toHaveText(title);
@@ -78,10 +78,13 @@ for (const browserType of [chromium, webkit]) {
 		await expect(visual).toHaveAttribute('data-visual-state', 'syncing');
 		await page.clock.runFor(250);
 		await expect(visual).toHaveAttribute('data-visual-state', 'syncing');
+		assert.equal(await visual.evaluate(el => getComputedStyle(el).getPropertyValue('--sync-indicator-color').trim()), '#f59e0b', 'Fast success keeps the visual indicator orange through its minimum syncing phase');
 		await page.clock.runFor(400);
 		await expect(visual).toHaveAttribute('data-visual-state', 'settling');
 		assert.equal(await indicator.locator('.crate-sync-indicator__ripple').evaluate(el => getComputedStyle(el).animationName), 'pwa-sync-ripple');
-		await page.clock.runFor(2900);
+		assert.equal(await visual.evaluate(el => getComputedStyle(el).getPropertyValue('--sync-indicator-color').trim()), '#22c55e');
+		assert.equal(await indicator.locator('.crate-sync-indicator__ripple').evaluate(el => getComputedStyle(el).animationDelay), '0s', 'The success wave starts with the green transition');
+		await page.clock.runFor(1450);
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 
 		// Failure/offline must interrupt a pending success, including its timers.

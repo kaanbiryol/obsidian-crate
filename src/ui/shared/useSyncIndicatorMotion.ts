@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 const MIN_SYNC_MOTION_MS = 650;
-// Let the color turn green before the completion pulse finishes.
-const SETTLE_MOTION_MS = 2800;
+// Match the outward success wave, which starts with the color transition.
+const SETTLE_MOTION_MS = 1400;
 
 /** Hold only the visual success transition; accessible status stays current. */
 export function useSyncIndicatorMotion(state: string): string {
