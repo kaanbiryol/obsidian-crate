@@ -1,13 +1,16 @@
+import { readingHighlights, type ReadingHighlight } from './highlights';
 /** The portable Markdown contract shared by local capture and the server. */
 export interface ReadingMetadata {
 	crate_reading_version: 1;
 	crate_reading_id: string;
 	title: string;
+	/** Empty for imported folder notes without a web source. */
 	source_url: string;
 	saved_at: string;
 	reading_status: 'inbox' | 'archived';
 	favorite: boolean;
 	tags: string[];
+	highlights?: ReadingHighlight[];
 	extraction_status: 'pending' | 'ready' | 'unavailable';
 	capture_method?: 'url' | 'web-clipper';
 	author?: string;
@@ -15,9 +18,8 @@ export interface ReadingMetadata {
 	favicon_url?: string;
 }
 
-export type ReadingChanges = Partial<Pick<ReadingMetadata, 'reading_status' | 'favorite' | 'tags'>>;
+export type ReadingChanges = Partial<Pick<ReadingMetadata, 'reading_status' | 'favorite' | 'tags' | 'highlights'>>;
 export interface ReadingItem extends ReadingMetadata { path: string }
-export const READING_IMPORT_MARKER = 'web-clipper-v1';
 export const ARTICLE_START = '<!-- crate:article:start -->';
 export const ARTICLE_END = '<!-- crate:article:end -->';
 export const MAX_READING_BYTES = 1024 * 1024;
@@ -75,9 +77,10 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 	if (value.author !== undefined && (typeof value.author !== 'string' || value.author.length > 1000)) throw new Error('Invalid author.');
 	return {
 		crate_reading_version: 1, crate_reading_id: value.crate_reading_id.toLowerCase(), title: value.title,
-		source_url: readingUrl(value.source_url), saved_at: readingTimestamp(value.saved_at),
+		source_url: value.source_url === '' && value.capture_method === 'web-clipper' ? '' : readingUrl(value.source_url), saved_at: readingTimestamp(value.saved_at),
 		reading_status: value.reading_status, favorite: value.favorite,
-		tags: value.tags as string[], extraction_status: value.extraction_status,
+		tags: value.tags as string[],
+		...(value.highlights === undefined ? {} : { highlights: readingHighlights(value.highlights) }), extraction_status: value.extraction_status,
 		...(value.capture_method === undefined ? {} : { capture_method: value.capture_method }),
 		...(value.author === undefined ? {} : { author: value.author }),
 		...(value.resolved_url === undefined ? {} : { resolved_url: readingUrl(value.resolved_url) }),

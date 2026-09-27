@@ -11,7 +11,7 @@ function harness() {
 		if (current === undefined) throw new Error('Deleted');
 		const result = update(current); files.set(file.path, result); return result;
 	});
-	const vault: ReadingVault = { files: () => [...files].map(([path, content]) => ({ path, size: new TextEncoder().encode(content).length })),
+	const vault: ReadingVault = { files: () => [...files].map(([path, content]) => ({ path, modifiedAt: Date.parse('2026-09-21T12:00:00Z'), size: new TextEncoder().encode(content).length })),
 		read: async file => files.get(file.path)!, process, create: async (path, content) => { if (files.has(path)) throw new Error('Already exists'); files.set(path, content); } };
 	const library = new ReadingLibrary(vault, 'Reading', controller.signal, () => canAdopt);
 	return { library, vault, files, process, controller, defer: () => { canAdopt = false; }, resume: () => { canAdopt = true; } };
@@ -19,6 +19,19 @@ function harness() {
 const clip = '---\ncrate_reading_import: web-clipper-v1\ntitle: A clip\nsource_url: https://example.com\nsaved_at: 2026-09-21T12:00:00Z\n---\n\nExact clipped text.\n';
 
 describe('local Reading library', () => {
+	it('imports default clips and source-less notes together, preserving edits and duplicate captures', async () => {
+		const h = harness();
+		const ordinaryClip = '---\nsource: https://example.com/article\ntags: [clippings]\n---\n\nClipped text.';
+		h.files.set('Reading/Nested/Article.md', ordinaryClip);
+		h.files.set('Reading/Second.md', ordinaryClip);
+		h.files.set('Reading/Notes.md', 'Personal thoughts.');
+		await h.library.refresh(); expect(h.library.getSnapshot().items).toHaveLength(3);
+		const item = h.library.getSnapshot().items.find(item => item.title === 'Notes')!;
+		await h.library.update(item, { reading_status: 'archived', favorite: true });
+		expect((await h.library.read(item)).markdown).toBe('Personal thoughts.');
+		await expect(h.library.add('https://example.com/article')).rejects.toThrow('Multiple notes');
+		expect((await h.library.add('https://another.example.com')).duplicate).toBe(false);
+	});
 	it('caches unchanged metadata and invalidates it for vault events', async () => {
 		const h = harness(); const { item } = await h.library.add('https://example.com');
 		const files = h.vault.files.bind(h.vault);
@@ -30,14 +43,15 @@ describe('local Reading library', () => {
 		expect(reads).toHaveBeenCalledTimes(2); expect(h.library.getSnapshot().items[0]?.favorite).toBe(true);
 		h.files.delete(item.path); await h.library.refresh(); expect(h.library.getSnapshot().items).toEqual([]);
 	});
-	it('defers adoption during sync and only writes explicitly marked files', async () => {
-		const h = harness(); h.files.set('Reading/Clip.md', clip); h.files.set('Reading/Private.md', '# Personal notes');
+	it('defers adoption during sync and imports every Markdown note only within the reading folder', async () => {
+		const h = harness(); h.files.set('Reading/Clip.md', clip); h.files.set('Reading/Personal.md', '# Personal notes'); h.files.set('Outside/Private.md', '# Private'); h.files.set('Reading/image.png', 'image'); h.files.set('ReadingElsewhere/Private.md', '# Private');
 		h.defer(); await h.library.refresh(); expect(h.process).not.toHaveBeenCalled();
-		expect(h.library.getSnapshot().issues).toHaveLength(1);
+		expect(h.library.getSnapshot().issues).toHaveLength(2);
 		h.resume(); await h.library.refresh();
-		expect(h.process).toHaveBeenCalledTimes(1); expect(h.library.getSnapshot().items).toHaveLength(1);
-		expect(h.files.get('Reading/Private.md')).toBe('# Personal notes');
-		await h.library.refresh(); expect(h.process).toHaveBeenCalledTimes(1);
+		expect(h.process).toHaveBeenCalledTimes(2); expect(h.library.getSnapshot().items).toHaveLength(2);
+		expect(h.files.get('Outside/Private.md')).toBe('# Private'); expect(h.files.get('Reading/image.png')).toBe('image'); expect(h.files.get('ReadingElsewhere/Private.md')).toBe('# Private');
+		expect(h.files.get('Reading/Personal.md')).toMatch(/---\n# Personal notes$/);
+		await h.library.refresh(); expect(h.process).toHaveBeenCalledTimes(2);
 	});
 	it('does not overwrite an edit arriving during adoption', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip);

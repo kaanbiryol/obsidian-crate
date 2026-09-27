@@ -2,7 +2,7 @@ import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNot
 import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { readReadingFrontmatter } from '../core/frontmatter';
 
-export interface ReadingFile { path: string; size: number; revision?: string }
+export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
 	files(): ReadingFile[];
 	read(file: ReadingFile): Promise<string>;
@@ -41,7 +41,7 @@ export class ReadingLibrary {
 		const items: ReadingItem[] = [];
 		const issues: ReadingIssue[] = [];
 		try {
-			const files = this.vault.files();
+			const files = this.vault.files().filter(file => file.path.startsWith(`${this.folder}/`) && /\.md$/i.test(file.path));
 			const paths = new Set(files.map(file => file.path));
 			for (const path of this.cache.keys()) if (!paths.has(path)) this.cache.delete(path);
 			for (const file of files) {
@@ -54,14 +54,9 @@ export class ReadingLibrary {
 				}
 				try {
 					let content = await this.vault.read(file);
-					// Ordinary notes are never adopted or rewritten just for being in this folder.
-					if (!/^[ \t]*["']?crate_reading_(?:version|import)["']?:/m.test(content.slice(0, 64 * 1024))) {
-						if (file.revision) this.cache.set(file.path, { revision: file.revision, metadata: null });
-						continue;
-					}
 					if (this.canAdopt()) {
 						const original = content;
-						const adopted = await adoptReadingClip(original, file.path);
+						const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
 						this.signal.throwIfAborted();
 						if (adopted !== original) content = await this.vault.process(file, current => {
 							this.signal.throwIfAborted();
@@ -74,7 +69,7 @@ export class ReadingLibrary {
 						items.push({ ...metadata, path: file.path });
 						if (file.revision) this.cache.set(file.path, { revision: file.revision, metadata });
 					}
-					else if (readReadingFrontmatter(content)?.value.crate_reading_import) issues.push({ path: file.path, message: 'Clip is waiting for import after sync.' });
+					else issues.push({ path: file.path, message: 'Note is waiting for import after sync.' });
 				} catch (error) {
 					this.cache.delete(file.path);
 					this.signal.throwIfAborted();
@@ -100,7 +95,7 @@ export class ReadingLibrary {
 		return this.enqueue(async () => {
 			await this.scan();
 			const identity = readingUrlIdentity(url);
-			const matches = this.snapshot.items.filter(item => readingUrlIdentity(item.source_url) === identity);
+			const matches = this.snapshot.items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === identity);
 			if (matches.length > 1) throw new Error('Multiple notes already save this link. Open reading to choose one.');
 			const existing = matches[0];
 			if (existing) return { item: existing, duplicate: true };

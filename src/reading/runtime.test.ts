@@ -35,6 +35,17 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Reading runtime lifecycle', () => {
+	it('discovers a normal clip after the vault is ready without a template marker', async () => {
+		const h = harness();
+		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');
+		h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		await getReadingLibrary(h.plugin)!.refresh();
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().issues).toEqual([]);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]).toMatchObject({ title: 'article', source_url: 'https://example.com/article', reading_status: 'inbox', favorite: false });
+		expect(h.vault.process).toHaveBeenCalledTimes(1);
+		stopReading(h.plugin);
+	});
 	it('waits for the vault and startup sync, then cancels every watcher on unload', async () => {
 		const h = harness(); startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500); expect(h.vault.read).not.toHaveBeenCalled();

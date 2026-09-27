@@ -1,3 +1,4 @@
+import { readingHighlights } from '@/reading/core/highlights';
 import type { ReadingChanges, ReadingItem } from '@/reading/core/model';
 import type { PendingReading } from './storage';
 
@@ -10,6 +11,7 @@ export function presentReadingItems(items: ReadingItem[], pending: PendingReadin
 		if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
 		const value = raw as Record<string, unknown>;
 		const changes: ReadingChanges = {};
+		if (value.highlights !== undefined) changes.highlights = readingHighlights(value.highlights);
 		if (typeof value.favorite === 'boolean') changes.favorite = value.favorite;
 		if (value.reading_status === 'inbox' || value.reading_status === 'archived') changes.reading_status = value.reading_status;
 		if (Array.isArray(value.tags) && value.tags.every(tag => typeof tag === 'string')) changes.tags = value.tags;

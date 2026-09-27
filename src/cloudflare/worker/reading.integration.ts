@@ -10,7 +10,7 @@ import type { Publication } from './reading/extraction/jobs';
 import { policy } from './reading/common';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { parseReadingNote, updateReadingNote } from '@/reading/core/notes';
+import { adoptReadingClip, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { commitFileDelete } from './sync-mutations';
 import { getStoredFileRow } from './sync-storage';
 
@@ -23,6 +23,27 @@ beforeEach(async () => {
   expect((await command('policy', { enabled: true, folderPath: 'Reading', revision: null })).status).toBe(200);
 });
 afterEach(reset);
+it('projects folder imports without extraction and syncs their reading metadata', async () => {
+  for (const [path, original] of [
+    ['Reading/Clip.md', '---\nsource: https://example.com/article\n---\nClipped text.'],
+    ['Reading/Note.md', 'My own text.'],
+  ]) {
+    const content = await adoptReadingClip(original!, path!, '2026-09-26T00:00:00Z');
+    await writeCommittedMarkdownFile(env.BUCKET, env.DB, path!, content, null);
+  }
+  await projectReading(env, (await policy(env.DB))!);
+  const { results } = await env.DB.prepare('SELECT item_id, url_identity, metadata_json FROM reading_sources ORDER BY path').all<{ item_id: string; url_identity: string | null; metadata_json: string }>();
+  expect(results).toHaveLength(2);
+  expect(results[0]!.url_identity).toBe('https://example.com/article');
+  expect(results[1]!.url_identity).toBeNull();
+  expect(JSON.parse(results[1]!.metadata_json)).toMatchObject({ source_url: '', title: 'Note', favorite: false });
+  const response = await command('update', { id: results[1]!.item_id, before: { favorite: false, reading_status: 'inbox', tags: [] }, changes: { favorite: true, reading_status: 'archived', tags: ['design', 'later'] }, operationId: id() });
+  expect(response.status, await response.clone().text()).toBe(200);
+  const changed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Note.md'))!;
+  expect(parseReadingNote(changed.content)).toMatchObject({ favorite: true, reading_status: 'archived', tags: ['design', 'later'] });
+  expect(changed.content.endsWith('My own text.')).toBe(true);
+  expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
+});
 async function capture() {
   const response = await command('capture', { url: 'https://example.com/article', operationId: id() });
   expect(response.status, await response.clone().text()).toBe(200);
@@ -76,4 +97,19 @@ it('replays a lost receipt even after deletion and rejects expired operation ide
   await commitFileDelete(env.BUCKET, env.DB, { path: file.path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });
   expect(await (await command('capture', body)).json()).toEqual(payload); expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
   expect((await command('capture', { url: body.url, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000) - 180) })).status).toBe(410);
+});
+
+it('persists highlights with replay receipts and rejects concurrent highlight replacement', async () => {
+  const content = await adoptReadingClip('Hello **world**!', 'Reading/Highlights.md', '2026-09-26T00:00:00Z');
+  const item = parseReadingNote(content)!;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Highlights.md', content, null);
+  const highlights = [{ start: 0, end: 5, text: 'Hello' }];
+  const body = { id: item.crate_reading_id, before: {}, changes: { highlights }, operationId: id() };
+  expect((await command('update', body)).status).toBe(200);
+  expect((await command('update', body)).status).toBe(200);
+  const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Highlights.md'))!;
+  expect(parseReadingNote(saved.content)?.highlights).toEqual(highlights);
+  expect(saved.content.endsWith('Hello **world**!')).toBe(true);
+  expect((await command('update', { ...body, operationId: id(), changes: { highlights: [] } })).status).toBe(409);
+  expect((await command('update', { ...body, operationId: id(), before: { highlights }, changes: { highlights: [] } })).status).toBe(200);
 });

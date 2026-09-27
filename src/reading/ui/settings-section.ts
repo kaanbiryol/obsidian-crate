@@ -4,7 +4,6 @@ import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsSectionHeading } from '../../ui/settings/section-helpers';
 import { bindCommittedText } from '../../ui/settings/input-helpers';
-import { createReadingClipperTemplate } from '../clipper-template';
 import { openReading } from '../register-integrations';
 import { startReading, stopReading, validateReadingConfiguration } from '../runtime';
 import type { ReadingSettings } from '../settings';
@@ -35,7 +34,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 			try { await save({ ...plugin.settings.reading, enabled }); }
 			catch (error) { new Notice(error instanceof Error ? error.message : 'Could not update reading settings.'); rerender(); }
 		}));
-	new Setting(container).setName('Reading folder').setDesc('A separate folder for marked reading notes. Changing it does not move files.')
+	new Setting(container).setName('Reading folder').setDesc('Every Markdown note in this folder and its subfolders appears in reading. Crate adds reading properties automatically. Changing the folder does not move files.')
 		.addText(text => {
 			text.setValue(settings.folderPath).setPlaceholder('Reading');
 			bindCommittedText(text, () => plugin.settings.reading.folderPath, folderPath => save({ ...plugin.settings.reading, folderPath }));
@@ -93,10 +92,6 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 	if (!settings.enabled) return;
 	new Setting(container).setName('Reading library').setDesc('Browse your inbox, favorites, and archive.')
 		.addButton(button => button.setButtonText('Open reading').onClick(() => { void openReading(plugin); }));
-	new Setting(container).setName('Web clipper template')
-		.setDesc('Copy the template, then import it from the clipboard in Obsidian web clipper settings. Select the imported template when saving an article.')
-		.addButton(button => button.setButtonText('Copy template').onClick(async () => {
-			try { await navigator.clipboard.writeText(createReadingClipperTemplate(settings.folderPath)); new Notice('Reading template copied.'); }
-			catch { new Notice('Could not copy the template. Check clipboard access and try again.'); }
-		}));
+	new Setting(container).setName('Obsidian web clipper')
+		.setDesc(`Save clips to ${settings.folderPath} in this vault. They appear in Reading automatically. No special template is needed.`);
 }

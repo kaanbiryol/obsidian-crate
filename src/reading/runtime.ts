@@ -46,7 +46,7 @@ export function startReading(plugin: CratePlugin): void {
 			if (entry instanceof TFolder) for (const child of entry.children) walk(child);
 			else if (entry instanceof TFile && entry.extension.toLowerCase() === 'md') {
 				if (!fileIds.has(entry)) fileIds.set(entry, ++nextFileId);
-				const file = { path: entry.path, size: entry.stat.size, revision: `${fileIds.get(entry)}:${entry.stat.mtime}:${entry.stat.size}:${fileEvents.get(entry) ?? 0}` };
+				const file = { path: entry.path, size: entry.stat.size, modifiedAt: entry.stat.mtime, revision: `${fileIds.get(entry)}:${entry.stat.mtime}:${entry.stat.size}:${fileEvents.get(entry) ?? 0}` };
 				fileRefs.set(file, entry); result.push(file);
 			}
 		};

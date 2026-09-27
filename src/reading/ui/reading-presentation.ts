@@ -5,7 +5,7 @@ export const readingSections = [
 	{ id: 'inbox', label: 'Inbox' }, { id: 'favorites', label: 'Favorites' }, { id: 'archived', label: 'Archive' },
 ] as const;
 
-export function readingSource(url: string): string { return new URL(url).hostname.replace(/^www\./, ''); }
+export function readingSource(url: string): string { return url ? new URL(url).hostname.replace(/^www\./, '') : 'Vault note'; }
 
 export function filterReadingItems(items: ReadingItem[], section: ReadingSection, query: string, tag: string | null): ReadingItem[] {
 	const search = query.trim().toLocaleLowerCase();

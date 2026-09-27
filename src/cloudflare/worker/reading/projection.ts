@@ -40,7 +40,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
         ON CONFLICT(path) DO UPDATE SET revision=excluded.revision, generation=excluded.generation, item_id=excluded.item_id,
         url_identity=excluded.url_identity, metadata_json=excluded.metadata_json, error=excluded.error`)
         .bind(row.path, row.revision, current.generation, metadata?.crate_reading_id ?? null,
-          metadata ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify(metadata) : null, error, row.path, row.revision),
+          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify(metadata) : null, error, row.path, row.revision),
       ...(job && metadata ? [db.prepare(`INSERT INTO reading_jobs(path, item_id, generation, source_revision, block_hash, url, available_at)
         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_sources WHERE path = ? AND revision = ?) AND (SELECT count(*) FROM reading_jobs)<1000
         ON CONFLICT(path) DO NOTHING`).bind(row.path, metadata.crate_reading_id, current.generation, row.revision, job.hash, job.url, Date.now(), row.path, row.revision)] : []),

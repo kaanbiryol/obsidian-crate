@@ -6,8 +6,6 @@
 	button, a, input { -webkit-tap-highlight-color: transparent; }
 	:where(button) { font: inherit; cursor: pointer; touch-action: manipulation; }
 	:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
-	input { width: 100%; min-width: 0; min-height: 46px; font: 16px/1.5 var(--font-interface, system-ui, sans-serif); color: var(--text-normal); background: var(--crate-control-bg); border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-control, 8px); padding: 10px 12px; box-shadow: none; }
-	input::placeholder { color: var(--text-faint, var(--text-muted)); }
 	.crate-reading__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 	.crate-reading__notice { padding: 12px 14px; margin: 12px 0; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; color: var(--text-muted); }
 	.crate-reading__notice button { margin: 4px; }
@@ -15,10 +13,6 @@
 	.crate-reading__notice summary { cursor: pointer; min-height: 32px; align-content: center; }
 	.crate-reading__capture { display: grid; gap: 20px; }
 	.crate-reading__capture > p { color: var(--text-muted); margin: 0; font-size: 14px; }
-	.crate-reading__capture label { display: grid; gap: 8px; font-size: 13px; color: var(--text-muted); }
-	.crate-reading__url-field { position: relative; }
-	.crate-reading__url-field svg { position: absolute; top: 15px; left: 12px; pointer-events: none; }
-	.crate-reading__url-field input { padding-left: 40px; }
 	.crate-reading-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
 }
 .crate-reminders-ui .crate-reading-dialog {

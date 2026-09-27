@@ -1,3 +1,4 @@
+import { coalesceReadingHighlights } from './coalesce-update';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
@@ -57,6 +58,10 @@ export async function queueReading(session: ReadingSession, action: PendingReadi
   if (action === 'capture') readingUrl(intent.url);
   return readingLock(async () => {
     assertReadingSession(session); const queue = await pendingReading(session);
+    const existing = action === 'update' ? queue.find(op => op.intent.id === intent.id) : undefined;
+    if (existing && coalesceReadingHighlights(existing, intent)) {
+      await writeValue(`pending:${session.id}`, queue, session); return queue;
+    }
     if (queue.length >= 200) throw new Error('Send or review pending Reading changes before adding more.');
     if (action !== 'capture' && queue.some(op => op.intent.id === intent.id)) throw new Error('This item already has a pending change. Send it before editing again.');
     queue.push({ id: crypto.randomUUID(), sessionId: session.id, action, intent });

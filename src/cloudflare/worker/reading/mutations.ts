@@ -44,7 +44,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
     if (!changes || typeof changes !== 'object' || Array.isArray(changes) || !body.before || typeof body.before !== 'object') throw new ReadingError('Choose a Reading change.');
     const before = body.before as Record<string, unknown>;
     for (const field of Object.keys(changes)) {
-      if (!['favorite', 'tags', 'reading_status'].includes(field)) throw new ReadingError('Unsupported Reading change.');
+      if (!['favorite', 'tags', 'reading_status', 'highlights'].includes(field)) throw new ReadingError('Unsupported Reading change.');
       if (JSON.stringify(source.item[field as keyof ReadingChanges]) !== JSON.stringify(before[field])) throw new ReadingError('This item changed on another device. Refresh before editing it.', 409, 'reading_conflict');
     }
     try { content = updateReadingNote(source.content, source.item.crate_reading_id, changes as ReadingChanges); }
