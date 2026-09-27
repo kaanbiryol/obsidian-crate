@@ -8,6 +8,9 @@ interface FeatureSettings {
 	status: { state: SyncIndicatorState; label: string };
 	attention: string | null;
 	unsynced: boolean;
+	/** Feature hydration and transient work must settle before navigating for an update. */
+	updateReady?: boolean;
+	updateContentReady?: boolean;
 	onRefresh: () => Promise<unknown>;
 	onExport?: () => void | Promise<void>;
 	onLogout: () => Promise<void>;

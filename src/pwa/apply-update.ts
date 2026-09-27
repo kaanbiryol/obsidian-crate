@@ -1,3 +1,4 @@
+import { hasUnsettledReminders } from './reminder-outbox-storage';
 import { hasUnsettledReading } from './reading/update-guard';
 import { fetchPwaAssetVersion } from './api';
 
@@ -49,6 +50,7 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	beforeNavigation?: () => boolean;
 	onStage?: (stage: 'downloading' | 'activating') => void;
 } = {}): Promise<boolean> {
+	if (hasUnsettledReminders()) throw new Error('Finish syncing or review pending reminder changes before updating.');
 	if (await hasUnsettledReading()) throw new Error('Finish or export pending Reading changes before updating.');
 	const version = options.version ?? await fetchPwaAssetVersion();
 	if (!version) throw new Error('Could not check for updates. Please try again.');
@@ -56,7 +58,7 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	const worker = await preparePwaUpdate(version);
 	// The user may have started editing or backgrounded the iPhone during download.
 	if (options.canApply && !options.canApply()) return false;
-	if (await hasUnsettledReading()) return false;
+	if (hasUnsettledReminders() || await hasUnsettledReading()) return false;
 	options.onStage?.('activating');
 	if (worker) await waitForWorkerActivation(worker);
 	if (options.canApply && !options.canApply()) return false;
@@ -64,7 +66,7 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	// Recheck after the transition's async paint, including a suspended iOS timer.
 	if (options.canApply && !options.canApply()) return false;
 	if (options.beforeNavigation && !options.beforeNavigation()) return false;
-	if (await hasUnsettledReading()) return false;
+	if (hasUnsettledReminders() || await hasUnsettledReading()) return false;
 	window.location.reload();
 	return true;
 }

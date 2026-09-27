@@ -367,7 +367,7 @@ async function testLaunchUpdate(browser, mode) {
         viewportRuleAdded = true;
       }
       if (document.querySelector(`script[type="module"][src*="${beforeVersion}"]`)
-        && document.querySelector('.pwa-reminders-view, .pwa-update-banner')) exposedOldContent = true;
+        && document.querySelector('.pwa-reminders-view, .pwa-update-notice')) exposedOldContent = true;
       if (document.documentElement.dataset.pwaUpdating === 'prepare') {
         const launch = document.querySelector('.pwa-launch-splash .pwa-update-screen__activity span');
         const curtain = document.querySelector('#pwa-update-transition .pwa-update-screen__activity span');
@@ -426,7 +426,7 @@ async function testLaunchUpdate(browser, mode) {
       expect(handoff).toMatchObject({ opacity: '1', sameSource: true, loaded: true });
       expect(handoff.iconOffset).toBeLessThan(1);
       expect(await page.locator('script[type="module"]').getAttribute('src')).toContain(afterVersion);
-      await expect(page.locator('.pwa-update-banner')).toHaveCount(0);
+      await expect(page.locator('.pwa-update-notice')).toHaveCount(0);
     } else {
       await page.getByRole('group', { name: cardName, exact: true }).waitFor();
       expect(Date.now() - started).toBeLessThan(3_500);

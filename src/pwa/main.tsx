@@ -32,7 +32,7 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
 import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
-import { usePwaUpdate } from './hooks/usePwaUpdate';
+import { useAppUpdate } from './components/PwaUpdateProvider';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
 import { usePwaStatus } from './hooks/usePwaStatus';
 import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
@@ -179,7 +179,7 @@ function App() {
 		showToast,
 	});
 
-	const { updateVersion, updateCheckComplete } = usePwaRefreshLifecycle({
+	usePwaRefreshLifecycle({
 		authToken,
 		bootstrapped,
 		hydratedCacheRef,
@@ -270,15 +270,7 @@ function App() {
 		pendingChangesReady: mutationsReady || Boolean(storageError),
 	});
 
-	const { updating, update, launchPending } = usePwaUpdate(showToast, initialContentReady, {
-		version: updateVersion,
-		checkComplete: updateCheckComplete,
-		canApply: () => active && initialContentReady && mutationsReady && Boolean(authToken)
-			&& !modal && !settingsOpen && !saving && !loggingOut && !reorderDragging
-			&& !launchReminderId && !loading && !refreshing && !isOffline
-			&& !storageError && changes.length === 0 && recoveryChanges.length === 0
-			&& quarantinedChanges.length === 0 && !isPreparingMutation(),
-	});
+	const { version: updateVersion, launchPending } = useAppUpdate();
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
 	usePrepareReminderEditor(initialContentReady && !launchPending && Boolean(authToken)
@@ -353,6 +345,12 @@ function App() {
 	useFeatureSettings('reminders', {
 		ready: bootstrapped && (mutationsReady || Boolean(storageError) || !authToken),
 		connected: Boolean(authToken), config, push,
+		updateContentReady: initialContentReady,
+		updateReady: bootstrapped && (!authToken || (initialContentReady && mutationsReady
+			&& !modal && !saving && !loggingOut && !reorderDragging
+			&& !launchReminderId && !loading && !refreshing && !isOffline
+			&& !storageError && changes.length === 0 && recoveryChanges.length === 0
+			&& quarantinedChanges.length === 0 && !isPreparingMutation())),
 		status: syncStatus,
 		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
 		unsynced: changes.length > 0 || needsRecovery || Boolean(storageError),
@@ -428,10 +426,7 @@ function App() {
 						<PwaTopNotices
 							statusText={statusText}
 							statusKind={statusKind}
-							updateAvailable={Boolean(updateVersion)}
-							updating={updating}
 							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
-							onReload={update}
 							onEnableNotifications={enablePushNotifications}
 						>
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />

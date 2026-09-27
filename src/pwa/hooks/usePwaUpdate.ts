@@ -11,9 +11,12 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 	version: string | null;
 	checkComplete: boolean;
 	canApply: () => boolean;
+	canManuallyApply: () => boolean;
 }) {
 	const canAutoApply = useRef(auto.canApply);
 	canAutoApply.current = auto.canApply;
+	const canManuallyApply = useRef(auto.canManuallyApply);
+	canManuallyApply.current = auto.canManuallyApply;
 	const [updating, setUpdating] = useState(false);
 	const inFlight = useRef(false);
 	const preparedVersion = useRef<string | null>(null);
@@ -71,10 +74,14 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean, auto: 
 		}
 	}, []);
 
-	const update = useCallback(() => {
-		void apply({}, true).catch((error: unknown) => {
+	const update = useCallback(async () => {
+		try {
+			if (!canManuallyApply.current()) throw new Error('Finish editing or syncing before updating.');
+			const applied = await apply({ canApply: () => canManuallyApply.current() }, true);
+			if (!applied) showToast('info', 'Update paused. Finish editing or syncing, then try again.');
+		} catch (error: unknown) {
 			showToast('error', error instanceof Error ? error.message : 'Update failed. Please try again.');
-		});
+		}
 	}, [apply, showToast]);
 
 	useEffect(() => {

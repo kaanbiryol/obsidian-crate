@@ -134,6 +134,19 @@ both hosts together.
   completion remains editor logic; it is not a plain combobox input.
 
 
+## App update notice
+
+`PwaUpdateProvider` in the shared feature shell owns version detection, dismissal,
+preparation, and update activation for both features. It checks on launch,
+foreground/pageshow, reconnect, and every five minutes while visible and online.
+`PwaUpdateNotice` uses a compact neutral surface above the dock; Settings renders
+it inside its focus boundary. Dismissal lasts for that version in the current app
+session, with the update action retained in **Settings → About**. Newer versions
+can show a new notice. Editors and transient toasts hide the floating notice.
+The existing bounded Reminders launch update stays behind its launch splash;
+after launch, applying an update requires an explicit action. Feature readiness
+and durable pending commands are checked before reload.
+
 ## Making a visual change
 
 PWA **Settings → Tabs** controls visibility and order for Inbox, Schedule, Projects,

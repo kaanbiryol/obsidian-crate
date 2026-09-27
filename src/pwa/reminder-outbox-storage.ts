@@ -171,3 +171,8 @@ export function clearReminderOutbox(): void {
 		try { storage.removeItem(key); } catch { throw new Error(STORAGE_ERROR); }
 	}
 }
+
+/** Check all retained sessions without reading private command bodies. */
+export function hasUnsettledReminders(): boolean {
+	return storageKeys(browserStorage()).some(key => key.startsWith(PREFIX));
+}

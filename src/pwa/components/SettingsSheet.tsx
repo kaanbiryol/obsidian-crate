@@ -19,7 +19,8 @@ import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
 import { useSettingsStore } from '../settings-context';
-import { applyPwaUpdate } from '../apply-update';
+import { useAppUpdate } from './PwaUpdateProvider';
+import { PwaUpdateNotice } from './PwaUpdateNotice';
 import type { PwaPreferences } from '../preferences';
 import type { CrateSection } from './FeatureSwitcherButton';
 
@@ -27,6 +28,7 @@ type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'updat
 
 export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: { activeSection: CrateSection; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
+	const appUpdate = useAppUpdate();
 	const { reminders, reading } = useSyncExternalStore(store.subscribe, store.getSnapshot);
 	const { preferences, updatePreferences } = usePwaPreferences();
 	const homeScreen = useHomeScreenInstall();
@@ -38,7 +40,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 	const [pending, setPending] = useState<ReadonlySet<SettingsAction>>(new Set());
 	const working = useRef(new Set<SettingsAction>());
 	const busy = pending.size > 0;
-	const exclusive = pending.has('update') || pending.has('logout');
+	const exclusive = appUpdate.updating || pending.has('update') || pending.has('logout');
 	const [message, setMessage] = useState<string | null>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const reducedMotion = useReducedMotion();
@@ -86,13 +88,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 		{reminders?.onExport && <Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('export-reminders')} onClick={() => void run('export-reminders', reminders.onExport!)}>Export unsynced reminders</Button>}
 		{reading?.onExport && <Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('export-reading')} onClick={() => void run('export-reading', reading.onExport!)}>Export Reading data</Button>}
 	</>;
-	const updateApp = async () => {
-		const applied = await applyPwaUpdate(undefined, { canApply: () => {
-			const current = store.getSnapshot();
-			return Boolean(current.reminders?.ready && current.reading?.ready && !current.reminders.unsynced && !current.reading.unsynced);
-		} });
-		if (!applied) setMessage('Update paused. Finish syncing or review pending changes, then try again.');
-	};
+
 	const close = () => {
 		if (exclusive) return false;
 		if (page !== 'settings') { navigate('settings'); return false; }
@@ -105,6 +101,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
 				closeDisabled={exclusive || transition.isClosing} onClose={close} />
+			{page === 'settings' && <PwaUpdateNotice disabled={busy || unsynced} />}
 			{message && <p className="settings-feedback" role="alert">{message}</p>}
 			<div className="settings-stack" data-base-ui-swipe-ignore="">
 				<motion.div ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
@@ -136,7 +133,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 					</SettingsDisclosure>
 					<SettingsDisclosure title="About">
 						<VersionSettings />
-						<Button size="touch" className="settings-action-button" disabled={unsynced || exclusive} aria-disabled={busy || unsynced} onClick={() => void run('update', updateApp)}>Update app</Button>
+						<Button size="touch" className="settings-action-button" disabled={unsynced || exclusive} aria-disabled={busy || unsynced} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : appUpdate.version ? 'Update available' : 'Update app'}</Button>
 						{unsynced && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
 					</SettingsDisclosure>
 					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>

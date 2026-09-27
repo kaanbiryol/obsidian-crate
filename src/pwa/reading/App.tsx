@@ -392,6 +392,8 @@ function ReadingAppContent() {
   const readingDisabled = !session && error === 'Reading is disabled. Enable it in Crate settings.';
   useFeatureSettings('reading', {
     ready: ready && !connecting, connected: Boolean(session), status,
+    updateContentReady: ready && !connecting && (!session || Boolean(cache) || Boolean(error)),
+    updateReady: ready && !connecting && !adding && !saving && !syncing && !isOffline,
     attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
     unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),
     onRefresh: () => session ? refresh() : connect(),

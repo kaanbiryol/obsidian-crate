@@ -5,7 +5,8 @@
     "scripts/pwa-dock-test.mjs": "local chromium/webkit run on 2026-09-26: 21 seconds",
     "scripts/pwa-feature-switcher-test.mjs": "local chromium/webkit run on 2026-09-22: 6.78 seconds",
     "scripts/pwa-schedule-test.mjs": "local chromium/webkit run on 2026-09-26: 5.65 seconds",
-    "scripts/pwa-settings-test.mjs": "local chromium/webkit run on 2026-09-27: 12.46 seconds"
+    "scripts/pwa-settings-test.mjs": "local chromium/webkit run on 2026-09-27: 12.46 seconds",
+    "scripts/pwa-update-notice-test.mjs": "local chromium/webkit run on 2026-09-27: 8.86 seconds"
   },
   "seconds": {
     "scripts/pwa-ios27-header-test.mjs": 6.42,
@@ -48,6 +49,7 @@
     "scripts/pwa-reorder-touch-test.mjs": 8,
     "scripts/pwa-project-transition-test.mjs": 5,
     "scripts/pwa-schedule-test.mjs": 5.65,
-    "scripts/pwa-settings-test.mjs": 12.46
+    "scripts/pwa-settings-test.mjs": 12.46,
+    "scripts/pwa-update-notice-test.mjs": 8.86
   }
 }
