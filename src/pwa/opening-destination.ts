@@ -16,5 +16,5 @@ export function resolvePwaOpeningDestination(search: string, defaultScreen: unkn
 		return { tab: 'reading' as const, readingTab, project: null,
 			title: readingTab === 'favorites' ? 'Favorites' : readingTab === 'archived' ? 'Archive' : 'Reading' } as const;
 	}
-	return { tab, project, title: project ?? { inbox: 'Inbox', today: 'Schedule', upcoming: 'Schedule', browse: 'Projects' }[tab] };
+	return { tab, project, title: project ?? { inbox: 'Inbox', today: 'Reminders', upcoming: 'Reminders', browse: 'Projects' }[tab] };
 }

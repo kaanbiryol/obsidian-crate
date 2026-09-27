@@ -1,7 +1,7 @@
 .crate-reminders-ui .crate-content-loading {
 	display: flex;
 	justify-content: center;
-	padding: 48px 20px;
+	padding: 16px 20px;
 	color: var(--text-muted);
 }
 .crate-reminders-ui .crate-content-loading__spinner {
@@ -9,9 +9,13 @@
 	width: 18px;
 	height: 18px;
 	visibility: hidden;
-	animation: crate-loading-appear 0s 250ms forwards, crate-loading-spin 1s steps(12) 250ms infinite;
+	opacity: 0;
+	animation: crate-loading-appear var(--crate-motion-duration-fast) ease-out 250ms forwards, crate-loading-spin 1s steps(12) 250ms infinite;
 }
-@keyframes crate-loading-appear { to { visibility: visible; } }
+@keyframes crate-loading-appear {
+	from { visibility: visible; opacity: 0; }
+	to { visibility: visible; opacity: 1; }
+}
 @keyframes crate-loading-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
 	.crate-reminders-ui .crate-content-loading__spinner { animation: crate-loading-appear 0s 250ms forwards; }

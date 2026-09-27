@@ -84,11 +84,6 @@
     }
 }
 
-.pwa-shadow-root .reminder-render-item {
-    content-visibility: auto;
-    contain-intrinsic-block-size: auto 88px;
-}
-
 // Custom checkbox
 .premium-checkbox {
     --premium-checkbox-size: var(--checkbox-size, var(--icon-size-s, 18px));

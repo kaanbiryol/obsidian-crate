@@ -41,7 +41,7 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
     await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
     const panel = page.locator('.crate-feature-panel[data-active="true"]');
     const dock = panel.locator('.pwa-dock');
-    await dock.getByRole('button', { name: 'Reading List', exact: true }).tap();
+    await dock.getByRole('button', { name: 'Reading', exact: true }).tap();
     await expect(panel).toHaveAttribute('data-crate-section', 'reading');
     for (const colorScheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });

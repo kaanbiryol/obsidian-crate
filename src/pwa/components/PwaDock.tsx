@@ -11,7 +11,7 @@ import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { FeatureNavigationContext, type CrateSection } from './FeatureSwitcherButton';
 
 const readingViews = [
-  { id: 'inbox', label: 'Reading List', iconName: 'book-open' },
+  { id: 'inbox', label: 'Reading', iconName: 'book-open' },
   { id: 'favorites', label: 'Favorites', iconName: 'star' },
   { id: 'archived', label: 'Archive', iconName: 'archive' },
   { id: 'highlights', label: 'Highlights', iconName: 'highlighter' },

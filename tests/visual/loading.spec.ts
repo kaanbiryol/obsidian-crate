@@ -10,7 +10,7 @@ for (const host of ['plugin', 'pwa']) {
       const spinner = status.locator('.crate-content-loading__spinner');
       await expect(spinner).toBeVisible();
       await expect(spinner.locator('rect')).toHaveCount(12);
-      await expect(spinner).toHaveCSS('animation-timing-function', 'ease, steps(12)');
+      await expect(spinner).toHaveCSS('animation-timing-function', 'ease-out, steps(12)');
       const visibilityAt = (time: number) => spinner.evaluate((element, time) => {
         for (const animation of element.getAnimations()) {
           animation.pause();

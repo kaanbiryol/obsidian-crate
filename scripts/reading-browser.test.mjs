@@ -599,7 +599,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
     await page.locator('.crate-feature-panel[data-active="true"] [data-dock-switcher]').press('ArrowDown');
-    await page.getByRole('dialog', { name: 'Reading views' }).getByRole('button',{name:'Reading List',exact:true}).click();
+    await page.getByRole('dialog', { name: 'Reading views' }).getByRole('button',{name:'Reading',exact:true}).click();
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
     // A slow update response must not hold the favorite or the cached reader.
     const updateStarted = Promise.withResolvers(), updateReleased = Promise.withResolvers();

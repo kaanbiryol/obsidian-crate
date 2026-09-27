@@ -54,7 +54,7 @@ export async function checkTabSettings(page, name) {
 	await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Archive', 'Favorites', 'Highlights', 'Upcoming']);
 	for (const label of ['Archive', 'Favorites', 'Highlights', 'Upcoming']) {
 		await page.locator('.crate-feature-panel[data-active="true"] .pwa-dock').getByRole('button', { name: label, exact: true }).click();
-		await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText(label === 'Upcoming' ? 'Schedule' : label);
+		await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText(label === 'Upcoming' ? 'Reminders' : label);
 		await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-dock [aria-current="page"]')).toHaveAttribute('aria-label', label);
 	}
 	await page.reload();
@@ -89,7 +89,7 @@ export async function checkTabSettings(page, name) {
 	await gear.click();
 	// The switcher belongs to the last slot, even when Reading moves first.
 	await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
-	for (let step = 0; step < 3; step++) await sheet.getByRole('button', { name: 'Reorder Reading list', exact: true }).press('ArrowUp');
+	for (let step = 0; step < 3; step++) await sheet.getByRole('button', { name: 'Reorder Reading', exact: true }).press('ArrowUp');
 	await expect.poll(savedTabs).toEqual(['reading', 'inbox', 'today', 'browse']);
 	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	const views = page.getByRole('dialog', { name: 'Reading views', exact: true });

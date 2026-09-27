@@ -15,6 +15,73 @@ const reminders = [
 	{ id: 'completed', content: 'Finished task', dueDate: '2026-09-27', completed: true },
 ].map(reminder => ({ revision: 'fixture', description: '', priority: 4, completed: false, project: 'Work', filePath: 'Reminders/Work.md', ...reminder }));
 
+async function checkTodayStartup(browser, reducedMotion) {
+	const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+		timezoneId: 'UTC', serviceWorkers: 'block', reducedMotion });
+	let response = Promise.withResolvers();
+	const list = Array.from({ length: 21 }, (_, index) => ({ ...reminders[0], id: `overdue-${index}`, dueDate: '2026-09-25' }));
+	await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+	await page.route('**/reminders/list?*', async route => {
+		await response.promise;
+		await route.fulfill({ json: { reminders: list, projects: ['Work'], issues: [] } });
+	});
+	await page.addInitScript(() => {
+		window.startupFrames = [];
+		const sample = () => {
+			const shell = document.querySelector('.pwa-reminders-view');
+			if (shell) {
+				const regions = ['.view-header-meta', '.pwa-schedule-switcher', '.reminders-content'].map(selector => shell.querySelector(selector));
+				const cards = [...shell.querySelectorAll('[data-reminder-id]')];
+				window.startupFrames.push({
+					loading: shell.hasAttribute('data-pwa-loading'),
+					visible: regions.map(node => getComputedStyle(node).visibility),
+					opacity: regions.map(node => Number(getComputedStyle(node).opacity)),
+					geometry: regions.slice(0, 2).map(node => { const r = node.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }),
+					cards: cards.length,
+					cardY: cards[0]?.getBoundingClientRect().y,
+					chrome: ['.view-header-title', '.view-header-actions', '.pwa-dock'].map(selector => Number(getComputedStyle(shell.querySelector(selector)).opacity)),
+				});
+			}
+			requestAnimationFrame(sample);
+		};
+		requestAnimationFrame(sample);
+	});
+	try {
+		await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=today`);
+		await expect(page.locator('.pwa-reminders-view[data-pwa-loading]')).toBeVisible();
+		await expect(page.getByRole('group', { name: 'Reminder dates' })).toBeHidden();
+		await expect(page.locator('.view-header-meta')).toBeHidden();
+		await expect.poll(() => page.evaluate(() => window.startupFrames.length)).toBeGreaterThan(1);
+		response.resolve();
+		for (const cached of [false, true]) {
+			if (cached) {
+				response = Promise.withResolvers();
+				await page.reload();
+			}
+			await expect(page.locator('.view-header-count')).toHaveText('21 reminders');
+			await expect(page.locator('.view-header-overdue')).toHaveText('21 overdue');
+			await expect(page.locator('[data-reminder-id]')).toHaveCount(21);
+			await expect.poll(() => page.evaluate(() => window.startupFrames.filter(frame => frame.cards === 21 && frame.opacity.every(value => value === 1)).length)).toBeGreaterThan(3);
+			const frames = await page.evaluate(() => window.startupFrames);
+			const ready = frames.filter(frame => frame.cards === 21);
+			assert.ok(frames.filter(frame => frame.loading).every(frame => frame.visible[0] === 'hidden' && frame.visible[1] === 'hidden'), 'Keep counts and dates hidden together while loading');
+			assert.ok(ready.every(frame => frame.opacity.every(value => Math.abs(value - frame.opacity[0]) < .01)), 'Counts, dates, and list must fade together');
+			assert.equal(ready.some(frame => frame.opacity[0] > 0 && frame.opacity[0] < 1), reducedMotion !== 'reduce', 'Respect reduced motion for cold and cached launches');
+			assert.ok(frames.every(frame => frame.chrome.every(value => value === 1)), 'Title, settings, and dock stay fully painted');
+			assert.ok(frames.every(frame => JSON.stringify(frame.geometry) === JSON.stringify(frames[0].geometry)), 'Keep the count row and switcher stationary');
+			assert.ok(ready.every(frame => Math.abs(frame.cardY - ready[0].cardY) < 1), 'The first card must not slide during the reveal');
+			if (cached) {
+				await page.evaluate(() => { window.startupFrames = []; });
+				list[0].content = 'Updated draft after refresh';
+				response.resolve();
+				await expect(page.locator('[data-reminder-id="overdue-0"]')).toContainText('Updated draft after refresh');
+				await expect.poll(() => page.evaluate(() => window.startupFrames.length)).toBeGreaterThan(15);
+				assert.ok(await page.evaluate(() => window.startupFrames.every(frame => frame.opacity.every(value => value === 1))), 'Background refresh must not replay the reveal');
+			}
+		}
+	} finally { response.resolve(); await page.close(); }
+}
+
 async function checkScheduleFade(page, nextView, interruptWith) {
 	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
 	const samples = await page.evaluate(async ({ nextView, interruptWith }) => {
@@ -132,6 +199,8 @@ try {
 	for (const engine of [chromium, webkit]) {
 		const browser = await engine.launch();
 		try {
+			await checkTodayStartup(browser, 'no-preference');
+			await checkTodayStartup(browser, 'reduce');
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, timezoneId: 'UTC', serviceWorkers: 'block' });
 			const errors = [];
 			page.on('pageerror', error => errors.push(error.message));
@@ -143,7 +212,7 @@ try {
 			const chip = name => chips.getByRole('button', { name, exact: true });
 			const dock = live.locator('.pwa-dock');
 			const row = id => live.locator(`[data-reminder-id="${id}"]`);
-			const geometry = () => page.locator('.pwa-schedule-switcher:visible').evaluate(element => {
+			const geometry = () => page.locator('.pwa-schedule-switcher').evaluate(element => {
 				const rect = node => { const box = node.getBoundingClientRect(); return [box.x, box.y, box.width, box.height]; };
 				return [rect(element), ...Array.from(element.querySelectorAll('.pwa-schedule-control, .pwa-schedule-chip'), rect)];
 			});
@@ -153,17 +222,18 @@ try {
 				try {
 					await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${initialTab}&upcomingDays=7`, { waitUntil: 'commit' });
 					const opening = page.locator('.pwa-launch-splash');
-					await expect(opening.locator('.pwa-schedule-switcher')).toBeVisible();
-					await expect(opening.locator('.view-header-title')).toHaveText('Schedule');
+					await expect(opening.locator('.pwa-schedule-switcher')).toBeHidden();
+					await expect(opening.locator('.view-header-title')).toHaveText('Reminders');
 					await expect(opening.locator('.pwa-schedule-chip[aria-pressed="true"]')).toHaveText(initialTab === 'today' ? 'Today' : 'Upcoming');
 					const openingGeometry = await geometry();
 					app.resolve();
 					await expect(live).toBeVisible();
-					await expect(live.locator('.view-header-title')).toHaveText('Schedule');
+					await expect(live.locator('.view-header-title')).toHaveText('Reminders');
 					assert.deepEqual(await geometry(), openingGeometry, 'Chips must not shift between the cached shell and the live app');
 					await expect(chip(initialTab === 'today' ? 'Today' : 'Upcoming')).toHaveAttribute('aria-pressed', 'true');
-					await expect(dock.getByRole('button', { name: 'Schedule', exact: true })).toHaveAttribute('aria-current', 'page');
+					await expect(dock.getByRole('button', { name: 'Reminders', exact: true })).toHaveAttribute('aria-current', 'page');
 					await expect(dock.locator('.pwa-dock__indicator')).toHaveCSS('opacity', '1');
+					await expect(chips).toHaveCSS('opacity', '1');
 				} finally { app.resolve(); await page.unroute('**/notifications/app.js*'); }
 			}
 			await expect(row('tomorrow')).toBeVisible();
@@ -212,7 +282,7 @@ try {
 			await expect(live.locator('.pwa-tab-panel')).toHaveCount(2);
 			await dock.getByRole('button', { name: 'Inbox', exact: true }).tap();
 			await expect(chips).toHaveCount(0);
-			await dock.getByRole('button', { name: 'Schedule', exact: true }).tap();
+			await dock.getByRole('button', { name: 'Reminders', exact: true }).tap();
 			await expect(chip('Today')).toHaveAttribute('aria-pressed', 'true');
 			await expect(row('today')).toBeVisible();
 			await checkRapidSwitches(page, true);

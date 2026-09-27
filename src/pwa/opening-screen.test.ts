@@ -6,19 +6,19 @@ import { resolvePwaOpeningDestination } from './opening-destination';
 import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from './opening-screen';
 
 it.each([
-	['', null, 'Schedule', 'today'],
+	['', null, 'Reminders', 'today'],
 	['', '{"defaultScreen":"reading"}', 'Reading', 'reading'],
 	['', '{"defaultScreen":"favorites"}', 'Favorites', 'reading'],
 	['', '{"defaultScreen":"archive"}', 'Archive', 'reading'],
-	['?reminderId=notification', '{"defaultScreen":"reading"}', 'Schedule', 'today'],
+	['?reminderId=notification', '{"defaultScreen":"reading"}', 'Reminders', 'today'],
 	['?tab=inbox', '{"defaultScreen":"favorites"}', 'Inbox', 'inbox'],
-	['?browserToken=enrollment', '{"defaultScreen":"reading"}', 'Schedule', 'today'],
+	['?browserToken=enrollment', '{"defaultScreen":"reading"}', 'Reminders', 'today'],
 	['', '{"defaultScreen":"browse"}', 'Projects', 'browse'],
 	['?tab=inbox', '{"defaultScreen":"browse"}', 'Inbox', 'inbox'],
-	['?tab=upcoming', null, 'Schedule', 'upcoming'],
+	['?tab=upcoming', null, 'Reminders', 'upcoming'],
 	['?project=%3Cwork%3E%20%26%20home&tab=inbox', null, '<work> & home', 'browse'],
 	['?section=reading&project=Work', null, 'Reading', 'reading'],
-	['?tab=invalid', 'broken json', 'Schedule', 'today'],
+	['?tab=invalid', 'broken json', 'Reminders', 'today'],
 ])('paints the complete cached shell before app.js: %s', (search, saved, title, tab) => {
 	const { document } = parseHTML(`<html><body><div class="pwa-launch-splash">${createPwaOpeningScreenHtml()}</div></body></html>`);
 	new Script(PWA_OPENING_DOCK_INIT_JS + PWA_OPENING_SCREEN_INIT_JS).runInNewContext({
