@@ -449,7 +449,7 @@ stays still with reduced motion. Reading uses it when the library has no cached
 data; Reminders uses it while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
-Phone headers use a 26px title, a 44px title/action row, and a compact 20px count
+Phone screen headers use a 32px title, a 44px title row, and a compact 20px count
 row. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
 Loaded and opening headers share these PWA spacing tokens so hydration does not
 move the title or content. Sync and settings retain 44px touch targets.
@@ -562,3 +562,11 @@ article beneath the sheet. Opening
 a sheet deep in a document-scrolling article must keep its header and close
 control in the viewport. Closing or swiping the sheet down restores the same
 article URL and scroll offset; the viewport portal is removed on dismissal.
+
+PWA screen headers share the article reader's rounded chrome: sync and Settings
+sit in a capsule to the right of the title and count. Inbox, Schedule, Projects,
+and all Reading library views use the same 32px heading. Project details use the
+same action surface and a rounded Back control. `src/pwa/styles/_header-chrome.scss`
+is loaded by the shared foundation so cached launch screens match live screens.
+Each feature retains its actions and navigation; Obsidian headers remain unchanged.
+Controls keep their 44px targets and opaque accessibility fallbacks.
