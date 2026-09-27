@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSyncFailureToast } from './useSyncFailureToast';
 import { createReminderOutbox } from '../reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
@@ -177,6 +178,14 @@ export function useReminderOutbox(options: {
 		const timer = window.setTimeout(() => { void outboxRef.current?.drain(); }, Math.max(0, Math.min(...retryTimes) - Date.now()));
 		return () => window.clearTimeout(timer);
 	}, [changes, ready]);
+	const currentOutbox = outboxRef.current;
+	useSyncFailureToast({
+		scope: authToken ? JSON.stringify([authToken, folderPath]) : null,
+		ready,
+		operationIds: changes.filter(change => change.status === 'failed' || change.status === 'uncertain' && change.attempts >= 3).map(change => change.operationId),
+		feature: 'Reminder', showToast: options.showToast,
+		isCurrent: () => currentOutbox !== null && outboxRef.current === currentOutbox,
+	});
 
 	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1),
 		quarantinedChanges, removeQuarantinedChanges: (entries: QuarantinedReminderEntry[]) => removeQuarantinedRef.current?.(entries) ?? Promise.resolve(false),

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
+import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import {
@@ -18,6 +19,7 @@ import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/de
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
 import { PWA_SURFACE_SPRING } from '../motion';
+import { useSheetKeyboardMotion } from '../hooks/useSheetKeyboardMotion';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));
 const ReminderPickerSheet = lazy(loadReminderPickerSheet);
@@ -92,7 +94,7 @@ function ReminderEditorSheet({
 	const pickerTransitionKeyboardInsetRef = useRef(0);
 	const reminderStageRef = useRef<HTMLDivElement | null>(null);
 	const keyboardInset = useKeyboardHeight();
-	const prefersReducedMotion = useReducedMotion();
+	const prefersReducedMotion = useObsidianReducedMotion();
 	const projectOptions = useMemo(
 		() => ['Inbox', ...projects.filter((project) => project !== 'Inbox')],
 		[projects],
@@ -140,6 +142,10 @@ function ReminderEditorSheet({
 	const renderedKeyboardInset = activeScreen === 'editor'
 		? pickerTransitionKeyboardInset || keyboardInset
 		: 0;
+	const setReminderStageRef = useSheetKeyboardMotion(
+		reminderStageRef, renderedKeyboardInset, prefersReducedMotion,
+		activeScreen === 'editor' && !isStageClosing && !isClosing,
+	);
 	const stageClosedOffset = isStageClosing
 		? pickerTransitionClosedOffsetRef.current
 		: '100%';
@@ -183,7 +189,7 @@ function ReminderEditorSheet({
 			dismissible={!saving && !isClosing && canInteract}
 		>
 			<motion.div
-				ref={reminderStageRef}
+				ref={setReminderStageRef}
 				className="pwa-reminder-sheet-stage"
 				style={{ '--pwa-keyboard-inset': `${renderedKeyboardInset}px` } as React.CSSProperties}
 				initial={false}

@@ -6,7 +6,7 @@ import { measureSheetTravel } from '../sheet-geometry';
 
 export function PwaModalSheet({
 	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, sheetClassName,
-	keyboardInset = 0, dismissible = true, label, role = 'dialog', descriptionId,
+	keyboardInset = 0, dismissible = true, viewportPortal = false, label, role = 'dialog', descriptionId,
 }: {
 	isOpen: boolean;
 	/** Return false when dismissal navigates within the sheet instead of closing it. */
@@ -17,6 +17,8 @@ export function PwaModalSheet({
 	variant: 'reminder' | 'settings';
 	sheetClassName?: string;
 	keyboardInset?: number;
+	/** Keep document-reader sheets outside the frozen app and its compositing layers. */
+	viewportPortal?: boolean;
 	dismissible?: boolean;
 	label: string;
 	role?: 'dialog' | 'alertdialog';
@@ -24,7 +26,7 @@ export function PwaModalSheet({
 }) {
 	// Retain the iOS layout/selection-safe lock through the exit animation.
 	// Base UI owns focus containment; trap-focus avoids a second document lock.
-	useLayoutEffect(lockSheetDocumentScroll, []);
+	useLayoutEffect(() => lockSheetDocumentScroll(viewportPortal), [viewportPortal]);
 	const popupRef = useRef<HTMLDivElement>(null);
 	const anchorRef = useRef<HTMLSpanElement>(null);
 	const setPopupRef = useCallback((popup: HTMLDivElement | null) => {
@@ -40,11 +42,21 @@ export function PwaModalSheet({
 	const [hasMounted, setHasMounted] = useState(false);
 	const [mountPoint, setMountPoint] = useState<HTMLElement | null>(null);
 	useLayoutEffect(() => {
-		// A notification can mount the app root and sheet in the same commit.
-		if (!mountPoint) setMountPoint(anchorRef.current?.closest<HTMLElement>('.pwa-shadow-root, .crate-feature-panel') ?? null);
+		const host = anchorRef.current?.closest<HTMLElement>('.pwa-shadow-root, .crate-feature-panel');
+		if (!host) return;
+		if (!viewportPortal) { setMountPoint(host); return; }
+		const portal = host.ownerDocument.createElement('div');
+		portal.className = 'crate-reminders-ui pwa-sheet-portal';
+		// Retain host theme tokens without inheriting the feature panel's layout.
+		if (host.classList.contains('pwa-reading-root')) portal.classList.add('pwa-reading-root');
+		host.ownerDocument.body.append(portal);
+		setMountPoint(portal);
+		return () => portal.remove();
+	}, [viewportPortal]);
+	useLayoutEffect(() => {
 		// Base UI skips entrance transitions when initially open. Open before paint
 		// after mounting its root, retaining synchronous first-tap editor focus.
-		else setHasMounted(true);
+		if (mountPoint) setHasMounted(true);
 	}, [mountPoint]);
 	useLayoutEffect(() => {
 		if (role === 'alertdialog') popupRef.current?.focus({ preventScroll: true });
@@ -86,7 +98,7 @@ export function PwaModalSheet({
 									data-base-ui-swipe-ignore={!dismissible ? '' : undefined}
 									initialFocus={variant === 'reminder' ? false : popupRef}
 									finalFocus={() => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
-										: mountPoint.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
+										: anchorRef.current?.closest('.pwa-shadow-root, .crate-feature-panel')?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
 								>
 									<Drawer.Content className="pwa-modal-sheet__content">
 										<div className="pwa-modal-sheet__scroller">{children}</div>

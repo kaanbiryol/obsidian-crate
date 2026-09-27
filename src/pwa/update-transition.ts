@@ -21,7 +21,13 @@ export function showPwaUpdateTransition(): void {
 	// Mobile browser chrome can resize the viewport during reload. Keep the
 	// message at the same height while the curtain continues to cover the screen.
 	const overlay = document.getElementById('pwa-update-transition');
-	const labelTop = (overlay?.getBoundingClientRect().height ?? window.innerHeight) / 2;
+	const launchScreen = document.querySelector<HTMLElement>('.pwa-launch-splash.is-updating .pwa-update-screen');
+	const launchRect = launchScreen?.getBoundingClientRect();
+	const labelTop = launchRect ? launchRect.top + launchRect.height / 2
+		: (overlay?.getBoundingClientRect().height ?? window.innerHeight) / 2;
+	// Two translucent copies can ghost or flash during the launch handoff.
+	// Replace the already-visible screen at full opacity and the same position.
+	if (overlay) overlay.dataset.launchHandoff = String(Boolean(launchScreen));
 	const activity = overlay?.querySelector<HTMLElement>('.pwa-update-screen__activity span');
 	const launchActivity = document.querySelector('.pwa-launch-splash.is-updating .pwa-update-screen__activity span');
 	// A fresh button press starts a new attempt. Launch updates already share

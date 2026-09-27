@@ -1,15 +1,10 @@
-.pwa-settings-root {
-	position: absolute;
-	inset: 0;
-	z-index: 4;
-	pointer-events: none;
-
+.pwa-settings-root, .pwa-reading-full-height {
 	.pwa-modal-sheet__container--settings {
 		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px - var(--pwa-sheet-keyboard-inset, 0px)));
 		max-height: var(--pwa-settings-height) !important;
 	}
 
-	.settings-sheet--unified {
+	:is(.settings-sheet--unified, .settings-sheet--full-height) {
 		height: var(--pwa-settings-height);
 		max-height: var(--pwa-settings-height);
 	}
@@ -22,6 +17,25 @@
 			width: 100% !important;
 		}
 	}
+}
+
+.pwa-settings-root {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+
+	// The tall settings page should respond immediately to a tap. The shared
+	// spring's slow start and long settling tail feel delayed over this distance.
+	.pwa-modal-sheet__container--settings {
+		transition-duration: 300ms;
+		transition-timing-function: cubic-bezier(.2, .8, .2, 1);
+	}
+	.pwa-modal-sheet__container--settings:is([data-starting-style], [data-swiping]) { transition: none; }
+	.pwa-modal-sheet__container--settings[data-ending-style] {
+		transition-duration: clamp(120ms, calc(240ms * var(--drawer-swipe-strength, 1)), 320ms);
+	}
+
 	.settings-stack { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 	.settings-panel { position: absolute; inset: 0; gap: 0; padding: 12px 20px calc(20px + env(safe-area-inset-bottom)); }
 	.settings-detail { background: var(--pwa-sheet-surface); }
@@ -79,4 +93,11 @@
 		.settings-theme-option { padding-inline: 6px; }
 		.settings-preference-control--select { flex-basis: 140px; width: 140px; }
 	}
+}
+
+.crate-reminders-ui {
+  .settings-tabs-description { margin: 0; padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
+  .settings-tab-controls { display: flex; align-items: center; flex-shrink: 0; }
+  .settings-tab-controls button { min-width: 44px; min-height: 44px; padding: 0; }
+  .settings-tab-controls input { width: 24px; height: 24px; margin: 10px; accent-color: var(--interactive-accent); }
 }

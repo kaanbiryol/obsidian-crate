@@ -1,3 +1,4 @@
+import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { LogOut } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -22,7 +23,9 @@ import { applyPwaUpdate } from '../apply-update';
 import type { PwaPreferences } from '../preferences';
 import type { CrateSection } from './FeatureSwitcherButton';
 
-export function SettingsSheet({ activeSection, onReviewReminders }: { activeSection: CrateSection; onReviewReminders: () => void }) {
+type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'update' | 'logout';
+
+export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: { activeSection: CrateSection; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
 	const { reminders, reading } = useSyncExternalStore(store.subscribe, store.getSnapshot);
 	const { preferences, updatePreferences } = usePwaPreferences();
@@ -32,8 +35,10 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 	const transition = useSheetTransition(finish);
 	const [page, setPage] = useState<'settings' | 'shortcut' | 'logout'>(() => new URL(location.href).searchParams.get('setup') === 'shortcut' ? 'shortcut' : 'settings');
 	const [syncOpen, setSyncOpen] = useState(false);
-	const [busy, setBusy] = useState(false);
-	const working = useRef(false);
+	const [pending, setPending] = useState<ReadonlySet<SettingsAction>>(new Set());
+	const working = useRef(new Set<SettingsAction>());
+	const busy = pending.size > 0;
+	const exclusive = pending.has('update') || pending.has('logout');
 	const [message, setMessage] = useState<string | null>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const reducedMotion = useReducedMotion();
@@ -60,12 +65,13 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 			else backRef.current?.closest('aside')?.querySelector<HTMLElement>('[aria-label="Back to settings"]')?.focus({ preventScroll: true });
 		});
 	};
-	const run = async (action: () => void | Promise<unknown>) => {
-		if (working.current) return;
-		working.current = true; setBusy(true); setMessage(null);
+	const run = async (key: SettingsAction, action: () => void | Promise<unknown>) => {
+		if (working.current.has(key) || working.current.has('update') || working.current.has('logout')
+			|| ((key === 'update' || key === 'logout') && working.current.size > 0)) return;
+		working.current.add(key); setPending(new Set(working.current)); setMessage(null);
 		try { await action(); }
 		catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not complete this action. Try again.'); }
-		finally { working.current = false; setBusy(false); }
+		finally { working.current.delete(key); setPending(new Set(working.current)); }
 	};
 	const changePreferences = (patch: Partial<PwaPreferences>) => {
 		try { updatePreferences(patch); setMessage(null); }
@@ -77,8 +83,8 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 		if (failure?.status === 'rejected') throw failure.reason;
 	};
 	const exports = <>
-		{reminders?.onExport && <Button size="touch" className="settings-action-button" disabled={busy} onClick={() => void run(reminders.onExport!)}>Export unsynced reminders</Button>}
-		{reading?.onExport && <Button size="touch" className="settings-action-button" disabled={busy} onClick={() => void run(reading.onExport!)}>Export Reading data</Button>}
+		{reminders?.onExport && <Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('export-reminders')} onClick={() => void run('export-reminders', reminders.onExport!)}>Export unsynced reminders</Button>}
+		{reading?.onExport && <Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('export-reading')} onClick={() => void run('export-reading', reading.onExport!)}>Export Reading data</Button>}
 	</>;
 	const updateApp = async () => {
 		const applied = await applyPwaUpdate(undefined, { canApply: () => {
@@ -88,17 +94,17 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 		if (!applied) setMessage('Update paused. Finish syncing or review pending changes, then try again.');
 	};
 	const close = () => {
-		if (busy) return false;
+		if (exclusive) return false;
 		if (page !== 'settings') { navigate('settings'); return false; }
 		transition.requestClose();
 		return true;
 	};
 	const title = page === 'shortcut' ? 'Set up iPhone shortcut' : page === 'logout' ? 'Log out of Crate?' : 'Settings';
 	return <PwaModalSheet isOpen={!transition.isClosing} onClose={close} onCloseEnd={transition.finishClose}
-		variant="settings" label={title} dismissible={!busy && !transition.isClosing} keyboardInset={keyboardInset}>
+		onOpenEnd={onOpenEnd} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing} keyboardInset={keyboardInset}>
 		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
-				closeDisabled={busy || transition.isClosing} onClose={close} />
+				closeDisabled={exclusive || transition.isClosing} onClose={close} />
 			{message && <p className="settings-feedback" role="alert">{message}</p>}
 			<div className="settings-stack" data-base-ui-swipe-ignore="">
 				<motion.div ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
@@ -109,6 +115,7 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 						<Button size="touch" variant="ghost" onClick={() => { setSyncOpen(true); requestAnimationFrame(() => panelRef.current?.querySelector('.settings-disclosure')?.scrollIntoView({ block: 'nearest' })); }}>Review sync</Button>
 					</div>}
 					<GeneralSettings preferences={preferences} onChange={changePreferences} />
+					<TabSettings preferences={preferences} onChange={changePreferences} />
 					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
 					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
 					<SettingsDisclosure title="Sync and device" summary={status} open={syncOpen} onOpenChange={setSyncOpen}>
@@ -120,7 +127,7 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 							{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
 						</div>
 						<div className="settings-actions">
-							<Button size="touch" className="settings-action-button" disabled={busy || !ready} onClick={() => void run(refreshAll)}>Refresh all</Button>
+							<Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('refresh') || !ready} onClick={() => void run('refresh', refreshAll)}>Refresh all</Button>
 							{exports}
 							{reminders?.attention && <Button size="touch" className="settings-action-button" onClick={() => { finish(); onReviewReminders(); }}>Review reminders</Button>}
 						</div>
@@ -129,10 +136,10 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 					</SettingsDisclosure>
 					<SettingsDisclosure title="About">
 						<VersionSettings />
-						<Button size="touch" className="settings-action-button" disabled={busy || unsynced} onClick={() => void run(updateApp)}>Update app</Button>
+						<Button size="touch" className="settings-action-button" disabled={unsynced || exclusive} aria-disabled={busy || unsynced} onClick={() => void run('update', updateApp)}>Update app</Button>
 						{unsynced && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
 					</SettingsDisclosure>
-					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={busy || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
+					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
 				</motion.div>
 				<motion.div ref={backRef} className="settings-panel settings-detail" onAnimationComplete={() => { if (page === 'settings') setSubpage(null); }} inert={page === 'settings'} aria-hidden={page === 'settings'}
 					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '100%' : '0%', opacity: reducedMotion && page === 'settings' ? 0 : 1 }}
@@ -146,12 +153,12 @@ export function SettingsSheet({ activeSection, onReviewReminders }: { activeSect
 					<div className="settings-actions">{exports}</div>
 					{reminders?.recovery}
 					<div className="settings-actions">
-						<Button size="touch" disabled={busy} onClick={() => navigate('settings')}>Cancel</Button>
-						<Button size="touch" tone="danger" disabled={busy || !ready} onClick={() => void run(async () => {
+						<Button size="touch" disabled={exclusive} onClick={() => navigate('settings')}>Cancel</Button>
+						<Button size="touch" tone="danger" disabled={exclusive || !ready} aria-disabled={busy || !ready} onClick={() => void run('logout', async () => {
 							const model = activeSection === 'reading' && reading?.connected ? reading : reminders?.connected ? reminders : reading;
 							if (!model) throw new Error('Settings are still loading.');
 							await model.onLogout();
-						})}>{busy ? 'Logging out…' : 'Log out and clear device data'}</Button>
+						})}>{pending.has('logout') ? 'Logging out…' : 'Log out and clear device data'}</Button>
 					</div>
 				</div>}
 				</motion.div>

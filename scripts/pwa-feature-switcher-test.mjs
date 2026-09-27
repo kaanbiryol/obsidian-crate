@@ -110,7 +110,7 @@ try {
         assert.equal(motion.second.barScale, 'none');
         await expect(page.locator('.pwa-reading-opening')).toBeVisible();
         await expect(page.getByRole('status',{name:'Loading Reading'})).toBeVisible();
-        await expect(page.locator('.crate-reading__loading-row')).toHaveCount(4);
+        await expect(page.locator('.crate-content-loading')).toHaveCount(1);
         await page.screenshot({path:`test-results/feature-switcher/${name}-transition-mid.png`});
         releaseReading();
         await page.waitForTimeout(80);

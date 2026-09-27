@@ -1,0 +1,21 @@
+.crate-reminders-ui .crate-content-loading {
+	display: flex;
+	justify-content: center;
+	padding: 48px 20px;
+	color: var(--text-muted);
+}
+.crate-reminders-ui .crate-content-loading__spinner {
+	display: block;
+	width: 18px;
+	height: 18px;
+	visibility: hidden;
+	animation: crate-loading-appear 0s 250ms forwards, crate-loading-spin 1s steps(12) 250ms infinite;
+}
+@keyframes crate-loading-appear { to { visibility: visible; } }
+@keyframes crate-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+	.crate-reminders-ui .crate-content-loading__spinner { animation: crate-loading-appear 0s 250ms forwards; }
+}
+.crate-reminders-ui .reminders-loading--still .crate-content-loading__spinner {
+	animation: crate-loading-appear 0s 250ms forwards;
+}

@@ -6,12 +6,17 @@ import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
 import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';
 import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from '../../../pwa/opening-screen';
-import { PWA_UPDATE_SCREEN_HTML } from '../../../pwa/update-screen';
+import { createPwaUpdateScreenHtml } from '../../../pwa/update-screen';
+import { CRATE_ICON_192_PNG } from './install-assets';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,
 	PWA_LIGHT_THEME_STYLE_ID,
 	PWA_THEME_COLOR_META_ID,
 } from '../../../pwa/theme';
+
+// The reload curtain must paint its logo with the document, even before the
+// service worker responds to image requests. Keep these bytes out of app.js.
+const updateScreenHtml = createPwaUpdateScreenHtml(`data:image/png;base64,${btoa(Array.from(CRATE_ICON_192_PNG, byte => String.fromCharCode(byte)).join(''))}`);
 
 export function createPwaHtml(requestUrl?: string, nonce: string = crypto.randomUUID()): string {
 	const manifestHref = manifestHrefForUrl(requestUrl);
@@ -54,7 +59,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<script nonce="${nonce}" id="pwa-theme-styles">${PWA_THEME_STYLES_JS}</script>
 </head>
 <body>
-	<div id="pwa-update-transition" role="status" aria-live="polite">${PWA_UPDATE_SCREEN_HTML}</div>
+	<div id="pwa-update-transition" role="status" aria-live="polite">${updateScreenHtml}</div>
 	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningScreenHtml()}</div></div>
 	<script nonce="${nonce}" id="pwa-opening-screen-init">${PWA_OPENING_SCREEN_INIT_JS}</script>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>

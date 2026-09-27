@@ -63,8 +63,7 @@
 
 .delete-confirmation-button {
   @include action.styles;
-  min-width: 72px;
-  padding: 0 var(--size-4-3, 12px);
+  @include action.dialog-button;
 }
 
 .delete-confirmation-cancel {

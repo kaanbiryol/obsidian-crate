@@ -394,7 +394,7 @@ function App() {
 				projects={initialContentReady ? visibleProjects : []}
 				incomplete={issues.length > 0}
 				checkingReminders={!initialContentReady || loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
-				showLoadingSkeleton={!initialContentReady || (sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error)))}
+				showLoadingIndicator={!initialContentReady || (sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error)))}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}

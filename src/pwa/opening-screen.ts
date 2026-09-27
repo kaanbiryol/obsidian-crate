@@ -1,15 +1,9 @@
+import { SPINNER_SPOKES_HTML } from '../ui/shared/spinner-spokes';
 import { createPwaOpeningDockHtml, openingIconSvg } from './opening-dock';
 import type { resolvePwaOpeningDestination } from './opening-destination';
 
-// These loading rows are shared by the document and the live React shell.
-export const PWA_REMINDER_SKELETON_HTML = `<div aria-hidden="true">${Array.from({ length: 3 }, () => `
-	<div class="pwa-reminders-skeleton__card">
-		<span class="pwa-reminders-skeleton__check pwa-mode-opening__shape"></span>
-		<span class="pwa-reminders-skeleton__copy">
-			<span class="pwa-reminders-skeleton__title pwa-mode-opening__shape"></span>
-			<span class="pwa-reminders-skeleton__detail pwa-mode-opening__shape"></span>
-		</span>
-	</div>`).join('')}</div>`;
+// Match the shared React loading indicator before the app module is available.
+const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;
 
 const settings = openingIconSvg('settings', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>');
 const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" aria-hidden="true">${icon}</span>`;
@@ -28,11 +22,11 @@ function scheduleChips(tab = 'today') {
 }
 
 const reminders = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-pwa-static-shell><main class="pwa-screen reminders-view is-primary pwa-mode-opening pwa-opening-screen">
-	${header()}${scheduleChips()}<div class="reminders-content"><div class="pwa-reminders-skeleton" role="status" aria-label="Loading reminders">${PWA_REMINDER_SKELETON_HTML}</div></div>${createPwaOpeningDockHtml()}
+	${header()}${scheduleChips()}<div class="reminders-content">${loadingIndicator('Loading reminders')}</div>${createPwaOpeningDockHtml()}
 </main></div>`;
 const reading = `<div class="crate-reminders-ui pwa-reading-root" data-pwa-static-shell><main class="pwa-screen crate-reading-web pwa-mode-opening pwa-reading-opening">
-	${header(true)}<div class="pwa-reading-opening__search pwa-mode-opening__shape" aria-hidden="true"></div>
-	<div class="pwa-mode-opening__content"><div class="crate-reading__loading" role="status" aria-label="Loading Reading"><div class="crate-reading__loading-content" aria-hidden="true"><span class="crate-reading__loading-group crate-reading__loading-shape"></span>${Array.from({ length: 4 }, () => `<div class="crate-reading__loading-row"><span class="crate-reading__loading-source crate-reading__loading-shape"></span><span class="crate-reading__loading-copy"><span class="crate-reading__loading-title crate-reading__loading-shape"></span><span class="crate-reading__loading-meta crate-reading__loading-shape"></span></span><span class="crate-reading__loading-action crate-reading__loading-shape"></span></div>`).join('')}</div></div></div>${createPwaOpeningDockHtml('reading')}
+	${header(true)}<div class="pwa-reading-opening__search" aria-hidden="true"></div>
+	<div class="pwa-mode-opening__content">${loadingIndicator('Loading Reading')}</div>${createPwaOpeningDockHtml('reading')}
 </main></div>`;
 
 const project = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-pwa-static-shell><main class="pwa-screen reminders-view is-primary is-modal is-fullscreen pwa-mode-opening pwa-opening-screen is-project-detail">
@@ -40,7 +34,7 @@ const project = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow
 		<div class="reminders-content"><div class="flex flex-col h-full relative min-h-0">
 			<div><span class="premium-back-button" aria-hidden="true">${openingIconSvg('chevron-left', '<path d="m15 18-6-6 6-6"/>')}<span>Projects</span></span></div>
 			<div class="project-detail-header"><div class="project-detail-header-top"><div class="project-detail-title-row"><h1 class="project-detail-title" data-pwa-launch-title>Schedule</h1></div><div class="crate-view-header-actions">${sync}</div></div></div>
-			<div class="flex-1 min-h-0 overflow-y-auto ios-scroll reminders-view-scroll has-fab"><div class="pwa-reminders-skeleton" role="status" aria-label="Loading reminders">${PWA_REMINDER_SKELETON_HTML}</div></div>
+			<div class="flex-1 min-h-0 overflow-y-auto ios-scroll reminders-view-scroll has-fab">${loadingIndicator('Loading reminders')}</div>
 		</div></div>
 		<span class="reminders-fab fab pwa-project-fab" aria-hidden="true">${openingIconSvg('plus', '<path d="M5 12h14"/><path d="M12 5v14"/>')}</span>
 	</div></div>

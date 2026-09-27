@@ -1,12 +1,15 @@
 /* Base UI supplies behavior; the PWA owns geometry and transition timing. */
-/* Keep keyboard interpolation local to the stage. Inheriting this animated
-   value forces style recalculation throughout the editor on every frame. */
+/* Keep keyboard geometry local to the stage rather than invalidating inherited
+   styles throughout the editor on each viewport update. */
 @property --pwa-keyboard-inset{syntax:"<length>";inherits:false;initial-value:0px}
 /* Retarget from the painted position; never animate direct finger tracking. */
+.pwa-sheet-portal{position:fixed;inset:0;z-index:1000;pointer-events:none}
 .pwa-modal-sheet{position:fixed;inset:0;z-index:1000;pointer-events:none}
 .pwa-modal-sheet__backdrop{position:absolute;inset:0;opacity:calc(1 - var(--drawer-swipe-progress,0));transition:opacity 240ms ease-out}
 .pwa-modal-sheet__container{position:absolute;bottom:0;left:0;display:flex;flex-direction:column;outline:none;pointer-events:auto;transform:none;transition:transform var(--pwa-motion-surface-duration) var(--pwa-motion-surface-ease)}
-.pwa-reminder-sheet-stage{transition:--pwa-keyboard-inset 180ms ease-out}
+/* Keyboard geometry commits once; useSheetKeyboardMotion animates only translate. */
+.pwa-modal-sheet--reminder .pwa-modal-sheet__scroller{position:relative}
+.pwa-keyboard-motion-fill{position:absolute;bottom:0;left:0;right:0;background:var(--pwa-sheet-surface);transform-origin:bottom;pointer-events:none}
 .pwa-modal-sheet__container[data-starting-style],.pwa-modal-sheet__container[data-ending-style]{transform:translateY(var(--pwa-sheet-travel,100%))}
 .pwa-modal-sheet__container[data-starting-style]{transition:none}
 .pwa-modal-sheet__container[data-ending-style]{transition-duration:clamp(120ms,calc(320ms * var(--drawer-swipe-strength,1)),420ms)}

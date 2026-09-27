@@ -3,7 +3,7 @@ import React, { useContext } from 'react';
 import { FeatureSwitcherButton, FeatureNavigationContext } from '../components/FeatureSwitcherButton';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ViewHeader } from '@/ui/shared/ViewHeader';
-import { ReadingListSkeleton } from '@/reading/ui/ReadingListSkeleton';
+import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 
 export function ReadingOpening() {
 	const tab = useContext(FeatureNavigationContext)?.readingTab;
@@ -13,11 +13,12 @@ export function ReadingOpening() {
 			title={tab === 'favorites' ? 'Favorites' : tab === 'archived' ? 'Archive' : 'Reading'}
 			count={0}
 			countUnit="saved link"
-			metaContent={<span className="pwa-mode-opening__meta pwa-mode-opening__shape" aria-hidden="true" />}
+			showMeta={false}
+			reserveMetaSpace
 			rightContent={<div className="crate-view-header-actions"><span className="pwa-reading-opening__sync" aria-hidden="true" /><span inert aria-hidden="true"><IconButton size="large" iconSize="l" icon="settings" label="Open settings" onClick={() => {}} /></span><FeatureSwitcherButton /></div>}
 		/>
-		<div className="pwa-reading-opening__search pwa-mode-opening__shape" aria-hidden="true" />
-		<div className="pwa-mode-opening__content"><ReadingListSkeleton /></div>
+		<div className="pwa-reading-opening__search" aria-hidden="true" />
+		<div className="pwa-mode-opening__content"><LoadingIndicator label="Loading Reading" /></div>
 		<PwaOpeningDock tab="reading" />
 	</main>;
 }

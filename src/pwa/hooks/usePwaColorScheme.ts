@@ -1,78 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '@/cloudflare/worker/pwa/pwa-params';
-import {
-	lightThemeMediaForPreference,
-	loadPwaThemePreference,
-	PWA_LIGHT_SCHEME_MEDIA,
-	PWA_LIGHT_THEME_STYLE_ID,
-	PWA_THEME_COLOR_META_ID,
-	PWA_THEME_PREFERENCE_KEY,
-	preferredPwaColorScheme,
-	resolvePwaColorScheme,
-	savePwaThemePreference,
-	type PwaColorScheme,
-	type PwaThemePreference,
-} from '../theme';
+import { createContext, useContext } from 'react';
+import type { PwaColorScheme, PwaThemePreference } from '../theme';
 
-export type { PwaColorScheme, PwaThemePreference } from '../theme';
-
-function applyPwaColorScheme(preference: PwaThemePreference, colorScheme: PwaColorScheme): void {
-	const isLight = colorScheme === 'light';
-	const root = document.documentElement;
-	root.dataset.pwaColorScheme = colorScheme;
-	root.style.setProperty('--pwa-launch-bg', isLight ? PWA_LIGHT_CHROME_COLOR : PWA_CHROME_COLOR);
-	root.style.background = isLight ? PWA_LIGHT_CHROME_COLOR : PWA_CHROME_COLOR;
-	root.style.colorScheme = colorScheme;
-
-	const lightTheme = document.getElementById(PWA_LIGHT_THEME_STYLE_ID) as HTMLStyleElement | null;
-	if (lightTheme) lightTheme.media = lightThemeMediaForPreference(preference);
-
-	const themeColor = document.getElementById(PWA_THEME_COLOR_META_ID);
-	themeColor?.setAttribute('media', 'all');
-	themeColor?.setAttribute('content', isLight ? PWA_LIGHT_CHROME_COLOR : PWA_CHROME_COLOR);
-}
-
-export function usePwaColorScheme(): {
+interface PwaThemeState {
 	colorScheme: PwaColorScheme;
 	themePreference: PwaThemePreference;
 	setThemePreference: (preference: PwaThemePreference) => void;
-} {
-	const [themePreference, setThemePreferenceState] = useState<PwaThemePreference>(() => loadPwaThemePreference());
-	const [systemScheme, setSystemScheme] = useState<PwaColorScheme>(() => preferredPwaColorScheme());
-	const colorScheme = resolvePwaColorScheme(themePreference, systemScheme);
-	useEffect(() => {
-		const changed = (event: Event) => {
-			if (event instanceof StorageEvent && event.key !== null && event.key !== PWA_THEME_PREFERENCE_KEY) return;
-			setThemePreferenceState(event instanceof CustomEvent ? event.detail as PwaThemePreference : loadPwaThemePreference());
-		};
-		window.addEventListener('crate-theme-changed', changed);
-		window.addEventListener('storage', changed);
-		return () => { window.removeEventListener('crate-theme-changed', changed); window.removeEventListener('storage', changed); };
-	}, []);
+}
 
-	useEffect(() => {
-		const preference = window.matchMedia(PWA_LIGHT_SCHEME_MEDIA);
-		const updateColorScheme = () => setSystemScheme(preferredPwaColorScheme(preference));
+export const PwaThemeContext = createContext<PwaThemeState | null>(null);
 
-		updateColorScheme();
-		if (typeof preference.addEventListener === 'function') {
-			preference.addEventListener('change', updateColorScheme);
-			return () => preference.removeEventListener('change', updateColorScheme);
-		}
-
-		preference.addListener(updateColorScheme);
-		return () => preference.removeListener(updateColorScheme);
-	}, []);
-
-	useLayoutEffect(() => {
-		applyPwaColorScheme(themePreference, colorScheme);
-	}, [colorScheme, themePreference]);
-
-	const setThemePreference = useCallback((preference: PwaThemePreference) => {
-		savePwaThemePreference(preference);
-		setThemePreferenceState(preference);
-		window.dispatchEvent(new CustomEvent('crate-theme-changed', { detail: preference }));
-	}, []);
-
-	return { colorScheme, themePreference, setThemePreference };
+export function usePwaColorScheme(): PwaThemeState {
+	const theme = useContext(PwaThemeContext);
+	if (!theme) throw new Error('PWA theme must be read inside the app theme provider.');
+	return theme;
 }
