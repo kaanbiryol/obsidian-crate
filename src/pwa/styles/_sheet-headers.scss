@@ -3,7 +3,7 @@
     --crate-icon-button-size: 44px;
     flex-shrink: 0;
     min-height: 56px;
-    padding: 6px 12px;
+    padding: var(--pwa-sheet-header-top-padding, 6px) 12px 6px;
     column-gap: 8px;
     // Matching side tracks center the title on the sheet, regardless of actions.
     grid-template-columns:
@@ -50,6 +50,8 @@
     }
 
     .reminder-modal-header-title {
+      // Match Cupertino's standard 17px semibold navigation-title tracking.
+      letter-spacing: -0.41px;
       white-space: normal;
       overflow-wrap: anywhere;
     }
