@@ -1,4 +1,4 @@
-import { ARTICLE_END, ARTICLE_START, READING_IMPORT_MARKER, readingTimestamp, readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingMetadata } from './model';
+import { ARTICLE_END, ARTICLE_START, readingTimestamp, readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingMetadata } from './model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
 
 export function parseReadingNote(markdown: string): ReadingMetadata | null {
@@ -20,6 +20,7 @@ export function updateReadingNote(markdown: string, id: string, changes: Reading
 	if (!metadata || metadata.crate_reading_id !== id) throw new Error('The reading note changed. Refresh before trying again.');
 	// Construct the allowlist explicitly, even for callers outside TypeScript.
 	const allowed: ReadingChanges = {
+		...(changes.highlights === undefined ? {} : { highlights: changes.highlights }),
 		...(changes.reading_status === undefined ? {} : { reading_status: changes.reading_status }),
 		...(changes.favorite === undefined ? {} : { favorite: changes.favorite }),
 		...(changes.tags === undefined ? {} : { tags: changes.tags }),
@@ -38,15 +39,22 @@ export async function readingImportId(path: string, original: string): Promise<s
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function adoptReadingClip(markdown: string, path: string): Promise<string> {
+/** Called only for Markdown inside the configured Reading folder. */
+export async function adoptReadingClip(markdown: string, path: string, savedAt: string): Promise<string> {
 	const parsed = readReadingFrontmatter(markdown);
-	if (!parsed || parsed.value.crate_reading_import !== READING_IMPORT_MARKER) return markdown;
-	if (Object.prototype.hasOwnProperty.call(parsed.value, 'crate_reading_version')) { parseReadingNote(markdown); return markdown; }
-	const value = parsed.value;
+	const value = parsed?.value ?? {};
+	if (Object.prototype.hasOwnProperty.call(value, 'crate_reading_version')) { parseReadingNote(markdown); return markdown; }
+	const body = parsed?.body ?? markdown;
+	// Default Clipper templates use source and may save authors as a list.
+	const source = value.source_url ?? value.source ?? value.url;
+	const author = Array.isArray(value.author) && value.author.every(entry => typeof entry === 'string')
+		? value.author.join(', ') : value.author;
 	const metadata = validateReadingMetadata({
 		...value, crate_reading_version: 1, crate_reading_id: value.crate_reading_id ?? await readingImportId(path, markdown),
-		saved_at: readingTimestamp(value.saved_at), reading_status: value.reading_status ?? 'inbox', favorite: value.favorite ?? false,
-		tags: value.tags ?? [], extraction_status: parsed.body.trim() ? 'ready' : 'unavailable', capture_method: 'web-clipper',
+		title: value.title ?? path.split('/').pop()!.replace(/\.md$/i, ''), source_url: source == null || source === '' ? '' : readingUrl(source),
+		saved_at: readingTimestamp(value.saved_at ?? savedAt), reading_status: value.reading_status ?? 'inbox', favorite: value.favorite ?? false,
+		tags: typeof value.tags === 'string' ? value.tags.split(/[,\s]+/).filter(Boolean) : value.tags ?? [],
+		author: author ?? (Object.prototype.hasOwnProperty.call(value, 'author') ? '' : undefined), extraction_status: body.trim() ? 'ready' : 'unavailable', capture_method: 'web-clipper',
 	});
 	return patchReadingFrontmatter(markdown, { ...metadata });
 }

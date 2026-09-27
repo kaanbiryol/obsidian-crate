@@ -1,3 +1,4 @@
+import { downloadJson } from '../download';
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ReadingItem } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -77,7 +78,5 @@ export async function clearReadingData(): Promise<void> {
 export async function exportReadingData(): Promise<void> {
   const db = await readingDatabase(), tx = db.transaction('values');
   const data: Record<string, unknown> = Object.fromEntries(await Promise.all((await tx.store.getAllKeys()).map(async key => [key, await tx.store.get(key)] as const)));
-  const blob = new Blob([JSON.stringify({ format: 1, origin: location.origin, data }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = 'crate-reading-recovery.json'; anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadJson('crate-reading-recovery.json', { format: 1, origin: location.origin, data });
 }

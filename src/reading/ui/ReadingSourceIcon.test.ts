@@ -13,4 +13,5 @@ it('uses a declared favicon or the site root for older and clipped notes', () =>
 
 it('does not request local domains', () => {
 	expect(sourceIconUrl({ ...item, source_url: 'http://localhost/read' })).toBeNull();
+	expect(sourceIconUrl({ ...item, source_url: '' })).toBeNull();
 });

@@ -6,16 +6,16 @@ export function readReadingFrontmatter(markdown: string) {
 	const opening = /^(?:\uFEFF)?---\r?\n/.exec(markdown);
 	if (!opening) return null;
 	const offset = opening[0].length;
-	const closing = /^(?:---|\.\.\.)\s*$/m.exec(markdown.slice(offset));
+	const closing = /^(?:---|\.\.\.)[ \t]*\r?$/m.exec(markdown.slice(offset));
 	if (!closing || closing.index > 64 * 1024) throw new Error('Missing or oversized reading properties.');
 	const yaml = markdown.slice(offset, offset + closing.index);
 	const document = parseDocument(yaml, { strict: true, uniqueKeys: true });
-	if (document.errors.length || document.warnings.length || !isMap(document.contents) || document.contents.flow) throw new Error('Reading properties must be a valid YAML mapping.');
+	if (document.errors.length || document.warnings.length || (document.contents !== null && (!isMap(document.contents) || document.contents.flow))) throw new Error('Reading properties must be a valid YAML mapping.');
 	visit(document, {
 		Alias() { throw new Error('Aliases are not supported in reading properties.'); },
 		Node(_key, node) { if (node.anchor || node.tag) throw new Error('Anchors and custom types are not supported in reading properties.'); },
 	});
-	const value: unknown = document.toJS({ maxAliasCount: 0 });
+	const value: unknown = document.contents === null ? {} : document.toJS({ maxAliasCount: 0 });
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid reading properties.');
 	const closeEnd = offset + closing.index + closing[0].length;
 	return { document, value: value as Record<string, unknown>, offset, end: offset + closing.index,
@@ -25,10 +25,17 @@ export function readReadingFrontmatter(markdown: string) {
 /** Replace owned entries only; unknown YAML and everything after the delimiter stay byte-for-byte. */
 export function patchReadingFrontmatter(markdown: string, changes: Record<string, unknown>): string {
 	const parsed = readReadingFrontmatter(markdown);
-	if (!parsed || !isMap(parsed.document.contents)) throw new Error('Reading properties are missing.');
+	if (!parsed) {
+		const bom = markdown.startsWith('\uFEFF') ? '\uFEFF' : '';
+		const newline = markdown.includes('\r\n') ? '\r\n' : '\n';
+		const result = `${bom}---${newline}${Object.entries(changes).map(([key, value]) => `${key}: ${JSON.stringify(value)}${newline}`).join('')}---${newline}${markdown.slice(bom.length)}`;
+		readReadingFrontmatter(result);
+		return result;
+	}
+	const pairs = isMap(parsed.document.contents) ? parsed.document.contents.items : [];
 	const edits: { start: number; end: number; text: string }[] = [];
 	const remaining = new Map(Object.entries(changes));
-	for (const pair of parsed.document.contents.items) {
+	for (const pair of pairs) {
 		if (!isScalar(pair.key) || typeof pair.key.value !== 'string' || !remaining.has(pair.key.value)) continue;
 		const key = pair.key.value;
 		const keyRange = pair.key.range;
@@ -39,7 +46,7 @@ export function patchReadingFrontmatter(markdown: string, changes: Record<string
 		edits.push({ start, end, text: `${key}: ${JSON.stringify(remaining.get(key))}${parsed.newline}` });
 		remaining.delete(key);
 	}
-	const firstKey = parsed.document.contents.items[0]?.key;
+	const firstKey = pairs[0]?.key;
 	const firstOffset = isScalar(firstKey) ? firstKey.range?.[0] : undefined;
 	const beforeFirstKey = firstOffset === undefined ? '' : markdown.slice(parsed.offset, parsed.offset + firstOffset);
 	const indentation = /(?:^|\n)([ \t]*)$/.exec(beforeFirstKey)?.[1] ?? '';

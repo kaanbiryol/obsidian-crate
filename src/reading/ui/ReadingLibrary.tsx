@@ -1,3 +1,4 @@
+import { TextField } from '../../ui/shared/TextField';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
@@ -15,6 +16,7 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 
 export interface ReadingLibraryProps {
 	snapshot: ReadingSnapshot;
+	initialSection?: ReadingSection;
 	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; disabled: boolean }) => React.ReactNode;
 	/** Host-owned transitions can retain the previous library while changing sections. */
 	renderLibraryContent?: (section: ReadingSection, content: React.ReactNode) => React.ReactNode;
@@ -23,8 +25,9 @@ export interface ReadingLibraryProps {
 	onUpdate: (item: ReadingItem, changes: ReadingChanges) => Promise<void>;
 	onRefresh: () => Promise<void>;
 	onSettings?: () => void;
+	settingsLabel?: string;
 	headerActions?: React.ReactNode;
-	headerTitleContent?: React.ReactNode;
+	headerStatus?: React.ReactNode;
 	activeId?: string;
 	reader?: React.ReactNode;
 	/** PWA phone navigation; browser history can settle without a second slide. */
@@ -40,8 +43,8 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
-export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, onAdd, onOpen, onUpdate, onRefresh, onSettings, headerActions, headerTitleContent, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
-	const [section, setSection] = useState<ReadingSection>('inbox');
+export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
+	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
 	const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
@@ -79,6 +82,9 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 	const items = useMemo(() => filterReadingItems(snapshot.items, section, query, tag), [snapshot.items, section, query, tag]);
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	const tags = useMemo(() => [...new Set(snapshot.items.flatMap(item => item.tags))].sort((a, b) => a.localeCompare(b)), [snapshot.items]);
+	useEffect(() => {
+		if (tag && !tags.includes(tag)) { setTag(null); setVisible(PAGE_SIZE); }
+	}, [tag, tags]);
 	const run = (key: string, action: () => Promise<void>) => {
 		if (pending.current) return;
 		pending.current = true; setBusy(key); setError(null);
@@ -108,8 +114,9 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 			</aside>
 			<div className="crate-reading__library" aria-busy={!!busy} inert={readerMotion !== undefined && !!reader}>
 				{renderLibrary(<>
-				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} titleContent={headerTitleContent} count={items.length} countUnit="saved link" showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{onSettings && <IconButton size="large" iconSize="l" icon="settings" label="Reading settings" onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" disabled={!!busy} onClick={onAdd} />{headerActions}</div>} />
-				<label className="crate-reading__search"><ThemeIcon id="search" size="m" aria-hidden="true" /><input type="search" placeholder="Search your reading" aria-label="Search reading" value={query} onChange={event => { setQuery(event.target.value); resetList(); }} />{query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />}</label>
+				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={items.length} countUnit="saved link" showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{headerStatus}{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" disabled={!!busy} onClick={onAdd} />{headerActions}</div>} />
+				<TextField fieldClassName="crate-reading__search" label="Search reading" hideLabel type="search" placeholder="Search your reading" leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />} value={query} onChange={event => { setQuery(event.target.value); resetList(); }} trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
+				{tags.length > 0 && <label className="crate-reading__tag-picker">Tags<select aria-label="Filter by tag" value={tag ?? ''} onChange={event => { setTag(event.target.value || null); resetList(); }}><option value="">All tags</option>{tags.map(value => <option key={value} value={value}>{value}</option>)}</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
@@ -120,7 +127,7 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 						{items.length === 0 && <div className="crate-reading__empty"><ThemeIcon id="book-open" size="xl" aria-hidden="true" /><h2>{query || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}</h2><p>{query || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}</p>{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}</div>}
 						{groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
 							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${item.title}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} disabled={!!busy} onClick={() => run(item.crate_reading_id, () => onOpen(item))}>
-								<ReadingSourceIcon item={item} /><span className="crate-reading__item-copy"><strong>{item.title}</strong><span className="crate-reading__meta">{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Text pending' : 'Link only'}</>}</span></span>
+								<ReadingSourceIcon item={item} /><span className="crate-reading__item-copy"><strong>{item.title}</strong><span className="crate-reading__meta">{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Text pending' : item.source_url ? 'Link only' : 'Empty note'}</>}</span></span>
 							</Button><IconButton size="large" icon="star" className="crate-reading__favorite" label={item.favorite ? 'Remove favorite' : 'Favorite'} aria-pressed={item.favorite} data-filled={item.favorite} disabled={!!busy || pendingItemIds?.has(item.crate_reading_id)} onClick={() => run(item.crate_reading_id, () => onUpdate(item, { favorite: !item.favorite }))} />
 						</li>)}</ul></section>)}
 						{visible < items.length && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
