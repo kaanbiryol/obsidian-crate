@@ -1,5 +1,23 @@
 # Testing
 
+## Optimistic Reading actions
+
+After building the Worker, run `node --test scripts/reading-optimistic.browser.test.mjs`
+for Chromium and WebKit coverage of immediate link saves, continued editing during
+delayed requests, tags and highlight notes, offline changes, and conflict rollback.
+The tests use the built PWA, native IndexedDB/Web Locks, and the real local Worker.
+Chromium also verifies offline reload; WebKit verifies offline use in the current
+document. Physical installed-app acceptance remains a device check.
+
+Reading persists changes locally before updating the UI and sends them in the
+background, like Reminders. Unsent edits combine while preserving their original
+preconditions; edits made during a request queue behind its immutable request body.
+Interrupted requests get the same short, bounded retries as Reminders, using those
+exact bytes and their original operation identity.
+Rejected edits and their dependents remain available for export in settings.
+New links appear immediately; editing them becomes available when the server
+assigns their article identity. Article extraction still requires a connection.
+
 ## Unified PWA settings
 
 After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`
@@ -8,6 +26,10 @@ and focus, shared theme and preferences, Reading launch destinations, explicit-l
 precedence, shortcut navigation, pending Reading exports from Reminders, and shared
 logout. The test uses the built client, local synthetic APIs, and native browser
 storage; screenshots include light/dark, 320px phone, and desktop layouts.
+Theme checks cover one document update with both features mounted, system-theme
+changes, explicit overrides, settings close/reopen, feature switching, and native
+cross-tab updates including invalid or removed preferences. Early HTML theme
+application before React loads is covered by `scripts/pwa-startup-empty-test.mjs`.
 Run the storage-safety, sheet-interaction, and Reading shortcut browser checks for
 cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
 keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.

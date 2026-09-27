@@ -4,7 +4,7 @@ import type { ReadingItem } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 export const READING_SESSION_KEY = 'crate-reading-session-v1';
 export interface ReadingSession { token: string; id: string; folderPath: string; generation: string; expiresAt: number; source?: 'reminders' }
-export interface PendingReading { id: string; sessionId: string; action: 'capture' | 'update' | 'retry'; intent: Record<string, unknown>; body?: string; error?: string; review?: boolean }
+export interface PendingReading { id: string; sessionId: string; action: 'capture' | 'update' | 'retry'; intent: Record<string, unknown>; queuedAt?: string; body?: string; error?: string; review?: boolean; attempts?: number; retryAt?: number }
 export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number }
 interface ReadingDatabase extends DBSchema { values: { key: string; value: unknown } }
 let opening: Promise<IDBPDatabase<ReadingDatabase>> | undefined;

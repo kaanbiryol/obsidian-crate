@@ -19,12 +19,21 @@ both hosts together.
   separate colors in feature styles. Existing names
   such as `--background-primary` and `--font-ui-medium` are compatibility inputs;
   using them does not import the Obsidian runtime into the browser.
+- `src/pwa/components/PwaThemeProvider.tsx`, mounted once by `FeatureShell`, owns
+  system-theme and cross-tab subscriptions, theme preferences, document colors,
+  the light stylesheet, and browser theme-color metadata. `usePwaColorScheme`
+  only reads that shared context. Keep the early launch theme in the HTML shell
+  and the parsing/persistence helpers in `src/pwa/theme.ts` so first paint stays
+  correct before React loads.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
 - `src/ui/shared/` owns buttons, icon buttons, text fields, and headers. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
+  Reading form actions and the PWA delete confirmation use `crate-dialog-actions`
+  for the plugin confirmation’s shared minimum width, padding, and subtle borders.
+  Phone layouts give both actions equal width and 48px minimum height.
 - `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
   primitives, and PWA header defaults for every feature. The PWA stylesheet
   entry point loads it independently of the reminder layout stylesheet.
@@ -37,6 +46,13 @@ both hosts together.
   validation, async actions, and persistence.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
+  Reading confirms explicit link, tag, and highlight-note saves after local
+  persistence; offline confirmations say they are saved on this device. Favorite,
+  archive, and passage-highlight changes use their immediate visual state.
+  Input validation stays beside the field. Failed local writes also show an error
+  toast. Both features announce rejected changes or exhausted automatic retries
+  once per operation, when the feature is visible; routine retries and refreshes
+  stay quiet. Persistent sync notices and settings retain the recovery details.
 - `src/pwa/components/PwaNotice.tsx` owns notice title/body/action layout, with
   styles in `src/pwa/styles/_notice.scss` loaded by the common foundation.
   Recovery features retain their announcements, retry/discard decisions, and
@@ -72,9 +88,25 @@ both hosts together.
   critically damped Motion spring; CSS-owned drawers and Reading navigation
   use a sampled spring curve with a cubic fallback. Direct drawer dragging
   remains unanimated, and CSS transitions resume from the current position.
+  The tall settings page uses a shorter ease-out transition (300ms in, 240ms
+  out before swipe adjustment). Initialize unvisited features only after its
+  entrance completes so their loading work does not interrupt the slide.
+  Reminder keyboard updates commit height/padding once, then
+  `useSheetKeyboardMotion` animates the resulting displacement with independent
+  `translate` keyframes. Do not interpolate the inset used by height and padding:
+  that lays out the editor on every animation frame. Keyboard closing keeps a
+  temporary scaled background beneath the moving surface; interruption and
+  unmount remove it. Picker transitions retain their own transform, and live
+  reduced-motion preferences skip keyboard movement.
   Keep native history gestures immediate and tab changes as stationary outgoing-screen dissolves over opaque incoming screens,
   and reduced-motion paths free of spatial transitions. Reader content stays
-  mounted until its exit completes; timeout cleanup is only a recovery path.
+  mounted until its exit completes; timeout cleanup is only a recovery path. Phone-sized
+  PWA readers use document scrolling so iOS can own the status-bar scroll-to-top
+  gesture. The PWA adapter restores the embedded scroll position for the closing
+  animation; desktop and plugin readers retain their own scroll container. The
+  sticky action header hides on downward scroll and returns on upward scroll or
+  keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
+  desktop browser automation cannot establish that OS behavior.
 
 - `src/reminders/components/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and
@@ -100,6 +132,14 @@ both hosts together.
 
 
 ## Making a visual change
+
+PWA **Settings → Tabs** controls visibility and order for Inbox, Schedule, Projects,
+and Reading in the bottom dock. Preferences are saved on the device and shared
+between its browser tabs. At least one destination remains visible; **Reset tabs**
+restores all four. **Open to** and explicit links remain independent of visibility.
+Reading keeps its view picker. The cached launch shell uses the same normalized
+preferences before React starts, including the dock width and selection indicator.
+
 
 The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented
 control with a shared frosted track and sliding selection. It uses 13px labels
@@ -214,16 +254,16 @@ the page backdrop has no gradient that can show through during mounting.
 `scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
 and data in both engines, including saved themes opposite to the system theme.
 The initial HTML includes the selected title, settings icon, bottom dock, and
-content skeletons. `src/pwa/opening-screen.ts` and `opening-dock.ts` supply the
+a small, muted content loading indicator. `src/pwa/opening-screen.ts` and `opening-dock.ts` supply the
 same appearance while the app module, session, and update check load. The cached
 HTML stays free of account data; nonce-authorized bootstraps resolve the current
 URL and saved default tab before app.js. Browser checks delay scripts, session
-hydration, and data independently, comparing header, cards, icons, and dock
+hydration, and data independently, comparing header, loading indicator, icons, and dock
 geometry across each handoff. Loading chrome must never be replaced by an empty
 canvas while JavaScript or network requests are pending.
 Once the launch destination is known, the real Reminders shell stays mounted
 while data loads. Its title, settings icon, and dock keep their DOM nodes and
-geometry; only the content skeleton is replaced. Startup checks assert node
+geometry; only the content loading indicator is replaced. Startup checks assert node
 identity and sample header visibility during delayed fetches in both engines.
 Home Screen cold launches and the OS-owned launch snapshot still require a
 physical iPhone check.
@@ -399,9 +439,11 @@ cannot reopen a dismissed article or accumulate article entries.
 `FeatureShell.tsx` preserves mounted feature state
 and navigation, keeps the inactive panel inert, and restores keyboard focus to the
 destination's visible navigation control after its initial loading completes.
-Both PWA modes show layout-matched skeletons while their first usable data is
-loading. Reading uses the same row skeleton when the library has no cached data;
-Reminders uses card skeletons while a cached empty list is being checked. Neither
+Both PWA modes and shared plugin views use a small, muted spinner while their
+first usable data is loading. Its 12-spoke graphic and stepped rotation match
+pull-to-refresh. It appears after 250 ms to avoid quick flashes and
+stays still with reduced motion. Reading uses it when the library has no cached
+data; Reminders uses it while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
 Phone headers use a 26px title, a 44px title/action row, and a compact 20px count
@@ -452,16 +494,68 @@ live highlighting, release outside, and interruption in both engines, plus nativ
 Chromium touch selection and pointer cancellation. Physical iPhone safe areas, VoiceOver, and Home Screen behavior remain
 device acceptance checks.
 
-In Reading, releasing a text selection saves a highlight automatically. Tapping a
-saved highlight shows custom start/end handles and a red X button beside the
-passage, labeled **Delete highlight** for assistive technology. Its 44px touch
-target stays clear of the resize handles and moves below the selection when
-there is no room at the right edge. Dragging a handle previews the range without moving the article; release
-saves the resized range. Handles auto-scroll near the reader edges and support
-Left/Right keys. Escape or pointer cancellation abandons an in-progress drag.
-Outside taps dismiss the selected highlight; scrolling keeps its handles attached.
+In Reading, releasing a text selection saves a highlight automatically and opens
+an inline action menu with **Copy**, **Share**, and **Delete highlight**. Copy and
+Share use the passage text and remain available while a highlight save is pending.
+Share opens the device share sheet where supported, otherwise it copies the text
+with feedback. Cancellation is quiet; failed actions show an error without
+claiming success. Tapping a saved highlight reopens its menu and resize handles.
+The menu stays within the reader viewport and clear of the passage and handles.
+Dragging a handle previews the range without moving the article; release saves
+the resized range. Handles auto-scroll near the reader edges and support Left/Right
+keys. Escape or pointer cancellation abandons an in-progress drag. Outside taps
+and ordinary scrolling dismiss the menu and handles without removing the highlight;
+handle auto-scroll keeps the controls attached. Late save/share completions never
+reopen dismissed controls.
 The PWA persists changes before confirming them, coalesces undispatched highlight
 edits offline, and keeps dispatched updates immutable until confirmed or reviewed.
 A failed save retains the selected range with an error and retry action. Highlights
 remain note metadata shared by both reader hosts; changed article text is never
 marked unless it still matches the saved text at the saved offsets.
+
+### PWA article code examples
+
+The PWA passes `highlightReadingCode` to the shared reader. Syntax grammars stay
+in the deferred Reading bundle; the Obsidian reader does not enable them. Code
+uses language labels where available and bounded detection for short unlabelled
+blocks. Unsupported languages and oversized examples remain plain text. Highlighted
+markup is sanitized and accepted only if it preserves the exact original text,
+so copying and annotation offsets remain stable. Colors use `--reading-code-*`
+palette tokens in both PWA themes.
+
+Supported article code languages and formats: JavaScript (including JSX),
+TypeScript (including TSX), Python, Bash, shell sessions, Swift, Java, Kotlin,
+C, C++, C#, Objective-C, Go, Rust, Ruby, PHP, Dart, R, MATLAB, Julia, Lua,
+Perl, Scala, PowerShell, HTML/XML, CSS, SCSS, SQL, GraphQL, JSON, YAML,
+INI/TOML, Dockerfile, Markdown, and diff. Language aliases such as `c#`,
+`c++`, `jsx`, `tsx`, and `toml` work in fenced code labels. Explicit language
+support is broader than automatic detection; the latter remains limited to
+JavaScript, Python, Bash, JSON, CSS, HTML/XML, SQL, and Swift.
+
+The PWA article reader keeps its actions visible in their existing positions.
+Back uses a circular surface, archive/favorite share a capsule, and the secondary
+actions use individual rounded surfaces beside the offline status. Article and
+Highlights use a rounded segmented control. These PWA-only styles reuse the dock
+palette, retain 44px targets, and fall back to opaque surfaces without backdrop
+filtering or when reduced transparency is requested. The iOS 27 opaque header
+workaround remains in place.
+
+The PWA article opens directly into its text without Article / Highlights tabs.
+A floating highlighter/count button opens the article highlights in a full-height
+PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it
+does not reserve a bottom bar or shorten the article. The button and navigation
+bar share the same scroll-direction threshold: down hides them, up or keyboard
+focus reveals them. After a 12px direction threshold, the floating button fades
+and rises over the next 48px of scrolling, with a short easing transition between
+scroll updates. Reduced motion uses an immediate visibility change without translation. Closing the sheet
+restores the passage position; selecting **View in article** closes the sheet
+before smoothly scrolling to and focusing the highlight; reduced motion uses an
+instant scroll. Obsidian retains its reader tabs.
+
+Reading sheets portal into a dedicated, themed viewport layer directly under the
+body, outside the frozen article and feature-panel compositing layers. The body
+stays at the viewport origin; only the app canvas is offset to preserve the
+article beneath the sheet. Opening
+a sheet deep in a document-scrolling article must keep its header and close
+control in the viewport. Closing or swiping the sheet down restores the same
+article URL and scroll offset; the viewport portal is removed on dismissal.

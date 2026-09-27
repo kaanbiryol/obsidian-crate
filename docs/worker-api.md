@@ -384,6 +384,30 @@ Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shor
 
 Reading updates also accept optional `highlights` alongside their `before.highlights`
 precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader
-text), and the exact `text`. Notes without this property remain valid. Limits are
-100 entries, 4,000 characters per entry, and 16,000 total characters. The existing
-mutation receipts and conflict checks apply; Markdown article bodies are preserved.
+text), and the exact `text`. Optional `id`, `createdAt`, `prefix`, `suffix`, and
+`note` fields retain identity, context, and personal annotations. Optional
+`codeAnchor: true` records exact code selections that cannot contain inline markers.
+`textAnchor: true` preserves other source-sensitive selections, such as partial
+autolinks, HTML, escaped table cells, literal `==`, and Obsidian constructs. The
+writer recalculates both flags from the selected Markdown syntax. Limits are 100
+entries, 4,000 characters per excerpt or note, 16,000 excerpt characters, and 48 KiB
+of serialized highlight metadata. Update requests allow 256 KiB for the before
+and after values, including JSON escaping. The existing mutation receipts and
+conflict checks apply.
+
+Highlight updates insert/remove `==` delimiters in the original Markdown body;
+they never serialize the article back from HTML. `highlight_format: markdown-v1`
+marks notes whose inline highlights are authoritative for prose and complete
+inline code and complete autolinks. Partial or multiline inline code and code-block selections use
+anchored metadata, preserving the code bytes. Code anchors can authorize only
+matching code characters, never unmarked prose. A rebuildable projection
+collects native markers, including changes made in Obsidian, and associates stored
+metadata by text and surrounding context. Matching legacy frontmatter highlights
+migrate on the next Crate save. Unmatched excerpts and orphaned personal annotations
+remain in `highlight_recovery` and are visible in the article's Highlights view.
+Unresolved code and text anchors also retain their excerpts for recovery. Text
+anchors can paint exact, contextually resolved visible excerpts while leaving the
+article source unchanged; native marker removal remains authoritative for entries
+without these explicit fallback flags. The writer verifies rendered structure as
+well as text and falls back to text annotations when new markers would alter it.
+See [Reading highlights](reading-highlights.md).

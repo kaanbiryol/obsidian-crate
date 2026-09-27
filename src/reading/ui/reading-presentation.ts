@@ -1,17 +1,18 @@
 import type { ReadingItem } from '../core/model';
 
-export type ReadingSection = 'inbox' | 'favorites' | 'archived';
+export type ReadingSection = 'inbox' | 'favorites' | 'archived' | 'highlights';
 export const readingSections = [
 	{ id: 'inbox', label: 'Inbox' }, { id: 'favorites', label: 'Favorites' }, { id: 'archived', label: 'Archive' },
+	{ id: 'highlights', label: 'Highlights' },
 ] as const;
 
 export function readingSource(url: string): string { return url ? new URL(url).hostname.replace(/^www\./, '') : 'Vault note'; }
 
 export function filterReadingItems(items: ReadingItem[], section: ReadingSection, query: string, tag: string | null): ReadingItem[] {
 	const search = query.trim().toLocaleLowerCase();
-	return items.filter(item => (section === 'favorites' ? item.favorite : item.reading_status === section)
+	return items.filter(item => (section === 'highlights' ? !!item.highlights?.length : section === 'favorites' ? item.favorite : item.reading_status === section)
 		&& (!tag || item.tags.includes(tag))
-		&& `${item.title} ${item.source_url} ${item.tags.join(' ')}`.toLocaleLowerCase().includes(search))
+		&& `${item.title} ${item.author ?? ''} ${item.source_url} ${item.tags.join(' ')} ${section === 'highlights' ? item.highlights?.map(entry => `${entry.text} ${entry.note ?? ''}`).join(' ') : ''}`.toLocaleLowerCase().includes(search))
 		.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));
 }
 
@@ -26,4 +27,14 @@ export function groupReadingItems(items: ReadingItem[], now = new Date()): { lab
 		const group = groups.get(label) ?? []; group.push(item); groups.set(label, group);
 	}
 	return Array.from(groups, ([label, items]) => ({ label, items }));
+}
+
+export function filterReadingHighlights(items: ReadingItem[], query: string, articleId: string) {
+	const search = query.trim().toLocaleLowerCase();
+	return items.filter(item => !articleId || item.crate_reading_id === articleId)
+		.flatMap(item => (item.highlights ?? [])
+			.filter(highlight => `${item.title} ${item.author ?? ''} ${item.source_url} ${item.tags.join(' ')} ${highlight.text} ${highlight.note ?? ''}`.toLocaleLowerCase().includes(search))
+			.map(highlight => ({ item, highlight })))
+		.sort((a, b) => (b.highlight.createdAt ?? b.item.saved_at).localeCompare(a.highlight.createdAt ?? a.item.saved_at)
+			|| a.item.crate_reading_id.localeCompare(b.item.crate_reading_id) || a.highlight.start - b.highlight.start);
 }

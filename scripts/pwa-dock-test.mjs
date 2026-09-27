@@ -82,7 +82,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     const active = async label => {
       await expect(dock().locator('[data-dock-active="true"]')).toHaveAccessibleName(label);
-      const icon = { 'Reading List': 'book-open', Favorites: 'star', Archive: 'archive' }[label];
+      const icon = { 'Reading List': 'book-open', Favorites: 'star', Archive: 'archive', Highlights: 'highlighter' }[label];
       if (icon) await expect(dock().locator('.pwa-dock__view-icon')).toHaveAttribute('data-icon', icon);
     };
     const center = async target => { const box = await target.boundingBox(); assert.ok(box); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; };
@@ -98,7 +98,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.mouse.move(start.x, start.y); await page.mouse.down();
       await page.waitForTimeout(480); await page.mouse.up();
       await expect(views).toBeVisible();
-      await expect(views.getByRole('button')).toHaveText(['Reading List', 'Favorites', 'Archive']);
+      await expect(views.getByRole('button')).toHaveText(['Reading List', 'Favorites', 'Archive', 'Highlights']);
       assert.deepEqual(await geometry(), before, 'Opening must not shift the page or add action');
       await expect(dock().locator('[data-dock-group]')).toHaveCSS('opacity', '0');
       await expect.poll(async () => {

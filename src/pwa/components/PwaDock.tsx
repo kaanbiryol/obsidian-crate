@@ -14,6 +14,7 @@ const readingViews = [
   { id: 'inbox', label: 'Reading List', iconName: 'book-open' },
   { id: 'favorites', label: 'Favorites', iconName: 'star' },
   { id: 'archived', label: 'Archive', iconName: 'archive' },
+  { id: 'highlights', label: 'Highlights', iconName: 'highlighter' },
 ] as const;
 const reminderTabs = TABS.filter(item => item.id !== 'upcoming')
   .map(item => ({ ...item, label: item.id === 'today' ? 'Schedule' : item.label }));

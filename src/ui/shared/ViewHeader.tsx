@@ -3,7 +3,7 @@ import React, { memo } from 'react';
 interface ViewHeaderProps {
   title: string;
   count: number;
-  countUnit?: 'reminder' | 'project' | 'saved link';
+  countUnit?: 'reminder' | 'project' | 'saved link' | 'highlight';
   overdueCount?: number;
   className?: string;
   /** Optional right-side action content (e.g., settings button) */

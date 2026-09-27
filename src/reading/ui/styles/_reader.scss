@@ -1,9 +1,13 @@
 .crate-reminders-ui .crate-reading-reader {
 	position: relative; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-	&__nav { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; min-height: 76px; padding: 8px 20px; border-bottom: 1px solid var(--crate-divider); background: var(--crate-app-bg); }
-	&__selection { position: absolute; z-index: 3; width: 44px; height: 44px; user-select: none; -webkit-user-select: none; }
-	&__selection .crate-icon-button { color: var(--crate-danger); border-radius: 50%; border-color: color-mix(in srgb, var(--crate-danger) 20%, var(--crate-divider)); background: color-mix(in srgb, var(--crate-danger) 10%, var(--crate-app-bg)); box-shadow: 0 3px 12px rgba(0, 0, 0, .14); }
-	&__selection .crate-icon-button:hover:not(:disabled) { color: var(--crate-danger); background: color-mix(in srgb, var(--crate-danger) 18%, var(--crate-app-bg)); }
+	&__nav { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 76px; padding: 8px 20px; border-bottom: 1px solid var(--crate-divider); background: var(--crate-app-bg); }
+	&__selection { position: absolute; z-index: 3; display: flex; align-items: center; gap: 2px; box-sizing: border-box; width: 208px; height: 52px; padding: 3px; border: 1px solid var(--crate-divider); border-radius: 10px; background: var(--crate-app-bg); box-shadow: 0 2px 4px rgba(0, 0, 0, .04), 0 6px 18px rgba(0, 0, 0, .1); user-select: none; -webkit-user-select: none; }
+	&__selection > .crate-action-button { flex: 1; min-height: 44px; padding: 0 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
+	&__selection-divider { flex: 0 0 1px; height: 18px; margin: 0 2px; background: var(--crate-divider); }
+	&__selection .crate-reading-reader__delete-highlight[data-variant="surface"] {
+		flex: 0 0 44px; color: var(--crate-danger); background: transparent; border-color: transparent; border-radius: 6px; box-shadow: none;
+		&:hover:not(:disabled), &:active:not(:disabled) { color: var(--crate-danger); background: color-mix(in srgb, var(--crate-danger) 10%, transparent); }
+	}
 	&__highlight-error { position: absolute; z-index: 3; width: min(220px, calc(100% - 24px)); padding: 8px; border: 1px solid var(--crate-divider); border-radius: 10px; background: var(--crate-app-bg); box-shadow: 0 4px 20px rgba(0, 0, 0, .18); }
 	&__highlight-error p { font-size: 12px; margin: 0 0 4px; }
 	&__highlight-error button { width: 100%; min-height: 44px; }
@@ -20,9 +24,6 @@
 	&__highlight:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 	&__body mark { background: var(--text-highlight-bg, rgba(255, 208, 64, .35)); color: inherit; }
 	&__quick-actions { display: flex; justify-content: flex-end; }
-	&__mode { display: flex; align-items: center; padding: 3px; border-radius: 9px; background: var(--crate-panel-bg); font-size: 12px; font-weight: 500; }
-	&__mode span { padding: 7px 12px; border-radius: 6px; background: var(--crate-selection-bg); }
-	&__mode a { display: flex; align-items: center; gap: 3px; padding: 7px 9px; text-decoration: none; color: var(--text-muted); border-radius: 6px; min-height: 36px; }
 	&__page { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; max-width: 748px; margin: 0 auto; padding: 52px clamp(24px, 5%, 64px) 60px; }
 	&__header { overflow-wrap: anywhere; margin-bottom: 32px; }
 	&__source { display: inline-flex; align-items: center; gap: 9px; color: var(--text-muted); font-size: 12px; text-decoration: none; margin-bottom: 23px; }
@@ -65,12 +66,12 @@
 	.crate-reading-reader__font-size { display: flex; align-items: center; gap: 16px; padding-top: 12px; }
 	.crate-reading-reader__font-size > span { margin-right: auto; color: var(--text-muted); font-size: 13px; }
 	.crate-reading-reader__font-size output { font-size: 13px; width: 18px; margin: 0; text-align: center; font-variant-numeric: tabular-nums; }
-	.crate-reading-reader__sample { text-align: center; padding: 22px 12px; line-height: 1.7; background: var(--crate-panel-bg); border-radius: 10px; margin: 10px 0 0; }
+	.crate-reading-reader__sample-frame { display: flex; box-sizing: border-box; height: 208px; overflow: auto; padding: 16px 12px; background: var(--crate-panel-bg); border-radius: 10px; margin-top: 10px; }
+	.crate-reading-reader__sample { width: 100%; margin: auto 0; text-align: center; line-height: 1.7; overflow-wrap: anywhere; }
 }
 @container reading (max-width: 719px) {
 	.crate-reminders-ui .crate-reading-reader {
 		&__nav { min-height: 64px; padding: 6px 12px; gap: 2px; }
-		&__mode { font-size: 12px; }
 		&__page { padding: 36px 26px max(40px, env(safe-area-inset-bottom)); }
 		&__header h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.035em; }
 		&__source { margin-bottom: 22px; }

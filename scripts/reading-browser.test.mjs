@@ -12,6 +12,81 @@ import { swipe } from './browser-touch-swipe.mjs';
 import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 
+async function checkReaderNavigation(page) {
+  const reader = page.locator('.crate-reading-reader');
+  await expect(reader).toHaveAttribute('data-document-scroll', 'true');
+  const nav = reader.getByRole('navigation', { name: 'Article actions' });
+  const floating = reader.locator('.crate-reading-reader__floating');
+  const highlights = reader.getByRole('button', { name: /^Highlights \(/ });
+  await expect(reader.getByRole('group', { name: 'Article view' })).toHaveCount(0);
+  await expect(floating).toHaveCSS('height', '0px');
+  // Give the short server fixture enough length to exercise real browser scrolling.
+  const length = await page.addStyleTag({ content: '.crate-reading-reader__body { min-height: 3000px; }' });
+  const scrollTo = async top => {
+    await page.evaluate(value => window.scrollTo(0, value), top);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(top);
+    await expect.poll(() => reader.evaluate(element => element.scrollTop)).toBe(0);
+  };
+  const visibleAtTop = async () => {
+    await expect(nav).toHaveAttribute('data-scroll-hidden', 'false');
+    await expect(floating).toHaveAttribute('data-scroll-hidden', 'false');
+    await expect(floating).toHaveCSS('opacity', '1');
+    const box = await highlights.boundingBox();
+    assert.ok(box && box.y > 0 && box.y + box.height <= page.viewportSize().height, JSON.stringify(box));
+    await expect.poll(() => nav.evaluate(element => Math.abs(element.getBoundingClientRect().top))).toBeLessThan(1);
+  };
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    await page.emulateMedia({ reducedMotion });
+    await scrollTo(0);
+    await visibleAtTop();
+    await scrollTo(450);
+    await expect(nav).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveCSS('opacity', '0');
+    await expect(highlights).toHaveCSS('pointer-events', 'none');
+    await expect.poll(() => nav.evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
+    await scrollTo(446); // Tiny reversals should not flicker the header.
+    await expect(nav).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveCSS('opacity', '0');
+    await expect(highlights).toHaveCSS('pointer-events', 'none');
+    await scrollTo(420);
+    if (reducedMotion === 'no-preference') {
+      await expect.poll(() => floating.evaluate(element => Number(getComputedStyle(element).opacity))).toBeGreaterThan(0);
+      await expect.poll(() => floating.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
+    }
+    await scrollTo(360);
+    await visibleAtTop();
+    // The overlay sheet must keep the full article and restore its scroll offset.
+    await highlights.click();
+    await expect(page.getByRole('dialog', { name: 'Highlights', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Highlights', exact: true })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(360);
+    await expect(highlights).toBeFocused();
+    await highlights.evaluate(element => element.blur());
+    // Opening a sheet from a scrolled article must restore the document offset.
+    await reader.getByRole('button', { name: 'Reading appearance', exact: true }).evaluate(element => element.click());
+    await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(360);
+    await scrollTo(700);
+    await expect(nav).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveAttribute('data-scroll-hidden', 'true');
+    await expect(floating).toHaveCSS('opacity', '0');
+    await expect(highlights).toHaveCSS('pointer-events', 'none');
+    await nav.getByRole('button', { name: 'Back to reading' }).focus();
+    await visibleAtTop();
+    await nav.getByRole('button', { name: 'Back to reading' }).evaluate(element => element.blur());
+    await scrollTo(0);
+    await visibleAtTop();
+    if (reducedMotion === 'reduce') await expect(nav).toHaveCSS('transition-duration', '0s');
+  }
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await length.evaluate(element => element.remove());
+}
+
 async function captureReaderMotion(page, action) {
   const hitTestStyle = await page.addStyleTag({ content: '.reader-motion-hit-test { pointer-events: auto !important; }' });
   try { return await page.evaluate(async action => {
@@ -123,6 +198,9 @@ async function refreshReadingFromSettings(page, expectedError) {
 }
 
 async function sheetAppearance(page) {
+  const sync = page.getByRole('button', { name: /^Sync and device/ });
+  if (await sync.getAttribute('aria-expanded') !== 'true') await sync.click();
+  await expect(page.getByRole('button', { name: 'Refresh all', exact: true })).toBeVisible();
   return page.getByRole('dialog').evaluate(sheet => {
     const header = sheet.querySelector('.reminder-modal-header');
     const close = header.querySelector('.crate-icon-button');
@@ -168,6 +246,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       window.__readingHistorySnapshots = [];
       const push = history.pushState.bind(history);
       history.pushState = (state, unused, url) => {
+        // Model the predecessor snapshot: replaceState cannot repaint an older entry.
+        if (state?.readingArticle) window.__readingBackTitle = document.querySelector('.pwa-tab-panel:not([data-leaving]) .crate-reading__header h1')?.textContent;
         if (state?.readingLibrary) window.__readingHistorySnapshots.push({
           open: document.querySelector('.crate-reading-workspace')?.dataset.readerOpen,
           articleCount: document.querySelectorAll('.crate-reading__reader-pane article').length,
@@ -200,14 +280,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const readingSync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     await listStarted.promise;
     await expect(page.getByRole('status',{name:'Loading Reading'})).toBeVisible();
-    await expect(page.locator('.crate-reading__loading-row')).toHaveCount(4);
+    await expect(page.locator('.crate-content-loading')).toHaveCount(1);
     await expect(readingSync).toHaveAttribute('data-sync-state','syncing');
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Loading Reading');
     const header = page.locator('.crate-reading__header');
     const loadingHeader = await header.boundingBox();
     listReleased.resolve();
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
-    await expect(page.locator('.crate-reading__loading-row')).toHaveCount(0);
+    await expect(page.locator('.crate-content-loading')).toHaveCount(0);
     assert.equal((await header.boundingBox()).height, loadingHeader.height);
     assert.deepEqual(await headerGeometry(), openingHeader, 'Reading header stays fixed when the count arrives');
     await checkPwaScreenGestures(page, page.locator('.crate-reading__list-scroll'));
@@ -324,7 +404,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await checkBackGesture(page, '.crate-reading__reader-pane', true);
     await page.screenshot({path:`test-results/reading/${name}-opening.png`,fullPage:true});
     assertReaderSlide(await opening, 'open');
-    const articleHistoryLength = await page.evaluate(() => history.length);
+    let articleHistoryLength = await page.evaluate(() => history.length);
     const articleUrl = page.url();
     await expect(page.getByText('Opening article…',{exact:true})).toBeVisible();
     const originalArticle = await page.locator('.crate-reading__reader-pane article').elementHandle();
@@ -332,13 +412,39 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByText('Available offline',{exact:true}).waitFor();
     assert.equal(await originalArticle.evaluate(el => el === document.querySelector('.crate-reading__reader-pane article')), true, 'Loading must resolve in the same article screen');
     await originalArticle.dispose();
+    // After visiting Inbox, another tab must not reuse its native Back snapshot.
+    await page.goBack();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
+    await page.getByRole('button', { name: 'Favorite', exact: true }).click();
+    for (const [section, title] of [['favorites', 'Favorites'], ['inbox', 'Reading'], ['favorites', 'Favorites'], ['inbox', 'Reading']]) {
+      await page.locator('.pwa-reading-root [data-dock-group]').click({ button: 'right' });
+      await page.locator(`[data-dock-destination="${section}"]`).click();
+      await page.waitForFunction(() => !document.querySelector('.pwa-reading-root [data-leaving="true"]'));
+      await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
+      for (let visit = 0; visit < 2; visit++) {
+        await page.getByRole('button', { name: /example.invalid A browser article/ }).click();
+        await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
+        assert.equal(await page.evaluate(() => window.__readingBackTitle), title, 'The native Back predecessor must contain the selected tab title');
+        await page.goBack();
+        await page.waitForFunction(() => history.state?.readingLibrary === true);
+        await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
+      }
+    }
+    await page.getByRole('button', { name: 'Remove favorite', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Favorite', exact: true })).toBeVisible();
+    await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
+    console.log(`${name}: native Back predecessors preserve Favorites and Reading titles across repeated visits`);
+    await page.getByRole('button', { name: /example.invalid A browser article/ }).click();
+    await page.getByText('Available offline', { exact: true }).waitFor();
+    articleHistoryLength = await page.evaluate(() => history.length);
+    await checkReaderNavigation(page);
     const articleTitle = page.locator('.crate-reading-reader__header h1');
     await checkPwaScreenGestures(page, articleTitle);
     await expect(page.locator('.crate-reading-reader__body')).toHaveCSS('-webkit-user-select', 'text');
     await articleTitle.dblclick();
     assert.ok(await page.evaluate(() => document.getSelection().toString().length > 0), 'Article text remains selectable');
     await page.evaluate(() => document.getSelection().removeAllRanges());
-    await expect(page.locator('.crate-reading-reader__mode')).toHaveCSS('-webkit-user-select', 'none');
+    await expect(page.locator('.crate-reading-reader__nav')).toHaveCSS('-webkit-user-select', 'none');
     await expect(page.getByRole('button', { name: 'Reading appearance', exact: true })).toHaveCSS('-webkit-user-select', 'none');
     await page.getByRole('button',{name:'Reading appearance',exact:true}).click();
     const appearance = page.getByRole('dialog',{name:'Reading appearance',exact:true});
@@ -355,12 +461,18 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await tags.getByRole('textbox').fill('essays');
     await tags.getByRole('button',{name:'Save tags',exact:true}).click();
     await expect(tags).toHaveCount(0);
+    const closingLength = await page.addStyleTag({ content: '.crate-reading-reader__body { min-height: 3000px; }' });
+    await page.evaluate(() => window.scrollTo(0, 700));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(700);
     const closing = captureReaderMotion(page, 'close');
     await page.waitForTimeout(80);
     await page.screenshot({path:`test-results/reading/${name}-closing.png`,fullPage:true});
     assertReaderSlide(await closing, 'close');
+    await closingLength.evaluate(element => element.remove());
     await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open','false');
     await expect(page.locator('.crate-reading__reader-pane .crate-reading-reader')).toHaveCount(0);
+    await expect(page.locator('html')).not.toHaveClass(/pwa-document-reader/);
+    assert.equal(await page.evaluate(() => window.scrollY), 0);
     await assertArticleStaysDismissed(page, articleHistoryLength);
     await checkBackGesture(page, '.crate-reading__library');
     await page.emulateMedia({reducedMotion:'reduce'});
@@ -510,8 +622,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Save link',exact:true}).click();
     await expect.poll(() => page.evaluate(async () => { const db = await new Promise((resolve,reject) => { const r=indexedDB.open('crate-reading-v1',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject; }); const id=JSON.parse(localStorage.getItem('crate-reading-session-v1')).id;return new Promise(resolve=>{const r=db.transaction('values').objectStore('values').get(`pending:${id}`);r.onsuccess=()=>{db.close();resolve(r.result?.some(op=>op.action==='capture' && op.error));};}); })).toBeTruthy();
     await expect(readingSync).toHaveAttribute('data-sync-state','error');
+    await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
     await assertNoPendingBanner(page);
-    await refreshReadingFromSettings(page, 'Save acknowledgement interrupted');
+    await expect(readingSync).toHaveAttribute('data-sync-state','synced', { timeout: 10000 });
     await expect.poll(() => page.evaluate(async () => { const db = await new Promise((resolve,reject) => { const r=indexedDB.open('crate-reading-v1',1); r.onsuccess=()=>resolve(r.result);r.onerror=reject; }); const id=JSON.parse(localStorage.getItem('crate-reading-session-v1')).id; return new Promise(resolve=>{ const r=db.transaction('values').objectStore('values').get(`pending:${id}`);r.onsuccess=()=>{db.close();resolve(r.result.length===0);}; }); })).toBe(true);
     assert.ok(sent.length >= 2, JSON.stringify({ sent, text: await page.locator('body').innerText() })); assert.equal(sent[0],sent[1]);
     if (name === 'chromium') {

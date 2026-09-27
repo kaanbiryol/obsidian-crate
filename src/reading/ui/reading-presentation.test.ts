@@ -8,6 +8,12 @@ const item = (id: string, savedAt: string, overrides: Partial<ReadingItem> = {})
 });
 
 describe('reading navigation', () => {
+	it('finds highlighted passages and annotations across archived and active articles', () => {
+		const items = [item('active', '2026-09-19T12:00:00Z'), item('saved', '2026-09-21T12:00:00Z', { reading_status: 'archived', highlights: [{ start: 0, end: 6, text: 'Wisdom', note: 'Revisit this idea' }] })];
+		expect(filterReadingItems(items, 'highlights', 'wisdom', null).map(item => item.crate_reading_id)).toEqual(['saved']);
+		expect(filterReadingItems(items, 'highlights', 'REVISIT', 'design')).toHaveLength(1);
+		expect(filterReadingItems(items, 'highlights', 'missing', null)).toEqual([]);
+	});
 	it('keeps archived favorites searchable without changing the source collection', () => {
 		const items = [item('older', '2026-09-19T12:00:00Z'), item('saved', '2026-09-21T12:00:00Z', { reading_status: 'archived', favorite: true })];
 		expect(filterReadingItems(items, 'inbox', '', null).map(i => i.crate_reading_id)).toEqual(['older']);

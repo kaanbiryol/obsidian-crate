@@ -11,6 +11,8 @@ export interface ReadingMetadata {
 	favorite: boolean;
 	tags: string[];
 	highlights?: ReadingHighlight[];
+	highlight_format?: 'markdown-v1';
+	highlight_recovery?: ReadingHighlight[];
 	extraction_status: 'pending' | 'ready' | 'unavailable';
 	capture_method?: 'url' | 'web-clipper';
 	author?: string;
@@ -66,6 +68,7 @@ export function readingTimestamp(value: unknown): string {
 }
 
 export function validateReadingMetadata(value: Record<string, unknown>): ReadingMetadata {
+	if (value.highlight_format !== undefined && value.highlight_format !== 'markdown-v1') throw new Error('Unsupported highlight format.');
 	if (value.crate_reading_version !== 1) throw new Error('Unsupported reading note version.');
 	if (typeof value.crate_reading_id !== 'string' || !UUID.test(value.crate_reading_id)) throw new Error('Reading note needs a valid ID.');
 	if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 1000) throw new Error('Reading note needs a title of at most 1,000 characters.');
@@ -80,7 +83,9 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 		source_url: value.source_url === '' && value.capture_method === 'web-clipper' ? '' : readingUrl(value.source_url), saved_at: readingTimestamp(value.saved_at),
 		reading_status: value.reading_status, favorite: value.favorite,
 		tags: value.tags as string[],
-		...(value.highlights === undefined ? {} : { highlights: readingHighlights(value.highlights) }), extraction_status: value.extraction_status,
+		...(value.highlights === undefined ? {} : { highlights: readingHighlights(value.highlights) }),
+		...(value.highlight_format === 'markdown-v1' ? { highlight_format: 'markdown-v1' as const } : {}),
+		...(value.highlight_recovery === undefined ? {} : { highlight_recovery: readingHighlights(value.highlight_recovery) }), extraction_status: value.extraction_status,
 		...(value.capture_method === undefined ? {} : { capture_method: value.capture_method }),
 		...(value.author === undefined ? {} : { author: value.author }),
 		...(value.resolved_url === undefined ? {} : { resolved_url: readingUrl(value.resolved_url) }),

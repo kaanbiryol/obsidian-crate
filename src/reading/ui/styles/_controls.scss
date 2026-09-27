@@ -13,7 +13,7 @@
 	.crate-reading__notice summary { cursor: pointer; min-height: 32px; align-content: center; }
 	.crate-reading__capture { display: grid; gap: 20px; }
 	.crate-reading__capture > p { color: var(--text-muted); margin: 0; font-size: 14px; }
-	.crate-reading-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
+	.crate-reading-dialog__actions { padding-top: 8px; }
 }
 .crate-reminders-ui .crate-reading-dialog {
 	position: relative; z-index: 1;

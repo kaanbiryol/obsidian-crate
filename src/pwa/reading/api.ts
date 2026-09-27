@@ -1,4 +1,4 @@
-import { coalesceReadingHighlights } from './coalesce-update';
+import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-update';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
@@ -55,16 +55,22 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
   return cache;
 }
 export async function queueReading(session: ReadingSession, action: PendingReading['action'], intent: Record<string, unknown>) {
-  if (action === 'capture') readingUrl(intent.url);
+  if (action === 'capture') {
+    intent = { ...intent, url: readingUrl(intent.url) };
+    if (intent.title !== undefined && (typeof intent.title !== 'string' || intent.title.length > 1000)) throw new Error('Use a title shorter than 1,000 characters.');
+  }
   return readingLock(async () => {
     assertReadingSession(session); const queue = await pendingReading(session);
-    const existing = action === 'update' ? queue.find(op => op.intent.id === intent.id) : undefined;
-    if (existing && coalesceReadingHighlights(existing, intent)) {
+    const previous = action === 'capture' ? [] : queue.filter(op => op.intent.id === intent.id);
+    if (previous.some(op => op.review)) throw new Error('Review this article’s unsynced changes in settings before editing again.');
+    if (previous.length && (action !== 'update' || previous.some(op => op.action !== 'update'))) throw new Error('Article text is being updated. Try again after it syncs.');
+    if (action === 'update') assertReadingUpdateBase(previous, intent);
+    const existing = previous.at(-1);
+    if (existing && coalesceReadingUpdate(existing, intent)) {
       await writeValue(`pending:${session.id}`, queue, session); return queue;
     }
     if (queue.length >= 200) throw new Error('Send or review pending Reading changes before adding more.');
-    if (action !== 'capture' && queue.some(op => op.intent.id === intent.id)) throw new Error('This item already has a pending change. Send it before editing again.');
-    queue.push({ id: crypto.randomUUID(), sessionId: session.id, action, intent });
+    queue.push({ id: crypto.randomUUID(), sessionId: session.id, action, intent, queuedAt: new Date().toISOString() });
     await writeValue(`pending:${session.id}`, queue, session);
     return queue;
   });
@@ -82,7 +88,7 @@ export async function drainReading(session: ReadingSession): Promise<ReadingCach
       if (candidate.review) continue;
       const op = await readingLock(async () => {
         const current = await pendingReading(session), next = current.find(entry => entry.id === candidate.id);
-        if (!next || next.review) return null;
+        if (!next || next.review || current.some(entry => entry.review && entry.intent.id === next.intent.id && next.action !== 'capture')) return null;
         if (!next.body) {
           next.body = JSON.stringify({ ...next.intent, operationId: createReminderOperationId(info.day) });
           // Store exact dispatch bytes and ID before making the request.
@@ -100,6 +106,18 @@ export async function drainReading(session: ReadingSession): Promise<ReadingCach
           if (!failed) return;
           failed.error = error instanceof Error ? error.message : 'Save has not been confirmed. Retry when connected.';
           failed.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
+          failed.attempts = (failed.attempts ?? 0) + 1;
+          failed.retryAt = !failed.review && (!(error instanceof ReadingApiError) || error.status >= 500 || error.status === 429)
+            ? Date.now() + 2_000 * 2 ** Math.min(failed.attempts - 1, 5) : undefined;
+          // Later edits depend on the rejected value. Keep them for recovery,
+          // but never send them or present them as if that value had committed.
+          if (failed.review && failed.action !== 'capture') {
+            for (const followUp of current.slice(current.indexOf(failed) + 1)) {
+              if (followUp.intent.id !== failed.intent.id) continue;
+              followUp.review = true;
+              followUp.error = 'An earlier change to this article needs review. These edits are saved on this device.';
+            }
+          }
           await writeValue(`pending:${session.id}`, current, session);
         });
         break;

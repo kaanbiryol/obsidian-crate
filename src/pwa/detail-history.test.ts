@@ -54,6 +54,26 @@ describe('detail history across feature switches', () => {
 		}
 	});
 
+	it('refreshes the back destination for every reading tab and reuses only matching tabs', () => {
+		let previousStack: string | undefined;
+		for (const section of ['inbox', 'favorites', 'archived', 'highlights', 'inbox'] as const) {
+			const stack = openReadingArticleHistory('article', section);
+			expect(stack).not.toBe(previousStack);
+			history.back();
+			expect(history.state).toMatchObject({ readingSection: section, readingStackId: stack });
+			dismissReadingArticleHistory(stack);
+			const length = entries.length;
+			expect(openReadingArticleHistory('another', section)).toBe(stack);
+			// Retrying an open article must preserve its original library destination.
+			expect(openReadingArticleHistory('another')).toBe(stack);
+			history.back();
+			expect(history.state).toMatchObject({ readingSection: section });
+			dismissReadingArticleHistory(stack);
+			expect(entries).toHaveLength(length);
+			previousStack = stack;
+		}
+	});
+
 	it('reuses the detail slot for repeated visits within one feature', () => {
 		for (const [open, dismiss] of [
 			[openProjectHistory, dismissProjectHistory],

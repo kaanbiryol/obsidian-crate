@@ -10,7 +10,7 @@ export function ReadingOpening() {
 	return <main className="pwa-screen crate-reading-web pwa-mode-opening pwa-reading-opening">
 		<ViewHeader
 			className="crate-reading__header pwa-reading-opening__header"
-			title={tab === 'favorites' ? 'Favorites' : tab === 'archived' ? 'Archive' : 'Reading'}
+			title={tab === 'highlights' ? 'Highlights' : tab === 'favorites' ? 'Favorites' : tab === 'archived' ? 'Archive' : 'Reading'}
 			count={0}
 			countUnit="saved link"
 			showMeta={false}

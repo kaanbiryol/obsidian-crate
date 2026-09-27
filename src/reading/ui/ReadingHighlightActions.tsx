@@ -1,3 +1,4 @@
+import { readerScrollElement } from './reader-scroll';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
@@ -9,16 +10,19 @@ type Box = { left: number; top: number; width: number; height: number };
 type Geometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top: number }; feedback: { left: number; top: number } };
 
 /** Native initial selection; portable handles for editing a saved annotation. */
-export function ReadingHighlightActions({ body, article, content, highlights, onSave, disabled }: {
+export function ReadingHighlightActions({ body, article, content, highlights, onSave, onCopyComplete, disabled }: {
 	body: React.RefObject<HTMLDivElement | null>; article: React.RefObject<HTMLElement | null>;
 	content: string; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
+	onCopyComplete?: () => void;
 }) {
 	const controls = useRef<HTMLDivElement>(null), editing = useRef<Editing | null>(null), saving = useRef(false);
-	const latest = useRef({ highlights, onSave, disabled });
-	useLayoutEffect(() => { latest.current = { highlights, onSave, disabled }; }, [highlights, onSave, disabled]);
+	const latest = useRef({ highlights, onSave, onCopyComplete, disabled });
+	useLayoutEffect(() => { latest.current = { highlights, onSave, onCopyComplete, disabled }; }, [highlights, onSave, onCopyComplete, disabled]);
 	const [draft, setDraft] = useState<Editing | null>(null), [geometry, setGeometry] = useState<Geometry | null>(null);
 	const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-	const commands = useRef({ save: () => {}, remove: () => {} });
+	const commands = useRef({ copy: () => {}, share: () => {}, save: () => {}, remove: () => {} });
+	const [transferBusy, setTransferBusy] = useState(false);
+	const [feedback, setFeedback] = useState<{ message: string; failed: boolean } | null>(null);
 	const [layout, setLayout] = useState(0);
 
 	useLayoutEffect(() => {
@@ -34,16 +38,21 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		const boxes = rects.filter((rect, index) => !rects.some((other, otherIndex) => otherIndex < index && other.left <= rect.left && other.right >= rect.right && other.top <= rect.top && other.bottom >= rect.bottom)).map(convert);
 		const first = convert(rects[0]!), last = convert(rects.at(-1)!);
 		const viewportBottom = Math.min(bounds.bottom, reader.ownerDocument.defaultView?.innerHeight ?? bounds.bottom);
-		const navBottom = reader.querySelector('nav')?.getBoundingClientRect().bottom ?? bounds.top;
+		const navBottom = Math.max(0, reader.querySelector('nav')?.getBoundingClientRect().bottom ?? bounds.top);
 		const firstRect = rects[0]!, lastRect = rects.at(-1)!;
-		// Leave 6px beyond the handle's 44px touch target, including at viewport edges.
-		const beside = lastRect.right + 28 + 44 <= bounds.right - 12;
-		const left = Math.max(12, Math.min(bounds.width - 56, lastRect.right - bounds.left + (beside ? 28 : -22)));
-		const below = lastRect.bottom + 28;
-		const desiredY = beside ? (lastRect.top + lastRect.bottom) / 2 - 22
-			: below + 44 <= viewportBottom - 12 ? below : firstRect.top - 72;
-		const menuY = Math.max(navBottom + 8, Math.min(viewportBottom - 56, desiredY));
-		const feedbackY = menuY + 156 <= viewportBottom ? menuY + 52 : Math.max(navBottom + 8, menuY - 112);
+		// Center the action over the passage instead of trailing its final line.
+		// Keep the toolbar close, with extra clearance only where it crosses a handle.
+		const passageLeft = Math.min(...rects.map(rect => rect.left));
+		const passageRight = Math.max(...rects.map(rect => rect.right));
+		const left = Math.max(12, Math.min(bounds.width - 220, (passageLeft + passageRight) / 2 - bounds.left - 104));
+		const clearsHandles = [firstRect.left, lastRect.right].every(x => x + 22 <= bounds.left + left || x - 22 >= bounds.left + left + 208);
+		const gap = clearsHandles ? 8 : 28;
+		const above = firstRect.top - 52 - gap;
+		const below = lastRect.bottom + gap;
+		const headerBottom = reader.querySelector('.crate-reading-reader__header')?.getBoundingClientRect().bottom ?? navBottom;
+		const desiredY = above >= Math.max(navBottom, headerBottom) + 8 ? above : below;
+		const menuY = Math.max(navBottom + 8, Math.min(viewportBottom - 64, desiredY));
+		const feedbackY = menuY + 156 <= viewportBottom ? menuY + 60 : Math.max(navBottom + 8, menuY - 112);
 		setGeometry({ boxes, start: first, end: last,
 			menu: { left, top: menuY - bounds.top + reader.scrollTop },
 			feedback: { left: Math.max(12, Math.min(bounds.width - 232, left)), top: feedbackY - bounds.top + reader.scrollTop },
@@ -58,10 +67,10 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		if (!reader || !text) return;
 		const document = reader.ownerDocument, window = document.defaultView;
 		if (!window) return;
-		let alive = true, held = false, nativeIntent = false, timer = 0, frame = 0, suppressClickUntil = 0, retryRemove = false;
+		let alive = true, held = false, nativeIntent = false, timer = 0, frame = 0, suppressClickUntil = 0, retryRemove = false, transferring = false;
 		let drag: { edge: 'start' | 'end'; pointer: number; initial: Editing; x: number; y: number; deltaY: number; target: HTMLElement } | null = null;
 		const edit = (value: Editing | null) => { editing.current = value; setDraft(value); };
-		const dismiss = () => { edit(null); setError(null); nativeIntent = false; window.clearTimeout(timer); };
+		const dismiss = () => { edit(null); setError(null); setFeedback(null); nativeIntent = false; window.clearTimeout(timer); };
 		const persist = async (value: Editing, remove = false) => {
 			if (saving.current) return;
 			retryRemove = remove;
@@ -72,42 +81,75 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				const next = latest.current.highlights.filter(entry => value.original
 					? entry.end <= value.original.start || entry.start >= value.original.end
 					: entry.start !== value.highlight.start || entry.end !== value.highlight.end);
-				if (!remove) next.push(value.highlight);
+				const previous = value.original && latest.current.highlights.find(entry => entry.start === value.original!.start && entry.end === value.original!.end);
+				if (!remove) next.push({ ...previous, ...value.highlight });
 				await latest.current.onSave(readingHighlights(next));
 				if (!alive) return;
 				if (editing.current === value) edit(remove ? null : { original: value.highlight, highlight: value.highlight });
-			} catch (cause) { if (alive) setError(cause instanceof Error ? cause.message : 'Could not save highlight.'); }
+			} catch (cause) { if (alive && editing.current === value) setError(cause instanceof Error ? cause.message : 'Could not save highlight.'); }
 			finally { saving.current = false; if (alive) setBusy(false); }
 		};
+		const transfer = async (share: boolean) => {
+			const value = editing.current;
+			if (!value || transferring) return;
+			transferring = true; setTransferBusy(true); setFeedback(null);
+			const current = () => alive && editing.current?.highlight === value.highlight;
+			try {
+				// Invoke directly from the button press, before awaiting anything else.
+				if (share && window.navigator.share) {
+					await window.navigator.share({ text: value.highlight.text });
+				} else {
+					if (!window.navigator.clipboard) throw new Error('Clipboard unavailable');
+					await window.navigator.clipboard.writeText(value.highlight.text);
+					if (current()) {
+						if (!share && latest.current.onCopyComplete) {
+							dismiss();
+							latest.current.onCopyComplete();
+						} else setFeedback({ message: share ? 'Sharing unavailable. Text copied.' : 'Text copied.', failed: false });
+					}
+				}
+			} catch (cause) {
+				if (current() && !(share && cause instanceof Error && cause.name === 'AbortError')) {
+					setFeedback({ message: share ? 'Could not share text. Try Copy instead.' : 'Could not copy text. Try again.', failed: true });
+				}
+			} finally { transferring = false; if (alive) setTransferBusy(false); }
+		};
 		commands.current = {
+			copy: () => { void transfer(false); },
+			share: () => { void transfer(true); },
 			save: () => { if (editing.current) void persist(editing.current, retryRemove); },
 			remove: () => { if (editing.current) void persist(editing.current, true); },
 		};
 		const finishNativeSelection = () => {
-			if (held || drag || !nativeIntent || saving.current) return;
+			if (held || drag || !nativeIntent || saving.current || controls.current?.contains(document.activeElement)) return;
 			const highlight = selectedHighlight(text, document.getSelection());
 			if (!highlight) return;
 			nativeIntent = false; suppressClickUntil = Date.now() + 400;
-			const value = { original: null, highlight }; edit(value);
+			const original = latest.current.highlights.find(entry => entry.start === highlight.start && entry.end === highlight.end) ?? null;
+			const value = { original, highlight }; edit(value); setError(null); setFeedback(null);
 			document.getSelection()?.removeAllRanges();
-			void persist(value);
+			if (!original) void persist(value);
 		};
 		const settle = () => { window.clearTimeout(timer); timer = window.setTimeout(finishNativeSelection, 120); };
-		const selectionChanged = () => { if (nativeIntent && !held) settle(); };
+		const selectionChanged = () => {
+			if (controls.current?.contains(document.activeElement)) return;
+			if (selectedHighlight(text, document.getSelection())) nativeIntent = true;
+			if (nativeIntent && !held) settle();
+		};
 		const activate = (event: MouseEvent | KeyboardEvent) => {
 			if ('key' in event && !['Enter', ' '].includes(event.key)) return;
 			const mark = (event.target as HTMLElement).closest<HTMLElement>('.crate-reading-reader__highlight');
 			if (!mark || !text.contains(mark)) return;
-			if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text, document.getSelection())) { event.preventDefault(); return; }
+			if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text, document.getSelection())) return;
 			event.preventDefault(); nativeIntent = false;
 			const start = Number(mark.dataset.highlightStart), end = Number(mark.dataset.highlightEnd);
 			const highlight = { start, end, text: (text.textContent ?? '').slice(start, end) };
-			edit({ original: highlight, highlight }); setError(null);
+			edit({ original: highlight, highlight }); setError(null); setFeedback(null);
 		};
 		const updateDrag = () => {
 			if (!drag || !editing.current) return;
 			const bounds = text.getBoundingClientRect(), viewport = reader.getBoundingClientRect();
-			const navBottom = reader.querySelector('nav')?.getBoundingClientRect().bottom ?? viewport.top;
+			const navBottom = Math.max(0, reader.querySelector('nav')?.getBoundingClientRect().bottom ?? viewport.top);
 			const y = Math.max(navBottom + 2, Math.min(Math.min(viewport.bottom, window.innerHeight) - 2, drag.y + drag.deltaY));
 			// Caret hit-testing must see the article under the moving handle's touch target.
 			const overlay = controls.current;
@@ -119,13 +161,14 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		};
 		const autoScroll = () => {
 			if (!drag) return;
-			const bounds = reader.getBoundingClientRect(), top = reader.querySelector('nav')?.getBoundingClientRect().bottom ?? bounds.top;
+			const bounds = reader.getBoundingClientRect(), top = Math.max(0, reader.querySelector('nav')?.getBoundingClientRect().bottom ?? bounds.top);
 			const bottom = Math.min(bounds.bottom, window.innerHeight);
 			const delta = drag.y < top + 40 ? -8 : drag.y > bottom - 40 ? 8 : 0;
-			if (delta) { reader.scrollTop += delta; updateDrag(); }
+			if (delta) { readerScrollElement(reader).scrollTop += delta; updateDrag(); }
 			frame = window.requestAnimationFrame(autoScroll);
 		};
 		const down = (event: PointerEvent) => {
+			if (event.button !== 0) return;
 			const target = event.target as HTMLElement;
 			const handle = target.closest<HTMLElement>('[data-highlight-edge]');
 			if (handle && controls.current?.contains(handle) && editing.current && !saving.current && !latest.current.disabled) {
@@ -175,6 +218,12 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			else settle();
 		};
 		const relayout = () => { setLayout(value => value + 1); };
+		const scroll = (event: Event) => {
+			if (event.target !== document && event.target !== document.scrollingElement && !reader.contains(event.target as Node)) return;
+			// Handle auto-scroll is part of resizing, not a request to dismiss it.
+			if (drag) relayout();
+			else if (editing.current) dismiss();
+		};
 		const blur = () => { held = false; nativeIntent = false; endDrag(true); };
 		document.addEventListener('selectionchange', selectionChanged);
 		document.addEventListener('pointerdown', down); document.addEventListener('pointermove', move, { passive: false });
@@ -182,7 +231,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		document.addEventListener('touchend', touchEnd, { passive: true }); document.addEventListener('touchcancel', touchCancel, { passive: true });
 		document.addEventListener('keydown', keydown); document.addEventListener('keyup', keyup);
 		text.addEventListener('click', activate); text.addEventListener('keydown', activate);
-		reader.addEventListener('scroll', relayout); window.addEventListener('resize', relayout); window.addEventListener('blur', blur);
+		document.addEventListener('scroll', scroll, true); window.addEventListener('resize', relayout); window.addEventListener('blur', blur);
 		return () => {
 			alive = false; window.clearTimeout(timer); window.cancelAnimationFrame(frame);
 			document.removeEventListener('selectionchange', selectionChanged);
@@ -191,7 +240,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			document.removeEventListener('touchend', touchEnd); document.removeEventListener('touchcancel', touchCancel);
 			document.removeEventListener('keydown', keydown); document.removeEventListener('keyup', keyup);
 			text.removeEventListener('click', activate); text.removeEventListener('keydown', activate);
-			reader.removeEventListener('scroll', relayout); window.removeEventListener('resize', relayout); window.removeEventListener('blur', blur);
+			document.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', relayout); window.removeEventListener('blur', blur);
 		};
 	}, [article, body]);
 
@@ -202,10 +251,14 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			return <button key={edge} type="button" className="crate-reading-reader__highlight-handle" data-highlight-edge={edge} aria-label={`Adjust highlight ${edge}`} disabled={busy || disabled}
 				style={{ left: box.left + (edge === 'end' ? box.width : 0), top: box.top, '--highlight-line-height': `${box.height}px` } as React.CSSProperties} />;
 		})}
-		<div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" style={geometry.menu} onPointerDown={event => event.preventDefault()}>
-			<IconButton className="crate-reading-reader__delete-highlight" icon="x" iconSize="l" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
+		<div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" style={geometry.menu}>
+			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
+			<Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>
+			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
+			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}
 		</div>
+		{feedback && !error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role={feedback.failed ? 'alert' : 'status'}>{feedback.message}</p></div>}
 		{error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role="alert">{error}</p><Button variant="ghost" disabled={busy || disabled} onClick={() => commands.current.save()}>Retry highlight</Button></div>}
 	</div>;
 }

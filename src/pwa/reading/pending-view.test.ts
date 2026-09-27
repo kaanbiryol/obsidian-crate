@@ -32,4 +32,26 @@ describe('pending Reading presentation', () => {
 			intent: { id: article.crate_reading_id, changes: { favorite: true } } }];
 		expect(presentReadingItems([article], pending)[0]?.favorite).toBe(false);
 	});
+	it('shows locally saved links before confirmation, without duplicating known URLs', () => {
+		const capture: PendingReading = { id: 'local-id', sessionId: 'session', action: 'capture', queuedAt: '2026-09-27T10:00:00.000Z',
+			intent: { url: 'https://example.com/new#passage', title: 'New article' } };
+		expect(presentReadingItems([], [capture])).toEqual([expect.objectContaining({ crate_reading_id: 'local-id', title: 'New article',
+			source_url: 'https://example.com/new', saved_at: capture.queuedAt, extraction_status: 'pending', path: '' })]);
+		expect(presentReadingItems([], [capture, { ...capture, id: 'duplicate' }])).toHaveLength(1);
+		expect(presentReadingItems([article], [{ ...capture, intent: { url: article.source_url + '#passage' } }])).toEqual([article]);
+		expect(presentReadingItems([], [{ ...capture, review: true }])).toEqual([]);
+	});
+	it('keeps uncertain edits visible and composes follow-ups in order', () => {
+		const pending: PendingReading[] = [
+			{ id: 'one', sessionId: 'session', action: 'update', body: 'sent', error: 'Reply lost', intent: { id: article.crate_reading_id, changes: { favorite: true, tags: ['essays'] } } },
+			{ id: 'two', sessionId: 'session', action: 'update', intent: { id: article.crate_reading_id, changes: { favorite: false, reading_status: 'archived' } } },
+		];
+		expect(presentReadingItems([article], pending)[0]).toMatchObject({ favorite: false, tags: ['essays'], reading_status: 'archived' });
+		expect(presentReadingItems([article], pending.map(op => ({ ...op, review: true })))).toEqual([article]);
+	});
+	it('shows extraction retry immediately and rolls it back if rejected', () => {
+		const pending: PendingReading = { id: 'retry', sessionId: 'session', action: 'retry', intent: { id: article.crate_reading_id } };
+		expect(presentReadingItems([article], [pending])[0]?.extraction_status).toBe('pending');
+		expect(presentReadingItems([article], [{ ...pending, review: true }])[0]?.extraction_status).toBe('ready');
+	});
 });
