@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useId, useRef } from 'react';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 import { Button } from '@/ui/shared/Button';
 import { ThemeIcon } from '@/reminders/components/theme-icon';
 
 type Point = { x: number; y: number };
 type Gesture = { pointerId: number; button: HTMLButtonElement; start: Point; choosing: boolean; moved: boolean };
 
-/** Tap selects the remembered view; hold or slide up to choose in one gesture. */
+/** Tap selects the slot’s destination; hold or slide up to choose in one gesture. */
 export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, onOpen, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
   label: string; icon: string; active: boolean; open: boolean; inert: boolean;
   onSelect: () => void; onOpen: () => void;
@@ -92,7 +92,7 @@ export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, 
         if (event.key === 'ArrowDown' || event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); cancel(); onOpen(); }
         else if (event.key === 'Enter' || event.key === ' ') suppressClick.current = false;
       }}>
-      <ThemeIcon key={icon} id={icon} size="l" className="pwa-dock__view-icon" style={icon === initialIcon.current ? { animation: 'none' } : undefined} aria-hidden="true" /><ChevronsUpDown className="pwa-dock__group-hint" size={12} aria-hidden="true" />
+      <ThemeIcon key={icon} id={icon} size="l" className="pwa-dock__view-icon" style={icon === initialIcon.current ? { animation: 'none' } : undefined} aria-hidden="true" /><span className="pwa-dock__group-hint" aria-hidden="true"><ChevronUp size={14} strokeWidth={2.5} /></span>
     </Button>
     <span id={description} className="pwa-dock__sr">Tap to open {label}. Hold or slide up, then drag to a view and release to select. Press Down arrow to choose Reading List, Favorites, Archive, or Highlights.</span>
   </>;
