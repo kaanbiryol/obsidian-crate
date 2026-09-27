@@ -7,6 +7,66 @@ const assets = await buildPwaPreviewAssets();
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
 
+async function scheduleScrollScenario(browser, reducedMotion) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    serviceWorkers: 'block', timezoneId: 'UTC', reducedMotion,
+    colorScheme: reducedMotion === 'reduce' ? 'light' : 'dark',
+  });
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+    const reminders = Array.from({ length: 440 }, (_, index) => ({
+      id: `schedule-scroll-${index}`, content: `Scheduled reminder ${String(index).padStart(3, '0')}`,
+      project: 'Inbox', priority: 4, completed: false,
+      dueDate: index < 220 ? '2026-09-26' : '2026-09-27',
+      filePath: 'Reminders/Inbox.md', revision: 'scroll-1', lineNumber: index + 1,
+      description: index % 3 === 0 ? 'Extra details that wrap across multiple lines on a phone and make this card taller.' : '',
+    }));
+    await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=today`);
+    for (const tab of ['Today', 'Upcoming']) {
+      await page.getByRole('button', { name: tab, exact: true }).tap();
+      await expect(page.locator('.pwa-tab-panel[data-leaving], .pwa-tab-panel[data-preparing]')).toHaveCount(0);
+      const scroller = page.locator('.reminders-view-scroll:visible');
+      await expect(scroller.locator('.reminder-render-item')).toHaveCount(200);
+      // Check before reading card geometry: measuring skipped descendants can
+      // itself force layout and conceal the blank-card regression.
+      const skipped = await scroller.locator('.premium-reminder-content').evaluateAll(cards => (
+        cards.filter(card => !card.checkVisibility({ contentVisibilityAuto: true })).length
+      ));
+      assert.equal(skipped, 0, `${tab}: offscreen cards must be ready before a fast scroll reaches them`);
+      const samples = await scroller.evaluate(async container => {
+        const initialHeight = container.scrollHeight;
+        const maxScroll = initialHeight - container.clientHeight;
+        const samples = [];
+        // Jump several viewports each frame, then reverse without settling.
+        for (const fraction of [0.2, 0.5, 0.9, 1, 0.7, 0.3, 0]) {
+          container.scrollTop = maxScroll * fraction;
+          await new Promise(requestAnimationFrame);
+          const bounds = container.getBoundingClientRect();
+          const cards = [...container.querySelectorAll('.premium-reminder-content')];
+          const visible = cards.filter(card => {
+            const rect = card.getBoundingClientRect();
+            return rect.bottom > bounds.top && rect.top < bounds.bottom;
+          });
+          samples.push({
+            heightDrift: Math.abs(container.scrollHeight - initialHeight),
+            visibleCards: visible.length,
+            ready: visible.every(card => card.checkVisibility({ contentVisibilityAuto: true, opacityProperty: true })),
+          });
+        }
+        return samples;
+      });
+      assert.ok(samples.every(sample => sample.heightDrift <= 1), `${tab}: scrolling must not replace estimated card heights`);
+      assert.ok(samples.every(sample => sample.visibleCards > 0 && sample.ready), `${tab}: cards must remain visible through rapid scroll reversals`);
+    }
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+}
+
 async function scenario(browser, reducedMotion, count) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, hasTouch: true, serviceWorkers: 'block', reducedMotion,
@@ -105,8 +165,10 @@ try {
     const browser = await browserType.launch();
     try {
       for (const reducedMotion of ['no-preference', 'reduce']) {
+        await scheduleScrollScenario(browser, reducedMotion);
         for (const count of [60, 240]) await scenario(browser, reducedMotion, count);
       }
+      console.log(`${browserType.name()}: paged Today and Upcoming cards stay rendered through fast scrolling in both themes`);
       console.log(`${browserType.name()}: long-list completion and reopening preserve the viewport with and without motion`);
     } finally { await browser.close(); }
   }

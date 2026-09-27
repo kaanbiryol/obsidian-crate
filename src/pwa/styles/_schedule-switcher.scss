@@ -6,6 +6,12 @@
     &[hidden] { display: none; }
   }
 
+  // Reserve the final geometry, but reveal the dates with their counts and list.
+  .pwa-opening-screen .pwa-schedule-switcher,
+  .pwa-reminders-view[data-pwa-loading] .pwa-schedule-switcher {
+    visibility: hidden;
+  }
+
   .pwa-schedule-control {
     position: relative;
     isolation: isolate;
@@ -13,9 +19,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: max-content;
     max-width: 100%;
-    padding-inline: 4px;
+    padding-inline: 0;
 
-    // The 32px track and 28px selection sit inside 44px touch targets.
+    // The track and selection share a 32px height inside 44px touch targets.
     &::before, &::after {
       content: '';
       position: absolute;
@@ -37,8 +43,8 @@
     }
 
     &::after {
-      inset: 8px auto 8px 4px;
-      width: calc((100% - 8px) / 2);
+      inset: 6px auto 6px 0;
+      width: 50%;
       background: color-mix(in srgb, var(--text-normal) 7%, transparent);
       transform: translateX(0);
       transition: transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);

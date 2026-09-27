@@ -23,7 +23,7 @@ describe('dock destinations', () => {
 		expect(dockDestinationIndex(['today', 'today-view', 'upcoming', 'inbox'], 'reminders', 'today')).toBe(1);
 		expect(dockDestinationIndex(['today-view', 'inbox', 'browse', 'reading'], 'reminders', 'upcoming')).toBe(-1);
 	});
-	it('selects Upcoming separately when pinned, otherwise Schedule', () => {
+	it('selects Upcoming separately when pinned, otherwise Reminders', () => {
 		expect(dockDestinationIndex(['today', 'upcoming'], 'reminders', 'upcoming')).toBe(1);
 		expect(dockDestinationIndex(['today'], 'reminders', 'upcoming')).toBe(0);
 		expect(dockDestinationIndex(['upcoming'], 'reminders', 'today')).toBe(-1);

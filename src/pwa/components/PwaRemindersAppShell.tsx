@@ -1,4 +1,4 @@
-import { PWA_CONTROL_SPRING } from '../motion';
+import { PWA_CONTROL_SPRING, PWA_FADE } from '../motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -97,6 +97,24 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? 'browse' : initialTab);
 	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
 	const reduceMotion = useObsidianReducedMotion();
+	const shell = useRef<HTMLDivElement>(null);
+	const contentRevealed = useRef(false);
+
+	useLayoutEffect(() => {
+		if (showLoadingIndicator || contentRevealed.current) return;
+		contentRevealed.current = true;
+		if (reduceMotion) return;
+		// Reveal the snapshot as one stationary change. Keep the title, actions,
+		// and dock painted, and never replay this entrance for background refreshes.
+		const regions = shell.current?.querySelectorAll<HTMLElement>(
+			'.pwa-navigation-viewport .view-header-meta, .pwa-navigation-viewport .pwa-schedule-switcher, .pwa-navigation-viewport .reminders-content',
+		);
+		const animations = Array.from(regions ?? [], region => region.animate(
+			[{ opacity: 0 }, { opacity: 1 }],
+			{ duration: PWA_FADE.duration * 1000, easing: 'ease-out' },
+		));
+		return () => animations.forEach(animation => animation.cancel());
+	}, [showLoadingIndicator, reduceMotion]);
 	const [skipProjectMotion, setSkipProjectMotion] = useState(Boolean(initialProject));
 	const navigationMotion = { direction, reduceMotion: reduceMotion || skipProjectMotion };
 	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
@@ -244,7 +262,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
+				ref={shell}
 				data-pwa-opening={initializing || undefined}
+				data-pwa-loading={showLoadingIndicator || undefined}
 				aria-busy={initializing}
 				className={[
 					'pwa-screen',
@@ -263,7 +283,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						<div className="overflow-hidden" inert={initializing}>
 							<ViewHeader
 								{...currentHeader}
-								title={primaryTab === 'today' ? 'Schedule' : currentHeader.title}
+								title={primaryTab === 'today' ? 'Reminders' : currentHeader.title}
 								countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 								large
 								showMeta={!showLoadingIndicator}
@@ -274,7 +294,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						</div>
 
 						{(viewMode === 'today' || viewMode === 'upcoming') && (
-							<PwaScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing} />
+							<PwaScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing || showLoadingIndicator} />
 						)}
 
 						{belowHeaderContent && (

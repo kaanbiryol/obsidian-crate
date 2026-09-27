@@ -82,7 +82,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     const active = async label => {
       await expect(dock().locator('[data-dock-active="true"]')).toHaveAccessibleName(label);
-      const icon = { 'Reading List': 'book-open', Favorites: 'star', Archive: 'archive', Highlights: 'highlighter' }[label];
+      const icon = { 'Reading': 'book-open', Favorites: 'star', Archive: 'archive', Highlights: 'highlighter' }[label];
       if (icon) await expect(dock().locator('.pwa-dock__view-icon')).toHaveAttribute('data-icon', icon);
     };
     const center = async target => { const box = await target.boundingBox(); assert.ok(box); return { x: box.x + box.width / 2, y: box.y + box.height / 2 }; };
@@ -98,7 +98,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.mouse.move(start.x, start.y); await page.mouse.down();
       await page.waitForTimeout(480); await page.mouse.up();
       await expect(views).toBeVisible();
-      await expect(views.getByRole('button')).toHaveText(['Reading List', 'Favorites', 'Archive', 'Highlights']);
+      await expect(views.getByRole('button')).toHaveText(['Reading', 'Favorites', 'Archive', 'Highlights']);
       assert.deepEqual(await geometry(), before, 'Opening must not shift the page or add action');
       await expect(dock().locator('[data-dock-group]')).toHaveCSS('opacity', '0');
       await expect.poll(async () => {
@@ -112,10 +112,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(`${origin}/notifications?browserToken=${enrollment.browserToken}`);
     await expect(dock()).toBeVisible();
     await expect(dock().locator('nav > button')).toHaveCount(4);
-    assert.deepEqual(await dock().locator('nav > button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['Inbox', 'Schedule', 'Projects', 'Reading List']);
+    assert.deepEqual(await dock().locator('nav > button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['Inbox', 'Reminders', 'Projects', 'Reading']);
     await direct('Projects');
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await direct('Schedule');
+    await direct('Reminders');
     // A reading destination must survive its first lazy mount.
     await selectView('Favorites');
     await expect(dock().locator('[data-dock-group]')).toBeFocused();
@@ -125,7 +125,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await dock().locator('[data-dock-group]').tap(); await closed(); await active('Favorites');
     await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('remember this');
     // The highlight must slide from Reading even when returning to the remembered tab.
-    for (const [index, label] of ['Inbox', 'Schedule', 'Projects'].entries()) {
+    for (const [index, label] of ['Inbox', 'Reminders', 'Projects'].entries()) {
       await direct(label);
       await dock().locator('[data-dock-group]').tap(); await closed(); await active('Favorites');
       const { positions, coverage } = await page.evaluate(async label => {
@@ -147,12 +147,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.ok(positions.at(-1).every(value => Math.abs(value - index) < .01));
       await closed(); await active(label);
     }
-    await direct('Projects'); await direct('Schedule');
+    await direct('Projects'); await direct('Reminders');
     // Sideways movement cancels a pending hold.
     const start = await center(dock().locator('[data-dock-group]'));
     await page.mouse.move(start.x, start.y); await page.mouse.down();
     await page.mouse.move(start.x + 20, start.y); await page.waitForTimeout(480); await page.mouse.up();
-    await closed(); await active('Schedule');
+    await closed(); await active('Reminders');
     await dock().locator('[data-dock-group]').press('ArrowDown');
     await expect(views).toBeVisible(); await page.keyboard.press('Escape'); await closed();
     // A spring grows continuously and keeps its current shape when reversed.
@@ -248,18 +248,18 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       return;
     }
     const dragViews = async (input, { immediate = false, ending = 'select' } = {}) => {
-      await direct('Schedule'); await page.mouse.move(-1, -1);
+      await direct('Reminders'); await page.mouse.move(-1, -1);
       const start = await center(dock().locator('[data-dock-group]'));
       await input.down(start);
       if (immediate) await input.move({ x: start.x, y: start.y - 18 });
       else await page.waitForTimeout(480);
       await expect(views).toBeVisible();
-      for (const label of ['Archive', 'Reading List', 'Favorites']) {
+      for (const label of ['Archive', 'Reading', 'Favorites']) {
         const choice = views.getByRole('button', { name: label, exact: true });
         await input.move(await center(choice));
         await expect(choice).toHaveAttribute('data-preview', 'true');
         await expect(views.locator('[data-preview="true"]')).toHaveCount(1);
-        await active('Schedule');
+        await active('Reminders');
       }
       if (ending === 'outside') { await input.move({ x: 8, y: 140 }); await expect(views.locator('[data-preview="true"]')).toHaveCount(0); }
       if (ending === 'cancel') await input.cancel();
@@ -267,7 +267,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         if (ending === 'blur') await page.evaluate(() => window.dispatchEvent(new Event('blur')));
         await input.up();
       }
-      await closed(); await active(ending === 'select' ? 'Favorites' : 'Schedule');
+      await closed(); await active(ending === 'select' ? 'Favorites' : 'Reminders');
     };
     const mouse = {
       down: async point => { await page.mouse.move(point.x, point.y); await page.mouse.down(); },
@@ -288,7 +288,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(views.getByRole('button', { name: 'Archive', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(views.locator('[data-icon="check"]')).toHaveCount(0);
     await page.mouse.click(8, 140); await closed(); await active('Archive');
-    await selectView('Reading List');
+    await selectView('Reading');
     await dock().getByRole('button', { name: 'Save a link', exact: true }).click();
     await expect(page.getByLabel('Link', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Close/ }).click(); await closed();
@@ -304,7 +304,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.setViewportSize(size); await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       const inset = size.width > size.height ? 21 : 34;
       const safeArea = await page.addStyleTag({ content: `:root { --pwa-safe-area-bottom: ${inset}px; }` });
-      await direct('Schedule');
+      await direct('Reminders');
       const [reminderBar] = await geometry();
       assert.ok(Math.abs(size.height - reminderBar.y - reminderBar.height - inset) < 1, 'Reminders dock respects the safe area without adding a second gap');
       await page.screenshot({ path: `test-results/dock/${name}-${theme}-${size.width}-closed.png` });
@@ -352,7 +352,7 @@ test('PWA dock indicator settles without repainting', { timeout: 30000 }, async 
         await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
         await expect(dock().locator('.pwa-dock__indicator')).toBeVisible();
         await expect(dock().getByRole('button', { name: 'Projects', exact: true })).toBeVisible();
-        for (const label of ['Projects', 'Schedule', 'Inbox']) {
+        for (const label of ['Projects', 'Reminders', 'Inbox']) {
           const animation = await dock().evaluateHandle(async (element, label) => {
             element.querySelector(`[aria-label="${label}"]`).click();
             await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);

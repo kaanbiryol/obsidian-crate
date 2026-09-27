@@ -1,12 +1,12 @@
 export const DEFAULT_DOCK_TABS = ['inbox', 'today', 'browse', 'reading'] as const;
-// Keep the existing 'today' preference for Schedule; 'today-view' pins Today directly.
+// Keep the existing 'today' preference for Reminders; 'today-view' pins Today directly.
 export const DOCK_TABS = [
 	{ id: 'inbox', label: 'Inbox', iconName: 'inbox' },
-	{ id: 'today', label: 'Schedule', iconName: 'calendar' },
+	{ id: 'today', label: 'Reminders', iconName: 'calendar' },
 	{ id: 'today-view', label: 'Today', iconName: 'calendar-check' },
 	{ id: 'upcoming', label: 'Upcoming', iconName: 'calendar-range' },
 	{ id: 'browse', label: 'Projects', iconName: 'folder-open' },
-	{ id: 'reading', label: 'Reading list', iconName: 'book-open' },
+	{ id: 'reading', label: 'Reading', iconName: 'book-open' },
 	{ id: 'favorites', label: 'Favorites', iconName: 'star' },
 	{ id: 'archive', label: 'Archive', iconName: 'archive' },
 	{ id: 'highlights', label: 'Highlights', iconName: 'highlighter' },
