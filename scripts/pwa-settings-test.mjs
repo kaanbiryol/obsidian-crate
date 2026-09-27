@@ -26,6 +26,24 @@ try {
 			await gear.click();
 			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(sheet).toBeVisible();
+			// Page presentation fills tall and short phones, rather than stopping
+			// at the desktop height cap. Resizing also exercises the layout lock.
+			for (const viewport of [{ width: 390, height: 844 }, { width: 430, height: 932 }, { width: 320, height: 568 }]) {
+				await page.setViewportSize(viewport);
+				await expect.poll(async () => {
+					const box = await sheet.boundingBox();
+					return box && Math.abs(box.y - 10) + Math.abs(box.height - (viewport.height - 10)) + Math.abs(box.width - viewport.width);
+				}).toBeLessThan(2);
+			}
+			await page.setViewportSize({ width: 390, height: 844 });
+			// Model the adapter's keyboard inset; keep the header in place and
+			// move the bottom above the keyboard without subtracting it twice.
+			await sheet.evaluate(element => { element.style.bottom = '300px'; element.style.setProperty('--pwa-sheet-keyboard-inset', '300px'); });
+			await expect.poll(async () => {
+				const box = await sheet.boundingBox();
+				return box && Math.abs(box.y - 10) + Math.abs(box.height - 534);
+			}).toBeLessThan(2);
+			await sheet.evaluate(element => { element.style.bottom = '0px'; element.style.setProperty('--pwa-sheet-keyboard-inset', '0px'); });
 			for (const title of ['General', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
 			await expect(page.getByRole('dialog')).toHaveCount(1);

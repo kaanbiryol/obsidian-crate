@@ -4,8 +4,23 @@
 	z-index: 4;
 	pointer-events: none;
 
+	.pwa-modal-sheet__container--settings {
+		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px - var(--pwa-sheet-keyboard-inset, 0px)));
+		max-height: var(--pwa-settings-height) !important;
+	}
+
 	.settings-sheet--unified {
-		height: min(760px, calc(100dvh - env(safe-area-inset-top) - 28px - var(--pwa-sheet-keyboard-inset, 0px)));
+		height: var(--pwa-settings-height);
+		max-height: var(--pwa-settings-height);
+	}
+
+	// iPhone-style page presentation: one tall surface below the status bar.
+	// Use the locked layout height so keyboard space is subtracted only once.
+	@media (max-width: 759px) {
+		.pwa-modal-sheet__container--settings {
+			--pwa-settings-height: calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 10px - var(--pwa-sheet-keyboard-inset, 0px));
+			width: 100% !important;
+		}
 	}
 	.settings-stack { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 	.settings-panel { position: absolute; inset: 0; gap: 0; padding: 12px 20px calc(20px + env(safe-area-inset-bottom)); }
