@@ -7,6 +7,6 @@ export default defineConfig({
   root: resolve('tests/visual/gallery'),
   plugins: [rawCssPlugin(), react()],
   css: { postcss: { plugins: [] } },
-  resolve: { alias: { '@': resolve('src') } },
+  resolve: { alias: { '@': resolve('src'), '@plugin-build': resolve('dist') } },
   server: { host: '127.0.0.1', port: 8790, strictPort: true, fs: { allow: [process.cwd()] } },
 });

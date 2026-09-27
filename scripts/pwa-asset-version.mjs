@@ -32,7 +32,7 @@ export function createPwaAssetVersion(clientAssets, root, onRead = () => {}) {
 	const imports = readFileSync(stylesEntry, 'utf-8').matchAll(/from\s+['"]([^'"]+\.scss)\?raw-css['"]/g);
 	for (const [, source] of imports) {
 		const path = resolve(dirname(stylesEntry), source);
-		const result = compile(path);
+		const result = compile(path, { style: 'compressed' });
 		hash.update(relative(root, path));
 		hash.update(result.css);
 		for (const url of result.loadedUrls) if (url.protocol === 'file:') onRead(fileURLToPath(url));

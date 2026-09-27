@@ -10,7 +10,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
       let browser: Browser;
       let page: Page;
       test.beforeAll(async () => { browser = await ({ chromium, webkit })[browserName].launch(); });
-      test.beforeEach(async () => { page = await browser.newPage({ baseURL: 'http://127.0.0.1:8790', viewport: { width: 390, height: 844 }, hasTouch: true }); });
+      test.beforeEach(async ({ baseURL }) => { page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, hasTouch: true }); });
       test.afterEach(async () => { await page.close(); });
       test.afterAll(async () => { await browser.close(); });
 

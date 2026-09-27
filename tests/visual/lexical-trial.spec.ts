@@ -8,9 +8,9 @@ for (const browserName of ['chromium', 'webkit'] as const) {
     test.describe(`${browserName} / ${host} Lexical trial`, () => {
       let browser: Browser;
       let page: Page;
-      test.beforeEach(async () => {
+      test.beforeEach(async ({ baseURL }) => {
         browser = await ({ chromium, webkit })[browserName].launch();
-        page = await browser.newPage({ baseURL: 'http://127.0.0.1:8790', viewport: { width: 390, height: 844 }, hasTouch: true });
+        page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, hasTouch: true });
       });
       test.afterEach(async () => { await browser?.close(); });
 

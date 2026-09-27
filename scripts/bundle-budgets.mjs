@@ -34,18 +34,18 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Reading, the reminder schedule parser, and full-screen project navigation measure about 1.004 MB raw / 334 KB gzip with the grouped navigation dock.
+		// Unified settings, offline Reading fallback and complete loading chrome measure
+		// 1.032 MB raw / 343.8 KB gzip. Retain a small, explicit growth margin.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		// The interruptible dock spring adds about 0.5 KB gzip (335.6 KB startup total with shared destination routing).
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1011000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '335750', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1040000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '347000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Reading and its phone pairing screen are deferred; all offline assets total about 1.178 MB raw / 394 KB gzip with the navigation dock.
-		// Full-screen project navigation and the dock spring bring the total to about 395.1 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1185000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '395500', 10),
+		// Reading and pairing stay deferred. Unified settings brings totals to
+		// 1.208 MB raw / 404.6 KB gzip, including the shared control additions.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1220000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '408000', 10),
 	}],
 };

@@ -21,7 +21,7 @@ import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmati
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { ReminderCard } from '@/reminders/components/ReminderCard';
 import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styles';
-import pluginStyles from '../../../dist/styles.css?raw';
+import pluginStyles from '@plugin-build/styles.css?raw';
 import fixtureStyles from './fixture.css?raw';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 

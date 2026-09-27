@@ -43,7 +43,7 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 
 			return [
 				`export const artifactVersion = ${JSON.stringify(packageJson.version)};`,
-				`export const workerBundleGzipBase64 = ${JSON.stringify(gzipSync(workerBundle).toString('base64'))};`,
+				`export const workerBundleGzipBase64 = ${JSON.stringify(gzipSync(workerBundle, { level: 9 }).toString('base64'))};`,
 				`export const workerBundleSha256 = ${JSON.stringify(workerBundleSha256)};`,
 				`export const artifactFingerprint = ${JSON.stringify(artifactFingerprint)};`,
 				`export const d1SchemaGzipBase64 = ${JSON.stringify(gzipSync(d1Schema).toString('base64'))};`,

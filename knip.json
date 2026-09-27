@@ -36,6 +36,7 @@
 		"tar",
 		"python3",
 		"plutil",
-		"shortcuts"
+		"shortcuts",
+		"openssl"
 	]
 }
