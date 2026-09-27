@@ -29,7 +29,7 @@ export function createPwaOpeningDockHtml(tab?: StartTab | 'reading', readingTab:
 	return `<div class="crate-reminders-ui pwa-opening-dock"${tab ? ` data-opening-tab="${tab}" data-opening-selection="${active}" style="--pwa-opening-dock-index:var(--pwa-dock-${active}-active-order,${index});--pwa-opening-dock-indicator:var(--pwa-dock-${active}-active-indicator,${index === -1 ? 0 : 1})"` : ''} aria-hidden="true" inert>
 		<div class="pwa-dock pwa-dock--opening"><nav class="pwa-dock__bar">
 			<span class="pwa-dock__surface"></span><span class="pwa-dock__indicator"></span>
-			${Object.entries(icons).map(([id, icon]) => `<span class="pwa-dock__tab" data-opening-destination="${id}">${icon}<span class="pwa-dock__group-hint">${svg('chevron-up', '<path d="m18 15-6-6-6 6"/>', 'style="stroke-width:2.5"', 14)}</span></span>`).join('')}
+			${Object.entries(icons).map(([id, icon]) => `<span class="pwa-dock__tab" data-opening-destination="${id}">${icon}<span class="pwa-dock__group-hint">${svg('chevrons-up-down', '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>', 'style="stroke-width:1.8"', 12)}</span></span>`).join('')}
 		</nav><span class="pwa-dock__add">${svg('plus', '<path d="M5 12h14"/><path d="M12 5v14"/>')}</span></div>
 	</div>`;
 }

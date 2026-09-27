@@ -1,3 +1,5 @@
+import { checkSheetDragPosition } from './pwa-sheet-drag-checks.mjs';
+import { trackSheetDismissal } from './pwa-sheet-motion-checks.mjs';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -53,6 +55,12 @@ try {
 			const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
 			const editor = page.getByRole('dialog', { name: 'Edit reminder', exact: true });
 			await expect(editor).toHaveCSS('transform', 'none');
+			const canvas = page.locator('.crate-modal-canvas');
+			const scale = () => canvas.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a);
+			await expect.poll(scale).toBeCloseTo(.94, 3);
+			assert.equal(await editor.evaluate(el => Boolean(el.closest('.crate-modal-canvas'))), false, 'The sheet must not inherit the background scale');
+			await expect(page.locator('.pwa-modal-sheet__backdrop')).toHaveCSS('transition-duration', '0s');
+			await checkSheetDragPosition(page, editor);
 			await title.fill('Keep my swiped draft');
 			await swipe(page, title, 40);
 			await expect(editor).toBeVisible();
@@ -65,14 +73,18 @@ try {
 			// Reproduce the stale desktop hover that used to interrupt the simulated
 			// finger when the sheet moved underneath the cursor.
 			await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+			const checkDismissal = await trackSheetDismissal(editor);
 			await swipe(page, editor.getByRole('heading', { name: 'Edit reminder', exact: true }));
+			await checkDismissal();
 			await expect(editor).toHaveCount(0);
+			await expect.poll(scale).toBe(1);
 			await card.tap();
 			await expect(title).toHaveText('Keep my swiped draft');
 
 			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
 			const picker = page.getByRole('dialog', { name: 'Select project', exact: true });
 			await expect(picker).toBeVisible();
+			await expect.poll(scale).toBeCloseTo(.94, 3);
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 			await swipe(page, picker.getByRole('heading', { name: 'Project', exact: true }));
 			await expect(editor).toBeVisible();

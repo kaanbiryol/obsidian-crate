@@ -1,5 +1,11 @@
-.crate-reminders-ui {
+.crate-reminders-ui, .crate-feature-shell {
   --pwa-motion-surface-duration: 420ms;
+  --pwa-motion-dismiss-duration: 320ms;
+  --pwa-motion-fade-duration: 160ms;
+  --pwa-motion-fade-ease: ease-out;
+  --pwa-motion-feedback-duration: 120ms;
+  --pwa-motion-control-duration: 180ms;
+  --pwa-motion-control-ease: cubic-bezier(.2, .8, .2, 1);
   --pwa-motion-navigation-duration: 380ms;
   --pwa-motion-surface-ease: cubic-bezier(.2, .8, .2, 1);
 }
@@ -7,7 +13,26 @@
 // retain Base UI's gesture/lifecycle handling and reverse from their current
 // position. Motion-owned surfaces use a physical spring (pwa/motion.ts).
 @supports (transition-timing-function: linear(0, 1)) {
-  .crate-reminders-ui {
+  .crate-reminders-ui, .crate-feature-shell {
     --pwa-motion-surface-ease: linear(0, .0756, .2281, .3917, .5383, .6587, .7527, .8236, .8757, .9134, .9403, .9592, .9724, .9816, .9879, .9922, .9951, .9971, .9985, .9994, 1);
   }
+}
+
+// The same paths still complete and clean up when movement is disabled.
+@media (prefers-reduced-motion: reduce) {
+  .crate-reminders-ui, .crate-feature-shell {
+    --pwa-motion-surface-duration: 0ms;
+    --pwa-motion-dismiss-duration: 0ms;
+    --pwa-motion-navigation-duration: 0ms;
+    --pwa-motion-fade-duration: 0ms;
+    --pwa-motion-feedback-duration: 0ms;
+    --pwa-motion-control-duration: 0ms;
+  }
+}
+
+// Shared controls inherit the PWA motion policy without changing Obsidian's theme.
+.crate-reminders-ui {
+  --anim-duration-fast: var(--pwa-motion-feedback-duration);
+  --anim-duration-moderate: var(--pwa-motion-control-duration);
+  --anim-motion-baseline: var(--pwa-motion-fade-ease);
 }

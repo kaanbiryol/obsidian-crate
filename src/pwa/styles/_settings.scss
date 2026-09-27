@@ -1,10 +1,10 @@
 .pwa-settings-root, .pwa-reading-full-height {
 	.pwa-modal-sheet__container--settings {
-		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px - var(--pwa-sheet-keyboard-inset, 0px)));
+		--pwa-settings-height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px));
 		max-height: var(--pwa-settings-height) !important;
 	}
 
-	:is(.settings-sheet--unified, .settings-sheet--full-height) {
+	.pwa-sheet-surface {
 		height: var(--pwa-settings-height);
 		max-height: var(--pwa-settings-height);
 	}
@@ -13,7 +13,7 @@
 	// Use the locked layout height so keyboard space is subtracted only once.
 	@media (max-width: 759px) {
 		.pwa-modal-sheet__container--settings {
-			--pwa-settings-height: calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 10px - var(--pwa-sheet-keyboard-inset, 0px));
+			--pwa-settings-height: calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 10px);
 			width: 100% !important;
 		}
 	}
@@ -25,87 +25,107 @@
 	z-index: 4;
 	pointer-events: none;
 
-	// The tall settings page should respond immediately to a tap. The shared
-	// spring's slow start and long settling tail feel delayed over this distance.
-	.pwa-modal-sheet__container--settings {
-		transition-duration: 300ms;
-		transition-timing-function: cubic-bezier(.2, .8, .2, 1);
-	}
-	.pwa-modal-sheet__container--settings:is([data-starting-style], [data-swiping]) { transition: none; }
-	.pwa-modal-sheet__container--settings[data-ending-style] {
-		transition-duration: clamp(120ms, calc(240ms * var(--drawer-swipe-strength, 1)), 320ms);
-	}
-
 	.settings-stack { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-	.settings-panel { position: absolute; inset: 0; gap: 0; padding: 12px 20px calc(20px + env(safe-area-inset-bottom)); }
+	.settings-panel { position: absolute; inset: 0; gap: 0; padding: 8px 20px calc(24px + env(safe-area-inset-bottom)); }
 	.settings-detail { background: var(--pwa-sheet-surface); }
 	.settings-panel[inert] { pointer-events: none; }
-	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; }
+	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; border-bottom: 0; }
 	.settings-feedback { margin: 0; padding: 12px 20px; }
 	.settings-navigation-row {
 		display: flex; justify-content: space-between; width: 100%; min-height: 48px;
-		padding: 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; text-align: left; font-weight: var(--reminder-font-weight-medium);
+		padding: 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; text-align: left; font-weight: 400;
 	}
 	.settings-navigation-row:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
-	.settings-navigation-row:active { background: var(--crate-control-active-bg); }
+	.settings-navigation-row[data-press-active] { background: var(--crate-control-active-bg); }
 	.settings-navigation-row svg { color: var(--text-faint); }
-	.settings-row__copy > strong { font-weight: var(--reminder-font-weight-medium); }
+	.settings-row__copy > strong { font-size: var(--pwa-font-body); font-weight: 400; line-height: 1.4; letter-spacing: normal; }
+	.settings-row__copy > span { color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
 	.settings-theme-option svg { display: none; }
-	.settings-theme-option { font-weight: var(--reminder-font-weight-medium); }
-	.settings-theme-picker { background: var(--crate-control-bg); border-color: var(--crate-divider); box-shadow: none; }
-	.settings-preference-input { background: transparent; border-color: transparent; box-shadow: none; text-align: right; }
-	.settings-preference-control--days { background: transparent; border-color: transparent; box-shadow: none; }
-	.settings-preference-control--days input { width: 52px; }
-	.settings-help { margin: 0 0 12px; }
+	.settings-theme-picker {
+		flex: 0 1 204px; gap: 0; padding: 0; border: 0; border-radius: 6px;
+		background: var(--crate-control-hover-bg); box-shadow: none;
+	}
+	.settings-theme-option {
+		position: relative; isolation: isolate; min-height: 44px; padding: 0 8px;
+		border-radius: 6px; background: transparent; box-shadow: none;
+		font-size: var(--pwa-font-caption); font-weight: 400; color: var(--text-muted);
+	}
+	.settings-theme-option.is-active {
+		background: transparent; box-shadow: none; color: var(--crate-accent-text);
+		&::before {
+			content: ''; position: absolute; inset: 4px 3px; z-index: -1;
+			border: 1px solid color-mix(in srgb, var(--crate-accent) 14%, transparent); border-radius: var(--crate-radius-control);
+			background: color-mix(in srgb, var(--crate-accent) 9%, var(--crate-panel-bg));
+		}
+	}
+	.settings-theme-option:focus-visible,
+	.settings-preference-control:focus-within,
+	.settings-tab-choice:focus-within {
+		outline: 2px solid var(--crate-focus-ring); outline-offset: 2px;
+	}
+	.settings-preference-control {
+		background: transparent; border-color: transparent; border-radius: 6px;
+		box-shadow: none; color: var(--text-muted);
+	}
+	.settings-preference-control .settings-preference-input { font-weight: 400; text-align: right; }
+	.settings-preference-control--select .settings-preference-input { padding-right: 20px; text-align-last: right; }
+	.settings-preference-control--select svg { right: 0; }
+	.settings-preference-control--days { flex-basis: 100px; width: 100px; }
+	.settings-preference-control--days input { width: 60px; }
+	.settings-preference-unit { padding-right: 0; }
+	.settings-help { margin: 0 0 8px; }
+	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 16px; border-bottom: 1px solid var(--crate-divider); }
 	.settings-main { display: flex; flex-direction: column; }
-	.settings-panel__section { padding: 12px 0; border-bottom: 1px solid var(--crate-divider); }
-	.settings-panel__title { margin: 0 0 6px; font-weight: var(--reminder-font-weight-medium); }
-	.settings-group { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-	.settings-row { padding: 8px 0; min-height: 48px; }
-	.settings-row + .settings-row { border: 0; }
-	.settings-row--theme { flex-direction: row; align-items: center; }
-	.settings-theme-picker { flex: 0 1 240px; }
+	.settings-panel__section { flex-shrink: 0; padding: 16px 0 0; border-bottom: 0; }
+	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; min-height: 28px; margin-bottom: 4px; }
+	.settings-panel__title { margin: 0; color: var(--text-muted); font-size: var(--pwa-font-caption); font-weight: 500; letter-spacing: normal; }
+	.settings-group { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+	.settings-row { box-sizing: border-box; padding: 10px 0; min-height: 56px; gap: 12px; }
+	.settings-row + .settings-row { border-top: 1px solid var(--crate-divider); }
+	.settings-group > .settings-row:last-child { border-bottom: 1px solid var(--crate-divider); }
+	.settings-row--theme { flex-direction: row; align-items: center; padding-block: 4px; }
 	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
-	.settings-value { color: var(--text-muted); font-size: var(--pwa-font-control); }
-	.settings-disclosure { border-bottom: 1px solid var(--crate-divider); }
+	.settings-value { color: var(--text-muted); font-size: var(--pwa-font-body); white-space: nowrap; }
+	.settings-status { font-size: var(--pwa-font-control); font-weight: 400; }
+	.settings-navigation-row { font-size: var(--pwa-font-body); font-weight: 400; }
+	.settings-disclosure { flex-shrink: 0; border-bottom: 1px solid var(--crate-divider); }
 	.settings-disclosure__trigger {
 		display: flex; align-items: center; justify-content: space-between; gap: 12px;
-		width: 100%; min-height: 52px; padding: 12px 0;
+		width: 100%; min-height: 56px; padding: 12px 0;
 		background: transparent; border: 0; border-radius: 0; color: var(--text);
-		font: inherit; text-align: left; touch-action: manipulation;
+		font: inherit; font-size: var(--pwa-font-body); font-weight: 400; text-align: left; touch-action: manipulation;
 	}
-	.settings-disclosure__summary { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: var(--pwa-font-caption); text-align: right; }
+	.settings-disclosure__summary { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: var(--pwa-font-detail); text-align: right; }
 	.settings-disclosure__summary svg { flex: 0 0 auto; }
 	.settings-disclosure__trigger[data-panel-open] svg { transform: rotate(90deg); }
 	.settings-disclosure__panel { padding-bottom: 16px; }
 	.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
 	.settings-actions > button { max-width: 100%; white-space: normal; }
-	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-detail); line-height: 1.45; overflow-wrap: anywhere; }
+	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-caption); line-height: 1.45; overflow-wrap: anywhere; }
 	.settings-feedback { color: var(--crate-danger); }
 	.settings-attention { color: var(--text-muted); }
 	.settings-attention p { margin: 8px 0; }
 	.settings-help { color: var(--text-faint); }
-	.settings-logout-button { margin-top: 16px; align-self: flex-start; }
+	.settings-logout-button { --crate-action-font-size: var(--pwa-font-control); margin-top: 16px; align-self: flex-start; padding-inline: 0; font-size: var(--pwa-font-control); font-weight: 400; }
 	.settings-subpage { min-width: 0; }
 
-	@media (max-width: 420px) {
-		.settings-theme-picker { flex: 0 1 216px; }
+	@media (max-width: 360px) {
+		.settings-panel { padding-inline: 16px; }
+		.settings-theme-picker { flex-basis: 180px; }
 		.settings-theme-option { padding-inline: 6px; }
 		.settings-preference-control--select { flex-basis: 140px; width: 140px; }
 	}
-}
 
-.crate-reminders-ui {
-  .settings-tabs-description { margin: 0; padding: 8px 0 12px; color: var(--text-muted); font-size: 13px; }
-  .settings-tab-list { margin: 0; padding: 0; list-style: none; }
-  .settings-tab-row { position: relative; display: flex; align-items: center; min-height: 52px; gap: 8px; background: var(--pwa-sheet-surface, var(--background-primary)); }
-  .settings-tab-row > svg { color: var(--text-muted); flex-shrink: 0; }
-  .settings-tab-row button { min-width: 44px; min-height: 44px; padding: 0; color: var(--text-muted); }
-  .settings-tab-row .settings-tab-handle { touch-action: none; cursor: grab; }
-  .settings-tab-row .settings-tab-handle:active { cursor: grabbing; }
-  .settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
-  .settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; font-size: 16px; box-shadow: none; }
-  .settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
-  .settings-tabs-footer { display: flex; align-items: center; justify-content: space-between; }
-  .settings-tabs-footer > button:last-child { margin-left: auto; color: var(--text-muted); }
+	.settings-tabs-description { margin: 0; padding: 0 0 12px; color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
+	.settings-tab-list { border-bottom: 1px solid var(--crate-divider); margin: 0; padding: 0; list-style: none; }
+	.settings-tab-row { position: relative; display: flex; align-items: center; min-height: 48px; gap: 12px; background: var(--pwa-sheet-surface, var(--background-primary)); }
+	.settings-tab-row + .settings-tab-row { border-top: 1px solid var(--crate-divider); }
+	.settings-tab-row > svg { color: var(--text-muted); flex-shrink: 0; }
+	.settings-tab-row button { min-width: 44px; min-height: 44px; padding: 0; color: var(--text-muted); }
+	.settings-tab-row .settings-tab-handle { color: var(--text-faint); touch-action: none; cursor: grab; }
+	.settings-tab-row .settings-tab-handle[data-press-active] { cursor: grabbing; }
+	.settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
+	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; font-size: var(--pwa-font-body); font-weight: 400; box-shadow: none; }
+	.settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
+	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); min-height: 44px; margin-block: -8px; margin-right: -8px; padding-inline: 8px; color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
 }

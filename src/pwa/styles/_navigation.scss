@@ -39,13 +39,25 @@
 
     .pwa-navigation-screen { pointer-events: auto; }
 
-    .pwa-project-fab {
-      bottom: calc(var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) + 16px);
+    .pwa-project-dock {
+      position: absolute;
+      bottom: 0;
+      align-self: center;
+      justify-content: flex-end;
     }
+  }
+
+  .pwa-navigation-screen--project .project-detail-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px 0;
+
+    .premium-back-button { margin: 0; }
   }
 
   // The project layer already accounts for the top safe area.
   .pwa-reminders-view .pwa-navigation-screen--project .premium-back-button {
-    margin-top: 8px;
+    margin-top: 0;
   }
 }

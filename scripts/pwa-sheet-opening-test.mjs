@@ -115,7 +115,7 @@ try {
 							// completion. Follow the interaction gate before the next tap.
 							await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
 						}
-						await page.touchscreen.tap(195, 20);
+						await editor.getByRole('button', { name: 'Close reminder editor', exact: true }).tap();
 						await expect(page.locator('.pwa-modal-sheet')).toHaveCount(0);
 						await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
 					} finally {

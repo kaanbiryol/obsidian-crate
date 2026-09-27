@@ -1,12 +1,12 @@
+import { PWA_CONTROL_SPRING } from '../motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { PwaDock } from './PwaDock';
+import { PwaDock, PwaDockAddButton } from './PwaDock';
 import { PwaTabTransition } from './PwaTabTransition';
 import { PwaScheduleSwitcher } from './PwaScheduleSwitcher';
 import { TABS } from '@/reminders/ui/layoutConstants';
-import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
@@ -201,7 +201,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			{
 				<motion.span
 					animate={{ rotate: showCompleted ? 180 : 0 }}
-					transition={{ duration: reduceMotion ? 0 : 0.2, ease: 'easeOut' }}
+					transition={reduceMotion ? { duration: 0 } : PWA_CONTROL_SPRING}
 					className="inline-flex"
 				>
 					<ChevronDown size={18} />
@@ -302,7 +302,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								<ProjectDetailView
 									project={selectedProject}
 									headerMetaContent={headerMetaContent}
-									headerRightContent={headerRightContent?.(true)}
+									backLabel="Back"
+									navigationRightContent={headerRightContent?.(true)}
 									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
 									reminders={reminders}
 									loadingContent={showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : undefined}
@@ -316,7 +317,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									reorderInteraction="long-press"
 								/>
 							</div>
-							{(initializing || !suppressFab) && <FloatingActionButton onClick={handleAdd} animateOnMount={false} inert={initializing || backgroundInert} className="fab pwa-project-fab" data-action="open-create-modal" />}
+							{(initializing || !suppressFab) && <div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>}
 						</PwaNavigationScreen>}
 					</AnimatePresence>
 				</div>

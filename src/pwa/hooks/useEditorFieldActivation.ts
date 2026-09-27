@@ -24,10 +24,7 @@ export function useEditorFieldActivation() {
 			const field = editorField(event.target);
 			activation.current = field && field !== field.ownerDocument.activeElement && event.button === 0
 				? { field, x: event.clientX, y: event.clientY, time: event.timeStamp } : null;
-			if (activation.current && event.pointerType === 'touch') {
-				// Keep the existing synchronous focus that prevents iOS document panning.
-				field?.focus({ preventScroll: true });
-			}
+			// The shared sheet focuses touch fields without scrolling after capture.
 		},
 		onPointerMoveCapture(event: PointerEvent<HTMLDivElement>) {
 			const tap = activation.current;

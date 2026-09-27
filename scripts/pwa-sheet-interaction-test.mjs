@@ -18,11 +18,15 @@ async function tapBackdropAbove(page, dialog) {
 	// geometry before choosing a coordinate just outside the visible content.
 	await surface.tap({ trial: true });
 	const bounds = await surface.boundingBox();
-	assert.ok(bounds && bounds.y > 24, 'The sheet must leave a visible backdrop');
-	const point = { x: bounds.x + bounds.width / 2, y: bounds.y - 24 };
+	assert.ok(bounds && bounds.y > 0, 'The sheet must leave a visible backdrop');
+	const point = { x: bounds.x + bounds.width / 2, y: bounds.y - Math.min(24, bounds.y / 2) };
 	assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('pwa-modal-sheet__backdrop'), point),
 		`Visible backdrop must receive the tap: ${JSON.stringify(bounds)}`);
-	await page.touchscreen.tap(point.x, point.y);
+	// Chromium expands touch targets into the header across the settings page's
+	// 10px top gap. Use precise pointer hit-testing there; settings touch swipe
+	// dismissal is covered by pwa-settings-motion-checks.
+	if (bounds.y < 24) await page.mouse.click(point.x, point.y);
+	else await page.touchscreen.tap(point.x, point.y);
 }
 
 async function expectNoTouchRing(locator) {
@@ -185,7 +189,7 @@ try {
 			await days.fill('12');
 			await expectNoTouchRing(days);
 			await expect(days).toHaveCSS('border-color', inputBorder);
-			const select = settings.getByRole('combobox');
+			const select = settings.getByRole('combobox', { name: 'Open to', exact: true });
 			await select.tap();
 			await expectNoTouchRing(select);
 			await select.selectOption('inbox');

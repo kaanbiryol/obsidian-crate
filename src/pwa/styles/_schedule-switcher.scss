@@ -41,7 +41,7 @@
       width: calc((100% - 8px) / 2);
       background: color-mix(in srgb, var(--text-normal) 7%, transparent);
       transform: translateX(0);
-      transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
+      transition: transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);
     }
 
     @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
@@ -74,11 +74,11 @@
     line-height: 1.3;
     cursor: pointer;
     touch-action: manipulation;
-    transition: color 160ms ease;
+    transition: color var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease);
 
     &[aria-pressed="true"] { color: var(--text-normal); }
-    @media (hover: hover) { &:hover { color: var(--text-normal); } }
-    &:active { opacity: .65; }
+    @media (hover: hover) and (pointer: fine) { &:hover { color: var(--text-normal); } }
+    &[data-press-active] { opacity: .65; }
     &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -4px; }
     @media (prefers-reduced-motion: reduce) { transition: none; }
   }

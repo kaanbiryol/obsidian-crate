@@ -176,6 +176,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // Match the working feature transition: fade the old painted screen over
     // an opaque incoming screen. A fade-in of replacement content is insufficient.
     const checkScreenFade = async (selector, interruptWith) => {
+      const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
       const samples = await page.evaluate(async ({ selector, interruptWith }) => {
         const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
         const container = panel.querySelector('.pwa-tab-transition');
@@ -216,11 +217,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       }, { selector, interruptWith });
       // Reversals shorten the remaining CSS transition, so sample its full range.
       const visibleFade = samples.filter(frame => frame.fading);
-      assert.ok(visibleFade.length >= (interruptWith ? 1 : 2), JSON.stringify(samples));
+      if (reducedMotion) assert.equal(visibleFade.length, 0, 'Reduced motion switches without intermediate fades');
+      else assert.ok(visibleFade.length >= (interruptWith ? 1 : 2), JSON.stringify(samples));
       assert.ok(samples.every(frame => frame.coverage === 1 && frame.dock === 1), 'The dock stays opaque and the screen stack never exposes the backdrop');
       assert.ok(samples.every(frame => frame.inert), 'Outgoing views cannot receive input');
       if (!interruptWith) assert.ok(samples.every(frame => frame.oldTitle && frame.oldScroll), 'The outgoing title and scroll position remain painted until the dissolve finishes');
-      assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', '0.16s', 'ease-out']))), 'Tabs keep the feature fade duration and easing with reversible opacity transitions');
+      assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs keep the feature fade duration and easing with reversible opacity transitions');
       assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
       assert.equal(samples.at(-1).retained, false);
       await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
@@ -233,7 +235,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await checkScreenFade(`.pwa-dock [data-tab="${tab}"]`);
     }
     await checkScreenFade('.pwa-dock [data-tab="today"]', '.pwa-dock [data-tab="inbox"]');
-    // Like feature switching, reduced motion retains the stationary dissolve.
+    // Reduced motion skips the dissolve while preserving the same cleanup.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await checkScreenFade('.pwa-dock [data-tab="today"]');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
