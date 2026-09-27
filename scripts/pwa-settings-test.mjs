@@ -1,8 +1,16 @@
+import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { switchFeature, installFeatureNavigation } from './pwa-feature-navigation.mjs';
+
+async function expectTheme(page, scheme, preference) {
+	await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', scheme);
+	await expect(page.locator('html')).toHaveCSS('color-scheme', scheme);
+	await expect(page.locator('#pwa-theme-color')).toHaveAttribute('content', scheme === 'light' ? '#f7f7f8' : '#0d0d0f');
+	await expect(page.locator('#pwa-light-theme')).toHaveAttribute('media', preference === 'system' ? '(prefers-color-scheme: light)' : preference === 'light' ? 'all' : 'not all');
+}
 
 const assets = await buildPwaPreviewAssets();
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
@@ -12,7 +20,8 @@ try {
 	for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
 		const browser = await engine.launch();
 		try {
-			const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce', serviceWorkers: 'block' });
+			await checkSettingsMotion(browser, origin);
+			const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce', serviceWorkers: 'block' });
 			const page = await context.newPage();
 			await installFeatureNavigation(page);
 			const errors = [];
@@ -26,6 +35,26 @@ try {
 			await gear.click();
 			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(sheet).toBeVisible();
+			// Customize the dock through Settings, then verify navigation and reload.
+			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
+			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
+			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
+			await sheet.getByRole('checkbox', { name: 'Show Projects tab' }).uncheck();
+			await sheet.getByRole('checkbox', { name: 'Show Schedule tab' }).uncheck();
+			await sheet.getByRole('checkbox', { name: 'Show Inbox tab' }).uncheck();
+			await expect(sheet.getByRole('checkbox', { name: 'Show Reading tab' })).toBeDisabled();
+			await sheet.getByRole('checkbox', { name: 'Show Inbox tab' }).check();
+			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			const dockTabs = page.locator('.crate-feature-panel[data-active="true"] .pwa-dock__bar > button');
+			await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Reading List', 'Inbox']);
+			await dockTabs.first().click();
+			await expect(page.locator('[data-crate-section="reading"]')).toHaveAttribute('data-active', 'true');
+			await page.reload();
+			await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Reading List', 'Inbox']);
+			await dockTabs.last().click();
+			await gear.click();
+			await expect(sheet.getByRole('checkbox', { name: 'Show Projects tab' })).not.toBeChecked();
+			await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
 			// Page presentation fills tall and short phones, rather than stopping
 			// at the desktop height cap. Resizing also exercises the layout lock.
 			for (const viewport of [{ width: 390, height: 844 }, { width: 430, height: 932 }, { width: 320, height: 568 }]) {
@@ -38,23 +67,43 @@ try {
 			await page.setViewportSize({ width: 390, height: 844 });
 			// Model the adapter's keyboard inset; keep the header in place and
 			// move the bottom above the keyboard without subtracting it twice.
-			await sheet.evaluate(element => { element.style.bottom = '300px'; element.style.setProperty('--pwa-sheet-keyboard-inset', '300px'); });
+			const keyboardStyles = await page.addStyleTag({ content: '.settings-keyboard-test { bottom: 300px !important; --pwa-sheet-keyboard-inset: 300px !important; }' });
+			await sheet.evaluate(element => element.classList.add('settings-keyboard-test'));
 			await expect.poll(async () => {
 				const box = await sheet.boundingBox();
 				return box && Math.abs(box.y - 10) + Math.abs(box.height - 534);
 			}).toBeLessThan(2);
-			await sheet.evaluate(element => { element.style.bottom = '0px'; element.style.setProperty('--pwa-sheet-keyboard-inset', '0px'); });
+			await sheet.evaluate(element => element.classList.remove('settings-keyboard-test'));
+			await keyboardStyles.evaluate(element => element.remove());
 			for (const title of ['General', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
 			await expect(page.getByRole('dialog')).toHaveCount(1);
 			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
 			const days = sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' });
 			await days.fill('17'); await days.press('Tab');
+			await expectTheme(page, 'dark', 'system');
+			// Retained features and the settings consumer must share one document owner.
+			await page.evaluate(() => {
+				window.__themeWrites = 0;
+				const observer = new MutationObserver(records => { window.__themeWrites += records.length; });
+				observer.observe(document.getElementById('pwa-theme-color'), { attributes: true, attributeFilter: ['content'] });
+				window.__stopThemeObserver = () => observer.disconnect();
+			});
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
+			await expectTheme(page, 'light', 'light');
+			expect(await page.evaluate(() => window.__themeWrites)).toBe(1);
+			await page.evaluate(() => window.__stopThemeObserver());
 			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
 			await expect(sheet.getByRole('button', { name: 'System', exact: true })).toHaveAttribute('aria-pressed', 'false');
+			await sheet.getByRole('button', { name: 'System', exact: true }).click();
+			await expectTheme(page, 'dark', 'system');
+			await page.emulateMedia({ colorScheme: 'light' });
+			await expectTheme(page, 'light', 'system');
+			await page.emulateMedia({ colorScheme: 'dark' });
+			await expectTheme(page, 'dark', 'system');
+			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
 			await sheet.getByRole('combobox', { name: 'Open to' }).selectOption('favorites');
-			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17 });
+			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'] });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 			await expect(sheet).toHaveCount(0);
@@ -89,7 +138,25 @@ try {
 			await page.emulateMedia({ reducedMotion: 'reduce' });
 			await sheet.getByRole('button', { name: /^Sync and device/ }).click();
 			await expect(sheet.getByText('Device storage', { exact: true })).toBeVisible();
+			// Hold refresh open so unrelated controls are checked during real pending work.
+			let releaseRefresh;
+			const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+			const delayedList = async route => { await refreshGate; await route.fulfill({ json: { items: [], issues: [], cursor: null } }); };
+			await page.route('**/reading/list*', delayedList);
 			await sheet.getByRole('button', { name: 'Refresh all', exact: true }).click();
+			await expect(sheet.getByRole('button', { name: 'Refresh all', exact: true })).toBeDisabled();
+			for (const label of ['Export Reading data', 'Close settings', 'Log out']) {
+				await expect(sheet.getByRole('button', { name: label, exact: true })).toBeEnabled();
+				await expect(sheet.getByRole('button', { name: label, exact: true })).toHaveCSS('opacity', '1');
+			}
+			await sheet.getByRole('button', { name: 'Log out', exact: true }).click();
+			const pendingLogout = page.getByRole('dialog', { name: 'Log out of Crate?', exact: true });
+			await expect(pendingLogout.getByRole('button', { name: 'Log out and clear device data', exact: true })).toHaveAttribute('aria-disabled', 'true');
+			await expect(pendingLogout.getByRole('button', { name: 'Logging out…', exact: true })).toHaveCount(0);
+			await pendingLogout.getByRole('button', { name: 'Cancel', exact: true }).click();
+			releaseRefresh();
+			await expect(sheet.getByRole('button', { name: 'Refresh all', exact: true })).toBeEnabled();
+			await page.unroute('**/reading/list*', delayedList);
 			await expect(sheet.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
 			await sheet.getByRole('button', { name: 'Dark', exact: true }).click();
 			await expect(sheet.getByRole('button', { name: 'Dark', exact: true })).toHaveClass(/is-active/);
@@ -99,6 +166,33 @@ try {
 			await expect(gear).toBeFocused();
 			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');
 			await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', 'dark');
+			// Theme subscriptions survive settings unmounts and ignore system changes
+			// while an explicit override is selected. Cross-tab updates are native events.
+			await page.emulateMedia({ colorScheme: 'light' });
+			await expectTheme(page, 'dark', 'dark');
+			const peer = await context.newPage();
+			try {
+				await peer.goto(origin + '/notifications?tab=inbox');
+				await peer.evaluate(() => localStorage.setItem('crate-reminders-theme', 'system'));
+				await expectTheme(page, 'light', 'system');
+				await gear.click();
+				await expect(sheet.getByRole('button', { name: 'System', exact: true })).toHaveAttribute('aria-pressed', 'true');
+				await peer.evaluate(() => localStorage.setItem('crate-reminders-theme', 'dark'));
+				await expectTheme(page, 'dark', 'dark');
+				await expect(sheet.getByRole('button', { name: 'Dark', exact: true })).toHaveAttribute('aria-pressed', 'true');
+				await peer.evaluate(() => localStorage.setItem('crate-reminders-theme', 'invalid-theme'));
+				await expectTheme(page, 'light', 'system');
+				await sheet.getByRole('button', { name: 'Dark', exact: true }).click();
+				await expectTheme(peer, 'dark', 'dark');
+				await peer.evaluate(() => localStorage.removeItem('crate-reminders-theme'));
+				await expectTheme(page, 'light', 'system');
+				await sheet.getByRole('button', { name: 'Dark', exact: true }).click();
+				await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			} finally { await peer.close(); }
+			await switchFeature(page, 'Reminders');
+			await expectTheme(page, 'dark', 'dark');
+			await switchFeature(page, 'Reading');
+			await expectTheme(page, 'dark', 'dark');
 
 			// The saved opening preference must select Reading before its first mount.
 			await page.goto(origin + '/notifications');

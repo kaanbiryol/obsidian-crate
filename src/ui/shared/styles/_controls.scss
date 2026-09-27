@@ -5,6 +5,7 @@
   .crate-action-button {
     @include action.control;
   }
+  .crate-dialog-actions { @include action.dialog-actions; }
   .completed-section-panel {
     height: var(--collapsible-panel-height);
     opacity: 1;

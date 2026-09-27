@@ -1,3 +1,4 @@
+import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
 import { Button as BaseButton } from '@/ui/shared/Button';
 import React, { useState } from 'react';
 import { useIsPresent } from 'motion/react';
@@ -11,7 +12,7 @@ import type { DataMode } from '../types';
 import { createPwaOpeningScreenHtml } from '../opening-screen';
 import { resolvePwaOpeningDestination } from '../opening-destination';
 import { loadPwaPreferences } from '../preferences';
-import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
+import { createPwaUpdateScreenHtml } from '../update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({
@@ -140,23 +141,17 @@ export function PwaPullRefreshIndicator({
 			aria-hidden={!visible}
 		>
 			<div className="pwa-pull-refresh__inner" aria-hidden="true">
-				<svg className="pwa-pull-refresh__glyph" viewBox="0 0 24 24" fill="none">
-					{Array.from({ length: 12 }, (_, index) => (
-						<rect
-							key={index}
-							x="11" y="2" width="2" height="5" rx="1"
-							fill="currentColor"
-							transform={`rotate(${index * 30} 12 12)`}
-							opacity={pullRefresh.refreshing ? (index + 1) / 12 : Math.max(0, Math.min(1, pullRefresh.progress * 12 - index))}
-						/>
-					))}
-				</svg>
+				<LoadingSpinner className="pwa-pull-refresh__glyph" progress={pullRefresh.refreshing ? undefined : pullRefresh.progress} />
 			</div>
 		</div>
 	);
 }
 
 export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
+	// Reuse the shell's embedded logo so launch and reload need no image fetch.
+	const [updateHtml] = useState(() => createPwaUpdateScreenHtml(
+		document.querySelector<HTMLImageElement>('#pwa-update-transition img')?.getAttribute('src') ?? undefined,
+	));
 	// Enrollment cleans the URL while this screen is visible. Keep its original
 	// destination until the real shell is ready so the title cannot jump back.
 	const [openingHtml] = useState(() => createPwaOpeningScreenHtml(resolvePwaOpeningDestination(location.search, loadPwaPreferences().defaultScreen)));
@@ -165,7 +160,7 @@ export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
 			className={`pwa-launch-splash${updating ? ' is-updating' : ''}`}
 			role="status"
 			aria-label={updating ? 'Updating Crate' : 'Loading Crate'}
-			dangerouslySetInnerHTML={{ __html: updating ? PWA_UPDATE_SCREEN_HTML : openingHtml }}
+			dangerouslySetInnerHTML={{ __html: updating ? updateHtml : openingHtml }}
 		/>
 	);
 }

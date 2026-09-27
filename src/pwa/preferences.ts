@@ -1,11 +1,13 @@
+import { normalizeDockTabs, type DockTab } from './dock-preferences';
 import type { StartTab } from './types';
 
-export type PwaStartScreen = StartTab | 'reading' | 'favorites' | 'archive';
+type PwaStartScreen = StartTab | 'reading' | 'favorites' | 'archive';
 
 export const PWA_PREFERENCES_KEY = 'crate-reminders-preferences';
 
 export interface PwaPreferences {
 	defaultScreen: PwaStartScreen;
+	dockTabs: DockTab[];
 	upcomingDays: number | null;
 }
 
@@ -13,6 +15,7 @@ export function loadPwaPreferences(): PwaPreferences {
 	try {
 		const value = JSON.parse(localStorage.getItem(PWA_PREFERENCES_KEY) ?? '{}') as Partial<PwaPreferences> | null;
 		return {
+			dockTabs: normalizeDockTabs(value?.dockTabs),
 			defaultScreen: value?.defaultScreen === 'inbox' || value?.defaultScreen === 'upcoming' || value?.defaultScreen === 'browse'
 				|| value?.defaultScreen === 'reading' || value?.defaultScreen === 'favorites' || value?.defaultScreen === 'archive'
 				? value.defaultScreen : 'today',
@@ -20,7 +23,7 @@ export function loadPwaPreferences(): PwaPreferences {
 				? value.upcomingDays : null,
 		};
 	} catch {
-		return { defaultScreen: 'today', upcomingDays: null };
+		return { defaultScreen: 'today', upcomingDays: null, dockTabs: normalizeDockTabs(null) };
 	}
 }
 

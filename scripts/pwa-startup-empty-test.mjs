@@ -25,17 +25,23 @@ try {
   try {
    await expect(firstLoad.locator('.pwa-reminders-view[data-pwa-opening]')).toBeVisible();
    await expect(firstLoad.getByRole('status',{name:'Loading reminders'})).toBeVisible();
-   await expect(firstLoad.locator('.pwa-reminders-skeleton__card')).toHaveCount(3);
+   await expect(firstLoad.locator('.crate-content-loading')).toHaveCount(1);
+   const spinner = firstLoad.locator('.crate-content-loading__spinner');
+   await expect(spinner).toBeVisible();
+   await expect(spinner).toHaveCSS('animation-delay', '0.25s, 0.25s');
+   await firstLoad.emulateMedia({ reducedMotion: 'reduce' });
+   await expect(spinner).toHaveCSS('animation-name', 'crate-loading-appear');
+   await firstLoad.emulateMedia({ reducedMotion: 'no-preference' });
    openingTitle = await firstLoad.locator('h1').elementHandle();
    await expect(firstLoad.locator('.pwa-header-settings-button')).toBeVisible();
    openingSettings = await firstLoad.locator('.pwa-header-settings-button').elementHandle();
    expect(openingSettings, 'settings uses its real icon during loading').not.toBeNull();
    await expect(firstLoad.locator('.pwa-header-settings-button [data-icon="settings"]')).toBeVisible();
    openingGeometry = { title: await openingTitle.boundingBox(), header: await firstLoad.locator('.view-header').boundingBox(), settings: await openingSettings.boundingBox() };
-   await mkdir('test-results/startup-skeleton',{recursive:true});
-   await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening.png`});
+   await mkdir('test-results/startup-loading',{recursive:true});
+   await firstLoad.screenshot({path:`test-results/startup-loading/${engine.name()}-opening.png`});
    await firstLoad.emulateMedia({colorScheme:'dark'});
-   await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-opening-dark.png`});
+   await firstLoad.screenshot({path:`test-results/startup-loading/${engine.name()}-opening-dark.png`});
   } finally { releaseFirstLoad(); }
   await expect(firstLoad.locator('.pwa-reminders-view:not([data-pwa-opening])')).toBeVisible();
   expect(await openingTitle.evaluate(element => element.isConnected), 'loading must not replace the title').toBe(true);
@@ -47,7 +53,7 @@ try {
   expect(Math.abs(loadedTitle.height - openingGeometry.title.height)).toBeLessThan(1);
   expect(Math.abs(loadedHeader.height - openingGeometry.header.height)).toBeLessThan(1);
   await expect(firstLoad.locator('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])')).toHaveCSS('opacity', '1');
-  await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-loaded-dark.png`});
+  await firstLoad.screenshot({path:`test-results/startup-loading/${engine.name()}-loaded-dark.png`});
   await firstLoad.locator('.view-header-overdue').evaluateAll(badges => badges.forEach(badge => badge.remove()));
   const withoutOverdue = await firstLoad.locator('.view-header').boundingBox();
   expect(Math.abs(withoutOverdue.height - loadedHeader.height)).toBeLessThan(1);
@@ -65,11 +71,11 @@ try {
    projectApp.resolve();
    await expect(projectPage.locator('.pwa-reminders-view[data-pwa-opening]')).toBeVisible();
    expect(await projectTitle.boundingBox()).toEqual(staticTitle);
-   await expect(projectPage.locator('.pwa-project-layer .pwa-reminders-skeleton__card')).toHaveCount(3);
+   await expect(projectPage.locator('.pwa-project-layer .crate-content-loading')).toHaveCount(1);
    const title = await projectTitle.elementHandle(), box = await title.boundingBox();
    projectList.resolve();
    await expect(projectPage.locator('.pwa-reminders-view:not([data-pwa-opening])')).toBeVisible();
-   await expect(projectPage.locator('.pwa-reminders-skeleton')).toHaveCount(0);
+   await expect(projectPage.locator('.crate-content-loading')).toHaveCount(0);
    expect(await title.evaluate(node => node.isConnected), 'project title stays mounted while its list loads').toBe(true);
    expect(await title.boundingBox()).toEqual(box);
   } finally { projectApp.resolve(); projectList.resolve(); await projectPage.close(); }
@@ -113,7 +119,7 @@ try {
    try {
     await expect(page.locator('.pwa-reminders-view')).toBeVisible();
     await expect(page.getByRole('status', { name: 'Loading reminders' })).toBeVisible();
-    await expect(page.locator('.pwa-reminders-skeleton__card')).toHaveCount(3);
+    await expect(page.locator('.crate-content-loading')).toHaveCount(1);
     await expect(page.locator('.reminders-empty-state')).toHaveCount(0);
     cachedTitle = await page.locator('.view-header-title').elementHandle();
     cachedSettings = await page.locator('.pwa-header-settings-button').elementHandle();
@@ -122,13 +128,13 @@ try {
      await expect(page.locator('.view-header-meta')).toHaveClass(/is-reserved/);
      const viewport = page.viewportSize();
      await page.setViewportSize({width:390,height:844});
-     await mkdir('test-results/startup-skeleton',{recursive:true});
-     await page.screenshot({path:`test-results/startup-skeleton/${engine.name()}-reminders.png`});
+     await mkdir('test-results/startup-loading',{recursive:true});
+     await page.screenshot({path:`test-results/startup-loading/${engine.name()}-reminders.png`});
      if (viewport) await page.setViewportSize(viewport);
     }
     expect(await page.evaluate(() => window.startupEmptyMessages)).toEqual([]);
    } finally { release(); }
-   await expect(page.locator('.pwa-reminders-skeleton')).toHaveCount(0);
+   await expect(page.locator('.crate-content-loading')).toHaveCount(0);
    expect(await cachedTitle.evaluate(node => node.isConnected), `${tab} title stays mounted during cache refresh`).toBe(true);
    expect(await cachedSettings.evaluate(node => node.isConnected), `${tab} settings stays mounted during cache refresh`).toBe(true);
    await expect(page.locator('.reminders-empty-state')).toHaveCount(0);

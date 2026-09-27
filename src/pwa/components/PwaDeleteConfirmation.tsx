@@ -17,7 +17,7 @@ export function PwaDeleteConfirmation({ id, message, isLoading, onClose, onConfi
 				onClose={onClose} closeDisabled={isLoading} preventFocusOnPress />
 			<div className="pwa-delete-confirmation-body">
 				<p id={`${id}-message`}>{message}</p>
-				<div className="pwa-delete-confirmation-actions">
+				<div className="crate-dialog-actions pwa-delete-confirmation-actions">
 					<PwaButton size="touch" disabled={isLoading} onClick={onClose}>Cancel</PwaButton>
 					<PwaButton variant="primary" tone="danger" size="touch" disabled={isLoading} onClick={onConfirm}>
 						{isLoading ? 'Deleting…' : 'Delete reminder'}

@@ -1,7 +1,9 @@
+import { usePwaPreferences } from './hooks/usePwaPreferences';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext, type CrateSection, type DockDestination } from './components/FeatureSwitcherButton';
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
+import { PwaThemeProvider } from './components/PwaThemeProvider';
 import { PwaThemeIcon } from './components/PwaThemeIcon';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { ReadingFeature } from './reading/ReadingFeature';
@@ -17,7 +19,7 @@ const MODE_TRANSITION_FALLBACK_MS = 1_000;
 
 export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 	const [settings] = useState(() => createSettingsStore(new URL(location.href).searchParams.get('setup') === 'shortcut'));
-	return <SettingsContext.Provider value={settings}><FeatureShellContent reminders={reminders} /></SettingsContext.Provider>;
+	return <PwaThemeProvider><SettingsContext.Provider value={settings}><FeatureShellContent reminders={reminders} /></SettingsContext.Provider></PwaThemeProvider>;
 }
 
 function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
@@ -27,13 +29,16 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const [destination, setDestination] = useState<DockDestination | null>(() => launch.tab === 'reading' ? { section: 'reading', tab: launch.readingTab } : null);
 	const [settingsOpen] = useSettingsOpen();
 	const [reminderDockIndex, rememberReminderDockIndex] = useState<number | null>(null);
-	const dockIndex = section === 'reading' ? 3 : reminderDockIndex;
+	const { preferences } = usePwaPreferences();
+	const dockIndex = section === 'reading' ? preferences.dockTabs.indexOf('reading') : reminderDockIndex;
 	const [readingTab, rememberReadingTab] = useState<ReadingSection>(() => launch.tab === 'reading' ? launch.readingTab : 'inbox');
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
 	const [visited, setVisited] = useState(() => new Set([section]));
-	useEffect(() => {
-		if (settingsOpen) setVisited(current => current.size === 2 ? current : new Set<CrateSection>(['reading', 'reminders']));
-	}, [settingsOpen]);
+	const settingsOpened = useCallback(() => {
+		// Initializing the other feature can load and render an entire library.
+		// Keep that work out of the sheet's entrance animation.
+		setVisited(current => current.size === 2 ? current : new Set<CrateSection>(['reading', 'reminders']));
+	}, []);
 	useEffect(() => {
 		// Keep launch preference resolution consistent with feature history and links.
 		if (launch.tab === 'reading' && currentSection() !== 'reading') {
@@ -116,8 +121,8 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		const panel = event.target as HTMLElement;
 		if (event.animationName === 'crate-mode-fade-out' && panel.dataset.crateSection === leavingSection) setLeavingSection(null);
 	}}>
-		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{(visited.has('reading') || settingsOpen) && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
-		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{(visited.has('reminders') || settingsOpen) && reminders}</FeatureNavigationContext.Provider></div>
-		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
+		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
+		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
 	</div></ThemeIconProvider>;
 }

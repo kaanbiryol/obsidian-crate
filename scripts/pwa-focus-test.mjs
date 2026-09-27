@@ -64,10 +64,24 @@ for (const browserType of [chromium, webkit]) {
 			await expect(page.locator('body')).toHaveCSS('position', 'fixed');
 			await expect(page.locator('.pwa-navigation-viewport')).toHaveAttribute('inert', '');
 			await expect(page.locator('.pwa-dock')).toHaveAttribute('inert', '');
-			await page.evaluate(() => {
+			const keyboardMotion = await page.evaluate(async () => {
+				const stage = document.querySelector('.pwa-reminder-sheet-stage');
 				window.keyboardViewportHeight = 510;
 				window.visualViewport.dispatchEvent(new Event('resize'));
+				const samples = [];
+				const start = performance.now();
+				while (performance.now() - start < 300) {
+					await new Promise(requestAnimationFrame);
+					if (getComputedStyle(stage).paddingBottom !== '334px') continue;
+					samples.push({ height: stage.offsetHeight, translate: getComputedStyle(stage).translate });
+				}
+				return samples;
 			});
+			assert.ok(keyboardMotion.length > 2, 'Keyboard motion must produce observable frames');
+			assert.equal(new Set(keyboardMotion.map(frame => frame.height)).size, 1,
+				'Keyboard motion must not change layout height every frame');
+			assert.ok(keyboardMotion.some(frame => frame.translate !== 'none'),
+				'Keyboard movement must remain animated after committing its final size');
 			const sheet = page.locator('.pwa-modal-sheet__container--reminder');
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
 			await expect(sheet).toHaveCSS('transform', 'none');
@@ -186,6 +200,42 @@ for (const browserType of [chromium, webkit]) {
 			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeHidden();
 			await expect(updatedCard).toBeHidden();
 			await expect(page.getByRole('group', { name: 'Unsaved deletion draft. Press Enter to edit reminder.', exact: true })).toBeHidden();
+			await page.getByRole('button', { name: 'Add reminder', exact: true }).tap();
+			await expect(title).toBeFocused();
+			await page.evaluate(() => {
+				window.keyboardViewportHeight = 510;
+				window.visualViewport.dispatchEvent(new Event('resize'));
+			});
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('translate', 'none');
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
+			// Closing the keyboard must keep the surface's bottom background covered.
+			const closingMotion = await page.evaluate(async () => {
+				const stage = document.querySelector('.pwa-reminder-sheet-stage');
+				const samples = [];
+				window.keyboardViewportHeight = 844;
+				window.visualViewport.dispatchEvent(new Event('resize'));
+				const start = performance.now();
+				while (performance.now() - start < 300) {
+					await new Promise(requestAnimationFrame);
+					const fill = document.querySelector('.pwa-keyboard-motion-fill');
+					if (fill) samples.push(fill.getBoundingClientRect().top - stage.getBoundingClientRect().bottom);
+				}
+				return samples;
+			});
+			assert.ok(closingMotion.length > 0, 'Closing keyboard must retain its background during motion');
+			assert.ok(closingMotion.every(gap => gap < 1), 'Keyboard motion must not expose a backdrop gap');
+			await expect(page.locator('.pwa-keyboard-motion-fill')).toHaveCount(0);
+			await page.emulateMedia({ reducedMotion: 'reduce' });
+			await page.evaluate(() => {
+				window.keyboardViewportHeight = 510;
+				window.visualViewport.dispatchEvent(new Event('resize'));
+			});
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
+			assert.equal(await page.locator('.pwa-reminder-sheet-stage').evaluate(element => element.getAnimations().length), 0,
+				'Reduced motion must skip keyboard displacement animation');
+			await page.getByRole('button', { name: 'Close reminder editor', exact: true }).tap();
+			await expect(page.getByRole('dialog', { name: 'New reminder', exact: true })).toHaveCount(0);
+			await expect(page.locator('.pwa-keyboard-motion-fill')).toHaveCount(0);
 			console.log(`${browserType.name()}: synchronous focus, discarded drafts, saving and keyboard-aware deletion passed`);
 		} finally {
 			await browser.close();

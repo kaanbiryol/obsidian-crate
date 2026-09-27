@@ -137,6 +137,7 @@ async function testUpdate(browser, launchMode) {
           button: document.querySelector('.pwa-update-button__label[aria-hidden="false"]').textContent,
           marker: sessionStorage.getItem(transitionKey),
           progress: new DOMMatrix(getComputedStyle(activity).transform).a,
+          icon: overlay.querySelector('img').getBoundingClientRect().toJSON(),
         }));
       });
     }, transitionKey);
@@ -151,6 +152,13 @@ async function testUpdate(browser, launchMode) {
     const transition = page.locator('#pwa-update-transition');
     await expect(transition.locator('.pwa-update-screen__title')).toHaveText('Updating Crate');
     await expect(transition.locator('.pwa-update-screen__detail')).toHaveText('Getting the latest version ready.');
+    const icon = transition.locator('img');
+    await expect(icon).toHaveAttribute('src', /^data:image\/png;base64,/);
+    expect(await icon.evaluate(image => image.complete && image.naturalWidth === 192)).toBe(true);
+    const restoredIcon = await icon.evaluate(image => image.getBoundingClientRect().toJSON());
+    expect(Math.abs(restoredIcon.y - beforeReload.icon.y)).toBeLessThan(1);
+    expect(restoredIcon.width).toBe(beforeReload.icon.width);
+    await transition.screenshot({ path: `test-results/update-transition/${browser.browserType().name()}-${savedTheme}.png` });
     const activity = transition.locator('.pwa-update-screen__activity span');
     const restoredProgress = await activity.evaluate(element => new DOMMatrix(getComputedStyle(element).transform).a);
     expect(restoredProgress).toBeGreaterThanOrEqual(beforeReload.progress - .001);
@@ -351,19 +359,37 @@ async function testLaunchUpdate(browser, mode) {
   await context.addInitScript(beforeVersion => {
     Object.defineProperty(navigator, 'standalone', { value: true });
     let exposedOldContent = false;
+    let viewportRuleAdded = false;
     new MutationObserver(() => {
+      // Model the app and fixed viewport having different heights under mobile chrome.
+      if (!viewportRuleAdded && document.styleSheets[0]) {
+        document.styleSheets[0].insertRule('.pwa-launch-splash.is-updating{height:calc(100% - 48px)}');
+        viewportRuleAdded = true;
+      }
       if (document.querySelector(`script[type="module"][src*="${beforeVersion}"]`)
         && document.querySelector('.pwa-reminders-view, .pwa-update-banner')) exposedOldContent = true;
       if (document.documentElement.dataset.pwaUpdating === 'prepare') {
         const launch = document.querySelector('.pwa-launch-splash .pwa-update-screen__activity span');
         const curtain = document.querySelector('#pwa-update-transition .pwa-update-screen__activity span');
-        if (launch && curtain) window.__updateProgressDifference = Math.abs(launch.getBoundingClientRect().width - curtain.getBoundingClientRect().width);
+        if (launch && curtain) {
+          window.__updateProgressDifference = Math.abs(launch.getBoundingClientRect().width - curtain.getBoundingClientRect().width);
+          const overlay = document.getElementById('pwa-update-transition');
+          const launchIcon = launch.closest('.pwa-update-screen').querySelector('img');
+          const curtainIcon = overlay.querySelector('img');
+          window.__updateHandoff = {
+            opacity: getComputedStyle(overlay).opacity,
+            iconOffset: Math.abs(launchIcon.getBoundingClientRect().top - curtainIcon.getBoundingClientRect().top),
+            sameSource: launchIcon.src === curtainIcon.src,
+            loaded: curtainIcon.complete && curtainIcon.naturalWidth === 192,
+          };
+        }
       }
     }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-pwa-updating'] });
     window.addEventListener('beforeunload', () => {
       sessionStorage.setItem('test-launch-exposed-content', String(exposedOldContent));
       if (typeof window.__updateProgressDifference === 'number') {
         sessionStorage.setItem('test-launch-progress-difference', String(window.__updateProgressDifference));
+        sessionStorage.setItem('test-launch-handoff', JSON.stringify(window.__updateHandoff));
       }
     });
   }, beforeVersion);
@@ -396,6 +422,9 @@ async function testLaunchUpdate(browser, mode) {
       const difference = await page.evaluate(() => sessionStorage.getItem('test-launch-progress-difference'));
       expect(difference).not.toBeNull();
       expect(Number(difference)).toBeLessThan(1);
+      const handoff = await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-launch-handoff')));
+      expect(handoff).toMatchObject({ opacity: '1', sameSource: true, loaded: true });
+      expect(handoff.iconOffset).toBeLessThan(1);
       expect(await page.locator('script[type="module"]').getAttribute('src')).toContain(afterVersion);
       await expect(page.locator('.pwa-update-banner')).toHaveCount(0);
     } else {

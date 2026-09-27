@@ -20,7 +20,7 @@ export interface RemindersSettings extends FeatureSettings {
 	recovery: ReactNode;
 }
 
-export interface ReadingSettings extends FeatureSettings {
+interface ReadingSettings extends FeatureSettings {
 	unavailable?: string;
 	shortcut: ReactNode;
 	issues: ReactNode;

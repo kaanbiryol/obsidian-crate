@@ -16,6 +16,7 @@ try {
 			await scenario(browser, verifyRejectedSaveRecovery);
 			await scenario(browser, verifyRejectedDeleteRecovery);
 			await scenario(browser, verifyLostAcknowledgement);
+			await scenario(browser, verifyExhaustedRetries);
 			console.log(`${browserType.name()}: optimistic mutations, retained drafts, rollback, reload recovery and idempotent retry passed`);
 		} finally {
 			await browser.close();
@@ -68,9 +69,9 @@ async function expectEditorClosed(page) {
 	await expect(page.locator('.pwa-modal-sheet__container--reminder')).toHaveCount(0);
 }
 
-async function expectSynced(page) {
-	await expect(page.locator('.pwa-sync-indicator')).toHaveCount(1);
-	await expect(page.locator('.pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'synced');
+async function expectSynced(page, indicator = page.locator('.pwa-navigation-viewport .pwa-sync-indicator')) {
+	await expect(indicator).toHaveCount(1);
+	await expect(indicator).toHaveAttribute('data-sync-state', 'synced');
 	await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 }
 
@@ -115,6 +116,7 @@ async function verifyImmediateUpdates(page) {
 		await save(page).click();
 		await create.wait();
 		await expectEditorClosed(page);
+		await expect(page.locator('.toast.is-success')).toHaveText('Reminder created');
 		await expect(card(page, 'Optimistic creation')).toBeVisible();
 		await expect(page.locator('.view-header .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'syncing');
 		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
@@ -165,11 +167,11 @@ async function verifyProjectSyncIndicator(page) {
 	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
 	await page.locator('[data-action="open-project"][data-project="Work"]').click();
 	const indicator = page.locator('.project-detail-header .pwa-sync-indicator');
-	const scroll = page.locator('.reminders-view-scroll');
+	const scroll = page.locator('.pwa-project-layer .reminders-view-scroll');
 	await expect(scroll).toHaveCount(1);
 	await expect(indicator).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
-	await expectSynced(page);
+	await expect(page.locator('.project-detail-header').getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
+	await expectSynced(page, indicator);
 	await indicator.getByRole('button').click();
 	await expect(page.locator('.toast')).toContainText('All changes synced');
 	const originalTop = (await scroll.boundingBox()).y;
@@ -191,12 +193,12 @@ async function verifyProjectSyncIndicator(page) {
 		await page.emulateMedia({ reducedMotion: 'reduce' });
 		await expect.poll(() => indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
 	} finally { mutation.finish(); }
-	await expectSynced(page);
+	await expectSynced(page, indicator);
 	expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
 	await page.context().setOffline(true);
 	await expect(indicator).toHaveAttribute('data-sync-state', 'offline');
 	await page.context().setOffline(false);
-	await expectSynced(page);
+	await expectSynced(page, indicator);
 }
 
 async function verifyRejectedSaveRecovery(page) {
@@ -213,6 +215,7 @@ async function verifyRejectedSaveRecovery(page) {
 	} finally { rejected.finish({ status: 400, error: 'This draft needs a correction' }); }
 	const notice = page.getByRole('region', { name: 'Not saved: Rejected draft title', exact: true });
 	await expect(notice).toBeVisible();
+	await expect(page.locator('.toast.is-error')).toHaveText('Reminder changes need attention. Review them in settings.');
 	await expect(page.locator('.pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'error');
 	await expect(notice.getByRole('button', { name: 'Retry: Rejected draft title', exact: true })).toBeEnabled();
 	await expect(notice.getByRole('button', { name: 'Edit: Rejected draft title', exact: true })).toBeEnabled();
@@ -270,6 +273,7 @@ async function verifyLostAcknowledgement(page) {
 		await expectEditorClosed(page);
 		const notice = page.getByRole('region', { name: 'Couldn’t sync: Saved despite lost acknowledgement', exact: true });
 		await expect(notice).toBeVisible();
+		await expect(page.locator('.toast.is-error')).toHaveCount(0);
 		await expect(card(page, 'Saved despite lost acknowledgement')).toHaveCount(1);
 		await notice.getByRole('button', { name: 'Retry: Saved despite lost acknowledgement', exact: true }).click();
 		await expect.poll(() => bodies.length).toBe(2);
@@ -281,6 +285,23 @@ async function verifyLostAcknowledgement(page) {
 	await page.reload();
 	await expect(card(page, 'Saved despite lost acknowledgement')).toHaveCount(1);
 	await expectSynced(page);
+}
+
+async function verifyExhaustedRetries(page) {
+	let attempts = 0;
+	await page.route(`${origin}/reminders/create`, route => {
+		attempts++;
+		return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Service temporarily unavailable' }) });
+	});
+	await page.locator('[data-action="open-create-modal"]').click();
+	await title(page).fill('Saved locally while service is unavailable');
+	await save(page).click();
+	await expectEditorClosed(page);
+	await expect.poll(() => attempts).toBe(1);
+	await expect(page.locator('.toast.is-error')).toHaveCount(0);
+	await expect.poll(() => attempts, { timeout: 12000 }).toBe(3);
+	await expect(page.locator('.toast.is-error')).toHaveText('Reminder changes need attention. Review them in settings.');
+	await expect(card(page, 'Saved locally while service is unavailable')).toBeVisible();
 }
 
 async function serverRecordCount(page, content) {

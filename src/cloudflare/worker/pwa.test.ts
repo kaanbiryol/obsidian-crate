@@ -417,7 +417,7 @@ describe('PWA activation metadata', () => {
 
 		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"><div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root"');
 		expect(html).toContain('data-pwa-launch-title>Schedule');
-		expect(html).toContain('pwa-reminders-skeleton__card');
+		expect(html).toContain('crate-content-loading__spinner');
 		expect(html).toContain('.pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}');
 		expect(html).not.toContain('pwa-launch-splash__label');
 		expect(html).not.toContain('pwa-bootstrap');

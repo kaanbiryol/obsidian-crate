@@ -1,3 +1,4 @@
+import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import React, { useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { PwaDockViewButton } from './PwaDockViewButton';
@@ -28,6 +29,8 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   disabled?: boolean;
   className?: string;
 }) {
+  const { preferences } = usePwaPreferences();
+  const tabs = preferences.dockTabs;
   const navigation = useContext(FeatureNavigationContext);
   const container = useRef<HTMLDivElement>(null);
   const [menuHeight, setMenuHeight] = useState(158);
@@ -47,7 +50,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   const readingTab = section === 'reading' ? activeTab : navigation?.readingTab ?? 'inbox';
   const groupItem = readingViews.find(item => item.id === readingTab) ?? readingViews[0];
   const activeReminderTab = activeTab === 'upcoming' ? 'today' : activeTab;
-  const activeIndex = section === 'reading' ? 3 : reminderTabs.findIndex(item => item.id === activeReminderTab);
+  const activeIndex = tabs.findIndex(tab => tab === (section === 'reading' ? 'reading' : activeReminderTab));
   const indicatorIndex = navigation?.dockIndex ?? activeIndex;
   const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
   useLayoutEffect(() => {
@@ -88,12 +91,13 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
     <Dialog.Root open={open} onOpenChange={value => { if (value) setOpen(true); else closeViews(); }} modal={!dragging}>
       <nav className="pwa-dock__bar" aria-label="Main navigation">
         <span ref={surface} className="pwa-dock__surface" aria-hidden="true" />
-        <span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: indicatorIndex < 0 ? 0 : undefined, width: 'calc((100% - 8px) / 4)', transform: `translateX(${indicatorIndex * 100}%)` }} />
-        {reminderTabs.map(item => <Button key={item.id} className={`pwa-dock__tab${section === 'reminders' && item.id === activeReminderTab ? ' is-active' : ''}`} data-dock-active={section === 'reminders' && item.id === activeReminderTab ? 'true' : undefined} aria-current={section === 'reminders' && item.id === activeReminderTab ? 'page' : undefined} aria-label={item.label} title={item.label} data-action="switch-tab" data-tab={item.id === 'browse' ? 'projects' : item.id} onClick={() => {
+        <span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: indicatorIndex < 0 ? 0 : undefined, width: `calc((100% - 8px) / ${tabs.length})`, transform: `translateX(${indicatorIndex * 100}%)` }} />
+        {tabs.map(tab => {
+          const item = reminderTabs.find(candidate => candidate.id === tab);
+          return item ? <Button key={item.id} className={`pwa-dock__tab${section === 'reminders' && item.id === activeReminderTab ? ' is-active' : ''}`} data-dock-active={section === 'reminders' && item.id === activeReminderTab ? 'true' : undefined} aria-current={section === 'reminders' && item.id === activeReminderTab ? 'page' : undefined} aria-label={item.label} title={item.label} data-action="switch-tab" data-tab={item.id === 'browse' ? 'projects' : item.id} onClick={() => {
           if (section === 'reminders') selectLocalTab(item.id);
           else navigation?.navigate({ section: 'reminders', tab: item.id });
-        }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button>)}
-        <PwaDockViewButton label={groupItem.label} icon={groupItem.iconName} active={section === 'reading'} open={open} inert={inert} onSelect={() => selectView(groupItem.id)} onOpen={() => setOpen(true)}
+        }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button> : <PwaDockViewButton key={tab} label={groupItem.label} icon={groupItem.iconName} active={section === 'reading'} open={open} inert={inert} onSelect={() => selectView(groupItem.id)} onOpen={() => setOpen(true)}
           onDragStart={() => { setDragging(true); setOpen(true); setPreviewTab(null); }}
           onDragMove={point => setPreviewTab(destinationAt(point))}
           onDragEnd={(point, moved) => {
@@ -102,7 +106,8 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
             if (tab !== null) selectView(tab);
             else if (moved) closeViews();
           }}
-          onDragCancel={closeViews} />
+          onDragCancel={closeViews} />;
+        })}
       </nav>
       <Dialog.Portal container={container} className="pwa-dock__portal">
         <Dialog.Backdrop className="pwa-dock__backdrop" />

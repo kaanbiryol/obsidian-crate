@@ -1,3 +1,4 @@
+import { applyOpeningDockPreferences } from '../dock-preferences';
 import { useCallback, useEffect, useState } from 'react';
 import { loadPwaPreferences, savePwaPreferences, PWA_PREFERENCES_KEY, type PwaPreferences } from '../preferences';
 
@@ -5,6 +6,7 @@ const CHANGED = 'crate-preferences-changed';
 
 export function usePwaPreferences() {
 	const [preferences, setPreferences] = useState(loadPwaPreferences);
+	useEffect(() => { applyOpeningDockPreferences(preferences.dockTabs); }, [preferences.dockTabs]);
 	useEffect(() => {
 		const changed = () => setPreferences(loadPwaPreferences());
 		const storage = (event: StorageEvent) => { if (event.key === PWA_PREFERENCES_KEY || event.key === null) changed(); };

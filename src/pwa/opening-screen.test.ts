@@ -35,7 +35,7 @@ it.each([
 	const isProject = Boolean(document.documentElement.dataset.pwaOpeningProject);
 	expect(document.querySelectorAll('[data-icon="settings"]')).toHaveLength(isProject ? 0 : 1);
 	expect(document.querySelectorAll('.pwa-dock svg')).toHaveLength(isProject ? 0 : 6);
-	expect(document.querySelectorAll(tab === 'reading' ? '.crate-reading__loading-row' : '.pwa-reminders-skeleton__card')).toHaveLength(tab === 'reading' ? 4 : 3);
+	expect(document.querySelectorAll('.crate-content-loading')).toHaveLength(1);
 	expect(document.querySelector('work')).toBeNull();
 });
 
@@ -44,4 +44,19 @@ it('escapes a project title in the React bootstrap shell', () => {
 	const { document } = parseHTML(createPwaOpeningScreenHtml(destination));
 	expect(document.querySelector('h1')?.textContent).toBe('<img src=x onerror=alert(1)>&$&');
 	expect(document.querySelector('img')).toBeNull();
+});
+
+it('applies custom dock order and visibility before React starts, including hidden launch targets', () => {
+  const { document } = parseHTML('<html><body></body></html>');
+  new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
+    document, URLSearchParams, location: { search: '?tab=today' },
+    localStorage: { getItem: () => JSON.stringify({ dockTabs: ['reading', 'inbox'] }) },
+  });
+  const style = document.documentElement.style;
+  expect(style.getPropertyValue('--pwa-dock-count')).toBe('2');
+  expect(style.getPropertyValue('--pwa-dock-reading-order')).toBe('0');
+  expect(style.getPropertyValue('--pwa-dock-inbox-order')).toBe('1');
+  expect(style.getPropertyValue('--pwa-dock-today-display')).toBe('none');
+  expect(style.getPropertyValue('--pwa-opening-dock-indicator')).toBe('0');
+  expect(document.documentElement.dataset.pwaOpeningTab).toBe('today');
 });

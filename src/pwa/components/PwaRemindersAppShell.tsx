@@ -14,7 +14,7 @@ import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
-import { PwaRemindersSkeletonRows } from './PwaRemindersSkeletonRows';
+import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
 import {
@@ -56,7 +56,7 @@ interface PwaRemindersAppShellProps {
 	backgroundInert?: boolean;
 	incomplete?: boolean;
 	checkingReminders?: boolean;
-	showLoadingSkeleton?: boolean;
+	showLoadingIndicator?: boolean;
 	initializing?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
@@ -87,7 +87,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	backgroundInert = false,
 	incomplete = false,
 	checkingReminders = false,
-	showLoadingSkeleton = false,
+	showLoadingIndicator = false,
 	initializing = false,
 	renderCard,
 	onAdd,
@@ -266,8 +266,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								title={primaryTab === 'today' ? 'Schedule' : currentHeader.title}
 								countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 								large
-								showMeta={!showLoadingSkeleton}
-								reserveMetaSpace={showLoadingSkeleton}
+								showMeta={!showLoadingIndicator}
+								reserveMetaSpace={showLoadingIndicator}
 								metaContent={headerMetaContent}
 								rightContent={headerRightContent?.(false)}
 							/>
@@ -284,7 +284,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						)}
 
 						<div className="reminders-content">
-							{showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : primaryTab === 'today' ? (
+							{showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : primaryTab === 'today' ? (
 								<PwaTabTransition viewKey={viewMode}>{viewPanels}</PwaTabTransition>
 							) : viewPanels}
 						</div>
@@ -305,7 +305,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									headerRightContent={headerRightContent?.(true)}
 									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
 									reminders={reminders}
-									loadingContent={showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : undefined}
+									loadingContent={showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : undefined}
 									onBack={handleBackToProjects}
 									animationConfig={{ enabled: !reduceMotion }}
 									renderCard={panelCardRenderer}

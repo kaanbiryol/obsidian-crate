@@ -1,3 +1,4 @@
+import { normalizeDockTabs, applyOpeningDockPreferences } from './dock-preferences';
 import { PWA_PREFERENCES_KEY } from './preferences';
 import { resolvePwaOpeningDestination } from './opening-destination';
 import type { StartTab } from './types';
@@ -19,7 +20,7 @@ export function createPwaOpeningDockHtml(tab?: StartTab | 'reading'): string {
 	// A cached HTML shell cannot embed request-specific state. Its selection
 	// comes from the early bootstrap; React can override it once enrollment resolves.
 	const index = tab ? ['inbox', 'today', 'browse', 'reading'].indexOf(tab === 'upcoming' ? 'today' : tab) : null;
-	return `<div class="crate-reminders-ui pwa-opening-dock"${tab ? ` data-opening-tab="${tab}" style="--pwa-opening-dock-index:${index};--pwa-opening-dock-indicator:${index === -1 ? 0 : 1}"` : ''} aria-hidden="true" inert>
+	return `<div class="crate-reminders-ui pwa-opening-dock"${tab ? ` data-opening-tab="${tab}" style="--pwa-opening-dock-index:var(--pwa-dock-${tab === 'upcoming' ? 'today' : tab}-order,${index});--pwa-opening-dock-indicator:var(--pwa-dock-${tab === 'upcoming' ? 'today' : tab}-indicator,${index === -1 ? 0 : 1})"` : ''} aria-hidden="true" inert>
 		<div class="pwa-dock pwa-dock--opening"><nav class="pwa-dock__bar">
 			<span class="pwa-dock__surface"></span><span class="pwa-dock__indicator"></span>
 			${Object.entries(icons).map(([id, icon]) => `<span class="pwa-dock__tab${id === 'reading' ? ' pwa-dock__group' : ''}" data-opening-destination="${id}">${icon}</span>`).join('')}
@@ -28,4 +29,4 @@ export function createPwaOpeningDockHtml(tab?: StartTab | 'reading'): string {
 }
 
 // This also runs for a service-worker shell whose HTML URL has no launch params.
-export const PWA_OPENING_DOCK_INIT_JS = `(()=>{let saved;try{saved=JSON.parse(localStorage.getItem(${JSON.stringify(PWA_PREFERENCES_KEY)})||'null')}catch{}const destination=(${resolvePwaOpeningDestination.toString()})(location.search,saved?.defaultScreen);const {tab,title,project}=destination;const root=document.documentElement;const index=['inbox','today','browse','reading'].indexOf(tab === 'upcoming' ? 'today' : tab);root.dataset.pwaOpeningTab=tab;root.dataset.pwaOpeningTitle=title;root.dataset.pwaOpeningProject=project||'';root.style.setProperty('--pwa-opening-dock-index',String(index));root.style.setProperty('--pwa-opening-dock-indicator',index<0?'0':'1')})();`;
+export const PWA_OPENING_DOCK_INIT_JS = `(()=>{let saved;try{saved=JSON.parse(localStorage.getItem(${JSON.stringify(PWA_PREFERENCES_KEY)})||'null')}catch{}const destination=(${resolvePwaOpeningDestination.toString()})(location.search,saved?.defaultScreen);const {tab,title,project}=destination;const root=document.documentElement;const tabs=(${normalizeDockTabs.toString()})(saved?.dockTabs);(${applyOpeningDockPreferences.toString()})(tabs);const index=tabs.indexOf(tab === 'upcoming' ? 'today' : tab);root.dataset.pwaOpeningTab=tab;root.dataset.pwaOpeningTitle=title;root.dataset.pwaOpeningProject=project||'';root.style.setProperty('--pwa-opening-dock-index',String(index));root.style.setProperty('--pwa-opening-dock-indicator',index<0?'0':'1')})();`;

@@ -197,8 +197,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						/>
 					) : undefined}
 					action={{
-						label: saving ? 'Saving…' : isEditing ? 'Save' : 'Add',
-						ariaLabel: saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder',
+						label: isEditing ? 'Save' : 'Add',
+						ariaLabel: isEditing ? 'Save reminder' : 'Add reminder',
 						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
 					}}
 				/>

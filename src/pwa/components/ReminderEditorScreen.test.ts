@@ -62,7 +62,9 @@ describe('PWA shared editor integration', () => {
 			expect(field).toContain('contentEditable="false"');
 			expect(field).toContain('aria-readonly="true"');
 		}
-		expect(markup).toContain('aria-label="Saving reminder"');
+		expect(button(markup, 'save-reminder')).toContain('aria-label="Save reminder"');
+		expect(markup).toContain('>Save</span>');
+		expect(markup).not.toContain('Saving');
 	});
 
 	it('blocks chip interaction without dimming chips during navigation', () => {
