@@ -68,7 +68,7 @@ export const UpcomingView = memo(function UpcomingView({
 
   return (
     <ReminderListLayout
-      className={className}
+      className={`reminders-upcoming-view ${className}`}
       hasFab={hasFab}
       hasContent={upcomingReminders.length > 0}
       renderCard={cardRenderer}

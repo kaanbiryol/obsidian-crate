@@ -1,0 +1,163 @@
+import { chromium, webkit, expect } from '@playwright/test';
+import { mkdir, readFile } from 'node:fs/promises';
+import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { switchFeature, installFeatureNavigation } from './pwa-feature-navigation.mjs';
+
+const assets = await buildPwaPreviewAssets();
+const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const origin = 'http://127.0.0.1:' + server.address().port;
+await mkdir('test-results/settings', { recursive: true });
+try {
+	for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
+		const browser = await engine.launch();
+		try {
+			const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce', serviceWorkers: 'block' });
+			const page = await context.newPage();
+			await installFeatureNavigation(page);
+			const errors = [];
+			page.on('pageerror', error => errors.push(error.message));
+			await page.route('**/reading/session', route => route.fulfill({ json: {
+				id: 'settings-test', folderPath: 'Reading', generation: 'settings-generation', expiresAt: Date.now() + 86400000,
+			} }));
+			await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+			await page.goto(origin + '/notifications?tab=inbox');
+			const gear = page.getByRole('button', { name: 'Open settings', exact: true });
+			await gear.click();
+			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
+			await expect(sheet).toBeVisible();
+			for (const title of ['General', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
+			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+			await expect(page.getByRole('dialog')).toHaveCount(1);
+			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
+			const days = sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' });
+			await days.fill('17'); await days.press('Tab');
+			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
+			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
+			await expect(sheet.getByRole('button', { name: 'System', exact: true })).toHaveAttribute('aria-pressed', 'false');
+			await sheet.getByRole('combobox', { name: 'Open to' }).selectOption('favorites');
+			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17 });
+			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
+			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			await expect(sheet).toHaveCount(0);
+			await expect(gear).toBeFocused();
+			await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText('Inbox');
+
+			await switchFeature(page, 'Reading');
+			await page.getByRole('searchbox', { name: 'Search reading' }).fill('retained query');
+			await gear.click();
+			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveValue('17');
+			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
+			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
+			const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
+			await expect(shortcut.getByRole('link', { name: 'Download Save to Crate' })).toBeVisible();
+			await expect(shortcut.getByRole('button', { name: 'Back to settings', exact: true })).toHaveCount(1);
+			await expect(shortcut.getByRole('button', { name: /Close/ })).toHaveCount(0);
+			await expect(shortcut.locator('.settings-main')).toHaveAttribute('inert', '');
+			await page.screenshot({ path: 'test-results/settings/' + name + '-shortcut.png' });
+			await shortcut.getByRole('button', { name: 'Back to settings', exact: true }).click();
+			await expect(sheet).toBeVisible();
+			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
+			// Exercise the spatial push/pop too, keeping the parent panel and scroll intact.
+			await page.emulateMedia({ reducedMotion: 'no-preference' });
+			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
+			const retainedScroll = await shortcut.locator('.settings-main').evaluate(element => element.scrollTop);
+			await expect.poll(() => shortcut.locator('.settings-detail').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
+			await page.keyboard.press('Escape');
+			await expect(sheet).toBeVisible();
+			await expect.poll(() => sheet.locator('.settings-main').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
+			expect(await sheet.locator('.settings-main').evaluate(element => element.scrollTop)).toBe(retainedScroll);
+			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
+			await page.emulateMedia({ reducedMotion: 'reduce' });
+			await sheet.getByRole('button', { name: /^Sync and device/ }).click();
+			await expect(sheet.getByText('Device storage', { exact: true })).toBeVisible();
+			await sheet.getByRole('button', { name: 'Refresh all', exact: true }).click();
+			await expect(sheet.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
+			await sheet.getByRole('button', { name: 'Dark', exact: true }).click();
+			await expect(sheet.getByRole('button', { name: 'Dark', exact: true })).toHaveClass(/is-active/);
+			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).not.toHaveClass(/is-active/);
+			await page.screenshot({ path: 'test-results/settings/' + name + '-dark-sync.png' });
+			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			await expect(gear).toBeFocused();
+			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');
+			await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', 'dark');
+
+			// The saved opening preference must select Reading before its first mount.
+			await page.goto(origin + '/notifications');
+			await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');
+			await expect(page.getByRole('heading', { name: 'Favorites', exact: true })).toBeVisible();
+			// Explicit notification and tab targets still win over the preference.
+			await page.goto(origin + '/notifications?tab=inbox');
+			await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText('Inbox');
+			await gear.click();
+			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+
+			// An inactive feature's saved work must be visible before a shared logout.
+			await page.evaluate(async () => {
+				const session = JSON.parse(localStorage.getItem('crate-reading-session-v1'));
+				const db = await new Promise((resolve, reject) => {
+					const request = indexedDB.open('crate-reading-v1', 1);
+					request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+				});
+				const tx = db.transaction('values', 'readwrite');
+				tx.objectStore('values').put([{ id: 'settings-pending', sessionId: session.id, action: 'capture',
+					intent: { url: 'https://example.com/pending', title: 'Keep this pending link' }, review: true, error: 'Saved Reading change needs review.' }], 'pending:' + session.id);
+				await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+				db.close(); window.dispatchEvent(new Event('crate-reading-change'));
+			});
+			await gear.click();
+			await expect(sheet.getByRole('status').filter({ hasText: 'Reading: 1 change needs attention' })).toBeVisible();
+			await sheet.getByRole('button', { name: 'Log out', exact: true }).click();
+			const logout = page.getByRole('dialog', { name: 'Log out of Crate?', exact: true });
+			await expect(logout.getByText(/unsynced or unverified changes/)).toBeVisible();
+			const downloading = page.waitForEvent('download');
+			await logout.getByRole('button', { name: 'Export Reading data', exact: true }).click();
+			const download = await downloading;
+			expect(download.suggestedFilename()).toBe('crate-reading-recovery.json');
+			const exported = await readFile(await download.path(), 'utf8');
+			expect(JSON.parse(exported)).toMatchObject({ format: 1, origin });
+			expect(exported).toContain('Keep this pending link');
+			await logout.getByRole('button', { name: 'Cancel', exact: true }).click();
+			await expect(sheet.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+			await page.setViewportSize({ width: 320, height: 568 });
+			await expect(sheet.getByRole('combobox', { name: 'Open to' })).toBeVisible();
+			expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+			await page.screenshot({ path: 'test-results/settings/' + name + '-compact.png' });
+			await page.setViewportSize({ width: 1280, height: 900 });
+			await page.screenshot({ path: 'test-results/settings/' + name + '-desktop.png' });
+			await sheet.getByRole('button', { name: 'Log out', exact: true }).click();
+			await logout.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expect.poll(() => page.evaluate(() => [localStorage.getItem('crate-reminders-auth-token'), localStorage.getItem('crate-reading-session-v1')])).toEqual([null, null]);
+			expect(errors).toEqual([]);
+			await context.close();
+			// Reading is optional: a disabled server feature is not an unsynced error.
+			const disabledContext = await browser.newContext({ serviceWorkers: 'block' });
+			const disabledPage = await disabledContext.newPage();
+			await disabledPage.route('**/reading/session', route => route.fulfill({ status: 403, json: { error: 'Reading is disabled. Enable it in Crate settings.' } }));
+			await disabledPage.goto(origin + '/notifications?tab=inbox');
+			await disabledPage.getByRole('button', { name: 'Open settings', exact: true }).click();
+			const disabledSheet = disabledPage.getByRole('dialog', { name: 'Settings', exact: true });
+			await disabledSheet.getByRole('button', { name: 'About', exact: true }).click();
+			await expect(disabledSheet.getByRole('button', { name: 'Update app', exact: true })).toBeEnabled();
+			await expect(disabledSheet.locator('.settings-attention')).toHaveCount(0);
+			await expect(disabledSheet.getByRole('button', { name: 'Set up iPhone shortcut', exact: true })).toBeDisabled();
+			await disabledContext.close();
+			const offlineContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, serviceWorkers: 'block' });
+			const offlinePage = await offlineContext.newPage();
+			await offlinePage.goto(origin + '/notifications?tab=inbox');
+			await offlinePage.getByRole('button', { name: 'Open settings', exact: true }).waitFor();
+			await offlineContext.setOffline(true);
+			await offlinePage.getByRole('button', { name: 'Open settings', exact: true }).click();
+			const offlineSheet = offlinePage.getByRole('dialog', { name: 'Settings', exact: true });
+			await expect(offlineSheet.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
+			await expect(offlineSheet.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
+			await offlineSheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			await expect(offlineSheet).toHaveCount(0);
+			await expect(offlinePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
+			await offlineContext.close();
+			console.log(name + ': unified settings, retained views, theme, launch preferences, pending export, and shared logout passed');
+		} finally { await browser.close(); }
+	}
+} finally { await new Promise(resolve => server.close(resolve)); }

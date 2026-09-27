@@ -83,6 +83,7 @@ async function checkIos27(browser, colorScheme, retainedTranslucent = false, sho
 	});
 	assert.equal((await header.boundingBox()).y, top, 'opaque header stays at the top while content scrolls');
 	await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+	await page.getByRole('button', { name: 'About', exact: true }).click();
 	await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible();
 	const backdrop = await page.locator('.pwa-modal-sheet__backdrop').boundingBox();
 	assert.ok(backdrop.y === 0 && backdrop.height === height, 'sheet covers the actual installed viewport');
@@ -161,6 +162,7 @@ try {
 				await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
 				await checkNavigation(page, reservedInset);
 				await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+				await page.getByRole('button', { name: 'About', exact: true }).click();
 				const copyButton = page.getByRole('button', { name: 'Copy diagnostics', exact: true });
 				await expect(copyButton).toBeVisible();
 				assert.ok(await copyButton.evaluate(button => button.scrollWidth <= button.clientWidth), 'diagnostics label fits inside its button');
@@ -176,6 +178,7 @@ try {
 				await copyButton.tap();
 				const fallback = page.getByRole('textbox', { name: 'Version diagnostics', exact: true });
 				await expect(fallback).toBeVisible();
+				await expect(fallback).toHaveCSS('min-height', '160px');
 				assert.equal(JSON.parse(await fallback.inputValue()).format, 'crate-version-diagnostics');
 				await page.close();
 			}

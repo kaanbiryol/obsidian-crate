@@ -5,7 +5,8 @@ import { PWA_OPENING_DOCK_INIT_JS } from './opening-dock';
 it.each([
 	['', null, 'today', '1'],
 	['', '{"defaultScreen":"inbox"}', 'inbox', '0'],
-	['?tab=upcoming', null, 'upcoming', '-1'],
+	['?tab=upcoming', null, 'upcoming', '1'],
+	['', '{"defaultScreen":"upcoming"}', 'upcoming', '1'],
 	['?tab=inbox', '{"defaultScreen":"browse"}', 'inbox', '0'],
 	['?project=Work&tab=inbox', null, 'browse', '2'],
 	['?section=reading&tab=today', null, 'reading', '3'],

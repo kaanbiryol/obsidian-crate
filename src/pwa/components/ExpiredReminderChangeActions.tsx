@@ -1,3 +1,4 @@
+import { downloadJson } from '../download';
 import { PwaButton as BaseButton } from './PwaButton';
 import React, { useState } from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
@@ -9,11 +10,7 @@ export function ExpiredReminderChangeActions({ change, onDiscard }: {
 	const [exportedChange, setExportedChange] = useState<string | null>(null);
 	const [reviewed, setReviewed] = useState(false);
 	const exportChange = () => {
-		const blob = new Blob([JSON.stringify({ format: 'crate-expired-reminder-change-v1', origin: window.location.origin, change }, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url; link.download = 'crate-expired-change.json'; link.click();
-		window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+		downloadJson('crate-expired-change.json', { format: 'crate-expired-reminder-change-v1', origin: window.location.origin, change });
 		setExportedChange(JSON.stringify(change)); setReviewed(false);
 	};
 	return <>

@@ -1,0 +1,30 @@
+@mixin styles {
+	.pwa-notice {
+		padding: 12px 12px 2px;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 12px;
+		background: var(--background-secondary);
+		flex-shrink: 0;
+	}
+
+	.pwa-notice__copy {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: var(--pwa-font-detail);
+		line-height: 1.4;
+		color: var(--text-muted);
+		overflow-wrap: anywhere;
+
+		strong { color: var(--text-normal); font-size: var(--pwa-font-body); }
+		summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
+		p { margin: 6px 0; white-space: pre-wrap; }
+	}
+
+	.pwa-notice__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin-left: -8px;
+	}
+}

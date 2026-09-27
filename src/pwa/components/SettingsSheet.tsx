@@ -1,209 +1,161 @@
-import { VersionSettings } from './VersionSettings';
-import { Toggle } from '@base-ui/react/toggle';
-import React, { useRef, useState } from 'react';
-import type { PwaPreferences } from '../preferences';
-import { PwaButton as Button } from './PwaButton';
-import {
-	Check,
-	ChevronDown,
-	LogOut,
-	Monitor,
-	Moon,
-	Sun,
-} from 'lucide-react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { LogOut } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PWA_NAVIGATION_SPRING } from '../motion';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
-import type { PwaThemePreference } from '../theme';
-import type { PushState, StoredConfig } from '../types';
+import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { PwaModalSheet } from './PwaModalSheet';
-import { HomeScreenInstallInstructions } from './HomeScreenInstall';
-import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
-
+import { PwaButton as Button } from './PwaButton';
+import { SettingsRow } from './SettingsRow';
+import { SettingsDisclosure } from './SettingsDisclosure';
+import { VersionSettings } from './VersionSettings';
 import { DeviceStorageSettings } from './DeviceStorageSettings';
+import { GeneralSettings } from './GeneralSettings';
+import { ReminderSettings } from './ReminderSettings';
+import { ReadingSettings } from '../reading/ReadingSettings';
+import { HomeScreenInstallInstructions } from './HomeScreenInstall';
+import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
+import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { useSheetTransition } from '../hooks/useSheetTransition';
+import { useSettingsStore } from '../settings-context';
+import { applyPwaUpdate } from '../apply-update';
+import type { PwaPreferences } from '../preferences';
+import type { CrateSection } from './FeatureSwitcherButton';
 
-export function SettingsSheet({
-	config,
-	homeScreenPlatform = null,
-	defaultScreen,
-	onPreferencesChange,
-	push,
-	themePreference,
-	loggingOut,
-	isClosing,
-	onClose,
-	onClosed,
-	onEnablePush,
-	onExportPendingChanges,
-	onThemePreferenceChange,
-	onLogout,
-}: {
-	config: StoredConfig;
-	homeScreenPlatform?: HomeScreenPlatform | null;
-	defaultScreen: PwaPreferences['defaultScreen'];
-	onPreferencesChange: (patch: Partial<PwaPreferences>) => void;
-	push: PushState;
-	themePreference: PwaThemePreference;
-	loggingOut: boolean;
-	isClosing: boolean;
-	onClose: () => void;
-	onClosed: () => void;
-	onEnablePush: () => void;
-	onExportPendingChanges?: () => void;
-	onThemePreferenceChange: (preference: PwaThemePreference) => void;
-	onLogout: () => void;
-}) {
-	const [upcomingDraft, setUpcomingDraft] = useState(String(config.upcomingDays));
-	const defaultScreenPointerSelection = useRef(false);
-	const notificationDescription = push.status
-		?? (push.phase === 'enabled' ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
-	return (
-		<PwaModalSheet
-			isOpen={!isClosing}
-			onClose={onClose}
-			onCloseEnd={onClosed}
-			variant="settings"
-			label="Settings"
-			dismissible={!loggingOut && !isClosing}
-		>
-			<aside className="settings-sheet outline-none" aria-busy={loggingOut || isClosing} tabIndex={-1}>
-				<ModalHeader
-					title="Settings"
-					closeLabel="Close settings"
-					closeDisabled={loggingOut || isClosing}
-					onClose={onClose}
-				/>
-				<div className="settings-panel">
-					{homeScreenPlatform && <HomeScreenInstallInstructions platform={homeScreenPlatform} />}
-					<section className="settings-panel__section" aria-labelledby="settings-appearance-title">
-						<h3 id="settings-appearance-title" className="settings-panel__title">Appearance</h3>
+export function SettingsSheet({ activeSection, onReviewReminders }: { activeSection: CrateSection; onReviewReminders: () => void }) {
+	const store = useSettingsStore();
+	const { reminders, reading } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+	const { preferences, updatePreferences } = usePwaPreferences();
+	const homeScreen = useHomeScreenInstall();
+	const keyboardInset = useKeyboardHeight();
+	const finish = useCallback(() => store.setOpen(false), [store]);
+	const transition = useSheetTransition(finish);
+	const [page, setPage] = useState<'settings' | 'shortcut' | 'logout'>(() => new URL(location.href).searchParams.get('setup') === 'shortcut' ? 'shortcut' : 'settings');
+	const [syncOpen, setSyncOpen] = useState(false);
+	const [busy, setBusy] = useState(false);
+	const working = useRef(false);
+	const [message, setMessage] = useState<string | null>(null);
+	const panelRef = useRef<HTMLDivElement>(null);
+	const reducedMotion = useReducedMotion();
+	const [subpage, setSubpage] = useState<'shortcut' | 'logout' | null>(page === 'settings' ? null : page);
+	const backRef = useRef<HTMLDivElement>(null);
+	const returnFocus = useRef<HTMLElement | null>(null);
+	const ready = Boolean(reminders?.ready && reading?.ready);
+	const unsynced = !ready || Boolean(reminders?.unsynced || reading?.unsynced);
+	const attention = [reminders?.connected && reminders.attention ? 'Reminders: ' + reminders.attention : null, reading?.attention ? 'Reading: ' + reading.attention : null].filter(Boolean);
+	const status = !ready ? 'Checking…' : attention.length ? 'Needs attention'
+		: [reminders, reading].some(model => model?.connected && model.status.state === 'offline') ? 'Offline'
+		: [reminders, reading].some(model => model?.connected && model.status.state !== 'synced') ? 'Changes pending'
+		: reminders?.connected || reading?.connected ? 'All changes synced' : 'Not connected';
+	const navigate = (next: typeof page) => {
+		setMessage(null);
+		if (next !== 'settings') {
+			setSubpage(next);
+			returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		}
+		setPage(next);
+		requestAnimationFrame(() => {
+			if (next !== 'settings' && backRef.current) backRef.current.scrollTop = 0;
+			if (next === 'settings' && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+			else backRef.current?.closest('aside')?.querySelector<HTMLElement>('[aria-label="Back to settings"]')?.focus({ preventScroll: true });
+		});
+	};
+	const run = async (action: () => void | Promise<unknown>) => {
+		if (working.current) return;
+		working.current = true; setBusy(true); setMessage(null);
+		try { await action(); }
+		catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not complete this action. Try again.'); }
+		finally { working.current = false; setBusy(false); }
+	};
+	const changePreferences = (patch: Partial<PwaPreferences>) => {
+		try { updatePreferences(patch); setMessage(null); }
+		catch { setMessage('Could not save settings on this device.'); }
+	};
+	const refreshAll = async () => {
+		const results = await Promise.allSettled([reminders?.connected ? reminders.onRefresh() : Promise.resolve(), reading?.onRefresh()]);
+		const failure = results.find(result => result.status === 'rejected');
+		if (failure?.status === 'rejected') throw failure.reason;
+	};
+	const exports = <>
+		{reminders?.onExport && <Button size="touch" className="settings-action-button" disabled={busy} onClick={() => void run(reminders.onExport!)}>Export unsynced reminders</Button>}
+		{reading?.onExport && <Button size="touch" className="settings-action-button" disabled={busy} onClick={() => void run(reading.onExport!)}>Export Reading data</Button>}
+	</>;
+	const updateApp = async () => {
+		const applied = await applyPwaUpdate(undefined, { canApply: () => {
+			const current = store.getSnapshot();
+			return Boolean(current.reminders?.ready && current.reading?.ready && !current.reminders.unsynced && !current.reading.unsynced);
+		} });
+		if (!applied) setMessage('Update paused. Finish syncing or review pending changes, then try again.');
+	};
+	const close = () => {
+		if (busy) return false;
+		if (page !== 'settings') { navigate('settings'); return false; }
+		transition.requestClose();
+		return true;
+	};
+	const title = page === 'shortcut' ? 'Set up iPhone shortcut' : page === 'logout' ? 'Log out of Crate?' : 'Settings';
+	return <PwaModalSheet isOpen={!transition.isClosing} onClose={close} onCloseEnd={transition.finishClose}
+		variant="settings" label={title} dismissible={!busy && !transition.isClosing} keyboardInset={keyboardInset}>
+		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
+			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
+				closeDisabled={busy || transition.isClosing} onClose={close} />
+			{message && <p className="settings-feedback" role="alert">{message}</p>}
+			<div className="settings-stack" data-base-ui-swipe-ignore="">
+				<motion.div ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
+					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '0%' : '-25%', opacity: page === 'settings' ? 1 : 0 }}
+					transition={reducedMotion ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
+					{attention.length > 0 && <div className="settings-attention" role="status">
+						{attention.map(text => <p key={text}>{text}</p>)}
+						<Button size="touch" variant="ghost" onClick={() => { setSyncOpen(true); requestAnimationFrame(() => panelRef.current?.querySelector('.settings-disclosure')?.scrollIntoView({ block: 'nearest' })); }}>Review sync</Button>
+					</div>}
+					<GeneralSettings preferences={preferences} onChange={changePreferences} />
+					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
+					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
+					<SettingsDisclosure title="Sync and device" summary={status} open={syncOpen} onOpenChange={setSyncOpen}>
 						<div className="settings-group">
-							<div className="settings-row settings-row--theme">
-								<div className="settings-row__copy">
-									<strong>Theme</strong>
-									<span>Choose a theme or follow this device.</span>
-								</div>
-								<div className="settings-theme-picker" role="group" aria-label="Theme">
-									{([
-										{ value: 'system', label: 'System', icon: Monitor },
-										{ value: 'light', label: 'Light', icon: Sun },
-										{ value: 'dark', label: 'Dark', icon: Moon },
-									] satisfies Array<{ value: PwaThemePreference; label: string; icon: typeof Monitor }>).map((option) => {
-										const Icon = option.icon;
-										const active = themePreference === option.value;
-										return (
-											<Toggle
-												key={option.value}
-												className={`settings-theme-option${active ? ' is-active' : ''}`}
-												type="button"
-												data-theme={option.value}
-												pressed={active}
-												onPressedChange={() => onThemePreferenceChange(option.value)}
-											>
-												<Icon size={15} />
-												<span>{option.label}</span>
-											</Toggle>
-										);
-									})}
-								</div>
-							</div>
-						</div>
-					</section>
-
-					<section className="settings-panel__section" aria-labelledby="settings-reminders-title">
-						<h3 id="settings-reminders-title" className="settings-panel__title">Reminders</h3>
-						<div className="settings-group">
-							<label className="settings-row settings-row--preference"
-								onPointerDownCapture={() => { defaultScreenPointerSelection.current = true; }}
-							>
-								<span className="settings-row__copy"><strong>Default screen</strong><span>Shown when Crate opens.</span></span>
-								<span className="settings-preference-control settings-preference-control--select">
-								<select className="settings-preference-input" value={defaultScreen}
-									onKeyDown={() => { defaultScreenPointerSelection.current = false; }}
-									onChange={(event) => {
-										onPreferencesChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] });
-										// Native touch menus leave the select focused after a choice.
-										if (defaultScreenPointerSelection.current) event.currentTarget.blur();
-									}}
-								>
-									<option value="today">Today</option>
-									<option value="inbox">Inbox</option>
-									<option value="upcoming">Upcoming</option>
-									<option value="browse">Browse</option>
-								</select>
-								<ChevronDown size={14} aria-hidden="true" />
-								</span>
-							</label>
-							<label className="settings-row settings-row--preference">
-								<span className="settings-row__copy"><strong>Upcoming range</strong><span>Days ahead to show.</span></span>
-								<span className="settings-preference-control settings-preference-control--days">
-								<input aria-label="Upcoming range (days)" className="settings-preference-input" type="number" inputMode="numeric" min={1} step={1} value={upcomingDraft}
-									onChange={(event) => setUpcomingDraft(event.currentTarget.value)}
-									onBlur={() => {
-										const days = Number(upcomingDraft);
-										if (Number.isSafeInteger(days) && days >= 1) {
-											onPreferencesChange({ upcomingDays: days });
-											setUpcomingDraft(String(days));
-										} else setUpcomingDraft(String(config.upcomingDays));
-									}}
-									onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-								/>
-								<span className="settings-preference-unit" aria-hidden="true">days</span>
-								</span>
-							</label>
-						</div>
-					</section>
-
-					<section className="settings-panel__section" aria-labelledby="settings-notifications-title">
-						<h3 id="settings-notifications-title" className="settings-panel__title">Notifications</h3>
-						<div className="settings-group">
-							<div className="settings-row">
-								<div className="settings-row__copy">
-									<strong>Push notifications</strong>
-									<span aria-live="polite">{notificationDescription}</span>
-								</div>
-								{push.phase === 'enabled' ? (
-									<span className="settings-status is-success"><Check size={12} /> On</span>
-								) : push.phase === 'checking' ? (
-									<span className="settings-status" role="status">Checking…</span>
-								) : push.phase === 'blocked' ? (
-									<span className="settings-status">Blocked</span>
-								) : homeScreenPlatform === 'ios' || push.phase === 'install' ? (
-									<span className="settings-status">Install first</span>
-								) : push.phase === 'off' || push.phase === 'error' ? (
-									<Button className="settings-action-button" type="button" data-action="enable-push" onClick={onEnablePush}>
-										{push.phase === 'error' ? 'Retry' : 'Enable'}
-									</Button>
-								) : (
-									<span className="settings-status">Not supported</span>
-								)}
-							</div>
-						</div>
-					</section>
-
-					<section className="settings-panel__section" aria-labelledby="settings-sync-title">
-						<h3 id="settings-sync-title" className="settings-panel__title">Sync</h3>
-						<div className="settings-group">
+							<SettingsRow title="Reminders" description={!reminders?.ready ? 'Checking…' : reminders.connected ? reminders.status.label : 'Not connected'} />
+							<SettingsRow title="Reading" description={reading?.unavailable ?? (!reading?.ready ? 'Checking…' : reading.connected ? reading.status.label : 'Not connected')} />
+							{reading?.issues}
 							<DeviceStorageSettings />
-							{onExportPendingChanges && <div className="settings-row">
-								<Button className="settings-action-button" type="button" onClick={onExportPendingChanges}>Export unsynced reminders</Button>
-							</div>}
-							<div className="settings-row settings-row--value">
-								<span>Folder</span>
-								<strong title={config.folderPath}>{config.folderPath}</strong>
-							</div>
-							<div className="settings-row settings-row--value">
-								<span>All-day alert</span>
-								<strong>{config.allDayNotificationTime ?? 'Not set'}</strong>
-							</div>
+							{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
 						</div>
-					</section>
-
-					<VersionSettings />
-
-					<Button variant="ghost" tone="danger" className="settings-logout-button" type="button" data-action="logout" isDisabled={loggingOut} onClick={onLogout}>
-						<LogOut size={16} /> {loggingOut ? 'Logging out...' : 'Log out'}
-					</Button>
-				</div>
-			</aside>
-		</PwaModalSheet>
-	);
+						<div className="settings-actions">
+							<Button size="touch" className="settings-action-button" disabled={busy || !ready} onClick={() => void run(refreshAll)}>Refresh all</Button>
+							{exports}
+							{reminders?.attention && <Button size="touch" className="settings-action-button" onClick={() => { finish(); onReviewReminders(); }}>Review reminders</Button>}
+						</div>
+						{reminders?.recovery}
+						{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
+					</SettingsDisclosure>
+					<SettingsDisclosure title="About">
+						<VersionSettings />
+						<Button size="touch" className="settings-action-button" disabled={busy || unsynced} onClick={() => void run(updateApp)}>Update app</Button>
+						{unsynced && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
+					</SettingsDisclosure>
+					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={busy || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
+				</motion.div>
+				<motion.div ref={backRef} className="settings-panel settings-detail" onAnimationComplete={() => { if (page === 'settings') setSubpage(null); }} inert={page === 'settings'} aria-hidden={page === 'settings'}
+					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '100%' : '0%', opacity: reducedMotion && page === 'settings' ? 0 : 1 }}
+					transition={reducedMotion ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
+				{subpage === 'shortcut' && <div className="crate-reading settings-subpage">
+					{reading?.shortcut ?? <p>{reading?.ready ? 'Connect Reading in Obsidian to set up the shortcut.' : 'Loading Reading settings…'}</p>}
+				</div>}
+				{subpage === 'logout' && <div className="settings-subpage">
+					<p>This logs out of Reading and Reminders and clears their offline data and drafts from this device. Your synced data stays on the server.</p>
+					{unsynced && <p className="settings-attention">There are unsynced or unverified changes on this device. Export and review them before logging out.</p>}
+					<div className="settings-actions">{exports}</div>
+					{reminders?.recovery}
+					<div className="settings-actions">
+						<Button size="touch" disabled={busy} onClick={() => navigate('settings')}>Cancel</Button>
+						<Button size="touch" tone="danger" disabled={busy || !ready} onClick={() => void run(async () => {
+							const model = activeSection === 'reading' && reading?.connected ? reading : reminders?.connected ? reminders : reading;
+							if (!model) throw new Error('Settings are still loading.');
+							await model.onLogout();
+						})}>{busy ? 'Logging out…' : 'Log out and clear device data'}</Button>
+					</div>
+				</div>}
+				</motion.div>
+			</div>
+		</aside>
+	</PwaModalSheet>;
 }

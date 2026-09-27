@@ -143,7 +143,7 @@
     }
 }
 
-.reminders-view.is-upcoming {
+.reminders-view .reminders-upcoming-view {
     .space-y-6 > :not([hidden]) ~ :not([hidden]) {
         margin-top: 18px;
     }

@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton } from './PwaButton';
 import React from 'react';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 
@@ -18,10 +18,10 @@ export function PwaDeleteConfirmation({ id, message, isLoading, onClose, onConfi
 			<div className="pwa-delete-confirmation-body">
 				<p id={`${id}-message`}>{message}</p>
 				<div className="pwa-delete-confirmation-actions">
-					<BaseButton type="button" disabled={isLoading} onClick={onClose}>Cancel</BaseButton>
-					<BaseButton type="button" className="is-destructive" disabled={isLoading} onClick={onConfirm}>
+					<PwaButton size="touch" disabled={isLoading} onClick={onClose}>Cancel</PwaButton>
+					<PwaButton variant="primary" tone="danger" size="touch" disabled={isLoading} onClick={onConfirm}>
 						{isLoading ? 'Deleting…' : 'Delete reminder'}
-					</BaseButton>
+					</PwaButton>
 				</div>
 			</div>
 		</section>

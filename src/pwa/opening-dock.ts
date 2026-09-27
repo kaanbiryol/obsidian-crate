@@ -1,10 +1,12 @@
 import { PWA_PREFERENCES_KEY } from './preferences';
+import { resolvePwaOpeningDestination } from './opening-destination';
 import type { StartTab } from './types';
 
 // Static, build-owned chrome for the HTML shell and React loading screens.
 // The SVG paths match the Lucide icons in PwaDock; browser coverage compares
 // their rendered geometry with the interactive dock at the loading handoff.
-const svg = (name: string, paths: string, extra = '', size = 20) => `<svg data-icon="${name}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${paths}</svg>`;
+export const openingIconSvg = (name: string, paths: string, extra = '', size = 20) => `<svg data-icon="${name}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${paths}</svg>`;
+const svg = openingIconSvg;
 const icons = {
 	inbox: svg('inbox', '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
 	today: svg('calendar', '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
@@ -16,7 +18,7 @@ const icons = {
 export function createPwaOpeningDockHtml(tab?: StartTab | 'reading'): string {
 	// A cached HTML shell cannot embed request-specific state. Its selection
 	// comes from the early bootstrap; React can override it once enrollment resolves.
-	const index = tab ? ['inbox', 'today', 'browse', 'reading'].indexOf(tab) : null;
+	const index = tab ? ['inbox', 'today', 'browse', 'reading'].indexOf(tab === 'upcoming' ? 'today' : tab) : null;
 	return `<div class="crate-reminders-ui pwa-opening-dock"${tab ? ` data-opening-tab="${tab}" style="--pwa-opening-dock-index:${index};--pwa-opening-dock-indicator:${index === -1 ? 0 : 1}"` : ''} aria-hidden="true" inert>
 		<div class="pwa-dock pwa-dock--opening"><nav class="pwa-dock__bar">
 			<span class="pwa-dock__surface"></span><span class="pwa-dock__indicator"></span>
@@ -26,4 +28,4 @@ export function createPwaOpeningDockHtml(tab?: StartTab | 'reading'): string {
 }
 
 // This also runs for a service-worker shell whose HTML URL has no launch params.
-export const PWA_OPENING_DOCK_INIT_JS = `(()=>{let tab='today';try{const saved=JSON.parse(localStorage.getItem(${JSON.stringify(PWA_PREFERENCES_KEY)})||'null');if(['inbox','today','upcoming','browse'].includes(saved?.defaultScreen))tab=saved.defaultScreen}catch{}const params=new URLSearchParams(location.search);if(['inbox','today','upcoming','browse'].includes(params.get('tab')))tab=params.get('tab');if(params.get('project'))tab='browse';if(params.get('section')==='reading')tab='reading';const root=document.documentElement;const index=['inbox','today','browse','reading'].indexOf(tab);root.dataset.pwaOpeningTab=tab;root.style.setProperty('--pwa-opening-dock-index',String(index));root.style.setProperty('--pwa-opening-dock-indicator',index<0?'0':'1')})();`;
+export const PWA_OPENING_DOCK_INIT_JS = `(()=>{let saved;try{saved=JSON.parse(localStorage.getItem(${JSON.stringify(PWA_PREFERENCES_KEY)})||'null')}catch{}const destination=(${resolvePwaOpeningDestination.toString()})(location.search,saved?.defaultScreen);const {tab,title,project}=destination;const root=document.documentElement;const index=['inbox','today','browse','reading'].indexOf(tab === 'upcoming' ? 'today' : tab);root.dataset.pwaOpeningTab=tab;root.dataset.pwaOpeningTitle=title;root.dataset.pwaOpeningProject=project||'';root.style.setProperty('--pwa-opening-dock-index',String(index));root.style.setProperty('--pwa-opening-dock-indicator',index<0?'0':'1')})();`;

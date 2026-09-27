@@ -1,4 +1,4 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { Button as BaseButton } from '@/ui/shared/Button';
 import React from 'react';
 import { SyncIndicator, type SyncIndicatorState } from '../../ui/shared/SyncIndicator';
 

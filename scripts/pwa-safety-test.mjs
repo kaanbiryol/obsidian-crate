@@ -41,6 +41,7 @@ try {
 			expect(new Set(updateBodies).size).toBe(1);
 			await one.getByRole('button', { name: 'Open settings', exact: true }).click();
 			await one.getByRole('button', { name: 'Log out', exact: true }).click();
+    await one.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
 			await expect.poll(() => one.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBe(null);
 			await expect.poll(() => revocations).toBe(1);
 			await expect(two.getByRole('group', { name: pendingCardName, exact: true })).toHaveCount(0);

@@ -1,4 +1,6 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { downloadJson } from '../download';
+import { PwaButton } from './PwaButton';
+import { PwaNotice } from './PwaNotice';
 import React from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 
@@ -9,27 +11,16 @@ export function ReminderRecoveryNotice({ changes, folderPath, onResume }: {
 }) {
 	if (!changes.length) return null;
 	const exportChanges = () => {
-		const blob = new Blob([JSON.stringify({ format: 'crate-reminder-recovery-v1', origin: window.location.origin,
-			folderPath, changes }, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = 'crate-saved-changes.json';
-		link.click();
-		window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+		downloadJson('crate-saved-changes.json', { format: 'crate-reminder-recovery-v1', origin: window.location.origin, folderPath, changes });
 	};
-	return <section className="pwa-reminder-sync-error" aria-label="Saved changes from an earlier session">
-		<div className="pwa-reminder-sync-error__copy">
-			<strong>Saved changes need your review</strong>
-			<span role="status">{changes.length} {changes.length === 1 ? 'change was' : 'changes were'} kept when your earlier session ended. Resume to check what already synced and retry the rest.</span>
-			<details><summary>Review saved changes</summary>{changes.map(change => <p key={change.operationId}>
-				{change.optimistic?.content || change.previous?.content || change.modal?.draft.content || change.project || 'Reminder'}
-				{change.modal?.draft.description ? ` — ${change.modal.draft.description}` : ''}
-			</p>)}</details>
-		</div>
-		<div className="pwa-reminder-sync-error__actions">
-			<BaseButton type="button" onClick={onResume}>Resume saved changes</BaseButton>
-			<BaseButton type="button" onClick={exportChanges}>Export saved changes</BaseButton>
-		</div>
-	</section>;
+	return <PwaNotice title="Saved changes need your review" aria-label="Saved changes from an earlier session" actions={<>
+		<PwaButton variant="ghost" size="touch" onClick={onResume}>Resume saved changes</PwaButton>
+		<PwaButton variant="ghost" size="touch" onClick={exportChanges}>Export saved changes</PwaButton>
+	</>}>
+		<span role="status">{changes.length} {changes.length === 1 ? 'change was' : 'changes were'} kept when your earlier session ended. Resume to check what already synced and retry the rest.</span>
+		<details><summary>Review saved changes</summary>{changes.map(change => <p key={change.operationId}>
+			{change.optimistic?.content || change.previous?.content || change.modal?.draft.content || change.project || 'Reminder'}
+			{change.modal?.draft.description ? ` — ${change.modal.draft.description}` : ''}
+		</p>)}</details>
+	</PwaNotice>;
 }

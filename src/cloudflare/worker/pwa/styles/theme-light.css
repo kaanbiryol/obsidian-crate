@@ -1,19 +1,11 @@
 :root{
 	--pwa-launch-bg:#f7f7f8;
-	--bg:#f7f7f8;
-	--panel:#ffffff;
-	--panel-2:#f2f2f4;
-	--panel-3:#e9e9ed;
-	--line:rgba(24,24,27,.12);
-	--line-soft:rgba(24,24,27,.075);
-	--text:#18181b;
+	--pwa-control-surface:#f2f2f4;
+	--pwa-control-active-surface:#e9e9ed;
+	--pwa-line-soft:rgba(24,24,27,.075);
 	--text-muted:#52525b;
 	--text-faint:#66666f;
-	--accent:#6d28d9;
 	--accent-rgb:109,40,217;
-	--accent-strong:#6d28d9;
-	--danger:#b42318;
-	--success:#166534;
 	--background-primary:#f7f7f8;
 	--background-primary-alt:#ffffff;
 	--background-secondary:#f0f0f3;
@@ -35,19 +27,19 @@
 	--interactive-normal:rgba(24,24,27,.04);
 	--interactive-hover:rgba(24,24,27,.07);
 	--pwa-sheet-surface:#f7f7f8;
-	--pwa-light-surface:#ffffff;
+	--pwa-light-surface:var(--background-primary-alt);
 	--pwa-light-surface-soft:rgba(255,255,255,.78);
 	--pwa-light-surface-subtle:rgba(24,24,27,.035);
 	--pwa-light-surface-hover:rgba(24,24,27,.065);
-	--pwa-light-border:rgba(24,24,27,.11);
-	--pwa-light-border-strong:rgba(24,24,27,.18);
-	--pwa-light-accent-text:#6d28d9;
-	--pwa-light-danger-text:#b42318;
-	--pwa-light-warning-text:#92400e;
-	--pwa-light-success-text:#166534;
+	--pwa-light-border:var(--background-modifier-border);
+	--pwa-light-border-strong:var(--background-modifier-border-hover);
+	--pwa-light-accent-text:var(--interactive-accent);
+	--pwa-light-danger-text:var(--text-error);
+	--pwa-light-warning-text:var(--text-warning);
+	--pwa-light-success-text:var(--text-success);
 	--pwa-light-placeholder:#6c6c75;
 	--pwa-tabbar-surface:rgba(247,247,248,.92);
-	--shadow:0 18px 48px rgba(24,24,27,.12);
+	--pwa-floating-shadow:0 18px 48px rgba(24,24,27,.12);
 	--shadow-s:0 2px 8px rgba(24,24,27,.08);
 	--shadow-l:0 25px 50px -12px rgba(24,24,27,.18);
 	color-scheme:light;
@@ -59,8 +51,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-top-notices{background:var(--background-primary)}
 .pwa-status-line,.pwa-notification-prompt{background:rgba(255,255,255,.76);border-color:var(--background-modifier-border);color:var(--text-normal)}
 .pwa-status-line.is-live{background:var(--pwa-light-surface-soft)}
-.pwa-status-line.is-offline,.pwa-status-line.is-cached,.pwa-status-line.is-error{background:rgba(146,64,14,.08);border-color:rgba(146,64,14,.2);color:var(--pwa-light-warning-text)}
-.pwa-update-banner__icon{color:var(--pwa-light-accent-text)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage,.modal-card,.settings-sheet{background:var(--pwa-sheet-surface);border-color:var(--background-modifier-border)}
 .pwa-modal-sheet{color:var(--text-normal);color-scheme:light}
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.18)}
@@ -73,12 +63,10 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 	--text-faint:#aaaaaa;
 	--crate-divider:#e0e0e0;
 }
-.pwa-picker-sheet.pwa-project-picker-sheet,.pwa-picker-sheet.pwa-date-picker-sheet,.pwa-picker-sheet.pwa-repeat-picker-sheet{background:var(--pwa-sheet-surface)}
 .settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
 .settings-row+.settings-row{border-color:var(--pwa-light-border)}
 .crate-progress-meter{background:var(--background-modifier-border)}
 .premium-project-chevron{opacity:.65}
-.premium-project-stat-done,.premium-project-stat-complete,.project-detail-stat-done,.settings-status.is-success{color:var(--pwa-light-success-text)}
 .settings-theme-picker{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border)}
 .settings-theme-option{color:var(--text-muted)}
 .settings-theme-option:hover{background:var(--pwa-light-surface-hover);color:var(--text-normal)}

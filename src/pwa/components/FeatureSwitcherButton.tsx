@@ -7,6 +7,7 @@ export type CrateSection = 'reading' | 'reminders';
 export type DockDestination = { section: 'reading'; tab: ReadingSection } | { section: 'reminders'; tab: TabId };
 export const FeatureNavigationContext = createContext<{
   section: CrateSection;
+  active: boolean;
   toggle: () => void;
   destination: DockDestination | null;
   navigate: (destination: DockDestination) => void;

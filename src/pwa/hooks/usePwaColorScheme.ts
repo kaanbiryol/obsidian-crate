@@ -6,6 +6,7 @@ import {
 	PWA_LIGHT_SCHEME_MEDIA,
 	PWA_LIGHT_THEME_STYLE_ID,
 	PWA_THEME_COLOR_META_ID,
+	PWA_THEME_PREFERENCE_KEY,
 	preferredPwaColorScheme,
 	resolvePwaColorScheme,
 	savePwaThemePreference,
@@ -39,6 +40,15 @@ export function usePwaColorScheme(): {
 	const [themePreference, setThemePreferenceState] = useState<PwaThemePreference>(() => loadPwaThemePreference());
 	const [systemScheme, setSystemScheme] = useState<PwaColorScheme>(() => preferredPwaColorScheme());
 	const colorScheme = resolvePwaColorScheme(themePreference, systemScheme);
+	useEffect(() => {
+		const changed = (event: Event) => {
+			if (event instanceof StorageEvent && event.key !== null && event.key !== PWA_THEME_PREFERENCE_KEY) return;
+			setThemePreferenceState(event instanceof CustomEvent ? event.detail as PwaThemePreference : loadPwaThemePreference());
+		};
+		window.addEventListener('crate-theme-changed', changed);
+		window.addEventListener('storage', changed);
+		return () => { window.removeEventListener('crate-theme-changed', changed); window.removeEventListener('storage', changed); };
+	}, []);
 
 	useEffect(() => {
 		const preference = window.matchMedia(PWA_LIGHT_SCHEME_MEDIA);
@@ -61,6 +71,7 @@ export function usePwaColorScheme(): {
 	const setThemePreference = useCallback((preference: PwaThemePreference) => {
 		savePwaThemePreference(preference);
 		setThemePreferenceState(preference);
+		window.dispatchEvent(new CustomEvent('crate-theme-changed', { detail: preference }));
 	}, []);
 
 	return { colorScheme, themePreference, setThemePreference };

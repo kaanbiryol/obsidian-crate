@@ -3,14 +3,13 @@ import { parseCrateServerInfo, type CrateServerInfo } from '@/protocol';
 import release from '@/cloudflare/server-release.json';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { fetchPwaAssetVersion } from '../api';
-import { PwaButton } from './PwaButton';
+import { CopyableText } from '@/ui/shared/CopyableText';
+import { SettingsRow } from './SettingsRow';
 
 export function VersionSettings() {
 	const [server, setServer] = useState<CrateServerInfo | null>(null);
 	const [asset, setAsset] = useState<string | null>(null);
 	const [checking, setChecking] = useState(true);
-	const [copyStatus, setCopyStatus] = useState('');
-	const [showDiagnostics, setShowDiagnostics] = useState(false);
 	const diagnostics = JSON.stringify({
 		format: 'crate-version-diagnostics', webAppRevision: release.revision, webAppBuild: PWA_ASSET_VERSION,
 		serverRevision: server?.serverRevision ?? null, serverBuild: asset,
@@ -32,29 +31,17 @@ export function VersionSettings() {
 		}).finally(() => window.clearTimeout(timer));
 		return () => { active = false; controller.abort(); window.clearTimeout(timer); };
 	}, []);
-	return <section className="settings-panel__section" aria-labelledby="settings-about-title">
-		<h3 id="settings-about-title" className="settings-panel__title">About</h3>
-		<div className="settings-group">
-			<div className="settings-row settings-row--value"><span>Web app</span><strong title={PWA_ASSET_VERSION}>Revision {release.revision} · {PWA_ASSET_VERSION.slice(0, 8)}</strong></div>
-			<div className="settings-row settings-row--value"><span>Server</span><strong title={asset ?? undefined}>{checking ? 'Checking…' : server?.serverRevision ? `Revision ${server.serverRevision}${asset ? ` · ${asset.slice(0, 8)}` : ''}` : 'Version unavailable'}</strong></div>
-			<div className="settings-row"><div className="settings-row__copy">
-				<span>{checking ? 'Checking web app build…' : asset ? asset === PWA_ASSET_VERSION
-					? 'This web app matches the server build.' : 'This web app differs from the server build. An update may be waiting to load.'
-					: 'Build comparison unavailable while the server cannot be reached.'}</span>
-			</div></div>
-			<div className="settings-row settings-row--diagnostics"><div className="settings-row__copy"><span role="status">{copyStatus || 'Version details for troubleshooting.'}</span></div>
-				<PwaButton className="settings-action-button" type="button" onClick={async () => {
-					try {
-						await navigator.clipboard.writeText(diagnostics);
-						setShowDiagnostics(false);
-						setCopyStatus('Version details copied.');
-					} catch {
-						setShowDiagnostics(true);
-						setCopyStatus('Select and copy the version details below.');
-					}
-				}}>Copy diagnostics</PwaButton>
-				{showDiagnostics && <textarea className="settings-diagnostics-text" aria-label="Version diagnostics" readOnly value={diagnostics} onFocus={event => event.currentTarget.select()} />}
-			</div>
-		</div>
-	</section>;
+	return <div className="settings-group">
+		<SettingsRow className="settings-row--value"><span>Web app</span><strong title={PWA_ASSET_VERSION}>Revision {release.revision} · {PWA_ASSET_VERSION.slice(0, 8)}</strong></SettingsRow>
+		<SettingsRow className="settings-row--value"><span>Server</span><strong title={asset ?? undefined}>{checking ? 'Checking…' : server?.serverRevision ? `Revision ${server.serverRevision}${asset ? ` · ${asset.slice(0, 8)}` : ''}` : 'Version unavailable'}</strong></SettingsRow>
+		<SettingsRow description={checking ? 'Checking web app build…' : asset ? asset === PWA_ASSET_VERSION
+				? 'This web app matches the server build.' : 'This web app differs from the server build. An update may be waiting to load.'
+				: 'Build comparison unavailable while the server cannot be reached.'} />
+		<SettingsRow className="settings-row--diagnostics">
+			<CopyableText value={diagnostics} label="Version diagnostics" copyLabel="Copy diagnostics"
+				description="Version details for troubleshooting." successMessage="Version details copied."
+				failureMessage="Select and copy the version details below."
+				fieldClassName="settings-diagnostics-text" buttonClassName="settings-action-button" />
+		</SettingsRow>
+	</div>;
 }

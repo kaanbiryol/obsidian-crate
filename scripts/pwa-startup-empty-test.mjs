@@ -1,4 +1,4 @@
-import { checkEarlyLaunchTheme, checkLaunchThemes } from './pwa-launch-theme-checks.mjs';
+import { checkEarlyLaunchTheme, checkLaunchThemes, checkReadingOpening } from './pwa-launch-theme-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -14,6 +14,7 @@ try {
  try {
   await checkEarlyLaunchTheme(browser, assets);
   await checkLaunchThemes(browser, origin);
+  await checkReadingOpening(browser, origin);
   const firstLoad = await browser.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});
   let releaseFirstLoad;
   const heldFirstLoad = new Promise(resolve => { releaseFirstLoad = resolve; });
@@ -45,7 +46,7 @@ try {
   expect(Math.abs(loadedTitle.y - openingGeometry.title.y)).toBeLessThan(1);
   expect(Math.abs(loadedTitle.height - openingGeometry.title.height)).toBeLessThan(1);
   expect(Math.abs(loadedHeader.height - openingGeometry.header.height)).toBeLessThan(1);
-  await expect(firstLoad.locator('.pwa-navigation-viewport .pwa-tab-panel:not([data-leaving])')).toHaveCSS('opacity', '1');
+  await expect(firstLoad.locator('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])')).toHaveCSS('opacity', '1');
   await firstLoad.screenshot({path:`test-results/startup-skeleton/${engine.name()}-loaded-dark.png`});
   await firstLoad.locator('.view-header-overdue').evaluateAll(badges => badges.forEach(badge => badge.remove()));
   const withoutOverdue = await firstLoad.locator('.view-header').boundingBox();
@@ -53,11 +54,17 @@ try {
   await firstLoad.close();
   const projectPage = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const projectList = Promise.withResolvers();
+  const projectApp = Promise.withResolvers();
+  await projectPage.route('**/notifications/app.js*', async route => { await projectApp.promise; await route.continue(); });
   await projectPage.route('**/reminders/list?*', async route => { await projectList.promise; await route.continue(); });
   try {
-   await projectPage.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&project=Work`);
+   await projectPage.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&project=Work`, { waitUntil: 'commit' });
    const projectTitle = projectPage.locator('.project-detail-title');
    await expect(projectTitle).toHaveText('Work');
+   const staticTitle = await projectTitle.boundingBox();
+   projectApp.resolve();
+   await expect(projectPage.locator('.pwa-reminders-view[data-pwa-opening]')).toBeVisible();
+   expect(await projectTitle.boundingBox()).toEqual(staticTitle);
    await expect(projectPage.locator('.pwa-project-layer .pwa-reminders-skeleton__card')).toHaveCount(3);
    const title = await projectTitle.elementHandle(), box = await title.boundingBox();
    projectList.resolve();
@@ -65,7 +72,7 @@ try {
    await expect(projectPage.locator('.pwa-reminders-skeleton')).toHaveCount(0);
    expect(await title.evaluate(node => node.isConnected), 'project title stays mounted while its list loads').toBe(true);
    expect(await title.boundingBox()).toEqual(box);
-  } finally { projectList.resolve(); await projectPage.close(); }
+  } finally { projectApp.resolve(); projectList.resolve(); await projectPage.close(); }
    for (const tab of ['today', 'inbox', 'upcoming', 'browse']) {
    const page = await browser.newPage({ serviceWorkers: 'block' });
    await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${tab}`);

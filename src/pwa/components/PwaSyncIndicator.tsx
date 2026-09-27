@@ -15,7 +15,7 @@ interface PwaSyncIndicatorProps {
 	onShowStatus: (label: string) => void;
 }
 
-function syncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: PwaSyncIndicatorProps): { state: SyncIndicatorState; label: string } {
+export function reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: Omit<PwaSyncIndicatorProps, 'onShowStatus'>): { state: SyncIndicatorState; label: string } {
 	const pendingCount = changes.filter(change => change.status === 'pending').length;
 	const errorCount = changes.length - pendingCount;
 	const pendingLabel = `${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'}`;
@@ -36,5 +36,5 @@ function syncStatus({ changes, isOffline, refreshing, loading, dataMode, error, 
 
 /** Stable header space keeps background saves from moving the reminder list. */
 export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
-	return <PwaSyncStatusIndicator {...syncStatus(props)} onShowStatus={props.onShowStatus} />;
+	return <PwaSyncStatusIndicator {...reminderSyncStatus(props)} onShowStatus={props.onShowStatus} />;
 }

@@ -1,0 +1,60 @@
+@use "../../ui/shared/styles/fields";
+@use "../../ui/shared/styles/view-header";
+@use "../../ui/shared/styles/controls";
+@use "../../ui/shared/styles/modal-header";
+@use "../../ui/shared/styles/modal-layout";
+@use "../../ui/shared/styles/delete-confirmation";
+@use "../../ui/shared/styles/tokens";
+@use "settings";
+@use "notice";
+
+// Shared PWA theme and controls. Feature styles only own their content/layout.
+.crate-reminders-ui {
+	@include tokens.styles;
+	--crate-view-title-size: 30px;
+	--crate-view-title-weight: 700;
+	--crate-view-title-spacing: -.04em;
+	--crate-view-title-leading: 1.12;
+	--pwa-header-top-gap: 17px;
+	--pwa-header-bottom-gap: 11px;
+	--pwa-header-meta-height: 28px;
+	--pwa-header-meta-gap: 6px;
+	--crate-view-header-padding: var(--pwa-header-top-gap) 18px var(--pwa-header-bottom-gap);
+	@media (max-width: 759px) {
+		--crate-view-title-size: 26px;
+		--crate-view-title-spacing: -.03em;
+		--pwa-header-top-gap: 4px;
+		--pwa-header-bottom-gap: 8px;
+		--pwa-header-meta-height: 20px;
+		--pwa-header-meta-gap: 0px;
+	}
+	@include controls.styles;
+	@include fields.styles;
+	@include notice.styles;
+	@include view-header.styles;
+	@include modal-header.styles;
+	@include modal-layout.styles;
+	@include delete-confirmation.styles;
+
+	&.pwa-shadow-root, &.pwa-reading-root {
+		--crate-tab-active-color: var(--text-accent, var(--interactive-accent));
+		--crate-tab-active-bg: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+	}
+}
+
+// One header geometry for live screens and loading shells. Safe-area ownership
+// stays with each host screen: Reading insets its wrapper, Reminders its header.
+// The host selector takes precedence over shared .reminders-view.is-primary
+// geometry even when a feature stylesheet is loaded after this foundation.
+.crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) :is(.pwa-reminders-view.is-primary, .pwa-opening-screen, .crate-reading-web) .view-header {
+	min-height: 0;
+	.view-header-title {
+		font-size: var(--crate-view-title-size);
+		font-weight: var(--crate-view-title-weight);
+		letter-spacing: var(--crate-view-title-spacing);
+		line-height: var(--crate-view-title-leading);
+	}
+	.view-header-meta { height: var(--pwa-header-meta-height); min-height: var(--pwa-header-meta-height); margin-top: var(--pwa-header-meta-gap); }
+	.view-header-title-row { min-height: 44px; }
+	.view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
+}

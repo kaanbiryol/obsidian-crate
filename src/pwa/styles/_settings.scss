@@ -1,0 +1,67 @@
+.pwa-settings-root {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+
+	.settings-sheet--unified {
+		height: min(760px, calc(100dvh - env(safe-area-inset-top) - 28px - var(--pwa-sheet-keyboard-inset, 0px)));
+	}
+	.settings-stack { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+	.settings-panel { position: absolute; inset: 0; gap: 0; padding: 12px 20px calc(20px + env(safe-area-inset-bottom)); }
+	.settings-detail { background: var(--pwa-sheet-surface); }
+	.settings-panel[inert] { pointer-events: none; }
+	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; }
+	.settings-feedback { margin: 0; padding: 12px 20px; }
+	.settings-navigation-row {
+		display: flex; justify-content: space-between; width: 100%; min-height: 48px;
+		padding: 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; text-align: left; font-weight: var(--reminder-font-weight-medium);
+	}
+	.settings-navigation-row:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
+	.settings-navigation-row:active { background: var(--crate-control-active-bg); }
+	.settings-navigation-row svg { color: var(--text-faint); }
+	.settings-row__copy > strong { font-weight: var(--reminder-font-weight-medium); }
+	.settings-theme-option svg { display: none; }
+	.settings-theme-option { font-weight: var(--reminder-font-weight-medium); }
+	.settings-theme-picker { background: var(--crate-control-bg); border-color: var(--crate-divider); box-shadow: none; }
+	.settings-preference-input { background: transparent; border-color: transparent; box-shadow: none; text-align: right; }
+	.settings-preference-control--days { background: transparent; border-color: transparent; box-shadow: none; }
+	.settings-preference-control--days input { width: 52px; }
+	.settings-help { margin: 0 0 12px; }
+	.settings-main { display: flex; flex-direction: column; }
+	.settings-panel__section { padding: 12px 0; border-bottom: 1px solid var(--crate-divider); }
+	.settings-panel__title { margin: 0 0 6px; font-weight: var(--reminder-font-weight-medium); }
+	.settings-group { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+	.settings-row { padding: 8px 0; min-height: 48px; }
+	.settings-row + .settings-row { border: 0; }
+	.settings-row--theme { flex-direction: row; align-items: center; }
+	.settings-theme-picker { flex: 0 1 240px; }
+	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
+	.settings-value { color: var(--text-muted); font-size: var(--pwa-font-control); }
+	.settings-disclosure { border-bottom: 1px solid var(--crate-divider); }
+	.settings-disclosure__trigger {
+		display: flex; align-items: center; justify-content: space-between; gap: 12px;
+		width: 100%; min-height: 52px; padding: 12px 0;
+		background: transparent; border: 0; border-radius: 0; color: var(--text);
+		font: inherit; text-align: left; touch-action: manipulation;
+	}
+	.settings-disclosure__summary { display: flex; align-items: center; gap: 8px; color: var(--text-faint); font-size: var(--pwa-font-caption); text-align: right; }
+	.settings-disclosure__summary svg { flex: 0 0 auto; }
+	.settings-disclosure__trigger[data-panel-open] svg { transform: rotate(90deg); }
+	.settings-disclosure__panel { padding-bottom: 16px; }
+	.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
+	.settings-actions > button { max-width: 100%; white-space: normal; }
+	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-detail); line-height: 1.45; overflow-wrap: anywhere; }
+	.settings-feedback { color: var(--crate-danger); }
+	.settings-attention { color: var(--text-muted); }
+	.settings-attention p { margin: 8px 0; }
+	.settings-help { color: var(--text-faint); }
+	.settings-logout-button { margin-top: 16px; align-self: flex-start; }
+	.settings-subpage { min-width: 0; }
+
+	@media (max-width: 420px) {
+		.settings-theme-picker { flex: 0 1 216px; }
+		.settings-theme-option { padding-inline: 6px; }
+		.settings-preference-control--select { flex-basis: 140px; width: 140px; }
+	}
+}

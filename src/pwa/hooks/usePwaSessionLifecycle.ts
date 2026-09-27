@@ -42,7 +42,6 @@ export async function performPwaLogout({
 export function usePwaSessionLifecycle({
 	apiFetch,
 	cancelModalClose,
-	cancelSettingsClose,
 	disablePushNotifications,
 	handleUnauthorizedRef,
 	resetReminderState,
@@ -55,7 +54,6 @@ export function usePwaSessionLifecycle({
 }: {
 	apiFetch: ApiFetch;
 	cancelModalClose: () => void;
-	cancelSettingsClose: () => void;
 	disablePushNotifications: () => Promise<void>;
 	handleUnauthorizedRef: MutableRefObject<() => void>;
 	resetReminderState: () => void;
@@ -83,7 +81,6 @@ export function usePwaSessionLifecycle({
 		invalidatePwaSession();
 		setAuthToken(nextToken);
 		resetReminderState();
-		cancelSettingsClose();
 		cancelModalClose();
 		setSettingsOpen(false);
 		setModal(null);
@@ -100,7 +97,6 @@ export function usePwaSessionLifecycle({
 		}
 	}, [
 		cancelModalClose,
-		cancelSettingsClose,
 		resetReminderState,
 		setAuthToken,
 		setModal,

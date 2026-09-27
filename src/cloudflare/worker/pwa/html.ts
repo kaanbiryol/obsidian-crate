@@ -4,7 +4,8 @@ import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
-import { createPwaOpeningDockHtml, PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';
+import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';
+import { createPwaOpeningScreenHtml, PWA_OPENING_SCREEN_INIT_JS } from '../../../pwa/opening-screen';
 import { PWA_UPDATE_SCREEN_HTML } from '../../../pwa/update-screen';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,
@@ -54,7 +55,8 @@ ${PWA_LIGHT_THEME_STYLES}
 </head>
 <body>
 	<div id="pwa-update-transition" role="status" aria-live="polite">${PWA_UPDATE_SCREEN_HTML}</div>
-	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningDockHtml()}</div></div>
+	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningScreenHtml()}</div></div>
+	<script nonce="${nonce}" id="pwa-opening-screen-init">${PWA_OPENING_SCREEN_INIT_JS}</script>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;

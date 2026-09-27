@@ -162,6 +162,7 @@ async function testInstall(browser, launchMode) {
 
   await home.getByRole('button', { name: 'Open settings', exact: true }).click();
   await home.getByRole('button', { name: 'Log out', exact: true }).click();
+    await home.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => home.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
   await home.goto(launchUrl);
   await home.getByRole('button', { name: 'Open Obsidian', exact: true }).waitFor();
@@ -175,6 +176,7 @@ async function testInstall(browser, launchMode) {
   // Logging out in Safari must discard the outstanding install handoff too.
   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
   expect(await safari.cookies()).toEqual([]);
   expect(new URL(page.url()).searchParams.has('token')).toBe(false);
@@ -210,6 +212,7 @@ async function testConcurrentEnrollment(browser) {
     await expect.poll(() => exchanges.length).toBe(2);
     await two.getByRole('button', { name: 'Open settings', exact: true }).click();
     await two.getByRole('button', { name: 'Log out', exact: true }).click();
+    await two.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
     await expect.poll(() => two.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
     await pending.fulfill({ response: await pending.fetch() });
     await one.getByRole('button', { name: 'Open Obsidian', exact: true }).waitFor();

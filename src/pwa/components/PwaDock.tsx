@@ -14,7 +14,8 @@ const readingViews = [
   { id: 'favorites', label: 'Favorites', iconName: 'star' },
   { id: 'archived', label: 'Archive', iconName: 'archive' },
 ] as const;
-const reminderTabs = TABS.filter(item => item.id !== 'upcoming');
+const reminderTabs = TABS.filter(item => item.id !== 'upcoming')
+  .map(item => ({ ...item, label: item.id === 'today' ? 'Schedule' : item.label }));
 
 /** PWA navigation; shared feature panels supply their destinations and actions. */
 export function PwaDock<T extends string>({ section, items, activeTab, onTabChange, onAdd, inert = false, disabled = false, className = '' }: {
@@ -45,7 +46,8 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   const [previewTab, setPreviewTab] = useState<ReadingSection | null>(null);
   const readingTab = section === 'reading' ? activeTab : navigation?.readingTab ?? 'inbox';
   const groupItem = readingViews.find(item => item.id === readingTab) ?? readingViews[0];
-  const activeIndex = section === 'reading' ? 3 : reminderTabs.findIndex(item => item.id === activeTab);
+  const activeReminderTab = activeTab === 'upcoming' ? 'today' : activeTab;
+  const activeIndex = section === 'reading' ? 3 : reminderTabs.findIndex(item => item.id === activeReminderTab);
   const indicatorIndex = navigation?.dockIndex ?? activeIndex;
   const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
   useLayoutEffect(() => {
@@ -87,7 +89,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
       <nav className="pwa-dock__bar" aria-label="Main navigation">
         <span ref={surface} className="pwa-dock__surface" aria-hidden="true" />
         <span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: indicatorIndex < 0 ? 0 : undefined, width: 'calc((100% - 8px) / 4)', transform: `translateX(${indicatorIndex * 100}%)` }} />
-        {reminderTabs.map(item => <Button key={item.id} className={`pwa-dock__tab${section === 'reminders' && item.id === activeTab ? ' is-active' : ''}`} data-dock-active={section === 'reminders' && item.id === activeTab ? 'true' : undefined} aria-current={section === 'reminders' && item.id === activeTab ? 'page' : undefined} aria-label={item.label} title={item.label} data-action="switch-tab" data-tab={item.id === 'browse' ? 'projects' : item.id} onClick={() => {
+        {reminderTabs.map(item => <Button key={item.id} className={`pwa-dock__tab${section === 'reminders' && item.id === activeReminderTab ? ' is-active' : ''}`} data-dock-active={section === 'reminders' && item.id === activeReminderTab ? 'true' : undefined} aria-current={section === 'reminders' && item.id === activeReminderTab ? 'page' : undefined} aria-label={item.label} title={item.label} data-action="switch-tab" data-tab={item.id === 'browse' ? 'projects' : item.id} onClick={() => {
           if (section === 'reminders') selectLocalTab(item.id);
           else navigation?.navigate({ section: 'reminders', tab: item.id });
         }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button>)}

@@ -1,0 +1,91 @@
+@mixin styles {
+  .pwa-schedule-switcher {
+    flex-shrink: 0;
+    padding: 4px 16px 2px;
+
+    &[hidden] { display: none; }
+  }
+
+  .pwa-schedule-control {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: max-content;
+    max-width: 100%;
+    padding-inline: 4px;
+
+    // The 32px track and 28px selection sit inside 44px touch targets.
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      z-index: -1;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    &::before {
+      inset: 6px 0;
+      border: 1px solid color-mix(in srgb, var(--text-normal) 5%, transparent);
+      background: var(--background-primary-alt);
+
+      @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        background: color-mix(in srgb, var(--background-primary-alt) 55%, transparent);
+        backdrop-filter: blur(10px) saturate(1.05);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+      }
+    }
+
+    &::after {
+      inset: 8px auto 8px 4px;
+      width: calc((100% - 8px) / 2);
+      background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+      transform: translateX(0);
+      transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
+    }
+
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+      &::before { background: var(--background-primary-alt); border-color: var(--text-muted); backdrop-filter: none; -webkit-backdrop-filter: none; }
+      &::after { background: var(--pwa-control-active-surface); border: 1px solid var(--text-muted); }
+    }
+
+    @media (prefers-reduced-motion: reduce) { &::after { transition: none; } }
+  }
+
+  .pwa-schedule-switcher[data-value="upcoming"] .pwa-schedule-control::after {
+    transform: translateX(100%);
+  }
+
+  .pwa-schedule-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-family: var(--reminder-font-ui);
+    font-size: 13px;
+    font-weight: var(--reminder-font-weight-normal);
+    line-height: 1.3;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 160ms ease;
+
+    &[aria-pressed="true"] { color: var(--text-normal); }
+    @media (hover: hover) { &:hover { color: var(--text-normal); } }
+    &:active { opacity: .65; }
+    &:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -4px; }
+    @media (prefers-reduced-motion: reduce) { transition: none; }
+  }
+
+  // Keep the heading and date choices on the same uninterrupted surface.
+  .pwa-reminders-view .pwa-tab-panel:has(> .pwa-schedule-switcher) .view-header,
+  .pwa-opening-screen:has(.pwa-schedule-switcher:not([hidden])) .view-header {
+    border-bottom-color: transparent;
+  }
+}

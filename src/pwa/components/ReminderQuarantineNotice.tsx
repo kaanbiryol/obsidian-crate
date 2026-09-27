@@ -1,4 +1,6 @@
+import { downloadJson } from '../download';
 import { PwaButton as BaseButton } from './PwaButton';
+import { PwaNotice } from './PwaNotice';
 import React, { useState } from 'react';
 import type { QuarantinedReminderEntry } from '../reminder-outbox-storage';
 
@@ -14,12 +16,10 @@ export function ReminderQuarantineNotice({ entries, folderPath, onRemove, kind =
 	if (!entries.length) return null;
 	const exportEntries = () => {
 		const snapshot = entries.map(entry => ({ ...entry }));
-		const blob = new Blob([JSON.stringify({ format: kind === 'draft' ? 'crate-saved-reminder-draft-v1' : 'crate-damaged-reminder-changes-v1', origin: window.location.origin,
-			folderPath, entries: snapshot }, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url; link.download = kind === 'draft' ? 'crate-saved-draft.json' : 'crate-damaged-changes.json'; link.click();
-		window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+		downloadJson(kind === 'draft' ? 'crate-saved-draft.json' : 'crate-damaged-changes.json', {
+			format: kind === 'draft' ? 'crate-saved-reminder-draft-v1' : 'crate-damaged-reminder-changes-v1',
+			origin: window.location.origin, folderPath, entries: snapshot,
+		});
 		setExported(snapshot); setReviewed(false);
 	};
 	const remove = async () => {
@@ -28,21 +28,19 @@ export function ReminderQuarantineNotice({ entries, folderPath, onRemove, kind =
 		try { if (await onRemove(exported)) { setExported([]); setReviewed(false); } }
 		finally { setBusy(false); }
 	};
-	return <section className="pwa-reminder-sync-error" aria-label={kind === 'draft' ? 'Saved draft recovery' : 'Damaged pending changes'}>
-		<div className="pwa-reminder-sync-error__copy">
-			<strong>{kind === 'draft' ? 'Saved draft needs review' : `${entries.length} ${entries.length === 1 ? 'saved change needs' : 'saved changes need'} recovery`}</strong>
-			<span role="status">{kind === 'draft' ? 'This saved draft cannot be restored into this editor. Its original text stays on this device until you export and review it.' : 'These entries cannot be read safely and will not be sent. Their original text stays on this device while other changes can sync.'}</span>
-			<details><summary>Review damaged entries</summary>
-				<p>Export the full text and compare it with current reminders before restoring any missing edits in Obsidian. An earlier attempt may already have synced.</p>
-				<div className="pwa-reminder-recovery-preview">{entries.map((entry, index) => <div key={entry.key}><strong>Entry {index + 1}</strong><pre>{entry.raw.slice(0, 20_000)}</pre>
-					{entry.raw.length > 20_000 && <p>Preview limited to 20,000 characters. The export contains the full text.</p>}
-				</div>)}</div>
-			</details>
-			{exported.length > 0 && <label className="pwa-reminder-recovery-confirm"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.currentTarget.checked)} /> I saved and reviewed the export</label>}
-		</div>
-		<div className="pwa-reminder-sync-error__actions">
+	return <PwaNotice aria-label={kind === 'draft' ? 'Saved draft recovery' : 'Damaged pending changes'}
+		title={kind === 'draft' ? 'Saved draft needs review' : `${entries.length} ${entries.length === 1 ? 'saved change needs' : 'saved changes need'} recovery`}
+		actions={<>
 			<BaseButton variant="ghost" size="touch" type="button" onClick={exportEntries}>Export damaged entries</BaseButton>
 			{exported.length > 0 && <BaseButton variant="ghost" size="touch" type="button" disabled={!reviewed || busy} onClick={() => { void remove(); }}>Remove exported copies from device</BaseButton>}
-		</div>
-	</section>;
+		</>}>
+		<span role="status">{kind === 'draft' ? 'This saved draft cannot be restored into this editor. Its original text stays on this device until you export and review it.' : 'These entries cannot be read safely and will not be sent. Their original text stays on this device while other changes can sync.'}</span>
+		<details><summary>Review damaged entries</summary>
+			<p>Export the full text and compare it with current reminders before restoring any missing edits in Obsidian. An earlier attempt may already have synced.</p>
+			<div className="pwa-reminder-recovery-preview">{entries.map((entry, index) => <div key={entry.key}><strong>Entry {index + 1}</strong><pre>{entry.raw.slice(0, 20_000)}</pre>
+				{entry.raw.length > 20_000 && <p>Preview limited to 20,000 characters. The export contains the full text.</p>}
+			</div>)}</div>
+		</details>
+		{exported.length > 0 && <label className="pwa-reminder-recovery-confirm"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.currentTarget.checked)} /> I saved and reviewed the export</label>}
+	</PwaNotice>;
 }

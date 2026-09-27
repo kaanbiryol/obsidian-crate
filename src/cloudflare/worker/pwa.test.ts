@@ -104,13 +104,13 @@ describe('PWA activation metadata', () => {
 
 		expect(html).toContain('--interactive-accent:#8b5cf6;');
 		expect(html).toContain('--interactive-accent-hover:#9b75f7;');
-		expect(html).toContain('--accent:#8b5cf6;');
+		expect(html).toContain('--accent:var(--interactive-accent);');
 		expect(html).toContain('--accent-rgb:139,92,246;');
-		expect(html).toContain('--accent-strong:#8b5cf6;');
+		expect(html).toContain('--accent-strong:var(--interactive-accent);');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-button {');
 		expect(html).toContain('color: var(--crate-tab-active-color, var(--interactive-accent));');
 		expect(html).toContain('--crate-tab-active-color: var(--crate-selection-color);');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-content{width:100%;height:100%;justify-content:center}');
+		expect(html).toContain('.crate-reminders-ui .pwa-dock__tab.is-active {');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-icon {');
 		expect(html).toContain('contain: paint;');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-icon svg {');
@@ -118,10 +118,10 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-label {');
 		expect(html).toContain('.crate-reminders-ui .reminders-view.is-primary .reminders-fab {');
 		expect(html).toContain('--crate-fab-bg: var(--crate-accent);');
-		expect(html).toContain('.pwa-header-settings-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
+		expect(html).toContain('.crate-reminders-ui .crate-icon-button[data-size=large] {');
 		expect(html).toContain('--crate-icon-button-size: 44px;');
 		expect(html).toContain('.crate-reminders-ui .crate-icon-button {');
-		expect(html).toContain('.pwa-modal-sheet .reminder-modal-header .reminder-modal-header-close {');
+		expect(html).toContain('.reminder-modal-header .reminder-modal-header-close {');
 		expect(html).toContain('.pwa-reminders-view .completed-section-toggle{height:44px;min-height:44px}');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action:disabled {');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action[data-tone=danger].is-enabled {');
@@ -183,30 +183,23 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui.pwa-shadow-root .pwa-reminders-view.is-modal.is-fullscreen{--reminders-tabbar-overlay:0px;');
 		expect(html).toContain('--pwa-tabbar-bleed:0px');
 		expect(html).toContain('.pwa-reminders-view .reminders-view-scroll{overflow-anchor:none}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;');
-		expect(html).toContain('border-top:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.065)');
-		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px');
-		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:none!important');
-		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider-track {');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider-track{inset:4px 0}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider{margin:0 6px}');
-		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider {');
-		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
-		expect(html).toContain('padding:0!important;transform:none!important');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-button:active .bottom-tab-icon{transform:scale(.88)}');
-		expect(html).toContain('@media (prefers-reduced-motion:reduce){.pwa-reminders-view .bottom-tab-icon{transition:none}');
-		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
-		expect(html).toContain('.pwa-header-settings-button{position:relative;width:44px;height:44px;min-width:44px;');
+		// Runtime geometry, rotation, and touch targets are checked by pwa-safe-area-test.mjs.
+		expect(html).toContain('--pwa-dock-bottom-inset: max(10px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)));');
+		expect(html).toContain('--pwa-dock-height: calc(70px + var(--pwa-dock-bottom-inset));');
+		expect(html).toContain('.crate-reminders-ui .pwa-dock__bar {');
+		expect(html).toContain('.crate-reminders-ui .pwa-dock__indicator {');
+		expect(html).toContain('scroll-padding-bottom: calc(var(--pwa-dock-height) + 16px);');
+		expect(html).toContain('pointer-events: none;');
+		expect(html).not.toContain('--pwa-safe-area-bottom-floor');
+		expect(html).toContain('--crate-icon-button-size: 44px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
-		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
 		expect(html).not.toContain('name="apple-mobile-web-app-status-bar-style" content="default"');
 		expect(html).not.toContain('--pwa-safe-area-top-floor');
 		expect(html).not.toContain('--pwa-status-bar-clearance');
 		expect(PWA_THEME_BOOTSTRAP_JS).not.toContain('pwaIosScrollEdge');
-		expect(html).toContain('@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}');
-		expect(html).toContain('.pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(var(--pwa-safe-area-top) + 17px)');
+		expect(html).toContain('--pwa-safe-area-bottom:env(safe-area-inset-bottom)');
+		expect(html).toContain(':is(.pwa-reminders-view,.pwa-opening-screen) .view-header{max-width:100vw;overflow:hidden;padding:calc(var(--pwa-safe-area-top) + var(--pwa-header-top-gap))');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(var(--pwa-safe-area-top) + 12px)}');
 		expect(html).not.toContain('@supports (-webkit-touch-callout: none)');
 		expect(html).not.toContain('bottom:calc(0px - env(safe-area-inset-bottom))');
@@ -226,7 +219,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--text-success:#166534;');
 		expect(html).toContain('--interactive-accent:#6d28d9;');
 		expect(html).toContain('--crate-reminder-card-bg: var(--crate-panel-bg);');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);');
+		expect(html).toContain('--dock-surface: var(--background-primary-alt);');
 		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
 		expect(html).toContain('.crate-reminders-ui .reminder-editor-fields .reminder-title-input {');
 		expect(html).toContain('color: var(--text-normal);');
@@ -253,7 +246,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('.pwa-modal-sheet.is-screen-transition-closing .pwa-modal-sheet__backdrop');
 		expect(html).not.toContain('backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:opacity');
 		expect(html).toContain('.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;');
-		expect(html).toContain('.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}');
+		expect(html).toContain('.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:calc(90dvh - var(--pwa-sheet-keyboard-inset,0px))!important}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}');
 		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
 		expect(html).toContain('.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}');
@@ -302,7 +295,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:44px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab{position:absolute;bottom:');
 		expect(html).not.toContain('.pwa-header-add-button');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;background:rgba(13,13,15,.9);');
+		expect(html).toContain('.pwa-screen{touch-action:pan-x pan-y;-webkit-touch-callout:none}');
+		expect(html).toContain('.crate-reminders-ui .pwa-dock__add {');
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {
@@ -421,7 +415,9 @@ describe('PWA activation metadata', () => {
 	it('hands off from the native launch surface to one static app splash', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"><div class="crate-reminders-ui pwa-opening-dock"');
+		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"><div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root"');
+		expect(html).toContain('data-pwa-launch-title>Schedule');
+		expect(html).toContain('pwa-reminders-skeleton__card');
 		expect(html).toContain('.pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}');
 		expect(html).not.toContain('pwa-launch-splash__label');
 		expect(html).not.toContain('pwa-bootstrap');

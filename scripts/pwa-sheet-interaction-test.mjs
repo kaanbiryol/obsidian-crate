@@ -100,7 +100,7 @@ try {
 			const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
 			await card.tap();
 			await expect(title).toBeFocused();
-			await expect(fab).toHaveAttribute('inert', '');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
 			await expect(fab).toHaveCSS('opacity', '1');
 			await fab.evaluate(element => { element.focus(); element.click(); });
 			await expect(title).toBeFocused();
@@ -158,7 +158,7 @@ try {
 			await tapBackdropAbove(page, editor);
 			await expect(editor).toBeHidden();
 			await expectNoTouchRing(card);
-			await expect(fab).not.toHaveAttribute('inert');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
 			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
 			await card.tap();
 			await expect(title).toHaveText('Check this article');
@@ -169,7 +169,7 @@ try {
 
 			await page.getByRole('button', { name: 'Open settings', exact: true }).tap();
 			const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-			await expect(fab).toHaveAttribute('inert', '');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
 			await expect(fab).toHaveCSS('opacity', '1');
 			// The dialog role now belongs to the popup, which has a deliberate sheet shadow.
 			await expect(settings).toHaveCSS('outline-style', 'none');
@@ -199,7 +199,7 @@ try {
 			await expectNoTouchRing(darkTheme);
 			await tapBackdropAbove(page, settings);
 			await expect(settings).toBeHidden();
-			await expect(fab).not.toHaveAttribute('inert');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
 			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
 			await expectNoTouchRing(page.getByRole('button', { name: 'Open settings', exact: true }));
 			await tabTo(page, card);
@@ -215,10 +215,10 @@ try {
 			await fab.tap();
 			const create = page.getByRole('dialog', { name: 'New reminder', exact: true });
 			await expect(create).toBeVisible();
-			await expect(fab).toHaveAttribute('inert', '');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
 			await tapBackdropAbove(page, create);
 			await expect(create).toBeHidden();
-			await expect(fab).not.toHaveAttribute('inert');
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
 			await expect(fab).toHaveCSS('transform', 'none');
 			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
 		} finally {

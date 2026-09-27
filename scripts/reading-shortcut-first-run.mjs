@@ -51,7 +51,7 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
   const needsSetup = whenEmpty(configuration);
   let endpoint, authorization;
   if (pairing) {
-    const code = ask('In the Crate web app, open Reading settings → Set up iPhone shortcut. Paste the pairing code here.', '^https://[^\\s/?#@]+/reading/shortcut-exchange#[a-f0-9]{64}$', 'Copy a new pairing code from the Crate web app, then run this shortcut again.');
+    const code = ask('In the Crate web app, open Settings → Reading → Set up. Paste the pairing code here.', '^https://[^\\s/?#@]+/reading/shortcut-exchange#[a-f0-9]{64}$', 'Copy a new pairing code from the Crate web app, then run this shortcut again.');
     // Split locally: the temporary secret must never appear in a network URL.
     const exchangeUrl = add('text.replace', { WFReplaceTextFind: '#[a-f0-9]{64}$', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
     const grant = add('text.replace', { WFReplaceTextFind: '^.*#', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });

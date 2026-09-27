@@ -1,4 +1,5 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { PwaButton } from './PwaButton';
+import { PwaNotice } from './PwaNotice';
 import React, { useState, useSyncExternalStore } from 'react';
 import { reminderCacheHealth } from '../reminder-cache-database';
 
@@ -14,13 +15,8 @@ export function ReminderCacheNotice({ isOffline, onRebuild }: { isOffline: boole
 	const [busy, setBusy] = useState(false);
 	if (!problem) return null;
 	const rebuild = async () => { setBusy(true); try { await onRebuild(); } finally { setBusy(false); } };
-	return <section className="pwa-reminder-sync-error" aria-label="Offline copy unavailable">
-		<div className="pwa-reminder-sync-error__copy">
-			<strong>Offline copy unavailable</strong>
-			<span role="status">{explanations[problem]}</span>
-		</div>
-		{problem !== 'unsupported' && <div className="pwa-reminder-sync-error__actions">
-			<BaseButton type="button" disabled={isOffline || busy} onClick={() => { void rebuild(); }}>Rebuild offline copy</BaseButton>
-		</div>}
-	</section>;
+	return <PwaNotice title="Offline copy unavailable" aria-label="Offline copy unavailable" actions={problem !== 'unsupported' &&
+		<PwaButton variant="ghost" size="touch" disabled={isOffline || busy} onClick={() => { void rebuild(); }}>Rebuild offline copy</PwaButton>}>
+		<span role="status">{explanations[problem]}</span>
+	</PwaNotice>;
 }

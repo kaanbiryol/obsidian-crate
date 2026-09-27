@@ -134,6 +134,9 @@ export default tseslint.config(
 				paths: [{
 					name: '@/reminders/ui/plugin/PluginRemindersAppShell',
 					message: 'The PWA owns its application shell; share panels, cards, and view-model logic instead.',
+				}, {
+					name: '@base-ui/react/button',
+					message: 'Use ui/shared/Button or PwaButton so PWA actions share control behavior and styling.',
 				}],
 			}],
 			'obsidianmd/platform': 'off',
@@ -155,7 +158,7 @@ export default tseslint.config(
 	{
 		// This DOM adapter is shared with the standalone PWA, where Obsidian's
 		// element helpers do not exist.
-		files: ['src/reminders/components/richTextInputDom.ts'],
+		files: ['src/reminders/components/richTextInputDom.ts', 'src/reading/ui/reader-highlights.ts'],
 		rules: {
 			'obsidianmd/prefer-create-el': 'off',
 		},
