@@ -1,12 +1,10 @@
+import { createDetailStack, isCurrentDetailStack } from './detail-history';
+
 interface ProjectHistoryEntry {
 	reminderProject?: string;
 	reminderProjectList?: boolean;
 	reminderProjectStackId?: string;
 }
-
-// A restored history state can belong to an earlier document. Only reuse a
-// detail slot created by this instance of the PWA.
-let documentStackId: string | null = null;
 
 export function hasProjectHistory(): boolean {
 	return typeof (history.state as ProjectHistoryEntry | null)?.reminderProject === 'string';
@@ -17,13 +15,12 @@ export function openProjectHistory(project: string): string {
 	const detail = new URL(location.href);
 	detail.searchParams.delete('section');
 	detail.searchParams.set('project', project);
-	if (entry?.reminderProjectStackId && entry.reminderProjectStackId === documentStackId
+	if (entry?.reminderProjectStackId && isCurrentDetailStack(entry.reminderProjectStackId)
 		&& (entry.reminderProject || entry.reminderProjectList)) {
 		history.replaceState({ reminderProject: project, reminderProjectStackId: entry.reminderProjectStackId }, '', detail);
 		return entry.reminderProjectStackId;
 	}
-	const stackId = crypto.randomUUID();
-	documentStackId = stackId;
+	const stackId = createDetailStack();
 	const list = new URL(detail);
 	list.searchParams.delete('project');
 	history.replaceState({ reminderProjectStackId: stackId }, '', list);
