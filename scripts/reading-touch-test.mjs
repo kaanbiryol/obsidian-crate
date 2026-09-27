@@ -26,15 +26,57 @@ try {
       await page.addInitScript(session => localStorage.setItem('crate-reading-session-v1', JSON.stringify(session)), session);
       await page.route('**/reading/session', route => route.fulfill({ json: session }));
       await page.route('**/reading/list*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
-      await page.route('**/reading/item?*', route => route.fulfill({ json: {
-        item: items.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
-        markdown: 'A passage to read before returning to the library.\n\n'.repeat(80),
-      } }));
+      let heldArticle;
+      await page.route('**/reading/item?*', async route => {
+        if (heldArticle) {
+          const held = heldArticle; heldArticle = undefined;
+          held.started.resolve();
+          if (await held.release.promise === 'fail') return route.fulfill({ status: 503, json: { error: 'Article unavailable' } });
+        }
+        return route.fulfill({ json: {
+          item: items.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
+          markdown: 'A passage to read before returning to the library.\n\n'.repeat(80),
+        } });
+      });
       await page.goto(`${origin}/notifications?section=reading`);
       const button = page.locator('.crate-reading__open').first();
       const card = page.locator('.crate-reading__item').first();
       const workspace = page.locator('.crate-reading-workspace');
       await expect(button).toBeVisible();
+      // Hold uncached content beyond the transition, including desktop and reduced motion.
+      for (const [index, width, reducedMotion, fail] of [[1, 390, 'no-preference', false], [2, 390, 'reduce', false], [3, 1280, 'no-preference', false], [4, 390, 'no-preference', true]]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ reducedMotion });
+        const held = { started: Promise.withResolvers(), release: Promise.withResolvers() };
+        heldArticle = held;
+        try {
+          await page.locator('.crate-reading__open').nth(index).click();
+          await held.started.promise;
+          const reader = page.locator('.crate-reading-reader');
+          await expect(reader.getByRole('status', { name: 'Loading article', exact: true })).toBeVisible();
+          await expect(reader.locator('h1')).toHaveCount(0);
+          await expect(reader.locator('.crate-reading-reader__body')).toHaveCount(0);
+          const back = reader.getByRole('button', { name: 'Back to reading' });
+          await expect(back).toBeEnabled();
+          await back.focus();
+          held.release.resolve(fail ? 'fail' : 'ready');
+          if (fail) {
+            await expect(reader.getByRole('alert')).toBeVisible();
+            await expect(reader.getByRole('heading', { name: items[index].title, exact: true })).toBeVisible();
+            await expect(reader.locator('.crate-reading-reader__source')).toHaveAttribute('href', items[index].source_url);
+            await reader.getByRole('button', { name: 'Retry', exact: true }).click();
+          }
+          await expect(reader.locator('.crate-reading-reader__body')).toBeVisible();
+          await expect(reader.getByRole('heading', { name: items[index].title, exact: true })).toBeVisible();
+          await expect(reader.getByText(/\d+ min read/)).toBeVisible();
+          if (!fail) await expect(back).toBeFocused();
+          await back.click();
+          await expect(workspace).toHaveAttribute('data-reader-open', 'false');
+          await expect(reader).toHaveCount(0);
+        } finally { held.release.resolve('ready'); }
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
       for (const colorScheme of ['light', 'dark']) {
         await page.emulateMedia({ colorScheme });
         await page.mouse.move(-1, -1);
@@ -50,11 +92,32 @@ try {
           await button.tap();
           await expect(page.locator('.crate-reading-reader__body')).toBeVisible();
           await expect(button).not.toHaveAttribute('data-press-active', '');
+          // Sample the whole reveal, not only the settled card after Back.
+          await page.evaluate(() => {
+            window.readingReturnFrames = new Promise(resolve => {
+              const frames = [], card = document.querySelector('.crate-reading__item');
+              const workspace = document.querySelector('.crate-reading-workspace');
+              let started;
+              const sample = now => {
+                if (workspace.dataset.readerOpen === 'false') {
+                  started ??= now;
+                  const css = getComputedStyle(card);
+                  frames.push({ background: css.backgroundColor, border: css.borderColor, shadow: css.boxShadow });
+                }
+                if (started !== undefined && now - started >= 450) resolve(frames);
+                else requestAnimationFrame(sample);
+              };
+              requestAnimationFrame(sample);
+            });
+          });
           if (close === 'toolbar') await page.getByRole('button', { name: 'Back to reading' }).tap();
           else await page.goBack();
           await expect(workspace).toHaveAttribute('data-reader-open', 'false');
           await expect(card).toHaveAttribute('data-selected', 'false');
           await expect.poll(() => appearance(card), { message: `${colorScheme}: ${close} return clears feedback` }).toEqual(resting);
+          const frames = await page.evaluate(() => window.readingReturnFrames);
+          assert.ok(frames.length > 1);
+          assert.ok(frames.every(frame => JSON.stringify(frame) === JSON.stringify(resting)), `${colorScheme}: ${close} must not flash a selected card during return: ${JSON.stringify(frames)}`);
         }
         if (engine === chromium) {
           const cdp = await page.context().newCDPSession(page);
@@ -97,8 +160,17 @@ try {
       await expect(workspace).toHaveAttribute('data-reader-open', 'false');
       await expect(button).toBeFocused();
       await expect(card).toHaveAttribute('data-selected', 'false');
+      // Split view still identifies the article beside its visible library.
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const wideResting = await appearance(card);
+      await button.tap();
+      await expect(card).toHaveAttribute('data-selected', 'true');
+      await card.evaluate(async element => {
+        await Promise.allSettled(element.getAnimations().map(animation => animation.finished));
+      });
+      assert.notEqual((await appearance(card)).background, wideResting.background);
       assert.deepEqual(errors, []);
-      console.log(`${engine.name()}: Reading touch return, cancellation, scroll, hover, and keyboard checks passed`);
+      console.log(`${engine.name()}: Reading return frames, split-view selection, touch cancellation, scroll, hover, and keyboard checks passed`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

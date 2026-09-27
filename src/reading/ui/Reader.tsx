@@ -18,6 +18,7 @@ import type { ReadingMetadata, ReadingChanges } from '../core/model';
 import { ReadingDialog } from './ReadingDialog';
 import { readingSource } from './reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
+import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
 
 /** All article HTML is untrusted, including content captured by Web Clipper. */
 function renderReadingText(markdown: string, source: string, highlightCode?: (code: string, language: string) => string | undefined): string {
@@ -59,10 +60,12 @@ function renderReadingText(markdown: string, source: string, highlightCode?: (co
 	return container.innerHTML;
 }
 
-export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode }: {
+export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode }: {
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
 	/** Keep article parsing and layout out of the host's opening slide. */
 	deferContentUntilEntered?: boolean;
+	/** Reveal article metadata with its text; retain source access if loading fails. */
+	revealContentTogether?: boolean;
 	/** Host feedback after an explicit form save has been accepted. */
 	onSaveComplete?: (action: 'tags' | 'note') => void;
 	onCopyComplete?: () => void;
@@ -85,6 +88,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const pending = useRef({ mutation: false, share: false }), article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
 	const [enteredId, setEnteredId] = useState<string | null>(null);
 	const markdown = deferContentUntilEntered && enteredId !== item.crate_reading_id ? null : loadedMarkdown;
+	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
 	useEffect(() => {
 		if (!deferContentUntilEntered) return;
 		let cancelled = false;
@@ -101,11 +105,15 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const copyTimer = useRef<{ window: Window; id: number } | undefined>(undefined);
 	const clearCopyTimer = () => { if (copyTimer.current) copyTimer.current.window.clearTimeout(copyTimer.current.id); };
 	useEffect(() => {
-		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); heading.current?.focus({ preventScroll: true });
+		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
 		setError(null); setCopied(false); setDialog(null);
 		setMode('article'); setAnnotation(null); setHighlightsOpen(false); sheetAction.current = null;
 		return clearCopyTimer;
 	}, [item.crate_reading_id]);
+	useEffect(() => {
+		// Transfer opening focus without taking it from a control used while loading.
+		if (showHeader && article.current?.ownerDocument.activeElement === article.current) heading.current?.focus({ preventScroll: true });
+	}, [showHeader]);
 	// Serialize metadata writes without dimming unrelated toolbar actions. Sharing
 	// has its own guard so it remains available while a local write settles.
 	// Native sharing may settle after the sheet closes; keep its button visually
@@ -168,7 +176,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		{!!item.highlight_recovery?.length && <details className="crate-reading__notice"><summary>{item.highlight_recovery.length} saved highlights need reselecting</summary><p>The original excerpts are preserved here. Select their current passages in the article to highlight them again.</p><HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} /></details>}
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
-	return <article ref={article} className="crate-reading crate-reading-reader" data-serif={serif} style={{ '--reading-font-size': `${fontSize}px` } as React.CSSProperties}>
+	return <article ref={article} tabIndex={-1} className="crate-reading crate-reading-reader" data-serif={serif} style={{ '--reading-font-size': `${fontSize}px` } as React.CSSProperties}>
 		{floatingHighlights && <div className="crate-reading-reader__floating"><Button variant="outline" size="touch" className="crate-reading-reader__highlights-button" aria-label={`Highlights (${item.highlights?.length ?? 0})`} aria-haspopup="dialog" aria-expanded={highlightsOpen} onClick={() => setHighlightsOpen(true)}><ThemeIcon id="highlighter" size="m" aria-hidden="true" /><span>{item.highlights?.length ?? 0}</span></Button></div>}
 		<nav className="crate-reading-reader__nav" aria-label="Article actions">
 			<IconButton size="large" iconSize="l" icon="chevron-left" label="Back to reading" onClick={onBack} />
@@ -176,11 +184,11 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		</nav>
 		<div className="crate-reading-reader__page">
 			{notice}
-			<header className="crate-reading-reader__header">{item.source_url ? <a className="crate-reading-reader__source" href={item.source_url} target="_blank" rel="noopener noreferrer"><ReadingSourceIcon item={item} />{readingSource(item.source_url)}<ThemeIcon id="arrow-up-right" size="xs" aria-hidden="true" /></a> : <span className="crate-reading-reader__source"><ReadingSourceIcon item={item} />Vault note</span>}<h1 ref={heading} tabIndex={-1}>{item.title}</h1>
+			{showHeader && <header className="crate-reading-reader__header">{item.source_url ? <a className="crate-reading-reader__source" href={item.source_url} target="_blank" rel="noopener noreferrer"><ReadingSourceIcon item={item} />{readingSource(item.source_url)}<ThemeIcon id="arrow-up-right" size="xs" aria-hidden="true" /></a> : <span className="crate-reading-reader__source"><ReadingSourceIcon item={item} />Vault note</span>}<h1 ref={heading} tabIndex={-1}>{item.title}</h1>
 				<div className="crate-reading-reader__byline">{item.author && <span>{item.author}</span>}<time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}</div>
-				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div><IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />{onUpdate && <Button variant="ghost" size="touch" aria-label="Edit article tags" disabled={mutationPending} onClick={() => { setTags(item.tags.join(', ')); setDialog('tags'); }}><ThemeIcon id="hash" size="m" aria-hidden="true" />Tags</Button>}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : 'Share article'} aria-disabled={sharing} onClick={() => void run(share, 'share')} />}</div>
+				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div><IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />{onUpdate && <IconButton size="large" icon="hash" label="Edit article tags" disabled={mutationPending} onClick={() => { setTags(item.tags.join(', ')); setDialog('tags'); }} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : 'Share article'} aria-disabled={sharing} onClick={() => void run(share, 'share')} />}</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
-			</header>
+			</header>}
 			{error && <p role="alert" className="crate-reading__notice">{error}</p>}
 			{copied && <span className="crate-reading__sr-only" role="status">Link copied</span>}
 			{!floatingHighlights && <div className="crate-reading-reader__tabs" role="group" aria-label="Article view"><ToggleButton pressed={mode === 'article'} onPressedChange={() => setMode('article')}>Article</ToggleButton><ToggleButton pressed={mode === 'highlights'} onPressedChange={() => setMode('highlights')}>Highlights{item.highlights?.length ? ` (${item.highlights.length})` : ''}</ToggleButton></div>}
@@ -189,7 +197,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">{item.extraction_status === 'pending' ? 'Your link is saved. Article text is on its way.' : item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.'}{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Try again</Button>}</p>}
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
-					: <><span className="pwa-reading-opening__spinner" aria-hidden="true" /><p role="status">Opening article…</p></>}
+					: <LoadingIndicator label="Loading article" />}
 			</div> : <ReadingBody body={body} article={article} html={html} highlights={item.highlights ?? []} />}
 			{markdown !== null && item.extraction_status === 'ready' && <footer className="crate-reading-reader__end"><span aria-hidden="true">✦</span><p>You’ve reached the end.</p>{onUpdate && item.reading_status === 'inbox' && <Button variant="outline" disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ reading_status: 'archived' }))}><ThemeIcon id="archive" size="m" aria-hidden="true" />Mark as read</Button>}</footer>}
 			</div>

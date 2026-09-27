@@ -4,7 +4,7 @@
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: var(--pwa-safe-area-top, env(safe-area-inset-top)) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: 48px; margin: 16px 18px 20px; border-radius: var(--crate-radius-field-rounded); }
 .crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
-.crate-reminders-ui .pwa-reading-article-opening__body { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--text-muted); text-align: center; }
+.crate-reminders-ui .pwa-reading-article-opening__body { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--text-muted); text-align: center; }
 .crate-reminders-ui .pwa-reading-article-opening__body p { max-width: 32ch; margin: 0; font-size: 14px; line-height: 1.5; }
 @media (max-width: 719px) {
   .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
@@ -76,10 +76,26 @@
 
 // Transform the sticky header without changing article layout or scroll position.
 .crate-reminders-ui .crate-reading-web .crate-reading-reader__nav {
-  transition: transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);
-  &[data-scroll-hidden="true"] { transform: translateY(-100%); pointer-events: none; }
-  &:has(:focus-visible) { transform: none; pointer-events: auto; }
-  @media (prefers-reduced-motion: reduce) { transition: none; }
+  --reader-navigation-inset: 0px;
+  position: sticky;
+  top: var(--reader-navigation-inset);
+  opacity: var(--reader-navigation-visibility, 1);
+  transform: translateY(calc((1 - var(--reader-navigation-visibility, 1)) * (-100% - var(--reader-navigation-inset))));
+  transition: opacity 120ms linear, transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);
+  &[data-scroll-hidden="true"] { pointer-events: none; }
+  &:has(:focus-visible) { opacity: 1; transform: none; pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    transform: none;
+    opacity: 1;
+    &[data-scroll-hidden="true"] { opacity: 0; }
+    &:has(:focus-visible) { opacity: 1; }
+  }
+}
+
+.crate-reminders-ui .crate-reading-web .crate-reading-reader[data-document-scroll="true"] .crate-reading-reader__nav {
+  --reader-navigation-inset: var(--pwa-safe-area-top, env(safe-area-inset-top));
+  top: var(--reader-navigation-inset);
 }
 
 .crate-reminders-ui.pwa-reading-root .crate-reading-reader__body pre code {
@@ -123,13 +139,13 @@ html.pwa-document-reader {
 
   &__nav { min-height: 64px; border-bottom: 0; }
   &__nav > .crate-icon-button { justify-self: start; }
-  & .crate-reading-reader__nav > .crate-icon-button[data-variant], &__quick-actions, & .crate-reading-reader__tools > button[data-variant] {
+  & .crate-reading-reader__nav > .crate-icon-button[data-variant], &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
     border: 1px solid var(--reader-control-border);
     border-radius: 999px;
     background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--reader-control-surface);
     box-shadow: var(--reader-control-shadow);
   }
-  &__nav > .crate-icon-button, &__quick-actions {
+  &__nav > .crate-icon-button, &__quick-actions, &__tools > button, &__highlights-button {
     backdrop-filter: blur(24px) saturate(1.35);
     -webkit-backdrop-filter: blur(24px) saturate(1.35);
   }
@@ -137,6 +153,7 @@ html.pwa-document-reader {
   &__quick-actions:empty { display: none; }
   &__quick-actions > button { border-radius: 50%; }
   &__page { padding-top: 28px; }
+  &__page:not(:has(> .crate-reading-reader__header)) { padding-top: 0; }
   &__header { margin-bottom: 20px; }
   &__source { margin-bottom: 18px; }
   &__header h1 { margin-bottom: 18px; }
@@ -156,7 +173,7 @@ html.pwa-document-reader {
   }
   @media (prefers-reduced-transparency: reduce) {
     --reader-control-surface: var(--background-primary-alt);
-    &__nav > .crate-icon-button, &__quick-actions { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    &__nav > .crate-icon-button, &__quick-actions, &__tools > button, &__highlights-button { backdrop-filter: none; -webkit-backdrop-filter: none; }
   }
 }
 
@@ -177,6 +194,7 @@ html.pwa-document-reader {
   &:has(:focus-visible) { opacity: 1; transform: none; }
   &:has(:focus-visible) .crate-reading-reader__highlights-button { pointer-events: auto; }
   .crate-reading-reader__highlights-button {
+    --crate-action-border: var(--reader-control-border);
     pointer-events: auto;
     display: flex;
     align-items: center;
@@ -185,10 +203,7 @@ html.pwa-document-reader {
     height: 52px;
     padding: 0 18px;
     border-radius: 999px;
-    border: 1px solid var(--crate-divider-strong);
-    background: var(--crate-panel-bg);
-    color: var(--text-normal);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, .18);
+    color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
   @media (prefers-reduced-motion: reduce) {
