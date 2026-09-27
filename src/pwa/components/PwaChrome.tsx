@@ -1,11 +1,9 @@
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
-import { Button as BaseButton } from '@/ui/shared/Button';
 import React, { useState } from 'react';
 import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
-	Download,
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
@@ -59,41 +57,22 @@ export function PwaHeaderActions({
 export function PwaTopNotices({
 	statusText,
 	statusKind,
-	updateAvailable,
-	updating,
 	showNotificationPrompt,
-	onReload,
 	onEnableNotifications,
 	children,
 }: {
 	statusText: string | null;
 	statusKind: DataMode | 'offline';
-	updateAvailable: boolean;
-	updating: boolean;
 	showNotificationPrompt: boolean;
-	onReload: () => void;
 	onEnableNotifications: () => void;
 	children?: React.ReactNode;
 }) {
 	const showStatusLine = Boolean(statusText && statusKind !== 'live');
-	const showNotices = showStatusLine || updateAvailable || showNotificationPrompt || children;
+	const showNotices = showStatusLine || showNotificationPrompt || children;
 	if (!showNotices) return null;
 
 	return (
 		<div className="pwa-top-notices">
-			{updateAvailable && (
-				<div className="pwa-update-banner" role="status">
-					<span className="pwa-update-banner__icon" aria-hidden="true"><Download size={18} strokeWidth={1.8} /></span>
-					<div className="pwa-update-banner__copy">
-						<span className="pwa-update-banner__text">Update available</span>
-						<span className="pwa-update-banner__detail">Install the latest version when you’re ready.</span>
-					</div>
-					<BaseButton variant="primary" size="touch" className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
-						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
-						<span className="pwa-update-button__label pwa-update-button__label--busy" aria-hidden={!updating}>Updating…</span>
-					</BaseButton>
-				</div>
-			)}
 			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
 			{children}
 			{showNotificationPrompt && (

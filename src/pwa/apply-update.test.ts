@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { hasUnsettledReminders } from './reminder-outbox-storage';
 import { fetchPwaAssetVersion } from './api';
 import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
 
 vi.mock('./reading/update-guard', () => ({ hasUnsettledReading: vi.fn(async () => false) }));
+vi.mock('./reminder-outbox-storage', () => ({ hasUnsettledReminders: vi.fn(() => false) }));
 vi.mock('./api', () => ({ fetchPwaAssetVersion: vi.fn() }));
 
 class UpdateWorker extends EventTarget {
@@ -19,12 +21,32 @@ describe('reliable PWA updates', () => {
 	const reload = vi.fn();
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(hasUnsettledReminders).mockReturnValue(false);
 		vi.mocked(fetchPwaAssetVersion).mockResolvedValue('new');
 		vi.stubGlobal('window', { location: { reload } });
 	});
 	afterEach(() => {
 		vi.unstubAllGlobals();
 		vi.useRealTimers();
+	});
+
+	it('does not update from Reading while reminder commands remain on disk', async () => {
+		vi.mocked(hasUnsettledReminders).mockReturnValue(true);
+		await expect(applyPwaUpdate()).rejects.toThrow('pending reminder changes');
+		expect(fetchPwaAssetVersion).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('rechecks reminder commands after preparing the new shell', async () => {
+		const worker = new UpdateWorker();
+		vi.stubGlobal('navigator', { serviceWorker: { register: vi.fn().mockResolvedValue({ installing: worker }) } });
+		const update = applyPwaUpdate();
+		await vi.waitFor(() => expect(fetchPwaAssetVersion).toHaveBeenCalled());
+		vi.mocked(hasUnsettledReminders).mockReturnValue(true);
+		worker.transition('installed');
+		await expect(update).resolves.toBe(false);
+		expect(worker.postMessage).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
 	});
 
 	it('waits for the latest worker to activate before reloading', async () => {

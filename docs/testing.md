@@ -34,6 +34,17 @@ Run the storage-safety, sheet-interaction, and Reading shortcut browser checks f
 cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
 keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
 
+## App updates
+
+Run `node scripts/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
+version detection from a Reading-only launch, foreground polling, navigation,
+editor deferral, dismissal, Settings access, and light/dark mobile layouts.
+Screenshots are written to `test-results/update-notice/`.
+`node scripts/pwa-update-test.mjs` exercises real service-worker preparation,
+activation, failed/slow checks, launch updates, pending writes, and other tabs.
+Both are included in `npm run test:pwa-browser`. Installed iPhone safe areas,
+app suspension, and VoiceOver announcements still require physical-device checks.
+
 ## Framework and Config
 
 - **Framework:** vitest

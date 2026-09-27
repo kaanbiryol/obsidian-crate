@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { MutableRefObject } from 'react';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
-import { fetchPwaAssetVersion } from '../api';
 import type { LoadReminders } from '../types';
 
 export function usePwaRefreshLifecycle({
@@ -16,9 +14,7 @@ export function usePwaRefreshLifecycle({
 	hydratedCacheRef: MutableRefObject<boolean>;
 	loadReminders: LoadReminders;
 	refreshPushState: () => Promise<void>;
-}): { updateVersion: string | null; updateCheckComplete: boolean } {
-	const [updateCheckComplete, setUpdateCheckComplete] = useState(false);
-	const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+}) {
 
 	useEffect(() => {
 		if (!bootstrapped || !authToken) return;
@@ -28,26 +24,8 @@ export function usePwaRefreshLifecycle({
 		]);
 	}, [authToken, bootstrapped, hydratedCacheRef, loadReminders, refreshPushState]);
 
-	const checkForUpdate = useCallback(async () => {
-		try {
-			const assetVersion = await fetchPwaAssetVersion();
-			if (assetVersion && assetVersion !== PWA_ASSET_VERSION) {
-				setUpdateVersion(assetVersion);
-			}
-		} catch {
-			// Version checks are opportunistic and should not disrupt reminder use.
-		} finally {
-			setUpdateCheckComplete(true);
-		}
-	}, []);
-
-	useEffect(() => {
-		void checkForUpdate();
-	}, [checkForUpdate]);
-
 	useEffect(() => {
 		const resume = () => {
-			void checkForUpdate();
 			if (!bootstrapped || !authToken) return;
 			void loadReminders({ silent: true, maxAgeMs: 30_000 });
 			void refreshPushState().catch(() => undefined);
@@ -64,7 +42,5 @@ export function usePwaRefreshLifecycle({
 			window.removeEventListener('online', resume);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
-	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
-
-	return { updateVersion, updateCheckComplete };
+	}, [authToken, bootstrapped, loadReminders, refreshPushState]);
 }

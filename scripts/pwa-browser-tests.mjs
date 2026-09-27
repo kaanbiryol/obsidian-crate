@@ -41,6 +41,7 @@ export const browserScripts = [
 	'scripts/pwa-optimistic-test.mjs',
 	'scripts/pwa-install-test.mjs',
 	'scripts/pwa-update-test.mjs',
+	'scripts/pwa-update-notice-test.mjs',
 	'scripts/pwa-capacity-test.mjs',
 	'scripts/pwa-pagination-test.mjs',
 	'scripts/pwa-reminder-scroll-test.mjs',

@@ -1,3 +1,4 @@
+import { PwaUpdateProvider } from './components/PwaUpdateProvider';
 import { usePwaPreferences } from './hooks/usePwaPreferences';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext, type CrateSection, type DockDestination } from './components/FeatureSwitcherButton';
@@ -117,12 +118,12 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	};
 	const navigate = (next: DockDestination) => { setDestination(next); switchSection(next.section); };
 	const toggle = () => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); };
-	return <ThemeIconProvider renderer={PwaThemeIcon}><div ref={root} className="crate-feature-shell" onAnimationEnd={event => {
+	return <ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><div ref={root} className="crate-feature-shell" onAnimationEnd={event => {
 		const panel = event.target as HTMLElement;
 		if (event.animationName === 'crate-mode-fade-out' && panel.dataset.crateSection === leavingSection) setLeavingSection(null);
 	}}>
 		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
 		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
 		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
-	</div></ThemeIconProvider>;
+	</div></PwaUpdateProvider></ThemeIconProvider>;
 }

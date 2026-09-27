@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearReminderOutbox, createReminderOutboxStorage, createReminderRecoveryStorage } from './reminder-outbox-storage';
+import { clearReminderOutbox, hasUnsettledReminders, createReminderOutboxStorage, createReminderRecoveryStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange } from './reminder-outbox-types';
 
 let values: Map<string, string>;
@@ -28,6 +28,21 @@ describe('durable reminder outbox storage', () => {
 		vi.stubGlobal('localStorage', storage);
 	});
 	afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+	it('blocks updates for retained commands and corrupt entries without reading their bodies', async () => {
+		values.set('unrelated', 'value');
+		expect(hasUnsettledReminders()).toBe(false);
+		const outbox = await createReminderOutboxStorage('older-session', 'Reminders');
+		const pending = change();
+		outbox.put(pending);
+		expect(hasUnsettledReminders()).toBe(true);
+		outbox.remove(pending.operationId);
+		expect(hasUnsettledReminders()).toBe(false);
+		values.set('crate-reminder-outbox:unknown-version', 'corrupt');
+		const read = vi.spyOn(storage, 'getItem');
+		expect(hasUnsettledReminders()).toBe(true);
+		expect(read).not.toHaveBeenCalled();
+	});
 
 	it('restores the exact attempted command after reload without storing the token', async () => {
 		const original = change();
