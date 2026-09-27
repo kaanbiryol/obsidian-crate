@@ -37,7 +37,7 @@ function LocalReadingLibrary({ plugin, library }: { plugin: CratePlugin; library
 	const snapshot = useSyncExternalStore(library.subscribe, library.getSnapshot);
 	const [article, setArticle] = useState<Awaited<ReturnType<ReadingLibrary['read']>> | null>(null);
 	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
-	const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [title, setTitle] = useState('');
+	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
 	const [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
 	const pending = useRef(false);
 	const item = article && (snapshot.items.find(item => item.crate_reading_id === article.item.crate_reading_id) ?? article.item);
@@ -53,10 +53,10 @@ function LocalReadingLibrary({ plugin, library }: { plugin: CratePlugin; library
 		onUpdate={(item, changes) => library.update(item, changes)}
 		onRefresh={() => library.refresh()} onSettings={() => plugin.openSettingsTab()} activeId={item?.crate_reading_id}
 		reader={article && item && <ReadingReader focusHighlight={focusHighlight} item={item} markdown={article.markdown} status="Saved in your vault" onUpdate={async changes => { await library.update(item, changes); const updated = await library.read({ ...item, ...changes }); setArticle(current => current?.item.crate_reading_id === item.crate_reading_id ? updated : current); }} onBack={() => setArticle(null)} onEdit={() => { void plugin.app.workspace.openLinkText(item.path, '', true).catch(() => { new Notice('Could not open the reading note. It may have moved.'); }); }} />} />
-		{adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} title={title} onUrl={setUrl} onTitle={setTitle} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => {
+		{adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => {
 			if (pending.current) return;
 			pending.current = true; setSaving(true); setError(null);
-			void library.add(url, title).then(result => { setAdding(false); setUrl(''); setTitle(''); new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); })
+			void library.add(url).then(result => { setAdding(false); setUrl(''); new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); })
 				.catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not save this link.'))
 				.finally(() => { pending.current = false; setSaving(false); });
 		}} /></ReadingDialog>}

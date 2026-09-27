@@ -9,6 +9,7 @@ interface ModalHeaderAction {
     ariaLabel?: string;
     disabled?: boolean;
     type?: 'button' | 'submit';
+    form?: string;
     busy?: boolean;
     tone?: 'accent' | 'danger';
     dataAction?: string;
@@ -69,6 +70,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
                 <Button
                     onClick={action.onClick}
                     type={action.type}
+                    form={action.form}
                     aria-busy={action.busy}
                     data-action={action.dataAction}
                     data-tone={action.tone}

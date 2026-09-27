@@ -172,12 +172,10 @@ export function registerControlTests() {
     await expect(page.getByRole('dialog', { name: 'Save a link' })).toBeVisible();
     expect(await link.evaluate((input: HTMLInputElement) => input.validity.typeMismatch)).toBe(true);
     await link.fill('https://example.com/later');
-    await page.getByRole('textbox', { name: 'Title (optional)' }).fill('Read later');
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(save).toBeVisible();
     await save.click();
     await expect(link).toHaveValue('https://example.com/later');
-    await expect(page.getByRole('textbox', { name: 'Title (optional)' })).toHaveValue('Read later');
     await page.getByRole('button', { name: 'Save link', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 

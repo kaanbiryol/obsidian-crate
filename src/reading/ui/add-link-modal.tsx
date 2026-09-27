@@ -26,7 +26,7 @@ export class AddReadingLinkModal extends BaseUiModal {
 }
 
 function LocalCapture({ plugin, onClose }: { plugin: CratePlugin; onClose: () => void }) {
-	const [url, setUrl] = useState(''), [title, setTitle] = useState('');
+	const [url, setUrl] = useState('');
 	const [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
 	const pending = useRef(false);
 	const save = async () => {
@@ -35,10 +35,10 @@ function LocalCapture({ plugin, onClose }: { plugin: CratePlugin; onClose: () =>
 		try {
 			const library = getReadingLibrary(plugin);
 			if (!library) throw new Error('Enable reading in Crate settings first.');
-			const result = await library.add(url, title);
+			const result = await library.add(url);
 			new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); onClose();
 		} catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save this link.'); }
 		finally { pending.current = false; setSaving(false); }
 	};
-	return <ReadingDialog title="Save a link" busy={saving} onClose={onClose}><SaveLinkForm url={url} title={title} onUrl={setUrl} onTitle={setTitle} saving={saving} error={error} onCancel={onClose} onSave={() => void save()} /></ReadingDialog>;
+	return <ReadingDialog title="Save a link" busy={saving} onClose={onClose}><SaveLinkForm url={url} onUrl={setUrl} saving={saving} error={error} onCancel={onClose} onSave={() => void save()} /></ReadingDialog>;
 }
