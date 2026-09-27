@@ -49,7 +49,6 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   const groupItem = readingViews.find(item => item.id === readingTab) ?? readingViews[0];
   const activeIndex = dockDestinationIndex(tabs, section, activeTab);
   const readingIndex = dockDestinationIndex(tabs, 'reading', readingTab);
-  const groupActive = section === 'reading' && tabs[activeIndex] === 'reading';
   const displayedGroup = tabs[readingIndex] === 'reading' ? groupItem : readingViews[0];
   const indicatorIndex = navigation?.dockIndex ?? activeIndex;
   const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
@@ -92,18 +91,22 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
       <nav className="pwa-dock__bar" aria-label="Main navigation">
         <span ref={surface} className="pwa-dock__surface" aria-hidden="true" />
         <span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: indicatorIndex < 0 ? 0 : undefined, width: `calc((100% - 8px) / ${tabs.length})`, transform: `translateX(${indicatorIndex * 100}%)` }} />
-        {tabs.map(tab => {
+        {tabs.map((tab, index) => {
           const item = DOCK_TABS.find(candidate => candidate.id === tab)!;
           const readingView = tab === 'favorites' || tab === 'archive' || tab === 'highlights';
           const selected = tabs[activeIndex] === tab;
-          return tab !== 'reading' ? <Button key={tab} className={`pwa-dock__tab${selected ? ' is-active' : ''}`} data-dock-active={selected ? 'true' : undefined} aria-current={selected ? 'page' : undefined} aria-label={item.label} title={item.label} data-action={readingView ? 'switch-reading-section' : 'switch-tab'} data-tab={tab === 'browse' ? 'projects' : tab === 'archive' ? 'archived' : tab} onClick={() => {
-            if (readingView) selectView(tab === 'archive' ? 'archived' : tab);
+          const label = tab === 'reading' ? displayedGroup.label : item.label;
+          const icon = tab === 'reading' ? displayedGroup.iconName : item.iconName;
+          const select = () => {
+            if (tab === 'reading') selectView(displayedGroup.id);
+            else if (readingView) selectView(tab === 'archive' ? 'archived' : tab);
             else {
               const destinationTab = tab === 'today-view' ? 'today' : tab;
               if (section === 'reminders') selectLocalTab(destinationTab);
               else navigation?.navigate({ section: 'reminders', tab: destinationTab });
             }
-          }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button> : <PwaDockViewButton key={tab} label={displayedGroup.label} icon={displayedGroup.iconName} active={groupActive} open={open} inert={inert} onSelect={() => selectView(displayedGroup.id)} onOpen={() => setOpen(true)}
+          };
+          return index !== tabs.length - 1 ? <Button key={tab} className={`pwa-dock__tab${selected ? ' is-active' : ''}`} data-dock-active={selected ? 'true' : undefined} aria-current={selected ? 'page' : undefined} aria-label={label} title={label} data-action={readingView || tab === 'reading' ? 'switch-reading-section' : 'switch-tab'} data-tab={tab === 'reading' ? displayedGroup.id : tab === 'browse' ? 'projects' : tab === 'archive' ? 'archived' : tab} onClick={select}><ThemeIcon id={icon} size="l" aria-hidden="true" /></Button> : <PwaDockViewButton key={tab} label={label} icon={icon} active={selected} open={open} inert={inert} onSelect={select} onOpen={() => setOpen(true)}
           onDragStart={() => { setDragging(true); setOpen(true); setPreviewTab(null); }}
           onDragMove={point => setPreviewTab(destinationAt(point))}
           onDragEnd={(point, moved) => {

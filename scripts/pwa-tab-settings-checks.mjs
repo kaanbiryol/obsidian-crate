@@ -87,6 +87,43 @@ export async function checkTabSettings(page, name) {
 	await page.reload();
 	await expect(activeDock.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
 	await gear.click();
+	// The switcher belongs to the last slot, even when Reading moves first.
+	await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
+	for (let step = 0; step < 3; step++) await sheet.getByRole('button', { name: 'Reorder Reading list', exact: true }).press('ArrowUp');
+	await expect.poll(savedTabs).toEqual(['reading', 'inbox', 'today', 'browse']);
+	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+	const views = page.getByRole('dialog', { name: 'Reading views', exact: true });
+	const assertSwitcher = async () => {
+		await expect(activeDock.locator('[data-dock-switcher]')).toHaveAccessibleName('Projects');
+		await expect(dockTabs.nth(0)).not.toHaveAttribute('aria-haspopup');
+		await expect(dockTabs.nth(3)).toHaveAttribute('aria-haspopup', 'dialog');
+	};
+	await assertSwitcher();
+	await dockTabs.nth(0).click();
+	await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');
+	await assertSwitcher();
+	await dockTabs.nth(3).click();
+	await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText('Projects');
+	const last = await dockTabs.nth(3).boundingBox();
+	await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2);
+	await page.mouse.down();
+	await page.waitForTimeout(480);
+	await page.mouse.up();
+	await expect(views).toBeVisible();
+	await views.getByRole('button', { name: 'Favorites', exact: true }).click();
+	await expect(views).toHaveCount(0);
+	await assertSwitcher();
+	await page.reload();
+	await assertSwitcher();
+	await dockTabs.nth(3).press('ArrowDown');
+	await expect(views).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(dockTabs.nth(3)).toBeFocused();
+	for (const colorScheme of ['light', 'dark']) {
+		await page.emulateMedia({ colorScheme });
+		await page.screenshot({ path: 'test-results/settings/' + name + '-switcher-' + colorScheme + '.png' });
+	}
+	await gear.click();
 	await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
 	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await page.locator('.crate-feature-panel[data-active="true"] .pwa-dock').getByRole('button', { name: 'Inbox', exact: true }).click();

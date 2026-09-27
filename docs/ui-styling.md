@@ -157,7 +157,9 @@ tabs retain their selections and fill the remaining slots from the defaults.
 Preferences persist on the device and update across browser tabs.
 **Reset tabs** restores Inbox, Schedule, Projects, and Reading. **Open to** and
 explicit links remain independent of visibility. Pinned Reading destinations open
-directly; the Reading tab retains its view picker for other destinations. The cached
+directly. The last dock slot always opens the Reading view picker on hold or upward
+slide, regardless of its destination; a normal tap still opens that slot’s view.
+A contrasting upward-chevron badge marks this control. The cached
 launch shell uses the same order, visibility, and selection before React starts.
 
 The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented

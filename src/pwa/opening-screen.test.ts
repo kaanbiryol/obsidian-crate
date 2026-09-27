@@ -34,7 +34,7 @@ it.each([
 	}
 	const isProject = Boolean(document.documentElement.dataset.pwaOpeningProject);
 	expect(document.querySelectorAll('[data-icon="settings"]')).toHaveLength(isProject ? 0 : 1);
-	expect(document.querySelectorAll('.pwa-dock svg')).toHaveLength(isProject ? 0 : 11);
+	expect(document.querySelectorAll('.pwa-dock__tab > svg, .pwa-dock__add > svg')).toHaveLength(isProject ? 0 : 10);
 	expect(document.querySelectorAll('.crate-content-loading')).toHaveLength(1);
 	expect(document.querySelector('work')).toBeNull();
 });
@@ -81,4 +81,16 @@ it('selects a pinned Today tab in the cached launch shell', () => {
 	});
 	expect(document.documentElement.dataset.pwaOpeningDockTab).toBe('today-view');
 	expect(document.documentElement.style.getPropertyValue('--pwa-dock-today-active-order')).toBe('1');
+});
+
+it('marks only the last saved dock slot with the startup switch badge', () => {
+	for (const dockTabs of [['reading', 'inbox', 'today', 'browse'], ['archive', 'favorites', 'highlights', 'upcoming']]) {
+		const { document } = parseHTML(`<html><body>${createPwaOpeningScreenHtml()}</body></html>`);
+		new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
+			document, URLSearchParams, location: { search: '' }, localStorage: { getItem: () => JSON.stringify({ dockTabs }) },
+		});
+		for (const [index, tab] of dockTabs.entries()) {
+			expect(document.documentElement.style.getPropertyValue(`--pwa-dock-${tab}-hint`)).toBe(index === 3 ? 'flex' : 'none');
+		}
+	}
 });

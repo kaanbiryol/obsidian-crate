@@ -37,6 +37,7 @@ export function applyOpeningDockPreferences(tabs: readonly DockTab[]): void {
 	for (const tab of ['inbox', 'today', 'today-view', 'upcoming', 'browse', 'reading', 'favorites', 'archive', 'highlights']) {
 		const index = tabs.indexOf(tab as DockTab);
 		root.style.setProperty(`--pwa-dock-${tab}-order`, String(index));
+		root.style.setProperty(`--pwa-dock-${tab}-hint`, index === tabs.length - 1 ? 'flex' : 'none');
 		root.style.setProperty(`--pwa-dock-${tab}-display`, index < 0 ? 'none' : 'flex');
 		root.style.setProperty(`--pwa-dock-${tab}-indicator`, index < 0 ? '0' : '1');
 		const fallback = tab === 'today' && tabs.includes('today-view') ? tabs.indexOf('today-view') : index >= 0 ? index : ['favorites', 'archive', 'highlights'].includes(tab) ? tabs.indexOf('reading') : tab === 'upcoming' ? tabs.indexOf('today') : -1;

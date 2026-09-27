@@ -68,7 +68,7 @@
   .pwa-dock__group { gap: 4px; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
   .pwa-dock__view-icon { animation: pwa-dock-icon-in 160ms ease-out; }
   @keyframes pwa-dock-icon-in { from { opacity: .25; } to { opacity: 1; } }
-  .pwa-dock__group-hint { flex: 0 0 12px; color: var(--text-muted); }
+  .pwa-dock__group-hint { display: flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%; color: var(--text-on-accent); background: var(--interactive-accent); }
   .pwa-dock__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .pwa-dock__add { display: flex; flex: 0 0 60px; align-items: center; justify-content: center; height: 60px; padding: 0; border-radius: 50%; color: var(--text-normal); touch-action: manipulation; }
   .pwa-dock__add > svg { width: 25px; height: 25px; }
@@ -143,6 +143,7 @@
   .pwa-opening-dock [data-opening-destination="#{$tab}"] {
     order: var(--pwa-dock-#{$tab}-order, 0);
     display: var(--pwa-dock-#{$tab}-display, none);
+    .pwa-dock__group-hint { display: var(--pwa-dock-#{$tab}-hint, none); }
   }
   :root[data-pwa-opening-dock-tab="#{$tab}"] .pwa-opening-dock:not([data-opening-tab]) [data-opening-destination="#{$tab}"],
   .pwa-opening-dock[data-opening-selection="#{$tab}"] [data-opening-destination="#{$tab}"] { color: var(--text-normal); }
