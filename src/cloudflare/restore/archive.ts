@@ -2,7 +2,7 @@ import type { CloudflareApiClient } from '../cloudflare-api';
 import { SERVER_RELEASE, validateMigrationHistory } from '../database-upgrades';
 
 export interface BackupSource { account: string; database: string; bucket: string }
-export interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
+interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
 export interface UpgradeBackup { format: 1; complete: true; createdAt: string; source: BackupSource; databaseSha256: string; objects: BackupObject[] }
 export interface BackupChoice { prefix: string; manifest: UpgradeBackup; hash: string }
 export type Cell = string | number | null;
@@ -77,7 +77,7 @@ export function parseBackupRows(sql: string): BackupRow[] {
   }
   return rows;
 }
-export const record = (row: BackupRow): Record<string, Cell> => Object.fromEntries(row.columns.map((column, index) => [column, row.values[index]!]));
+const record = (row: BackupRow): Record<string, Cell> => Object.fromEntries(row.columns.map((column, index) => [column, row.values[index]!]));
 const RESET = new Set(['crate_schema', 'crate_release', 'crate_migrations', 'auth_tokens', 'push_subscriptions', 'web_enrollment_tokens', 'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache', 'object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state', 'reading_sources', 'reading_jobs', 'reading_enrollments', 'reading_handoffs']);
 export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentSchema: string, restoredAt: number): BackupRow[] {
   // Schema 1→2 adds Reading tables; 2→3 adds a defaulted column. Future data
