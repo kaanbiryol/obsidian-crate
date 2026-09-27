@@ -16,6 +16,13 @@
 .pwa-modal-sheet__backdrop[data-swiping]{transition:none}
 .pwa-modal-sheet__content{display:flex;flex-direction:column}
 .pwa-modal-sheet__scroller{flex:1}
+/* Anchor the grabber to the visible surface, including the moving reminder
+   stage. Let touches reach the header and Base UI's existing swipe handling. */
+.crate-reminders-ui .pwa-modal-sheet__container--settings::after,
+.crate-reminders-ui .pwa-reminder-sheet-stage::after{content:"";position:absolute;top:5px;left:50%;z-index:2;width:36px;height:5px;border-radius:999px;background:var(--text-faint);opacity:.4;transform:translateX(-50%);pointer-events:none}
+/* Match Flutter's Cupertino grabber geometry: 5px above, 5px handle, 5px
+   below before content. Include this inset in the measured editor header. */
+.pwa-modal-sheet{--pwa-sheet-header-top-padding:15px}
 @media(prefers-reduced-motion:reduce){
  .pwa-modal-sheet__container,.pwa-modal-sheet__backdrop,.pwa-reminder-sheet-stage{transition-duration:0ms!important}
 }
