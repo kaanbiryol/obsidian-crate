@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/ui/shared/Button';
+import { PwaButton as Button } from '../components/PwaButton';
+import { SettingsSection } from '../components/SettingsSection';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { READING_SHORTCUT_URL } from '@/reading/shortcut';
 import { ReadingApiError, readingRequest } from './api';
@@ -32,13 +33,13 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
     finally { working.current = false; if (alive.current) setBusy(false); }
   };
   return <div className="crate-reading-shortcut">
-    <div className="crate-reading-shortcut__intro"><p>From your share sheet to your reading inbox.</p><span>iOS 27+ · Internet connection required</span></div>
+    <div className="crate-reading-shortcut__intro"><p>Save articles from the iPhone share sheet.</p><span>iOS 27+ · Internet connection required</span></div>
     <ol aria-label="Shortcut setup steps">
-      <li><span className="crate-reading-shortcut__number" aria-hidden="true">1</span><div className="crate-reading-shortcut__step"><h3>Install the shortcut</h3><p>Open the download and select <strong>Add Shortcut</strong>. Saved to Files? Select it in <strong>Downloads</strong>.</p>
-        <a className="crate-action-button" data-variant="outline" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Download Save to Crate</a>
-      </div></li>
-      <li><span className="crate-reading-shortcut__number" aria-hidden="true">2</span><div className="crate-reading-shortcut__step"><h3>Connect your library</h3><p>Create a code, run <strong>Save to Crate (iOS 27)</strong> from <strong>All Shortcuts</strong>, and paste when asked.</p>
-        <Button variant="primary" disabled={busy || !online} onClick={() => void create()}>{busy ? 'Creating code…' : pairing ? 'Create new pairing code' : 'Create pairing code'}</Button>
+      <li><SettingsSection title="1. Install the shortcut"><p>Download <strong>Save to Crate</strong>, then select <strong>Add Shortcut</strong>. If it opens in Files, find it in <strong>Downloads</strong>.</p>
+        <a className="crate-action-button" data-variant="outline" data-size="touch" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Download Save to Crate</a>
+      </SettingsSection></li>
+      <li><SettingsSection title="2. Connect your library"><p>Create a pairing code. In <strong>Shortcuts → All Shortcuts</strong>, run <strong>Save to Crate (iOS 27)</strong> and paste the code when asked.</p>
+        <Button size="touch" variant="outline" disabled={busy || !online} onClick={() => void create()}>{busy ? 'Creating code…' : pairing ? 'Create new pairing code' : 'Create pairing code'}</Button>
         {pairing && !expired && <div className="crate-reading-shortcut__code">
           <CopyableText key={pairing.pairingCode} value={pairing.pairingCode} label="Pairing code" copyLabel="Copy pairing code" alwaysShow
             successMessage="Copied. Open the shortcut from your Shortcuts library and paste when asked."
@@ -53,9 +54,9 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
         {expired && <p role="status">This pairing code expired. Create a new code to continue.</p>}
         {!online && <p role="status">Connect to the internet to pair your shortcut.</p>}
         {error && <p role="alert">{error}</p>}
-      </div></li>
-      <li><span className="crate-reading-shortcut__number" aria-hidden="true">3</span><div className="crate-reading-shortcut__step"><h3>Try it</h3><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong>, then dismiss the sheet.</p></div></li>
+      </SettingsSection></li>
+      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong> before closing the share sheet.</p></SettingsSection></li>
     </ol>
-    <details className="crate-reading-shortcut__privacy"><summary>Privacy and access</summary><p>The shortcut can save links but cannot read your library. Access lasts up to 90 days. Revoke it in Obsidian’s connected devices, or run setup again to reconnect.</p></details>
+    <SettingsSection title="Privacy and access"><p>The shortcut can save links but cannot read your library. Access lasts up to 90 days. Revoke it in Obsidian’s connected devices, or run setup again to reconnect.</p></SettingsSection>
   </div>;
 }

@@ -1,3 +1,5 @@
+@use "rounded-sheet-control";
+
 // Browser sheet geometry and touch targets. Editor presentation is shared.
 @mixin styles {
   // Hidden overflow still allows Safari's focus scrolling. Only the editor body
@@ -43,12 +45,24 @@
 
     .reminder-modal-header {
       flex-shrink: 0;
-      --pwa-header-side-width: 96px;
+      --pwa-header-side-width: 116px;
       border-bottom-color: color-mix(in srgb, var(--crate-divider) 55%, transparent);
     }
 
     .reminder-modal-header-side.is-right {
-      gap: 4px;
+      gap: 8px;
+    }
+
+    // Match Settings navigation while retaining the editor's action layout.
+    .reminder-modal-header :is(.reminder-modal-header-close, .reminder-header-delete, .reminder-modal-header-action) {
+      @include rounded-sheet-control.surface;
+    }
+
+    .reminder-modal-header .reminder-modal-header-action[data-action="save-reminder"] {
+      min-width: 64px;
+      padding-inline: 12px;
+
+      &:not(:disabled)[data-press-active] { opacity: .5; }
     }
 
     .reminder-action-chips {

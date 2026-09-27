@@ -48,7 +48,6 @@ try {
         const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
         await expect(settings.locator('.pwa-update-notice')).toBeVisible();
         await expect(settings.getByRole('button', { name: 'Update to the latest version' })).toHaveCount(1);
-        await settings.getByRole('button', { name: 'About', exact: true }).click();
         await expect(settings.getByRole('button', { name: 'Update app', exact: true })).toHaveCount(0);
         await page.getByRole('button', { name: 'Close settings', exact: true }).click();
         await switchFeature(page, 'Reading');

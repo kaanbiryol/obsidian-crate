@@ -31,7 +31,9 @@ export async function checkPwaScreenGestures(page, target) {
 }
 
 export async function checkPwaTextField(field, { sheet = false } = {}) {
-	await expect(field).toHaveCSS('-webkit-user-select', 'text');
+	// Native inputs keep editable selection with the browser's default `auto`.
+	const nativeInput = await field.evaluate(element => element.matches('input, textarea'));
+	await expect(field).toHaveCSS('-webkit-user-select', nativeInput ? /^(text|auto)$/ : 'text');
 	if (sheet) assert.equal(await field.evaluate(element => !!element.closest('.pwa-screen')), false,
 		'Sheets must keep native editing outside the screen gesture policy');
 }

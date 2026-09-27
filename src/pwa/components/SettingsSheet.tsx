@@ -1,13 +1,13 @@
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { LogOut } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
-import { PWA_NAVIGATION_SPRING } from '../motion';
+import { PwaPushStack } from './PwaPushStack';
+import type { PushedScreenHistory } from '../pushed-screen-history';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { PwaModalSheet } from './PwaModalSheet';
 import { PwaButton as Button } from './PwaButton';
 import { SettingsRow } from './SettingsRow';
-import { SettingsDisclosure } from './SettingsDisclosure';
+import { SettingsSection } from './SettingsSection';
 import { VersionSettings } from './VersionSettings';
 import { DeviceStorageSettings } from './DeviceStorageSettings';
 import { GeneralSettings } from './GeneralSettings';
@@ -25,7 +25,7 @@ import type { CrateSection } from './FeatureSwitcherButton';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'update' | 'logout';
 
-export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: { activeSection: CrateSection; onReviewReminders: () => void; onOpenEnd: () => void }) {
+export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd, navigation }: { navigation: PushedScreenHistory<'shortcut' | 'logout'>; activeSection: CrateSection; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
 	const appUpdate = useAppUpdate();
 	const { reminders, reading } = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -33,18 +33,14 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 	const homeScreen = useHomeScreenInstall();
 	const finish = useCallback(() => store.setOpen(false), [store]);
 	const transition = useSheetTransition(finish);
-	const [page, setPage] = useState<'settings' | 'shortcut' | 'logout'>(() => new URL(location.href).searchParams.get('setup') === 'shortcut' ? 'shortcut' : 'settings');
-	const [syncOpen, setSyncOpen] = useState(false);
+	const { page: detailPage, entryId, immediate, closing } = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot);
+	const page = detailPage ?? 'settings';
 	const [pending, setPending] = useState<ReadonlySet<SettingsAction>>(new Set());
 	const working = useRef(new Set<SettingsAction>());
 	const busy = pending.size > 0;
 	const exclusive = appUpdate.updating || pending.has('update') || pending.has('logout');
 	const [message, setMessage] = useState<string | null>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
-	const reducedMotion = useReducedMotion();
-	const [subpage, setSubpage] = useState<'shortcut' | 'logout' | null>(page === 'settings' ? null : page);
-	const backRef = useRef<HTMLDivElement>(null);
-	const returnFocus = useRef<HTMLElement | null>(null);
 	const ready = Boolean(reminders?.ready && reading?.ready);
 	const unsynced = !ready || Boolean(reminders?.unsynced || reading?.unsynced);
 	const attention = [reminders?.connected && reminders.attention ? 'Reminders: ' + reminders.attention : null, reading?.attention ? 'Reading: ' + reading.attention : null].filter(Boolean);
@@ -52,18 +48,10 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 		: [reminders, reading].some(model => model?.connected && model.status.state === 'offline') ? 'Offline'
 		: [reminders, reading].some(model => model?.connected && model.status.state !== 'synced') ? 'Changes pending'
 		: reminders?.connected || reading?.connected ? 'All changes synced' : 'Not connected';
-	const navigate = (next: typeof page) => {
+	const navigate = (next: 'settings' | 'shortcut' | 'logout') => {
 		setMessage(null);
-		if (next !== 'settings') {
-			setSubpage(next);
-			returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		}
-		setPage(next);
-		requestAnimationFrame(() => {
-			if (next !== 'settings' && backRef.current) backRef.current.scrollTop = 0;
-			if (next === 'settings' && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
-			else backRef.current?.closest('aside')?.querySelector<HTMLElement>('[aria-label="Back to settings"]')?.focus({ preventScroll: true });
-		});
+		if (next === 'settings') navigation.back();
+		else navigation.push(next);
 	};
 	const run = async (key: SettingsAction, action: () => void | Promise<unknown>) => {
 		if (working.current.has(key) || working.current.has('update') || working.current.has('logout')
@@ -88,58 +76,24 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 	</>;
 
 	const close = () => {
-		if (exclusive) return false;
+		if (exclusive || closing) return false;
 		if (page !== 'settings') { navigate('settings'); return false; }
 		transition.requestClose();
 		return true;
 	};
-	const title = page === 'shortcut' ? 'Set up iPhone shortcut' : page === 'logout' ? 'Log out of Crate?' : 'Settings';
+	const pageTitle = (screen: typeof page) => screen === 'shortcut' ? 'Set up iPhone shortcut' : screen === 'logout' ? 'Log out of Crate?' : 'Settings';
+	const title = pageTitle(page);
+	const header = (screen: typeof page) => <>
+		<ModalHeader title={pageTitle(screen)} navigation={screen === 'settings' ? 'dismiss' : 'back'} closeLabel={screen === 'settings' ? 'Close settings' : 'Back to settings'}
+			closeDisabled={exclusive || closing || transition.isClosing} onClose={close} />
+		{page === screen && message && <p className="settings-feedback" role="alert">{message}</p>}
+	</>;
 	return <PwaModalSheet isOpen={!transition.isClosing} onClose={close} onCloseEnd={transition.finishClose}
 		onOpenEnd={onOpenEnd} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing}>
-		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
-			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
-				closeDisabled={exclusive || transition.isClosing} onClose={close} />
-			{message && <p className="settings-feedback" role="alert">{message}</p>}
-			<div className="settings-stack" data-base-ui-swipe-ignore="">
-				<motion.div layoutScroll ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
-					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '0%' : '-25%', opacity: page === 'settings' ? 1 : 0 }}
-					transition={reducedMotion ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
-					{attention.length > 0 && <div className="settings-attention" role="status">
-						{attention.map(text => <p key={text}>{text}</p>)}
-						<Button size="touch" variant="ghost" onClick={() => { setSyncOpen(true); requestAnimationFrame(() => panelRef.current?.querySelector('.settings-disclosure')?.scrollIntoView({ block: 'nearest' })); }}>Review sync</Button>
-					</div>}
-					<PwaUpdateNotice disabled={busy || unsynced} />
-					<PwaUpdateFeedback />
-					<GeneralSettings preferences={preferences} onChange={changePreferences} />
-					<TabSettings preferences={preferences} onChange={changePreferences} />
-					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
-					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
-					<SettingsDisclosure title="Sync and device" summary={status} open={syncOpen} onOpenChange={setSyncOpen}>
-						<div className="settings-group">
-							<SettingsRow title="Reminders" description={!reminders?.ready ? 'Checking…' : reminders.connected ? reminders.status.label : 'Not connected'} />
-							<SettingsRow title="Reading" description={reading?.unavailable ?? (!reading?.ready ? 'Checking…' : reading.connected ? reading.status.label : 'Not connected')} />
-							{reading?.issues}
-							<DeviceStorageSettings />
-							{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
-						</div>
-						<div className="settings-actions">
-							<Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('refresh') || !ready} onClick={() => void run('refresh', refreshAll)}>Refresh all</Button>
-							{exports}
-							{reminders?.attention && <Button size="touch" className="settings-action-button" onClick={() => { finish(); onReviewReminders(); }}>Review reminders</Button>}
-						</div>
-						{reminders?.recovery}
-						{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
-					</SettingsDisclosure>
-					<SettingsDisclosure title="About">
-						<VersionSettings />
-						{!appUpdate.version && <Button size="touch" className="settings-action-button" disabled={busy || unsynced || exclusive} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : 'Update app'}</Button>}
-						{unsynced && !appUpdate.version && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
-					</SettingsDisclosure>
-					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
-				</motion.div>
-				<motion.div ref={backRef} className="settings-panel settings-detail" onAnimationComplete={() => { if (page === 'settings') setSubpage(null); }} inert={page === 'settings'} aria-hidden={page === 'settings'}
-					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '100%' : '0%', opacity: reducedMotion && page === 'settings' ? 0 : 1 }}
-					transition={reducedMotion ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
+		<aside data-pwa-back={!!detailPage && !exclusive && !closing} className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
+			<PwaPushStack page={detailPage} entryId={entryId} immediate={immediate} onBackComplete={navigation.finishBack} rootRef={panelRef}
+				rootHeader={header('settings')} renderHeader={header}
+				rootClassName="settings-panel settings-main" detailClassName="settings-panel settings-detail" renderPage={subpage => <>
 				{subpage === 'shortcut' && <div className="crate-reading settings-subpage">
 					{reading?.shortcut ?? <p>{reading?.ready ? 'Connect Reading in Obsidian to set up the shortcut.' : 'Loading Reading settings…'}</p>}
 				</div>}
@@ -157,8 +111,40 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 						})}>{pending.has('logout') ? 'Logging out…' : 'Log out and clear device data'}</Button>
 					</div>
 				</div>}
-				</motion.div>
-			</div>
+				</>}>
+					{attention.length > 0 && <div className="settings-attention" role="status">
+						{attention.map(text => <p key={text}>{text}</p>)}
+						<Button size="touch" variant="ghost" onClick={() => { panelRef.current?.querySelector('[data-settings-sync]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>Review sync</Button>
+					</div>}
+					<PwaUpdateNotice disabled={busy || unsynced} />
+					<PwaUpdateFeedback />
+					<GeneralSettings />
+					<TabSettings preferences={preferences} onChange={changePreferences} />
+					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
+					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
+					<div data-settings-sync=""><SettingsSection title="Sync and device" description={status}>
+						<div className="settings-group">
+							<SettingsRow title="Reminders" description={!reminders?.ready ? 'Checking…' : reminders.connected ? reminders.status.label : 'Not connected'} />
+							<SettingsRow title="Reading" description={reading?.unavailable ?? (!reading?.ready ? 'Checking…' : reading.connected ? reading.status.label : 'Not connected')} />
+							{reading?.issues}
+							<DeviceStorageSettings />
+							{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
+						</div>
+						<div className="settings-actions">
+							<Button size="touch" className="settings-action-button" disabled={exclusive || pending.has('refresh') || !ready} onClick={() => void run('refresh', refreshAll)}>Refresh all</Button>
+							{exports}
+							{reminders?.attention && <Button size="touch" className="settings-action-button" onClick={() => { finish(); onReviewReminders(); }}>Review reminders</Button>}
+						</div>
+						{reminders?.recovery}
+						{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
+					</SettingsSection></div>
+					<SettingsSection title="About">
+						<VersionSettings />
+						{!appUpdate.version && <Button size="touch" className="settings-action-button" disabled={busy || unsynced || exclusive} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : 'Update app'}</Button>}
+						{unsynced && !appUpdate.version && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
+					</SettingsSection>
+					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
+			</PwaPushStack>
 		</aside>
 	</PwaModalSheet>;
 }

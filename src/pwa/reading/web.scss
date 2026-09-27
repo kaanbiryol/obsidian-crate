@@ -45,30 +45,25 @@
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
 .crate-reminders-ui .crate-reading-welcome p { color: var(--text-muted); line-height: 1.8; font-size: 14px; }
 
-// A quiet, numbered setup flow, using the same controls and palette as Reading.
+// Shortcut setup uses the same sections, surfaces and action controls as Settings.
 .crate-reminders-ui .crate-reading-shortcut {
   min-width: 0;
-  padding-top: 16px;
-  font-size: 14px;
-  line-height: 1.55;
-  p { margin: 0 0 14px; color: var(--text-muted); }
+  padding: 8px 0 16px;
+  font-size: var(--pwa-font-caption);
+  line-height: 1.5;
+  p { margin: 0; color: var(--text-muted); }
   strong { color: var(--text-normal); font-weight: 500; }
-  &__intro { padding-bottom: 24px; }
-  &__intro p { margin-bottom: 6px; color: var(--text-normal); font-size: 16px; letter-spacing: -.015em; }
-  &__intro span { color: var(--text-muted); font-size: 12px; }
+  &__intro { padding: 8px 2px 0; }
+  &__intro p { color: var(--text-normal); font-size: var(--pwa-font-body); }
+  &__intro span { display: block; margin-top: 6px; color: var(--text-faint); font-size: var(--pwa-font-detail); }
   ol { list-style: none; padding: 0; margin: 0; }
-  li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; padding: 22px 0; border-top: 1px solid var(--background-modifier-border); }
-  &__number { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--background-modifier-border); border-radius: 50%; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  &__step { min-width: 0; }
-  h3 { margin: 2px 0 8px; color: var(--text-normal); font-size: 14px; line-height: 1.5; font-weight: 600; letter-spacing: -.01em; }
-  .crate-action-button { min-height: 44px; max-width: 100%; white-space: normal; text-align: center; text-decoration: none; }
-  &__code { display: grid; gap: 10px; margin-top: 16px; }
-  &__code label { font-size: 12px; color: var(--text-muted); }
-  &__code p { font-size: 12px; }
-  &__privacy { padding: 4px 0 8px; color: var(--text-muted); font-size: 12px; }
-  &__privacy summary { min-height: 44px; align-content: center; cursor: pointer; }
-  &__privacy p { margin: 4px 0 0; }
-  [role="alert"] { margin-top: 12px; color: var(--text-error); }
+  .settings-panel__section > .settings-group { padding: 14px; }
+  .crate-action-button { width: 100%; min-height: 44px; margin-top: 14px; }
+  &__code { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--crate-divider); }
+  &__code .crate-action-button { margin-top: 0; }
+  &__code label, &__code p { font-size: var(--pwa-font-detail); }
+  &__code input { font-size: 16px; }
+  [role="alert"] { margin-top: 12px; color: var(--crate-danger); }
   [role="status"] { margin-top: 12px; }
 }
 

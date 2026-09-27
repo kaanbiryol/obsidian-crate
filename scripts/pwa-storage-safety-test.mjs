@@ -30,7 +30,6 @@ try {
      if (failure === 'cache') IDBFactory.prototype.deleteDatabase = () => { throw new DOMException('Storage denied', 'SecurityError'); };
     }, failure);
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    await page.getByRole('button', { name: /^Sync and device/ }).click();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
     await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
     console.log(`${type.name()}: checking ${failure} cleanup`);
@@ -55,7 +54,6 @@ try {
     }, granted);
     await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    await page.getByRole('button', { name: /^Sync and device/ }).click();
     if (granted === null) await expect(page.getByText('Storage protection is unavailable', { exact: false })).toBeVisible();
     else {
      const protect = page.getByRole('button', { name: 'Protect offline data', exact: true });
@@ -97,7 +95,6 @@ try {
    await page.context().setOffline(true);
    await expect(page.getByRole('region', { name: 'Changes on this device', exact: true })).toHaveCount(0);
    await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    await page.getByRole('button', { name: /^Sync and device/ }).click();
    const downloadPromise = page.waitForEvent('download');
    await page.getByRole('button', { name: 'Export unsynced reminders', exact: true }).click();
    const download = await downloadPromise;
