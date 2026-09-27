@@ -1,3 +1,5 @@
+@use "focus";
+
 @mixin styles {
 	.crate-text-input {
 		box-sizing: border-box;
@@ -33,11 +35,10 @@
 	.crate-field__error { color: var(--text-error); }
 	.crate-field--search {
 		.crate-field__control { gap: 9px; padding: 0 var(--crate-field-padding-inline, 12px); background: var(--crate-control-bg); border: 1px solid var(--crate-divider); border-radius: var(--crate-field-radius, var(--crate-radius-control, 8px)); }
-		.crate-field__control:focus-within { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
+		.crate-field__control { @include focus.within; }
 		.crate-field__icon { position: static; flex: none; }
 		.crate-text-input { min-height: calc(var(--crate-field-height) - 2px); padding: 8px 0; border: 0; border-radius: 0; background: transparent; }
 		.crate-field__control:has([aria-invalid="true"]) { border-color: var(--text-error); }
-		.crate-text-input:focus { outline: none; box-shadow: none; }
 		.crate-icon-button { flex: 0 0 44px; }
 		&.crate-field--with-action .crate-text-input::-webkit-search-cancel-button { display: none; }
 	}
