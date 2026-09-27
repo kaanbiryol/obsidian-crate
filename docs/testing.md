@@ -1,5 +1,17 @@
 # Testing
 
+## Unified PWA settings
+
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`
+for Chromium and WebKit coverage of both settings entry points, retained view/search
+and focus, shared theme and preferences, Reading launch destinations, explicit-link
+precedence, shortcut navigation, pending Reading exports from Reminders, and shared
+logout. The test uses the built client, local synthetic APIs, and native browser
+storage; screenshots include light/dark, 320px phone, and desktop layouts.
+Run the storage-safety, sheet-interaction, and Reading shortcut browser checks for
+cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
+keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
+
 ## Framework and Config
 
 - **Framework:** vitest
@@ -335,12 +347,19 @@ ignoring title-like text in scripts, comments, attributes, and other raw-text el
 Outbound page responses are controlled fixtures; these tests do not contact websites
 or establish physical-device, installed-PWA, or hosted-network acceptance.
 
-Avoid rebuilding the generated styles from another task during browser tests: the
-visual gallery imports `dist/styles.css`, and Vite can reload an active fixture when
-that file changes. For concurrent work, build the gallery once with
-`npx vite build --config vite.visual.config.mts --outDir /tmp/crate-title-gallery`,
-serve that snapshot with `npx vite preview --config vite.visual.config.mts --outDir /tmp/crate-title-gallery --host 127.0.0.1 --port 8790`,
-and run the Playwright command against that existing server.
+Playwright starts a private static gallery for each visual run. It snapshots the
+built plugin stylesheet before bundling the gallery, chooses an available loopback
+port, and never reuses the live preview. Rebuilding or removing `dist/` after that
+snapshot cannot reload or break active fixtures. Build the plugin before starting
+tests; a missing stylesheet fails with an actionable error. Source changes made
+after the snapshot require a new run.
+
+The gallery snapshot stays in `.generated/visual-runs/<run-id>/`; results and HTML
+reports stay in `test-results/visual-<run-id>/` and
+`playwright-report/visual-<run-id>/`. These ignored directories can be removed after
+review. `npm run preview:ui` remains the live editing server on port 8790.
+`npm run test:ci` checks that concurrent gallery snapshots retain their own styles
+even after the input stylesheet changes or disappears.
 
 Whole-vault history restore is covered by `src/sync/history-restore.test.ts`,
 `src/sync/runtime-history-restore.test.ts`, and

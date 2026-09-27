@@ -12,7 +12,7 @@ A user shares an article from their phone, sees it in Crate's reading inbox, rea
 
 - Reading inbox, archive, favorites, tags, and title/source/tag search in Obsidian and the web app.
 - Save a URL from either host, an iPhone Shortcut, or an installed Android web share target.
-- Import desktop Obsidian Web Clipper captures using a provided **Crate Reading** template and existing vault sync.
+- Import desktop Obsidian Web Clipper captures from the Reading folder using existing vault sync.
 - Extract public HTML articles into Markdown asynchronously; retain a useful bookmark when extraction fails.
 - Read cached article text offline in the web app; queue supported changes safely.
 - Open the source, open the note in Obsidian, archive/unarchive, favorite/unfavorite, and edit tags.
@@ -26,7 +26,7 @@ Deferred: RSS, newsletters, PDFs, video transcripts, AI features, full-library b
 
 Reading is off by default. **Settings → Crate → Reading** enables it and selects a folder, defaulting to `Reading/`. Explain that saving a URL sends it to the user's Worker, which requests the source website and stores extracted text in their vault. The website sees the server request; extraction does not use the user's browser login.
 
-Validate the folder against portable sync paths and ignore rules. Do not allow overlap with the configured reminders folder. Never rewrite unrelated notes in an existing folder. Index only explicitly marked Reading notes. Initial release folder changes require Reading to be disabled and pending work resolved; no automatic migration of notes or grants. Re-enabling for another folder requires fresh web/capture enrollment.
+Validate the folder against portable sync paths and ignore rules. Do not allow overlap with the configured reminders folder. Adopt every Markdown note in the selected folder and its subfolders; never adopt notes outside it. Initial release folder changes require Reading to be disabled and pending work resolved; no automatic migration of notes or grants. Re-enabling for another folder requires fresh web/capture enrollment.
 
 Local Reading notes and views work without a server. Server extraction and phone-to-server capture require a connected, compatible deployment. A local URL-only save creates a bookmark that can be enriched after it reaches the server; Web Clipper supplies its own extracted content.
 
@@ -42,17 +42,17 @@ Add a **Reminders / Reading** section switch to the existing web app. Preserve i
 
 ### Desktop Web Clipper capture
 
-Provide **Settings → Crate → Reading → Export Web Clipper template**. Generate an importable JSON template named **Crate Reading** for the selected vault and Reading folder. Use Web Clipper's **Create a new note** behavior, populated title/source/author/date properties, and `{{content}}` for the Markdown body. Users import it once through Web Clipper settings; no fork of the extension, server credential, or new extension-to-Worker API is needed. Template exports contain the configured vault/folder names, which setup should make clear. Changing the configured folder requires updating the template.
+One-time setup: set Obsidian Web Clipper's destination to the configured Reading folder in the intended vault. Use its default template or a personal template; no Crate-specific template or property is required. The settings UI explains that every Markdown note in the folder and its subfolders becomes a Reading item. Changing the folder requires changing Clipper's destination too and does not move existing files.
 
-Daily flow: **Web Clipper → Crate Reading → Add to Obsidian**. Web Clipper creates the note in the selected vault; Crate detects it, registers it as an inbox item, and existing automatic sync uploads it. It then appears in the enrolled web app on refresh/reconciliation. Offline desktop capture stays local until sync resumes. With automatic sync disabled, the user selects **Crate: Sync now**. Saving through Clipper must not be described as a confirmed server save.
+Daily flow: **Web Clipper → Add to Obsidian**. Crate detects the saved note, registers it as an inbox item, and existing automatic sync uploads it. It then appears in the enrolled web app on refresh/reconciliation. With automatic sync disabled, select **Crate: Sync now**. Saving through Clipper is a local save; it does not confirm a server save.
 
-Folder membership alone does not adopt arbitrary Markdown. The template supplies the explicit import marker `crate_reading_import: web-clipper-v1` and source metadata. It must not require a nonexistent Clipper UUID variable. Crate's local import normalizer fills missing canonical metadata and identity using a conditional vault update, preserving the filename, body, and user properties. Derive the initial UUID deterministically from a fixed versioned namespace plus the normalized initial vault-relative path and exact pre-adoption bytes; two devices receiving the same unadopted file converge. Once persisted, never derive the ID again. Invalid or ambiguous imports remain intact and show a source issue. Debounce create/modify events and retry only against unchanged input to avoid adopting an incomplete write.
+Folder membership is sufficient to adopt Markdown. Existing `crate_reading_import: web-clipper-v1` templates remain compatible but are no longer generated or required. The local normalizer fills missing canonical metadata and identity using a conditional vault update, preserving filenames, bodies, and custom properties. Derive the initial UUID deterministically from the existing versioned namespace plus the normalized initial vault-relative path and exact pre-adoption bytes. Once persisted, never derive the ID again. Invalid or ambiguous imports remain intact and show a source issue. Debounce create/modify events and retry only against unchanged input.
 
-A normalized clip has `capture_method: web-clipper`, `reading_status: inbox`, `favorite: false`, and `extraction_status: ready` when it contains usable saved text; use `unavailable` for a link-only clip. Preserve explicit valid user values and normalize a captured timestamp with an offset to UTC. The template emits a timestamp with an explicit offset; validate its actual export against the supported Clipper version. IDs and defaults may be absent only in marked, unnormalized imports. The Worker does not independently adopt these files or fetch their URLs while waiting for the normalized revision.
+Read source URLs from `source_url`, `source`, or `url`, in that order. If absent, store an empty `source_url` and show a vault note without original/share actions. Fall back to the filename for title and the file modification timestamp for saved date. Normalize Clipper author lists to display text and scalar tags to a list. A normalized import has `capture_method: web-clipper`, `reading_status: inbox`, `favorite: false`, and `extraction_status: ready` when it has saved text; otherwise use `unavailable`. Preserve explicit valid reading values. The Worker indexes normalized notes only and never fetches imported notes, even those without text.
 
 Treat Clipper's Markdown as the captured article, including selections, highlights, and personal additions. Do not add extraction-owned markers to this body or automatically fetch/re-extract it, even when empty. A future user-requested replacement requires preview and explicit acceptance. Preserve image links in the source note, but the Crate reading views suppress remote article image loading and apply safe Markdown rendering; normal Obsidian editing/preview behavior is controlled by Obsidian. Source badges may load HTTPS favicons directly from their hosts and fall back to letters when unavailable. Offline availability guarantees cached text only.
 
-If Clipper creates another file for a previously saved URL, preserve both notes and flag the duplicate; do not silently delete or merge them. The import template must use create-new behavior and the tested host collision handling, rather than append to or overwrite a prior article. This path captures what Clipper can read from the loaded page, which can differ from what a server fetching only the URL receives.
+If Clipper creates another file for a previously saved URL, preserve both notes and flag the duplicate; do not silently delete or merge them. Clipper should use create-new behavior and the tested host collision handling, rather than append to or overwrite a prior article. This path captures what Clipper can read from the loaded page, which can differ from what a server fetching only the URL receives.
 
 ### iPhone capture
 
@@ -130,7 +130,7 @@ Article text will appear here when available.
 ## My notes
 ```
 
-Required: version, ID, title, source URL, saved date, reading status (`inbox` or `archived`), favorite, tags, and extraction status (`pending`, `ready`, or `unavailable`). Author and resolved URL are optional. Serialize frontmatter with a safe YAML serializer; imported text cannot add properties or escape into Markdown structure. Dates are UTC ISO strings, tags are strings, and unknown user properties must survive edits.
+Required: version, ID, title, source URL (empty for imported notes without a web source), saved date, reading status (`inbox` or `archived`), favorite, tags, and extraction status (`pending`, `ready`, or `unavailable`). Author and resolved URL are optional. Serialize frontmatter with a safe YAML serializer; imported text cannot add properties or escape into Markdown structure. Dates are UTC ISO strings, tags are strings, and unknown user properties must survive edits.
 
 The body, including personal notes, is canonical Markdown. Extraction may replace only the initial, unchanged managed article block. Store its expected hash in the extraction job. Strip reserved marker strings from extracted content. If the user changes/removes the block or malformed/duplicate markers appear, preserve the file and stop automatic replacement. Offer explicit review of a new extraction; never overwrite an edited article on retry. Metadata changes patch only owned fields and preserve other text.
 
@@ -144,7 +144,7 @@ Reuse existing file namespace validation, staged immutable R2 objects, condition
 
 A server capture stages the bookmark and atomically publishes file metadata, changelog, capture receipt, identity/URL reservation, and extraction job. R2 and D1 are not one transaction: failed publication leaves a tracked staged object for existing cleanup, not a visible reading item. A durable acknowledgment means the bookmark was published, not merely that a background promise started.
 
-Local Obsidian saves use vault APIs and existing sync. Committed canonical Reading notes from any writer enqueue projection through commit effects; enrichment is only eligible for URL-only captures with a verified pending managed block. Web Clipper imports bypass enrichment. An unnormalized marked import may arrive through sync first; retain it as a pending source until the plugin publishes its normalized revision, without exposing an incomplete reading item or fetching the URL. Local saves awaiting sync show that state. Concurrent local/server captures of the same URL are reconciled as duplicate sources without deleting either note or merging personal notes automatically.
+Local Obsidian saves use vault APIs and existing sync. Committed canonical Reading notes from any writer enqueue projection through commit effects; enrichment is only eligible for URL-only captures with a verified pending managed block. Web Clipper imports bypass enrichment. An unnormalized folder import may arrive through sync first; retain it as a pending source until the plugin publishes its normalized revision, without exposing an incomplete reading item or fetching the URL. Local saves awaiting sync show that state. Concurrent local/server captures of the same URL are reconciled as duplicate sources without deleting either note or merging personal notes automatically.
 
 Archive, favorite, and tags use semantic preconditions plus file revision compare-and-swap. Preserve concurrent body changes by rereading and applying only a still-valid metadata patch; otherwise return a conflict with the current state. Extraction also verifies current identity, policy generation, file revision, and managed-block hash before publishing. Deletes, moves, and policy changes cannot be undone by a delayed job.
 
@@ -220,7 +220,7 @@ Logout clears Reading credentials, cache, and pending private content across tab
 
 ## Implementation boundaries
 
-- `src/reading/`: schema/parser, URL identity, repository contracts, local index/watcher, Web Clipper template export and import normalization, metadata writer, shared reading components, commands and view registration.
+- `src/reading/`: schema/parser, URL identity, repository contracts, local index/watcher, Reading-folder import normalization, metadata writer, shared reading components, commands and view registration.
 - `src/cloudflare/worker/reading/`: capture, projection, safe extraction, jobs, receipts, API handlers and scope checks.
 - `src/pwa/reading/`: web API, cache/outbox adapters, host views and share handling.
 - Existing plugin settings/lifecycle: opt-in, folder policy, runtime registration and cleanup.
@@ -236,8 +236,8 @@ Preserve file content hashes, storage keys, device credentials, reminder receipt
 
 ## Delivery sequence
 
-1. Prove Defuddle plus a DOM implementation, outbound fetch restrictions, and bundle impact on both runtime profiles; prototype Shortcut pairing and Clipper template import. See plan milestone 0 for evidence needed before choosing dependencies.
-2. Implement the Markdown contract, local Reading runtime/view, and Web Clipper template/import. Use the existing file sync and preserve captured bodies.
+1. Prove Defuddle plus a DOM implementation, outbound fetch restrictions, and bundle impact on both runtime profiles; prototype Shortcut pairing and Clipper folder import. See plan milestone 0 for evidence needed before choosing dependencies.
+2. Implement the Markdown contract, local Reading runtime/view, and Reading-folder import. Use the existing file sync and preserve captured bodies.
 3. Implement tested upgrades for both hosting modes, Reading policy/credentials, atomic server capture, projection, and durable retry records.
 4. Add bounded extraction jobs and guarded publication, with preserved personal edits and graceful link-only outcomes.
 5. Add Reading to the existing PWA with independent enrollment, safe reader rendering, offline cache and pending changes.
@@ -251,7 +251,7 @@ Each step is independently testable; the first user-facing release includes the 
 - Real Worker/D1/R2 tests: simultaneous captures; lost acknowledgment/retry; transaction failure after staging; receipt expiry; deletion followed by replay; projection rebuild; extraction lease recovery; edits/moves/deletes during extraction; policy invalidation; exact scope isolation and destination restrictions.
 - Hosting/upgrade tests: fresh and populated schema-1 cloud/local installations, checkpoint creation failure, interrupted/repeated migrations, token-table preservation, coordinator restart, self-hosted maintenance recovery, and restore from verified pre-upgrade backups. A new schema must not require vault re-upload.
 - Sync integration: server-created article downloads normally; local edits survive enrichment and metadata changes; local duplicate captures preserve both notes; retained history and paired recovery include new operational records.
-- Desktop Clipper integration: import the generated template into the supported extension version and capture through **Add to Obsidian**. Verify configured vault/folder, title collisions, typed properties and timestamp, idempotent normalization across devices, unnormalized uploads, moves, duplicate URLs, preserved selections/body bytes, and zero server extraction calls for imported clips. Ordinary unmarked notes in the folder remain untouched. Check paused/offline automatic sync and source image preservation versus safe reader display.
+- Desktop Clipper integration: save with the default template into the configured Reading folder and capture through **Add to Obsidian**. Verify configured vault/folder, title collisions, typed properties and timestamp, idempotent normalization across devices, unnormalized uploads, moves, duplicate URLs, preserved selections/body bytes, and zero server extraction calls for imported clips. Ordinary unmarked notes in the folder are imported; notes outside it remain untouched. Check paused/offline automatic sync and source image preservation versus safe reader display.
 - Browser tests: offline capture draft, dispatched request replay, quota failure, body eviction, expired session, logout, multiple tabs, service-worker update, and protocol mismatch. Verify keyboard navigation and screen-reader labels.
 - Physical devices: Safari share-sheet Shortcut installation/pairing and daily save; actual installed Android share target; installed iPhone/Android reader reopened offline. Desktop browser emulation is not evidence for these flows.
 - Branded handoff: browser without a Reading session, normal/duplicate saves, lost preparation or commit responses, reload, early close, expiry, credential revocation, wrong-origin launch rejection, fragment removal, no private caching, and no access beyond the prepared operation. Verify visible success follows the bookmark receipt and never waits for extraction.
@@ -260,7 +260,7 @@ Each step is independently testable; the first user-facing release includes the 
 
 Acceptance scenario: with Obsidian closed, share a public article from a phone and receive durable save confirmation. Open its extracted text in Crate, verify **Available offline**, enable airplane mode, reopen and read it, then archive it. Reconnect and sync Obsidian: exactly one article note appears with its source, text, and archived state. Repeat with extraction failure and a lost response; the bookmark remains accessible and retries do not create another active item.
 
-Desktop acceptance: install the exported **Crate Reading** template, clip an article into the configured vault folder, and confirm it appears in the local inbox and then the web inbox through ordinary sync. The article body stays exactly as saved by Clipper, including a deliberately selected excerpt; the Worker makes no extraction request. Archive it on the phone and verify the original note's metadata updates without changing its filename or body.
+Desktop acceptance: use the default Clipper template to save an article into the configured vault folder, and confirm it appears in the local inbox and then the web inbox through ordinary sync. The article body stays exactly as saved by Clipper, including a deliberately selected excerpt; the Worker makes no extraction request. Archive it on the phone and verify the original note's metadata updates without changing its filename or body.
 
 ## References
 

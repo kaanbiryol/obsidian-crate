@@ -381,3 +381,9 @@ retention, cleanup, restore validation, and older-server behavior.
 Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
 
 `POST /reading/shortcut-exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Both routes require the normal mutation protocol header, have separate per-minute action limits, and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+
+Reading updates also accept optional `highlights` alongside their `before.highlights`
+precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader
+text), and the exact `text`. Notes without this property remain valid. Limits are
+100 entries, 4,000 characters per entry, and 16,000 total characters. The existing
+mutation receipts and conflict checks apply; Markdown article bodies are preserved.

@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, Web Clipper template, and iPhone/Android capture flows. Server revision 66 upgrades schema 1 to schema 2; protocol 11 stays compatible.
+This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Server revision 66 upgrades schema 1 to schema 2; protocol 11 stays compatible.
 
 ## Try the browser now
 
@@ -14,9 +14,9 @@ Save a public article, wait for extraction, open it, favorite it, add tags, arch
 2. In **Settings → Crate → Reading**, enable Reading on this device. Use **Crate: Add reading link** and **Crate: Open reading**. These work locally before connecting a server.
 3. Connect the test vault to a server built from this branch. For a fresh local server, use `npm run server -- start --local --data-dir ./test-results/reading-server`. For phone access, use the existing HTTPS server/tunnel setup described in the README.
 4. Select **Enable server reading**. An already enrolled Reminders web app should open Reading through its feature switch without another setup link. For a browser without a Reminders connection, select **Open web reading** or use **Copy setup link** on another device. Setup links expire after 10 minutes and are single use.
-5. Select **Copy template**, import it from the clipboard in Obsidian Web Clipper, and save with **Crate Reading** into the test vault. Crate preserves the clip's body and filename; it appears in the web library after normal sync. With automatic sync off, select **Crate: Sync now**.
+5. Set Obsidian Web Clipper's destination to the Reading folder in the test vault and save with its default template. No Crate template or properties are required. Confirm it appears in the inbox, then favorite and archive it. Crate preserves the clip's body and filename; it appears in the web library after normal sync. With automatic sync off, select **Crate: Sync now**. Also test a plain Markdown note without frontmatter, a nested folder, an old Crate Reading template, and a note outside Reading (which must remain untouched). Notes without links should have no **Original**, **Share article**, or extraction retry action.
 
-The reader suppresses remote article images and active HTML. Source badges may request HTTPS favicons and fall back to letters when offline or unavailable. **Open note** uses Obsidian's normal Markdown rendering. Unmarked notes are not adopted. Changes to Reading metadata preserve personal notes and unknown YAML properties.
+The reader suppresses remote article images and active HTML. Source badges may request HTTPS favicons and fall back to letters when offline or unavailable. **Open note** uses Obsidian's normal Markdown rendering. All Markdown notes inside the Reading folder are adopted; notes outside it are untouched. Changes to Reading metadata preserve personal notes and unknown YAML properties.
 
 ## Test iPhone
 
@@ -71,3 +71,15 @@ Extraction uses Defuddle 0.19.4 and linkedom 0.18.12 with asynchronous fallbacks
 Login-only pages, JavaScript-only pages, bot protection, large pages, unsupported destinations, and failed fetches remain usable saved links. The queue holds up to 1,000 extraction jobs and retries fetch failures up to three times. Public capture is limited to 30 requests per minute per credential; Reading writes share a 500-per-day credential budget and the deployment's edge admission limit. These requests, database operations, alarms, and saved files use the deployment's ordinary hosting resources.
 
 The revised iPhone sheet flow, Android installation, an installed Obsidian/Web Clipper round trip, and a live Cloudflare upgrade/extraction run remain device/deployment acceptance checks. They are not implied by the automated browser and workerd results. No production deployment is changed by building or running the sandbox.
+
+Selection highlighting: after `npm run build:worker`, run
+`node --test scripts/reading-highlights.browser.test.mjs`. Chromium and WebKit
+exercise automatic highlighting on selection release, both resize handles across
+inline formatting and paragraphs, canceled drags, removal, repeated
+undispatched edits offline, reopening, and server confirmation. Chromium also
+reloads the cached app offline. Article extraction is a deterministic fixture;
+the built PWA, IndexedDB, Worker mutations, and receipts are real. Check the
+native long-press selection, release timing, handle dragging, and edge scrolling
+separately on an installed iPhone. The same browser test also creates, resizes,
+and deletes a highlight deep in a long article, asserting stable scroll position
+and retained paragraph nodes through server confirmation.

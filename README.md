@@ -73,10 +73,18 @@ or page referrer with the image. Each browser or Obsidian device may cache icons
 independently and may request them again. A letter appears when an icon cannot
 load, including offline. Article images remain suppressed.
 
-For desktop capture, select **Copy template**, import it in Obsidian Web Clipper,
-and save using **Crate Reading** into the intended vault. Crate adopts explicitly
-marked clips, preserves their body and filename, and syncs them. It never re-extracts
-clips or adopts unrelated notes. Changing the Reading folder does not move files.
+For desktop capture, set Obsidian Web Clipper to save into Crate's Reading folder
+in the intended vault, then clip normally. No Crate template is needed. Every
+Markdown note in that folder and its subfolders appears in Reading. Crate adds
+reading status, favorites, and identity automatically, preserves the body and
+filename, and syncs the note without re-extracting it. Existing Crate Reading
+templates still work. Notes without a source URL appear as vault notes.
+Changing the Reading folder does not move files.
+
+Select **Tags** in an article to add or remove comma-separated tags. Clipper's
+existing tags carry over automatically. Filter by tag in the desktop sidebar or
+the **Tags** selector on smaller screens. Tags are saved in the note's `tags`
+property and sync with the article; no special Clipper template is needed.
 
 On iPhone with iOS 27 or later, open the web app’s **Reading settings → Set up
 iPhone shortcut**. Download **Save to Crate**, select **Add Shortcut**, then create
