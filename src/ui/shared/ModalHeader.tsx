@@ -18,6 +18,7 @@ interface ModalHeaderProps {
     title?: string;
     titleId?: string;
     closeLabel: string;
+    navigation?: 'dismiss' | 'back';
     onClose: () => void;
     action?: ModalHeaderAction;
     secondaryActions?: React.ReactNode;
@@ -36,6 +37,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
     title,
     titleId,
     closeLabel,
+    navigation = 'dismiss',
     onClose,
     action,
     secondaryActions,
@@ -48,11 +50,11 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
             <IconButton
                 disabled={closeDisabled}
                 preventFocusOnPress={preventFocusOnPress}
-                icon="x"
+                icon={navigation === 'back' ? 'chevron-left' : 'x'}
                 iconSize="m"
                 onClick={onClose}
                 label={closeLabel}
-                title="Close"
+                title={navigation === 'back' ? 'Back' : 'Close'}
                 className="reminder-modal-header-close"
             />
         </div>
