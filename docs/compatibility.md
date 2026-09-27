@@ -79,3 +79,11 @@ One-off and repeating editor schedules accept timezone suffixes, for example `to
 Revision 67 adds `reading-shortcut-pairing-v1` without changing protocol 11 or schema 2. Enrolled Reading sessions may mint one-use capture grants, but cannot renew or mint library sessions. Capture access is bounded by the issuer’s expiry. Existing manually configured shortcuts continue working. Deploy the signed v1 shortcut through the Pages workflow before distributing this server revision; downloaded templates contain no account data.
 
 Revision 69 lets an enrolled Reminders PWA use the same browser credential for Reading after server Reading is enabled. The Reading library stays gated by the active server policy; Reminders credentials still cannot create Reading setup links, change Reading policy, or access vault sync. The web app keeps Reading-only setup links for browsers without a Reminders connection. Protocol 11 and schema 2 do not change.
+
+Reading-folder imports no longer require a Clipper marker. Existing marked templates
+remain supported. Imported notes without a web source use `source_url: ""` with
+`capture_method: web-clipper`; URL captures still require a valid HTTP(S) URL.
+Use matching updated plugin and server builds for these source-less notes: older
+Reading parsers reject them as invalid sources. File sync, schema, and protocol
+are unchanged. The server still indexes normalized notes and never adopts or
+extracts arbitrary folder content itself.

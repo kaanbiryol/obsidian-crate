@@ -13,16 +13,43 @@ both hosts together.
   theme. `src/styles/plugin-ui/_theme.scss` adds the plugin's scoped control
   styles and modal/reduced-motion integration.
 - The PWA supplies the same host-variable vocabulary: its palette lives in
-  `src/cloudflare/worker/pwa/styles/reminders-view.css` and `theme-light.css`,
-  while `theme.css` defines standalone typography and geometry. Existing names
+  `src/cloudflare/worker/pwa/styles/palette.css` and `theme-light.css`,
+  while `theme.css` defines standalone typography and geometry. Legacy shell
+  names (`--text`, `--bg`, `--accent`, etc.) alias this palette; do not give them
+  separate colors in feature styles. Existing names
   such as `--background-primary` and `--font-ui-medium` are compatibility inputs;
   using them does not import the Obsidian runtime into the browser.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-- `src/ui/shared/` owns buttons, icon buttons, and modal headers. Icons use the
+- `src/ui/shared/` owns buttons, icon buttons, text fields, and headers. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
+- `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
+  primitives, and PWA header defaults for every feature. The PWA stylesheet
+  entry point loads it independently of the reminder layout stylesheet.
+- `src/ui/shared/styles/_view-header.scss` owns common header presentation.
+  `foundation.scss` supplies PWA title/count geometry for both features and their
+  loading screens. Feature adapters retain their safe-area ownership.
+- `src/pwa/components/SettingsSection.tsx` and `SettingsRow.tsx` own settings
+  grouping and row structure. Sections generate unique heading associations;
+  rows can wrap a native control with a label. Feature settings keep their own
+  validation, async actions, and persistence.
+- `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
+  feature. Errors use assertive alerts; other feedback uses polite status messages.
+- `src/pwa/components/PwaNotice.tsx` owns notice title/body/action layout, with
+  styles in `src/pwa/styles/_notice.scss` loaded by the common foundation.
+  Recovery features retain their announcements, retry/discard decisions, and
+  review-before-removal safeguards. Standard actions use `Button`/`PwaButton`;
+  PWA feature code cannot import Base UI Button directly.
+- `src/ui/shared/CopyableText.tsx` owns clipboard feedback and the selectable
+  readonly fallback. It uses the control's owner window, ignores stale copy
+  completions, and runs an optional synchronous feature guard before copying.
+  Shortcut setup retains pairing expiry and session validation; diagnostics
+  retains its payload. Copy failure never changes or regenerates the value.
+- `src/pwa/download.ts` owns the JSON download and Blob URL lifecycle shared by
+  Reading and reminder recovery. Each caller retains its filename, payload
+  format, and export snapshot. Starting a download does not prove it was saved.
 - `ReminderEditorFields` and `ReminderActionChips` are shared editor content.
   Their styles live in `src/reminders/ui/shared/styles/_editor-*.scss`; header
   and control styles live in `src/ui/shared/styles/`. The plugin field adapter
@@ -74,6 +101,42 @@ both hosts together.
 
 ## Making a visual change
 
+The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented
+control with a shared frosted track and sliding selection. It uses 13px labels
+and a 32px visible track within 44px touch targets.
+`PwaScheduleSwitcher` keeps the controls mounted while the shared reminder panels
+change. Their content reuses `PwaTabTransition` for the same stationary dissolve
+as dock navigation, while the heading and segmented control stay mounted.
+Upcoming retains its configured range, date groups, and launch links;
+both views select Schedule in the dock. The opening shell paints the same chips
+before JavaScript loads. `scripts/pwa-schedule-test.mjs` checks selection,
+keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
+empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin
+retains its separate Upcoming navigation.
+
+The shared components and semantic tokens are Crate's design system. Extend
+them for common controls and states; keep feature layouts and article typography
+in their feature styles. PWA-wide behavior belongs in the host layer:
+
+- `src/cloudflare/worker/pwa/styles/interactions.css` owns native control taps,
+  selection, callouts, and the reusable `.pwa-screen` gesture policy. Use this
+  class on a feature's PWA screen, including its loading state. Screens allow
+  horizontal/vertical scrolling while suppressing touch page zoom. Do not put
+  the policy on `#app` or the portal mount: sheets retain native editing gestures.
+- App chrome is not selectable. Inputs and editable text retain selection and
+  callouts; article pages explicitly enable both for reading and copying.
+  Reader font-size controls remain available. Browser/OS accessibility zoom is
+  outside this touch policy; the viewport has no scaling restriction.
+- `button-feedback.scss`, `focus.css`, and `motion.scss` own PWA press feedback,
+  input-modality focus, and motion respectively. New features reuse them rather
+  than adding a second interaction policy.
+
+Built-app checks in `scripts/reading-browser.test.mjs` and
+`scripts/pwa-focus-test.mjs` cover the shared screen policy, native Chromium
+pinching, text selection, font sizing, and sheet editing boundaries. Desktop
+WebKit checks the CSS policy and editing behavior; installed iPhone gestures
+still need physical-device verification.
+
 Modal surfaces inherit the shared theme border, including editors, exclusions,
 and mobile sheets. Do not remove it in a screen-specific rule. Standard text
 actions use `src/ui/shared/styles/_action.scss` for typography, geometry, transparent
@@ -94,6 +157,20 @@ instead of introducing a separate palette or button style for each screen.
    plugin cards and keyboard focus when changing card styles.
 
 ### Action controls
+
+Plain text inputs use `src/ui/shared/TextField.tsx` and `_fields.scss`. The component
+preserves native input props and refs and associates the label, description, and
+error with the input. Search uses the same control with a hidden label and optional
+icons/actions. Its focus cue surrounds the whole search control; the clear button
+keeps its own keyboard focus cue. Use `.crate-text-input` on native textareas such
+as copyable diagnostics and pairing codes. The 16px input font avoids iPhone focus
+zoom. Keep rich-text caret logic and native settings select/number controls in
+their existing adapters.
+
+The `controls` gallery exercises these fields, headers, settings sections, and
+toast states alongside buttons in light/dark themes at narrow and wide widths.
+`controls.spec.ts` and `controls-webkit.spec.ts` check label/error associations,
+selection, keyboard focus, theme aliases, and loaded/loading header geometry.
 
 `Button` is the shared text-action component. Use `variant="outline"` for normal
 actions (including empty states, retry, settings, and export), `variant="ghost"`
@@ -136,11 +213,14 @@ The document, launch screen, update curtain, and app use matching surface colors
 the page backdrop has no gradient that can show through during mounting.
 `scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
 and data in both engines, including saved themes opposite to the system theme.
-The bottom dock paints its real icons and selected destination in the initial
-HTML, then keeps the same appearance through session/data loading. Only content
-uses skeletons. `src/pwa/opening-dock.ts` owns the inert pre-ready markup; browser
-checks compare its icon paths, opacity, colors, and geometry with the interactive
-dock so the handoff cannot introduce pulsing placeholders or an entrance fade.
+The initial HTML includes the selected title, settings icon, bottom dock, and
+content skeletons. `src/pwa/opening-screen.ts` and `opening-dock.ts` supply the
+same appearance while the app module, session, and update check load. The cached
+HTML stays free of account data; nonce-authorized bootstraps resolve the current
+URL and saved default tab before app.js. Browser checks delay scripts, session
+hydration, and data independently, comparing header, cards, icons, and dock
+geometry across each handoff. Loading chrome must never be replaced by an empty
+canvas while JavaScript or network requests are pending.
 Once the launch destination is known, the real Reminders shell stays mounted
 while data loads. Its title, settings icon, and dock keep their DOM nodes and
 geometry; only the content skeleton is replaced. Startup checks assert node
@@ -169,7 +249,8 @@ plugin or PWA styles. Query parameters select `host=plugin|pwa`,
 The plugin fixture supplies deterministic Obsidian-style variables; it does not
 replace testing actual community themes or native modal/keyboard integration.
 
-`npm run test:visual` compares 48 screenshots at 390px and 1280px widths and
+`npm run test:visual` builds a private gallery snapshot on its own port before
+comparing 48 screenshots at 390px and 1280px widths and
 checks project/repeat keyboard navigation. The canonical snapshot platform is
 macOS 26 on Apple silicon, matching the `macos-26` CI runner. Use that platform
 when comparing or updating these images: system fonts and native controls can
@@ -207,12 +288,13 @@ Headers, icon sizes, selection, focus, and action variants belong to these share
 controls. Reading dialogs use a host adapter: the PWA reuses Reminders’
 `PwaModalSheet`, `ModalHeader`, sheet transitions, scroll lock, and settings styles.
 All PWA icons use `PwaThemeIcon`. Both PWA headers use the same sync indicator and status toast, driven by
-each feature's own pending work and refresh state. Its touch target does not
-enlarge the title row. Reading shows confirmed sync only after refreshing the
+each feature's own pending work and refresh state. The indicator sits immediately
+left of Settings in the header actions, with a 44px touch target. Project details
+retain it on the right without a Settings button. Loading headers reserve the same position. Reading shows confirmed sync only after refreshing the
 current session online; cached, offline, and unconfirmed changes stay distinct.
 Reading applies saved local edits immediately and uses the header indicator for
 background sync. There is no pending-change banner in its library or reader;
-failed changes, refresh, and export are available under **Reading settings → Sync**.
+failed changes, refresh, and export are available under **Settings → Sync and device**.
 Keep article typography and library layout in Reading rather than
 overriding every button or dialog there. Native text fields retain browser editing
 and selection behavior; composite search fields draw one focus cue around the
@@ -231,7 +313,7 @@ Article HTML still passes through the existing sanitizer. Source badges begin as
 letter marks and load HTTPS favicons when available; an unavailable or offline icon
 leaves the letter in place. Each host uses its own browser image cache. Appearance,
 tags, and capture use the existing Base UI modal primitive with portals in the
-current host document. Device/session controls live under **Reading settings**.
+current host document. Device/session controls live under **Settings → Sync and device**.
 The shared `src/ui/shared/styles/_base-modal.scss` mixin provides dialog geometry
 in both hosts. Reading and reminder sheets share the PWA modal header layout.
 Phone sheets follow the visual viewport while an input is focused,
@@ -267,14 +349,29 @@ reminder tab or the reading switcher. Both feature docks share the indicator
 position, so it slides from the fourth slot when returning to any reminder tab,
 even if that tab was already selected before opening Reading. Reminder tabs,
 Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
-stationary dissolve and CSS keyframes: the outgoing screen stays mounted above a fully opaque
-incoming screen and fades out. Headers and list content change together, with no
+stationary dissolve. Tab panels use reversible CSS opacity transitions and retain
+their paint order until the switch settles, so a rapid reversal continues from
+the current blend. New screens enter beneath the painted stack. Headers and list
+content change together, with no
 blank frame or dip in background opacity. The dock stays outside tab transitions.
-Outgoing screens are inert, retain their scroll position, and unmount on animation
-completion; a timeout only recovers cancelled animations. Returning from another
+Outgoing screens are inert, retain their scroll position, and unmount on transition
+completion; a timeout only recovers cancelled transitions. Newly mounted reminder
+cards use their measured heights during the dissolve instead of offscreen estimates;
+retained lists keep their existing layout. Upcoming's date styles belong to its
+list rather than the active navigation state. Returning from another
 feature lets the feature shell own the dissolve without adding a second tab fade.
 Reduced motion retains this non-spatial dissolve, matching feature switching.
-Settings remains in each feature's header.
+Both header gears open the same **Settings** sheet above the feature panels.
+The feature shell owns its visibility and preserves the underlying tab, search,
+scroll position, and focus. Settings use General, Reminders, and Reading sections,
+with expandable Sync and device and About sections. Theme and opening-screen
+preferences apply across both features; explicit launch links take precedence.
+Feature runtimes publish status and actions through the settings store, while
+retaining ownership of their persistence, recovery, and session cleanup. Opening
+settings loads the other feature as needed without navigating to it. Inactive
+features do not open restored editors or apply automatic updates.
+The shared logout confirmation explains cleanup for both features and exposes
+pending exports and recovery before clearing private device data.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
@@ -354,3 +451,17 @@ sheets, and light/dark phone and landscape layouts. Drag-to-select coverage chec
 live highlighting, release outside, and interruption in both engines, plus native
 Chromium touch selection and pointer cancellation. Physical iPhone safe areas, VoiceOver, and Home Screen behavior remain
 device acceptance checks.
+
+In Reading, releasing a text selection saves a highlight automatically. Tapping a
+saved highlight shows custom start/end handles and a red X button beside the
+passage, labeled **Delete highlight** for assistive technology. Its 44px touch
+target stays clear of the resize handles and moves below the selection when
+there is no room at the right edge. Dragging a handle previews the range without moving the article; release
+saves the resized range. Handles auto-scroll near the reader edges and support
+Left/Right keys. Escape or pointer cancellation abandons an in-progress drag.
+Outside taps dismiss the selected highlight; scrolling keeps its handles attached.
+The PWA persists changes before confirming them, coalesces undispatched highlight
+edits offline, and keeps dispatched updates immutable until confirmed or reviewed.
+A failed save retains the selected range with an error and retry action. Highlights
+remain note metadata shared by both reader hosts; changed article text is never
+marked unless it still matches the saved text at the saved offsets.

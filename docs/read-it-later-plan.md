@@ -4,7 +4,7 @@ Planning baseline: 2026-09-21, `master` at `48b9a902`, plugin 0.3.0 / server rev
 
 ## Implementation status
 
-Implemented on `codex/read-it-later`: local Reading and Web Clipper adoption; server policy and scoped enrollment; durable bookmark/metadata operations; bounded background Defuddle extraction; independent web Reading with cached article text and a persistent outbox; branded iPhone handoff; signed shortcut source/build command; and Android share-target storage and capture.
+Implemented on `codex/read-it-later`: local Reading and automatic folder adoption; server policy and scoped enrollment; durable bookmark/metadata operations; bounded background Defuddle extraction; independent web Reading with cached article text and a persistent outbox; branded iPhone handoff; signed shortcut source/build command; and Android share-target storage and capture.
 
 Server revision 66 uses schema 2 and protocol 11. The migration preserves existing file/version/token rows. Cloudflare upgrades create a verified paired D1/R2 checkpoint under a database write guard before migrating. Local upgrades require a stopped server and a new, verified backup. Recovery can download the cloud checkpoint into the existing archive format. No production server has been changed.
 
@@ -24,7 +24,7 @@ One **Reading** library in Obsidian and the existing Crate web app, with two cap
 | --- | --- | --- |
 | iPhone **Share → Save to Crate**, Android **Share → Crate**, or paste a URL into the web app | The server commits a bookmark, then fetches the page and extracts Markdown with Defuddle | Normal vault sync downloads the note; the web app reads the server's verified Reading projection |
 | **Crate: Add reading link** in Obsidian | Save a local bookmark immediately; extraction follows its successful upload | Existing automatic/manual sync; the enriched revision returns through the same sync engine |
-| Desktop Obsidian Web Clipper using **Crate Reading** | Clipper captures the loaded page into the configured vault folder | Crate adopts/indexes the marked note and syncs the exact captured body; the server does not extract it again |
+| Desktop Obsidian Web Clipper saving to the Reading folder | Clipper captures the loaded page into the configured vault folder | Crate adopts/indexes the note and syncs the exact captured body; the server does not extract it again |
 
 The initial library supports inbox/archive, favorites, tags, title/source/tag search, a reader, and offline saved text. Reading status lives in Markdown frontmatter. Opening a note does not mark it done. Permanent deletion uses Obsidian's existing file workflow. Keep RSS, AI, PDFs, transcripts, new highlight editing, automatic image downloads, and reading reminders outside this release.
 
@@ -57,7 +57,7 @@ Deliverables:
 - A small Defuddle + linkedom prototype inside Crate's actual Worker test/build environment, with no production route yet. Compare its output against representative article fixtures: headings, lists, tables, code, footnotes, relative links, multilingual text, malformed HTML, and pages with no usable article.
 - Confirm the exact import entry point, conversion options, no extractor-initiated network calls (`useAsync: false`), resource limits and sanitization needs. Pin the validated versions and record their bundle/CPU/memory impact; do not import a URL-fetching CLI.
 - Prove safe outbound HTTP behavior in Cloudflare and local workerd: time/byte limits, redirect validation, private destinations and DNS resolution/rebinding. A string-level hostname check is insufficient evidence. Select a constrained transport if the host fetch path cannot enforce the requirement; report the limitation explicitly before enabling extraction.
-- Import a sample **Crate Reading** template into the real Web Clipper version. Verify destination, typed properties, timestamp with timezone, new-note collision handling and exact selected-content capture.
+- Use the default template in the real Web Clipper version, saving into the Reading folder. Verify destination, typed properties, saved date defaults, new-note collision handling and exact selected-content capture.
 - Prototype the iPhone Shortcut's one-time configuration, URL/text input and browser handoff against a disposable test endpoint. Verify the branded saving/success/error page, operation-bound capability exchange, launch without a browser Reading session, early close/reload and actual Safari behavior. The preliminary Shortcut request retains system UI. This can validate the UX before the production enrollment API exists.
 
 Done when: extraction runs in the target runtime with measured output/cost and an established network boundary; the capture formats are proven. Physical phone testing remains explicitly pending if no device is available. Record those results in this plan, including failed cases, rather than treating Node-only success as Worker support.
@@ -66,16 +66,16 @@ No real vault, production server, or live credential is needed for this mileston
 
 ### 1. Local Reading and Web Clipper
 
-Primary modules: new `src/reading/core/`, `data/`, `ui/`, `runtime.ts`, `register-integrations.ts`, and `clipper-template.ts`; focused integration with plugin settings/lifecycle.
+Primary modules: new `src/reading/core/`, `data/`, `ui/`, `runtime.ts`, `register-integrations.ts`, and import normalization; focused integration with plugin settings/lifecycle.
 
 - Implement schema/version validation, conservative URL identity, frontmatter creation and surgical metadata patches. Preserve unknown properties and unchanged body bytes. Crate-created filenames use IDs; imports keep their filenames.
 - Register stable `add-reading-link` and `open-reading` commands and a Reading workspace view. Reuse existing shared buttons, icons, theme tokens and modal primitives.
-- Provide opt-in settings and folder validation. Keep the server's folder/generation authoritative once connected; stale device startup must not overwrite it. Mirror the configured policy locally for offline indexing. No implicit adoption of unmarked Markdown.
-- Export the **Crate Reading** Clipper template. Normalize only marked imports, fill missing metadata/identity once, preserve filenames/body, and mark their capture method so no enrichment is scheduled.
+- Provide opt-in settings and folder validation. Keep the server's folder/generation authoritative once connected; stale device startup must not overwrite it. Mirror the configured policy locally for offline indexing. Folder membership opts Markdown into automatic adoption.
+- Import every Markdown note in the configured Reading folder, without a special Clipper template, fill missing metadata/identity once, preserve filenames/body, and mark their capture method so no enrichment is scheduled.
 - Scope scans to the configured folder and metadata candidates; debounce events, defer normalization during active sync, guard conditional writes, and stop watchers on unload. Follow lifecycle cancellation patterns from `src/reminders/runtime.ts` without sharing reminder domain state.
 - Add local inbox/archive/favorite/tag actions and open-note behavior. URL-only bookmarks remain visibly pending until an extraction-capable server processes them. Clipper text is readable immediately.
 
-Done when: a real Clipper save appears in the Obsidian Reading view, survives reload/rename, and syncs as an ordinary file without altering its body. An unrelated file in the folder is untouched. Concurrent local adoption either converges on the same persisted ID or reports ambiguity without rewriting user content.
+Done when: a real Clipper save appears in the Obsidian Reading view, survives reload/rename, and syncs as an ordinary file without altering its body. A note outside the folder is untouched. Concurrent local adoption either converges on the same persisted ID or reports ambiguity without rewriting user content.
 
 ### 2. Storage upgrade, policy, and durable server capture
 
@@ -99,7 +99,7 @@ Persist these responsibilities separately:
 - Implement policy read/enable/update, enrollment issuance/exchange, capture, scoped receipt lookup, browser handoff prepare/commit/status, cursor list/detail, metadata update and extraction-retry routes. Handoff commits reuse the atomic capture path and recheck their originating grant. The spec's API table describes public behavior; define exact DTOs and errors before clients depend on them.
 - Reuse `storage.ts`, staged immutable objects, `commitStagedFile`/commit effects, retained versions, namespace checks and changelog. Extend helpers with opaque revision preconditions where required; a content hash alone cannot distinguish delete-and-recreate of the same bytes. Do not build a parallel file API.
 - Atomically commit a bookmark, receipt, identity/URL reservation and job. Distinguish durable bookmark acceptance from finished extraction. Expired requests stop for review; lost responses reuse exact bytes and IDs.
-- Hook Reading projection into ordinary uploads, bulk uploads, restores, renames and deletes. Bootstrap existing marked files in bounded batches without blocking sync or rebuilding all items on every request.
+- Hook Reading projection into ordinary uploads, bulk uploads, restores, renames and deletes. Bootstrap existing normalized files in bounded batches without blocking sync or rebuilding all items on every request.
 
 Done when: an authenticated server capture appears in Obsidian through unmodified sync behavior, duplicate/retried captures converge, and the full scope matrix passes. Fresh install plus populated upgrade/backup/recovery pass for both hosting modes, preserving reminder behavior and existing file revisions.
 
