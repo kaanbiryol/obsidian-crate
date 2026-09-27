@@ -28,7 +28,9 @@ both hosts together.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
   Reading uses the same cards on desktop and phones, retaining its source icon,
-  favorite action, and selected-article state. Shared Sass mixins preserve each
+  favorite action, and selected-article state in split views. Stacked phone layouts
+  keep the covered library unselected, so returning from an article cannot reveal
+  a selection-color fade. Shared Sass mixins preserve each
   feature's existing DOM and interaction semantics. Future compact/non-card
   presentation should be implemented here for both features; no density setting
   is exposed yet. Existing reminder surface tokens remain host-theme inputs.
@@ -49,6 +51,11 @@ both hosts together.
   (pointer: fine)`. Keep actual selection, checked states, keyboard focus, and
   native field editing independent of press feedback. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
+  Compound fields use `focus.within` from `src/ui/shared/styles/_focus.scss`
+  for one outline around the whole control. Settings selectors, number fields,
+  and search boxes share it. The PWA enables that outline only after keyboard
+  navigation through `--crate-compound-focus-style`; touch and mouse focus stay
+  undecorated without blurring controls. Obsidian retains its normal focus cue.
   Reading form actions and the PWA delete confirmation use `crate-dialog-actions`
   for the plugin confirmation’s shared minimum width, padding, and subtle borders.
   Phone layouts give both actions equal width and 48px minimum height.
@@ -67,6 +74,23 @@ both hosts together.
   grouping and row structure. Sections generate unique heading associations;
   rows can wrap a native control with a label. Feature settings keep their own
   validation, async actions, and persistence.
+  **Default tab** belongs to **Tabs** and retains the saved opening preference.
+  **Sync and device** and **About** are always-visible sections. Shortcut setup
+  uses these same section surfaces, typography and shared action controls.
+- `PwaPushStack` owns retained sheet pages, push/pop motion and focus return.
+  Each opaque page includes its fixed header and scrolling body. It slides over
+  the stationary root with the Projects navigation spring; its resting offscreen
+  position stays at 100% even for immediate history changes or reduced motion.
+  This keeps subsequent pushes spatial and avoids fading or swapping the header.
+  `createPushedScreenHistory` owns their browser history. Keep its controller
+  mounted in the app shell so Back/Forward cannot reach the feature router below
+  an open sheet. Capture the root before showing its detail, and finish app Back
+  motion before traversing history. Native Back renders the root immediately.
+  All pushed screens declare `data-pwa-back` and a history `pwaBackDestination`;
+  `usePwaBackGesture` applies one native edge-swipe policy to settings pages,
+  Reading articles and projects. Root screens and covering modal editors block
+  that gesture. Do not add feature-specific gesture selectors or a second touch
+  recognizer on top of native history navigation.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
   Both features share bottom-center positioning above the dock and safe area.
@@ -142,6 +166,15 @@ both hosts together.
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   Dock expansion uses the surface spring; native dragging remains immediate.
   Shared control tokens inherit these PWA defaults without changing Obsidian.
+  Shared navigation indicators use a critically damped spring. Centered Obsidian
+  dialogs use a stationary fade; bottom sheets retain their source direction and
+  swipe tracking. Completion checkmarks settle without overshooting, and progress
+  meters scale their fill without relaying out neighboring content. Checkmark and
+  pull-to-refresh animations stop under reduced motion.
+  Empty/list replacements dissolve concurrently. Departing content leaves normal
+  flow in its current position, keeping the incoming scroller’s parent and geometry
+  intact. Incoming reminders accept input immediately; departing content is inert.
+  Empty-state copy and icons fade as one unit without a separate icon delay.
   `PwaSheetSurface` owns keyboard padding and motion for reminder stages,
   Reading dialogs, and Settings. `PwaModalSheet` measures the keyboard by default;
   reminder navigation can override the inset while handing off to a picker.
@@ -210,12 +243,12 @@ and durable pending commands are checked before reload.
 ## Making a visual change
 
 PWA **Settings → Tabs** lets people choose exactly four bottom destinations from
-Inbox, Schedule, Today, Upcoming, Projects, Reading list, Favorites, Archive, and Highlights.
+Inbox, Reminders, Today, Upcoming, Projects, Reading, Favorites, Archive, and Highlights.
 Each row has a replacement picker and a drag handle (also movable with arrow
 keys). There are no add or remove actions. Older saved layouts with fewer than four
 tabs retain their selections and fill the remaining slots from the defaults.
 Preferences persist on the device and update across browser tabs.
-**Reset tabs** restores Inbox, Schedule, Projects, and Reading. **Open to** and
+**Reset tabs** restores Inbox, Reminders, Projects, and Reading. **Default tab** and
 explicit links remain independent of visibility. Pinned Reading destinations open
 directly. The last dock slot always opens the Reading view picker on hold or upward
 slide, regardless of its destination; a normal tap still opens that slot’s view.
@@ -223,15 +256,19 @@ A small, muted up/down chevron pair marks this control, vertically centered besi
 the destination icon without shifting it or adding a badge background. The cached
 launch shell uses the same order, visibility, and selection before React starts.
 
-The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented
+The PWA's **Reminders** screen contains a compact **Today / Upcoming** segmented
 control with a shared frosted track and sliding selection. It uses 13px labels
 and a 32px visible track within 44px touch targets.
 `PwaScheduleSwitcher` keeps the controls mounted while the shared reminder panels
 change. Their content reuses `PwaTabTransition` for the same stationary dissolve
 as dock navigation, while the heading and segmented control stay mounted.
 Upcoming retains its configured range, date groups, and launch links;
-Both views select Schedule in the default dock; a pinned Upcoming tab has its own selection. The opening shell paints the same chips
-before JavaScript loads. `scripts/pwa-schedule-test.mjs` checks selection,
+Both views select Reminders in the default dock; a pinned Upcoming tab has its own selection. The opening shell reserves the chips' final space
+before JavaScript loads. Once the initial reminder snapshot is ready, the counts,
+chips, and list reveal together with the shared 160ms fade. The title, actions,
+and dock stay painted; reduced motion reveals content immediately, and background
+refreshes do not replay the entrance. `scripts/pwa-schedule-test.mjs` checks cold
+and cached launches with overdue reminders, coordinated reveal, selection,
 keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
 empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin
 retains its separate Upcoming navigation.
@@ -447,7 +484,7 @@ The PWA uses `src/pwa/components/PwaDock.tsx` for its floating bottom navigation
 Both sections show Inbox, Today, and Projects as direct reminder destinations,
 followed by a switcher with small up/down chevrons. Its icon follows the remembered
 reading destination: book, star, or archive. The switcher
-remembers the chosen Reading List, Favorites, or Archive view and opens it on tap.
+remembers the chosen Reading, Favorites, or Archive view and opens it on tap.
 Holding it for 420 ms or sliding upward reveals those three reading choices inside
 the expanding navigation pill. Upcoming remains a separate reminder view for
 existing launch links; it is not merged into Today or exposed by this picker.
@@ -456,8 +493,11 @@ each feature owns its view, search, and list state. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
 The pill expands with a heavily damped spring, maintaining its height and velocity
 when opening is interrupted or reversed. Its corner radius follows the same
-progress. The translucent surface has a restrained edge highlight, and menu content
-fades in without moving its touch targets. Reduced motion jumps to the final shape;
+progress. The translucent surface has a restrained edge highlight. The spring also
+controls the tab icons' opacity and reveals the choices along the surface's painted
+edge, so text stays inside the material and held-finger targets remain stationary.
+A short, reversible popup fade handles dismissal without delaying input. Reduced
+motion jumps to the final shape and reveals the choices immediately;
 increased contrast or reduced transparency uses an opaque surface.
 The compact dropdown has no visible header or close button. Tapping outside or
 pressing Escape dismisses it. A background highlight marks the selected reading
@@ -471,9 +511,10 @@ reminder tab or the reading switcher. Both feature docks share the indicator
 position, so it slides from the fourth slot when returning to any reminder tab,
 even if that tab was already selected before opening Reading. Reminder tabs,
 Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
-stationary dissolve. Tab panels use reversible CSS opacity transitions and retain
-their paint order until the switch settles, so a rapid reversal continues from
-the current blend. New screens enter beneath the painted stack. Headers and list
+stationary dissolve. Tab panels and feature layers use reversible CSS opacity
+transitions and retain their paint order until the switch settles, so a rapid
+reversal continues from the current blend. Feature layers stay mounted after the
+fade; only the outgoing tab panels unmount. New screens enter beneath the painted stack. Headers and list
 content change together, with no
 blank frame or dip in background opacity. The dock stays outside tab transitions.
 Outgoing screens are inert, retain their scroll position, and unmount on transition
@@ -482,7 +523,7 @@ cards use their measured heights during the dissolve instead of offscreen estima
 retained lists keep their existing layout. Upcoming's date styles belong to its
 list rather than the active navigation state. Returning from another
 feature lets the feature shell own the dissolve without adding a second tab fade.
-Reduced motion retains this non-spatial dissolve, matching feature switching.
+Reduced motion switches tabs and features immediately.
 Both header gears open the same **Settings** sheet above the feature panels.
 The feature shell owns its visibility and preserves the underlying tab, search,
 scroll position, and focus. Settings use General, Reminders, and Reading sections,
@@ -514,17 +555,29 @@ Native history closes commit the library immediately and let it paint before
 replacing the forward entry, so WebKit cannot record the outgoing reader as the
 library snapshot. Loading and loaded content share one reader component. On phone slides, article downloads start immediately, while Markdown parsing, syntax highlighting, and body layout wait for the pane’s transform transition to settle. Reduced-motion and non-sliding opens render without that wait. Detail history slots are
 scoped to the running document; reloads create a fresh library predecessor so Back
-cannot restore an older page instance. Reduced-motion users retain the section
-dissolve while spatial animations are disabled. Dismissing an article clears its forward-history
-destination and reuses the detail entry on the next open, so a right-edge swipe
-cannot reopen a dismissed article or accumulate article entries.
+cannot restore an older page instance. Reduced-motion users switch sections
+immediately while spatial animations are disabled. Dismissing an article clears its forward-history
+destination, so a right-edge swipe cannot reopen a dismissed article.
+Projects and Reading share `src/pwa/detail-history.ts`. Every reopen revisits the
+known same-document predecessor while leaving the current list rendered, then
+pushes a fresh detail entry before mounting it. Replacing a closed detail entry
+alone retains old native-preview pixels, even when the destination tab matches:
+its theme, data, filters, scroll position, or dock may have changed. Refresh the
+whole predecessor instead of maintaining per-setting invalidation rules. The
+internal traversal is consumed by the coordinator; normal Back still closes once,
+and repeated visits replace the forward slot without growing history. Feature
+switches cancel pending opens. Physical iPhone edge swipes still require device
+verification; browser tests inspect the rendered predecessor at each push.
 `FeatureShell.tsx` preserves mounted feature state
 and navigation, keeps the inactive panel inert, and restores keyboard focus to the
 destination's visible navigation control after its initial loading completes.
 Both PWA modes and shared plugin views use a small, muted spinner while their
 first usable data is loading. Its 12-spoke graphic and stepped rotation match
-pull-to-refresh. It appears after 250 ms to avoid quick flashes and
-stays still with reduced motion. Reading uses it when the library has no cached
+pull-to-refresh. Keep it horizontally centered at the top of the content, with
+16px of padding below the screen's header controls rather than vertically centering
+it in a tall loading container. After a 250 ms delay to avoid quick flashes, it
+fades in using the shared fast duration. Reduced motion skips the fade and keeps
+the spinner still. Reading uses it when the library has no cached
 data; Reminders uses it while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
@@ -623,6 +676,10 @@ filtering or when reduced transparency is requested. The iOS 27 opaque header
 workaround remains in place.
 
 The PWA article opens directly into its text without Article / Highlights tabs.
+Its title, byline, reading time, and text appear together once the text is available
+and the opening slide has finished. Navigation stays available with a loading
+indicator meanwhile; cached text adds no delay beyond the slide. A load failure
+shows the article metadata and original source alongside the error and retry action.
 A floating highlighter/count button opens the article highlights in a full-height
 PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it
 does not reserve a bottom bar or shorten the article. The button and navigation
@@ -643,7 +700,7 @@ control in the viewport. Closing or swiping the sheet down restores the same
 article URL and scroll offset; the viewport portal is removed on dismissal.
 
 PWA screen headers share the article reader's rounded chrome: sync and Settings
-sit in a capsule to the right of the title and count. Inbox, Schedule, Projects,
+sit in a capsule to the right of the title and count. Inbox, Reminders, Projects,
 and all Reading library views use the same 32px heading. Project details use the
 same action surface and a rounded Back control. `src/pwa/styles/_header-chrome.scss`
 is loaded by the shared foundation so cached launch screens match live screens.

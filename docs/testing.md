@@ -26,6 +26,14 @@ and focus, shared theme and preferences, Reading launch destinations, explicit-l
 precedence, shortcut navigation, pending Reading exports from Reminders, and shared
 logout. The test uses the built client, local synthetic APIs, and native browser
 storage; screenshots include light/dark, 320px phone, and desktop layouts.
+The navigation checks cover Default tab in Tabs, always-visible About and Sync
+and device sections, retained settings scroll/focus, native Back/Forward, the
+header Back action, Escape, and shared edge-gesture eligibility. Motion checks
+sample full-page push/pop frames, including the moving header, opaque surface,
+stationary parent, fixed header during scrolling, and restored scroll/focus. Desktop engines
+can check history and gesture arbitration; the interactive OS swipe preview and
+cancellation still need an installed iPhone check. `pushed-screen-history.test.ts`
+covers preserving an underlying feature, repeated visits and quick reopening.
 Theme checks cover one document update with both features mounted, system-theme
 changes, explicit overrides, settings close/reopen, feature switching, and native
 cross-tab updates including invalid or removed preferences. Early HTML theme
@@ -122,6 +130,13 @@ The full list still grows with folder size. Before promising support for large f
 `npm run benchmark:pwa` measures the production PWA with a local synthetic API in Chromium and WebKit at a 390 × 844 viewport. It is also included in `test:pwa-browser`. The test checks page navigation, off-page editing, saved changes, complete reorder payloads and bounded rendered rows at 1,000 and 10,000 reminders. The fixture deliberately stresses a single Inbox; it does not claim that 10,000 reminders fit the real per-file indexing limits.
 
 The PWA now pages active, completed and date-grouped lists in batches of 200. A native page selector reaches any range. Paging affects rendered rows only: counts, cache, edits and reorder validation retain the full data. Obsidian's plugin views keep their existing behavior.
+
+Cards within each page remain rendered offscreen. Avoid `content-visibility: auto`
+on reminder rows: fast scrolling can expose unpainted cards and replace estimated
+row heights mid-scroll. Run `node scripts/pwa-reminder-scroll-test.mjs` for
+Chromium/WebKit checks of Today and Upcoming rendering before scrolling, rapid
+scroll reversals with variable-height cards, and completion scroll anchoring.
+Installed iPhone momentum scrolling still requires a physical-device check.
 
 | Local 10,000-reminder Inbox | Before paging | With paging |
 | --- | ---: | ---: |
@@ -466,3 +481,17 @@ contract in Chromium and WebKit, in both document and Shadow DOM hosts. It cover
 release outside an inert control, cancellation, movement into scrolling, window
 blur, keyboard activation, disabled controls, persistent toggle selection, and
 native input editing. It is included in `npm run test:pwa-browser`.
+
+## Motion continuity
+
+`node scripts/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
+mid-fade reversals, delayed animation cleanup, lazy-loading surfaces, immediate
+reduced-motion switching and focus in Chromium/WebKit. Build the Worker first,
+or let its preview harness build it.
+
+After `npm run build:plugin`, run
+`npx playwright test tests/visual/motion.spec.ts tests/visual/motion-webkit.spec.ts --workers=1`
+for shared empty/list reversals, immediate input, stable list geometry, progress
+fill geometry, restrained checkmarks and reduced motion. The plugin fixture uses
+Shadow DOM and also checks stationary centered dialogs. Actual installed iPhone
+and Obsidian rendering still requires device verification.
