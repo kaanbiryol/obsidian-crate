@@ -1,3 +1,4 @@
+import { PWA_SURFACE_SPRING } from '../motion';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useMotionValueEvent, useSpring } from 'motion/react';
 
@@ -5,7 +6,7 @@ import { useMotionValueEvent, useSpring } from 'motion/react';
 export function useDockMorph(open: boolean, menuHeight: number) {
   const surface = useRef<HTMLSpanElement>(null);
   const target = open ? menuHeight : 60;
-  const height = useSpring(60, { stiffness: 460, damping: 42, mass: 1, restDelta: .1, restSpeed: .1 });
+  const height = useSpring(60, PWA_SURFACE_SPRING);
   useMotionValueEvent(height, 'change', value => {
     const element = surface.current;
     if (!element) return;

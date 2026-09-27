@@ -109,8 +109,17 @@ try {
       await expect(page.locator('.reminders-browse-view')).toHaveCount(1);
       await expect(page.locator('.pwa-project-layer')).toHaveAttribute('data-project-open', 'true');
       await expect(page.getByRole('heading', { name: 'Errands', exact: true })).toBeVisible();
-      await expect(page.locator('.pwa-dock')).toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-screen > .pwa-dock')).toHaveAttribute('inert', '');
       await checkBackGesture(page, '.pwa-project-layer', true);
+      await expect(page.locator('.project-detail-navigation .premium-back-button')).toHaveText('Back');
+      await expect(page.locator('.project-detail-navigation .pwa-sync-indicator')).toBeVisible();
+      await expect(page.locator('.project-detail-header .pwa-sync-indicator')).toHaveCount(0);
+      const captureStyle = element => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height, background: style.background, radius: style.borderRadius, color: style.color };
+      };
+      assert.deepEqual(await page.locator('.pwa-project-fab').evaluate(captureStyle), await page.locator('.pwa-screen > .pwa-dock .pwa-dock__add').evaluate(captureStyle), 'Project capture uses the main dock control');
       await page.locator('.pwa-project-fab').click();
       await expect(page.getByRole('dialog', { name: 'New reminder', exact: true })).toBeVisible();
       await checkBackGesture(page, '.pwa-project-layer');
@@ -137,7 +146,7 @@ try {
       await page.locator('.pwa-project-layer .premium-back-button').click();
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
-      await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-screen > .pwa-dock')).not.toHaveAttribute('inert', '');
       assert.equal(new URL(page.url()).searchParams.has('project'), false);
       assert.equal(await list.evaluate(scroll => scroll.scrollTop), before.scrollTop);
       await expect(target).toBeFocused();
@@ -183,7 +192,7 @@ try {
       await page.goBack();
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
-      await expect(page.locator('.pwa-dock')).not.toHaveAttribute('inert', '');
+      await expect(page.locator('.pwa-screen > .pwa-dock')).not.toHaveAttribute('inert', '');
       console.log(`${type.name()}: project overlay, back navigation, and edge gesture passed`);
       await checkProjectMouseFeedback(browser, `http://127.0.0.1:${server.address().port}`);
       console.log(`${type.name()}: project touch hover and mouse feedback passed in both themes`);

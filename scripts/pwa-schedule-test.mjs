@@ -16,6 +16,7 @@ const reminders = [
 ].map(reminder => ({ revision: 'fixture', description: '', priority: 4, completed: false, project: 'Work', filePath: 'Reminders/Work.md', ...reminder }));
 
 async function checkScheduleFade(page, nextView, interruptWith) {
+	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
 	const samples = await page.evaluate(async ({ nextView, interruptWith }) => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
@@ -53,9 +54,9 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 		}
 		return samples;
 	}, { nextView, interruptWith });
-	assert.ok(samples.some(frame => frame.fading), 'Schedule content must visibly fade');
+	assert.equal(samples.some(frame => frame.fading), !reducedMotion, 'Fade only when motion is enabled');
 	assert.ok(samples.every(frame => frame.coverage === 1 && frame.inert && frame.oldContent && frame.stationary && frame.chromeStable), 'Keep the background covered and content stationary, departing content inert, and chrome stable');
-	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', '0.16s', 'ease-out'])), 'Reuse the dock tab fade');
+	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out'])), 'Reuse the dock tab fade');
 	assert.equal(samples.at(-1).retained, false, 'Remove the old content after the fade');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
@@ -63,6 +64,7 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 // Compare each screen's actual contribution to the composite, not just its own
 // opacity: swapping two partly faded layers can flash while both look animated.
 async function checkRapidSwitches(page, dock = false) {
+	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
 	const frames = await page.evaluate(async dock => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector(dock
@@ -104,10 +106,11 @@ async function checkRapidSwitches(page, dock = false) {
 	for (let index = 0; index < frames.length; index++) {
 		const frame = frames[index], previous = frames[index - 1];
 		assert.equal(frame.uncovered, 0, 'Rapid switching must never expose the background');
+		if (reducedMotion) assert.ok(Object.values(frame.weights).every(weight => weight === 0 || weight === 1), 'Reduced motion switches without intermediate fades');
 		if (previous) {
 			assert.deepEqual(frame.order.filter(view => previous.order.includes(view)), previous.order.filter(view => frame.order.includes(view)), 'Retained screens must not swap paint order on reversal');
 		}
-		if (previous) for (const view of new Set([...Object.keys(frame.weights), ...Object.keys(previous.weights)])) {
+		if (previous && !reducedMotion) for (const view of new Set([...Object.keys(frame.weights), ...Object.keys(previous.weights)])) {
 			const change = Math.abs((frame.weights[view] ?? 0) - (previous.weights[view] ?? 0));
 			// Allow one compositor frame of sampling skew. A third dock screen
 			// can also contribute two overlapping fades at once.

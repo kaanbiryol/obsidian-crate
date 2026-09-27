@@ -1,5 +1,4 @@
 import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
@@ -18,8 +17,8 @@ import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
-import { PWA_SURFACE_SPRING } from '../motion';
-import { useSheetKeyboardMotion } from '../hooks/useSheetKeyboardMotion';
+import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../motion';
+import { PwaSheetSurface } from './PwaSheetSurface';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));
 const ReminderPickerSheet = lazy(loadReminderPickerSheet);
@@ -142,10 +141,6 @@ function ReminderEditorSheet({
 	const renderedKeyboardInset = activeScreen === 'editor'
 		? pickerTransitionKeyboardInset || keyboardInset
 		: 0;
-	const setReminderStageRef = useSheetKeyboardMotion(
-		reminderStageRef, renderedKeyboardInset, prefersReducedMotion,
-		activeScreen === 'editor' && !isStageClosing && !isClosing,
-	);
 	const stageClosedOffset = isStageClosing
 		? pickerTransitionClosedOffsetRef.current
 		: '100%';
@@ -184,14 +179,15 @@ function ReminderEditorSheet({
 				: REMINDER_PICKER_COPY[activeScreen === 'date' ? 'schedule' : activeScreen === 'recurrence' ? 'repeat' : 'project'].dialogLabel}
 			role={activeScreen === 'delete' ? 'alertdialog' : 'dialog'}
 			descriptionId={activeScreen === 'delete' ? `${confirmationId}-message` : undefined}
-			sheetClassName={activeScreen === 'editor' || activeScreen === 'delete' ? 'is-editor-screen' : undefined}
+			sheetClassName={activeScreen === 'editor' ? 'is-editor-screen is-full-height-editor' : activeScreen === 'delete' ? 'is-editor-screen' : undefined}
 			keyboardInset={renderedKeyboardInset}
 			dismissible={!saving && !isClosing && canInteract}
 		>
-			<motion.div
-				ref={setReminderStageRef}
+			<PwaSheetSurface
+				surfaceRef={reminderStageRef}
+				keyboardInset={renderedKeyboardInset}
+				animateKeyboard={activeScreen === 'editor' && !isStageClosing && !isClosing}
 				className="pwa-reminder-sheet-stage"
-				style={{ '--pwa-keyboard-inset': `${renderedKeyboardInset}px` } as React.CSSProperties}
 				initial={false}
 				animate={{ y: isStageClosing || isPickerLoading ? stageClosedOffset : '0%' }}
 				transition={prefersReducedMotion || isPickerLoading
@@ -200,7 +196,7 @@ function ReminderEditorSheet({
 						// Focus restores synchronously on return, starting the native
 						// keyboard. Shorten the wait before the editor appears,
 						// but keep its entrance cadence consistent with other sheets.
-						? { duration: isReturningToEditor ? 0.08 : 0.18, ease: [0.4, 0, 1, 1] }
+						? (isReturningToEditor ? PWA_PICKER_RETURN : PWA_PICKER_EXIT)
 						// This is new content, swapped below the viewport. Its entrance
 						// must not inherit the previous screen's downward exit velocity.
 						: { ...PWA_SURFACE_SPRING, velocity: 0 }}
@@ -251,7 +247,7 @@ function ReminderEditorSheet({
 						/></Suspense>
 					</div>
 				)}
-			</motion.div>
+			</PwaSheetSurface>
 		</PwaModalSheet>
 	);
 }

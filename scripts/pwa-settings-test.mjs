@@ -47,14 +47,15 @@ try {
 				}).toBeLessThan(2);
 			}
 			await page.setViewportSize({ width: 390, height: 844 });
-			// Model the adapter's keyboard inset; keep the header in place and
-			// move the bottom above the keyboard without subtracting it twice.
-			const keyboardStyles = await page.addStyleTag({ content: '.settings-keyboard-test { bottom: 300px !important; --pwa-sheet-keyboard-inset: 300px !important; }' });
+			// Model keyboard space inside the shared surface. The sheet keeps
+			// painting to the bottom while its scrollable contents shrink.
+			const keyboardStyles = await page.addStyleTag({ content: '.settings-keyboard-test .pwa-sheet-surface { padding-bottom: 300px !important; }' });
 			await sheet.evaluate(element => element.classList.add('settings-keyboard-test'));
 			await expect.poll(async () => {
 				const box = await sheet.boundingBox();
-				return box && Math.abs(box.y - 10) + Math.abs(box.height - 534);
+				return box && Math.abs(box.y - 10) + Math.abs(box.height - 834);
 			}).toBeLessThan(2);
+			await expect(sheet.locator('.settings-sheet')).toHaveCSS('height', '534px');
 			await sheet.evaluate(element => element.classList.remove('settings-keyboard-test'));
 			await keyboardStyles.evaluate(element => element.remove());
 			for (const title of ['General', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();

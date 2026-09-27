@@ -5,20 +5,29 @@
 /* Retarget from the painted position; never animate direct finger tracking. */
 .pwa-sheet-portal{position:fixed;inset:0;z-index:1000;pointer-events:none}
 .pwa-modal-sheet{position:fixed;inset:0;z-index:1000;pointer-events:none}
-.pwa-modal-sheet__backdrop{position:absolute;inset:0;opacity:calc(1 - var(--drawer-swipe-progress,0));transition:opacity 240ms ease-out}
+.pwa-modal-sheet__backdrop{position:absolute;inset:0;opacity:calc(1 - var(--pwa-sheet-position,1))}
 .pwa-modal-sheet__container{position:absolute;bottom:0;left:0;display:flex;flex-direction:column;outline:none;pointer-events:auto;transform:none;transition:transform var(--pwa-motion-surface-duration) var(--pwa-motion-surface-ease)}
 /* Keyboard geometry commits once; useSheetKeyboardMotion animates only translate. */
-.pwa-modal-sheet--reminder .pwa-modal-sheet__scroller{position:relative}
+.pwa-modal-sheet__scroller{position:relative}
 .pwa-keyboard-motion-fill{position:absolute;bottom:0;left:0;right:0;background:var(--pwa-sheet-surface);transform-origin:bottom;pointer-events:none}
 .pwa-modal-sheet__container[data-starting-style],.pwa-modal-sheet__container[data-ending-style]{transform:translateY(var(--pwa-sheet-travel,100%))}
 .pwa-modal-sheet__container[data-starting-style]{transition:none}
-.pwa-modal-sheet__container[data-ending-style]{transition-duration:clamp(120ms,calc(320ms * var(--drawer-swipe-strength,1)),420ms)}
+/* Keep a visible spring settle after a flick: 120ms compressed most remaining
+   travel into a few frames. Resolve timing on the sheet itself. Depth and dimming
+   follow its painted position instead of running independent transitions. */
+.pwa-modal-sheet__container[data-ending-style]{transition-duration:clamp(240ms,calc(320ms * var(--drawer-swipe-strength,1)),320ms);transition-timing-function:var(--pwa-motion-surface-ease)}
 .pwa-modal-sheet__container[data-swiping]{transform:translateY(var(--drawer-swipe-movement-y,0px));transition:none}
-.pwa-modal-sheet__backdrop[data-starting-style],.pwa-modal-sheet__backdrop[data-ending-style]{opacity:0}
-.pwa-modal-sheet__backdrop[data-ending-style]{transition-duration:220ms}
-.pwa-modal-sheet__backdrop[data-swiping]{transition:none}
+/* Native carets can lag compositor motion. Keep focus/selection and the keyboard,
+   but reveal the caret only after both drawer and keyboard movement settle. */
+:is(.pwa-modal-sheet__container[data-sheet-moving],.pwa-modal-sheet__container[data-starting-style],.pwa-modal-sheet__container[data-ending-style],.pwa-modal-sheet__container[data-swiping],.pwa-sheet-surface[data-keyboard-moving]) :is(input,textarea,[contenteditable="true"]){caret-color:transparent}
 .pwa-modal-sheet__content{display:flex;flex-direction:column}
 .pwa-modal-sheet__scroller{flex:1}
+.pwa-sheet-surface{position:relative;display:flex;flex-direction:column;box-sizing:border-box;min-height:0;flex-shrink:0;background:var(--pwa-sheet-surface);overflow:clip}
+.pwa-modal-sheet--settings .pwa-sheet-surface{max-height:var(--pwa-settings-height,calc(var(--pwa-sheet-layout-height,100dvh) - env(safe-area-inset-top) - 28px))}
+.pwa-modal-sheet--settings .pwa-sheet-surface>.settings-sheet{flex:1 1 auto;min-height:0;max-height:none}
+/* Only each form's content panel scrolls. Hidden overflow still lets WebKit
+   pan outer wrappers when focusing a field, lifting the entire sheet. */
+.pwa-modal-sheet,.pwa-modal-sheet__container,.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{overflow:clip!important}
 /* Anchor the grabber to the visible surface, including the moving reminder
    stage. Let touches reach the header and Base UI's existing swipe handling. */
 .crate-reminders-ui .pwa-modal-sheet__container--settings::after,

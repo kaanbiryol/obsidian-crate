@@ -126,6 +126,16 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
-    {onAdd && <Button className="pwa-dock__add" disabled={disabled} aria-label={section === 'reading' ? 'Save a link' : 'Add reminder'} data-action={section === 'reminders' ? 'open-create-modal' : 'open-save-link'} onClick={onAdd}><ThemeIcon id="plus" size="l" aria-hidden="true" /></Button>}
+    {onAdd && <PwaDockAddButton section={section} disabled={disabled} onClick={onAdd} />}
   </div>;
+}
+
+/** Shared capture action for the main dock and detail screens. */
+export function PwaDockAddButton({ section, disabled = false, onClick, className = '' }: {
+  section: CrateSection;
+  disabled?: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return <Button className={`pwa-dock__add ${className}`} disabled={disabled} aria-label={section === 'reading' ? 'Save a link' : 'Add reminder'} data-action={section === 'reminders' ? 'open-create-modal' : 'open-save-link'} onClick={onClick}><ThemeIcon id="plus" size="l" aria-hidden="true" /></Button>;
 }

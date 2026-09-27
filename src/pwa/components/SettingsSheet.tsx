@@ -4,7 +4,6 @@ import { LogOut } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { PWA_NAVIGATION_SPRING } from '../motion';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
-import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { PwaModalSheet } from './PwaModalSheet';
 import { PwaButton as Button } from './PwaButton';
 import { SettingsRow } from './SettingsRow';
@@ -32,7 +31,6 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 	const { reminders, reading } = useSyncExternalStore(store.subscribe, store.getSnapshot);
 	const { preferences, updatePreferences } = usePwaPreferences();
 	const homeScreen = useHomeScreenInstall();
-	const keyboardInset = useKeyboardHeight();
 	const finish = useCallback(() => store.setOpen(false), [store]);
 	const transition = useSheetTransition(finish);
 	const [page, setPage] = useState<'settings' | 'shortcut' | 'logout'>(() => new URL(location.href).searchParams.get('setup') === 'shortcut' ? 'shortcut' : 'settings');
@@ -97,7 +95,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 	};
 	const title = page === 'shortcut' ? 'Set up iPhone shortcut' : page === 'logout' ? 'Log out of Crate?' : 'Settings';
 	return <PwaModalSheet isOpen={!transition.isClosing} onClose={close} onCloseEnd={transition.finishClose}
-		onOpenEnd={onOpenEnd} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing} keyboardInset={keyboardInset}>
+		onOpenEnd={onOpenEnd} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing}>
 		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
 				closeDisabled={exclusive || transition.isClosing} onClose={close} />

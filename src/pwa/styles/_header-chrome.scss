@@ -9,7 +9,7 @@
   .view-header { align-items: flex-start; gap: 10px; border-bottom: 0; }
   .project-detail-title { font-size: var(--crate-view-title-size); letter-spacing: var(--crate-view-title-spacing); }
 
-  :is(.view-header, .project-detail-header) .crate-view-header-actions,
+  :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions,
   .pwa-navigation-screen--project .premium-back-button {
     border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
     border-radius: 999px;
@@ -18,9 +18,9 @@
     backdrop-filter: blur(24px) saturate(1.35);
     -webkit-backdrop-filter: blur(24px) saturate(1.35);
   }
-  :is(.view-header, .project-detail-header) .crate-view-header-actions { padding: 2px; gap: 2px; }
+  :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions { padding: 2px; gap: 2px; }
   .pwa-navigation-screen--project .premium-back-button { padding-inline: 12px; }
-  :is(.view-header, .project-detail-header) .crate-view-header-actions button { border-radius: 50%; }
+  :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions button { border-radius: 50%; }
 
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     --pwa-header-control-surface: color-mix(in srgb, var(--background-primary-alt) 80%, transparent);

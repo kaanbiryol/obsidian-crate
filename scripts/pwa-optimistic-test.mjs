@@ -166,7 +166,7 @@ async function verifyProjectSyncIndicator(page) {
 	await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
 	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
 	await page.locator('[data-action="open-project"][data-project="Work"]').click();
-	const indicator = page.locator('.project-detail-header .pwa-sync-indicator');
+	const indicator = page.locator('.project-detail-navigation .pwa-sync-indicator');
 	const scroll = page.locator('.pwa-project-layer .reminders-view-scroll');
 	await expect(scroll).toHaveCount(1);
 	await expect(indicator).toBeVisible();

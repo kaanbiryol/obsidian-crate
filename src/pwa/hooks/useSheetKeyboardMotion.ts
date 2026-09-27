@@ -22,6 +22,7 @@ export function useSheetKeyboardMotion(
 			observer.disconnect();
 			animationRef.current?.cancel();
 			animationRef.current = null;
+			stage.removeAttribute('data-keyboard-moving');
 			fillRef.current?.remove();
 			fillRef.current = null;
 			stageRef.current = null;
@@ -36,6 +37,7 @@ export function useSheetKeyboardMotion(
 		if (!enabled || reducedMotion) {
 			animationRef.current?.cancel();
 			animationRef.current = null;
+			stage.removeAttribute('data-keyboard-moving');
 			fillRef.current?.remove();
 			fillRef.current = null;
 			heightRef.current = stage.offsetHeight;
@@ -51,6 +53,7 @@ export function useSheetKeyboardMotion(
 		heightRef.current = height;
 		animationRef.current?.cancel();
 		animationRef.current = null;
+		stage.removeAttribute('data-keyboard-moving');
 		fillRef.current?.remove();
 		fillRef.current = null;
 		if (Math.abs(delta) < 0.5) return;
@@ -69,10 +72,19 @@ export function useSheetKeyboardMotion(
 			const animation = fill.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(0)' }], timing);
 			animation.onfinish = () => { fill.remove(); if (fillRef.current === fill) fillRef.current = null; };
 		}
-		animationRef.current = stage.animate([
+		stage.setAttribute('data-keyboard-moving', '');
+		const animation = stage.animate([
 			{ translate: `0 ${delta}px` },
 			{ translate: '0 0' },
 		], timing);
+		animationRef.current = animation;
+		const settled = () => {
+			// An interrupted animation must not reveal the caret during its replacement.
+			if (animationRef.current !== animation) return;
+			animationRef.current = null;
+			stage.removeAttribute('data-keyboard-moving');
+		};
+		void animation.finished.then(settled, settled);
 	}, [enabled, keyboardInset, reducedMotion, stageRef]);
 
 	return setStageRef;

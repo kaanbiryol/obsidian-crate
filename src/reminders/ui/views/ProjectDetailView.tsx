@@ -18,6 +18,8 @@ import { ThemeIcon } from '../../components/theme-icon';
 export interface ProjectDetailViewProps {
   project: string;
   hideTitle?: boolean;
+  backLabel?: string;
+  navigationRightContent?: React.ReactNode;
   headerRightContent?: React.ReactNode;
   headerTitleContent?: React.ReactNode;
   headerMetaContent?: React.ReactNode;
@@ -48,6 +50,8 @@ export interface ProjectDetailViewProps {
 export const ProjectDetailView = memo(function ProjectDetailView({
   project,
   hideTitle = false,
+  backLabel = 'Projects',
+  navigationRightContent,
   headerRightContent,
   headerTitleContent,
   headerMetaContent,
@@ -101,11 +105,12 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       isDragging={order.isDragging}
       header={
         <>
-          <div>
+          <div className="project-detail-navigation">
             <ShadowDOMNativeButton onClick={onBack} className="premium-back-button">
               <ThemeIcon size="xs" id="chevron-left" />
-              <span>Projects</span>
+              <span>{backLabel}</span>
             </ShadowDOMNativeButton>
+            {navigationRightContent}
           </div>
           <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} titleContent={headerTitleContent} rightContent={headerRightContent} metaContent={headerMetaContent} />
           {belowHeaderContent}

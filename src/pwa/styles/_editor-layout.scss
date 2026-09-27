@@ -2,10 +2,6 @@
 @mixin styles {
   // Hidden overflow still allows Safari's focus scrolling. Only the editor body
   // should scroll; moving these wrappers lifts the whole sheet above its anchor.
-  .pwa-modal-sheet--reminder,
-  .pwa-modal-sheet--reminder .pwa-modal-sheet__container,
-  .pwa-modal-sheet--reminder .pwa-modal-sheet__content,
-  .pwa-modal-sheet--reminder .pwa-modal-sheet__scroller,
   .pwa-modal-sheet--reminder .pwa-reminder-sheet-stage,
   .pwa-modal-sheet--reminder .modal-card.pwa-reminder-editor,
   .pwa-modal-sheet--reminder .modal-form {
@@ -101,7 +97,9 @@
       > * { pointer-events: none; }
 
       &.is-active { color: var(--crate-semantic-color); }
-      &:hover:not(.is-active) { color: var(--text-muted); }
+      @media (hover: hover) and (pointer: fine) {
+        &:hover:not(.is-active) { color: var(--text-muted); }
+      }
     }
 
     .modal-form {
@@ -193,11 +191,29 @@
     // viewport inset. A transparent margin exposes the backdrop during opening.
     box-sizing: border-box;
     height: min(calc(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px)), 100%);
-    padding-bottom: var(--pwa-keyboard-inset, 0px);
   }
 
   .pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor {
     padding-bottom: 16px;
   }
 
+  // Give new/edit the same tall page geometry as Settings. Keep the surface
+  // anchored while keyboard padding reduces the scrollable form inside it.
+  .pwa-modal-sheet--reminder.is-editor-screen.is-full-height-editor {
+    .pwa-modal-sheet__container--reminder {
+      height: min(760px, calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 28px)) !important;
+      max-height: none !important;
+    }
+
+    .pwa-reminder-sheet-stage {
+      height: 100%;
+      flex: none;
+    }
+
+    @media (max-width: 759px) {
+      .pwa-modal-sheet__container--reminder {
+        height: calc(var(--pwa-sheet-layout-height, 100dvh) - env(safe-area-inset-top) - 10px) !important;
+      }
+    }
+  }
 }

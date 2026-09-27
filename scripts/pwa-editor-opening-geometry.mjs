@@ -69,13 +69,14 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		await expect(stage).toHaveCSS('transform', 'none');
 		await stage.tap({ trial: true });
 		const original = await stage.boundingBox();
+		const fullHeight = await stage.evaluate(el => Boolean(el.closest('.is-full-height-editor')));
 		await page.evaluate(() => {
 			window.editorKeyboardHeight = 532;
 			window.visualViewport.dispatchEvent(new Event('resize'));
 		});
 		// Wait for the first keyboard movement, then model its final 30px report
 		// arriving after the drawer's entrance transition has already finished.
-		await expect.poll(async () => Math.round((await stage.boundingBox()).y)).toBe(Math.round(original.y - 336));
+		await expect.poll(async () => Math.round((await stage.boundingBox()).y)).toBe(Math.round(fullHeight ? original.y : original.y - 336));
 		await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
 		const lateFrames = await page.evaluate(async () => {
 			const stage = document.querySelector('.pwa-reminder-sheet-stage');
@@ -93,8 +94,12 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 			});
 			return positions;
 		});
-		assert.ok(Math.abs(lateFrames[0] - lateFrames.at(-1) - 30) < 1, 'editor ends above the final keyboard position');
-		if (reducedMotion === 'no-preference') {
+		assert.ok(Math.abs(lateFrames[0] - lateFrames.at(-1) - (fullHeight ? 0 : 30)) < 1, 'Tall editors keep their header anchored; compact editors move above the keyboard');
+		if (fullHeight) {
+			await expect(stage).toHaveCSS('padding-bottom', '350px');
+			assert.ok(Math.abs((await stage.boundingBox()).height - original.height) < 1, 'Keyboard padding must not grow the tall sheet');
+		}
+		if (!fullHeight && reducedMotion === 'no-preference') {
 			assert.ok(lateFrames.some(y => y < lateFrames[0] - 1 && y > lateFrames.at(-1) + 1),
 				`late keyboard geometry must move through intermediate frames instead of snapping (${lateFrames})`);
 		}

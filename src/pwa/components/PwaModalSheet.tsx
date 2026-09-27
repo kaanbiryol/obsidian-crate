@@ -3,10 +3,13 @@ import { flushSync } from 'react-dom';
 import { Drawer } from '@base-ui/react/drawer';
 import { lockSheetDocumentScroll } from '../sheet-scroll-lock';
 import { measureSheetTravel } from '../sheet-geometry';
+import { trackSheetPresentation } from '../sheet-presentation';
+import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
+import { PwaSheetSurface } from './PwaSheetSurface';
 
 export function PwaModalSheet({
 	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, sheetClassName,
-	keyboardInset = 0, dismissible = true, viewportPortal = false, label, role = 'dialog', descriptionId,
+	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, label, role = 'dialog', descriptionId,
 }: {
 	isOpen: boolean;
 	/** Return false when dismissal navigates within the sheet instead of closing it. */
@@ -16,6 +19,7 @@ export function PwaModalSheet({
 	children: React.ReactNode;
 	variant: 'reminder' | 'settings';
 	sheetClassName?: string;
+	/** Measured automatically; override only for coordinated screen handoffs. */
 	keyboardInset?: number;
 	/** Keep document-reader sheets outside the frozen app and its compositing layers. */
 	viewportPortal?: boolean;
@@ -24,14 +28,23 @@ export function PwaModalSheet({
 	role?: 'dialog' | 'alertdialog';
 	descriptionId?: string;
 }) {
+	const measuredKeyboardInset = useKeyboardHeight(keyboardInsetOverride === undefined);
+	const keyboardInset = keyboardInsetOverride ?? measuredKeyboardInset;
 	// Retain the iOS layout/selection-safe lock through the exit animation.
 	// Base UI owns focus containment; trap-focus avoids a second document lock.
 	useLayoutEffect(() => lockSheetDocumentScroll(viewportPortal), [viewportPortal]);
 	const popupRef = useRef<HTMLDivElement>(null);
 	const anchorRef = useRef<HTMLSpanElement>(null);
+	const stopPresentation = useRef<(() => void) | undefined>(undefined);
 	const setPopupRef = useCallback((popup: HTMLDivElement | null) => {
+		stopPresentation.current?.();
+		stopPresentation.current = undefined;
 		popupRef.current = popup;
 		measureSheetTravel(popup);
+		if (popup) stopPresentation.current = trackSheetPresentation(popup);
+		// The portal can attach after the parent layout effect. Focus in its
+		// mount ref so a synchronous opening tap still activates the keyboard.
+		popup?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)')?.focus({ preventScroll: true });
 	}, []);
 	useLayoutEffect(() => {
 		// Snapshot before exit, including the currently visible keyboard inset.
@@ -44,12 +57,18 @@ export function PwaModalSheet({
 	useLayoutEffect(() => {
 		const host = anchorRef.current?.closest<HTMLElement>('.pwa-shadow-root, .crate-feature-panel');
 		if (!host) return;
-		if (!viewportPortal) { setMountPoint(host); return; }
+		const shell = host.closest<HTMLElement>('.crate-feature-shell');
+		const inCanvas = Boolean(host.closest('.crate-modal-canvas'));
+		if (!viewportPortal && !inCanvas) { setMountPoint(host); return; }
+		// Modal surfaces must be siblings of the receding app canvas, otherwise
+		// its transform also shrinks their fixed positioning and gesture geometry.
+		// A scrolled document reader keeps its existing viewport/body portal.
+		const documentReader = host.ownerDocument.documentElement.classList.contains('pwa-document-reader');
 		const portal = host.ownerDocument.createElement('div');
-		portal.className = 'crate-reminders-ui pwa-sheet-portal';
+		portal.className = 'crate-reminders-ui pwa-shadow-root pwa-sheet-portal';
 		// Retain host theme tokens without inheriting the feature panel's layout.
 		if (host.classList.contains('pwa-reading-root')) portal.classList.add('pwa-reading-root');
-		host.ownerDocument.body.append(portal);
+		(shell && !documentReader ? shell : host.ownerDocument.body).append(portal);
 		setMountPoint(portal);
 		return () => portal.remove();
 	}, [viewportPortal]);
@@ -93,15 +112,21 @@ export function PwaModalSheet({
 								<Drawer.Backdrop className="pwa-modal-sheet__backdrop" />
 								<Drawer.Popup ref={setPopupRef}
 									className={`pwa-modal-sheet__container pwa-modal-sheet__container--${variant}`}
-									style={variant === 'settings' ? { bottom: keyboardInset, '--pwa-sheet-keyboard-inset': `${keyboardInset}px` } as React.CSSProperties : undefined}
 									role={role} aria-label={label} aria-modal="true" aria-describedby={descriptionId}
 									data-base-ui-swipe-ignore={!dismissible ? '' : undefined}
-									initialFocus={variant === 'reminder' ? false : popupRef}
+									onPointerDown={(event) => {
+										if (event.pointerType !== 'touch' || event.button !== 0 || !(event.target instanceof Element)) return;
+										const field = event.target.closest<HTMLElement>('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]');
+										if (field && field !== field.ownerDocument.activeElement) field.focus({ preventScroll: true });
+									}}
+									initialFocus={variant === 'reminder' ? false : () => popupRef.current?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)') ?? popupRef.current}
 									finalFocus={() => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
 										: anchorRef.current?.closest('.pwa-shadow-root, .crate-feature-panel')?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
 								>
 									<Drawer.Content className="pwa-modal-sheet__content">
-										<div className="pwa-modal-sheet__scroller">{children}</div>
+										<div className="pwa-modal-sheet__scroller">{variant === 'settings'
+											? <PwaSheetSurface keyboardInset={keyboardInset} animateKeyboard={isOpen}>{children}</PwaSheetSurface>
+											: children}</div>
 									</Drawer.Content>
 								</Drawer.Popup>
 							</Drawer.Viewport>

@@ -17,11 +17,11 @@
 // Keep both modes in the paint tree so iOS can animate a previously inactive
 // panel. Dissolve the outgoing panel over a fully opaque incoming panel so
 // shared chrome and backgrounds never dim halfway through the transition.
-.crate-feature-panel[data-leaving="true"] { z-index: 3; animation: crate-mode-fade-out 160ms ease-out both; }
+.crate-feature-panel[data-leaving="true"] { z-index: 3; animation: crate-mode-fade-out var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease) both; }
 @keyframes crate-mode-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
 .crate-feature-panel .pwa-tab-transition { position: relative; flex: 1; height: 100%; min-height: 0; min-width: 0; isolation: isolate; }
-.crate-feature-panel .pwa-tab-panel { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--background-primary); transition: opacity 160ms ease-out; }
+.crate-feature-panel .pwa-tab-panel { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--background-primary); transition: opacity var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease); }
 .crate-feature-panel .pwa-tab-panel[data-leaving="true"] { pointer-events: none; }
 // Lay out newly mounted cards before the dissolve reveals them. Leave retained
 // lists alone so changing offscreen estimates cannot shift a scrolled viewport.
@@ -35,7 +35,7 @@
 	border-radius: 12px;
 	transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
 }
-.crate-feature-panel .pwa-feature-switch-button:active { transform: scale(.92); }
+.crate-feature-panel .pwa-feature-switch-button[data-press-active] { transform: scale(.92); }
 
 
 
@@ -79,7 +79,33 @@
 	.crate-feature-panel .pwa-feature-switch-button,
 	.crate-feature-panel .pwa-feature-switch-button svg { transition: none; }
 	.crate-feature-panel .pwa-feature-switch-button { animation: none; }
-	.crate-feature-panel .pwa-feature-switch-button:active { transform: none; }
+	.crate-feature-panel .pwa-feature-switch-button[data-press-active] { transform: none; }
 }
 .auth-card__brand > .pwa-feature-switch-button { margin-left: auto; }
 .pwa-feature-welcome-action { position: absolute; top: 16px; right: 20px; }
+
+// All app-owned modal surfaces share a presentation canvas. Portals stay outside
+// it so the sheet itself never inherits the background transform.
+.crate-modal-canvas {
+	position: relative;
+	height: 100%;
+	min-height: 0;
+	transform-origin: center top;
+}
+@media (max-width: 759px) and (prefers-reduced-motion: no-preference) {
+	.crate-feature-shell:has(.pwa-modal-sheet) > .crate-modal-canvas {
+		// Follow the sheet's rendered position; never switch to a separate
+		// animation or reset depth when the gesture's progress resets.
+		overflow: hidden;
+		transform: translateY(calc(8px * (1 - var(--pwa-sheet-position, 1)))) scale(calc(.94 + .06 * var(--pwa-sheet-position, 1)));
+		border-radius: calc(24px * (1 - var(--pwa-sheet-position, 1)));
+	}
+}
+
+// A long article uses native document scrolling; leave its frozen canvas in place.
+html.pwa-document-reader .crate-feature-shell > .crate-modal-canvas {
+	overflow: visible;
+	transform: none;
+	border-radius: 0;
+	transition: none;
+}
