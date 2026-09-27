@@ -41,5 +41,6 @@ html[data-scene="status"] .crate-status-actions .mod-cta { background: var(--int
 .controls-gallery section { margin-top: 24px; }
 .controls-gallery h2 { margin: 0 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 400; }
 .controls-gallery__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.controls-gallery__fields { display: grid; gap: 16px; }
 html[data-scene="controls"] { --background-modifier-hover: color-mix(in srgb, var(--text-normal) 5%, transparent); --background-modifier-active-hover: color-mix(in srgb, var(--text-normal) 8%, transparent); }
 html[data-scene="controls"] body { overflow: auto; }

@@ -26,18 +26,7 @@
     display: flex;
     gap: 12px;
     margin-top: 24px;
-    button {
-      flex: 1;
-      min-height: 48px;
-      padding: 12px;
-      border-radius: 10px;
-      background: var(--background-modifier-hover);
-      color: var(--text-normal);
-      font-size: 16px;
-      font-weight: 600;
-      &:disabled { opacity: .5; }
-      &.is-destructive { background: #c83232; color: white; }
-    }
+    .crate-action-button { flex: 1; }
   }
 
   .modal-card.pwa-reminder-editor {

@@ -194,6 +194,7 @@ async function logoutDuringConfirmation(browser) {
     await expect.poll(() => attempts.length).toBe(1);
     await page.getByRole('region', { name: 'Notifications', exact: true }).getByText('Checking…', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
     await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBe(null);
     const peer = await context.newPage();
     await renew(peer);

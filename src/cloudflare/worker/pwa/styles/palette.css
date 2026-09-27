@@ -1,0 +1,45 @@
+/* Standalone host palette. Shared components consume the semantic Crate tokens. */
+:root{
+	--background-primary:#0d0d0f;
+	--background-primary-alt:#141417;
+	--background-secondary:#09090b;
+	--background-modifier-border:rgba(255,255,255,.075);
+	--background-modifier-border-hover:rgba(255,255,255,.13);
+	--background-modifier-hover:rgba(255,255,255,.045);
+	--background-modifier-active-hover:rgba(255,255,255,.07);
+	--background-modifier-form-field:#18181c;
+	--background-modifier-cover:rgba(0,0,0,.55);
+	--background-modifier-box-shadow:rgba(0,0,0,.3);
+	--text-normal:#f0f0f2;
+	--text-muted:#9a9aa3;
+	--text-faint:#66666f;
+	--text-error:#ef4444;
+	--text-warning:#f59e0b;
+	--text-success:#22c55e;
+	--text-on-accent:#ffffff;
+	--interactive-accent:#8b5cf6;
+	--interactive-accent-hover:#9b75f7;
+	--interactive-normal:rgba(255,255,255,.045);
+	--interactive-hover:rgba(255,255,255,.07);
+	--shadow-s:0 2px 8px rgba(0,0,0,.18);
+	--shadow-l:0 25px 50px -12px rgba(0,0,0,.35);
+	--accent-rgb:139,92,246;
+	--pwa-control-surface:#17171b;
+	--pwa-control-active-surface:#1d1d22;
+	--pwa-line-soft:rgba(255,255,255,.052);
+	--pwa-floating-shadow:none;
+	--pwa-sheet-surface:#101013;
+	--bg:var(--background-primary);
+	--panel:var(--background-primary-alt);
+	--panel-2:var(--pwa-control-surface);
+	--panel-3:var(--pwa-control-active-surface);
+	--line:var(--background-modifier-border);
+	--line-soft:var(--pwa-line-soft);
+	--text:var(--text-normal);
+	--accent:var(--interactive-accent);
+	--accent-strong:var(--interactive-accent);
+	--danger:var(--text-error);
+	--success:var(--text-success);
+	--reminder-red:var(--text-error);
+	--shadow:var(--pwa-floating-shadow);
+}

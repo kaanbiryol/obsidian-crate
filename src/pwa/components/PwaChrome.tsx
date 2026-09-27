@@ -1,5 +1,5 @@
-import { Button as BaseButton } from '@base-ui/react/button';
-import React from 'react';
+import { Button as BaseButton } from '@/ui/shared/Button';
+import React, { useState } from 'react';
 import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
@@ -8,7 +8,9 @@ import {
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
-import { createPwaOpeningDockHtml } from '../opening-dock';
+import { createPwaOpeningScreenHtml } from '../opening-screen';
+import { resolvePwaOpeningDestination } from '../opening-destination';
+import { loadPwaPreferences } from '../preferences';
 import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
@@ -37,15 +39,18 @@ export function PwaHeaderActions({
 	settingsOpen,
 	onToggleSettings,
 	showSettings = true,
+	children,
 }: {
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
 	showSettings?: boolean;
+	children?: React.ReactNode;
 }) {
-	if (!showSettings) return null;
+	if (!showSettings && !children) return null;
 	return (
 		<div className="pwa-header-actions crate-view-header-actions">
-			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
+			{children}
+			{showSettings && <PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />}
 		</div>
 	);
 }
@@ -82,7 +87,7 @@ export function PwaTopNotices({
 						<span className="pwa-update-banner__text">Update available</span>
 						<span className="pwa-update-banner__detail">Install the latest version when you’re ready.</span>
 					</div>
-					<BaseButton className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
+					<BaseButton variant="primary" size="touch" className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
 						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
 						<span className="pwa-update-button__label pwa-update-button__label--busy" aria-hidden={!updating}>Updating…</span>
 					</BaseButton>
@@ -152,12 +157,15 @@ export function PwaPullRefreshIndicator({
 }
 
 export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
+	// Enrollment cleans the URL while this screen is visible. Keep its original
+	// destination until the real shell is ready so the title cannot jump back.
+	const [openingHtml] = useState(() => createPwaOpeningScreenHtml(resolvePwaOpeningDestination(location.search, loadPwaPreferences().defaultScreen)));
 	return (
 		<div
 			className={`pwa-launch-splash${updating ? ' is-updating' : ''}`}
 			role="status"
 			aria-label={updating ? 'Updating Crate' : 'Loading Crate'}
-			dangerouslySetInnerHTML={{ __html: updating ? PWA_UPDATE_SCREEN_HTML : createPwaOpeningDockHtml() }}
+			dangerouslySetInnerHTML={{ __html: updating ? PWA_UPDATE_SCREEN_HTML : openingHtml }}
 		/>
 	);
 }

@@ -2,6 +2,7 @@ import { PwaButton as BaseButton } from './PwaButton';
 import React from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import { ExpiredReminderChangeActions } from './ExpiredReminderChangeActions';
+import { PwaNotice } from './PwaNotice';
 
 function changeTitle(change: PendingReminderChange): string {
 	return change.optimistic?.content || change.previous?.content || change.modal?.draft.content || change.project || 'Reminder';
@@ -41,37 +42,24 @@ export function ReminderSyncNotice({
 	return (
 		<div className="pwa-reminder-sync-notices" aria-label="Reminder sync">
 			{storageError && (
-				<section className="pwa-reminder-sync-error" aria-label="Pending changes unavailable">
-					<div className="pwa-reminder-sync-error__copy">
-						<strong>Couldn’t load pending changes</strong>
-						<span role="status">{storageError}</span>
-					</div>
-					{onRetryInitialization && <div className="pwa-reminder-sync-error__actions">
+				<PwaNotice title="Couldn’t load pending changes" aria-label="Pending changes unavailable"
+					actions={onRetryInitialization &&
 						<BaseButton variant="ghost" size="touch" type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</BaseButton>
-					</div>}
-				</section>
+					}>
+					<span role="status">{storageError}</span>
+				</PwaNotice>
 			)}
 			{errors.map(change => {
 				const title = changeTitle(change);
 				const failedSave = change.status === 'failed' && !change.ambiguous && change.kind === 'save';
 				const description = failedSave ? change.modal?.draft.description ?? change.optimistic?.description : undefined;
 				return (
-					<section
+					<PwaNotice
 						key={change.operationId}
-						className="pwa-reminder-sync-error"
+						title={failureLabel(change)}
 						aria-label={`${failureLabel(change)}: ${title}`}
 						data-sync-status={change.status}
-					>
-						<div className="pwa-reminder-sync-error__copy">
-							<strong>{failureLabel(change)}</strong>
-							<span className="pwa-reminder-sync-error__title">{title}</span>
-							{description && <details><summary>Draft details</summary><p>{description}</p></details>}
-							<span role="status">{change.error || (change.status === 'uncertain'
-								? 'Your change is kept on this device. Retry to confirm it synced.'
-								: 'Your change could not be saved.')}</span>
-						</div>
-						<div className="pwa-reminder-sync-error__actions">
-							{change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
+						actions={change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
 							<BaseButton variant="ghost" size="touch" type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</BaseButton>
 							{failedSave && <BaseButton variant="ghost" size="touch" type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</BaseButton>}
 							{change.status === 'failed' && (
@@ -79,9 +67,13 @@ export function ReminderSyncNotice({
 									{failedSave ? 'Discard' : 'Dismiss'}
 								</BaseButton>
 							)}
-							</>}
-						</div>
-					</section>
+						</>}>
+						<span className="pwa-reminder-change-title">{title}</span>
+						{description && <details><summary>Draft details</summary><p>{description}</p></details>}
+						<span role="status">{change.error || (change.status === 'uncertain'
+							? 'Your change is kept on this device. Retry to confirm it synced.'
+							: 'Your change could not be saved.')}</span>
+					</PwaNotice>
 				);
 			})}
 		</div>

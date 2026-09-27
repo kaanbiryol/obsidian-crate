@@ -17,32 +17,79 @@ export async function dockAppearance(page) {
  });
 }
 
+async function loadingChrome(page, cardSelector = '.pwa-reminders-skeleton__card') {
+ return page.locator('.view-header').evaluate((header, cardSelector) => {
+  const rect = element => { const box = element.getBoundingClientRect(); return [box.x, box.y, box.width, box.height]; };
+  const title = header.querySelector('.view-header-title'), settings = header.querySelector('[data-icon="settings"]');
+  const font = getComputedStyle(title);
+  return { header: rect(header), title: rect(title), text: title.textContent,
+   font: [font.fontFamily, font.fontSize, font.fontWeight, font.lineHeight, font.letterSpacing, font.color],
+   settings: rect(settings), settingsColor: getComputedStyle(settings).color,
+   cards: Array.from(document.querySelectorAll(cardSelector)).map(rect) };
+ }, cardSelector);
+}
+
+/** Reading's loading screen must also be ready before app.js. */
+export async function checkReadingOpening(browser, origin) {
+ for (const colorScheme of ['light', 'dark']) {
+  const app = Promise.withResolvers(), session = Promise.withResolvers();
+  const page = await browser.newPage({ viewport: { width: 393, height: 852 }, colorScheme, serviceWorkers: 'block',
+   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
+  await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
+  await page.route('**/reading/exchange', async route => { await session.promise; await route.abort(); });
+  try {
+   await page.goto(`${origin}/notifications?section=reading#reading=slow-opening`, { waitUntil: 'commit' });
+   await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
+   await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
+   await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Reading');
+   await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();
+   await expect(page.locator('.crate-reading__loading-row')).toHaveCount(4);
+   const initial = await loadingChrome(page, '.crate-reading__loading-row'), dock = await dockAppearance(page);
+   app.resolve();
+   await expect(page.locator('.crate-feature-shell .pwa-reading-opening')).toBeVisible();
+   expect(await loadingChrome(page, '.crate-reading__loading-row')).toEqual(initial);
+   expect(await dockAppearance(page)).toEqual(dock);
+   expect(errors).toEqual([]);
+  } finally { app.resolve(); session.resolve(); await page.close(); }
+ }
+}
+
 /** Inspect every web-painted launch frame while JavaScript and data arrive separately. */
 export async function checkLaunchThemes(browser, origin) {
  for (const system of ['light', 'dark']) for (const saved of ['system', system === 'light' ? 'dark' : 'light']) {
   const scheme = saved === 'system' ? system : saved;
   const expected = scheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)';
   const page = await browser.newPage({ viewport: { width: 393, height: 852 }, colorScheme: system, serviceWorkers: 'block' });
-  const app = Promise.withResolvers(), list = Promise.withResolvers();
+  const app = Promise.withResolvers(), enrollment = Promise.withResolvers(), version = Promise.withResolvers(), list = Promise.withResolvers();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(({ saved }) => {
    localStorage.setItem('crate-reminders-theme', saved);
+   const bootstrap = new Promise(resolve => { window.__releaseOpeningBootstrap = resolve; });
+   const requestLock = navigator.locks.request.bind(navigator.locks);
+   navigator.locks.request = (name, callback) => requestLock(name, async lock => {
+    if (name === 'crate-reminders-enrollment') await bootstrap;
+    return callback(lock);
+   });
    window.launchFrames = [];
    window.dockFrames = [];
    window.headerFrames = [];
    const sample = () => {
     if (document.querySelector('#app')) {
      const title = document.querySelector('.view-header-title');
+     const liveTitle = document.querySelector('.pwa-reminders-view .view-header-title');
      if (title) {
-      window.firstHeaderTitle ??= title;
+      if (liveTitle) window.firstHeaderTitle ??= liveTitle;
       const chain = [];
       for (let node = title; node; node = node.parentElement) chain.push(getComputedStyle(node));
-      window.headerFrames.push({ sameNode: title === window.firstHeaderTitle,
+      window.headerFrames.push({ sameNode: !liveTitle || liveTitle === window.firstHeaderTitle,
        visible: chain.every(style => style.opacity === '1' && style.visibility === 'visible'),
        settings: Boolean(document.querySelector('.pwa-header-settings-button svg')),
       });
-     }
+     } else window.headerFrames.push({ visible: false });
      const dock = document.querySelector('.pwa-dock');
      window.dockFrames.push({
       visible: Boolean(dock && dock.getBoundingClientRect().height > 0),
@@ -69,16 +116,28 @@ export async function checkLaunchThemes(browser, origin) {
   });
   await page.route('**/notifications/theme-bootstrap.js*', route => route.abort());
   await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
+  await page.route('**/notifications/reminders-exchange', async route => { await enrollment.promise; await route.continue(); });
+  await page.route('**/notifications/version.json*', async route => { await version.promise; await route.continue(); });
   await page.route('**/reminders/list?*', async route => { await list.promise; await route.continue(); });
   try {
    await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=inbox`, { waitUntil: 'commit' });
    await expect(page.locator('.pwa-launch-splash')).toBeVisible();
    await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', scheme);
    await expect(page.locator('.pwa-launch-splash')).toHaveCSS('background-color', expected);
+   await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Inbox');
+   await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();
+   await expect(page.locator('.pwa-launch-splash .pwa-reminders-skeleton__card')).toHaveCount(3);
    await expect(page.locator('.pwa-dock svg')).toHaveCount(6);
    const launchDock = await dockAppearance(page);
+   const launchChrome = await loadingChrome(page);
    app.resolve();
+   await expect(page.locator('.crate-feature-shell .pwa-launch-splash')).toBeVisible();
+   expect(await loadingChrome(page)).toEqual(launchChrome);
+   await page.evaluate(() => window.__releaseOpeningBootstrap());
+   enrollment.resolve();
+   version.resolve();
    await expect(page.locator('.pwa-reminders-view[data-pwa-opening]')).toBeVisible();
+   expect(await loadingChrome(page)).toEqual(launchChrome);
    await expect(page.locator('.reminders-shadow-root')).toHaveCSS('background-color', expected);
    expect(await dockAppearance(page)).toEqual(launchDock);
    const title = await page.locator('.view-header-title').elementHandle();
@@ -97,7 +156,11 @@ export async function checkLaunchThemes(browser, origin) {
    assert.ok(frames.length > 0);
    assert.deepEqual(frames.flat().filter(surface => surface.background !== expected || surface.image !== 'none'), [], `${system} system / ${saved} preference: launch surface changed`);
    assert.deepEqual(errors, []);
-  } finally { app.resolve(); list.resolve(); await page.close(); }
+  } catch (error) {
+   if (errors.length) console.error('Startup script errors:', errors);
+   console.error('Startup state:', await page.locator('#app').evaluate(app => app.outerHTML.slice(0, 700)));
+   throw error;
+  } finally { app.resolve(); enrollment.resolve(); version.resolve(); list.resolve(); await page.close(); }
  }
 }
 

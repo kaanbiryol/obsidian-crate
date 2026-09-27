@@ -1,0 +1,17 @@
+/* Preserve browser scrolling and accessibility zoom. */
+html,body{touch-action:auto}
+button,input,textarea,select{font:inherit}
+/* Immediate control taps while preserving pinch zoom. */
+button,a,input,textarea,select{touch-action:manipulation}
+button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}
+button:disabled{cursor:not-allowed;opacity:.55}
+/* App surfaces are tap/scroll targets; editable fields retain native selection. */
+#app{user-select:none;-webkit-user-select:none}
+#app :is(input,textarea,[contenteditable="true"]),#app [contenteditable="true"] *{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+#app button,#app [role="button"]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+:focus-visible{outline:2px solid rgba(var(--accent-rgb),.72);outline-offset:2px}
+
+/* App screens share native panning without touch page zoom. Keep this on the
+   screen, not #app: portalled sheets retain their native editing gestures.
+   Both axes allow horizontal article code/table scrolling as well as lists. */
+.pwa-screen{touch-action:pan-x pan-y;-webkit-touch-callout:none}

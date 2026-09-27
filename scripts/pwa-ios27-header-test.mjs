@@ -55,9 +55,9 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
         await expect(menu).toBeVisible();
         await expect.poll(async () => (await menu.boundingBox()).y).toBeGreaterThanOrEqual((await header.boundingBox()).y + (await header.boundingBox()).height);
         await page.keyboard.press('Escape'); await expect(menu).not.toBeVisible();
-        await page.getByRole('button', { name: 'Reading settings', exact: true }).click();
-        await expect(page.getByRole('dialog', { name: 'Reading settings', exact: true })).toBeVisible();
-        await page.getByRole('button', { name: 'Close reading settings', exact: true }).click();
+        await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+        await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Close settings', exact: true }).click();
         await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
       }
     }

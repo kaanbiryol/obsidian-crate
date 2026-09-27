@@ -3,7 +3,10 @@ import motionStyles from '../../../pwa/styles/motion.scss?raw-css';
 import readingStyles from '../../../reading/ui/reading.scss?raw-css';
 import readingWebStyles from '../../../pwa/reading/web.scss?raw-css';
 import featureSwitcherStyles from '../../../pwa/styles/feature-switcher.scss?raw-css';
+import paletteStyles from './styles/palette.css?raw-css';
 import baseStyles from './styles/base.css?raw-css';
+import interactionStyles from './styles/interactions.css?raw-css';
+import foundationStyles from '../../../pwa/styles/foundation.scss?raw-css';
 import drawerStyles from './styles/drawer.css?raw-css';
 import editorStyles from './styles/editor.css?raw-css';
 import remindersViewStyles from './styles/reminders-view.css?raw-css';
@@ -18,8 +21,12 @@ import pwaRemindersViewStyles from '../../../pwa/styles/reminders-view.scss?raw-
 export const PWA_LIGHT_THEME_STYLES = lightThemeStyles;
 
 export const PWA_STYLES = [
+	paletteStyles,
+	interactionStyles,
 	baseStyles,
- readingStyles, readingWebStyles,
+	readingStyles,
+	readingWebStyles,
+	foundationStyles,
 	pwaRemindersViewStyles,
 	remindersViewStyles,
 	editorStyles,

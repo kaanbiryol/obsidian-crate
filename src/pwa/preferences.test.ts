@@ -19,7 +19,7 @@ describe('PWA preferences', () => {
 
 	it('persists a custom range and each supported launch screen', () => {
 		storage();
-		for (const defaultScreen of ['today', 'inbox', 'upcoming', 'browse'] as const) {
+		for (const defaultScreen of ['today', 'inbox', 'upcoming', 'browse', 'reading', 'favorites', 'archive'] as const) {
 			savePwaPreferences({ defaultScreen, upcomingDays: 23 });
 			expect(loadPwaPreferences()).toEqual({ defaultScreen, upcomingDays: 23 });
 		}

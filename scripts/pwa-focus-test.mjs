@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
 
 const assets = await buildPwaPreviewAssets();
 for (const browserType of [chromium, webkit]) {
@@ -16,6 +17,7 @@ for (const browserType of [chromium, webkit]) {
 			await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 			await card.waitFor();
+			await checkPwaScreenGestures(page, page.locator('.view-header-title'));
 			// Observe focus before the card click finishes, not after an async load.
 			await page.evaluate(() => {
 				window.editorFocusedDuringClick = [];
@@ -30,6 +32,7 @@ for (const browserType of [chromium, webkit]) {
 					`${browserType.name()}: opening ${opening + 1} must focus during the tap`);
 				const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
 				await expect(title).toHaveText('Check this article');
+				await checkPwaTextField(title, { sheet: true });
 				await title.fill('Discard this draft');
 				await page.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
 				await page.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });

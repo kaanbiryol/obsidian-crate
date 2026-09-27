@@ -14,7 +14,7 @@ interface ReadingSyncIndicatorProps {
 	onShowStatus: (label: string) => void;
 }
 
-function syncStatus({ pending, isOffline, loading, refreshing, confirmed, error, recovery }: ReadingSyncIndicatorProps): { state: SyncIndicatorState; label: string } {
+export function readingSyncStatus({ pending, isOffline, loading, refreshing, confirmed, error, recovery }: Omit<ReadingSyncIndicatorProps, 'onShowStatus'>): { state: SyncIndicatorState; label: string } {
 	const attention = pending.filter(op => op.review || op.error).length;
 	if (recovery) return { state: 'error', label: 'Sync needs attention: earlier changes are stored on this device' };
 	if (attention) return { state: 'error', label: `${attention} ${attention === 1 ? 'change needs' : 'changes need'} attention` };
@@ -28,5 +28,5 @@ function syncStatus({ pending, isOffline, loading, refreshing, confirmed, error,
 }
 
 export function ReadingSyncIndicator(props: ReadingSyncIndicatorProps) {
-	return <PwaSyncStatusIndicator {...syncStatus(props)} onShowStatus={props.onShowStatus} />;
+	return <PwaSyncStatusIndicator {...readingSyncStatus(props)} onShowStatus={props.onShowStatus} />;
 }

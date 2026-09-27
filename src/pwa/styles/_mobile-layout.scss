@@ -8,27 +8,15 @@
       --reminder-font-xxs: 13px;
     }
 
-    .pwa-reminders-view.is-primary, &.pwa-reading-root, &.reading-gallery {
+    .pwa-reminders-view.is-primary, .pwa-opening-screen, &.pwa-reading-root, &.reading-gallery {
       --reminder-font-base: 16px;
       --reminder-font-sm: 15px;
       --reminder-font-xs: 14px;
       --reminder-font-xxs: 13px;
       --reminder-font-title: 26px;
-      --crate-view-title-size: 26px;
-      --crate-view-title-spacing: -.03em;
       --crate-radius-card: 16px;
       --checkbox-size: 22px;
       --icon-l: 24px;
-
-      .view-header-title {
-        font-size: var(--crate-view-title-size);
-        font-weight: var(--crate-view-title-weight);
-        letter-spacing: var(--crate-view-title-spacing);
-      }
-
-      .view-header-meta {
-        margin-top: var(--pwa-header-meta-gap);
-      }
 
       .view-header-overdue { padding: 1px 6px; font-size: 12px; line-height: 16px; }
 

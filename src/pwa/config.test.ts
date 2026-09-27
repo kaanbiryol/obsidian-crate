@@ -1,14 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	detectDeviceName,
 	enrollmentTokenFromParams,
 	isIosOrIpados,
+	isStandaloneApp,
 	urlWithoutEnrollmentTokens,
 } from './config';
 
 function device(userAgent: string, maxTouchPoints = 0): Pick<Navigator, 'maxTouchPoints' | 'userAgent'> {
 	return { userAgent, maxTouchPoints };
 }
+
+describe('PWA installed-app detection', () => {
+	afterEach(() => vi.unstubAllGlobals());
+	it.each([
+		[true, undefined, true],
+		[false, true, true],
+		[false, false, false],
+		[false, undefined, false],
+	])('detects display mode %s and Safari standalone %s', (matches, standalone, installed) => {
+		vi.stubGlobal('window', { matchMedia: (query: string) => ({ matches: query === '(display-mode: standalone)' && matches }) });
+		vi.stubGlobal('navigator', { standalone });
+		expect(isStandaloneApp()).toBe(installed);
+	});
+});
 
 describe('PWA device detection', () => {
 	it('recognizes iPhones and classic iPad user agents', () => {

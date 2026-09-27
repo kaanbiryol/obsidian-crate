@@ -1,6 +1,7 @@
-import { Button as BaseButton } from '@base-ui/react/button';
+import { Button as BaseButton } from '@/ui/shared/Button';
 import React from 'react';
-import { Smartphone, X } from 'lucide-react';
+import { Smartphone } from 'lucide-react';
+import { IconButton } from '@/ui/shared/IconButton';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
 
 export function HomeScreenInstallPrompt({ onShowSteps, onDismiss }: {
@@ -13,11 +14,9 @@ export function HomeScreenInstallPrompt({ onShowSteps, onDismiss }: {
 			<div className="pwa-home-screen-prompt__copy">
 				<strong>Add to home screen</strong>
 				<span>Open Crate like an app, with one tap.</span>
-				<BaseButton className="pwa-home-screen-prompt__action" type="button" onClick={onShowSteps}>Show steps</BaseButton>
+					<BaseButton variant="ghost" size="touch" className="pwa-home-screen-prompt__action" type="button" onClick={onShowSteps}>Show steps</BaseButton>
 			</div>
-			<BaseButton className="pwa-home-screen-prompt__dismiss" type="button" aria-label="Dismiss home screen tip" onClick={onDismiss}>
-				<X size={18} aria-hidden="true" />
-			</BaseButton>
+				<IconButton className="pwa-home-screen-prompt__dismiss" size="large" icon="x" label="Dismiss home screen tip" onClick={onDismiss} />
 		</section>
 	);
 }

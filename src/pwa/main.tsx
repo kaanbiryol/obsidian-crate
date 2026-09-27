@@ -1,7 +1,9 @@
+import { PwaToast } from './components/PwaToast';
 import { FeatureShell } from './FeatureShell';
+import { FeatureNavigationContext } from './components/FeatureSwitcherButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
-import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -21,7 +23,7 @@ import {
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
-import { PwaSyncIndicator } from './components/PwaSyncIndicator';
+import { PwaSyncIndicator, reminderSyncStatus } from './components/PwaSyncIndicator';
 import { exportPendingChanges } from './export-pending-changes';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
@@ -41,7 +43,8 @@ import { usePrepareReminderEditor } from './hooks/usePrepareReminderEditor';
 import { useToast } from './hooks/useToast';
 import { useHomeScreenInstall } from './hooks/useHomeScreenInstall';
 import { HomeScreenInstallPrompt } from './components/HomeScreenInstall';
-import { loadPwaPreferences, savePwaPreferences, type PwaPreferences } from './preferences';
+import { usePwaPreferences } from './hooks/usePwaPreferences';
+import { useFeatureSettings, useSettingsOpen } from './settings-context';
 import { isInitialPwaContentReady } from './initial-content-readiness';
 import { toSharedReminder } from './reminder-list-state';
 import { buildModalDraft } from './reminder-modal-draft';
@@ -54,7 +57,6 @@ import type {
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
 import { ReminderSheet } from './components/ReminderSheet';
-import { SettingsSheet } from './components/SettingsSheet';
 const ReminderSyncNotice = lazy(() => import('./components/ReminderSyncNotice')
 	.then(module => ({ default: module.ReminderSyncNotice })));
 const ReminderRecoveryNotice = lazy(() => import('./components/ReminderRecoveryNotice')
@@ -63,7 +65,8 @@ const ReminderQuarantineNotice = lazy(() => import('./components/ReminderQuarant
 	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 function App() {
-	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
+	const active = useContext(FeatureNavigationContext)?.active !== false;
+	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authSession, setAuthSession] = useState(() => ({ token: localStorage.getItem(AUTH_TOKEN_KEY) }));
 	const authToken = authSession.token;
@@ -74,11 +77,11 @@ function App() {
 	}, []);
 	const [bootstrapped, setBootstrapped] = useState(false);
 	const [storedConfig, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
-	const [preferences, setPreferences] = useState(loadPwaPreferences);
+	const { preferences } = usePwaPreferences();
 	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
-	const [startTab, setStartTab] = useState<StartTab>(() => preferences.defaultScreen);
-	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [startTab, setStartTab] = useState<StartTab>(() => ['today', 'inbox', 'upcoming', 'browse'].includes(preferences.defaultScreen) ? preferences.defaultScreen as StartTab : 'today');
+	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
@@ -87,11 +90,8 @@ function App() {
 	const homeScreenInstall = useHomeScreenInstall();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
-	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
 	const modalTransition = useSheetTransition(finalizeModalClose);
-	const settingsTransition = useSheetTransition(finalizeSettingsClose);
 	const { requestClose: requestModalClose, cancelClose: cancelModalClose } = modalTransition;
-	const { requestClose: requestSettingsClose, cancelClose: cancelSettingsClose } = settingsTransition;
 
 	useEffect(() => {
 		const reportVersion = () => navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
@@ -152,7 +152,6 @@ function App() {
 	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose,
-		cancelSettingsClose,
 		disablePushNotifications,
 		handleUnauthorizedRef,
 		resetReminderState,
@@ -219,14 +218,7 @@ function App() {
 		requestModalClose();
 	}, [modal, requestModalClose]);
 
-	const toggleSettings = useCallback(() => {
-		if (settingsOpen) {
-			requestSettingsClose();
-			return;
-		}
-		cancelSettingsClose();
-		setSettingsOpen(true);
-	}, [settingsOpen, cancelSettingsClose, requestSettingsClose]);
+	const toggleSettings = useCallback(() => setSettingsOpen(open => !open), [setSettingsOpen]);
 
 	const {
 		saveReminder,
@@ -281,7 +273,7 @@ function App() {
 	const { updating, update, launchPending } = usePwaUpdate(showToast, initialContentReady, {
 		version: updateVersion,
 		checkComplete: updateCheckComplete,
-		canApply: () => initialContentReady && mutationsReady && Boolean(authToken)
+		canApply: () => active && initialContentReady && mutationsReady && Boolean(authToken)
 			&& !modal && !settingsOpen && !saving && !loggingOut && !reorderDragging
 			&& !launchReminderId && !loading && !refreshing && !isOffline
 			&& !storageError && changes.length === 0 && recoveryChanges.length === 0
@@ -319,35 +311,24 @@ function App() {
 			return;
 		}
 		const reminder = reminderId ? visibleReminders.find((item) => item.id === reminderId) ?? null : null;
-		cancelSettingsClose();
 		cancelModalClose();
 		setSettingsOpen(false);
 		setSaving(false);
 		flushSync(() => {
 			setModal({ mode, reminderId, expectedRevision: reminder?.revision, filePath: reminder?.filePath, operationId: crypto.randomUUID(), draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
 		});
-	}, [changes, ensureCanMutate, cancelModalClose, mutationsReady, visibleReminders, selectedProject, cancelSettingsClose, showToast]);
+	}, [changes, ensureCanMutate, cancelModalClose, mutationsReady, visibleReminders, selectedProject, setSettingsOpen, showToast]);
 
 	const editFailedChange = useCallback((operationId: string) => {
 		if (!mutationsReady || !ensureCanMutate()) return;
 		const draft = prepareEdit(operationId);
 		if (!draft) return;
-		cancelSettingsClose();
 		cancelModalClose();
 		setSettingsOpen(false);
 		setSaving(false);
 		flushSync(() => setModal(draft));
-	}, [ensureCanMutate, cancelModalClose, mutationsReady, prepareEdit, cancelSettingsClose]);
+	}, [ensureCanMutate, cancelModalClose, mutationsReady, prepareEdit, setSettingsOpen]);
 
-	const updatePreferences = (patch: Partial<PwaPreferences>) => {
-		const next = { ...preferences, ...patch };
-		try {
-			savePwaPreferences(next);
-			setPreferences(next);
-		} catch {
-			showToast('error', 'Could not save settings on this device.');
-		}
-	};
 
 	const sharedReminders = useMemo(() => visibleReminders.map(toSharedReminder), [visibleReminders]);
 	const editReminder = useCallback((id: string) => {
@@ -366,6 +347,24 @@ function App() {
 			onToggleComplete={toggleReminderCompleted}
 		/>
 	), [editReminder, toggleReminderCompleted]);
+
+	const syncStatus = reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError });
+	const needsRecovery = recoveryChanges.length > 0 || quarantinedChanges.length > 0;
+	useFeatureSettings('reminders', {
+		ready: bootstrapped && (mutationsReady || Boolean(storageError) || !authToken),
+		connected: Boolean(authToken), config, push,
+		status: syncStatus,
+		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
+		unsynced: changes.length > 0 || needsRecovery || Boolean(storageError),
+		onRefresh: handlePullRefresh,
+		onExport: changes.length || recoveryChanges.length ? () => exportPendingChanges([...changes, ...recoveryChanges]) : undefined,
+		onEnablePush: enablePushNotifications,
+		onLogout: logOut,
+		recovery: <>
+			{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
+			{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
+		</>,
+	});
 
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.
@@ -406,18 +405,20 @@ function App() {
 						settingsOpen={settingsOpen}
 						onToggleSettings={toggleSettings}
 						showSettings={!isProjectDetail}
-					/>
+					>
+						<PwaSyncIndicator
+							onShowStatus={(label) => showToast('info', `Sync across all projects: ${label}`)}
+							changes={changes}
+							isOffline={isOffline}
+							refreshing={refreshing}
+							loading={loading}
+							dataMode={dataMode}
+							error={error}
+							storageError={storageError}
+						/>
+					</PwaHeaderActions>
 				) : undefined}
-				headerTitleContent={authToken ? <PwaSyncIndicator
-					onShowStatus={(label) => showToast('info', `Sync across all projects: ${label}`)}
-					changes={changes}
-					isOffline={isOffline}
-					refreshing={refreshing}
-					loading={loading}
-					dataMode={dataMode}
-					error={error}
-					storageError={storageError}
-				/> : undefined}
+
 				belowHeaderContent={initialContentReady && authToken ? (isProjectDetail) => (
 					<>
 						<PwaPullRefreshIndicator
@@ -459,25 +460,7 @@ function App() {
 				onReorder={persistReorder}
 				onReorderDragActiveChange={setReorderDragging}
 			>
-				{settingsOpen && (
-					<SettingsSheet
-						config={config}
-						homeScreenPlatform={homeScreenInstall.platform}
-						defaultScreen={preferences.defaultScreen}
-						onPreferencesChange={updatePreferences}
-						push={push}
-						themePreference={themePreference}
-						loggingOut={loggingOut}
-						isClosing={settingsTransition.isClosing}
-						onClose={requestSettingsClose}
-						onClosed={settingsTransition.finishClose}
-						onEnablePush={enablePushNotifications}
-						onExportPendingChanges={changes.length ? () => exportPendingChanges(changes) : undefined}
-						onThemePreferenceChange={setThemePreference}
-						onLogout={() => void logOut()}
-					/>
-				)}
-				{modal && (
+				{modal && active && !settingsOpen && (
 					<PageTitleContext.Provider value={resolvePageTitle}>
 						<ReminderSheet
 							key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
@@ -494,15 +477,7 @@ function App() {
 						/>
 					</PageTitleContext.Provider>
 				)}
-				{toast && (
-					<div
-						className={`toast is-${toast.kind}`}
-						role={toast.kind === 'error' ? 'alert' : 'status'}
-						aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
-					>
-						{toast.message}
-					</div>
-				)}
+				<PwaToast toast={toast} />
 			</PwaRemindersAppShell>
 		</div>
 	);

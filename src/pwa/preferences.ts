@@ -1,9 +1,11 @@
 import type { StartTab } from './types';
 
+export type PwaStartScreen = StartTab | 'reading' | 'favorites' | 'archive';
+
 export const PWA_PREFERENCES_KEY = 'crate-reminders-preferences';
 
 export interface PwaPreferences {
-	defaultScreen: StartTab;
+	defaultScreen: PwaStartScreen;
 	upcomingDays: number | null;
 }
 
@@ -12,6 +14,7 @@ export function loadPwaPreferences(): PwaPreferences {
 		const value = JSON.parse(localStorage.getItem(PWA_PREFERENCES_KEY) ?? '{}') as Partial<PwaPreferences> | null;
 		return {
 			defaultScreen: value?.defaultScreen === 'inbox' || value?.defaultScreen === 'upcoming' || value?.defaultScreen === 'browse'
+				|| value?.defaultScreen === 'reading' || value?.defaultScreen === 'favorites' || value?.defaultScreen === 'archive'
 				? value.defaultScreen : 'today',
 			upcomingDays: typeof value?.upcomingDays === 'number' && Number.isSafeInteger(value.upcomingDays) && value.upcomingDays >= 1
 				? value.upcomingDays : null,

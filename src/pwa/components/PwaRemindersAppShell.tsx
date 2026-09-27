@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 
 import { PwaDock } from './PwaDock';
 import { PwaTabTransition } from './PwaTabTransition';
+import { PwaScheduleSwitcher } from './PwaScheduleSwitcher';
 import { TABS } from '@/reminders/ui/layoutConstants';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
@@ -47,7 +48,6 @@ interface PwaRemindersAppShellProps {
 	initialProject?: string;
 	upcomingDays: number;
 	headerRightContent?: (isProjectDetail: boolean) => React.ReactNode;
-	headerTitleContent?: React.ReactNode;
 	headerMetaContent?: React.ReactNode;
 	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
 	children?: React.ReactNode;
@@ -79,7 +79,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	initialProject,
 	upcomingDays,
 	headerRightContent,
-	headerTitleContent,
 	headerMetaContent,
 	belowHeaderContent,
 	children,
@@ -171,6 +170,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const currentHeader = useMemo(() => {
 		return getCurrentHeaderData(viewMode, headerData);
 	}, [headerData, viewMode]);
+	const primaryTab = viewMode === 'upcoming' ? 'today' : viewMode;
 
 	const handleAdd = useCallback(() => {
 		if (backgroundInert) return;
@@ -247,6 +247,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				data-pwa-opening={initializing || undefined}
 				aria-busy={initializing}
 				className={[
+					'pwa-screen',
 					'reminders-view',
 					'is-primary',
 					isDarkMode ? 'dark' : 'light',
@@ -258,19 +259,23 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			>
 				<div className="pwa-navigation-viewport" inert={backgroundInert || Boolean(selectedProject) || closingProject.current}>
 					{/* Keep the Projects list and its scroll position mounted behind detail. */}
-					<PwaTabTransition viewKey={viewMode}>
+					<PwaTabTransition viewKey={primaryTab}>
 						<div className="overflow-hidden" inert={initializing}>
 							<ViewHeader
 								{...currentHeader}
+								title={primaryTab === 'today' ? 'Schedule' : currentHeader.title}
 								countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 								large
 								showMeta={!showLoadingSkeleton}
 								reserveMetaSpace={showLoadingSkeleton}
-								titleContent={headerTitleContent}
 								metaContent={headerMetaContent}
 								rightContent={headerRightContent?.(false)}
 							/>
 						</div>
+
+						{(viewMode === 'today' || viewMode === 'upcoming') && (
+							<PwaScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing} />
+						)}
 
 						{belowHeaderContent && (
 							<div className="pwa-below-header-content">
@@ -279,7 +284,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						)}
 
 						<div className="reminders-content">
-							{showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : viewPanels}
+							{showLoadingSkeleton ? <PwaRemindersSkeletonRows /> : primaryTab === 'today' ? (
+								<PwaTabTransition viewKey={viewMode}>{viewPanels}</PwaTabTransition>
+							) : viewPanels}
 						</div>
 					</PwaTabTransition>
 				</div>
@@ -294,7 +301,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 							<div className="reminders-content">
 								<ProjectDetailView
 									project={selectedProject}
-									headerTitleContent={headerTitleContent}
 									headerMetaContent={headerMetaContent}
 									headerRightContent={headerRightContent?.(true)}
 									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
@@ -310,7 +316,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									reorderInteraction="long-press"
 								/>
 							</div>
-							{!suppressFab && <FloatingActionButton onClick={handleAdd} inert={backgroundInert} className="fab pwa-project-fab" data-action="open-create-modal" />}
+							{(initializing || !suppressFab) && <FloatingActionButton onClick={handleAdd} animateOnMount={false} inert={initializing || backgroundInert} className="fab pwa-project-fab" data-action="open-create-modal" />}
 						</PwaNavigationScreen>}
 					</AnimatePresence>
 				</div>

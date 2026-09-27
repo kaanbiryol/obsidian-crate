@@ -149,6 +149,7 @@ async function verifyScopeAndLogout(browser, delayPeerEvents = false) {
     setFailure('none');
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
     await expect.poll(() => other.evaluate(key => localStorage.getItem(key), authKey)).toBe(null);
     if (delayPeerEvents) {
       await renew('Private');

@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { swipe } from './browser-touch-swipe.mjs';
+import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 
 async function captureReaderMotion(page, action) {
@@ -112,9 +113,12 @@ async function assertNoPendingBanner(page) {
 
 async function refreshReadingFromSettings(page, expectedError) {
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button',{name:'Reading settings',exact:true}).click();
+  await page.getByRole('button',{name:'Open settings',exact:true}).click();
+  await page.getByRole('button', { name: /^Sync and device/ }).click();
   if (expectedError) await expect(page.getByRole('dialog').getByText(expectedError,{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Refresh library',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh all',exact:true}).click();
+  await expect(page.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Close settings', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
@@ -184,7 +188,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const box = selector => { const r = header.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
       const icon = header.querySelector('[data-icon="settings"]'), style = getComputedStyle(icon);
       return { height: header.getBoundingClientRect().height, title: box('.view-header-title'), meta: box('.view-header-meta'), switcher: box('.pwa-feature-switch-button'),
-        settings: box('[aria-label="Reading settings"]'), settingsIcon: icon.outerHTML, settingsColor: style.color, settingsOpacity: style.opacity };
+        settings: box('[aria-label="Open settings"]'), settingsIcon: icon.outerHTML, settingsColor: style.color, settingsOpacity: style.opacity };
     });
     const openingHeader = await headerGeometry();
     await expect(page.locator('.pwa-dock .pwa-mode-opening__shape')).toHaveCount(0);
@@ -206,6 +210,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.crate-reading__loading-row')).toHaveCount(0);
     assert.equal((await header.boundingBox()).height, loadingHeader.height);
     assert.deepEqual(await headerGeometry(), openingHeader, 'Reading header stays fixed when the count arrives');
+    await checkPwaScreenGestures(page, page.locator('.crate-reading__list-scroll'));
+    await checkPwaTextField(page.getByRole('searchbox', { name: 'Search reading' }));
+    await expect(page.locator('.crate-reading__header h1')).toHaveCSS('-webkit-user-select', 'none');
     const target = await readingSync.getByRole('button').boundingBox();
     assert.equal(target.width,44); assert.equal(target.height,44);
     await readingSync.getByRole('button').click();
@@ -225,20 +232,21 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // Reading uses the same PWA sheet surface, icon buttons, focus and gestures.
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
-      await page.getByRole('button',{name:'Reading settings',exact:true}).click();
-      const sheet = page.getByRole('dialog',{name:'Reading settings',exact:true});
+      await page.getByRole('button',{name:'Open settings',exact:true}).click();
+      const sheet = page.getByRole('dialog',{name:'Settings',exact:true});
       await expect(sheet).toHaveClass(/pwa-modal-sheet__container--settings/);
       await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
       await expect(sheet.locator('.settings-group')).toHaveCount(3);
-      await expect(sheet.getByRole('button',{name:'Close reading settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
+      await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
       await page.screenshot({path:`test-results/reading/${name}-settings-${theme}.png`});
-      await swipe(page, sheet.getByRole('heading',{name:'Reading settings',exact:true}));
+      await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}));
       await expect(sheet).toHaveCount(0);
-      await expect(page.getByRole('button',{name:'Reading settings',exact:true})).toBeFocused();
+      await expect(page.getByRole('button',{name:'Open settings',exact:true})).toBeFocused();
       await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
     }
 
     await page.getByRole('button',{name:'Save a link',exact:true}).click();
+    await checkPwaTextField(page.getByLabel('Link', { exact: true }), { sheet: true });
     await page.getByLabel('Link',{exact:true}).fill('https://example.invalid/browser');
     await page.getByLabel('Title (optional)').fill('A browser article');
     await page.getByRole('button',{name:'Save link',exact:true}).click();
@@ -246,9 +254,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('dialog')).toHaveCount(0);
     // Exercise the real populated library and authenticated Reminders together,
     // in a separate device session so this test's logout/recovery flow is unchanged.
-    const modeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+    const modeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference', serviceWorkers: 'block' });
     try {
       const modePage = await modeContext.newPage();
+      await modePage.route('**/reminders/list?*', route => route.fulfill({ json: {
+        projects: ['Errands'], reminders: [{ id: 'history-reminder', content: 'History reminder', project: 'Errands',
+          priority: 4, completed: false, filePath: 'Reminders/Errands.md', lineNumber: 1 }],
+      } }));
       const modeEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
       await modePage.goto(`${origin}/notifications?browserToken=${modeEnrollment.browserToken}`);
       await expect(modePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
@@ -282,6 +294,26 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       }
       await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
       console.log(`${name}: connected Reminders and populated Reading fade in both directions with touch taps`);
+      // Each feature remembers its closed detail slot. Opening the other feature's
+      // detail replaces that slot's predecessor, so it must no longer be reused.
+      for (let cycle = 0; cycle < 3; cycle++) {
+        await modePage.getByRole('button', { name: /example.invalid A browser article/ }).click();
+        await expect(modePage.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
+        await modePage.goBack();
+        await modePage.waitForFunction(() => history.state?.readingLibrary === true);
+        await expect(modePage.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');
+        await expect(modePage.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'false');
+        await modePage.locator('.crate-feature-panel[data-active="true"] .pwa-dock [data-tab="projects"]').click();
+        await modePage.getByRole('button', { name: 'Open Errands', exact: true }).click();
+        await expect(modePage.locator('.pwa-project-layer')).toHaveAttribute('data-project-open', 'true');
+        await modePage.goBack();
+        await modePage.waitForFunction(() => history.state?.reminderProjectList === true);
+        await expect(modePage.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reminders');
+        await expect(modePage.locator('.pwa-navigation-screen--project')).toHaveCount(0);
+        await expect(modePage.locator('.crate-feature-panel[data-active="true"] [data-dock-active="true"]')).toHaveAccessibleName('Projects');
+        await switchFeature(modePage, 'Reading');
+      }
+      console.log(`${name}: alternating article/project history Back retains the selected tab`);
     } finally { await modeContext.close(); }
     const firstArticleStarted = Promise.withResolvers(), firstArticleReleased = Promise.withResolvers();
     heldResponses.push(firstArticleReleased.resolve);
@@ -300,16 +332,26 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByText('Available offline',{exact:true}).waitFor();
     assert.equal(await originalArticle.evaluate(el => el === document.querySelector('.crate-reading__reader-pane article')), true, 'Loading must resolve in the same article screen');
     await originalArticle.dispose();
+    const articleTitle = page.locator('.crate-reading-reader__header h1');
+    await checkPwaScreenGestures(page, articleTitle);
+    await expect(page.locator('.crate-reading-reader__body')).toHaveCSS('-webkit-user-select', 'text');
+    await articleTitle.dblclick();
+    assert.ok(await page.evaluate(() => document.getSelection().toString().length > 0), 'Article text remains selectable');
+    await page.evaluate(() => document.getSelection().removeAllRanges());
+    await expect(page.locator('.crate-reading-reader__mode')).toHaveCSS('-webkit-user-select', 'none');
+    await expect(page.getByRole('button', { name: 'Reading appearance', exact: true })).toHaveCSS('-webkit-user-select', 'none');
     await page.getByRole('button',{name:'Reading appearance',exact:true}).click();
     const appearance = page.getByRole('dialog',{name:'Reading appearance',exact:true});
     await expect(appearance).toHaveClass(/pwa-modal-sheet__container--settings/);
     await page.getByRole('button',{name:'Increase text size'}).click();
+    await expect(page.locator('.crate-reading-reader__body')).toHaveCSS('font-size', '20px');
     await page.keyboard.press('Escape');
     await expect(appearance).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Reading appearance',exact:true})).toBeFocused();
     await page.getByRole('button',{name:'Edit article tags'}).click();
     const tags = page.getByRole('dialog',{name:'Article tags'});
     await expect(tags).toHaveClass(/pwa-modal-sheet__container--settings/);
+    await checkPwaTextField(tags.getByRole('textbox'), { sheet: true });
     await tags.getByRole('textbox').fill('essays');
     await tags.getByRole('button',{name:'Save tags',exact:true}).click();
     await expect(tags).toHaveCount(0);
@@ -495,7 +537,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await phone.getByRole('heading',{name:'Saved to Crate ✓'}).waitFor(); assert.equal(new URL(phone.url()).hash,'');
     await phone.screenshot({path:`test-results/reading/${name}-saved.png`,fullPage:true});
     await phone.reload(); await phone.getByRole('heading',{name:'Saved to Crate ✓'}).waitFor();
-    await page.getByRole('button',{name:'Reading settings'}).click();
+    await page.getByRole('button',{name:'Open settings'}).click();
+    await page.getByRole('button',{name:'Log out',exact:true}).click();
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')),null);
@@ -518,8 +561,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await switchFeature(page, 'Reading');
     await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
-    await page.getByRole('button',{name:'Reading settings'}).click();
+    await page.getByRole('button',{name:'Open settings'}).click();
     assert.deepEqual(await sheetAppearance(page), reminderSheetAppearance, 'Both modes must share sheet and control styling');
+    await page.getByRole('button',{name:'Log out',exact:true}).click();
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reminders-auth-token')), null);
