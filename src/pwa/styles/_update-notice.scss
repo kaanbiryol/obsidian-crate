@@ -1,42 +1,26 @@
 .crate-reminders-ui {
-	&.pwa-update-floating {
-		position: fixed;
-		z-index: 44;
-		inset-inline: 14px;
-		bottom: calc(var(--pwa-dock-height, 80px) + 8px);
-		max-width: 400px;
-		margin-inline: auto;
-		pointer-events: none;
-		&[hidden] { display: none; }
+	.crate-view-header-actions button.pwa-update-pill {
+		border-radius: 999px;
+		padding-inline: 12px;
+		min-height: 44px;
+		color: var(--interactive-accent);
+		font-size: 13px;
+		font-weight: 600;
 	}
-	.pwa-update-notice {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		min-height: 52px;
-		padding: 2px 4px 2px 14px;
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 14px;
-		background: var(--background-primary);
-		box-shadow: 0 4px 20px rgb(0 0 0 / 8%);
-		color: var(--text-muted);
-		pointer-events: auto;
-		> svg { flex-shrink: 0; }
+	.settings-row.pwa-update-notice {
+		padding-block: 12px 16px;
+		margin-bottom: 8px;
+		border-bottom: 1px solid var(--crate-divider);
+		gap: 16px;
 	}
-	.pwa-update-notice__text { flex: 1; color: var(--text-normal); font-size: 13px; font-weight: 500; line-height: 1.35; }
-	.pwa-update-notice .pwa-update-button {
+	.pwa-update-button.crate-action-button {
+		white-space: nowrap;
 		display: grid;
 		place-items: center;
 		flex-shrink: 0;
-		padding-inline: 8px;
-		color: var(--interactive-accent);
-		font-size: 13px;
+		min-width: 100px;
 	}
 	.pwa-update-button__label { grid-area: 1 / 1; }
 	.pwa-update-button__label[aria-hidden="true"] { visibility: hidden; }
-	.settings-sheet > .pwa-update-notice { margin: 0 16px 12px; box-shadow: none; }
-	&.pwa-update-feedback .toast { z-index: 1000; }
+	.pwa-update-status { font-size: 13px; }
 }
-// Keep drafts and transient feedback unobstructed, including reader dialogs
-// portaled outside the feature shell. The notice returns when these close.
-body:has(.pwa-modal-sheet--reminder, .pwa-reading-sheet, .toast) .crate-reminders-ui.pwa-update-floating { visibility: hidden; }

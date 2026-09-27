@@ -1,3 +1,4 @@
+import { PwaUpdateButton } from './PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
 import React, { useState } from 'react';
 import { useIsPresent } from 'motion/react';
@@ -48,6 +49,7 @@ export function PwaHeaderActions({
 	if (!showSettings && !children) return null;
 	return (
 		<div className="pwa-header-actions crate-view-header-actions">
+			{showSettings && <PwaUpdateButton />}
 			{children}
 			{showSettings && <PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />}
 		</div>

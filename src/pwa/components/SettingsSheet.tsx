@@ -19,7 +19,7 @@ import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
 import { useSettingsStore } from '../settings-context';
 import { useAppUpdate } from './PwaUpdateProvider';
-import { PwaUpdateNotice } from './PwaUpdateNotice';
+import { PwaUpdateNotice, PwaUpdateFeedback } from './PwaUpdateNotice';
 import type { PwaPreferences } from '../preferences';
 import type { CrateSection } from './FeatureSwitcherButton';
 
@@ -99,7 +99,6 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 		<aside className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<ModalHeader title={title} navigation={page === 'settings' ? 'dismiss' : 'back'} closeLabel={page === 'settings' ? 'Close settings' : 'Back to settings'}
 				closeDisabled={exclusive || transition.isClosing} onClose={close} />
-			{page === 'settings' && <PwaUpdateNotice disabled={busy || unsynced} />}
 			{message && <p className="settings-feedback" role="alert">{message}</p>}
 			<div className="settings-stack" data-base-ui-swipe-ignore="">
 				<motion.div layoutScroll ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
@@ -109,6 +108,8 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 						{attention.map(text => <p key={text}>{text}</p>)}
 						<Button size="touch" variant="ghost" onClick={() => { setSyncOpen(true); requestAnimationFrame(() => panelRef.current?.querySelector('.settings-disclosure')?.scrollIntoView({ block: 'nearest' })); }}>Review sync</Button>
 					</div>}
+					<PwaUpdateNotice disabled={busy || unsynced} />
+					<PwaUpdateFeedback />
 					<GeneralSettings preferences={preferences} onChange={changePreferences} />
 					<TabSettings preferences={preferences} onChange={changePreferences} />
 					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
@@ -131,8 +132,8 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 					</SettingsDisclosure>
 					<SettingsDisclosure title="About">
 						<VersionSettings />
-						<Button size="touch" className="settings-action-button" disabled={unsynced || exclusive} aria-disabled={busy || unsynced} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : appUpdate.version ? 'Update available' : 'Update app'}</Button>
-						{unsynced && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
+						{!appUpdate.version && <Button size="touch" className="settings-action-button" disabled={busy || unsynced || exclusive} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : 'Update app'}</Button>}
+						{unsynced && !appUpdate.version && <p className="settings-help">Finish syncing or review pending changes before updating.</p>}
 					</SettingsDisclosure>
 					<Button size="touch" variant="ghost" tone="danger" className="settings-logout-button" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}><LogOut size={16} /> Log out</Button>
 				</motion.div>

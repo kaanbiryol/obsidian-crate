@@ -1,20 +1,20 @@
-import { createContext, useContext, useEffect, useMemo, useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { fetchPwaAssetVersion } from '../api';
 import { usePwaUpdate } from '../hooks/usePwaUpdate';
 import { useToast } from '../hooks/useToast';
-import { useSettingsStore } from '../settings-context';
+import { PwaToast } from './PwaToast';
+import { useSettingsOpen, useSettingsStore } from '../settings-context';
 import { startUpdateChecks } from '../update-checker';
 import type { CrateSection } from './FeatureSwitcherButton';
-import { PwaToast } from './PwaToast';
-import { PwaUpdateNotice } from './PwaUpdateNotice';
+import type { ToastState } from '../types';
 
 interface AppUpdate {
+	feedback: ToastState | null;
+	blockedReason: string | null;
 	version: string | null;
 	updating: boolean;
 	launchPending: boolean;
-	dismissed: boolean;
-	dismiss: () => void;
 	update: () => Promise<void>;
 }
 const UpdateContext = createContext<AppUpdate | null>(null);
@@ -27,10 +27,16 @@ export function useAppUpdate() {
 
 export function PwaUpdateProvider({ activeSection, children }: { activeSection: CrateSection; children: ReactNode }) {
 	const store = useSettingsStore();
+	const [settingsOpen] = useSettingsOpen();
 	const models = useSyncExternalStore(store.subscribe, store.getSnapshot);
 	const [version, setVersion] = useState<string | null>(null);
 	const [checkComplete, setCheckComplete] = useState(false);
-	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
+	const [online, setOnline] = useState(() => navigator.onLine);
+	useEffect(() => {
+		const changed = () => setOnline(navigator.onLine);
+		window.addEventListener('online', changed); window.addEventListener('offline', changed);
+		return () => { window.removeEventListener('online', changed); window.removeEventListener('offline', changed); };
+	}, []);
 	const { toast, showToast } = useToast();
 	useEffect(() => {
 		let active = true;
@@ -55,14 +61,12 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 		canApply: () => activeSection === 'reminders' && Boolean(store.getSnapshot().reminders?.connected) && !store.getOpen() && canApply(),
 		canManuallyApply: canApply,
 	});
-	const dismissed = version === dismissedVersion;
-	const dismiss = useCallback(() => setDismissedVersion(version), [version]);
-	const value = useMemo(() => ({ version, updating, update, launchPending, dismissed, dismiss }), [version, updating, update, launchPending, dismissed, dismiss]);
+	const blockedReason = !online ? 'Connect to the internet to update.'
+		: !models[activeSection]?.ready || [models.reminders, models.reading].some(model => model && !model.ready) ? 'Checking saved changes…'
+		: [models.reminders, models.reading].some(model => model?.unsynced || model?.updateReady === false) ? 'Finish editing or syncing before updating.' : null;
+	const value = useMemo(() => ({ version, updating, update, launchPending, blockedReason, feedback: toast }), [version, updating, update, launchPending, blockedReason, toast]);
 	return <UpdateContext.Provider value={value}>
 		{children}
-		<div className="crate-reminders-ui pwa-update-floating" hidden={models.open || launchPending}>
-			{!launchPending && <PwaUpdateNotice />}
-		</div>
-		<div className="crate-reminders-ui pwa-update-feedback"><PwaToast toast={toast} /></div>
+		<div className="crate-reminders-ui"><PwaToast toast={settingsOpen ? null : toast} /></div>
 	</UpdateContext.Provider>;
 }

@@ -106,7 +106,7 @@ async function testUpdate(browser, launchMode) {
     // with service workers blocked. The new worker precaches generic HTML.
     assets = delayedAfter;
     await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
-    const update = page.getByRole('button', { name: 'Update to the latest version', exact: true });
+    const update = page.getByRole('button', { name: 'Update available', exact: true });
     await update.waitFor();
     failNextVersionCheck = true;
     await update.click();
@@ -134,7 +134,7 @@ async function testUpdate(browser, launchMode) {
           phase: document.documentElement.dataset.pwaUpdating,
           opacity: getComputedStyle(overlay).opacity,
           background: getComputedStyle(document.documentElement).backgroundColor,
-          button: document.querySelector('.pwa-update-button__label[aria-hidden="false"]').textContent,
+          busy: document.querySelector('.pwa-update-pill').getAttribute('aria-busy'),
           marker: sessionStorage.getItem(transitionKey),
           progress: new DOMMatrix(getComputedStyle(activity).transform).a,
           icon: overlay.querySelector('img').getBoundingClientRect().toJSON(),
@@ -145,7 +145,7 @@ async function testUpdate(browser, launchMode) {
     await page.waitForFunction(() => typeof window.__releaseUpdateApp === 'function'
       && document.documentElement.dataset.pwaUpdating === 'restore');
     const beforeReload = await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-update-beforeunload')));
-    expect(beforeReload).toMatchObject({ phase: 'prepare', opacity: '1', background: themeBackground, button: 'Updating…' });
+    expect(beforeReload).toMatchObject({ phase: 'prepare', opacity: '1', background: themeBackground, busy: 'true' });
     expect(Number(beforeReload.marker)).toBeGreaterThan(0);
     expect(navigations).toBe(1);
 
@@ -322,11 +322,11 @@ async function testDeferredUpdate(browser) {
     });
     await page.waitForTimeout(2_500);
     expect(navigations).toBe(0); // Reading and resuming never trigger a reload.
-    await page.getByRole('button', { name: 'Update to the latest version', exact: true }).click();
+    await page.getByRole('button', { name: 'Update available', exact: true }).click();
     await expect.poll(() => navigations, { timeout: 15_000 }).toBe(1);
     await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
     await expect(page.getByRole('group', { name: 'Saved before automatic update. Press Enter to edit reminder.', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Update to the latest version', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Update available', exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('v'))).toBe(afterVersion);
     await expect(otherTitle).toHaveText('Keep this other tab draft');
     expect(await other.locator('script[type="module"]').getAttribute('src')).toContain(beforeVersion);
@@ -432,7 +432,7 @@ async function testLaunchUpdate(browser, mode) {
       expect(Date.now() - started).toBeLessThan(3_500);
       await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
       if (mode.startsWith('slow')) {
-        await page.getByRole('button', { name: 'Update to the latest version', exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Update available', exact: true }).waitFor();
         await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting));
       }
       await page.waitForTimeout(2_500);
