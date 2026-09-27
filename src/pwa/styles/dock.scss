@@ -139,13 +139,13 @@
     transition: none;
   }
 }
-@each $tab in inbox, today, browse, reading {
+@each $tab in inbox, today, today-view, upcoming, browse, reading, favorites, archive, highlights {
   .pwa-opening-dock [data-opening-destination="#{$tab}"] {
     order: var(--pwa-dock-#{$tab}-order, 0);
-    display: var(--pwa-dock-#{$tab}-display, flex);
+    display: var(--pwa-dock-#{$tab}-display, none);
   }
-  :root[data-pwa-opening-tab="#{$tab}"] .pwa-opening-dock:not([data-opening-tab]) [data-opening-destination="#{$tab}"],
-  .pwa-opening-dock[data-opening-tab="#{$tab}"] [data-opening-destination="#{$tab}"] { color: var(--text-normal); }
+  :root[data-pwa-opening-dock-tab="#{$tab}"] .pwa-opening-dock:not([data-opening-tab]) [data-opening-destination="#{$tab}"],
+  .pwa-opening-dock[data-opening-selection="#{$tab}"] [data-opening-destination="#{$tab}"] { color: var(--text-normal); }
 }
 @media (min-width: 1100px) {
   :root[data-pwa-opening-tab="reading"] .pwa-launch-splash .pwa-opening-dock,

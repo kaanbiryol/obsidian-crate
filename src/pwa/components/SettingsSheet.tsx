@@ -104,7 +104,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd }: {
 			{page === 'settings' && <PwaUpdateNotice disabled={busy || unsynced} />}
 			{message && <p className="settings-feedback" role="alert">{message}</p>}
 			<div className="settings-stack" data-base-ui-swipe-ignore="">
-				<motion.div ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
+				<motion.div layoutScroll ref={panelRef} className="settings-panel settings-main" inert={page !== 'settings'} aria-hidden={page !== 'settings'}
 					initial={false} animate={{ x: reducedMotion ? 0 : page === 'settings' ? '0%' : '-25%', opacity: page === 'settings' ? 1 : 0 }}
 					transition={reducedMotion ? { duration: 0 } : PWA_NAVIGATION_SPRING}>
 					{attention.length > 0 && <div className="settings-attention" role="status">

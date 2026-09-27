@@ -1,37 +1,55 @@
-import { ArrowDown, ArrowUp } from 'lucide-react';
-import { DEFAULT_DOCK_TABS, type DockTab } from '../dock-preferences';
+import { useId } from 'react';
+import { ChevronDown, GripVertical } from 'lucide-react';
+import { Reorder, useDragControls, useReducedMotion } from 'motion/react';
+import { DEFAULT_DOCK_TABS, DOCK_TABS, type DockTab } from '../dock-preferences';
 import type { PwaPreferences } from '../preferences';
+import { ThemeIcon } from '@/reminders/components/theme-icon';
 import { PwaButton as Button } from './PwaButton';
-import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
-const labels: Record<DockTab, string> = { inbox: 'Inbox', today: 'Schedule', browse: 'Projects', reading: 'Reading' };
+function TabRow({ tab, tabs, onChange, description }: {
+	tab: DockTab; tabs: DockTab[]; onChange: (tabs: DockTab[]) => void; description: string;
+}) {
+	const controls = useDragControls();
+	const reducedMotion = useReducedMotion();
+	const item = DOCK_TABS.find(item => item.id === tab)!;
+	return <Reorder.Item value={tab} dragListener={false} dragControls={controls} layout="position" transition={reducedMotion ? { duration: 0 } : undefined}
+		className="settings-tab-row" data-settings-tab={tab}>
+		<Button variant="ghost" className="settings-tab-handle" aria-label={`Reorder ${item.label}`} aria-describedby={description}
+			onPointerDown={event => controls.start(event)} onKeyDown={event => {
+				if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+				event.preventDefault();
+				const index = tabs.indexOf(tab), nextIndex = index + (event.key === 'ArrowUp' ? -1 : 1);
+				if (nextIndex < 0 || nextIndex >= tabs.length) return;
+				const next = [...tabs];
+				next.splice(index, 1); next.splice(nextIndex, 0, tab); onChange(next);
+			}}><GripVertical size={18} aria-hidden="true" /></Button>
+		<ThemeIcon id={item.iconName} size="m" aria-hidden="true" />
+		<span className="settings-tab-choice">
+			<select aria-label={`Tab ${tabs.indexOf(tab) + 1}`} value={tab}
+				onChange={event => onChange(tabs.map(value => value === tab ? event.currentTarget.value as DockTab : value))}>
+				{DOCK_TABS.filter(item => item.id === tab || !tabs.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+			</select>
+			<ChevronDown size={14} aria-hidden="true" />
+		</span>
+	</Reorder.Item>;
+}
 
 export function TabSettings({ preferences, onChange }: {
 	preferences: PwaPreferences;
 	onChange: (patch: Partial<PwaPreferences>) => void;
 }) {
 	const tabs = preferences.dockTabs;
-	const rows = [...tabs, ...DEFAULT_DOCK_TABS.filter(tab => !tabs.includes(tab))];
-	const move = (index: number, offset: number) => {
-		const next = [...tabs];
-		[next[index], next[index + offset]] = [next[index + offset]!, next[index]!];
-		onChange({ dockTabs: next });
-	};
+	const description = useId();
+	const changeTabs = (dockTabs: DockTab[]) => onChange({ dockTabs });
 	return <SettingsSection title="Tabs">
-		<p className="settings-tabs-description">Choose the bottom tabs and their order on this device. Keep at least one visible.</p>
-		{rows.map(tab => {
-			const index = tabs.indexOf(tab);
-			const visible = index >= 0;
-			return <SettingsRow key={tab} title={labels[tab]}>
-				<div className="settings-tab-controls">
-					<Button variant="ghost" aria-label={`Move ${labels[tab]} up`} disabled={!visible || index === 0} onClick={() => move(index, -1)}><ArrowUp size={18} aria-hidden="true" /></Button>
-					<Button variant="ghost" aria-label={`Move ${labels[tab]} down`} disabled={!visible || index === tabs.length - 1} onClick={() => move(index, 1)}><ArrowDown size={18} aria-hidden="true" /></Button>
-					<input type="checkbox" aria-label={`Show ${labels[tab]} tab`} checked={visible} disabled={visible && tabs.length === 1}
-						onChange={() => onChange({ dockTabs: visible ? tabs.filter(value => value !== tab) : [...tabs, tab] })} />
-				</div>
-			</SettingsRow>;
-		})}
-		<Button variant="ghost" size="touch" onClick={() => onChange({ dockTabs: [...DEFAULT_DOCK_TABS] })}>Reset tabs</Button>
+		<p className="settings-tabs-description">Choose four tabs. Drag to reorder, or select a tab to replace it.</p>
+		<span id={description} className="pwa-dock__sr">Drag to reorder, or use the Up and Down arrow keys.</span>
+		<Reorder.Group axis="y" values={tabs} onReorder={changeTabs} className="settings-tab-list" aria-label="Your tabs">
+			{tabs.map(tab => <TabRow key={tab} tab={tab} tabs={tabs} onChange={changeTabs} description={description} />)}
+		</Reorder.Group>
+		<div className="settings-tabs-footer">
+			<Button variant="ghost" size="touch" onClick={() => changeTabs([...DEFAULT_DOCK_TABS])}>Reset tabs</Button>
+		</div>
 	</SettingsSection>;
 }

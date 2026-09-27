@@ -1,3 +1,4 @@
+import { checkTabSettings } from './pwa-tab-settings-checks.mjs';
 import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -35,26 +36,7 @@ try {
 			await gear.click();
 			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(sheet).toBeVisible();
-			// Customize the dock through Settings, then verify navigation and reload.
-			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
-			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
-			await sheet.getByRole('button', { name: 'Move Reading up', exact: true }).click();
-			await sheet.getByRole('checkbox', { name: 'Show Projects tab' }).uncheck();
-			await sheet.getByRole('checkbox', { name: 'Show Schedule tab' }).uncheck();
-			await sheet.getByRole('checkbox', { name: 'Show Inbox tab' }).uncheck();
-			await expect(sheet.getByRole('checkbox', { name: 'Show Reading tab' })).toBeDisabled();
-			await sheet.getByRole('checkbox', { name: 'Show Inbox tab' }).check();
-			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
-			const dockTabs = page.locator('.crate-feature-panel[data-active="true"] .pwa-dock__bar > button');
-			await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Reading List', 'Inbox']);
-			await dockTabs.first().click();
-			await expect(page.locator('[data-crate-section="reading"]')).toHaveAttribute('data-active', 'true');
-			await page.reload();
-			await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Reading List', 'Inbox']);
-			await dockTabs.last().click();
-			await gear.click();
-			await expect(sheet.getByRole('checkbox', { name: 'Show Projects tab' })).not.toBeChecked();
-			await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
+			await checkTabSettings(page, name);
 			// Page presentation fills tall and short phones, rather than stopping
 			// at the desktop height cap. Resizing also exercises the layout lock.
 			for (const viewport of [{ width: 390, height: 844 }, { width: 430, height: 932 }, { width: 320, height: 568 }]) {

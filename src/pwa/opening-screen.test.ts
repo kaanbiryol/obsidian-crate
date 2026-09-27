@@ -34,7 +34,7 @@ it.each([
 	}
 	const isProject = Boolean(document.documentElement.dataset.pwaOpeningProject);
 	expect(document.querySelectorAll('[data-icon="settings"]')).toHaveLength(isProject ? 0 : 1);
-	expect(document.querySelectorAll('.pwa-dock svg')).toHaveLength(isProject ? 0 : 6);
+	expect(document.querySelectorAll('.pwa-dock svg')).toHaveLength(isProject ? 0 : 11);
 	expect(document.querySelectorAll('.crate-content-loading')).toHaveLength(1);
 	expect(document.querySelector('work')).toBeNull();
 });
@@ -50,13 +50,35 @@ it('applies custom dock order and visibility before React starts, including hidd
   const { document } = parseHTML('<html><body></body></html>');
   new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
     document, URLSearchParams, location: { search: '?tab=today' },
-    localStorage: { getItem: () => JSON.stringify({ dockTabs: ['reading', 'inbox'] }) },
+    localStorage: { getItem: () => JSON.stringify({ dockTabs: ['reading', 'inbox', 'archive', 'highlights'] }) },
   });
   const style = document.documentElement.style;
-  expect(style.getPropertyValue('--pwa-dock-count')).toBe('2');
+  expect(style.getPropertyValue('--pwa-dock-count')).toBe('4');
   expect(style.getPropertyValue('--pwa-dock-reading-order')).toBe('0');
   expect(style.getPropertyValue('--pwa-dock-inbox-order')).toBe('1');
   expect(style.getPropertyValue('--pwa-dock-today-display')).toBe('none');
   expect(style.getPropertyValue('--pwa-opening-dock-indicator')).toBe('0');
   expect(document.documentElement.dataset.pwaOpeningTab).toBe('today');
+});
+
+it('selects a pinned Reading subview in the cached shell', () => {
+	const { document } = parseHTML('<html><body></body></html>');
+	new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
+		document, URLSearchParams, location: { search: '' },
+		localStorage: { getItem: () => JSON.stringify({ defaultScreen: 'favorites', dockTabs: ['highlights', 'archive', 'favorites', 'upcoming'] }) },
+	});
+	const style = document.documentElement.style;
+	expect(style.getPropertyValue('--pwa-opening-dock-index')).toBe('2');
+	expect(style.getPropertyValue('--pwa-dock-reading-display')).toBe('none');
+	expect(style.getPropertyValue('--pwa-dock-favorites-active-order')).toBe('2');
+});
+
+it('selects a pinned Today tab in the cached launch shell', () => {
+	const { document } = parseHTML('<html><body></body></html>');
+	new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
+		document, URLSearchParams, location: { search: '?tab=today' },
+		localStorage: { getItem: () => JSON.stringify({ dockTabs: ['upcoming', 'today-view', 'inbox', 'reading'] }) },
+	});
+	expect(document.documentElement.dataset.pwaOpeningDockTab).toBe('today-view');
+	expect(document.documentElement.style.getPropertyValue('--pwa-dock-today-active-order')).toBe('1');
 });

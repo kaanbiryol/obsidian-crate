@@ -1,3 +1,4 @@
+import { dockDestinationIndex } from './dock-preferences';
 import { PwaUpdateProvider } from './components/PwaUpdateProvider';
 import { usePwaPreferences } from './hooks/usePwaPreferences';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -31,8 +32,8 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const [settingsOpen] = useSettingsOpen();
 	const [reminderDockIndex, rememberReminderDockIndex] = useState<number | null>(null);
 	const { preferences } = usePwaPreferences();
-	const dockIndex = section === 'reading' ? preferences.dockTabs.indexOf('reading') : reminderDockIndex;
 	const [readingTab, rememberReadingTab] = useState<ReadingSection>(() => launch.tab === 'reading' ? launch.readingTab : 'inbox');
+	const dockIndex = section === 'reading' ? dockDestinationIndex(preferences.dockTabs, 'reading', readingTab) : reminderDockIndex;
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
 	const [visited, setVisited] = useState(() => new Set([section]));
 	const settingsOpened = useCallback(() => {

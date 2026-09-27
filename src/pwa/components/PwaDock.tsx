@@ -1,3 +1,4 @@
+import { DOCK_TABS, dockDestinationIndex } from '../dock-preferences';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import React, { useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
@@ -6,7 +7,6 @@ import { useDockMorph } from '../hooks/useDockMorph';
 import { Button } from '@/ui/shared/Button';
 import { ThemeIcon } from '@/reminders/components/theme-icon';
 import type { NavigationItem } from '@/ui/shared/NavigationBar';
-import { TABS } from '@/reminders/ui/layoutConstants';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { FeatureNavigationContext, type CrateSection } from './FeatureSwitcherButton';
 
@@ -16,9 +16,6 @@ const readingViews = [
   { id: 'archived', label: 'Archive', iconName: 'archive' },
   { id: 'highlights', label: 'Highlights', iconName: 'highlighter' },
 ] as const;
-const reminderTabs = TABS.filter(item => item.id !== 'upcoming')
-  .map(item => ({ ...item, label: item.id === 'today' ? 'Schedule' : item.label }));
-
 /** PWA navigation; shared feature panels supply their destinations and actions. */
 export function PwaDock<T extends string>({ section, items, activeTab, onTabChange, onAdd, inert = false, disabled = false, className = '' }: {
   section: CrateSection;
@@ -50,8 +47,10 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   const [previewTab, setPreviewTab] = useState<ReadingSection | null>(null);
   const readingTab = section === 'reading' ? activeTab : navigation?.readingTab ?? 'inbox';
   const groupItem = readingViews.find(item => item.id === readingTab) ?? readingViews[0];
-  const activeReminderTab = activeTab === 'upcoming' ? 'today' : activeTab;
-  const activeIndex = tabs.findIndex(tab => tab === (section === 'reading' ? 'reading' : activeReminderTab));
+  const activeIndex = dockDestinationIndex(tabs, section, activeTab);
+  const readingIndex = dockDestinationIndex(tabs, 'reading', readingTab);
+  const groupActive = section === 'reading' && tabs[activeIndex] === 'reading';
+  const displayedGroup = tabs[readingIndex] === 'reading' ? groupItem : readingViews[0];
   const indicatorIndex = navigation?.dockIndex ?? activeIndex;
   const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
   useLayoutEffect(() => {
@@ -94,11 +93,17 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
         <span ref={surface} className="pwa-dock__surface" aria-hidden="true" />
         <span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: indicatorIndex < 0 ? 0 : undefined, width: `calc((100% - 8px) / ${tabs.length})`, transform: `translateX(${indicatorIndex * 100}%)` }} />
         {tabs.map(tab => {
-          const item = reminderTabs.find(candidate => candidate.id === tab);
-          return item ? <Button key={item.id} className={`pwa-dock__tab${section === 'reminders' && item.id === activeReminderTab ? ' is-active' : ''}`} data-dock-active={section === 'reminders' && item.id === activeReminderTab ? 'true' : undefined} aria-current={section === 'reminders' && item.id === activeReminderTab ? 'page' : undefined} aria-label={item.label} title={item.label} data-action="switch-tab" data-tab={item.id === 'browse' ? 'projects' : item.id} onClick={() => {
-          if (section === 'reminders') selectLocalTab(item.id);
-          else navigation?.navigate({ section: 'reminders', tab: item.id });
-        }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button> : <PwaDockViewButton key={tab} label={groupItem.label} icon={groupItem.iconName} active={section === 'reading'} open={open} inert={inert} onSelect={() => selectView(groupItem.id)} onOpen={() => setOpen(true)}
+          const item = DOCK_TABS.find(candidate => candidate.id === tab)!;
+          const readingView = tab === 'favorites' || tab === 'archive' || tab === 'highlights';
+          const selected = tabs[activeIndex] === tab;
+          return tab !== 'reading' ? <Button key={tab} className={`pwa-dock__tab${selected ? ' is-active' : ''}`} data-dock-active={selected ? 'true' : undefined} aria-current={selected ? 'page' : undefined} aria-label={item.label} title={item.label} data-action={readingView ? 'switch-reading-section' : 'switch-tab'} data-tab={tab === 'browse' ? 'projects' : tab === 'archive' ? 'archived' : tab} onClick={() => {
+            if (readingView) selectView(tab === 'archive' ? 'archived' : tab);
+            else {
+              const destinationTab = tab === 'today-view' ? 'today' : tab;
+              if (section === 'reminders') selectLocalTab(destinationTab);
+              else navigation?.navigate({ section: 'reminders', tab: destinationTab });
+            }
+          }}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /></Button> : <PwaDockViewButton key={tab} label={displayedGroup.label} icon={displayedGroup.iconName} active={groupActive} open={open} inert={inert} onSelect={() => selectView(displayedGroup.id)} onOpen={() => setOpen(true)}
           onDragStart={() => { setDragging(true); setOpen(true); setPreviewTab(null); }}
           onDragMove={point => setPreviewTab(destinationAt(point))}
           onDragEnd={(point, moved) => {
