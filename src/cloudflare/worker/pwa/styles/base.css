@@ -60,7 +60,9 @@ body.pwa-sheet-scroll-locked .pwa-modal-sheet__container--reminder{max-height:ca
 .settings-theme-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.018)}
 .settings-theme-option{width:100%;min-width:0;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--text-faint);font-size:var(--pwa-font-control);font-weight:580;transition:background .16s ease,color .16s ease,box-shadow .16s ease}
 .settings-theme-option svg{flex:0 0 auto}
-.settings-theme-option:hover{background:rgba(255,255,255,.045);color:var(--text-normal)}
+@media (hover: hover) and (pointer: fine) {
+  .settings-theme-option:hover {background:rgba(255,255,255,.045);color:var(--text-normal)}
+}
 .settings-theme-option.is-active{background:rgba(255,255,255,.08);color:var(--text-normal);box-shadow:none}
 .settings-row--diagnostics{align-items:stretch;flex-direction:column;gap:12px}
 .settings-row--diagnostics .settings-action-button{align-self:flex-start;flex:none;max-width:100%}

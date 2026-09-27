@@ -1,0 +1,32 @@
+// Shared item presentation; feature markup retains its own semantics and actions.
+// Future density modes belong here, independently of reminder/reading content.
+@mixin surface {
+    border-radius: var(--crate-radius-card);
+    background: var(--crate-reminder-card-bg);
+    border: 1px solid var(--crate-reminder-card-border);
+    box-shadow: var(--crate-reminder-card-shadow);
+    transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+}
+
+@mixin hover {
+    background: var(--crate-reminder-card-hover-bg);
+    border-color: var(--crate-reminder-card-hover-border);
+    box-shadow: var(--crate-reminder-card-hover-shadow, var(--crate-reminder-card-shadow));
+}
+
+@mixin active {
+    background: var(--crate-reminder-card-active-bg);
+    border-color: var(--crate-reminder-card-active-border);
+}
+
+@mixin primary-spacing {
+    gap: 10px;
+    padding: 11px 12px;
+}
+
+@mixin title {
+    font-size: var(--reminder-font-base);
+    font-weight: var(--reminder-font-weight-medium);
+    line-height: 1.4;
+    letter-spacing: normal;
+}

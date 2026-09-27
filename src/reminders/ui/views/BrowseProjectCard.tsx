@@ -1,4 +1,4 @@
-import React, { memo, useRef, useState } from 'react';
+import React, { memo } from 'react';
 
 import { ProgressMeter } from '../../components/ProgressMeter';
 import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
@@ -17,12 +17,6 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
   onClick: () => void;
 }) {
   const { project, stats, accentColor, isComplete } = card;
-  const [pressed, setPressed] = useState(false);
-  const pressOrigin = useRef<{ x: number; y: number } | null>(null);
-  const clearPress = () => {
-    pressOrigin.current = null;
-    setPressed(false);
-  };
 
   return (
     <ShadowDOMNativeMotionButton
@@ -30,22 +24,6 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
       className="premium-project-card"
       data-action="open-project"
       data-project={project}
-      data-pressed={pressed ? '' : undefined}
-      onPointerDown={event => {
-        if (!event.isPrimary || event.button !== 0) return;
-        pressOrigin.current = { x: event.clientX, y: event.clientY };
-        setPressed(true);
-      }}
-      onPointerMove={event => {
-        const origin = pressOrigin.current;
-        // A press that becomes a scroll must stop looking selected immediately.
-        if (origin && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 8) clearPress();
-      }}
-      onPointerUp={clearPress}
-      onPointerCancel={clearPress}
-      onPointerLeave={clearPress}
-      onLostPointerCapture={clearPress}
-      onBlur={clearPress}
       aria-label={`Open ${project}`}
       initial={false}
       animate={{ opacity: 1 }}

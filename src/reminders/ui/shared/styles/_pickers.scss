@@ -97,9 +97,11 @@
   text-align: right;
   color-scheme: light;
 
-  &:hover {
-    border-color: color-mix(in srgb, var(--text-normal) 16%, transparent);
-    background: var(--crate-control-hover-bg);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: color-mix(in srgb, var(--text-normal) 16%, transparent);
+      background: var(--crate-control-hover-bg);
+    }
   }
 
   &:focus {
@@ -194,9 +196,11 @@
     border-left: 0;
   }
 
-  &:hover:not(.is-selected) {
-    background: var(--crate-control-hover-bg);
-    color: var(--text-normal);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+      color: var(--text-normal);
+    }
   }
 
 }
@@ -280,9 +284,11 @@
   cursor: pointer;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
-  &:hover:not(.is-selected) {
-    background: var(--crate-control-hover-bg);
-    color: var(--text-normal);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+      color: var(--text-normal);
+    }
   }
 
   &.is-selected {
@@ -321,8 +327,10 @@
   font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
 
-  &:hover {
-    background: var(--crate-control-hover-bg);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--crate-control-hover-bg);
+    }
   }
 
   &.is-active {
@@ -464,8 +472,10 @@
     border: 0;
   }
 
-  &:hover {
-    background: var(--crate-control-hover-bg);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--crate-control-hover-bg);
+    }
   }
 
   &:focus-visible {
@@ -548,7 +558,6 @@
   & + .picker-control-row {
     border-top: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
   }
-
 }
 
 .reminder-date-picker .picker-schedule-fields .picker-field-copy strong {
@@ -797,9 +806,11 @@
   line-height: 1.25;
   cursor: pointer;
 
-  &:hover {
-    background: color-mix(in srgb, var(--text-error) 7%, transparent);
-    color: var(--text-error);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: color-mix(in srgb, var(--text-error) 7%, transparent);
+      color: var(--text-error);
+    }
   }
 
   &:focus-visible {
@@ -838,8 +849,10 @@
   transition: border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
   -webkit-tap-highlight-color: transparent;
 
-  &:hover:not(.is-selected) {
-    background: var(--crate-control-hover-bg);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+    }
   }
 
   &.is-selected {
@@ -903,12 +916,16 @@
   box-shadow: none;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
-  &:hover:not(:disabled),
-  &:focus-within {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: var(--crate-control-hover-bg);
+    }
+  }
+  &:has(:focus-visible) {
     background: var(--crate-control-hover-bg);
   }
 
-  &:active:not(:disabled) {
+  &[data-press-active]:not(:disabled) {
     background: var(--crate-control-active-bg);
   }
 
@@ -924,9 +941,12 @@
   color: var(--text-normal);
   font-weight: var(--reminder-font-weight-semibold);
 
-  &:hover:not(:disabled),
-  &:focus-within,
-  &:active:not(:disabled) {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+    }
+  }
+  &:has(:focus-visible), &[data-press-active]:not(:disabled) {
     background: color-mix(in srgb, var(--text-normal) 10%, transparent);
   }
 }

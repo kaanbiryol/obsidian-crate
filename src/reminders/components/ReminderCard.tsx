@@ -1,3 +1,5 @@
+import { usePressFeedback } from '../../ui/shared/usePressFeedback';
+import { Button } from '../../ui/shared/Button';
 import { Checkbox } from '@base-ui/react/checkbox';
 import React from 'react';
 import { motion } from 'motion/react';
@@ -84,6 +86,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     colorScheme = 'dark',
     completionPreview = false,
 }) => {
+    const { pressed, events: pressEvents } = usePressFeedback<HTMLDivElement>();
     const reducedMotion = useObsidianReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reducedMotion;
     const trackedReminders = React.useMemo(() => [reminder], [reminder]);
@@ -118,19 +121,20 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
             x: -16,
             transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const }
         },
-        whileTap: { scale: 0.985 },
     } : {};
 
     return (
         <Wrapper
             className={`premium-reminder-card ${reminder.completed ? 'is-completed' : ''} ${className}`}
             {...wrapperProps}
+            {...pressEvents}
+            data-press-active={pressed ? '' : undefined}
         >
             {/* Card content */}
             <div className="premium-reminder-content">
                 {/* Custom checkbox */}
                 <Checkbox.Root
-                    render={<button type="button" />}
+                    render={<Button type="button" />}
                     nativeButton
                     className={`premium-checkbox${isCheckboxChecked ? ' is-checked' : ''}${isImportant ? ' is-important' : ''}${completionPreview ? ' is-completing' : ''}`}
                     checked={isCheckboxChecked}

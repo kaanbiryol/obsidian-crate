@@ -46,18 +46,20 @@
         transition: transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
     }
 
-    &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
         color: var(--text-normal);
         background: var(--crate-control-hover-bg);
         border-color: var(--crate-divider-strong);
         box-shadow: none;
 
         svg {
-            transform: translateX(-2px);
+          transform: translateX(-2px);
         }
+      }
     }
 
-    &:active {
+    &[data-press-active] {
         transform: scale(0.96);
         box-shadow: none;
     }

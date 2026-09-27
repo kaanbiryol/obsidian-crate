@@ -67,7 +67,7 @@ export async function checkProjectTouchFeedback(page) {
     // keeps the source card mounted underneath the new screen.
     await card.tap();
     await expect(page.getByRole('heading', { name: project, exact: true })).toBeVisible();
-    await expect(card).not.toHaveAttribute('data-pressed', '');
+    await expect(card).not.toHaveAttribute('data-press-active', '');
     await page.goBack();
     await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
     await expect.poll(() => appearance(card)).toEqual(resting);

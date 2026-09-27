@@ -1,3 +1,5 @@
+@use "../../../../ui/shared/styles/list-item";
+
 // Shared primary-screen density and hierarchy.
 // Each host supplies its own theme-aware surface, accent, and semantic colors.
 
@@ -60,39 +62,29 @@
     }
 
     .premium-reminder-content {
-        gap: 10px;
-        padding: 11px 12px;
-        border-radius: var(--crate-radius-card);
-        background: var(--crate-reminder-card-bg, var(--crate-panel-bg));
-        border-color: var(--crate-reminder-card-border, var(--crate-divider));
-        box-shadow: var(--crate-reminder-card-shadow, none);
+        @include list-item.primary-spacing;
+        @include list-item.surface;
     }
 
     @media (hover: hover) and (pointer: fine) {
-        .premium-reminder-card:hover .premium-reminder-content {
-            background: var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg));
-            border-color: var(--crate-reminder-card-hover-border, var(--crate-divider-strong));
-            box-shadow: var(--crate-reminder-card-hover-shadow, var(--crate-reminder-card-shadow, none));
-        }
+      .premium-reminder-card:hover .premium-reminder-content {
+        @include list-item.hover;
+      }
     }
 
-    .premium-reminder-card:active .premium-reminder-content {
+    .premium-reminder-card[data-press-active] .premium-reminder-content {
         transform: var(--crate-reminder-card-active-transform, none);
-        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
-        border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
+        @include list-item.active;
     }
 
     // The reorder wrapper scales the entire card.
     .reorderable-reminder-item[data-reorder-interaction="drag"]
-        .premium-reminder-card:active .premium-reminder-content {
+        .premium-reminder-card[data-press-active] .premium-reminder-content {
         transform: none;
     }
 
     .premium-reminder-title {
-        font-size: var(--reminder-font-base);
-        line-height: 1.4;
-        font-weight: var(--reminder-font-weight-medium);
-        letter-spacing: normal;
+        @include list-item.title;
     }
 
     .premium-reminder-description {
@@ -173,9 +165,8 @@
         box-shadow: var(--crate-project-card-shadow, var(--crate-reminder-card-shadow, none));
     }
 
-    .premium-project-card:is([data-pressed], :focus-visible:active) .premium-project-content {
-        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
-        border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
+    .premium-project-card[data-press-active] .premium-project-content {
+        @include list-item.active;
     }
 
     .premium-project-left {
@@ -272,5 +263,4 @@
     letter-spacing: normal;
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
-
 }

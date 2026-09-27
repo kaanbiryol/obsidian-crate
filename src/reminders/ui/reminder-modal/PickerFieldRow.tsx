@@ -1,3 +1,4 @@
+import { usePressFeedback } from '../../../ui/shared/usePressFeedback';
 import type { ReactNode } from 'react';
 
 interface PickerFieldRowProps {
@@ -17,6 +18,7 @@ export function PickerFieldRow({
 	className,
 	asLabel = false,
 }: PickerFieldRowProps) {
+	const { pressed, events } = usePressFeedback<HTMLElement>();
 	const classes = ['picker-control-row', className].filter(Boolean).join(' ');
 	const copy = (
 		<span className="picker-field-copy">
@@ -30,7 +32,7 @@ export function PickerFieldRow({
 
 	if (asLabel) {
 		return (
-			<label className={classes}>
+			<label className={classes} {...events} data-press-active={pressed ? '' : undefined}>
 				{copy}
 				{children}
 			</label>
@@ -38,7 +40,7 @@ export function PickerFieldRow({
 	}
 
 	return (
-		<div className={classes}>
+		<div className={classes} {...events} data-press-active={pressed ? '' : undefined}>
 			{copy}
 			{children}
 		</div>

@@ -55,14 +55,18 @@
       box-shadow: var(--crate-glass-back-shadow);
     }
 
-    &:hover:not(:disabled) {
-      border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent);
-      background: var(--crate-control-hover-bg);
-      color: var(--text-normal);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent);
+        background: var(--crate-control-hover-bg);
+        color: var(--text-normal);
+      }
     }
 
-    &[data-tone="danger"]:hover:not(:disabled) {
-      color: var(--crate-danger);
+    @media (hover: hover) and (pointer: fine) {
+      &[data-tone="danger"]:hover:not(:disabled) {
+        color: var(--crate-danger);
+      }
     }
 
     &[data-tone="accent"] {
@@ -92,5 +96,4 @@
       --crate-semantic-color: var(--crate-warning);
     }
   }
-
 }
