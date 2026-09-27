@@ -13,6 +13,9 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { adoptReadingClip, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { commitFileDelete } from './sync-mutations';
 import { getStoredFileRow } from './sync-storage';
+import { readReadingFrontmatter } from '@/reading/core/frontmatter';
+import { readingDocument } from '@/reading/core/markdown';
+import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const command = (path: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
@@ -108,8 +111,73 @@ it('persists highlights with replay receipts and rejects concurrent highlight re
   expect((await command('update', body)).status).toBe(200);
   expect((await command('update', body)).status).toBe(200);
   const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Highlights.md'))!;
-  expect(parseReadingNote(saved.content)?.highlights).toEqual(highlights);
-  expect(saved.content.endsWith('Hello **world**!')).toBe(true);
+  const confirmedHighlights = parseReadingNote(saved.content)!.highlights;
+  expect(confirmedHighlights?.[0]).toMatchObject(highlights[0]!);
+  expect(saved.content.endsWith('==Hello== **world**!')).toBe(true);
   expect((await command('update', { ...body, operationId: id(), changes: { highlights: [] } })).status).toBe(409);
+  expect((await command('update', { ...body, operationId: id(), before: { highlights: confirmedHighlights }, changes: { highlights: [] } })).status).toBe(200);
+  const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Highlights.md'))!;
+  expect(removed.content.endsWith('Hello **world**!')).toBe(true);
+});
+
+it('commits code annotations with replay receipts while preserving literal source', async () => {
+  const path = 'Reading/Code.md', markdown = 'Use `DSButton`.\n\n```swift\nlet kind = "primary"\n```\n';
+  const content = await adoptReadingClip(markdown, path, '2026-09-26T00:00:00Z'), item = parseReadingNote(content)!;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  const start = readingDocument(markdown).text.indexOf('kind');
+  const highlights = writeMarkdownHighlights(markdown, [{ start, end: start + 4, text: 'kind', note: 'Use this API' }]).highlights;
+  const body = { id: item.crate_reading_id, before: {}, changes: { highlights }, operationId: id() };
+  expect((await command('update', body)).status).toBe(200);
+  const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  expect((await command('update', body)).status).toBe(200);
+  expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.hash).toBe(saved.hash);
+  expect(readReadingFrontmatter(saved.content)!.body).toBe(markdown);
+  expect(parseReadingNote(saved.content)!.highlights).toEqual(highlights);
+  const list = await handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+  expect(await list.json()).toMatchObject({ items: [{ highlights }] });
   expect((await command('update', { ...body, operationId: id(), before: { highlights }, changes: { highlights: [] } })).status).toBe(200);
+  const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  expect(readReadingFrontmatter(removed.content)!.body).toBe(markdown);
+  expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
+});
+
+it('rebuilds old projections from native markers and observes subsequent vault edits', async () => {
+  const path = 'Reading/Native.md';
+  const content = await adoptReadingClip('Read ==this passage==.', path, '2026-09-26T00:00:00Z');
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  await projectReading(env, (await policy(env.DB))!);
+  await env.DB.prepare("UPDATE reading_sources SET metadata_json=json_set(json_remove(metadata_json, '$.highlights'), '$._highlightIndex', 2) WHERE path=?").bind(path).run();
+  const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+  const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
+  expect(projected.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['this passage']);
+  const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  const updated = content.replace('==this passage==', '==a new passage==');
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, updated, source.hash);
+  const changed = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
+  expect(changed.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['a new passage']);
+});
+
+it('persists source-sensitive text highlights and notes through replay, projection and deletion', async () => {
+  const path = 'Reading/Formatting.md', markdown = 'Visit https://example.com.\n\n<div>Embedded HTML.</div>\n\nCompare a == b.\n';
+  const content = await adoptReadingClip(markdown, path, '2026-09-26T00:00:00Z'), item = parseReadingNote(content)!;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  const text = readingDocument(markdown).text;
+  const highlights = writeMarkdownHighlights(markdown, ['example.com', 'Embedded HTML.', 'a == b'].map(excerpt => {
+    const start = text.indexOf(excerpt);
+    return { start, end: start + excerpt.length, text: excerpt, note: 'Keep this source' };
+  })).highlights;
+  expect(highlights.every(highlight => highlight.textAnchor)).toBe(true);
+  const body = { id: item.crate_reading_id, before: { highlights: item.highlights }, changes: { highlights }, operationId: id() };
+  expect((await command('update', body)).status).toBe(200);
+  const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  expect((await command('update', body)).status).toBe(200);
+  expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.hash).toBe(saved.hash);
+  expect(readReadingFrontmatter(saved.content)!.body).toBe(markdown);
+  expect(parseReadingNote(saved.content)!.highlights).toEqual(highlights);
+  const list = await handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+  expect(await list.json()).toMatchObject({ items: [{ highlights }] });
+  expect((await command('update', { ...body, operationId: id(), before: { highlights }, changes: { highlights: [] } })).status).toBe(200);
+  const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  expect(readReadingFrontmatter(removed.content)!.body).toBe(markdown);
+  expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
 });

@@ -9,6 +9,8 @@ export interface ReadingDialogProps {
 	title: string;
 	onClose: () => void;
 	busy?: boolean;
+	/** Use the PWA settings page height instead of sizing to the contents. */
+	fullHeight?: boolean;
 	children: React.ReactNode | ((close: () => void) => React.ReactNode);
 }
 

@@ -60,7 +60,13 @@ export function ReadingFixture({ onAdd }: { onAdd: () => void }) {
 	const [items, setItems] = useState(() => new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [title, setTitle] = useState('');
-	const update = async (item: ReadingItem, changes: Partial<ReadingItem>) => { setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
+	const update = async (item: ReadingItem, changes: Partial<ReadingItem>) => {
+		if (new URLSearchParams(location.search).has('reader-delayed-update')) {
+			await new Promise<void>((resolve, reject) => window.addEventListener('reading-settle-update', event => {
+				if ((event as CustomEvent).detail === 'fail') reject(new Error('Could not save article.')); else resolve();
+			}, { once: true }));
+		}
+		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
 	return <><ReadingLibraryPanel snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
 		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : undefined} reader={article && <ReadingReader item={article} markdown={body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status="Available offline" onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />

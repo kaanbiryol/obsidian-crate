@@ -1,5 +1,9 @@
 /* Standalone host palette. Shared components consume the semantic Crate tokens. */
 :root{
+	--reading-code-keyword:#c4a7ff;
+	--reading-code-string:#a6d6a0;
+	--reading-code-symbol:#91c7ff;
+	--reading-code-number:#edbd83;
 	--background-primary:#0d0d0f;
 	--background-primary-alt:#141417;
 	--background-secondary:#09090b;

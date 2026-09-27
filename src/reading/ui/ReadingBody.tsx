@@ -1,3 +1,4 @@
+import { readerScrollElement } from './reader-scroll';
 import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import type { ReadingHighlight } from '../core/highlights';
 import { paintHighlights } from './reader-highlights';
@@ -11,7 +12,7 @@ export function ReadingBody({ body, article, html, highlights }: {
 	const markup = useMemo(() => ({ __html: html }), [html]);
 	const painted = useRef<{ html: string; highlights: string } | null>(null);
 	useLayoutEffect(() => {
-		const text = body.current, reader = article.current;
+		const text = body.current, reader = article.current ? readerScrollElement(article.current) : null;
 		if (!text) return;
 		const signature = JSON.stringify(highlights);
 		if (painted.current?.html === html && painted.current.highlights === signature) return;

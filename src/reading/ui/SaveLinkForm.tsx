@@ -12,6 +12,6 @@ export function SaveLinkForm({ url, title, onUrl, onTitle, onSave, onCancel, sav
 		<TextField label="Link" leadingIcon={<ThemeIcon id="link" size="m" aria-hidden="true" />} data-initial-focus type="url" inputMode="url" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="https://…" required maxLength={8192} value={url} onChange={event => onUrl(event.target.value)} disabled={saving} />
 		<TextField label="Title (optional)" placeholder="Give it a name" maxLength={1000} value={title} onChange={event => onTitle(event.target.value)} disabled={saving} />
 		{error && <p className="crate-reading__notice" role="alert">{error}</p>}
-		<div className="crate-reading-dialog__actions"><Button variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button><Button variant="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save link'}<ThemeIcon id="arrow-up-right" size="m" aria-hidden="true" /></Button></div>
+		<div className="crate-dialog-actions crate-reading-dialog__actions"><Button variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button><Button variant="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save link'}</Button></div>
 	</form>;
 }

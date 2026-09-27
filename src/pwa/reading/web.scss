@@ -1,3 +1,5 @@
+// The reader supplies selection actions; keep saved passages selectable for resizing.
+#app .crate-reading-reader__body, #app .crate-reading-reader__highlight { user-select: text; -webkit-user-select: text; -webkit-touch-callout: none; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
 .crate-reminders-ui .crate-reading-web { height: 100%; min-height: 0; overflow: hidden; background: var(--crate-app-bg); color: var(--text-normal); padding: var(--pwa-safe-area-top, env(safe-area-inset-top)) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .crate-reminders-ui .pwa-reading-opening__search { flex-shrink: 0; height: var(--crate-field-height); margin: 16px 18px 20px; border-radius: var(--crate-radius-control); }
@@ -76,3 +78,135 @@
 .crate-reminders-ui .pwa-reading-opening__header .view-header-count { display: none; }
 .crate-reminders-ui .pwa-reading-opening__header .pwa-mode-opening__meta { margin-top: 0; }
 .crate-reminders-ui .pwa-reading-opening__sync { width: 44px; height: 44px; flex-shrink: 0; }
+
+// Transform the sticky header without changing article layout or scroll position.
+.crate-reminders-ui .crate-reading-web .crate-reading-reader__nav {
+  transition: transform 180ms ease-out;
+  &[data-scroll-hidden="true"] { transform: translateY(-100%); pointer-events: none; }
+  &:has(:focus-visible) { transform: none; pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.crate-reminders-ui.pwa-reading-root .crate-reading-reader__body pre code {
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-meta { color: var(--reading-code-keyword); }
+  .hljs-string, .hljs-regexp, .hljs-addition { color: var(--reading-code-string); }
+  .hljs-title, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-selector-class, .hljs-selector-id, .hljs-section { color: var(--reading-code-symbol); }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-variable, .hljs-deletion { color: var(--reading-code-number); }
+  .hljs-comment, .hljs-quote { color: var(--text-muted); font-style: italic; }
+}
+
+// Only the open phone reader escapes the app's fixed-height scroll containers.
+// Keep their heights so the library retains its geometry and list scroll offset.
+html.pwa-document-reader {
+  overflow-x: clip;
+  overflow-y: auto;
+  body, #app, .crate-feature-shell,
+  .crate-feature-panel[data-crate-section="reading"],
+  .crate-reading-web, .crate-reading-workspace, .crate-reading__layout { overflow: visible; }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
+    height: auto;
+    min-height: 100%;
+    bottom: auto;
+    overflow: visible;
+  }
+  .crate-reminders-ui .crate-reading-reader[data-document-scroll="true"] {
+    height: auto;
+    min-height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
+    overflow: visible;
+    padding-bottom: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom));
+  }
+  // The fixed body preserves the passage behind a sheet; clipping #app would
+  // otherwise cut off a long article at the original viewport's bottom edge.
+  body.pwa-sheet-scroll-locked #app { overflow: visible !important; }
+}
+
+// Keep reader actions visible, with the same quiet glass surfaces as the dock.
+.crate-reminders-ui.pwa-reading-root .crate-reading-reader {
+  --reader-control-surface: var(--background-primary-alt);
+  --reader-control-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --reader-control-shadow: 0 3px 12px #00000014, inset 0 1px 0 #ffffff08;
+
+  &__nav { min-height: 64px; border-bottom: 0; }
+  &__nav > .crate-icon-button { justify-self: start; }
+  & .crate-reading-reader__nav > .crate-icon-button[data-variant], &__quick-actions, & .crate-reading-reader__tools > button[data-variant] {
+    border: 1px solid var(--reader-control-border);
+    border-radius: 999px;
+    background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--reader-control-surface);
+    box-shadow: var(--reader-control-shadow);
+  }
+  &__nav > .crate-icon-button, &__quick-actions {
+    backdrop-filter: blur(24px) saturate(1.35);
+    -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  }
+  &__quick-actions { padding: 2px; gap: 2px; }
+  &__quick-actions:empty { display: none; }
+  &__quick-actions > button { border-radius: 50%; }
+  &__page { padding-top: 28px; }
+  &__header { margin-bottom: 20px; }
+  &__source { margin-bottom: 18px; }
+  &__header h1 { margin-bottom: 18px; }
+  &__tools { gap: 6px; margin-top: 20px; border: 0; min-height: 44px; flex-wrap: wrap; }
+  &__availability { min-width: 100px; }
+  &__tools > button { min-height: 44px; flex-shrink: 0; }
+  &__tabs { padding: 3px; gap: 3px; border: 1px solid var(--reader-control-border); border-radius: 999px; background: var(--background-primary-alt); }
+  &__tabs button { min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: 999px; font-size: 14px; }
+  &__tabs button[aria-pressed="true"] {
+    color: var(--text-normal);
+    background: color-mix(in srgb, var(--background-primary-alt) 88%, var(--text-normal));
+    border-color: var(--reader-control-border);
+    box-shadow: var(--reader-control-shadow);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    --reader-control-surface: color-mix(in srgb, var(--background-primary-alt) 80%, transparent);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    --reader-control-surface: var(--background-primary-alt);
+    &__nav > .crate-icon-button, &__quick-actions { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+}
+
+// A zero-height sticky layer overlays the full article without reserving a dock.
+.crate-reminders-ui .crate-reading-web .crate-reading-reader__floating {
+  position: sticky;
+  top: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)) - max(16px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom))) - 52px);
+  height: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: max(20px, env(safe-area-inset-right));
+  pointer-events: none;
+  opacity: var(--reader-floating-visibility, 1);
+  transform: translateY(calc((1 - var(--reader-floating-visibility, 1)) * 12px));
+  transition: opacity 120ms linear, transform 160ms ease-out;
+  &[data-scroll-hidden="true"] .crate-reading-reader__highlights-button { pointer-events: none; }
+  &:has(:focus-visible) { opacity: 1; transform: none; }
+  &:has(:focus-visible) .crate-reading-reader__highlights-button { pointer-events: auto; }
+  .crate-reading-reader__highlights-button {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 76px;
+    height: 52px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid var(--crate-divider-strong);
+    background: var(--crate-panel-bg);
+    color: var(--text-normal);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .18);
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    transform: none;
+    opacity: 1;
+    &[data-scroll-hidden="true"] { opacity: 0; }
+    &:has(:focus-visible) { opacity: 1; }
+  }
+}
+
+// Document scrolling positions sticky controls against the full viewport,
+// so the reader's top safe area must not also lift the bottom overlay.
+.crate-reminders-ui .crate-reading-web .crate-reading-reader[data-document-scroll="true"] .crate-reading-reader__floating {
+  top: calc(100dvh - max(16px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom))) - 52px);
+}

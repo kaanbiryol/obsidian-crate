@@ -1,10 +1,14 @@
 import { ARTICLE_END, ARTICLE_START, readingTimestamp, readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingMetadata } from './model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
+import { readMarkdownHighlights, writeMarkdownHighlights } from './markdown-highlights';
 
 export function parseReadingNote(markdown: string): ReadingMetadata | null {
 	const parsed = readReadingFrontmatter(markdown);
 	if (!parsed || !Object.prototype.hasOwnProperty.call(parsed.value, 'crate_reading_version')) return null;
-	return validateReadingMetadata(parsed.value);
+	const metadata = validateReadingMetadata(parsed.value);
+	if (!metadata.highlights?.length && !parsed.body.includes('==')) return metadata;
+	const { highlights, recovery } = readMarkdownHighlights(parsed.body, metadata.highlights, !metadata.highlight_format);
+	return { ...metadata, highlights, ...(recovery.length ? { highlight_recovery: [...(metadata.highlight_recovery ?? []), ...recovery] } : {}) };
 }
 
 export function createReadingNote(input: { id: string; url: string; title?: string; savedAt: string }): string {
@@ -26,6 +30,13 @@ export function updateReadingNote(markdown: string, id: string, changes: Reading
 		...(changes.tags === undefined ? {} : { tags: changes.tags }),
 	};
 	validateReadingMetadata({ ...metadata, ...allowed });
+	if (changes.highlights !== undefined || (!metadata.highlight_format && metadata.highlights?.length)) {
+		const parsed = readReadingFrontmatter(markdown)!;
+		const written = writeMarkdownHighlights(parsed.body, allowed.highlights ?? metadata.highlights ?? []);
+		markdown = markdown.slice(0, markdown.length - parsed.body.length) + written.markdown;
+		return patchReadingFrontmatter(markdown, { ...allowed, highlights: written.highlights, highlight_format: 'markdown-v1',
+			...(metadata.highlight_recovery?.length ? { highlight_recovery: metadata.highlight_recovery } : {}) });
+	}
 	return patchReadingFrontmatter(markdown, allowed);
 }
 

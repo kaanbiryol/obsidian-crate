@@ -7,23 +7,28 @@ export const bundleBudgets = {
 		// about 3.16 MB raw / 1.67 MB gzip, including Defuddle's full Markdown bundle.
 		// Defuddle/DOM code runs only on the server. In-app backup restore adds
 		// about 40 KB raw / 9 KB gzip; the combined plugin is about 3.29 MB / 1.72 MB.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3300000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1725000', 10),
+		// Markdown source mapping and the embedded Highlights PWA bring this to
+		// about 3.50 MB raw / 1.85 MB gzip. The reader uses no full DOM runtime.
+		// Expanded PWA code grammars embedded for deployment: about 3.58 MB / 1.91 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3620000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1930000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
 		// about 244 KB raw / 32 KB gzip. The same styles ship to both hosts.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '250000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '33000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '255000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '33500', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
 		// The deployable Worker embeds the complete reminders PWA assets.
 		// Reading with Defuddle's upstream Markdown/math support and the PWA:
 		// about 3.30 MB raw / 1.19 MB gzip, including the numbered shortcut setup and expanding navigation dock.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3325000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1210000', 10),
+		// Source-preserving highlights and the deferred review UI: about 3.57 MB / 1.30 MB.
+		// Expanded PWA-only code grammars bring the embedded Worker to about 3.74 MB / 1.35 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3780000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1380000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -45,7 +50,10 @@ export const bundleBudgets = {
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
 		// Reading and pairing stay deferred. Unified settings brings totals to
 		// 1.208 MB raw / 404.6 KB gzip, including the shared control additions.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1220000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '408000', 10),
+		// Deferred Markdown source mapping and highlight review: about 1.37 MB / 470 KB.
+		// Expanded PWA article code highlighting: about 1.54 MB raw / 523 KB gzip.
+		// Entry and startup budgets above remain unchanged.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1570000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '540000', 10),
 	}],
 };

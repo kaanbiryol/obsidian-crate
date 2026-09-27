@@ -9,11 +9,12 @@ import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess
 import { mutateReading } from './mutations';
 import { projectReading } from './projection';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
+import { validateReadingMetadata } from '@/reading/core/model';
 
 export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState): Promise<Response> {
   try {
     const url = new URL(request.url), path = url.pathname;
-    const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, 24_576);
+    const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;
     const body = parsed.value;
     if (path === '/reading/shortcut-exchange' && request.method === 'POST') return await exchangeShortcutPairing(env.DB, body, request);
@@ -53,7 +54,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
         FROM reading_sources s JOIN files f ON f.path=s.path AND f.storage_key=s.revision
         WHERE s.generation=? AND s.path>? AND (s.item_id IS NOT NULL OR s.error IS NOT NULL) ORDER BY s.path LIMIT 100`)
         .bind(current.generation, cursor).all<{ path: string; metadata_json: string | null; error: string | null; copies: number }>();
-      return readingResponse({ items: results.filter(row => row.metadata_json && row.copies === 1).map(row => ({ ...(JSON.parse(row.metadata_json!) as Record<string, unknown>), path: row.path })),
+      return readingResponse({ items: results.filter(row => row.metadata_json && row.copies === 1).map(row => ({ ...validateReadingMetadata(JSON.parse(row.metadata_json!) as Record<string, unknown>), path: row.path })),
         issues: results.filter(row => row.error || row.copies > 1).map(row => ({ path: row.path, message: row.error ?? 'Several notes have this Reading ID. Fix the duplicates in Obsidian.' })),
         cursor: results.length === 100 ? results.at(-1)!.path : null });
     }

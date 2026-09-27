@@ -35,10 +35,12 @@ import {
   X,
   GripVertical,
   Hash,
+  Highlighter,
   Inbox,
   Plus,
   Repeat,
   Sparkles,
+  SquarePen,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -82,10 +84,12 @@ const ICONS: Record<string, LucideIcon> = {
   'folder-open': FolderOpen,
   'grip-vertical': GripVertical,
   hash: Hash,
+  highlighter: Highlighter,
   inbox: Inbox,
   plus: Plus,
   repeat: Repeat,
   sparkles: Sparkles,
+  'square-pen': SquarePen,
 };
 
 const ICON_SIZES: Record<ThemeIconSize, number> = {

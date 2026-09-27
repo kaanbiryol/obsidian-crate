@@ -1,4 +1,8 @@
 :root{
+	--reading-code-keyword:#7137a8;
+	--reading-code-string:#246b36;
+	--reading-code-symbol:#175fa3;
+	--reading-code-number:#8a4b0f;
 	--pwa-launch-bg:#f7f7f8;
 	--pwa-control-surface:#f2f2f4;
 	--pwa-control-active-surface:#e9e9ed;
