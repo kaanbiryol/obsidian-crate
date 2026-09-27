@@ -59,8 +59,10 @@ function renderReadingText(markdown: string, source: string, highlightCode?: (co
 	return container.innerHTML;
 }
 
-export function ReadingReader({ item, markdown, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode }: {
+export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode }: {
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
+	/** Keep article parsing and layout out of the host's opening slide. */
+	deferContentUntilEntered?: boolean;
 	/** Host feedback after an explicit form save has been accepted. */
 	onSaveComplete?: (action: 'tags' | 'note') => void;
 	onCopyComplete?: () => void;
@@ -81,6 +83,20 @@ export function ReadingReader({ item, markdown, onBack, onEdit, onUpdate, onSave
 	const [target, setTarget] = useState<ReadingHighlight | null>(null);
 	const [annotation, setAnnotation] = useState<ReadingHighlight | null>(null), [note, setNote] = useState('');
 	const pending = useRef({ mutation: false, share: false }), article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
+	const [enteredId, setEnteredId] = useState<string | null>(null);
+	const markdown = deferContentUntilEntered && enteredId !== item.crate_reading_id ? null : loadedMarkdown;
+	useEffect(() => {
+		if (!deferContentUntilEntered) return;
+		let cancelled = false;
+		// Reading the pane's animations flushes its new style, including the first
+		// opening transition. Cached/network text can arrive while it is moving.
+		const animations = article.current?.closest('.crate-reading__reader-pane')?.getAnimations()
+			.filter(animation => 'transitionProperty' in animation && animation.transitionProperty === 'transform') ?? [];
+		void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+			if (!cancelled) setEnteredId(item.crate_reading_id);
+		});
+		return () => { cancelled = true; };
+	}, [deferContentUntilEntered, item.crate_reading_id]);
 	useReaderNavigation(article, autoHideNavigation, item.crate_reading_id);
 	const copyTimer = useRef<{ window: Window; id: number } | undefined>(undefined);
 	const clearCopyTimer = () => { if (copyTimer.current) copyTimer.current.window.clearTimeout(copyTimer.current.id); };
@@ -110,7 +126,7 @@ export function ReadingReader({ item, markdown, onBack, onEdit, onUpdate, onSave
 			else { await navigator.clipboard.writeText(item.source_url); setCopied(true); clearCopyTimer(); copyTimer.current = { window: ownerWindow, id: ownerWindow.setTimeout(() => setCopied(false), 2500) }; }
 		} catch (cause) { if (!(cause instanceof Error && cause.name === 'AbortError')) throw cause; }
 	};
-	const html = useMemo(() => renderReadingText(markdown ?? '', item.source_url, highlightCode), [markdown, item.source_url, highlightCode]);
+	const html = useMemo(() => markdown === null ? '' : renderReadingText(markdown, item.source_url, highlightCode), [markdown, item.source_url, highlightCode]);
 	useEffect(() => { if (focusHighlight) { setMode('article'); setTarget(focusHighlight); } }, [focusHighlight]);
 	useEffect(() => {
 		if (!target || mode !== 'article' || markdown === null) return;

@@ -1,4 +1,5 @@
 import { dockAppearance } from './pwa-launch-theme-checks.mjs';
+import { checkSaveLinkKeyboard } from './pwa-sheet-field-checks.mjs';
 import { switchFeature, featureNavigationTarget } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { test } from 'node:test';
@@ -106,6 +107,7 @@ async function captureReaderMotion(page, action) {
       for (const { element, inert } of saved) { element.inert = inert; element.classList.remove('reader-motion-hit-test'); }
       return { reader: x(pane), list: x(list), bar: x(bar), coversBar, bottomGap: barRect.bottom - paneRect.bottom,
         visible: getComputedStyle(pane).visibility === 'visible', article: !!pane.querySelector('.crate-reading-reader__header h1'),
+        body: !!pane.querySelector('.crate-reading-reader__body'),
         tabOpacity: getComputedStyle(readingTab).opacity,
         iconOpacity: getComputedStyle(readingTab.querySelector('.pwa-dock__view-icon')).opacity,
         dockInert: !!readingTab.closest('[inert]') };
@@ -326,11 +328,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     }
 
     await page.getByRole('button',{name:'Save a link',exact:true}).click();
+    await checkSaveLinkKeyboard(page);
     await checkPwaTextField(page.getByLabel('Link', { exact: true }), { sheet: true });
-    await page.getByLabel('Link',{exact:true}).fill('https://example.invalid/browser');
-    await page.getByLabel('Title (optional)').fill('A browser article');
+    await page.getByLabel('Link',{exact:true}).fill('https://browser.example.invalid/browser');
     await page.getByRole('button',{name:'Save link',exact:true}).click();
-    await page.getByRole('button',{name:/example.invalid A browser article/}).waitFor();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).waitFor();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     // Exercise the real populated library and authenticated Reminders together,
     // in a separate device session so this test's logout/recovery flow is unchanged.
@@ -345,7 +347,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await modePage.goto(`${origin}/notifications?browserToken=${modeEnrollment.browserToken}`);
       await expect(modePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
       await switchFeature(modePage, 'Reading');
-      await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
+      await expect(modePage.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ })).toBeVisible();
       for (const destination of ['Reminders', 'Reading']) {
         await modePage.waitForFunction(() => !document.querySelector('[data-leaving="true"]'));
         await modePage.evaluate(() => {
@@ -372,12 +374,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         assert.ok(frames.filter(values => values.some(value => value > .05 && value < .95)).length >= 2, `${name}: populated mode dissolve to ${destination}: ${JSON.stringify(frames)}`);
         assert.ok(frames.every(values => values.some(value => value === 1)), 'The incoming feature stays opaque beneath the outgoing feature');
       }
-      await expect(modePage.getByRole('button', { name: /example.invalid A browser article/ })).toBeVisible();
+      await expect(modePage.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ })).toBeVisible();
       console.log(`${name}: connected Reminders and populated Reading fade in both directions with touch taps`);
       // Each feature remembers its closed detail slot. Opening the other feature's
       // detail replaces that slot's predecessor, so it must no longer be reused.
       for (let cycle = 0; cycle < 3; cycle++) {
-        await modePage.getByRole('button', { name: /example.invalid A browser article/ }).click();
+        await modePage.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
         await expect(modePage.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
         await modePage.goBack();
         await modePage.waitForFunction(() => history.state?.readingLibrary === true);
@@ -415,6 +417,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // After visiting Inbox, another tab must not reuse its native Back snapshot.
     await page.goBack();
     await page.waitForFunction(() => history.state?.readingLibrary === true);
+    // Cached text is available during the next slide. It must not trigger
+    // parsing, syntax highlighting, or a full article layout while moving.
+    const cachedOpening = await captureReaderMotion(page, 'open');
+    assertReaderSlide(cachedOpening, 'open');
+    assert.ok(cachedOpening.samples.filter(sample => sample.reader > 1).every(sample => !sample.body), 'Article body waits for the opening slide');
+    await expect(page.locator('.crate-reading-reader__body')).toHaveCount(1);
+    await page.goBack();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
     await page.getByRole('button', { name: 'Favorite', exact: true }).click();
     for (const [section, title] of [['favorites', 'Favorites'], ['inbox', 'Reading'], ['favorites', 'Favorites'], ['inbox', 'Reading']]) {
       await page.locator('.pwa-reading-root [data-dock-group]').click({ button: 'right' });
@@ -422,7 +432,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.waitForFunction(() => !document.querySelector('.pwa-reading-root [data-leaving="true"]'));
       await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
       for (let visit = 0; visit < 2; visit++) {
-        await page.getByRole('button', { name: /example.invalid A browser article/ }).click();
+        await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
         await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
         assert.equal(await page.evaluate(() => window.__readingBackTitle), title, 'The native Back predecessor must contain the selected tab title');
         await page.goBack();
@@ -434,7 +444,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('button', { name: 'Favorite', exact: true })).toBeVisible();
     await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
     console.log(`${name}: native Back predecessors preserve Favorites and Reading titles across repeated visits`);
-    await page.getByRole('button', { name: /example.invalid A browser article/ }).click();
+    await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
     await page.getByText('Available offline', { exact: true }).waitFor();
     articleHistoryLength = await page.evaluate(() => history.length);
     await checkReaderNavigation(page);
@@ -481,9 +491,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const cachedArticleStarted = Promise.withResolvers(), cachedArticleReleased = Promise.withResolvers();
     heldResponses.push(cachedArticleReleased.resolve);
     holdArticle = { started: cachedArticleStarted.resolve, release: cachedArticleReleased.promise };
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await cachedArticleStarted.promise;
-    await expect(page.getByRole('heading',{name:'A browser article',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();
     await expect(page.getByText('Available offline',{exact:true})).toBeVisible();
     cachedArticleReleased.resolve();
     await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
@@ -500,7 +510,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     }
     await assertArticleStaysDismissed(page, articleHistoryLength);
     // Reopening is an explicit action and reuses the closed detail slot.
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await page.getByText('Available offline',{exact:true}).waitFor();
     await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
     await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
@@ -514,7 +524,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await assertArticleStaysDismissed(page, articleHistoryLength);
     // Repeated open/back cycles must not grow the history stack.
     for (let cycle = 0; cycle < 3; cycle++) {
-      await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+      await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
       await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open','true');
       await page.goBack();
       await assertArticleStaysDismissed(page, articleHistoryLength);
@@ -523,7 +533,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const started = Promise.withResolvers(), released = Promise.withResolvers();
     heldResponses.push(released.resolve);
     holdArticle = { started: started.resolve, release: released.promise };
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await started.promise; await page.goBack();
     const responseReceived = page.waitForResponse(response => response.url().includes('/reading/item?'));
     released.resolve(); await responseReceived;
@@ -550,8 +560,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await context.setOffline(true); if (name === 'chromium') await page.reload();
     const offlineDocument = await page.evaluate(() => window.__readingDocument);
     await expect(readingSync).toHaveAttribute('data-sync-state','offline');
-    await page.getByRole('button',{name:/example.invalid A browser article/}).waitFor();
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).waitFor();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await page.getByText('Available offline',{exact:true}).waitFor();
     const offlineHistoryLength = await page.evaluate(() => history.length);
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
@@ -569,7 +579,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const archiveStarted = Promise.withResolvers(), archiveReleased = Promise.withResolvers();
     heldResponses.push(archiveReleased.resolve);
     holdUpdate = { started: archiveStarted.resolve, release: archiveReleased.promise };
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await page.getByText('Available offline',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Archive article',exact:true}).click();
     await archiveStarted.promise;
@@ -577,14 +587,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await assertNoPendingBanner(page);
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
-    await expect(page.getByRole('button',{name:/example.invalid A browser article/})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/})).toHaveCount(0);
     await assertNoPendingBanner(page);
     await page.locator('.crate-feature-panel[data-active="true"] [data-dock-switcher]').press('ArrowDown');
     await page.getByRole('dialog', { name: 'Reading views' }).getByRole('button',{name:'Archive',exact:true}).click();
-    await page.getByRole('button',{name:/example.invalid A browser article/}).waitFor();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).waitFor();
     archiveReleased.resolve();
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await page.getByRole('button',{name:'Move to inbox',exact:true}).click();
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
@@ -600,21 +610,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Syncing 1 change');
     await expect(page.getByRole('button',{name:'Favorite',exact:true})).toHaveAttribute('aria-pressed','false');
     await assertNoPendingBanner(page);
-    await page.getByRole('button',{name:/example.invalid A browser article/}).click();
-    await expect(page.getByRole('heading',{name:'A browser article',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
+    await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();
     await expect(page.getByText('Available offline',{exact:true})).toBeVisible();
     await assertNoPendingBanner(page);
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await page.getByRole('button',{name:'Save a link',exact:true}).click();
-    await page.getByLabel('Link',{exact:true}).fill('https://example.invalid/while-pending');
-    await page.getByLabel('Title (optional)').fill('Saved during update');
+    await page.getByLabel('Link',{exact:true}).fill('https://pending.example.invalid/while-pending');
     await page.getByRole('button',{name:'Save link',exact:true}).click();
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Syncing 2 changes');
     await assertNoPendingBanner(page);
     updateReleased.resolve();
     await assertNoPendingBanner(page);
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
-    await page.getByRole('button',{name:/example.invalid Saved during update/}).waitFor();
+    await page.getByRole('button',{name:/pending.example.invalid pending.example.invalid/}).waitFor();
     // A committed save with a lost response must resend exactly the persisted operation.
     sent.length = 0; loseCaptureReply = true;
     await page.getByRole('button',{name:'Save a link',exact:true}).click();
@@ -630,15 +639,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     if (name === 'chromium') {
       await page.goto(`${origin}/notifications/test-share`); await page.waitForFunction(() => !!navigator.serviceWorker.controller);
       await context.setOffline(true);
-      await page.evaluate(() => { const form=document.createElement('form');form.method='POST';form.action='/notifications/share/reading';for (const [name,value] of Object.entries({url:'https://example.invalid/android',title:'Android share'})){const input=document.createElement('input');input.name=name;input.value=value;form.append(input);}document.body.append(form);form.submit(); });
+      await page.evaluate(() => { const form=document.createElement('form');form.method='POST';form.action='/notifications/share/reading';for (const [name,value] of Object.entries({url:'https://android.example.invalid/android',title:'Android share'})){const input=document.createElement('input');input.name=name;input.value=value;form.append(input);}document.body.append(form);form.submit(); });
       await page.waitForURL(/share=/);
-      await page.getByLabel('Link',{exact:true}).waitFor(); assert.equal(await page.getByLabel('Link',{exact:true}).inputValue(),'https://example.invalid/android');
+      await page.getByLabel('Link',{exact:true}).waitFor(); assert.equal(await page.getByLabel('Link',{exact:true}).inputValue(),'https://android.example.invalid/android');
       await page.getByRole('button',{name:'Save link',exact:true}).click();
       await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Offline: 1 change waiting to sync');
       await assertNoPendingBanner(page);
       await context.setOffline(false);
       await refreshReadingFromSettings(page);
-      await page.getByRole('button',{name:/example.invalid Android share/}).waitFor();
+      await page.getByRole('button',{name:/android.example.invalid android.example.invalid/}).waitFor();
     }
     const fresh = await browser.newContext({serviceWorkers:'block'}), shared = await fresh.newPage();
     await shared.goto(`${origin}/notifications/test-share`);

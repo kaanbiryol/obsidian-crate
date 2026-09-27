@@ -80,10 +80,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     const toast = page.locator('.pwa-reading-root .toast');
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
-    const saveLink = async (url, title, offline = false) => {
+    const saveLink = async (url, offline = false) => {
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
       await page.getByLabel('Link', { exact: true }).fill(url);
-      await page.getByLabel('Title (optional)').fill(title);
+      await expect(page.getByLabel('Title (optional)')).toHaveCount(0);
       await page.getByRole('button', { name: 'Save link', exact: true }).click();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(toast).toHaveText(offline ? 'Link saved on this device' : 'Link saved');
@@ -112,9 +112,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       };
     });
     await page.getByRole('button', { name: 'Save a link', exact: true }).click();
+    const captureSheet = page.getByRole('dialog', { name: 'Save a link' });
+    const headerSave = captureSheet.locator('.reminder-modal-header').getByRole('button', { name: 'Save link', exact: true });
+    await expect(headerSave).toHaveText('Save');
+    await expect(headerSave).toBeDisabled();
+    await expect(captureSheet.locator('.crate-dialog-actions')).toHaveCount(0);
+    const saveBounds = await headerSave.boundingBox();
+    assert.ok(saveBounds && saveBounds.width >= 44 && saveBounds.height >= 44);
     await page.getByLabel('Link', { exact: true }).fill('ftp://example.invalid/invalid');
-    await page.getByRole('button', { name: 'Save link', exact: true }).click();
-    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('HTTP or HTTPS');
+    await expect(page.getByRole('button', { name: 'Save link', exact: true })).toBeDisabled();
     await expect(toast).toHaveCount(0);
     await page.getByLabel('Link', { exact: true }).fill('https://example.invalid/unsaved');
     await page.getByRole('button', { name: 'Save link', exact: true }).click();
@@ -123,16 +129,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByLabel('Link', { exact: true })).toHaveValue('https://example.invalid/unsaved');
     assert.equal((await pending(page)).length, 0);
     await page.evaluate(() => window.__restoreReadingPut());
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Close save a link', exact: true }).click();
 
     // Creation is visible and can be opened before the server even receives it.
     const capture = hold('/reading/capture');
-    await saveLink('https://example.invalid/queued', 'Queued link');
+    await saveLink('https://queued.example.invalid/queued');
     await capture.started;
-    const row = page.getByRole('button', { name: 'example.invalid Queued link', exact: true });
+    const row = page.getByRole('button', { name: 'queued.example.invalid queued.example.invalid', exact: true });
     await expect(row).toBeVisible();
     await row.click();
-    await expect(page.getByRole('heading', { name: 'Queued link', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'queued.example.invalid', exact: true })).toBeVisible();
     await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
     capture.release();
     await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
@@ -198,22 +204,22 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await setTags('offline', true);
     await page.getByRole('button', { name: 'Favorite article', exact: true }).click();
     await back();
-    await saveLink('https://example.invalid/offline', 'Offline link', true);
-    await expect(page.getByRole('button', { name: 'example.invalid Offline link', exact: true })).toBeVisible();
+    await saveLink('https://offline.example.invalid/offline', true);
+    await expect(page.getByRole('button', { name: 'offline.example.invalid offline.example.invalid', exact: true })).toBeVisible();
     await expect(sync).toHaveAttribute('data-sync-state', 'offline');
     if (name === 'chromium') {
       await page.reload();
-      await expect(page.getByRole('button', { name: 'example.invalid Offline link', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'offline.example.invalid offline.example.invalid', exact: true })).toBeVisible();
       await expect(page.locator('.crate-reading__library').getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
     }
     await context.setOffline(false);
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
     await expect.poll(async () => (await pending(page)).length).toBe(0);
-    await expect(page.getByRole('button', { name: 'example.invalid Offline link', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'offline.example.invalid offline.example.invalid', exact: true })).toHaveCount(1);
 
     // Automatic recovery of a lost response should not flash an error toast.
     loseCaptureReply = true;
-    await saveLink('https://example.invalid/lost-toast-reply', 'Retried quietly');
+    await saveLink('https://lost-toast-reply.example.invalid/lost-toast-reply');
     await expect.poll(async () => (await pending(page)).some(op => op.error)).toBe(true);
     await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
     await expect(sync).toHaveAttribute('data-sync-state', 'synced', { timeout: 10000 });
