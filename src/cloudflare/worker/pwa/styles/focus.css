@@ -1,14 +1,12 @@
 /* Touch focus is kept for editing/restoration without painting selection rings. */
-.crate-reminders-ui:is(.pwa-shadow-root,.pwa-reading-root){--crate-focus-ring:var(--text-muted)}
+.crate-reminders-ui:is(.pwa-shadow-root,.pwa-reading-root){--crate-focus-ring:var(--text-muted);--crate-compound-focus-style:none}
 :is(.pwa-shadow-root,.pwa-reading-root) :focus,
 :is(.pwa-shadow-root,.pwa-reading-root) :focus-visible .premium-checkbox-visual,
 :is(.pwa-shadow-root,.pwa-reading-root) :focus-visible .premium-project-content{outline:none!important}
 :is(.pwa-shadow-root,.pwa-reading-root) :is(input,textarea,[contenteditable="true"]):focus{box-shadow:none!important}
 
 /* A deliberate Tab restores a neutral, visible cue for keyboard navigation. */
-html[data-pwa-input="keyboard"] :is(.pwa-shadow-root,.pwa-reading-root) :focus-visible{outline:2px solid var(--text-muted)!important;outline-offset:2px}
-/* Compound search fields draw their focus cue around the icon and input together. */
-html[data-pwa-input="keyboard"] :is(.pwa-shadow-root,.pwa-reading-root) .crate-field--search input:focus{outline:none!important}
+html[data-pwa-input="keyboard"] .crate-reminders-ui:is(.pwa-shadow-root,.pwa-reading-root){--crate-compound-focus-style:solid}
+/* Keep the generic cue below compound controls, which draw it on their wrapper. */
+html[data-pwa-input="keyboard"] :where(.pwa-shadow-root,.pwa-reading-root) :focus-visible{outline:2px solid var(--text-muted)!important;outline-offset:2px}
 html[data-pwa-input="keyboard"] :is(.pwa-shadow-root,.pwa-reading-root) :is([role="dialog"],[role="alertdialog"]):focus{outline:none!important}
-
-html:not([data-pwa-input="keyboard"]) :is(.pwa-shadow-root,.pwa-reading-root) .crate-field--search .crate-field__control:focus-within{outline:none}

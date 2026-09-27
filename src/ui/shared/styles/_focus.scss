@@ -1,0 +1,13 @@
+// Compound controls paint one focus cue around the whole field. The PWA
+// enables it only for keyboard navigation; plugin hosts keep their usual cue.
+@mixin within {
+  &:focus-within {
+    outline: 2px var(--crate-compound-focus-style, solid) var(--crate-focus-ring);
+    outline-offset: 2px;
+  }
+
+  :is(input, select, textarea):focus {
+    outline: none !important;
+    box-shadow: none;
+  }
+}
