@@ -46,6 +46,9 @@ both hosts together.
   validation, async actions, and persistence.
 - `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
   feature. Errors use assertive alerts; other feedback uses polite status messages.
+  Both features share bottom-center positioning above the dock and safe area.
+  Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
+  Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
   persistence; offline confirmations say they are saved on this device. Favorite,
   archive, and passage-highlight changes use their immediate visual state.
