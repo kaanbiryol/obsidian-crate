@@ -8,6 +8,7 @@
 @use "../../ui/shared/styles/tokens";
 @use "settings";
 @use "notice";
+@use "header-chrome";
 
 // Shared PWA theme and controls. Feature styles only own their content/layout.
 .crate-reminders-ui {
