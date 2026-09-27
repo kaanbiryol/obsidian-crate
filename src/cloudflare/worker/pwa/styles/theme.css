@@ -60,6 +60,9 @@
 .pwa-update-screen__activity span.is-resetting{transition:none}
 @media (orientation:landscape){.pwa-update-screen{top:50%}}
 :root[data-pwa-updating] #pwa-update-transition{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}
-:root[data-pwa-updating="restore"] #pwa-update-transition{transition:none}
+:root:is([data-pwa-updating="prepare"],[data-pwa-updating="restore"]) #pwa-update-transition{transition:none}
+/* Keep composited docks and sheets out of the update frame, including sheets
+   portalled outside #app. Retain layout so startup can settle before revealing. */
+:root:is([data-pwa-updating="prepare"],[data-pwa-updating="restore"]) :is(#app,.pwa-sheet-portal){opacity:0;pointer-events:none}
 :root[data-pwa-updating="revealing"] #pwa-update-transition{opacity:0;transition:opacity .32s ease-out}
 @media (prefers-reduced-motion:reduce){#pwa-update-transition{transition:none}.pwa-update-screen__activity span{transition:none}}

@@ -115,11 +115,13 @@ async function testUpdate(browser, launchMode) {
     await expect(page.locator('html')).toHaveAttribute('data-pwa-updating', 'prepare');
     await expect(page.locator('#pwa-update-transition')).toHaveCSS('opacity', '1');
     await expect(page.locator('#app')).toHaveAttribute('inert', '');
+    await expect(page.locator('#app')).toHaveCSS('opacity', '0');
     expect(await page.evaluate(key => sessionStorage.getItem(key), transitionKey)).toBeNull();
     releaseVersionCheck();
     await expect(page.getByRole('alert')).toContainText('Could not check for updates');
     await expect(update).toBeEnabled();
     await expect(page.locator('#app')).not.toHaveAttribute('inert');
+    await expect(page.locator('#app')).toHaveCSS('opacity', '1');
     expect(navigations).toBe(0);
     expect(await page.evaluate(key => sessionStorage.getItem(key), transitionKey)).toBeNull();
     await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
@@ -179,6 +181,7 @@ async function testUpdate(browser, launchMode) {
           opacity: Number(getComputedStyle(document.getElementById('pwa-update-transition')).opacity),
           inert: document.getElementById('app').hasAttribute('inert'),
           home: Boolean(document.querySelector('.pwa-reminders-view')),
+          appOpacity: getComputedStyle(document.getElementById('app')).opacity,
         });
         if (phase) requestAnimationFrame(sample);
       };
@@ -190,6 +193,9 @@ async function testUpdate(browser, launchMode) {
     await expect(transition).toHaveCSS('opacity', '0');
     await expect(page.locator('#app')).not.toHaveAttribute('inert');
     const revealSamples = await page.evaluate(() => window.__updateRevealSamples);
+    expect(revealSamples.some(sample => sample.phase === 'restore' && sample.home)).toBe(true);
+    expect(revealSamples.filter(sample => sample.phase === 'restore').every(sample => sample.appOpacity === '0')).toBe(true);
+    expect(revealSamples.filter(sample => sample.phase === 'revealing' || !sample.phase).every(sample => sample.appOpacity === '1')).toBe(true);
     const intermediate = revealSamples.filter(sample => sample.opacity > 0 && sample.opacity < 1);
     if (reducedMotion === 'reduce') expect(intermediate).toHaveLength(0);
     else {
