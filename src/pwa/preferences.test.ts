@@ -41,8 +41,9 @@ it.each([
   [undefined, [...DEFAULT_DOCK_TABS]],
   [[], [...DEFAULT_DOCK_TABS]],
   [['unknown'], [...DEFAULT_DOCK_TABS]],
-  [['reading', 'today', 'reading', null, 'bad'], ['reading', 'today']],
-  [['browse'], ['browse']],
+  [['reading', 'today', 'reading', null, 'bad'], ['reading', 'today', 'inbox', 'browse']],
+  [['browse'], ['browse', 'inbox', 'today', 'reading']],
+  [['highlights', 'favorites', 'archive', 'upcoming', 'inbox'], ['highlights', 'favorites', 'archive', 'upcoming']],
 ])('normalizes dock preferences without losing their order: %j', (dockTabs, expected) => {
   storage(JSON.stringify({ dockTabs }));
   expect(loadPwaPreferences().dockTabs).toEqual(expected);
@@ -51,5 +52,5 @@ it.each([
 it('persists hidden and reordered tabs independently of the launch screen', () => {
   storage();
   savePwaPreferences({ ...loadPwaPreferences(), dockTabs: ['reading', 'inbox'] });
-  expect(loadPwaPreferences()).toMatchObject({ defaultScreen: 'today', dockTabs: ['reading', 'inbox'] });
+  expect(loadPwaPreferences()).toMatchObject({ defaultScreen: 'today', dockTabs: ['reading', 'inbox', 'today', 'browse'] });
 });

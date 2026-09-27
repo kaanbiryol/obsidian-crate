@@ -26,7 +26,7 @@ const reminders = `<div class="crate-reminders-ui reminders-shadow-root pwa-shad
 </main></div>`;
 const reading = `<div class="crate-reminders-ui pwa-reading-root" data-pwa-static-shell><main class="pwa-screen crate-reading-web pwa-mode-opening pwa-reading-opening">
 	${header(true)}<div class="pwa-reading-opening__search" aria-hidden="true"></div>
-	<div class="pwa-mode-opening__content">${loadingIndicator('Loading Reading')}</div>${createPwaOpeningDockHtml('reading')}
+	<div class="pwa-mode-opening__content">${loadingIndicator('Loading Reading')}</div>${createPwaOpeningDockHtml()}
 </main></div>`;
 
 const project = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-pwa-static-shell><main class="pwa-screen reminders-view is-primary is-modal is-fullscreen pwa-mode-opening pwa-opening-screen is-project-detail">
@@ -44,11 +44,10 @@ const escapeText = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '
 
 export function createPwaOpeningScreenHtml(destination?: ReturnType<typeof resolvePwaOpeningDestination>): string {
 	if (!destination) return reminders;
-	const index = ['inbox', 'today', 'browse', 'reading'].indexOf(destination.tab === 'upcoming' ? 'today' : destination.tab);
 	return (destination.tab === 'reading' ? reading : destination.project ? project : reminders)
 		.replace(scheduleChips(), scheduleChips(destination.tab))
 		.replace('data-pwa-launch-title>Schedule', () => `data-pwa-launch-title>${escapeText(destination.title)}`)
-		.replace('data-pwa-static-shell', `data-pwa-static-shell style="--pwa-opening-dock-index:${index};--pwa-opening-dock-indicator:${index < 0 ? 0 : 1}"`);
+		.replace(createPwaOpeningDockHtml(), createPwaOpeningDockHtml(destination.tab, destination.tab === 'reading' ? destination.readingTab : undefined));
 }
 
 // The service worker caches generic HTML. Resolve this launch's labels before

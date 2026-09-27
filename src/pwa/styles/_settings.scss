@@ -96,8 +96,16 @@
 }
 
 .crate-reminders-ui {
-  .settings-tabs-description { margin: 0; padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
-  .settings-tab-controls { display: flex; align-items: center; flex-shrink: 0; }
-  .settings-tab-controls button { min-width: 44px; min-height: 44px; padding: 0; }
-  .settings-tab-controls input { width: 24px; height: 24px; margin: 10px; accent-color: var(--interactive-accent); }
+  .settings-tabs-description { margin: 0; padding: 8px 0 12px; color: var(--text-muted); font-size: 13px; }
+  .settings-tab-list { margin: 0; padding: 0; list-style: none; }
+  .settings-tab-row { position: relative; display: flex; align-items: center; min-height: 52px; gap: 8px; background: var(--pwa-sheet-surface, var(--background-primary)); }
+  .settings-tab-row > svg { color: var(--text-muted); flex-shrink: 0; }
+  .settings-tab-row button { min-width: 44px; min-height: 44px; padding: 0; color: var(--text-muted); }
+  .settings-tab-row .settings-tab-handle { touch-action: none; cursor: grab; }
+  .settings-tab-row .settings-tab-handle:active { cursor: grabbing; }
+  .settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
+  .settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; font-size: 16px; box-shadow: none; }
+  .settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
+  .settings-tabs-footer { display: flex; align-items: center; justify-content: space-between; }
+  .settings-tabs-footer > button:last-child { margin-left: auto; color: var(--text-muted); }
 }

@@ -149,13 +149,16 @@ and durable pending commands are checked before reload.
 
 ## Making a visual change
 
-PWA **Settings → Tabs** controls visibility and order for Inbox, Schedule, Projects,
-and Reading in the bottom dock. Preferences are saved on the device and shared
-between its browser tabs. At least one destination remains visible; **Reset tabs**
-restores all four. **Open to** and explicit links remain independent of visibility.
-Reading keeps its view picker. The cached launch shell uses the same normalized
-preferences before React starts, including the dock width and selection indicator.
-
+PWA **Settings → Tabs** lets people choose exactly four bottom destinations from
+Inbox, Schedule, Today, Upcoming, Projects, Reading list, Favorites, Archive, and Highlights.
+Each row has a replacement picker and a drag handle (also movable with arrow
+keys). There are no add or remove actions. Older saved layouts with fewer than four
+tabs retain their selections and fill the remaining slots from the defaults.
+Preferences persist on the device and update across browser tabs.
+**Reset tabs** restores Inbox, Schedule, Projects, and Reading. **Open to** and
+explicit links remain independent of visibility. Pinned Reading destinations open
+directly; the Reading tab retains its view picker for other destinations. The cached
+launch shell uses the same order, visibility, and selection before React starts.
 
 The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented
 control with a shared frosted track and sliding selection. It uses 13px labels
@@ -164,7 +167,7 @@ and a 32px visible track within 44px touch targets.
 change. Their content reuses `PwaTabTransition` for the same stationary dissolve
 as dock navigation, while the heading and segmented control stay mounted.
 Upcoming retains its configured range, date groups, and launch links;
-both views select Schedule in the dock. The opening shell paints the same chips
+Both views select Schedule in the default dock; a pinned Upcoming tab has its own selection. The opening shell paints the same chips
 before JavaScript loads. `scripts/pwa-schedule-test.mjs` checks selection,
 keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
 empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin
