@@ -20,6 +20,7 @@ export const browserScripts = [
 	'scripts/pwa-safe-area-test.mjs',
 	'scripts/pwa-ios27-header-test.mjs',
 	'scripts/pwa-focus-test.mjs',
+	'scripts/pwa-sheet-field-test.mjs',
 	'scripts/pwa-feature-switcher-test.mjs',
 	'scripts/pwa-dock-test.mjs',
 	'scripts/pwa-editor-contract-test.mjs',
@@ -47,6 +48,8 @@ export const browserScripts = [
 	'scripts/pwa-reminder-scroll-test.mjs',
 	'scripts/pwa-reorder-touch-test.mjs',
 	'scripts/pwa-project-transition-test.mjs',
+	'scripts/reading-touch-test.mjs',
+	'scripts/shared-press-feedback-test.mjs',
 ];
 
 export function selectScripts(shard) {

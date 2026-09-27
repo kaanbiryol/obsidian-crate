@@ -25,15 +25,38 @@ both hosts together.
   only reads that shared context. Keep the early launch theme in the HTML shell
   and the parsing/persistence helpers in `src/pwa/theme.ts` so first paint stays
   correct before React loads.
+- `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
+  primary spacing, and title typography shared by reminder and Reading items.
+  Reading uses the same cards on desktop and phones, retaining its source icon,
+  favorite action, and selected-article state. Shared Sass mixins preserve each
+  feature's existing DOM and interaction semantics. Future compact/non-card
+  presentation should be implemented here for both features; no density setting
+  is exposed yet. Existing reminder surface tokens remain host-theme inputs.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-- `src/ui/shared/` owns buttons, icon buttons, text fields, and headers. Icons use the
+- Reading search and Save a link fields opt into `crate-field--rounded`: 16px
+  corners, 48px minimum height, and 16px horizontal padding. Their filled
+  surfaces, borders, and focus rings retain shared theme colors. Reminder
+  editor fields retain their existing geometry.
+- `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
+  `usePressFeedback` owns momentary interaction state for buttons, reminder cards,
+  and native picker rows. Style it with `data-press-active`; never use CSS
+  `:active` or Base UI's persistent toggle `data-pressed` for that feedback.
+  Release, cancellation, scrolling, pointer exit, blur, activation, and app
+  backgrounding clear the press. Scope hover effects to `(hover: hover) and
+  (pointer: fine)`. Keep actual selection, checked states, keyboard focus, and
+  native field editing independent of press feedback. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
   Reading form actions and the PWA delete confirmation use `crate-dialog-actions`
   for the plugin confirmation’s shared minimum width, padding, and subtle borders.
   Phone layouts give both actions equal width and 48px minimum height.
+  PWA **Save a link** uses the shared reminder editor header instead: close on
+  the left, title centered, and **Save** on the right, disabled until the web link
+  is valid. Its header submit action targets the form; there are no footer actions.
+  Link capture in both hosts asks only for the URL; article extraction supplies the
+  title, with the hostname as the fallback while extraction is pending.
 - `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
   primitives, and PWA header defaults for every feature. The PWA stylesheet
   entry point loads it independently of the reminder layout stylesheet.
@@ -85,22 +108,58 @@ both hosts together.
   and scrolling. Swiping the editor retains its draft, while swiping a picker or
   delete confirmation returns to the editor. Explicit editor close still discards
   the draft. Busy operations and screen transitions block dismissal.
+  Forms opt into opening focus with `data-initial-focus`. The shared sheet focuses
+  that field without scrolling during mount and applies the same no-scroll focus
+  to touch activation of editable fields. Open capture synchronously within its
+  initiating tap so iOS can show the keyboard. Outer sheet wrappers use clipped
+  overflow; the form's content panel retains native scrolling and selection.
+  `scripts/pwa-sheet-field-test.mjs` checks capture focus and simulated keyboard
+  geometry in Chromium/WebKit; installed iPhone keyboard behavior needs a device check.
 
   PWA surface motion lives in `src/pwa/motion.ts` and
   `src/pwa/styles/motion.scss`. Project details and picker entrances use a
   critically damped Motion spring; CSS-owned drawers and Reading navigation
   use a sampled spring curve with a cubic fallback. Direct drawer dragging
   remains unanimated, and CSS transitions resume from the current position.
-  The tall settings page uses a shorter ease-out transition (300ms in, 240ms
-  out before swipe adjustment). Initialize unvisited features only after its
-  entrance completes so their loading work does not interrupt the slide.
-  Reminder keyboard updates commit height/padding once, then
+  All modal sheets and backdrops use the shared 420ms spring curve on entry
+  and a coordinated 320ms exit. Sheet swipes shorten that exit to 240–320ms
+  using the drawer's release strength and the shared spring curve. A 240ms floor
+  keeps a fast flick's remaining travel visible instead of compressing it into
+  the first few frames;
+  the backdrop and canvas follow the sheet's painted position instead of animating
+  separately. Gesture progress resets cannot change background depth, including
+  when a settling sheet is grabbed again. On phones, sheet position scales
+  and rounds the underlying feature canvas. Modals portal outside that canvas
+  so their geometry and direct touch tracking remain independent. The canvas,
+  sheet and backdrop remain proportional during dragging, interruption, and cancellation.
+  Reading dialogs over a document-scrolled article retain their viewport portal
+  and stationary frozen article, preserving scroll position and native Back.
+  Reduced motion removes the depth effect and sets CSS motion durations to zero.
+  Initialize unvisited features and picker modules after the entrance completes.
+  Picker screen handoffs retain their existing focus/keyboard timing; these are
+  replacements inside one drawer, not additional stacked dialogs.
+  Stationary tab dissolves and toasts share a 160ms fade. Press feedback uses
+  120ms, and control movement uses the shared control spring or 180ms CSS curve.
+  Dock expansion uses the surface spring; native dragging remains immediate.
+  Shared control tokens inherit these PWA defaults without changing Obsidian.
+  `PwaSheetSurface` owns keyboard padding and motion for reminder stages,
+  Reading dialogs, and Settings. `PwaModalSheet` measures the keyboard by default;
+  reminder navigation can override the inset while handing off to a picker.
+  Keep the surface anchored at the viewport bottom and paint behind the keyboard:
+  compact forms grow by the inset, while full-height forms retain their height
+  and shrink their scrollable content. Do not lift new dialogs with `bottom` or
+  subtract the keyboard from both the surface height and its content area.
+  Shared keyboard updates commit height/padding once, then
   `useSheetKeyboardMotion` animates the resulting displacement with independent
   `translate` keyframes. Do not interpolate the inset used by height and padding:
   that lays out the editor on every animation frame. Keyboard closing keeps a
   temporary scaled background beneath the moving surface; interruption and
   unmount remove it. Picker transitions retain their own transform, and live
   reduced-motion preferences skip keyboard movement.
+  Keep input focus synchronous with the opening tap. During drawer transitions,
+  dragging, and keyboard displacement, hide only the caret with `caret-color`;
+  restore it when all movement ends. Do not blur/refocus or reset selection to
+  work around a caret lagging its transformed surface.
   Keep native history gestures immediate and tab changes as stationary outgoing-screen dissolves over opaque incoming screens,
   and reduced-motion paths free of spatial transitions. Reader content stays
   mounted until its exit completes; timeout cleanup is only a recovery path. Phone-sized
@@ -136,13 +195,14 @@ both hosts together.
 
 ## App update notice
 
-`PwaUpdateProvider` in the shared feature shell owns version detection, dismissal,
+`PwaUpdateProvider` in the shared feature shell owns version detection,
 preparation, and update activation for both features. It checks on launch,
 foreground/pageshow, reconnect, and every five minutes while visible and online.
-`PwaUpdateNotice` uses a compact neutral surface above the dock; Settings renders
-it inside its focus boundary. Dismissal lasts for that version in the current app
-session, with the update action retained in **Settings → About**. Newer versions
-can show a new notice. Editors and transient toasts hide the floating notice.
+`PwaUpdateButton` shows a compact **Update** pill in the Reminders and Reading
+headers, to the left of sync and Settings. Selecting **Update** immediately starts
+applying the update without a confirmation sheet. Offline or pending work disables
+the action; update failures appear as toast feedback. `PwaUpdateNotice` provides the
+same action at the top of Settings. There is no floating update banner.
 The existing bounded Reminders launch update stays behind its launch splash;
 after launch, applying an update requires an explicit action. Feature readiness
 and durable pending commands are checked before reload.
@@ -159,7 +219,8 @@ Preferences persist on the device and update across browser tabs.
 explicit links remain independent of visibility. Pinned Reading destinations open
 directly. The last dock slot always opens the Reading view picker on hold or upward
 slide, regardless of its destination; a normal tap still opens that slot’s view.
-A contrasting upward-chevron badge marks this control. The cached
+A small, muted up/down chevron pair marks this control, vertically centered beside
+the destination icon without shifting it or adding a badge background. The cached
 launch shell uses the same order, visibility, and selection before React starts.
 
 The PWA's **Schedule** screen contains a compact **Today / Upcoming** segmented
@@ -451,7 +512,7 @@ painted beneath the full-height article, with background controls inert. Toolbar
 Back slides the article out once, then traverses history after the exit ends.
 Native history closes commit the library immediately and let it paint before
 replacing the forward entry, so WebKit cannot record the outgoing reader as the
-library snapshot. Loading and loaded content share one reader component. Detail history slots are
+library snapshot. Loading and loaded content share one reader component. On phone slides, article downloads start immediately, while Markdown parsing, syntax highlighting, and body layout wait for the pane’s transform transition to settle. Reduced-motion and non-sliding opens render without that wait. Detail history slots are
 scoped to the running document; reloads create a fresh library predecessor so Back
 cannot restore an older page instance. Reduced-motion users retain the section
 dissolve while spatial animations are disabled. Dismissing an article clears its forward-history

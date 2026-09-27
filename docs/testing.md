@@ -34,11 +34,18 @@ Run the storage-safety, sheet-interaction, and Reading shortcut browser checks f
 cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
 keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
 
+Run `node scripts/pwa-sheet-field-test.mjs` for Chromium/WebKit coverage of
+**Save a link** focus, keyboard geometry, and caret visibility during opening,
+closing, interrupted dragging, and retargeted keyboard movement. It also checks
+caret restoration with reduced motion and draft preservation across reopening.
+The keyboard viewport is simulated; native caret painting and software-keyboard
+behavior still require an installed-app check on an iPhone.
+
 ## App updates
 
 Run `node scripts/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
 version detection from a Reading-only launch, foreground polling, navigation,
-editor deferral, dismissal, Settings access, and light/dark mobile layouts.
+direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
 Screenshots are written to `test-results/update-notice/`.
 `node scripts/pwa-update-test.mjs` exercises real service-worker preparation,
 activation, failed/slow checks, launch updates, pending writes, and other tabs.
@@ -444,3 +451,18 @@ Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 `src/cloudflare/deployment-service.test.ts`,
 `src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
 Browser OAuth handoff and real hosted credentials still require manual acceptance.
+
+## Reading touch feedback
+
+Run `node scripts/reading-touch-test.mjs` for Chromium/WebKit checks of article
+open/Back cycles in both themes, retained hover, and keyboard focus restoration.
+Chromium also exercises native touch cancellation and scrolling, plus a forced
+stale `:active` state. The test uses the built PWA with synthetic Reading APIs
+and is included in `npm run test:pwa-browser`. Installed iPhone behavior still
+requires device verification.
+
+Run `node scripts/shared-press-feedback-test.mjs` for the shared controls’ press
+contract in Chromium and WebKit, in both document and Shadow DOM hosts. It covers
+release outside an inert control, cancellation, movement into scrolling, window
+blur, keyboard activation, disabled controls, persistent toggle selection, and
+native input editing. It is included in `npm run test:pwa-browser`.
