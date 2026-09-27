@@ -7,15 +7,16 @@
 		width: 16px;
 		height: 16px;
 		--sync-indicator-color: var(--text-muted);
-		--sync-indicator-color-duration: 150ms;
+		--sync-indicator-color-duration: 300ms;
 		color: var(--sync-indicator-color);
 
 		// Keep sync colors consistent across Obsidian themes and the PWA.
-		&[data-sync-state="synced"] {
+		&[data-visual-state="synced"],
+		&[data-visual-state="settling"] {
 			--sync-indicator-color: #22c55e;
 		}
-		&[data-sync-state="syncing"] { --sync-indicator-color: #f59e0b; }
-		&[data-sync-state="error"] { --sync-indicator-color: var(--text-error); }
+		&[data-visual-state="syncing"] { --sync-indicator-color: #f59e0b; }
+		&[data-visual-state="error"] { --sync-indicator-color: var(--text-error); }
 	}
 
 	#{$selector}__dot {
@@ -71,13 +72,13 @@
 	}
 
 	#{$selector}[data-visual-state="settling"] {
-		#{$selector}__halo { transition-duration: 1400ms; }
-		#{$selector}__dot { animation: pwa-sync-settle 1200ms ease-in-out 1400ms; }
-		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms ease-out 1200ms both; }
+		#{$selector}__dot { animation: pwa-sync-settle 600ms cubic-bezier(.22, 1, .36, 1); }
+		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms cubic-bezier(.22, 1, .36, 1) both; }
 	}
 
 	@keyframes pwa-sync-settle {
-		0%, 100% {
+		0% { transform: scale(.92); }
+		100% {
 			transform: scale(1);
 			box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
 		}
@@ -105,11 +106,10 @@
 		#{$selector}__halo::before,
 		#{$selector}__ripple,
 		#{$selector}__button { transition: none; }
-		#{$selector}__button:active { transform: none; }
+		#{$selector}__button[data-press-active] { transform: none; }
 		#{$selector} #{$selector}__dot { transform: none; }
 		#{$selector}__halo::before,
 		#{$selector}[data-visual-state] #{$selector}__dot,
 		#{$selector}[data-visual-state] #{$selector}__ripple { animation: none; }
 	}
-
 }

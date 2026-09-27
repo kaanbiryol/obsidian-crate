@@ -26,10 +26,12 @@
 		box-shadow: none;
 		cursor: pointer;
 		touch-action: manipulation;
-		transition: background 160ms ease, transform 160ms ease;
+		transition: background var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease), transform var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease);
 
-		&:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
-		&:active { transform: scale(.92); }
+		@media (hover: hover) and (pointer: fine) {
+		  &:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
+		}
+		&[data-press-active] { transform: scale(.92); }
 		&:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 	}
 
@@ -47,7 +49,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.pwa-sync-indicator__button { transition: none; }
-		.pwa-sync-indicator__button:active { transform: none; }
+		.pwa-sync-indicator__button[data-press-active] { transform: none; }
 	}
 
 	.pwa-sync-indicator__label {
@@ -95,5 +97,4 @@
 		color: var(--text-normal);
 		white-space: pre-wrap;
 	}
-
 }
