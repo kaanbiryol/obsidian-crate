@@ -1,3 +1,5 @@
+@use "../../ui/shared/styles/fields";
+@use "../../ui/shared/styles/view-header";
 @use "../../ui/shared/styles/controls";
 @use "../../ui/shared/styles/tokens";
 
@@ -62,6 +64,8 @@
   }
 
   @include controls.styles;
+  @include fields.styles;
+  @include view-header.styles;
 
   .shadow-dom-button__spinner {
     width: 1em;
