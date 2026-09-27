@@ -10,7 +10,7 @@ export async function dockAppearance(page) {
    return [box.x, box.y, box.width, box.height].map(value => Math.round(value * 100) / 100);
   };
   const shapes = svg => Array.from(svg.children).map(node => [node.tagName, Array.from(node.attributes).map(attr => [attr.name, attr.value]).sort()]);
-  return Array.from(dock.querySelectorAll('.pwa-dock__bar, .pwa-dock__indicator, .pwa-dock__add, svg')).map(element => ({
+  return Array.from(dock.querySelectorAll('.pwa-dock__bar, .pwa-dock__indicator, .pwa-dock__add, svg')).filter(element => element.getClientRects().length > 0).map(element => ({
    rect: rect(element), color: getComputedStyle(element).color, opacity: getComputedStyle(element).opacity,
    ...(element.tagName.toLowerCase() === 'svg' ? { shapes: shapes(element) } : {}),
   }));
@@ -91,11 +91,12 @@ export async function checkLaunchThemes(browser, origin) {
       });
      } else window.headerFrames.push({ visible: false });
      const dock = document.querySelector('.pwa-dock');
+     const dockIcons = Array.from(dock?.querySelectorAll('svg') ?? []).filter(icon => icon.getClientRects().length > 0);
      window.dockFrames.push({
       visible: Boolean(dock && dock.getBoundingClientRect().height > 0),
-      icons: dock?.querySelectorAll('svg').length ?? 0,
+      icons: dockIcons.length,
       placeholders: dock?.querySelectorAll('.pwa-mode-opening__shape').length ?? 0,
-      faded: dock ? Array.from(dock.querySelectorAll('svg')).some(icon => getComputedStyle(icon).opacity !== '1') : false,
+      faded: dockIcons.some(icon => getComputedStyle(icon).opacity !== '1'),
      });
      const selectors = ['html', 'body', '#app', '.pwa-launch-splash', '.crate-feature-shell', '.reminders-shadow-root'];
      window.launchFrames.push(selectors.flatMap(selector => {
@@ -127,7 +128,7 @@ export async function checkLaunchThemes(browser, origin) {
    await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Inbox');
    await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();
    await expect(page.locator('.pwa-launch-splash .crate-content-loading')).toHaveCount(1);
-   await expect(page.locator('.pwa-dock svg')).toHaveCount(6);
+   await expect(page.locator('.pwa-dock svg:visible')).toHaveCount(6);
    const launchDock = await dockAppearance(page);
    const launchChrome = await loadingChrome(page);
    app.resolve();

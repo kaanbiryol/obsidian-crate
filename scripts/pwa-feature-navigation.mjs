@@ -15,7 +15,11 @@ export async function installFeatureNavigation(page) {
       const header = panel.querySelector('.pwa-feature-switch-button');
       if (header?.getClientRects().length) { header.click(); return; }
       const next = destination ?? (panel.dataset.crateSection === 'reading' ? 'Reminders' : 'Reading');
-      panel.querySelector(next === 'Reading' ? '[data-dock-switcher]' : '.pwa-dock [data-tab="today"]').click();
+      const button = panel.querySelector(next === 'Reading' ? '[data-dock-switcher]' : '.pwa-dock [data-tab="today"]');
+      // Match keyboard activation: the dock clears cancelled pointer gestures
+      // on Enter. A bare programmatic click can be suppressed after window blur.
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      button.click();
     };
   });
 }

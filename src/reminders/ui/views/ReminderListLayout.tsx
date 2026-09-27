@@ -1,11 +1,19 @@
-import React, { useId, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import React, { forwardRef, useCallback, useId, useState } from 'react';
+import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProps } from 'motion/react';
 import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { REMINDER_LIST_FADE_TRANSITION } from '../layoutConstants';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
+
+// Pop the departing state out of flow without changing the scroller's parent.
+// Incoming content mounts immediately; outgoing controls cannot receive input.
+const ListState = forwardRef<HTMLDivElement, HTMLMotionProps<'div'>>(function ListState(props, ref) {
+  const present = useIsPresent();
+  return <motion.div {...props} ref={ref} inert={!present} aria-hidden={!present}
+    style={{ pointerEvents: present ? 'auto' : 'none' }} />;
+});
 
 interface ReminderListLayoutProps {
   children: React.ReactNode;
@@ -40,13 +48,19 @@ export function ReminderListLayout({
   const layoutGroupId = useId();
   const scrollRef = useStableReminderScroll(isDragging);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [presenceRoot, setPresenceRoot] = useState<ShadowRoot>();
+  const captureRoot = useCallback((element: HTMLDivElement | null) => {
+    const root = element?.getRootNode();
+    // Motion's pop-layout stylesheet must live alongside the animated nodes.
+    setPresenceRoot(root && 'host' in root ? root as ShadowRoot : undefined);
+  }, []);
 
   return (
-    <div className={`flex flex-col h-full relative min-h-0 ${className}`}>
+    <div ref={captureRoot} className={`flex flex-col h-full relative min-h-0 ${className}`}>
       {header}
-      <AnimatePresence initial={false} mode="wait">
+      <AnimatePresence initial={false} mode="popLayout" root={presenceRoot}>
         {hasContent ? (
-          <motion.div
+          <ListState
             key="reminder-list"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -67,16 +81,16 @@ export function ReminderListLayout({
                 animationConfig={animationConfig}
               />
             </LayoutGroup>
-          </motion.div>
+          </ListState>
         ) : (
-          <motion.div
+          <ListState
             key="empty-state"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={transition}
             className="flex-1 flex items-center justify-center"
-          >{emptyState}</motion.div>
+          >{emptyState}</ListState>
         )}
       </AnimatePresence>
     </div>

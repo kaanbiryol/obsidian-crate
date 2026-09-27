@@ -43,6 +43,9 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const [readingTab, rememberReadingTab] = useState<ReadingSection>(() => launch.tab === 'reading' ? launch.readingTab : 'inbox');
 	const dockIndex = section === 'reading' ? dockDestinationIndex(preferences.dockTabs, 'reading', readingTab) : reminderDockIndex;
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
+	// Keep the painted front layer in place through reversals. Swapping the
+	// layers mid-fade would replace the current mixture with an opaque screen.
+	const [frontSection, setFrontSection] = useState(section);
 	const [visited, setVisited] = useState(() => new Set([section]));
 	const settingsOpened = useCallback(() => {
 		// Initializing the other feature can load and render an entire library.
@@ -84,13 +87,21 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		const navigate = () => { settings.setOpen(false); showSection(currentSection()); };
 		window.addEventListener('popstate', navigate); return () => window.removeEventListener('popstate', navigate);
 	}, [showSection, settings]);
-	useEffect(() => {
+	const finishSectionTransition = useCallback(() => {
+		setFrontSection(section);
+		setLeavingSection(null);
+	}, [section]);
+	const finishSettledSection = useCallback(() => {
+		const front = root.current?.querySelector<HTMLElement>(`[data-crate-section="${frontSection}"]`);
+		if (front && Number(getComputedStyle(front).opacity) === (section === frontSection ? 1 : 0)) finishSectionTransition();
+	}, [frontSection, section, finishSectionTransition]);
+	useLayoutEffect(() => {
 		if (!leavingSection) return;
-		// Only recover if the browser cancels/suppresses animation events. Normal
-		// completion follows the rendered animation, not an independent 200ms clock.
-		const timeout = window.setTimeout(() => setLeavingSection(null), MODE_TRANSITION_FALLBACK_MS);
-		return () => window.clearTimeout(timeout);
-	}, [leavingSection, section]);
+		// Also settle reduced motion and reversals before a transition starts.
+		const frame = requestAnimationFrame(finishSettledSection);
+		const timeout = window.setTimeout(finishSectionTransition, MODE_TRANSITION_FALLBACK_MS);
+		return () => { cancelAnimationFrame(frame); window.clearTimeout(timeout); };
+	}, [leavingSection, finishSectionTransition, finishSettledSection]);
 	useEffect(() => {
 		if (!restoreFocus.current || !root.current) return;
 		let frame = 0;
@@ -138,13 +149,17 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	};
 	const navigate = (next: DockDestination) => { setDestination(next); switchSection(next.section); };
 	const toggle = () => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); };
-	return <ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><div ref={root} className="crate-feature-shell" onAnimationEnd={event => {
+	const panelStyle = (panel: CrateSection) => ({
+		zIndex: panel === frontSection ? 2 : 1,
+		opacity: panel === frontSection ? Number(section === frontSection) : Number(leavingSection !== null),
+	});
+	return <ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><div ref={root} className="crate-feature-shell" onTransitionEnd={event => {
 		const panel = event.target as HTMLElement;
-		if (event.animationName === 'crate-mode-fade-out' && panel.dataset.crateSection === leavingSection) setLeavingSection(null);
+		if (event.propertyName === 'opacity' && panel.dataset.crateSection === frontSection) finishSettledSection();
 	}}>
 		<div className="crate-modal-canvas">
-		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
-		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" style={panelStyle('reading')} data-front={frontSection === 'reading'} data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reading') && <ReadingFeature />}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" style={panelStyle('reminders')} data-front={frontSection === 'reminders'} data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{visited.has('reminders') && reminders}</FeatureNavigationContext.Provider></div>
 		</div>
 		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet navigation={settingsNavigation} onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
 	</div></PwaUpdateProvider></ThemeIconProvider>;

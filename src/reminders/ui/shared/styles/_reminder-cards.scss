@@ -168,21 +168,25 @@
 
 .premium-checkbox-icon {
     color: var(--checkbox-marker-color, var(--text-on-accent));
-    animation: crate-checkmark-pop var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    animation: crate-checkmark-pop var(--crate-motion-duration-fast) var(--crate-motion-easing);
 }
 
 @keyframes crate-checkmark-pop {
     0% {
-        transform: scale(0);
+        transform: scale(.86);
         opacity: 0;
-    }
-    50% {
-        transform: scale(1.2);
     }
     100% {
         transform: scale(1);
         opacity: 1;
     }
+}
+
+// Keep this beside the animation: shared card styles load after host theme rules.
+.is-reduced-motion .premium-checkbox-icon { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .premium-checkbox-icon { animation: none; }
+    .premium-checkbox:is(:hover, [data-press-active]) .premium-checkbox-visual { transform: none; }
 }
 
 // Body content

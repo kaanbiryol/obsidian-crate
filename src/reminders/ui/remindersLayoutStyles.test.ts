@@ -22,7 +22,7 @@ describe('plugin reminder layout styles', () => {
   it('maps custom surfaces and geometry to Obsidian theme tokens', async () => {
     const themeStyles = await readPluginThemeStyles();
     const modalStyles = await readFile(
-      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
+      new URL('../../ui/shared/styles/_base-modal.scss', import.meta.url),
       'utf8',
     );
     const editorStyles = await readEditorStyles();

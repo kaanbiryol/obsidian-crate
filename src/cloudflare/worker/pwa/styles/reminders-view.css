@@ -19,8 +19,8 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 .reminders-stack,.reorder-list,.completed-list{gap:0}
 .date-group{margin-bottom:20px}
 .date-group__title{margin:0 0 9px;padding-left:3px;font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.09em}
-.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check 360ms cubic-bezier(.16,1,.3,1)}
-@keyframes pwa-completion-check{0%{transform:scale(.92)}55%{transform:scale(1.14)}100%{transform:scale(1)}}
+.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check var(--pwa-motion-control-duration) var(--pwa-motion-control-ease)}
+@keyframes pwa-completion-check{0%{transform:scale(.92)}100%{transform:scale(1)}}
 .modal-card,.settings-sheet{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:24px 24px 0 0}
 .composer-surface,.composer-panel{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);border-radius:14px}
 .field input,.field textarea,.field select{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:var(--text-normal)}
@@ -79,3 +79,5 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 }
 .pwa-notification-prompt .pwa-notification-prompt__enable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:340px){.pwa-notification-prompt{flex-wrap:wrap}.pwa-notification-prompt__copy{flex-basis:calc(100% - 44px)}.pwa-notification-prompt .pwa-notification-prompt__enable{margin-left:44px}}
+
+@media(prefers-reduced-motion:reduce){.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:none}.pwa-pull-refresh{transition:none}.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{animation:none}}

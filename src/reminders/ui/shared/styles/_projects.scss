@@ -290,7 +290,10 @@
 .crate-progress-meter-fill {
     height: 100%;
     border-radius: inherit;
-    transition: width var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    transform-origin: left center;
+    transition: transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    &:dir(rtl) { transform-origin: right center; }
+    @media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
 .premium-project-percentage {

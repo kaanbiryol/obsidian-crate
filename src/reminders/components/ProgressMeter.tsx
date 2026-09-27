@@ -28,6 +28,8 @@ export const ProgressMeter = memo(function ProgressMeter({
 				className={['crate-progress-meter-fill', fillClassName].filter(Boolean).join(' ')}
 				style={{
 					backgroundColor: color,
+					width: '100%',
+					transform: `scaleX(${boundedPercentage / 100})`,
 				}}
 			/>
 		</Progress.Root>
