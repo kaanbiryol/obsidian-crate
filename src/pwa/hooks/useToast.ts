@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ToastKind, ToastState } from '../types';
+import type { ShowToast, ToastKind, ToastState } from '../types';
 
 export function getToastDuration(kind: ToastKind): number {
 	return kind === 'success' ? 2800 : kind === 'error' ? 4200 : 3200;
@@ -7,7 +7,7 @@ export function getToastDuration(kind: ToastKind): number {
 
 export function useToast(): {
 	toast: ToastState | null;
-	showToast: (kind: ToastKind, message: string) => void;
+	showToast: ShowToast;
 	clearToast: () => void;
 } {
 	const [toast, setToast] = useState<ToastState | null>(null);
@@ -21,8 +21,8 @@ export function useToast(): {
 		setToast(null);
 	}, []);
 
-	const showToast = useCallback((kind: ToastKind, message: string) => {
-		setToast({ kind, message });
+	const showToast = useCallback<ShowToast>((kind, message, syncState) => {
+		setToast({ kind, message, syncState });
 		if (timerRef.current !== null) window.clearTimeout(timerRef.current);
 		const duration = getToastDuration(kind);
 		timerRef.current = window.setTimeout(() => {
