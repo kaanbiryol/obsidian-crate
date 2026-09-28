@@ -82,7 +82,7 @@ const RESET = new Set(['crate_schema', 'crate_release', 'crate_migrations', 'aut
 export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentSchema: string, restoredAt: number): BackupRow[] {
   // Future data transformations beyond the launch baseline must add an
   // explicit recovery adapter before enabling them.
-  if (SERVER_RELEASE.schemaVersion > 4) throw new Error('This schema needs a newer in-app restore adapter');
+  if (SERVER_RELEASE.schemaVersion > 1) throw new Error('This schema needs a newer in-app restore adapter');
   const allowed = new Set([...currentSchema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]));
   allowed.add('sqlite_sequence');
   if (rows.some(row => !allowed.has(row.table))) throw new Error('Unknown backup table');

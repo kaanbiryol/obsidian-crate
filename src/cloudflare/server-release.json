@@ -1,7 +1,6 @@
 {
-  "revision": 161,
-  "schemaVersion": 4,
-  "minimumSchemaVersion": 4,
-  "migrations": [],
-  "baselineSchemaVersion": 4
+  "revision": 1,
+  "schemaVersion": 1,
+  "minimumSchemaVersion": 1,
+  "migrations": []
 }

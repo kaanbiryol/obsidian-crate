@@ -137,13 +137,14 @@ test('collects transitive deployment/build imports plus runtime graph and raw Sa
 	assert.ok(!inputs.some(path => path.startsWith('node_modules/') || path.startsWith('<')));
 });
 
-test('allows an explicit new baseline to retire unsupported development migrations', () => {
+test('allows only the marked pre-launch baseline to reset to schema one', () => {
 	const h = fixture();
-	const migration = { id: 'example', from: 1, to: 2, file: 'example.sql', checksum: 'a'.repeat(64) };
-	h.release({ revision: 2, schemaVersion: 2, migrations: [migration] });
+	h.release({ revision: 2, schemaVersion: 4, minimumSchemaVersion: 4, baselineSchemaVersion: 4 });
 	const base = h.commit();
-	h.release({ revision: 3, schemaVersion: 4, minimumSchemaVersion: 4, baselineSchemaVersion: 4 });
+	h.release({ revision: 3, schemaVersion: 1, minimumSchemaVersion: 1 });
 	assert.doesNotThrow(() => checkServerRevision(h.root, base, h.inputs));
-	h.release({ revision: 3, schemaVersion: 4, minimumSchemaVersion: 1, baselineSchemaVersion: 4 });
-	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /Invalid database schema baseline/);
+	h.release({ revision: 2, schemaVersion: 1, minimumSchemaVersion: 1 });
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
+	h.release({ revision: 3, schemaVersion: 2, minimumSchemaVersion: 1 });
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
 });

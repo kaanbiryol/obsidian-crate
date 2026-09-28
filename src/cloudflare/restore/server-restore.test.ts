@@ -181,7 +181,7 @@ it('does not execute backup expressions and rejects unrecognized schemas', async
   expect(() => parseBackupRows('INSERT INTO "files" ("path") VALUES (readfile(\'/etc/passwd\'));')).toThrow('Non-literal');
   expect(() => parseBackupRows('DROP TABLE files;')).toThrow('Unsupported');
   const f = await fixture();
-  await f.rewriteSQL(sql => sql.replace('VALUES (1,4,4)', 'VALUES (1,99,99)'));
+  await f.rewriteSQL(sql => sql.replace('VALUES (1,1,1)', 'VALUES (1,99,99)'));
   await expect(f.run()).rejects.toThrow(); expect(f.api.createD1Database).not.toHaveBeenCalled();
 });
 
