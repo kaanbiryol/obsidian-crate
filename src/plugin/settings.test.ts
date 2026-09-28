@@ -23,11 +23,17 @@ describe('normalizeCrateSettings', () => {
 				workersSubdomain: 'my-workers-subdomain',
 				lastDeployedVersion: '0.1.0',
 				lastDeployedFingerprint: 'f'.repeat(64),
+				lastKnownRevision: 42,
 			},
 		}, 'vault-config');
 
 		expect(settings.cloudflareDeployment?.workerName).toBe('crate-0123456789abcdef');
 		expect(settings.cloudflareDeployment?.vaultName).toBe('Notes');
+		expect(settings.cloudflareDeployment?.lastKnownRevision).toBe(42);
+		for (const lastKnownRevision of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, undefined]) {
+			const reloaded = normalizeCrateSettings({ ...settings, cloudflareDeployment: { ...settings.cloudflareDeployment!, lastKnownRevision } }, 'vault-config');
+			expect(reloaded.cloudflareDeployment?.lastKnownRevision).toBeUndefined();
+		}
 	});
 
 	it('drops malformed Cloudflare deployment metadata', () => {

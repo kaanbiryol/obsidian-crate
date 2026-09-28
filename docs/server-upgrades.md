@@ -63,3 +63,20 @@ export, including in the reset Worker. No application binding calls it and it do
 not schedule alarms or modify its stored ledger. This permits updates from the
 experimental safety build without deleting its namespace. Cloud safety enforcement
 is not enabled by this compatibility export.
+
+## Saved revision in plugin settings
+
+The plugin saves `cloudflareDeployment.lastKnownRevision` in its local settings
+only after a verified deployment, completed recovery, or explicit live version
+check. Update notices show this as **Last known server revision** without fetching
+the server when settings open. Existing installations without this field can use
+**Check live server** once or complete an update to populate it. Cached revisions
+are informational; deployment verification and update authorization still inspect
+the live server.
+
+Settings distinguish a newer revision from a fingerprint mismatch. Missing saved
+revision metadata prompts a manual live check; matching revision numbers with
+different builds require a higher server revision before deployment. Neither
+case is labeled an available update or permits the ordinary update action.
+Matching live artifacts still route to publication recovery when saved deployment
+metadata has not been confirmed.

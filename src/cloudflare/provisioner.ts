@@ -209,10 +209,12 @@ export async function provisionCloudflareDeployment(input: {
     await fence.completeVerification();
 
 		if (
-			input.metadata.lastDeployedVersion !== input.artifacts.version
+			input.metadata.lastKnownRevision !== SERVER_RELEASE.revision
+			|| input.metadata.lastDeployedVersion !== input.artifacts.version
 			|| input.metadata.lastDeployedFingerprint !== input.artifacts.fingerprint
 			|| input.metadata.vaultName !== previousVaultName
 		) {
+			input.metadata.lastKnownRevision = SERVER_RELEASE.revision;
 			input.metadata.lastDeployedVersion = input.artifacts.version;
 			input.metadata.lastDeployedFingerprint = input.artifacts.fingerprint;
 			await input.onMetadataChanged();

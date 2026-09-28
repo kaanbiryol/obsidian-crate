@@ -38,6 +38,7 @@ export async function completePublishedDeployment(
 	// Inspect before replacing an unconfirmed activation, then recheck under our
 	// ownership. No activation request is retried, and the old owner cannot advance.
 	if (isPendingAddressActivation(record)) await verifyAddress();
+	let verifiedRevision: number | undefined;
 	await withDeploymentFence({ api, accountId, databaseId, resumeUpdateValue: value,
 		record: { worker: target.workerName, kind: 'update', version: record.version, fingerprint,
 			verificationPending: true, completionOnly: true },
@@ -64,7 +65,9 @@ export async function completePublishedDeployment(
 		await releaseUpgradeGuards(api, accountId, databaseId, fence);
 		await recordDeploymentRelease(schema, fence, live.revision);
 		await fence.completeVerification();
+		verifiedRevision = live.revision;
 	});
+	target.lastKnownRevision = verifiedRevision;
 	target.lastDeployedVersion = record.version;
 	target.lastDeployedFingerprint = fingerprint;
 }
