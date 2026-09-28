@@ -137,10 +137,10 @@ async function verify(browser) {
     await expect(notice(page)).toBeVisible();
     mode = 'empty';
     await notice(page).getByRole('button', { name: 'Refresh reminders', exact: true }).click();
-    await expect(page.getByText('No results from available files', { exact: true })).toBeVisible();
+    await expect(page.locator('.pwa-tab-panel:not([data-leaving])').getByRole('heading', { name: 'No results from available files', exact: true })).toBeVisible();
     for (const tab of ['inbox', 'today', 'projects']) {
       await page.locator(`[data-action="switch-tab"][data-tab="${tab}"]`).click();
-      await expect(page.getByText('No results from available files', { exact: true })).toBeVisible();
+      await expect(page.locator('.pwa-tab-panel:not([data-leaving])').getByRole('heading', { name: 'No results from available files', exact: true })).toBeVisible();
       await expect(page.getByText(/Your inbox is empty|Nothing due today|Enjoy your free time!/)).toHaveCount(0);
     }
     await expect.poll(async () => (await cachedSnapshot(page))?.reminders.length).toBe(0);
@@ -151,7 +151,7 @@ async function verify(browser) {
     await expect(notice(page).getByRole('button', { name: 'Refresh reminders', exact: true })).toBeDisabled();
     await notice(page).getByText('Review affected files (3)', { exact: true }).click();
     for (const issue of issues) await expect(notice(page).getByText(issue.path, { exact: true })).toBeVisible();
-    await expect(page.getByText('No results from available files', { exact: true })).toBeVisible();
+    await expect(page.locator('.pwa-tab-panel:not([data-leaving])').getByRole('heading', { name: 'No results from available files', exact: true })).toBeVisible();
     mode = 'repaired';
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(notice(page)).toHaveCount(0);

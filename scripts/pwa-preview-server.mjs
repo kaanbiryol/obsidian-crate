@@ -40,7 +40,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 		createPwaVersionJson,
 	} = assets;
 
-	return http.createServer(async (req, res) => {
+	const handleRequest = async (req, res) => {
 		const url = new URL(req.url || '/', origin);
 		const path = url.pathname;
 		const method = req.method || 'GET';
@@ -315,6 +315,15 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 		}
 
 		sendJson(res, 404, { error: 'Not found' });
+	};
+	return http.createServer((req, res) => {
+		void handleRequest(req, res).catch(error => {
+			// Closing a browser can abort an in-flight request body during teardown.
+			if (req.aborted && error.code === 'ECONNRESET') return;
+			console.error(error);
+			if (!res.headersSent) sendJson(res, 500, { error: 'Preview request failed' });
+			else res.destroy(error);
+		});
 	});
 }
 

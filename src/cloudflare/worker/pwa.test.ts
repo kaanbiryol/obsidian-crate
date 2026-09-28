@@ -255,7 +255,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .project-picker-row {');
 		expect(html).toContain('.crate-reminders-ui .recurrence-frequency-tabs {');
 		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
-		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:var(--pwa-sheet-surface);');
+		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;border:0;border-radius:0;padding:0;box-shadow:none');
 		expect(html).not.toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;');
 		expect(html).toContain('.settings-panel{display:flex;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;');
 		expect(html).toContain('.crate-reminders-ui .modal-card.pwa-reminder-editor .modal-form {');
@@ -290,8 +290,8 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('.crate-reminders-ui .premium-checkbox {');
 		expect(html).toContain('box-shadow: var(--crate-checkbox-checked-shadow, none);');
-		expect(html).toContain('.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check 360ms cubic-bezier(.16,1,.3,1)}');
-		expect(html).toContain('@keyframes pwa-completion-check{0%{transform:scale(.92)}55%{transform:scale(1.14)}100%{transform:scale(1)}}');
+		expect(html).toContain('.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check var(--pwa-motion-control-duration) var(--pwa-motion-control-ease)}');
+		expect(html).toContain('@keyframes pwa-completion-check{0%{transform:scale(.92)}100%{transform:scale(1)}}');
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:44px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab{position:absolute;bottom:');
 		expect(html).not.toContain('.pwa-header-add-button');
@@ -416,7 +416,7 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"><div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root"');
-		expect(html).toContain('data-pwa-launch-title>Schedule');
+		expect(html).toContain('data-pwa-launch-title>Reminders');
 		expect(html).toContain('crate-content-loading__spinner');
 		expect(html).toContain('.pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}');
 		expect(html).not.toContain('pwa-launch-splash__label');

@@ -18,7 +18,7 @@ const policy = { folderPath: 'Reminders', timezone: 'America/New_York', allDayTi
 async function configure() {
   await handleNotificationPolicy(new Request('https://test/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) }), env.DB);
 }
-const note = '- [ ] Due @2099-01-02T10:00:00.000Z <!-- crate-id:11111111-1111-4111-8111-111111111111 -->';
+const note = '- [ ] Due 2099-01-02T10:00:00.000Z <!-- crate-id:11111111-1111-4111-8111-111111111111 -->';
 async function jobs() { expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL').all()).results).toEqual([]); return (await env.DB.prepare('SELECT reminder_id, operation, payload_json FROM notification_jobs').all()).results; }
 
 describe('authoritative projections and file revisions', () => {

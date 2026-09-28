@@ -147,10 +147,13 @@ for (const browserType of [chromium, webkit]) {
   await expect(status).toHaveAttribute('aria-label', /Syncing…/);
   const dot = indicator.locator('.crate-sync-indicator__dot');
   await expect(dot).toHaveCSS('background-color','rgb(245, 158, 11)');
-  await page.evaluate(() => window.setSyncState({lastSync:new Date().toISOString()}));
-  await expect(indicator).toHaveAttribute('data-visual-state','settling');
-  const colors = await dot.evaluate(el => {
-    const transition = el.getAnimations().find(animation => animation.transitionProperty === 'background-color');
+  const colors = await dot.evaluate(async el => {
+    window.setSyncState({lastSync:new Date().toISOString()});
+    let transition;
+    for (let frame = 0; frame < 120 && !transition; frame++) {
+      await new Promise(requestAnimationFrame);
+      transition = el.getAnimations().find(animation => animation.transitionProperty === 'background-color');
+    }
     if (!transition) throw new Error('Expected a dot color transition');
     transition.pause();
     transition.currentTime = Number(transition.effect.getTiming().duration) / 2;

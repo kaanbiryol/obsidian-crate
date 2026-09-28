@@ -179,7 +179,7 @@ async function testInstall(browser, launchMode) {
     await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
   expect(await safari.cookies()).toEqual([]);
-  expect(new URL(page.url()).searchParams.has('token')).toBe(false);
+  await expect.poll(() => new URL(page.url()).searchParams.has('token')).toBe(false);
   await installed.close();
   await safari.close();
 }

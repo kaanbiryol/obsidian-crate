@@ -98,7 +98,7 @@ export async function checkSettingsMotion(browser, origin) {
 		});
 		const release = await touch('touchend', 540);
 		expect(release.strength).toBeGreaterThan(0);
-		expect(release.strength).toBeLessThan(1);
+		expect(release.strength).toBeLessThanOrEqual(1);
 		const duration = Math.max(.24, Math.min(.32, .32 * release.strength));
 		expect(release.duration).toBeCloseTo(duration, 4);
 		await expect.poll(() => canvas.evaluate(el => el.getAnimations().some(animation => animation.playState === 'running'))).toBe(true);

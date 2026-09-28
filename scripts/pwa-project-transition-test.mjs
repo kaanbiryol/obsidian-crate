@@ -106,7 +106,8 @@ try {
         const samples = [];
         const x = () => { const transform = getComputedStyle(screen).transform; return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m41; };
         const started = performance.now();
-        do { samples.push(x()); await new Promise(resolve => requestAnimationFrame(resolve)); } while (performance.now() - started < 380);
+        do { samples.push(x()); await new Promise(resolve => requestAnimationFrame(resolve)); } while (performance.now() - started < 1500 && (Math.abs(x()) >= 1 || screen.getAnimations().some(animation => animation.playState === 'running')));
+        samples.push(x());
         return { samples, width: screen.getBoundingClientRect().width };
       });
       assert.ok(opening.samples.some(x => x > 1 && x < opening.width - 1), 'Project should slide over Projects');

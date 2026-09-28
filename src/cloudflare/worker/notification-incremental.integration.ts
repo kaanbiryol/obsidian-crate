@@ -12,7 +12,7 @@ import { runNotificationCoordinator } from './notification-coordinator';
 
 const path = 'Reminders/Inbox.md';
 const due = '2099-01-01T12:00:00.000Z';
-const note = (id: string, title = 'Task', date = due) => `- [ ] ${title}${date ? ` @${date}` : ''} <!-- crate-id:${id} -->`;
+const note = (id: string, title = 'Task', date = due) => `- [ ] ${title}${date ? ` ${date}` : ''} <!-- crate-id:${id} -->`;
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
   await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({
