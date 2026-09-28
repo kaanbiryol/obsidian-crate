@@ -16,13 +16,12 @@ export function createPushedScreenHistory<Page extends string>(pages: readonly P
 	const current = () => history.state as PageState<Page> | null;
 	let activeId: string | null = null;
 	let parentState: unknown = null;
-	let parentUrl = '';
 	let traversing = false;
 	let queuedPage: Page | null = null;
 	const push = (page: Page) => {
 		if (snapshot.closing) { queuedPage = page; return; }
 		if (snapshot.page) return;
-		parentState = history.state; parentUrl = location.href;
+		parentState = history.state;
 		activeId = crypto.randomUUID();
 		const base = { ...current(), cratePushedPage: undefined, cratePushedPageBase: activeId };
 		// Record the visible root before mounting its detail, for native Back previews.
@@ -71,7 +70,7 @@ export function createPushedScreenHistory<Page extends string>(pages: readonly P
 		},
 		reset() {
 			// Logout/session loss can unmount the sheet directly from a pushed page.
-			if (current()?.cratePushedPage?.owner === owner) history.replaceState(parentState, '', parentUrl);
+			if (current()?.cratePushedPage?.owner === owner) history.replaceState(parentState, '', location.href);
 			activeId = null;
 			queuedPage = null;
 			traversing = false;
