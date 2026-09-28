@@ -813,3 +813,35 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: open reader follows extraction transitions`, { timeout: 60000 }, async () => {
+  const { buildPwaPreviewAssets } = await import('./pwa-preview-assets.mjs');
+  const { listenPwaPreviewServer } = await import('./pwa-preview-server.mjs');
+  const { server } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await engine.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
+    let status = 'pending';
+    const item = () => ({ crate_reading_version: 1, crate_reading_id: '67de6c50-c70c-4c85-93f2-a048d9f33b1a', title: 'Extraction fixture',
+      source_url: 'https://example.com/article', saved_at: '2026-09-21T10:00:00.000Z', reading_status: 'inbox', favorite: false,
+      tags: [], extraction_status: status, capture_method: 'url', path: 'Reading/Article.md' });
+    await page.route('**/reading/session', route => route.fulfill({ json: { id: 'extraction-test', folderPath: 'Reading', generation: 'generation', expiresAt: Date.now() + 86400000 } }));
+    await page.route('**/reading/list*', route => route.fulfill({ json: { items: [item()], issues: [], cursor: null } }));
+    await page.route('**/reading/item?*', route => route.fulfill({ json: { item: item(), markdown: status === 'ready' ? 'The extracted article is now available.' : '' } }));
+    await page.goto(`${origin}/notifications?section=reading`);
+    await page.getByRole('button', { name: /Extraction fixture/ }).click();
+    await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toBeVisible();
+    status = 'ready';
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.locator('.crate-reading-reader__body')).toContainText('The extracted article is now available.');
+    await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toHaveCount(0);
+    // A retry may go back to pending without changing the highlights array.
+    status = 'pending';
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toBeVisible();
+    status = 'unavailable';
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+});

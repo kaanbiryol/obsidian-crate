@@ -39,7 +39,7 @@ import { presentReadingItems } from './pending-view';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './article-history';
 
-interface OpenReadingArticle { item: ReadingItem; markdown: string | null; availableOffline: boolean; error?: string; sourceHighlights?: string }
+interface OpenReadingArticle { item: ReadingItem; markdown: string | null; availableOffline: boolean; error?: string; sourceHighlights?: string; sourceExtractionStatus?: ReadingItem['extraction_status'] }
 
 export default function ReadingApp() {
   return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
@@ -249,7 +249,7 @@ function ReadingAppContent() {
         const saved = await readValue<{ item: ReadingItem; markdown: string }>(`article:${session.id}:${item.crate_reading_id}`);
         if (saved?.item?.crate_reading_id === item.crate_reading_id && typeof saved.markdown === 'string') {
           validateReadingMetadata({ ...saved.item });
-          if (current()) { cached = true; setReader({ item, markdown: saved.markdown, availableOffline: true, sourceHighlights: JSON.stringify(item.highlights ?? []) }); }
+          if (current()) { cached = true; setReader({ item, markdown: saved.markdown, availableOffline: true, sourceHighlights: JSON.stringify(saved.item.highlights ?? []), sourceExtractionStatus: saved.item.extraction_status }); }
         }
       } catch { /* A damaged or blocked cache must not prevent an online open. */ }
       if (!current()) return;
@@ -261,7 +261,7 @@ function ReadingAppContent() {
         const article = await readingRequest<{ item: ReadingItem; markdown: string }>(`/reading/item?id=${encodeURIComponent(item.crate_reading_id)}`, session);
         validateReadingMetadata({ ...article.item });
         if (!current()) return;
-        setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []) });
+        setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status });
         try {
           await cacheReadingArticle(session, article.item, article.markdown);
           if (current()) setReader(opened => opened?.item.crate_reading_id === item.crate_reading_id ? { ...opened, availableOffline: true } : opened);
@@ -278,10 +278,10 @@ function ReadingAppContent() {
   }, [session]);
   useEffect(() => {
     if (!session || !reader || reader.markdown === null || reader.sourceHighlights === undefined || !navigator.onLine
-      || reader.sourceHighlights === JSON.stringify(reader.item.highlights ?? [])) return;
+      || (reader.sourceHighlights === JSON.stringify(reader.item.highlights ?? []) && reader.sourceExtractionStatus === reader.item.extraction_status)) return;
     let active = true;
     const request = navigation.current;
-    // Inline changes from Obsidian can change both the excerpt and its offsets.
+    // Extraction and inline edits can replace the body without changing its saved highlights.
     void (async () => {
       try {
         const article = await readingRequest<{ item: ReadingItem; markdown: string }>(`/reading/item?id=${encodeURIComponent(reader.item.crate_reading_id)}`, session);
@@ -291,7 +291,7 @@ function ReadingAppContent() {
         try { await cacheReadingArticle(session, article.item, article.markdown); cached = true; } catch { /* Preserve the confirmed online article. */ }
         assertReadingSession(session);
         if (!active || request !== navigation.current) return;
-        setReader(current => current?.item.crate_reading_id === article.item.crate_reading_id ? { ...current, ...article, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []) } : current);
+        setReader(current => current?.item.crate_reading_id === article.item.crate_reading_id ? { ...current, ...article, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status } : current);
         if (!cached) setError('Offline copy could not be updated.');
       } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Reopen this article to refresh its saved text and highlights.'); }
     })();
