@@ -1,6 +1,6 @@
 import { AbstractInputSuggest, TFolder, type App } from 'obsidian';
 
-export class RemindersFolderSuggest extends AbstractInputSuggest<TFolder> {
+export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	constructor(app: App, input: HTMLInputElement) {
 		super(app, input);
 		this.onSelect(folder => {

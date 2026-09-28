@@ -43,6 +43,18 @@ export class FakeElement {
 		return child;
 	}
 
+	querySelector(selector: string): FakeElement | null {
+		for (const child of this.children) {
+			const matches = selector.startsWith('.')
+				? child.classNames.has(selector.slice(1))
+				: child.tagName.toLowerCase() === selector.toLowerCase();
+			if (matches) return child;
+			const nested = child.querySelector(selector);
+			if (nested) return nested;
+		}
+		return null;
+	}
+
 	createDiv(info?: { text?: string; cls?: string }): FakeElement {
 		return this.createEl('div', info);
 	}

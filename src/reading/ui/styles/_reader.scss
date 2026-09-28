@@ -82,3 +82,42 @@
 		&__availability { font-size: 10px; }
 	}
 }
+
+// A zero-height sticky layer overlays the full article without reserving a dock.
+.crate-reminders-ui .crate-reading-reader__floating {
+  position: sticky;
+  top: calc(100% - 68px);
+  height: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: max(20px, env(safe-area-inset-right));
+  pointer-events: none;
+  opacity: var(--reader-floating-visibility, 1);
+  transform: translateY(calc((1 - var(--reader-floating-visibility, 1)) * 12px));
+  transition: none;
+  &[data-scroll-hidden="true"] .crate-reading-reader__highlights-button { pointer-events: none; }
+  &:has(:focus-visible) { opacity: 1; transform: none; }
+  &:has(:focus-visible) .crate-reading-reader__highlights-button { pointer-events: auto; }
+  .crate-reading-reader__highlights-button {
+    --crate-action-border: var(--reader-control-border, var(--crate-divider));
+    pointer-events: auto;
+    background: var(--crate-app-bg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 76px;
+    height: 52px;
+    padding: 0 18px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    transform: none;
+    opacity: 1;
+    &[data-scroll-hidden="true"] { opacity: 0; }
+    &:has(:focus-visible) { opacity: 1; }
+  }
+}

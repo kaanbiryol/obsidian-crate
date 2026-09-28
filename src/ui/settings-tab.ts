@@ -64,6 +64,10 @@ export class CrateSettingTab extends PluginSettingTab {
 
 		if (isConfigured) renderCrateWebApp(containerEl, this.plugin);
 
+		if (sections.showReminders || sections.showReading || sections.showNotifications) {
+			createSettingsSectionHeading(containerEl, 'Features');
+		}
+
 		if (sections.showReminders) {
 			const remindersEl = containerEl.createDiv({ cls: 'crate-reminders-settings' });
 			this.cleanupFns.push(renderRemindersSection({
@@ -74,7 +78,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showReading) {
-			renderReadingSettings(containerEl, this.plugin, () => this.update());
+			this.cleanupFns.push(renderReadingSettings(containerEl, this.plugin, () => this.update()));
 		}
 
 		if (sections.showNotifications) {
@@ -83,6 +87,10 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 				rerender: () => this.update(),
 			}));
+		}
+
+		if (isConfigured || sections.showInfrastructure) {
+			createSettingsSectionHeading(containerEl, 'Management');
 		}
 
 		if (isConfigured) {

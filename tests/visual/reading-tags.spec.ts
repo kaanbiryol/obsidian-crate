@@ -42,9 +42,9 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		expect(await article.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-reader-${host}-${width}.png` });
 		await article.getByRole('button', { name: 'Back to reading' }).click();
-		if (width < 720) await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
-		if (width < 1100) {
-			const filter = page.getByRole('combobox', { name: 'Filter by tag' });
+		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
+		const filter = page.getByRole('combobox', { name: 'Filter by tag' });
+		if (await filter.isVisible()) {
 			expect((await filter.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 			await filter.selectOption('later');
 		}
@@ -58,11 +58,11 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
 		await expect(article.locator('.crate-reading-reader__tags')).toHaveCount(0);
 		await article.getByRole('button', { name: 'Back to reading' }).click();
-		if (width < 720) await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
+		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
 		// Removing the final use of a selected tag must not leave an empty, stuck filter.
 		await expect(page.locator('.crate-reading__open')).toHaveCount(6);
 		await expect(page.locator('.crate-reading__tag-filter')).toHaveCount(0);
-		if (width < 1100) await expect(page.getByRole('combobox', { name: 'Filter by tag' })).toHaveValue('');
+		await expect(page.getByRole('combobox', { name: 'Filter by tag' })).toHaveValue('');
 		} finally { await browser.close(); }
 	});
 }

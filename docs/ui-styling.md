@@ -28,9 +28,10 @@ both hosts together.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
   Reading uses the same cards on desktop and phones, retaining its source icon,
-  favorite action, and selected-article state in split views. Stacked phone layouts
-  keep the covered library unselected, so returning from an article cannot reveal
-  a selection-color fade. Shared Sass mixins preserve each
+  favorite action, and one stacked library/reader flow at every width in both hosts.
+  Reading uses bottom navigation, floating Highlights, and sheets; do not introduce
+  desktop sidebars, split panes, or centered dialogs. Desktop support is separate
+  future work. Covered library cards keep their resting surface on return. Shared Sass mixins preserve each
   feature's existing DOM and interaction semantics. Future compact/non-card
   presentation should be implemented here for both features; no density setting
   is exposed yet. Existing reminder surface tokens remain host-theme inputs.
@@ -486,10 +487,12 @@ icon renderer in the plugin; the PWA loads article-only icons with Reading. Inpu
 modality belongs to the PWA feature shell so keyboard focus works before either
 feature has been opened. Each feature retains its existing persistence and modal
 lifecycle adapter.
-Container queries select a three-pane desktop workspace, a two-pane compact
-workspace, or phone navigation; a narrow Obsidian pane behaves like the phone UI.
-The library and reader own separate scroll containers, so opening an article
-preserves filters and list position. Browser history remains in the PWA adapter.
+Reading uses a single-screen library with bottom navigation at every width in
+both hosts. Opening an article replaces the library; filters remain in the picker.
+Reading dialogs use sheets rather than a separate desktop presentation.
+Obsidian keeps separate library and reader scroll containers. The PWA reader uses
+document scrolling while preserving the covered library’s filters and list position.
+Browser history remains in the PWA adapter.
 
 Article HTML still passes through the existing sanitizer. Source badges begin as
 letter marks and load HTTPS favicons when available; an unavailable or offline icon
@@ -581,11 +584,11 @@ surface. Scroll containers reserve dock height plus a small gap at the end, keep
 the final item reachable above the controls. Space around the pill and add button
 passes gestures through to the list; the expanded picker still blocks the backdrop.
 The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
-its shared navigation. Wide Reading layouts retain their sidebar and header
-switch, and connection screens retain the header switch for enrollment.
+its shared navigation. Obsidian wide layouts retain their sidebar; PWA connection
+screens retain the header switch for enrollment.
 The feature shell preserves mounted state and browser locations and restores focus to
 its visible navigation control. The modes dissolve the outgoing panel over an opaque incoming panel over 160 ms;
-scrolling content, headers, and docks keep their geometry throughout the dissolve. On phones, opening a Reading
+scrolling content, headers, and docks keep their geometry throughout the dissolve. Opening a PWA Reading
 article slides the reader over the stationary library and bottom bar. Both stay
 painted beneath the full-height article, with background controls inert. Toolbar
 Back slides the article out once, then traverses history after the exit ends.
@@ -768,9 +771,11 @@ without an error alert. Keep navigation mounted while **Check again** is pending
 
 ## Plugin settings disclosure
 
-The plugin keeps sync status and feature switches visible.
-**Sync options**, **Reminders preferences**, **Notification options**,
-**Reading options** reveal secondary controls.
+Plugin settings use three top-level groups: **Sync** for connection status,
+sync options, and web app access; **Features** for the matching **Reminders**,
+**Reading**, and **Notifications** disclosures; and **Management** for
+**Account and devices**, **Server**, and **Troubleshooting**. Feature switches
+live inside their disclosures. Collapsed rows summarize folder choices or status.
 The web-app row has two visible actions: **Open app** and **Connect another device**.
 Connecting another device opens a QR dialog with **Copy link**; if clipboard
 access fails, the same dialog reveals a read-only setup link.
@@ -781,8 +786,8 @@ Reading folder selection stays available while disabled because server folder
 changes require Reading to be off.
 
 **Account and devices** and **Server** mount their contents on first expansion;
-notification schedule and device controls mount when **Notification options**
-opens. The visible notification toggle still checks the shared server policy.
+the notification toggle, schedule, and device controls mount when **Notifications**
+opens. The collapsed status and notification toggle check the shared server policy.
 Device lists are not fetched for collapsed sections. Management sections avoid
 redundant nested accordions. Saved recovery operations surface a review action
 at the top; update notices remain visible outside **Server**.

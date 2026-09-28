@@ -2,12 +2,14 @@ import { setSharedFeature } from '../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../ui/settings/section-helpers';
+import { FolderSuggest } from '../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../ui/settings/input-helpers';
 import { readingServerRequest, type ServerReadingPolicy } from '../server';
 import { startReading, stopReading, validateReadingConfiguration } from '../runtime';
 import { READING_VIEW_TYPE } from './reading-view';
 
-export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): void {
+export function renderReadingSettings(container: HTMLElement, plugin: CratePlugin, rerender: () => void): () => void {
+	let folderSuggest: FolderSuggest | undefined;
 	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
 		new Setting(options).setName('Enable reading')
 			.setDesc('All devices · pause or resume reading and article downloads. Saved notes and vault sync are preserved.')
@@ -23,6 +25,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 		new Setting(options).setName('Reading folder')
 			.setDesc('Notes in this folder appear in reading. Changing the folder does not move files.')
 			.addText(text => {
+				folderSuggest = new FolderSuggest(plugin.app, text.inputEl);
 				text.setValue(plugin.settings.reading.folderPath).setPlaceholder('Reading');
 				bindCommittedText(text, () => plugin.settings.reading.folderPath, async folderPath => {
 					try {
@@ -44,4 +47,5 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 				});
 			});
 	} });
+	return () => folderSuggest?.close();
 }

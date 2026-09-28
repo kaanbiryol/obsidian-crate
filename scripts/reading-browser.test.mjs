@@ -553,8 +553,23 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
     await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
     await page.setViewportSize({width:1280,height:844});
-    await expect(page.locator('.crate-reading__library')).not.toHaveAttribute('inert');
-    await expect(page.getByRole('searchbox',{name:'Search reading'})).toBeVisible();
+    await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
+    await expect(page.locator('html')).toHaveClass(/pwa-document-reader/);
+    await expect(page.locator('.crate-reading__brand')).toBeHidden();
+    await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(1280);
+    assertReaderSlide(await captureReaderMotion(page, 'close'), 'close');
+    await assertArticleStaysDismissed(page, articleHistoryLength);
+    for (const width of [1280, 900, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(page.locator('.crate-reading__brand')).toBeHidden();
+      await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
+      await expect(page.locator('.pwa-dock.crate-reading__mobile-nav')).toBeVisible();
+      await expect(page.getByRole('searchbox', { name: 'Search reading' })).toBeVisible();
+      await expect.poll(() => page.locator('.crate-reading__library').evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(width);
+    }
+    await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
+    await page.getByText('Available offline',{exact:true}).waitFor();
+    await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
     await page.setViewportSize({width:390,height:844});
     await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
     // A reopened article still supports one toolbar exit with retained content.
@@ -731,4 +746,70 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal((await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status, 401);
     assert.deepEqual(errors,[]);
   } catch (error) { await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
+});
+
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: single-screen layout at every width`, { timeout: 60000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-layout-'));
+  let runtime, browser, server;
+  try {
+    runtime = await openLocalRuntime({ dataDir: dir });
+    const vault = await issueLocalDevice(runtime.db, 'Layout test');
+    server = createServer(async (req, res) => {
+      try {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, {
+          method: req.method, headers: req.headers,
+          ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }),
+        });
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(Buffer.from(await response.arrayBuffer()));
+      } catch { res.writeHead(500); res.end(); }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const origin = `http://localhost:${server.address().port}`;
+    const api = async (path, body) => {
+      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 200, await response.clone().text());
+      return response.json();
+    };
+    await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
+    const enrollment = await api('/reading/access', { kind: 'reading' });
+    browser = await engine.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 844 } });
+    await page.goto(enrollment.url);
+    await expect(page.getByRole('heading', { name: 'Save something worth your time' })).toBeVisible();
+    for (const width of [1280, 900, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(page.locator('.crate-reading__brand')).toBeHidden();
+      await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
+      await expect(page.locator('.pwa-dock.crate-reading__mobile-nav')).toBeVisible();
+      await expect.poll(() => page.locator('.crate-reading__library').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(width);
+    }
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await page.getByRole('button', { name: 'Save your first link' }).click();
+    await page.getByRole('textbox', { name: 'Link', exact: true }).fill('https://layout.example.invalid/article');
+    await page.getByRole('button', { name: 'Save link', exact: true }).click();
+    const article = page.locator('.crate-reading__open').first();
+    await expect(article).toBeVisible();
+    await expect(article).not.toHaveAttribute('aria-disabled', 'true');
+    await article.click();
+    await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
+    await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
+    await expect(page.locator('html')).toHaveClass(/pwa-document-reader/);
+    await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(1280);
+    await page.getByRole('button', { name: 'Back to reading' }).click();
+    await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
+    await expect(article).toBeVisible();
+    await expect(page.locator('.pwa-dock.crate-reading__mobile-nav')).toBeVisible();
+    await mkdir('test-results/reading', { recursive: true });
+    await page.screenshot({ path: `test-results/reading/${name}-desktop-single-screen.png` });
+  } finally {
+    await browser?.close();
+    if (server) await new Promise(resolve => server.close(resolve));
+    await runtime?.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 });

@@ -24,40 +24,39 @@
 .crate-reminders-ui .pwa-reading-opening .pwa-mode-opening__content { padding: 0 14px; }
 .crate-reminders-ui .pwa-reading-article-opening__body { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--text-muted); text-align: center; }
 .crate-reminders-ui .pwa-reading-article-opening__body p { max-width: 32ch; margin: 0; font-size: 14px; line-height: 1.5; }
-@media (max-width: 719px) {
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar) {
-    // Keep the tab bar's own z-index inside the library layer throughout navigation.
-    z-index: 0;
-    display: flex;
-  }
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__sidebar { z-index: 1; }
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
-    position: absolute;
-    grid-area: 1 / 1 / -1 / -1;
-    inset: 0;
-    z-index: 2;
-    display: block;
-    visibility: hidden;
-    pointer-events: none;
-    height: 100%;
-    background: var(--crate-app-bg);
-    box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
-    transform: translate3d(100%, 0, 0);
-    transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s linear var(--pwa-motion-navigation-duration);
-  }
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane {
-    visibility: visible;
-    pointer-events: auto;
-    transform: translate3d(0, 0, 0);
-    transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s;
-  }
-  // Browser history gestures already animate the page; do not replay the slide afterward.
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-motion="none"] .crate-reading__reader-pane { transition: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
-    .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
-  }
+
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar) {
+  // Keep the tab bar's own z-index inside the library layer throughout navigation.
+  z-index: 0;
+  display: flex;
+}
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__sidebar { z-index: 1; }
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
+  position: absolute;
+  grid-area: 1 / 1 / -1 / -1;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  visibility: hidden;
+  pointer-events: none;
+  height: 100%;
+  background: var(--crate-app-bg);
+  box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
+  transform: translate3d(100%, 0, 0);
+  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s linear var(--pwa-motion-navigation-duration);
+}
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane {
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s;
+}
+// Browser history gestures already animate the page; do not replay the slide afterward.
+.crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-motion="none"] .crate-reading__reader-pane { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
+  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
 }
 .crate-reminders-ui .crate-reading-welcome { position: relative; max-width: 440px; margin: 0 auto; padding: 80px 28px 40px; overflow-y: auto; max-height: 100%; }
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
@@ -133,7 +132,7 @@
   .hljs-comment, .hljs-quote { color: var(--text-muted); font-style: italic; }
 }
 
-// Only the open phone reader escapes the app's fixed-height scroll containers.
+// Only the open reader escapes the app's fixed-height scroll containers.
 // Keep their heights so the library retains its geometry and list scroll offset.
 html.pwa-document-reader {
   overflow-x: clip;
@@ -206,42 +205,8 @@ html.pwa-document-reader {
   }
 }
 
-// A zero-height sticky layer overlays the full article without reserving a dock.
 .crate-reminders-ui .crate-reading-web .crate-reading-reader__floating {
-  position: sticky;
   top: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)) - max(16px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom))) - 52px);
-  height: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: flex-end;
-  padding-right: max(20px, env(safe-area-inset-right));
-  pointer-events: none;
-  opacity: var(--reader-floating-visibility, 1);
-  transform: translateY(calc((1 - var(--reader-floating-visibility, 1)) * 12px));
-  transition: none;
-  &[data-scroll-hidden="true"] .crate-reading-reader__highlights-button { pointer-events: none; }
-  &:has(:focus-visible) { opacity: 1; transform: none; }
-  &:has(:focus-visible) .crate-reading-reader__highlights-button { pointer-events: auto; }
-  .crate-reading-reader__highlights-button {
-    --crate-action-border: var(--reader-control-border);
-    pointer-events: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 76px;
-    height: 52px;
-    padding: 0 18px;
-    border-radius: 999px;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-    transform: none;
-    opacity: 1;
-    &[data-scroll-hidden="true"] { opacity: 0; }
-    &:has(:focus-visible) { opacity: 1; }
-  }
 }
 
 // Document scrolling positions sticky controls against the full viewport,

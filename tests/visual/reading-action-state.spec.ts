@@ -107,7 +107,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					await expect(page.getByRole('button', { name: 'Save tags', exact: true })).toBeDisabled();
 					await page.evaluate(() => window.dispatchEvent(new CustomEvent('reading-settle-update')));
 					await expect(page.getByRole('button', { name: 'Save tags', exact: true })).toBeEnabled();
-					await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+					await page.getByRole('button', { name: 'Close article tags', exact: true }).click();
 					const undo = action === 'Archive article' ? 'Move to inbox' : 'Remove favorite';
 					await expect(article.getByRole('button', { name: undo, exact: true })).toBeVisible();
 					await article.getByRole('button', { name: undo, exact: true }).click();

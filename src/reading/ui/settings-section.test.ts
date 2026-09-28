@@ -6,6 +6,7 @@ const validate = vi.fn();
 const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision: 'r' };
 
 beforeEach(() => {
+	vi.doMock('../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../server', () => ({ readingServerRequest: request }));
 	vi.doMock('../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
@@ -16,6 +17,7 @@ afterEach(() => {
 	resetObsidianUiMocks();
 	vi.resetModules();
 	vi.doUnmock('obsidian');
+	vi.doUnmock('../../ui/settings/folder-suggest');
 	vi.doUnmock('../server');
 	vi.doUnmock('../runtime');
 	vi.doUnmock('./reading-view');

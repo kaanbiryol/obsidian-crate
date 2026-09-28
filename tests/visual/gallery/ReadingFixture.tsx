@@ -69,7 +69,7 @@ export function ReadingFixture({ onAdd }: { onAdd: () => void }) {
 		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
 	return <><ReadingLibraryPanel snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
-		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : undefined} reader={article && <ReadingReader item={article} markdown={body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status="Available offline" onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
+		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status="Available offline" onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
 		{adding && <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>}
 	</>;
 }
