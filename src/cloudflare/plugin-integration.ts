@@ -252,7 +252,7 @@ async function executeCloudflareOperation(
 
 	if (deployment.deleted) {
 		plugin.refreshSettingsTab();
-		progress.succeed('Crate server deleted', 'This server and its remote data have been removed. Your local vault files are kept. To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync now.');
+		progress.succeed('Crate server deleted', 'This server and its remote data have been removed. Your local vault files are kept. To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync - sync now.');
 		return;
 	}
 
@@ -310,7 +310,7 @@ async function executeCloudflareOperation(
 
 	progress.succeed(
 		isReconnect ? 'Connection verified' : isReset ? 'Crate server rebuilt' : 'Crate is connected',
-		isReconnect ? 'Cloudflare and this device are connected. Select Sync now to retry syncing.' : isReset ? 'This device is connected. Open the command palette and select Crate: Sync now to sync this vault with the server. Reconnect other devices and set up web push again.' : 'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
+		isReconnect ? 'Cloudflare and this device are connected. Select Sync now to retry syncing.' : isReset ? 'This device is connected. Open the command palette and select Crate: Sync - sync now to sync this vault with the server. Reconnect other devices and set up web push again.' : 'Connected. Open the command palette and select Crate: Sync - sync now to sync this vault with the server.',
 	);
 }
 

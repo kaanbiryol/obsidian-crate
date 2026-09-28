@@ -27,7 +27,7 @@ class CloudflareServerPickerModal extends SharedModal {
 		this.bodyEl.createEl('p', {
 			text: this.deployments.length
 				? 'Local files stay unchanged during setup. Syncing combines local and remote files and may update matching paths. Review both before syncing.'
-				: 'Local files stay unchanged during setup. When ready, run Crate: Sync now from the command palette.',
+				: 'Local files stay unchanged during setup. When ready, run Crate: Sync - sync now from the command palette.',
 			cls: 'crate-cloudflare-server-picker-help',
 		});
 

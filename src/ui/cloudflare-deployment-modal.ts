@@ -156,7 +156,7 @@ export class CloudflareDeploymentModal extends Modal {
 				title, onClose: () => this.close(),
 				children: createElement('div', { className: 'crate-vault-selection' },
 					createElement('p', null, deployments.length ? (missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Each server syncs one vault. To keep this vault separate, create a new server. Select an existing server only to sync another copy of the same vault.') : (missing ? 'Your previous server is gone. Create a new Cloudflare server for this vault.' : 'Create a Cloudflare server for this vault.')),
-					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.'),
+					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync - sync now from the command palette to start syncing.'),
 					...deployments.map(deployment => createElement(Button, {
 						key: deployment.metadata.workerName,
 						onClick: () => this.finishSelection(deployment), title: deployment.metadata.workerName,

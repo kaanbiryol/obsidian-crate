@@ -149,7 +149,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
 		expect(progress.succeed).toHaveBeenCalledWith(
 			'Crate is connected',
-			'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
+			'Connected. Open the command palette and select Crate: Sync - sync now to sync this vault with the server.',
 		);
 	});
 
@@ -194,7 +194,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		const report = (plugin.cloudflareDeploymentService.handleCallback.mock.calls[0] as unknown as [unknown, unknown, (message: string) => void])[2];
 		report('Checking remote files: 10 checked…');
 		expect(progress.setWorking).toHaveBeenCalledWith('Rebuilding Crate server', 'Checking remote files: 10 checked…');
-		expect(progress.succeed).toHaveBeenCalledWith('Crate server rebuilt', expect.stringContaining('Crate: Sync now'));
+		expect(progress.succeed).toHaveBeenCalledWith('Crate server rebuilt', expect.stringContaining('Crate: Sync - sync now'));
 		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
 	});
 
