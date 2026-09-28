@@ -1,4 +1,3 @@
-import { PwaButton } from './PwaButton';
 import React from 'react';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 
@@ -14,15 +13,18 @@ export function PwaDeleteConfirmation({ id, message, isLoading, onClose, onConfi
 		<section id={id} className="pwa-delete-confirmation"
 			aria-busy={isLoading} tabIndex={-1}>
 			<ModalHeader title="Delete reminder" titleId={`${id}-title`} closeLabel="Cancel deletion"
-				onClose={onClose} closeDisabled={isLoading} preventFocusOnPress />
+				onClose={onClose} closeDisabled={isLoading} preventFocusOnPress
+				action={{
+					label: 'Delete',
+					ariaLabel: 'Delete reminder',
+					onClick: onConfirm,
+					tone: 'danger',
+					disabled: isLoading,
+					busy: isLoading,
+					dataAction: 'confirm-delete',
+				}} />
 			<div className="pwa-delete-confirmation-body">
 				<p id={`${id}-message`}>{message}</p>
-				<div className="crate-dialog-actions pwa-delete-confirmation-actions">
-					<PwaButton size="touch" disabled={isLoading} onClick={onClose}>Cancel</PwaButton>
-					<PwaButton variant="primary" tone="danger" size="touch" disabled={isLoading} onClick={onConfirm}>
-						{isLoading ? 'Deleting…' : 'Delete reminder'}
-					</PwaButton>
-				</div>
 			</div>
 		</section>
 	);

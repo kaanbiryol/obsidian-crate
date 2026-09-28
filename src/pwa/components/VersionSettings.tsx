@@ -31,17 +31,14 @@ export function VersionSettings() {
 		}).finally(() => window.clearTimeout(timer));
 		return () => { active = false; controller.abort(); window.clearTimeout(timer); };
 	}, []);
-	return <div className="settings-group">
+	return <>
 		<SettingsRow className="settings-row--value"><span>Web app</span><strong title={PWA_ASSET_VERSION}>Revision {release.revision} · {PWA_ASSET_VERSION.slice(0, 8)}</strong></SettingsRow>
 		<SettingsRow className="settings-row--value"><span>Server</span><strong title={asset ?? undefined}>{checking ? 'Checking…' : server?.serverRevision ? `Revision ${server.serverRevision}${asset ? ` · ${asset.slice(0, 8)}` : ''}` : 'Version unavailable'}</strong></SettingsRow>
-		<SettingsRow description={checking ? 'Checking web app build…' : asset ? asset === PWA_ASSET_VERSION
-				? 'This web app matches the server build.' : 'This web app differs from the server build. An update may be waiting to load.'
-				: 'Build comparison unavailable while the server cannot be reached.'} />
 		<SettingsRow className="settings-row--diagnostics">
 			<CopyableText value={diagnostics} label="Version diagnostics" copyLabel="Copy diagnostics"
-				description="Version details for troubleshooting." successMessage="Version details copied."
+				successMessage="Version details copied."
 				failureMessage="Select and copy the version details below."
-				fieldClassName="settings-diagnostics-text" buttonClassName="settings-action-button" />
+				fieldClassName="settings-diagnostics-text" buttonClassName="settings-action-row" />
 		</SettingsRow>
-	</div>;
+	</>;
 }

@@ -57,10 +57,11 @@ try {
 			await expect(editor).toHaveCSS('transform', 'none');
 			const canvas = page.locator('.crate-modal-canvas');
 			const scale = () => canvas.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a);
-			await expect.poll(scale).toBeCloseTo(.94, 3);
+			await expect.poll(scale).toBe(1);
+			await expect(canvas).toHaveCSS('transform', 'none');
 			assert.equal(await editor.evaluate(el => Boolean(el.closest('.crate-modal-canvas'))), false, 'The sheet must not inherit the background scale');
 			await expect(page.locator('.pwa-modal-sheet__backdrop')).toHaveCSS('transition-duration', '0s');
-			await checkSheetDragPosition(page, editor);
+			await checkSheetDragPosition(page, editor, { recedeCanvas: false });
 			await title.fill('Keep my swiped draft');
 			await swipe(page, title, 40);
 			await expect(editor).toBeVisible();
@@ -73,7 +74,7 @@ try {
 			// Reproduce the stale desktop hover that used to interrupt the simulated
 			// finger when the sheet moved underneath the cursor.
 			await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-			const checkDismissal = await trackSheetDismissal(editor);
+			const checkDismissal = await trackSheetDismissal(editor, { recedeCanvas: false });
 			await swipe(page, editor.getByRole('heading', { name: 'Edit reminder', exact: true }));
 			await checkDismissal();
 			await expect(editor).toHaveCount(0);
@@ -84,14 +85,17 @@ try {
 			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
 			const picker = page.getByRole('dialog', { name: 'Select project', exact: true });
 			await expect(picker).toBeVisible();
-			await expect.poll(scale).toBeCloseTo(.94, 3);
+			await expect.poll(scale).toBe(1);
+			await expect(canvas).toHaveCSS('transform', 'none');
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 			await swipe(page, picker.getByRole('heading', { name: 'Project', exact: true }));
 			await expect(editor).toBeVisible();
 			await expect(editor).toHaveCSS('transform', 'none');
 			await expect(title).toHaveText('Keep my swiped draft');
 			await expect(title).toBeFocused();
+			const checkButtonDismissal = await trackSheetDismissal(editor, { recedeCanvas: false });
 			await editor.getByRole('button', { name: 'Close reminder editor', exact: true }).tap();
+			await checkButtonDismissal();
 			await expect(page.locator('.pwa-modal-sheet')).toHaveCount(0);
 			assert.deepEqual(errors, [], 'Drawer interactions must not throw');
 			console.log(`${browserType.name()}: cancelled and completed swipes, native field gestures, retained drafts and picker return passed`);

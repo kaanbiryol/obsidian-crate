@@ -28,15 +28,17 @@ export async function checkSettingsNavigation(page) {
 		// Native activation can scroll a button into view before the push.
 		const scroll = await main.evaluate(el => el.scrollTop);
 		await expect(shortcut).toBeVisible();
-		await expect.poll(() => shortcut.locator('.pwa-push-stack__detail').evaluate(el => Math.abs(new DOMMatrix(getComputedStyle(el).transform).m41))).toBeLessThan(1);
-		await expect(main).toHaveAttribute('inert', '');
+		await expect(shortcut).toHaveCSS('transform', 'none');
+		await expect(shortcut.locator('.settings-shortcut-body')).toBeVisible();
+		await expect(page.locator('.settings-page-stack')).toHaveAttribute('inert', '');
 		expect(await allowsNativeBack(shortcut.getByRole('heading', { name: 'Set up iPhone shortcut', exact: true }))).toBe(true);
 		const currentLength = await page.evaluate(() => history.length);
 		if (length !== undefined) expect(currentLength).toBe(length);
 		length = currentLength;
 		if (method === 'native') await page.goBack();
-		else if (method === 'button') await shortcut.getByRole('button', { name: 'Back to settings' }).click();
+		else if (method === 'button') await shortcut.getByRole('button', { name: 'Close shortcut setup' }).click();
 		else await page.keyboard.press('Escape');
+		await expect(shortcut).toHaveCount(0);
 		await expect(settings).toBeVisible();
 		await expect.poll(() => page.evaluate(() => !!history.state?.cratePushedPage)).toBe(false);
 		await expect(open).toBeFocused();

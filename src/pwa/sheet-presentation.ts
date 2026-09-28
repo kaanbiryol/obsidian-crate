@@ -1,11 +1,11 @@
 /** Keep background depth tied to the painted sheet, including interrupted drags. */
-export function trackSheetPresentation(popup: HTMLElement): () => void {
+export function trackSheetPresentation(popup: HTMLElement, recedeCanvas = true): () => void {
 	// Focus must stay synchronous with the opening tap to activate iOS's keyboard.
 	// Suppress only caret painting until its transformed ancestors have settled.
 	popup.setAttribute('data-sheet-moving', '');
 	const sheet = popup.closest<HTMLElement>('.pwa-modal-sheet');
 	const backdrop = sheet?.querySelector<HTMLElement>('.pwa-modal-sheet__backdrop');
-	const canvas = sheet?.closest('.crate-feature-shell')?.querySelector<HTMLElement>('.crate-modal-canvas');
+	const canvas = recedeCanvas ? sheet?.closest('.crate-feature-shell')?.querySelector<HTMLElement>('.crate-modal-canvas') : null;
 	const depth = matchMedia('(max-width: 759px) and (prefers-reduced-motion: no-preference)');
 	let frame = 0;
 	let height = popup.offsetHeight;

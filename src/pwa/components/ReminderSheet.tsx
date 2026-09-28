@@ -174,12 +174,13 @@ function ReminderEditorSheet({
 			onCloseEnd={handleCloseEnd}
 			onOpenEnd={handleOpenEnd}
 			variant="reminder"
+			recedeCanvas={false}
 			label={activeScreen === 'editor' ? modal.mode === 'edit' ? 'Edit reminder' : 'New reminder'
 				: activeScreen === 'delete' ? 'Delete reminder'
 				: REMINDER_PICKER_COPY[activeScreen === 'date' ? 'schedule' : activeScreen === 'recurrence' ? 'repeat' : 'project'].dialogLabel}
 			role={activeScreen === 'delete' ? 'alertdialog' : 'dialog'}
 			descriptionId={activeScreen === 'delete' ? `${confirmationId}-message` : undefined}
-			sheetClassName={activeScreen === 'editor' ? 'is-editor-screen is-full-height-editor' : activeScreen === 'delete' ? 'is-editor-screen' : undefined}
+			sheetClassName={activeScreen === 'editor' || activeScreen === 'delete' ? 'is-editor-screen' : undefined}
 			keyboardInset={renderedKeyboardInset}
 			dismissible={!saving && !isClosing && canInteract}
 		>

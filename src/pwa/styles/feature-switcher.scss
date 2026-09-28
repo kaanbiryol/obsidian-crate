@@ -87,7 +87,7 @@
 	transform-origin: center top;
 }
 @media (max-width: 759px) and (prefers-reduced-motion: no-preference) {
-	.crate-feature-shell:has(.pwa-modal-sheet) > .crate-modal-canvas {
+	.crate-feature-shell:has(.pwa-modal-sheet[data-recede-canvas]) > .crate-modal-canvas {
 		// Follow the sheet's rendered position; never switch to a separate
 		// animation or reset depth when the gesture's progress resets.
 		overflow: hidden;

@@ -12,11 +12,11 @@ interface FeatureSettings {
 	updateReady?: boolean;
 	updateContentReady?: boolean;
 	onRefresh: () => Promise<unknown>;
-	onExport?: () => void | Promise<void>;
 	onLogout: () => Promise<void>;
 }
 
 export interface RemindersSettings extends FeatureSettings {
+	onExport?: () => void | Promise<void>;
 	config: StoredConfig;
 	push: PushState;
 	onEnablePush: () => Promise<void>;

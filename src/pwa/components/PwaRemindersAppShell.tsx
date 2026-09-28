@@ -17,6 +17,7 @@ import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationSc
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
+import { BackButton } from '@/ui/shared/BackButton';
 import {
 	getCurrentHeaderData,
 	getReminderCreateProject,
@@ -324,7 +325,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								<ProjectDetailView
 									project={selectedProject}
 									headerMetaContent={headerMetaContent}
-									backLabel="Back"
+									backControl={<BackButton label="Back to projects" onClick={handleBackToProjects} />}
 									navigationRightContent={headerRightContent?.(true)}
 									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
 									reminders={reminders}

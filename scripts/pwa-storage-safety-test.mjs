@@ -54,7 +54,7 @@ try {
     }, granted);
     await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    if (granted === null) await expect(page.getByText('Storage protection is unavailable', { exact: false })).toBeVisible();
+    if (granted === null) await expect(page.getByRole('status').filter({ hasText: /^Unavailable$/ })).toBeVisible();
     else {
      const protect = page.getByRole('button', { name: 'Protect offline data', exact: true });
      await expect(protect).toBeVisible();
@@ -63,8 +63,8 @@ try {
       await protect.scrollIntoViewIfNeeded();
       const layout = await protect.evaluate(button => {
        const bounds = button.getBoundingClientRect();
-       const row = button.closest('.settings-row').getBoundingClientRect();
-       const copy = button.closest('.settings-row').querySelector('.settings-row__copy').getBoundingClientRect();
+       const row = button.closest('.settings-group').getBoundingClientRect();
+       const copy = button.closest('.settings-group').querySelector('.settings-row__copy').getBoundingClientRect();
        return { fits: button.scrollWidth <= button.clientWidth && bounds.left >= row.left && bounds.right <= row.right,
         belowCopy: bounds.top >= copy.bottom, height: bounds.height };
       });
@@ -73,7 +73,7 @@ try {
       expect(layout.height).toBeGreaterThanOrEqual(44);
      }
      await protect.click();
-     await expect(page.getByText(granted ? 'Persistent storage granted.' : 'Best effort storage.', { exact: false })).toBeVisible();
+     await expect(page.getByText(granted ? 'Protected' : 'Best effort', { exact: false })).toBeVisible();
     }
     await page.close();
    }

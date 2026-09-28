@@ -49,6 +49,7 @@ export const browserScripts = [
 	'scripts/pwa-reorder-touch-test.mjs',
 	'scripts/pwa-project-transition-test.mjs',
 	'scripts/reading-touch-test.mjs',
+	'scripts/reading-appearance-test.mjs',
 	'scripts/shared-press-feedback-test.mjs',
 ];
 

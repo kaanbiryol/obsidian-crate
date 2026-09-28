@@ -21,7 +21,7 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await article.getByRole('button', { name: 'Favorite article', exact: true }).click();
 		await article.getByRole('button', { name: 'Archive article', exact: true }).click();
 		await article.getByRole('button', { name: 'Edit article tags' }).click();
-		await page.getByRole('textbox', { name: 'Tags, separated by commas' }).fill('essays, saved');
+		await page.getByRole('textbox', { name: 'Tags' }).fill('essays saved');
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
 		await expect(article.getByText('#saved', { exact: true })).toBeVisible();
 		await article.getByRole('button', { name: 'Back to reading' }).click();

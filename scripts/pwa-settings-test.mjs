@@ -3,7 +3,7 @@ import { checkCompoundFocus, checkSettingsFocus } from './pwa-compound-focus-che
 import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
 import { checkSettingsNavigation } from './pwa-settings-navigation-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { switchFeature, installFeatureNavigation } from './pwa-feature-navigation.mjs';
@@ -39,12 +39,28 @@ try {
 			const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(sheet).toBeVisible();
 			await checkSettingsNavigation(page);
+			await expect(sheet.getByRole('button', { name: 'Export Reading data', exact: true })).toHaveCount(0);
+			await expect(sheet.getByText('Up to date.', { exact: true })).toHaveCount(0);
+			await expect(sheet.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible();
+			await expect(sheet.getByRole('button', { name: 'Update app', exact: true })).toBeVisible();
+			for (const colorScheme of ['light', 'dark']) {
+				await page.emulateMedia({ colorScheme });
+				await sheet.locator('.settings-main').evaluate(element => { element.scrollTop = 0; });
+				await page.screenshot({ path: 'test-results/settings/' + name + '-overview-' + colorScheme + '.png' });
+				await sheet.getByRole('button', { name: 'Log out', exact: true }).scrollIntoViewIfNeeded();
+				await page.screenshot({ path: 'test-results/settings/' + name + '-maintenance-' + colorScheme + '.png' });
+			}
 			await checkSettingsFocus(page, sheet);
 			await checkTabSettings(page, name);
 			// Page presentation fills tall and short phones, rather than stopping
 			// at the desktop height cap. Resizing also exercises the layout lock.
 			for (const viewport of [{ width: 390, height: 844 }, { width: 430, height: 932 }, { width: 320, height: 568 }]) {
 				await page.setViewportSize(viewport);
+				await expect.poll(() => sheet.locator('.settings-main').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+				for (const action of await sheet.locator('.settings-action-row:visible').all()) {
+					const box = await action.boundingBox();
+					expect(box.height).toBeGreaterThanOrEqual(44);
+				}
 				await expect.poll(async () => {
 					const box = await sheet.boundingBox();
 					return box && Math.abs(box.y - 10) + Math.abs(box.height - (viewport.height - 10)) + Math.abs(box.width - viewport.width);
@@ -108,19 +124,21 @@ try {
 			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
 			const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
 			await expect(shortcut.getByRole('link', { name: 'Download Save to Crate' })).toBeVisible();
-			await expect(shortcut.getByRole('button', { name: 'Back to settings', exact: true })).toHaveCount(1);
-			await expect(shortcut.getByRole('button', { name: /Close/ })).toHaveCount(0);
-			await expect(shortcut.locator('.settings-main')).toHaveAttribute('inert', '');
+			await expect(shortcut.getByRole('button', { name: 'Close shortcut setup', exact: true })).toHaveCount(1);
+			await expect(shortcut.getByRole('button', { name: 'Back to settings' })).toHaveCount(0);
+			await expect(page.locator('.settings-page-stack')).toHaveAttribute('inert', '');
 			await page.screenshot({ path: 'test-results/settings/' + name + '-shortcut.png' });
-			await shortcut.getByRole('button', { name: 'Back to settings', exact: true }).click();
+			await shortcut.getByRole('button', { name: 'Close shortcut setup', exact: true }).click();
+			await expect(shortcut).toHaveCount(0);
 			await expect(sheet).toBeVisible();
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
-			// Exercise the spatial push/pop too, keeping the parent panel and scroll intact.
+			// Exercise sheet dismissal too, keeping the parent panel and scroll intact.
 			await page.emulateMedia({ reducedMotion: 'no-preference' });
 			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
-			const retainedScroll = await shortcut.locator('.settings-main').evaluate(element => element.scrollTop);
-			await expect.poll(() => shortcut.locator('.pwa-push-stack__detail').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
+			const retainedScroll = await page.locator('.settings-main').evaluate(element => element.scrollTop);
+			await expect(shortcut).toHaveCSS('transform', 'none');
 			await page.keyboard.press('Escape');
+			await expect(shortcut).toHaveCount(0);
 			await expect(sheet).toBeVisible();
 			await expect.poll(() => sheet.locator('.settings-main').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
 			expect(await sheet.locator('.settings-main').evaluate(element => element.scrollTop)).toBe(retainedScroll);
@@ -134,7 +152,7 @@ try {
 			await page.route('**/reading/list*', delayedList);
 			await sheet.getByRole('button', { name: 'Refresh all', exact: true }).click();
 			await expect(sheet.getByRole('button', { name: 'Refresh all', exact: true })).toBeDisabled();
-			for (const label of ['Export Reading data', 'Close settings', 'Log out']) {
+			for (const label of ['Copy diagnostics', 'Close settings', 'Log out']) {
 				await expect(sheet.getByRole('button', { name: label, exact: true })).toBeEnabled();
 				await expect(sheet.getByRole('button', { name: label, exact: true })).toHaveCSS('opacity', '1');
 			}
@@ -212,13 +230,7 @@ try {
 			await sheet.getByRole('button', { name: 'Log out', exact: true }).click();
 			const logout = page.getByRole('dialog', { name: 'Log out of Crate?', exact: true });
 			await expect(logout.getByText(/unsynced or unverified changes/)).toBeVisible();
-			const downloading = page.waitForEvent('download');
-			await logout.getByRole('button', { name: 'Export Reading data', exact: true }).click();
-			const download = await downloading;
-			expect(download.suggestedFilename()).toBe('crate-reading-recovery.json');
-			const exported = await readFile(await download.path(), 'utf8');
-			expect(JSON.parse(exported)).toMatchObject({ format: 1, origin });
-			expect(exported).toContain('Keep this pending link');
+			await expect(logout.getByRole('button', { name: 'Export Reading data', exact: true })).toHaveCount(0);
 			await logout.getByRole('button', { name: 'Cancel', exact: true }).click();
 			await expect(sheet.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 			await page.setViewportSize({ width: 320, height: 568 });
@@ -257,7 +269,7 @@ try {
 			await expect(offlineSheet).toHaveCount(0);
 			await expect(offlinePage.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
 			await offlineContext.close();
-			console.log(name + ': unified settings, retained views, theme, launch preferences, pending export, and shared logout passed');
+			console.log(name + ': unified settings, retained views, theme, launch preferences, pending-change warnings, and shared logout passed');
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }

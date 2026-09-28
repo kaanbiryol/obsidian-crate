@@ -23,11 +23,12 @@ assigns their article identity. Article extraction still requires a connection.
 After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`
 for Chromium and WebKit coverage of both settings entry points, retained view/search
 and focus, shared theme and preferences, Reading launch destinations, explicit-link
-precedence, shortcut navigation, pending Reading exports from Reminders, and shared
+precedence, shortcut navigation, pending Reading warnings from Reminders, and shared
 logout. The test uses the built client, local synthetic APIs, and native browser
 storage; screenshots include light/dark, 320px phone, and desktop layouts.
 The navigation checks cover Default tab in Tabs, always-visible About and Sync
-and device sections, retained settings scroll/focus, native Back/Forward, the
+and device sections, always-visible storage and version tools, conditional tab
+reset, touch targets, retained settings scroll/focus, native Back/Forward, the
 header Back action, Escape, and shared edge-gesture eligibility. Motion checks
 sample full-page push/pop frames, including the moving header, opaque surface,
 stationary parent, fixed header during scrolling, and restored scroll/focus. Desktop engines
@@ -468,6 +469,12 @@ Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 Browser OAuth handoff and real hosted credentials still require manual acceptance.
 
 ## Reading touch feedback
+
+Run `node scripts/pwa-project-transition-test.mjs` for project navigation and
+card feedback in Chromium/WebKit. It checks resting card styles at the history
+push after held presses and native taps, including grouped and nested projects
+in both themes. Verify the browser-owned swipe-back preview on an installed
+iPhone separately.
 
 Run `node scripts/reading-touch-test.mjs` for Chromium/WebKit checks of article
 open/Back cycles in both themes, retained hover, and keyboard focus restoration.

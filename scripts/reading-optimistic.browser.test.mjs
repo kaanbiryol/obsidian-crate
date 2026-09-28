@@ -96,6 +96,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const setTags = async (tags, offline = false) => {
       await page.getByRole('button', { name: 'Edit article tags' }).click();
       const dialog = page.getByRole('dialog', { name: 'Article tags' });
+      const chips = dialog.getByRole('button', { name: /^Remove tag / });
+      while (await chips.count()) await chips.first().click();
       await dialog.getByRole('textbox').fill(tags);
       await dialog.getByRole('button', { name: 'Save tags' }).click();
       await expect(dialog).toHaveCount(0);

@@ -1,3 +1,4 @@
+import { useReadingAppearance } from './appearance';
 import { PwaUpdateButton } from '../components/PwaUpdateNotice';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { highlightReadingCode } from './code-highlighting';
@@ -44,6 +45,7 @@ export default function ReadingApp() {
 }
 
 function ReadingAppContent() {
+  const { appearance, updateAppearance } = useReadingAppearance();
   const captureFormId = useId();
   const featureNavigation = useContext(FeatureNavigationContext);
   const active = featureNavigation?.active !== false;
@@ -408,15 +410,14 @@ function ReadingAppContent() {
     attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
     unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),
     onRefresh: () => session ? refresh() : connect(),
-    onExport: exportReadingData,
     onLogout: async () => {
       setSettingsOpen(false); navigation.current++; setSession(null); setCache(null); setReader(null); setPending([]);
       setError(await logoutReadingApp());
     },
     shortcut: session ? <ShortcutSetup session={session} /> : null,
     issues: <>
-      {recovery && <SettingsRow title="Earlier changes need review" description="Export Reading data to keep changes from an earlier sign-in." />}
-      {pending.filter(op => op.error || op.review).map(op => <SettingsRow key={op.id} title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'Export Reading data to review this change.'} />)}
+      {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}
+      {pending.filter(op => op.error || op.review).map(op => <SettingsRow key={op.id} title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'This change is still stored on this device.'} />)}
     </>,
   });
   if (!ready || (connecting && !session)) return <ReadingOpening />;
@@ -431,7 +432,7 @@ function ReadingAppContent() {
       <ReadingLibraryPanel initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <PwaTabTransition viewKey={section}>{content}</PwaTabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onUpdate={update} onRefresh={refresh} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} pendingItemIds={blockedItemIds} onReaderClosed={finishReaderClose} readerMotion={phoneReader ? window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(() => refresh())} />}
         headerStatus={<><PwaUpdateButton /><ReadingSyncIndicator pending={pending} isOffline={isOffline} loading={!cache} refreshing={syncing} confirmed={syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation} error={error} recovery={recovery} onShowStatus={(label, state) => showToast(state === 'error' ? 'error' : state === 'synced' ? 'success' : 'info', `Reading: ${label}`, state)} /></>}
-        reader={reader && visibleReader && <ReadingReader revealContentTogether deferContentUntilEntered={phoneReader && readerMotion === 'slide'} floatingHighlights highlightCode={highlightReadingCode} autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? 'Saved on this device' : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange('retry', { id: reader.item.crate_reading_id }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
+        reader={reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={phoneReader && readerMotion === 'slide'} floatingHighlights highlightCode={highlightReadingCode} autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? 'Saved on this device' : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange('retry', { id: reader.item.crate_reading_id }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
       {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
 
     </>}

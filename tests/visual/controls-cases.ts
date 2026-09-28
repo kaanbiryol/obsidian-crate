@@ -182,7 +182,7 @@ export function registerControlTests() {
     await page.goto(`/?host=${host}&theme=dark&scene=reading`);
     await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
     await page.getByRole('button', { name: 'Edit article tags' }).click();
-    await page.getByRole('textbox', { name: 'Tags, separated by commas' }).fill('essays, shared, shared');
+    await page.getByRole('textbox', { name: 'Tags' }).fill('essays shared shared');
     await page.getByRole('button', { name: 'Save tags', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.locator('.crate-reading-reader__tags').getByText('#shared', { exact: true })).toHaveCount(1);

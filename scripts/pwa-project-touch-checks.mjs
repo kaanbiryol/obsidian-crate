@@ -22,6 +22,26 @@ async function appearance(card) {
   });
 }
 
+async function captureProjectPressOnPush(page) {
+  await page.evaluate(() => {
+    const push = history.pushState.bind(history);
+    window.__projectPressSnapshot = null;
+    history.pushState = (state, unused, url) => {
+      if (state?.reminderProject) {
+        const source = [...document.querySelectorAll('[data-action="open-project"]')]
+          .find(element => element.dataset.project === state.reminderProject);
+        const surface = getComputedStyle(source.querySelector('.premium-project-content'));
+        window.__projectPressSnapshot = {
+          pressed: source.hasAttribute('data-press-active'),
+          background: surface.backgroundColor, transform: surface.transform,
+        };
+        history.pushState = push;
+      }
+      return push(state, unused, url);
+    };
+  });
+}
+
 export async function checkProjectTouchFeedback(page) {
   const scroll = page.locator('.reminders-browse-view .ios-scroll');
   // Cover standalone cards, grouped parents, and nested cards such as Finance.
@@ -36,6 +56,23 @@ export async function checkProjectTouchFeedback(page) {
     assert.ok(await card.evaluate(element => element.matches(':hover')));
     await expect.poll(() => appearance(card), { message: `${project}: touch hover must not highlight cards or icons` }).toEqual(resting);
     await page.mouse.move(-1, -1);
+
+    // Native Back previews the pixels captured when detail history is pushed,
+    // not the settled list checked after returning. Hold long enough to paint
+    // the press, then inspect that exact navigation boundary.
+    await captureProjectPressOnPush(page);
+    const bounds = await card.boundingBox();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await expect(card).toHaveAttribute('data-press-active', '');
+    await settleAppearance(card);
+    await page.mouse.up();
+    await expect(page.getByRole('heading', { name: project, exact: true })).toBeVisible();
+    assert.deepEqual(await page.evaluate(() => window.__projectPressSnapshot), {
+      pressed: false, background: resting.background, transform: resting.transform,
+    }, `${project}: native Back must capture the released card without a fading highlight`);
+    await page.goBack();
+    await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
 
     if (page.context().browser().browserType().name() === 'chromium') {
       const session = await page.context().newCDPSession(page);
@@ -65,9 +102,13 @@ export async function checkProjectTouchFeedback(page) {
     }
     // Native taps must clear feedback too, including when detail navigation
     // keeps the source card mounted underneath the new screen.
+    await captureProjectPressOnPush(page);
     await card.tap();
     await expect(page.getByRole('heading', { name: project, exact: true })).toBeVisible();
     await expect(card).not.toHaveAttribute('data-press-active', '');
+    assert.deepEqual(await page.evaluate(() => window.__projectPressSnapshot), {
+      pressed: false, background: resting.background, transform: resting.transform,
+    }, `${project}: a native tap must capture the released card`);
     await page.goBack();
     await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
     await expect.poll(() => appearance(card)).toEqual(resting);

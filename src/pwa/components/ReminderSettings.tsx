@@ -17,12 +17,12 @@ export function ReminderSettings({ model, homeScreenPlatform, onPreferencesChang
 	const available = model?.ready && model.connected;
 	return <SettingsSection title="Reminders">
 		{!available ? <SettingsRow description={!model?.ready ? 'Loading reminder settings…' : 'Open a fresh web app link from Obsidian to connect Reminders.'} /> : <>
-			<SettingsRow title="Push notifications" description={<span aria-live="polite">{push?.status ?? (push?.phase === 'enabled' ? 'Alerts are enabled on this device.' : 'Get alerts when Crate is closed.')}</span>}>
+			<SettingsRow title="Push notifications" description={push && ['blocked', 'error', 'install'].includes(push.phase) ? <span aria-live="polite">{push.status}</span> : undefined}>
 				{push?.phase === 'enabled' ? <span className="settings-status is-success"><Check size={12} /> On</span>
 					: push?.phase === 'checking' ? <span className="settings-status" role="status">Checking…</span>
 					: push?.phase === 'blocked' ? <span className="settings-status">Blocked</span>
 					: homeScreenPlatform === 'ios' || push?.phase === 'install' ? <span className="settings-status">Install first</span>
-					: push?.phase === 'off' || push?.phase === 'error' ? <Button size="touch" className="settings-action-button" data-action="enable-push" onClick={model.onEnablePush}>{push.phase === 'error' ? 'Retry' : 'Enable'}</Button>
+					: push?.phase === 'off' || push?.phase === 'error' ? <Button size="touch" variant="ghost" className="settings-inline-action" data-action="enable-push" onClick={model.onEnablePush}>{push.phase === 'error' ? 'Retry' : 'Enable'}</Button>
 					: <span className="settings-status">Not supported</span>}
 			</SettingsRow>
 			<SettingsRow title="All-day alert" description="Managed in Obsidian."><span className="settings-value">{model.config.allDayNotificationTime ?? 'Not set'}</span></SettingsRow>

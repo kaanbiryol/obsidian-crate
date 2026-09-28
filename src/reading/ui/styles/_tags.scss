@@ -1,0 +1,25 @@
+@use '../../../ui/shared/styles/focus';
+
+.crate-reminders-ui .crate-reading-tags__control {
+	@include focus.within;
+	display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+	min-width: 0; padding: 8px;
+	background: var(--crate-control-bg); border: 1px solid var(--crate-divider);
+	border-radius: var(--crate-radius-field-rounded, 16px);
+	.crate-text-input {
+		flex: 1 1 120px; width: 120px; min-width: 0; min-height: 44px;
+		padding: 6px; border: 0; border-radius: 0; background: transparent;
+		&:focus-visible { outline: none; }
+	}
+	.crate-reading-tags__chip {
+		display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 44px;
+		margin: 0; padding: 6px 10px; border: 0; box-shadow: none;
+		border-radius: var(--tag-radius, var(--radius-s, 6px));
+		background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+		color: var(--interactive-accent); font: inherit; font-weight: 500;
+		span { overflow-wrap: anywhere; min-width: 0; }
+		svg { flex-shrink: 0; }
+		&[data-press-active] { background: color-mix(in srgb, var(--interactive-accent) 20%, transparent); }
+		&:disabled { opacity: .5; }
+	}
+}

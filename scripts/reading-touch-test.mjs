@@ -16,6 +16,41 @@ const appearance = card => card.evaluate(element => {
   const css = getComputedStyle(element);
   return { background: css.backgroundColor, border: css.borderColor, shadow: css.boxShadow };
 });
+
+async function checkScrollMotion(page, reducedMotion) {
+  const samples = await page.locator('.crate-reading-reader').evaluate(async reader => {
+    const nav = reader.querySelector('.crate-reading-reader__nav');
+    const floating = reader.querySelector('.crate-reading-reader__floating');
+    const scroller = reader.dataset.documentScroll === 'true' ? document.scrollingElement : reader;
+    const sample = async top => {
+      scroller.scrollTo({ top, behavior: 'instant' });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return { scroll: scroller.scrollTop, bottom: nav.getBoundingClientRect().bottom,
+        opacity: Number(getComputedStyle(nav).opacity), floatingOpacity: Number(getComputedStyle(floating).opacity) };
+    };
+    const frames = [];
+    // Small scroll steps and immediate reversals expose transitions that keep
+    // restarting behind the gesture, even if the eventual endpoints look right.
+    for (const top of [1800, 1796, 1776, 1772, 1776, 1772, 1768]) frames.push(await sample(top));
+    frames.push(await sample(100), await sample(0));
+    return frames;
+  });
+  assert.equal(samples[0].scroll, 1800);
+  assert.equal(samples[0].opacity, 0);
+  assert.equal(samples[1].opacity, 0, 'A tiny reversal at the hidden endpoint must not flicker');
+  for (const sample of samples) assert.ok(Math.abs(sample.opacity - sample.floatingOpacity) < .001, 'Both controls follow the same scroll progress');
+  if (reducedMotion === 'reduce') {
+    for (const sample of samples) assert.ok(sample.opacity === 0 || sample.opacity === 1, 'Reduced motion switches visibility without a partial fade');
+  } else {
+    for (const [index, movement] of [[2, 12], [3, 4], [4, -4], [5, 4], [6, 4]]) {
+      assert.ok(Math.abs(samples[index].bottom - samples[index - 1].bottom - movement) < 1,
+        `Navigation must follow each scroll step without easing lag: ${JSON.stringify(samples)}`);
+    }
+  }
+  assert.equal(samples.at(-2).opacity, 1);
+  assert.equal(samples.at(-1).opacity, 1);
+}
+
 try {
   for (const engine of [chromium, webkit]) {
     const browser = await engine.launch();
@@ -47,6 +82,7 @@ try {
       for (const [index, width, reducedMotion, fail] of [[1, 390, 'no-preference', false], [2, 390, 'reduce', false], [3, 1280, 'no-preference', false], [4, 390, 'no-preference', true]]) {
         await page.setViewportSize({ width, height: 844 });
         await page.emulateMedia({ reducedMotion });
+        const safeArea = index === 1 ? await page.addStyleTag({ content: ':root { --pwa-safe-area-top: 47px; }' }) : null;
         const held = { started: Promise.withResolvers(), release: Promise.withResolvers() };
         heldArticle = held;
         try {
@@ -70,10 +106,15 @@ try {
           await expect(reader.getByRole('heading', { name: items[index].title, exact: true })).toBeVisible();
           await expect(reader.getByText(/\d+ min read/)).toBeVisible();
           if (!fail) await expect(back).toBeFocused();
+          if (!fail) {
+            await back.evaluate(element => element.blur());
+            await checkScrollMotion(page, reducedMotion);
+            await back.focus();
+          }
           await back.click();
           await expect(workspace).toHaveAttribute('data-reader-open', 'false');
           await expect(reader).toHaveCount(0);
-        } finally { held.release.resolve('ready'); }
+        } finally { held.release.resolve('ready'); await safeArea?.evaluate(element => element.remove()); }
       }
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ reducedMotion: 'no-preference' });

@@ -48,7 +48,9 @@ both hosts together.
   `:active` or Base UI's persistent toggle `data-pressed` for that feedback.
   Release, cancellation, scrolling, pointer exit, blur, activation, and app
   backgrounding clear the press. Scope hover effects to `(hover: hover) and
-  (pointer: fine)`. Keep actual selection, checked states, keyboard focus, and
+  (pointer: fine)`. PWA project cards restore their resting styles immediately
+  on touch release so native Back previews cannot capture a release fade.
+  Keep actual selection, checked states, keyboard focus, and
   native field editing independent of press feedback. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
   Compound fields use `focus.within` from `src/ui/shared/styles/_focus.scss`
@@ -56,22 +58,36 @@ both hosts together.
   and search boxes share it. The PWA enables that outline only after keyboard
   navigation through `--crate-compound-focus-style`; touch and mouse focus stay
   undecorated without blurring controls. Obsidian retains its normal focus cue.
-  Reading form actions and the PWA delete confirmation use `crate-dialog-actions`
+  Reading form actions use `crate-dialog-actions`
   for the plugin confirmation’s shared minimum width, padding, and subtle borders.
   Phone layouts give both actions equal width and 48px minimum height.
+  The PWA delete confirmation uses a single-line centered header title, a close
+  control to cancel, and a danger-colored **Delete** text action on the right.
+  Its body contains only the confirmation message; both header controls disable
+  while deletion is pending and retain at least 44px touch targets.
   PWA **Save a link** uses the shared reminder editor header instead: close on
   the left, title centered, and **Save** on the right, disabled until the web link
   is valid. Its header submit action targets the form; there are no footer actions.
   Link capture in both hosts asks only for the URL; article extraction supplies the
   title, with the hostname as the fallback while extraction is pending.
+  Headers with `preventFocusOnPress` also preserve field focus and selection on
+  title and empty-header taps, using the reminder editor's shared
+  `usePreserveFieldFocus` hook. These taps keep the keyboard open; header drags
+  and explicit actions retain their normal behavior.
 - `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
   primitives, and PWA header defaults for every feature. The PWA stylesheet
   entry point loads it independently of the reminder layout stylesheet.
+  `_sheet-headers.scss` owns the rounded, tinted 44px close/back controls for
+  all PWA sheets, including Settings, Reading dialogs, reminder editors, and
+  pickers. Keep this treatment here rather than adding feature-specific overrides.
 - `src/ui/shared/styles/_view-header.scss` owns common header presentation.
   `foundation.scss` supplies PWA title/count geometry for both features and their
   loading screens. Feature adapters retain their safe-area ownership.
 - `src/pwa/components/SettingsSection.tsx` and `SettingsRow.tsx` own settings
-  grouping and row structure. Sections generate unique heading associations;
+  grouping and row structure. Settings reuses the shared list-item surface and title
+  mixins, with semantic filled controls and shared button press feedback for its
+  theme selector. Native selects and number fields retain 16px text for iPhone focus.
+  Sections generate unique heading associations;
   rows can wrap a native control with a label. Feature settings keep their own
   validation, async actions, and persistence.
   **Default tab** belongs to **Tabs** and retains the saved opening preference.
@@ -152,8 +168,8 @@ both hosts together.
   the first few frames;
   the backdrop and canvas follow the sheet's painted position instead of animating
   separately. Gesture progress resets cannot change background depth, including
-  when a settling sheet is grabbed again. On phones, sheet position scales
-  and rounds the underlying feature canvas. Modals portal outside that canvas
+  when a settling sheet is grabbed again. On phones, sheets that opt into
+  background depth scale and round the underlying feature canvas. Modals portal outside that canvas
   so their geometry and direct touch tracking remain independent. The canvas,
   sheet and backdrop remain proportional during dragging, interruption, and cancellation.
   Reading dialogs over a document-scrolled article retain their viewport portal
@@ -182,6 +198,11 @@ both hosts together.
   compact forms grow by the inset, while full-height forms retain their height
   and shrink their scrollable content. Do not lift new dialogs with `bottom` or
   subtract the keyboard from both the surface height and its content area.
+  New and edit reminders use compact content-sized sheets. Their action chips
+  sit outside the scrolling fields so they remain visible above the keyboard
+  when long content fills the available height. Reminder sheets keep the app
+  canvas stationary during dragging and dismissal; only the sheet and dimming
+  follow the gesture, avoiding horizontal movement from background scaling.
   Shared keyboard updates commit height/padding once, then
   `useSheetKeyboardMotion` animates the resulting displacement with independent
   `translate` keyframes. Do not interpolate the inset used by height and padding:
@@ -481,13 +502,18 @@ The capture form preserves its draft on dismissal; only successful capture clear
 it. The PWA retains the existing durable capture and metadata outbox.
 
 The PWA uses `src/pwa/components/PwaDock.tsx` for its floating bottom navigation.
-Both sections show Inbox, Today, and Projects as direct reminder destinations,
-followed by a switcher with small up/down chevrons. Its icon follows the remembered
-reading destination: book, star, or archive. The switcher
-remembers the chosen Reading, Favorites, or Archive view and opens it on tap.
-Holding it for 420 ms or sliding upward reveals those three reading choices inside
-the expanding navigation pill. Upcoming remains a separate reminder view for
-existing launch links; it is not merged into Today or exposed by this picker.
+Both sections share four configurable tabs, defaulting to Inbox, Reminders,
+Projects, and Reading. The last slot has small up/down chevrons. Holding it for
+420 ms or sliding upward expands the pill to show only destinations absent from
+the visible bottom bar, including reminder screens removed in Settings. The
+picker replaces only the fourth, last slot with the chosen destination and saves
+that order. The first three tabs keep their configured destinations, including
+Reading when it sits there. The displaced fourth destination returns to the menu,
+and the new fourth destination is excluded. Today and Upcoming are date views
+inside Reminders, so neither appears
+as a dock slot or expanded-menu choice. **Default tab** can open **Reminders — Today**
+or **Reminders — Upcoming** at launch. Older Today/Upcoming dock slots migrate to
+one Reminders slot. Settings changes and resets immediately update the menu.
 The feature shell routes explicit tab requests across lazy feature mounts, while
 each feature owns its view, search, and list state. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
@@ -507,9 +533,9 @@ Down arrow, Shift+F10, and right-click provide keyboard and pointer access.
 Sideways/downward movement aborts a pending hold; cancellation or app interruption
 cancels the selection. The add button and page layout stay in place.
 Ordinary tab buttons select their view; the sliding highlight follows the active
-reminder tab or the reading switcher. Both feature docks share the indicator
-position, so it slides from the fourth slot when returning to any reminder tab,
-even if that tab was already selected before opening Reading. Reminder tabs,
+destination. Both feature docks share the indicator position, so it slides from
+the selected slot when switching features, even when returning to a view that
+was already selected before the switch. Reminder tabs,
 Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
 stationary dissolve. Tab panels and feature layers use reversible CSS opacity
 transitions and retain their paint order until the switch settles, so a rapid
@@ -527,14 +553,24 @@ Reduced motion switches tabs and features immediately.
 Both header gears open the same **Settings** sheet above the feature panels.
 The feature shell owns its visibility and preserves the underlying tab, search,
 scroll position, and focus. Settings use General, Reminders, and Reading sections,
-with expandable Sync and device and About sections. Theme and opening-screen
+with visible Sync and device and About sections. Settings actions use full-width
+text rows with shared spacing and touch targets. Device storage and version diagnostics stay visible alongside sync status.
+Reading has no general export action in Settings; unsynced reminder exports
+appear only when needed. Web app and server versions show directly without
+a separate build-comparison message. **Reset tabs**
+appears only when the dock differs from its defaults. Theme and opening-screen
 preferences apply across both features; explicit launch links take precedence.
 Feature runtimes publish status and actions through the settings store, while
 retaining ownership of their persistence, recovery, and session cleanup. Opening
 settings loads the other feature as needed without navigating to it. Inactive
 features do not open restored editors or apply automatic updates.
 The shared logout confirmation explains cleanup for both features and exposes
-pending exports and recovery before clearing private device data.
+unsynced reminder exports and recovery before clearing private device data.
+**Set up iPhone shortcut** opens in its own full-height Settings-style sheet.
+Its circular close control, downward swipe, Escape, and browser Back return to
+the retained Settings screen and scroll position. The nested sheet keeps the
+app canvas at the parent sheet's depth and shares the existing reduced-motion
+and keyboard behavior. Browser Forward can reopen setup.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
@@ -684,9 +720,12 @@ A floating highlighter/count button opens the article highlights in a full-heigh
 PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it
 does not reserve a bottom bar or shorten the article. The button and navigation
 bar share the same scroll-direction threshold: down hides them, up or keyboard
-focus reveals them. After a 12px direction threshold, the floating button fades
-and rises over the next 48px of scrolling, with a short easing transition between
-scroll updates. Reduced motion uses an immediate visibility change without translation. Closing the sheet
+focus reveals them. At the fully shown/hidden endpoints, a 12px direction threshold
+filters jitter. Once moving, reversals respond immediately. Navigation travels one
+pixel per scroll pixel over its height plus the top safe-area inset; the floating
+button shares that progress. Scroll updates drive transforms and opacity directly,
+without restarting CSS easing on every frame. Reduced motion uses an immediate
+visibility change without translation. Closing the sheet
 restores the passage position; selecting **View in article** closes the sheet
 before smoothly scrolling to and focusing the highlight; reduced motion uses an
 instant scroll. Obsidian retains its reader tabs.
@@ -702,7 +741,21 @@ article URL and scroll offset; the viewport portal is removed on dismissal.
 PWA screen headers share the article reader's rounded chrome: sync and Settings
 sit in a capsule to the right of the title and count. Inbox, Reminders, Projects,
 and all Reading library views use the same 32px heading. Project details use the
-same action surface and a rounded Back control. `src/pwa/styles/_header-chrome.scss`
+same action surface and the article reader’s shared icon-only `BackButton`. Their
+navigation rows share 64px geometry and a 28px gap before the heading content.
+`src/pwa/styles/_header-chrome.scss`
 is loaded by the shared foundation so cached launch screens match live screens.
 Each feature retains its actions and navigation; Obsidian headers remain unchanged.
 Controls keep their 44px targets and opaque accessibility fallbacks.
+
+The article tags editor uses a shared wrapping chip field in both hosts. Space or
+Enter commits a tag, Backspace in an empty input returns the last chip to text,
+and each chip has a remove action. The header provides **Save** and a close control;
+there are no footer actions. Saving includes unfinished input and removes
+duplicate tags. Chip colors match the rich-text editor's accent treatment; the
+compound field owns its focus outline and retains 44px touch targets.
+
+All PWA sheet header buttons use the shared rounded surface from
+`_sheet-headers.scss`, including close/back controls, text actions, and secondary
+icon actions. Save and destructive actions retain their semantic text colors;
+features must not opt in by action name or duplicate the surface styling.
