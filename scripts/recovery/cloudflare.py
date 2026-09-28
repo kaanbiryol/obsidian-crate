@@ -35,7 +35,9 @@ class NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
 class Cloudflare:
     def __init__(self, account, database, bucket):
         self.account, self.database, self.bucket = account, database, bucket
-        self.token = os.environ['CLOUDFLARE_API_TOKEN']
+        self.token = os.environ.get('CLOUDFLARE_API_TOKEN', '').strip()
+        if not self.token:
+            raise ValueError('CLOUDFLARE_API_TOKEN is not set. Export a Cloudflare API token in this terminal, then rerun the command. No Cloudflare requests were made.')
         self.base = 'https://api.cloudflare.com/client/v4/accounts/' + urllib.parse.quote(account, safe='')
         self.db_path = '/d1/database/' + urllib.parse.quote(database, safe='')
         self.r2_path = '/r2/buckets/' + urllib.parse.quote(bucket, safe='') + '/objects'

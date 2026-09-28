@@ -10,6 +10,13 @@ from recovery.cloudflare import Cloudflare
 
 
 class TransportTests(unittest.TestCase):
+    def test_missing_or_blank_token_fails_before_network_access(self):
+        for environment in ({}, {'CLOUDFLARE_API_TOKEN': ''}, {'CLOUDFLARE_API_TOKEN': '   '}):
+            with self.subTest(environment=environment), patch.dict(os.environ, environment, clear=True), patch('urllib.request.build_opener') as opener:
+                with self.assertRaisesRegex(ValueError, 'CLOUDFLARE_API_TOKEN is not set'):
+                    Cloudflare('account', 'database', '')
+                opener.assert_not_called()
+
     def test_retry_after_is_honored_before_retrying_a_429(self):
         error = urllib.error.HTTPError('https://api.cloudflare.com/test', 429, 'limited', {'Retry-After': '2'}, io.BytesIO())
         response = Mock()
