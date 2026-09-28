@@ -7,7 +7,7 @@ const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision:
 
 beforeEach(() => {
 	vi.doMock('../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
-	vi.doMock('obsidian', () => createObsidianUiModule());
+	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../server', () => ({ readingServerRequest: request }));
 	vi.doMock('../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
 	vi.doMock('./reading-view', () => ({ READING_VIEW_TYPE: 'crate-reading' }));

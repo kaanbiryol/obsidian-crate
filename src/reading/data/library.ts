@@ -1,3 +1,5 @@
+import { applyLocalArticle, managedArticle } from '../core/article';
+import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
@@ -6,6 +8,7 @@ import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontma
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
+	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
 	pendingCaptures?(): Promise<ReadingItem[]>;
 	queueCapture?(url: string, title?: string): Promise<ReadingItem>;
 	occupied?(path: string): boolean;
@@ -22,6 +25,9 @@ export class ReadingLibrary {
 	private snapshot: ReadingSnapshot = { items: [], issues: [], loading: true, error: null };
 	private listeners = new Set<() => void>();
 	private queue: Promise<void> = Promise.resolve();
+	private captures = new Map<string, Promise<void>>();
+	private captureErrors = new Map<string, string>();
+	private captureQueue: Promise<void> = Promise.resolve();
 	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null }>();
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
 		private canAdopt: () => boolean = () => true) {}
@@ -44,7 +50,7 @@ export class ReadingLibrary {
 	}
 	private async scan(): Promise<void> {
 		const items: ReadingItem[] = [];
-		const issues: ReadingIssue[] = [];
+		const issues: ReadingIssue[] = [...this.captureErrors].map(([path, message]) => ({ path, message }));
 		try {
 			const files = this.vault.files().filter(file => file.path.startsWith(`${this.folder}/`) && /\.md$/i.test(file.path));
 			const paths = new Set(files.map(file => file.path));
@@ -112,7 +118,7 @@ export class ReadingLibrary {
 			if (matches.length > 1) throw new Error('Multiple notes already save this link. Open reading to choose one.');
 			const existing = matches[0];
 			if (existing) return { item: existing, duplicate: true };
-			if (fetchArticle && this.vault.queueCapture) {
+			if (fetchArticle && !this.vault.captureArticle && this.vault.queueCapture) {
 				const item = await this.vault.queueCapture(url, title);
 				await this.scan();
 				return { item, duplicate: false };
@@ -124,8 +130,54 @@ export class ReadingLibrary {
 			this.signal.throwIfAborted();
 			await this.vault.create(path, content);
 			await this.scan();
-			return { item: { ...parseReadingNote(content)!, path }, duplicate: false };
+			const item = { ...parseReadingNote(content)!, path };
+			if (fetchArticle && this.vault.captureArticle) void this.retryCapture(item).catch(() => { /* The saved bookmark and library issue retain the failure. */ });
+			return { item, duplicate: false };
 		});
+	}
+	get canCaptureLocally(): boolean { return Boolean(this.vault.captureArticle); }
+	isCapturing(item: ReadingItem): boolean { return this.captures.has(item.crate_reading_id); }
+	retryCapture(item: ReadingItem): Promise<void> {
+		const existing = this.captures.get(item.crate_reading_id);
+		if (existing) return existing;
+		const capture = this.vault.captureArticle;
+		if (!capture || !item.path) return Promise.reject(new Error('Local article downloads are unavailable.'));
+		this.captureErrors.delete(item.path);
+		const work = this.captureQueue.then(async () => {
+			// Network work runs outside the mutation queue: saved notes remain editable.
+			const file = await this.enqueue(async () => {
+				await this.scan();
+				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
+				const file = this.vault.files().find(file => file.path === item.path);
+				if (!file) throw new Error('This reading note was moved or deleted.');
+				const content = await this.vault.read(file), metadata = parseReadingNote(content), block = managedArticle(content);
+				if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
+					|| metadata.capture_method !== 'url' || metadata.extraction_status !== 'unavailable' || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
+				return file;
+			});
+			this.signal.throwIfAborted();
+			const article = await capture(item.source_url, this.signal);
+			await this.enqueue(async () => {
+				await this.scan();
+				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
+				await this.vault.process(file, content => {
+					this.signal.throwIfAborted();
+					return applyLocalArticle(content, item, article);
+				});
+				this.invalidate(item.path);
+				await this.scan();
+			});
+		}).catch((error: unknown) => {
+			if (!this.signal.aborted) this.captureErrors.set(item.path, `Link saved. ${error instanceof Error ? error.message : 'Article download failed.'}`);
+			throw error;
+		}).finally(() => {
+			this.captures.delete(item.crate_reading_id);
+			if (!this.signal.aborted) void this.refresh().catch(() => { /* Refresh already publishes its error. */ });
+		});
+		this.captures.set(item.crate_reading_id, work);
+		this.captureQueue = work.catch(() => undefined);
+		this.publish({ ...this.snapshot });
+		return work;
 	}
 	read(item: ReadingItem): Promise<{ item: ReadingItem; markdown: string }> {
 		return this.enqueue(async () => {

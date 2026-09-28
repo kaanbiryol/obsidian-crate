@@ -119,6 +119,25 @@ Push subscriptions are created with an authenticated session and record that ses
 
 The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. The token is bound to the exact enrolled reminders folder. Route and folder authorization prevent that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. Open a fresh link from the plugin after the session expires.
 
+## Desktop Reading capture
+
+Desktop Obsidian saves a local bookmark before downloading its source through
+`requestUrl`. `ReadingLibrary` serializes downloads separately from vault mutations,
+so the user can keep reading or editing notes. An empty local bookmark is stored
+as `unavailable`, preventing the Worker from independently extracting it while
+normal sync runs; the reader shows an in-memory downloading state. A successful
+download conditionally fills only that bookmark’s empty managed article block,
+preserving current metadata and personal notes outside the block. Deleted, replaced,
+modified article blocks, changed identities, duplicates, and stopped runtimes reject
+late publication. A failed or interrupted download remains a retryable bookmark.
+
+HTML extraction lives in `src/reading/extraction/` and is shared with the Worker.
+It uses inert parsing and disables extractor network requests. Desktop capture
+loads it on demand; all executable code is bundled with the plugin. Mobile plugin
+captures and the PWA retain the durable server queue. Previously queued desktop
+server captures still drain through their original path. See
+[article fetching and CORS](reading-fetch-research.md) for transport limits and browser evidence.
+
 ## Secret Storage
 
 The plugin stores two local values through `SecretStorageService`:

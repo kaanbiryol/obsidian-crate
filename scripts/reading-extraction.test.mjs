@@ -3,17 +3,53 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { gzipSync } from 'node:zlib';
-import { readingExtractionPlugin } from './reading-extraction-build.mjs';
+import { readingExtractionPlugin, readingExtractionVitePlugin } from './reading-extraction-build.mjs';
+import { build as viteBuild } from 'vite';
+import { chromium, webkit } from '@playwright/test';
+import { resolve } from 'node:path';
 import { marked } from 'marked';
 import { parseHTML } from 'linkedom';
 
+test('desktop extraction uses an inert parser in Chromium and WebKit', { timeout: 60000 }, async () => {
+	const bundle = await viteBuild({ configFile: false, logLevel: 'error', plugins: [readingExtractionVitePlugin()],
+		resolve: { alias: { '@': resolve('src') } },
+		build: { write: false, minify: true, lib: { entry: resolve('src/reading/extraction/document.ts'), formats: ['iife'], name: 'ReadingExtraction' } },
+	});
+	const code = (Array.isArray(bundle) ? bundle[0] : bundle).output.find(output => output.type === 'chunk').code;
+	assert.ok(!code.includes('Problematic content:'), 'Article diagnostics must not ship to the plugin');
+	for (const engine of [chromium, webkit]) {
+		const browser = await engine.launch();
+		try {
+			const page = await browser.newPage();
+			const requests = [], logs = [];
+			await page.route('**/*', route => { requests.push(route.request().url()); return route.abort(); });
+			page.on('console', message => logs.push(message.text()));
+			await page.addScriptTag({ content: code });
+			const article = await page.evaluate(() => {
+				// Extraction must not fall through to the host's resource-loading DOM parser.
+				window.DOMParser = class { constructor() { throw new Error('Native DOM parser used'); } };
+				return window.ReadingExtraction.extractDocument(`<html><head><title>Desktop article</title></head><body><article>
+					<h1>Desktop article</h1><p>A useful article with enough context to save and read without a server connection.</p>
+					<p>Read <a href="/next">the next article</a> for more details.</p>
+					<img src="https://tracking.example.org/pixel"><iframe src="https://tracking.example.org/frame"></iframe>
+					<script>fetch('https://tracking.example.org/script')</script>
+					</article></body></html>`, 'https://example.com/story');
+			});
+			assert.equal(article.title, 'Desktop article');
+			assert.match(article.markdown, /\[the next article\]\(https:\/\/example.com\/next\)/);
+			assert.doesNotMatch(article.markdown, /tracking.example.org/);
+			assert.deepEqual(requests, []);
+			assert.deepEqual(logs, []);
+		} finally { await browser.close(); }
+	}
+});
 
 // Bundle with the production Worker's module-resolution settings. Loading the
 // dependency through Vite's CJS shim tests a different Turndown browser build.
 test('Defuddle extracts documents in the deployed workerd runtime without network access', { timeout: 60000 }, async t => {
 	const bundle = await build({ stdin: { contents: `
 		import { extractReadingDocument } from './tests/reading-extraction/extract-document';
-		import { articleMarkdown } from './src/cloudflare/worker/reading/extraction/markdown';
+		import { articleMarkdown } from './src/reading/extraction/markdown';
 		import { parseHTML } from 'linkedom';
 		import { createMarkdownContent } from 'defuddle/full';
 		export default { async fetch(request) {

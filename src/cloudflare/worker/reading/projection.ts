@@ -1,14 +1,10 @@
+import { managedArticle } from '@/reading/core/article';
+export { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
-import { ARTICLE_START, ARTICLE_END, readingUrlIdentity } from '@/reading/core/model';
+import { readingUrlIdentity } from '@/reading/core/model';
 import { readSource, type ReadingPolicy } from './common';
 import { sha256Hex } from '../auth';
 import type { Env } from '../types';
-
-export function managedArticle(content: string): { start: number; end: number; text: string } | null {
-  const start = content.indexOf(ARTICLE_START), end = content.indexOf(ARTICLE_END);
-  if (start < 0 || end < start || content.indexOf(ARTICLE_START, start + 1) >= 0 || content.indexOf(ARTICLE_END, end + 1) >= 0) return null;
-  return { start: start + ARTICLE_START.length, end, text: content.slice(start + ARTICLE_START.length, end) };
-}
 
 /** Rebuildable projection: all responses still verify the current immutable file revision. */
 export async function projectReading(env: Env, current: ReadingPolicy): Promise<boolean> {

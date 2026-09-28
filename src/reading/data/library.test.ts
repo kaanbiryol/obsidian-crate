@@ -139,3 +139,62 @@ describe('local Reading library', () => {
 		expect(parseReadingNote(h.files.get(item.path)!)).toMatchObject({ tags: ['latest'], favorite: true });
 	});
 });
+
+
+describe('local article downloads', () => {
+  const article = { markdown: 'Article text saved on this device.', title: 'An article', author: 'Writer' };
+  it('saves before downloading, skips server capture and preserves metadata and personal notes', async () => {
+    const h = harness(), pending = deferred<typeof article>();
+    h.vault.captureArticle = vi.fn(() => pending.promise);
+    const queueCapture = vi.fn(); h.vault.queueCapture = queueCapture;
+    const { item } = await h.library.add('https://example.com/article');
+    expect(h.files.has(item.path)).toBe(true);
+    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
+    expect(queueCapture).not.toHaveBeenCalled();
+    expect(h.library.isCapturing(item)).toBe(true);
+    const finished = h.library.retryCapture(item);
+    await h.library.update(item, { favorite: true });
+    h.files.set(item.path, h.files.get(item.path)! + '\nPersonal notes.');
+    expect((await h.library.add(item.source_url)).duplicate).toBe(true);
+    pending.resolve(article); await finished;
+    expect(h.vault.captureArticle).toHaveBeenCalledTimes(1);
+    expect(parseReadingNote(h.files.get(item.path)!)).toMatchObject({ title: 'An article', author: 'Writer', favorite: true, extraction_status: 'ready' });
+    expect(h.files.get(item.path)).toContain('Article text saved on this device.');
+    expect(h.files.get(item.path)).toContain('Personal notes.');
+    expect(h.library.isCapturing(item)).toBe(false);
+  });
+  it('keeps failed/offline bookmarks and allows retry after restarting the library', async () => {
+    const h = harness(); h.vault.captureArticle = vi.fn().mockRejectedValue(new Error('Offline'));
+    const { item } = await h.library.add('https://example.com/article');
+    await expect(h.library.retryCapture(item)).rejects.toThrow('Offline');
+    await h.library.refresh();
+    expect(h.library.getSnapshot().issues[0]?.message).toContain('Link saved. Offline');
+    expect(h.files.size).toBe(1);
+    const resumed = new ReadingLibrary(h.vault, 'Reading', h.controller.signal);
+    h.vault.captureArticle = vi.fn().mockResolvedValue(article);
+    await resumed.retryCapture(item);
+    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('ready');
+  });
+  it.each(['edited', 'deleted', 'replaced', 'duplicate', 'stopped'])('does not overwrite a %s note after a download', async state => {
+    const h = harness(), pending = deferred<typeof article>();
+    h.vault.captureArticle = vi.fn(() => pending.promise);
+    const { item } = await h.library.add('https://example.com/article');
+    const finished = h.library.retryCapture(item);
+    await vi.waitFor(() => expect(h.vault.captureArticle).toHaveBeenCalled());
+    if (state === 'edited') h.files.set(item.path, h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'My own text.\n<!-- crate:article:end -->'));
+    if (state === 'deleted') h.files.delete(item.path);
+    if (state === 'replaced') h.files.set(item.path, createReadingNote({ id: crypto.randomUUID(), url: 'https://other.example.com', savedAt: item.saved_at }));
+    if (state === 'duplicate') h.files.set('Reading/Copy.md', h.files.get(item.path)!);
+    if (state === 'stopped') h.controller.abort();
+    const before = [...h.files];
+    pending.resolve(article);
+    await expect(finished).rejects.toThrow();
+    expect([...h.files]).toEqual(before);
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(accept => { resolve = accept; });
+  return { promise, resolve };
+}

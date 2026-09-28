@@ -85,3 +85,23 @@ native long-press selection, release timing, handle dragging, and edge scrolling
 separately on an installed iPhone. The same browser test also creates, resizes,
 and deletes a highlight deep in a long article, asserting stable scroll position
 and retained paragraph nodes through server confirmation.
+
+
+## Desktop direct capture
+
+Save a public article on desktop with no server configured, and with a configured
+server offline. The bookmark must appear immediately; article text arrives locally
+without sync or a Worker capture request. Enable normal sync and confirm the same
+note reaches another device without a second article download on the server.
+
+Disconnect the network, save a link, and reopen the reader. The bookmark remains;
+**Try again** downloads after reconnection. Close Obsidian during a download and
+retry the retained bookmark after restart. Edit the article block, replace or delete
+the note while downloading; a late result must never overwrite or recreate it.
+Metadata and personal notes outside an unchanged empty article block are preserved.
+Mobile plugin and PWA captures must still use the existing server queue.
+
+Automated coverage: `src/reading/desktop-capture.test.ts`,
+`src/reading/data/library.test.ts`, `src/reading/runtime.test.ts`, and
+`npm run test:reading-extraction`. Native request transport, redirects, installed
+Obsidian appearance and device-to-device sync still require host acceptance.

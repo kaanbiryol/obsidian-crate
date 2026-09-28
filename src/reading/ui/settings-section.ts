@@ -1,5 +1,5 @@
 import { setSharedFeature } from '../../plugin/feature-settings';
-import { Notice, Setting } from 'obsidian';
+import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../ui/settings/section-helpers';
 import { FolderSuggest } from '../../ui/settings/folder-suggest';
@@ -12,7 +12,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 	let folderSuggest: FolderSuggest | undefined;
 	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
 		new Setting(options).setName('Enable reading')
-			.setDesc('All devices · pause or resume reading and article downloads. Saved notes and vault sync are preserved.')
+			.setDesc(`All devices · pause or resume reading and article downloads. ${Platform.isDesktopApp ? 'This device downloads saved links directly into your vault.' : 'Your server downloads saved links.'} Saved notes and vault sync are preserved.`)
 			.addToggle(toggle => toggle.setValue(plugin.settings.reading.enabled).onChange(async enabled => {
 				toggle.setDisabled(true);
 				try {

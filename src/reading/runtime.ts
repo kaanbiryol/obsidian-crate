@@ -2,7 +2,7 @@ import { ReadingCaptureOutbox } from './data/capture-outbox';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { portablePathKey } from '@/protocol/portable-path';
 import { readingServerRequest } from './server';
-import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
+import { Notice, Platform, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath } from '../sync/engine-ignore';
@@ -96,6 +96,10 @@ export function startReading(plugin: CratePlugin): void {
 		}, authority, folder, controller.signal);
 	})();
 	const library = new ReadingLibrary({ files,
+		...(Platform.isDesktopApp ? { captureArticle: async (url: string, signal: AbortSignal) => {
+			const { captureDesktopArticle } = await import('./desktop-capture');
+			return captureDesktopArticle(url, signal);
+		} } : {}),
 		occupied: path => vault.getAllLoadedFiles().some(file => portablePathKey(file.path) === portablePathKey(path)),
 		...(plugin.settings.workerUrl ? {
 			pendingCaptures: async () => (await outbox()).list(),
@@ -104,7 +108,7 @@ export function startReading(plugin: CratePlugin): void {
 		read: async file => { const content = await vault.read(resolve(file)); resolve(file); return content; },
 		process: (file, update) => vault.process(resolve(file), current => { resolve(file); return update(current); }),
 		create: async (path, content) => {
-      if (!policyChecked) throw new Error('Connect to your Crate server once to confirm the Reading folder before saving.');
+      if (!policyChecked && !Platform.isDesktopApp) throw new Error('Connect to your Crate server once to confirm the Reading folder before saving.');
 			const segments = folder.split('/');
 			for (let i = 1; i <= segments.length; i++) {
 				controller.signal.throwIfAborted();

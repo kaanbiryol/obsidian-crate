@@ -1,10 +1,13 @@
+import { captureDesktopArticle } from './desktop-capture';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TFile, TFolder } from 'obsidian';
+import { Platform, TFile, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
-import { createReadingNote, updateReadingNote } from './core/notes';
+import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
 import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime } from './runtime';
+
+vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
 
 function harness() {
 	vi.useFakeTimers(); vi.stubGlobal('window', globalThis);
@@ -35,6 +38,46 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Reading runtime lifecycle', () => {
+  it('saves and extracts on desktop before checking a configured server policy', async () => {
+    const h = harness(), saved = new Map<string, string>();
+    const root = h.vault.getAbstractFileByPath('Reading');
+    if (!(root instanceof TFolder)) throw new Error('Missing test folder');
+    const lookup = h.vault.getAbstractFileByPath;
+    Object.assign(h.vault, {
+      adapter: { exists: async () => false },
+      getAllLoadedFiles: () => root.children,
+      getAbstractFileByPath: (path: string) => root.children.find(file => file.path === path) ?? lookup(path),
+      create: async (path: string, content: string) => {
+        saved.set(path, content);
+        root.children.push(Object.assign(new TFile(), { path, extension: 'md', stat: { size: content.length, mtime: 2, ctime: 2 } }));
+      },
+    });
+    const read = h.vault.read.getMockImplementation()!;
+    h.vault.read.mockImplementation(async (file?: TFile) => file && saved.has(file.path) ? saved.get(file.path)! : read());
+    const process = h.vault.process.getMockImplementation()!;
+    h.vault.process.mockImplementation(async (file, update) => {
+      if (!saved.has(file.path)) return process(file, update);
+      const content = update(saved.get(file.path)!); saved.set(file.path, content); return content;
+    });
+    h.plugin.settings.workerUrl = 'https://crate.example.com';
+    Object.assign(h.plugin, { secretStorage: { get: () => 'device-token' }, manifest: { id: 'crate' }, registerInterval: vi.fn() });
+    startReading(h.plugin);
+    const library = getReadingLibrary(h.plugin)!;
+    const { item } = await library.add('https://example.com/desktop');
+    await library.retryCapture(item);
+    expect(parseReadingNote(saved.get(item.path)!)).toMatchObject({ title: 'Desktop article', extraction_status: 'ready' });
+    expect(captureDesktopArticle).toHaveBeenCalledWith('https://example.com/desktop', expect.any(AbortSignal));
+    stopReading(h.plugin);
+  });
+  it('retains server capture on mobile', () => {
+    const h = harness();
+    const desktop = Platform.isDesktopApp;
+    try {
+      Platform.isDesktopApp = false;
+      startReading(h.plugin);
+      expect(getReadingLibrary(h.plugin)!.canCaptureLocally).toBe(false);
+    } finally { Platform.isDesktopApp = desktop; stopReading(h.plugin); }
+  });
   it('updates mounted workspaces when the local library is replaced or stopped', () => {
     const h = harness();
     const listener = vi.fn(() => getReadingLibrary(h.plugin));
