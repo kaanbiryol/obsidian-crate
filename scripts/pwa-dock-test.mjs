@@ -377,7 +377,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 });
 
 
-test('PWA dock indicator settles without repainting', { timeout: 30000 }, async () => {
+test('PWA dock indicator has visible travel and settles without repainting', { timeout: 30000 }, async () => {
   const { server } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
   await mkdir('test-results/dock', { recursive: true });
   try {
@@ -393,13 +393,25 @@ test('PWA dock indicator settles without repainting', { timeout: 30000 }, async 
         await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
         await expect(dock().locator('.pwa-dock__indicator')).toBeVisible();
         await expect(dock().getByRole('button', { name: 'Projects', exact: true })).toBeVisible();
-        for (const label of ['Projects', 'Reminders', 'Inbox']) {
+        for (const label of ['Projects', 'Reminders', 'Inbox', 'Reminders', 'Inbox']) {
           const animation = await dock().evaluateHandle(async (element, label) => {
+            const indicator = element.querySelector('.pwa-dock__indicator');
+            const position = () => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41;
+            const start = position();
             element.querySelector(`[aria-label="${label}"]`).click();
             await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
-            const slide = element.querySelector('.pwa-dock__indicator').getAnimations().find(animation => animation.transitionProperty === 'transform');
+            const slide = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform');
             if (!slide) throw new Error('Expected a sliding tab indicator');
-            slide.pause(); slide.currentTime = Number(slide.effect.getTiming().duration) - .001;
+            slide.pause();
+            const duration = Number(slide.effect.getTiming().duration);
+            slide.currentTime = duration;
+            const end = position();
+            // The former fast-control curve covered ~80% in 60ms: a slide
+            // technically existed, but adjacent tabs looked like a jump.
+            slide.currentTime = 60;
+            const progress = (position() - start) / (end - start);
+            if (progress < .2 || progress > .65) throw new Error(`Tab slide needs visible early travel: ${progress}`);
+            slide.currentTime = duration - .001;
             return slide;
           }, label);
           // Let the independent screen fade finish while the slide stays paused.
@@ -413,6 +425,30 @@ test('PWA dock indicator settles without repainting', { timeout: 30000 }, async 
           assert.ok(moving.equals(settled), `${name}: ${label} highlight must not snap when the slide finishes`);
           await animation.dispose();
         }
+        const reversal = await dock().evaluate(async element => {
+          const indicator = element.querySelector('.pwa-dock__indicator');
+          const position = () => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width;
+          const frame = () => new Promise(requestAnimationFrame);
+          element.querySelector('[aria-label="Reminders"]').click();
+          await frame(); await frame();
+          const slide = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform');
+          if (!slide) throw new Error('Expected a slide to reverse');
+          slide.pause(); slide.currentTime = 60;
+          const before = position();
+          element.querySelector('[aria-label="Inbox"]').click();
+          await frame();
+          const after = position(), samples = [];
+          const start = performance.now();
+          while (performance.now() - start < 350) { await frame(); samples.push(position()); }
+          return { before, after, samples };
+        });
+        assert.ok(Math.abs(reversal.after - reversal.before) < .2, `${name}: reversal must continue from the painted position`);
+        assert.ok(reversal.samples.every(value => value >= -.01 && value <= reversal.before + .01), `${name}: reversal must not overshoot`);
+        assert.ok(Math.abs(reversal.samples.at(-1)) < .01);
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await dock().getByRole('button', { name: 'Reminders', exact: true }).tap();
+        await expect(dock().locator('.pwa-dock__indicator')).toHaveCSS('transition-duration', '0s');
+        assert.equal(await dock().locator('.pwa-dock__indicator').evaluate(element => element.getAnimations().length), 0);
       } finally { await browser.close(); }
     }
   } finally { await new Promise(resolve => server.close(resolve)); }
