@@ -25,7 +25,7 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
     const origin = `http://localhost:${server.address().port}`;
     const api = async (path, body) => {
       const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: {
-        Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json',
+        Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json',
       }, body: JSON.stringify(body) });
       assert.equal(response.status, 200, await response.clone().text()); return response.json();
     };

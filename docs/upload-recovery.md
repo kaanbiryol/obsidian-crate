@@ -1,6 +1,6 @@
 # Upload retries and rename preservation
 
-A never-populated remote uses a separate initial import in protocol 10. Its committed
+A never-populated remote uses a separate initial import in protocol 1. Its committed
 file inventory is the resume checkpoint: the client compares path, hash and size,
 skips matching files and uploads only missing or changed content. Initial imports
 create no per-file receipt journal, changelog, or version history. Locally deleted

@@ -13,7 +13,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     runtime = await openLocalRuntime({ dataDir: dir });
     const vault = await issueLocalDevice(runtime.db, 'Pairing test');
     const request = async (path, token = '', body = {}, origin = 'https://crate.example') => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return { status: response.status, body: await response.json(), cache: response.headers.get('Cache-Control') };
     };
     const browser = async () => {

@@ -29,7 +29,7 @@ export async function performPwaLogout({
 	let reading: ReturnType<typeof readingSession> = null;
   try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { /* Corrupt credentials must not prevent clearing local data. */ }
 	const cleanup = Promise.allSettled([
-    ...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '11' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
+    ...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '1' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
 		start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');

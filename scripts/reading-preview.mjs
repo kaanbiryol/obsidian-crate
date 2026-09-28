@@ -8,7 +8,7 @@ const port = 8877, origin = `http://localhost:${port}`;
 const runtime = await openLocalRuntime({ dataDir: resolve('.crate/reading-preview'), origin, handleSignals: false });
 const vault = await issueLocalDevice(runtime.db, 'Disposable Reading preview');
 const api = async (path, body) => {
-  const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
   if (!response.ok) throw new Error(`Preview setup failed (${response.status})`);
   return response.json();
 };

@@ -55,7 +55,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const origin = `http://localhost:${server.address().port}`;
     const api = async (path, body) => {
       const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: body ? 'POST' : 'GET',
-        headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
         ...(body ? { body: JSON.stringify(body) } : {}) });
       assert.equal(response.status, 200, await response.clone().text()); return response.json();
     };
@@ -66,7 +66,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const source = await download.text();
     const content = source.slice(0, source.indexOf('\n---\n') + 5).replace(/extraction_status: .*/, 'extraction_status: "ready"') + 'A useful ==article excerpt==.\n\nAnother paragraph to read.';
     const uploaded = await runtime.mf.dispatchFetch(`${origin}/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', headers: {
-      Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'text/markdown',
+      Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'text/markdown',
       'X-File-Hash': createHash('sha256').update(content).digest('hex'), 'X-File-Size': String(Buffer.byteLength(content)),
       'X-Crate-Expected-Hash': download.headers.get('X-File-Hash'), 'X-Crate-Upload-Operation': operationId(),
     }, body: content });

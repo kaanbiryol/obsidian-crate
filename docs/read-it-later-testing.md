@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-1 launch baseline; protocol 11 stays compatible.
+This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-1 launch baseline; protocol 1 is the launch contract.
 
 ## Try the browser now
 

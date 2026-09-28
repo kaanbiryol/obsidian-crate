@@ -13,7 +13,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     runtime = await openLocalRuntime({ dataDir: dir });
     const vault = await issueLocalDevice(runtime.db, 'Reading test');
     const request = async (path, token = vault.token, body, headers = {}) => {
-      const response = await runtime.mf.dispatchFetch(`http://localhost:8787${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json', ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      const response = await runtime.mf.dispatchFetch(`http://localhost:8787${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json', ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       return { status: response.status, body: await response.json() };
     };
     let result = await request('/reading/policy', vault.token, { enabled: true, folderPath: 'Reading', revision: null });

@@ -3,6 +3,9 @@ import { verifyWorkerDeployment } from './verify-worker-deployment';
 import release from './server-release.json';
 import type { HttpTransport } from './http';
 
+// Use a synthetic later release so older-release coverage also works at launch revision 1.
+vi.mock('./server-release.json', () => ({ default: { revision: 2, schemaVersion: 1 } }));
+
 const origin = 'https://crate.example.workers.dev';
 const fingerprint = 'f'.repeat(64);
 const identity = { service: 'crate', serverRevision: release.revision, schemaVersion: release.schemaVersion, deploymentFingerprint: fingerprint };

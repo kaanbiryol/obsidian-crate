@@ -2,7 +2,7 @@
 
 Status: implemented for integrated testing on `codex/read-it-later`. See [current implementation and acceptance status](read-it-later-plan.md#implementation-status) and [testing instructions](read-it-later-testing.md). This is not a published release.
 
-Revalidated on 2026-09-21 against `master` at `48b9a902`. See [the implementation plan](read-it-later-plan.md) for code integration points, delivery order, and release gates. The current baseline is plugin 0.3.0, server revision 59, schema 1, and protocol 11 (ordinary writes remain compatible with 7). These are observed versions, not version numbers reserved for Reading.
+Revalidated on 2026-09-21 against `master` at `48b9a902`. See [the implementation plan](read-it-later-plan.md) for code integration points, delivery order, and release gates. The launch baseline is plugin 0.3.0, server revision 1, schema 1, and protocol 1 (oldest compatible protocol 1).
 
 ## Outcome
 
