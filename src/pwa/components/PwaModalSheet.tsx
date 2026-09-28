@@ -37,6 +37,9 @@ export function PwaModalSheet({
 	useLayoutEffect(() => lockSheetDocumentScroll(viewportPortal), [viewportPortal]);
 	const popupRef = useRef<HTMLDivElement>(null);
 	const anchorRef = useRef<HTMLSpanElement>(null);
+	// Final focus can run after the portal anchor has unmounted. Keep the host
+	// available when a deleted reminder no longer supplies the original target.
+	const focusHostRef = useRef<HTMLElement | null>(null);
 	const stopPresentation = useRef<(() => void) | undefined>(undefined);
 	const setPopupRef = useCallback((popup: HTMLDivElement | null) => {
 		stopPresentation.current?.();
@@ -59,6 +62,7 @@ export function PwaModalSheet({
 	useLayoutEffect(() => {
 		const host = anchorRef.current?.closest<HTMLElement>('.pwa-shadow-root, .crate-feature-panel');
 		if (!host) return;
+		focusHostRef.current = host;
 		const shell = host.closest<HTMLElement>('.crate-feature-shell');
 		const inCanvas = Boolean(host.closest('.crate-modal-canvas'));
 		if (!viewportPortal && !inCanvas) { setMountPoint(host); return; }
@@ -124,7 +128,7 @@ export function PwaModalSheet({
 									}}
 									initialFocus={variant === 'reminder' ? false : () => popupRef.current?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)') ?? popupRef.current}
 									finalFocus={() => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
-										: anchorRef.current?.closest('.pwa-shadow-root, .crate-feature-panel')?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
+										: focusHostRef.current?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
 								>
 									<Drawer.Content className="pwa-modal-sheet__content">
 										<div className="pwa-modal-sheet__scroller">{variant === 'settings'

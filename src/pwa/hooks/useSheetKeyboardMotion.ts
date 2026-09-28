@@ -34,6 +34,10 @@ export function useSheetKeyboardMotion(
 		const previousInset = insetRef.current;
 		insetRef.current = keyboardInset;
 		if (!stage) return;
+		// Motion may defer plain style writes until its next render frame. The
+		// keyboard displacement must measure the new layout in this commit.
+		stage.style.paddingBottom = `${keyboardInset}px`;
+		stage.style.setProperty('--pwa-keyboard-inset', `${keyboardInset}px`);
 		if (!enabled || reducedMotion) {
 			animationRef.current?.cancel();
 			animationRef.current = null;

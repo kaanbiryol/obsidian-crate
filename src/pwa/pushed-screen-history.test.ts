@@ -80,6 +80,15 @@ describe('pushed screen history', () => {
 		expect(navigation.getSnapshot().page).toBeNull();
 	});
 
+	it('does not restore an enrollment token removed during logout', () => {
+		history.replaceState(history.state, '', 'https://crate.test/notifications?token=enrollment');
+		const navigation = createPushedScreenHistory(['logout']);
+		navigation.push('logout');
+		history.replaceState(history.state, '', 'https://crate.test/notifications');
+		navigation.reset();
+		expect(location.href).toBe('https://crate.test/notifications');
+	});
+
 	it('queues a quick reopen until the previous Back traversal finishes', () => {
 		const navigation = createPushedScreenHistory(['shortcut', 'logout']); navigation.install(vi.fn());
 		navigation.push('shortcut');
