@@ -61,15 +61,27 @@ it('does not reuse or overwrite another server’s saved revision', async () => 
 	expect(plugin.writeSettings).not.toHaveBeenCalled();
 });
 
-it('labels a same-revision build mismatch accurately and blocks updating', async () => {
+it('requires a live comparison before declaring a same-revision mismatch', async () => {
 	const { plugin, row } = await setup(release.revision);
 	const available = vi.fn();
 	const { renderUpdateVersions } = await import('./version-settings');
 	renderUpdateVersions(row as never, plugin as never, vi.fn(), available);
-	expect(row.nameEl.textContent).toBe('Server build differs');
-	expect(row.descEl.textContent).toContain('A newer server release is needed');
+	expect(row.nameEl.textContent).toBe('Check server version');
+	expect(row.descEl.textContent).toContain('Select Check live server');
 	expect(available).toHaveBeenLastCalledWith(false);
 	expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+});
+
+it('keeps a confirmed stable same-revision mismatch blocked with upgrade guidance', async () => {
+	const { plugin, row } = await setup(release.revision);
+	const available = vi.fn();
+	const { renderUpdateVersions } = await import('./version-settings');
+	renderUpdateVersions(row as never, plugin as never, vi.fn(), available);
+	plugin.syncRuntime.getVersionInfo.mockResolvedValue({ serverRevision: release.revision, deploymentFingerprint: 'b'.repeat(64) });
+	row.buttons.at(-1)!.click();
+	await vi.waitFor(() => expect(row.nameEl.textContent).toBe('Server build differs'));
+	expect(row.descEl.textContent).toContain('Update the plugin to get a newer server release');
+	expect(available).toHaveBeenLastCalledWith(false);
 });
 
 it('offers an update when the saved server revision is older', async () => {

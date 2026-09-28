@@ -75,13 +75,13 @@ export function checkServerRevision(root, base, inputs) {
   try {
     const policy = JSON.parse(readFileSync(resolve(root, 'scripts/server-release-policy.json'), 'utf8'));
     if (policy.baselineCommit === base && policy.initialRevision !== undefined) {
-      if (policy.initialRevision !== 1) throw new Error('The initial public server revision must be 1.');
+      if (!Number.isSafeInteger(policy.initialRevision) || policy.initialRevision < 1) throw new Error('The initial public server revision must be a positive integer.');
       initialRevision = policy.initialRevision;
     }
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (initialRevision !== undefined) {
-    if (current.revision !== initialRevision) throw new Error('The first public server release must use revision 1.');
-    before.revision = 0;
+    if (current.revision !== initialRevision) throw new Error(`The first public server release must use revision ${initialRevision}.`);
+    before.revision = initialRevision - 1;
   }
 	if (current.revision < before.revision) throw new Error('Server revision cannot decrease.');
 	const launchReset = before.baselineSchemaVersion === 4 && before.schemaVersion === 4

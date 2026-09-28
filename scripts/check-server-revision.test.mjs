@@ -208,3 +208,23 @@ test('starts an explicit pre-launch reset at one and enforces increments after p
   h.release({ revision: 2 });
   assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
 });
+
+
+test('reserves deployed pre-launch revisions before the first public candidate', () => {
+  const h = fixture();
+  const baseline = h.git('rev-parse', 'HEAD');
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 2 });
+  h.write('src/shared.ts', 'next implementation');
+  h.release({ revision: 1 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /must use revision 2/);
+  h.release({ revision: 2 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  h.release({ revision: 3 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /must use revision 2/);
+  h.release({ revision: 2 });
+  const published = h.commit();
+  h.write('src/shared.ts', 'subsequent implementation');
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /without increasing revision/);
+  h.release({ revision: 3 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
+});

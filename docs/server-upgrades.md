@@ -50,7 +50,7 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 ## Release evidence
 
-`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source/schema baseline after the intentional pre-launch reset; earlier prereleases belong to the retired sequence. Its `initialRevision: 1` starts the first public candidate at revision 1, independently of that baseline commit’s development revision. Once a release is published after that baseline, subsequent checks use that release. Keep the baseline fixed. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
+`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source/schema baseline after the intentional pre-launch reset; earlier prereleases belong to the retired sequence. Its `initialRevision: 2` reserves revision 1, which was already deployed during development, and starts the first public candidate at revision 2 so those installations can upgrade. This is independent of the baseline commit’s development revision. Once a release is published after that baseline, subsequent checks use that release. Keep the baseline fixed. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
 A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
 
@@ -90,7 +90,7 @@ the server when settings open. Existing installations without this field can use
 are informational; deployment verification and update authorization still inspect
 the live server.
 
-Settings distinguish a newer revision from a fingerprint mismatch. Missing saved
+Settings distinguish a newer revision from a fingerprint mismatch. Equal saved and bundled revisions prompt a live check before reporting a build mismatch. Missing saved
 revision metadata prompts a manual live check. Matching stable revision numbers
 with different builds require a higher server revision. For a development server,
 a live check can enable a newer development build or promotion to stable within
