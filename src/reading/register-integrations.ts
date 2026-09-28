@@ -17,8 +17,8 @@ async function openReading(plugin: CratePlugin): Promise<void> {
 export function registerReading(plugin: CratePlugin): void {
 	plugin.register(() => stopReading(plugin));
 	plugin.registerView(READING_VIEW_TYPE, leaf => new ReadingView(leaf, plugin));
-	plugin.addCommand({ id: 'open-reading', name: 'Open reading', callback: () => openReading(plugin) });
-	plugin.addCommand({ id: 'add-reading-link', name: 'Add reading link', callback: () => {
+	plugin.addCommand({ id: 'open-reading', name: 'Reading - open library', callback: () => openReading(plugin) });
+	plugin.addCommand({ id: 'add-reading-link', name: 'Reading - add link', callback: () => {
 		if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
 		new AddReadingLinkModal(plugin).open();
 	} });

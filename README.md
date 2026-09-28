@@ -53,7 +53,7 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 ## Reading
 
 Reading and Reminders are included with Crate. Choose a folder under **Settings → Crate → Reading**. Use
-**Crate: Add reading link** to save a URL and **Crate: Open reading** for your
+**Crate: Reading - add link** to save a URL and **Crate: Reading - open library** for your
 inbox, favorites, archive, tags, and search. Reading metadata and article text
 live in ordinary Markdown notes, carried by normal vault sync.
 
@@ -204,7 +204,7 @@ npm run deploy:plugin
 
 `npm run deploy:plugin` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
 
-To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.
+To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Sync - stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.
 
 ## Cloudflare Setup
 
@@ -216,7 +216,7 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
 3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. If it does not, select **Open Obsidian** on that page. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
-5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
+5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync - sync now** to sync this vault with the server.
 
 If setup shows **R2 is not active for this Cloudflare account**, follow [the R2 activation error steps](docs/deployment.md#r2-activation-error) and retry with the same account.
 
@@ -236,7 +236,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Sync Scope and Limits
 
-- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not scan or transfer vault files. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
+- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not scan or transfer vault files. A running sync finishes; use **Crate: Sync - sync now** in the command palette to sync manually.
 - Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.
@@ -244,7 +244,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 - Plugin settings may include credentials or device-specific paths. To keep a plugin local, add its folder (for example, `.obsidian/plugins/plugin-id/`) to ignore patterns, using your vault's configuration folder if different.
 - Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
 - Adding an ignore pattern stops future transfers but does not silently delete an existing remote copy. Use **Settings → Crate → Infrastructure → Remove ignored remote files** to review and remove those copies explicitly.
-- Remote files replaced or deleted by sync are retained for 30 days. Open a file’s context menu and select **File history**, or use **Crate: Show file history** for the active file. You can also open files, including deleted files, from **Sync Activity → History → File history**. Local-only files may have no server versions. Saved versions can be compared with the local file and restored; a force full sync also keeps its remote deletions recoverable for that period.
+- Remote files replaced or deleted by sync are retained for 30 days. Open a file’s context menu and select **File history**, or use **Crate: Sync - show file history** for the active file. You can also open files, including deleted files, from **Sync Activity → History → File history**. Local-only files may have no server versions. Saved versions can be compared with the local file and restored; a force full sync also keeps its remote deletions recoverable for that period.
 - **Sync Activity → History → Return to this state** restores the synced vault from a shared checkpoint, with a file-by-file preview and local recovery copies. The latest 20 checkpoints are available across your connected devices for up to 30 days. Checkpoints store file paths, hashes, and version references; file contents reuse existing server history. Update the Crate server to enable shared checkpoints, then run a successful sync. Existing local-only checkpoints remain on their original device. Files excluded on the restoring device stay untouched.
 - Synced paths must be portable across desktop and mobile filesystems. Windows-reserved names, unsupported characters, trailing dots/spaces, and case- or Unicode-normalization collisions are rejected before transfer.
 - Creating a server provisions Worker, R2, D1, and Durable Object resources in your Cloudflare account. Cloudflare plan limits and possible usage charges apply to those resources.
@@ -387,7 +387,7 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 
 ## Deleting a Crate server
 
-**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes the server and its remote files, history, and reminders for all devices. Local vault files are kept. To start over, delete the server, select **Connect with Cloudflare**, create a new server, then select **Crate: Sync now**. See [server deletion and recovery](docs/deployment.md#delete-a-crate-server).
+**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes the server and its remote files, history, and reminders for all devices. Local vault files are kept. To start over, delete the server, select **Connect with Cloudflare**, create a new server, then select **Crate: Sync - sync now**. See [server deletion and recovery](docs/deployment.md#delete-a-crate-server).
 
 ## License
 

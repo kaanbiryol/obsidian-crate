@@ -28,7 +28,7 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
                         `Worker: ${deployment.workerName}`,
                         `Database: ${deployment.d1DatabaseName} (${deployment.d1DatabaseId})`,
                         `File bucket: ${deployment.r2BucketName}`,
-                        'To sync again, connect with Cloudflare, create a new server, then run Crate: Sync now.',
+                        'To sync again, connect with Cloudflare, create a new server, then run Crate: Sync - sync now.',
                     ],
                     confirmText: 'Delete server',
                     warning: true,
