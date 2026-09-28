@@ -44,7 +44,7 @@ describe('reading Markdown', () => {
 	});
 	it('preserves unknown YAML, formatting, and every body byte during metadata edits', () => {
 		fc.assert(fc.property(fc.string(), body => {
-			const source = note().replace('\n---\n\n', '\nuser: { keep: \'spacing\' } # comment\n---\n\n') + body;
+			const source = note().replace('\n---\n', '\nuser: { keep: \'spacing\' } # comment\n---\n') + body;
 			const changed = updateReadingNote(source, id, { favorite: true, tags: ['one', 'two: three'] });
 			expect(changed.slice(changed.indexOf('\n---\n'))).toBe(source.slice(source.indexOf('\n---\n')));
 			expect(changed).toContain("user: { keep: 'spacing' } # comment");
