@@ -240,7 +240,7 @@ After the Pages site and a private or public Cloudflare OAuth client are configu
 4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, Memberships Read, and Account Analytics Read. Cloudflare may display the three write permissions using its legacy **Edit** label. Select exactly one account.
 5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
 6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, initializes the schema, enables the workers.dev endpoint, and connects the current device.
-7. Confirm connecting alone does not upload or download vault files. Explicitly select **Crate: Sync now** in the command palette using non-critical notes only.
+7. Confirm connecting alone does not upload or download vault files. Explicitly select **Crate: Sync - sync now** in the command palette using non-critical notes only.
 8. Select **Disconnect this device**, connect with Cloudflare again, and confirm Crate reuses the same Worker instead of creating another deployment.
 9. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.
 10. For the inactive-R2 case, use an account without an active R2 subscription and confirm Crate shows the activation message rather than a generic API error.
@@ -256,7 +256,7 @@ Record the Obsidian version, operating-system version, and result for each devic
 - Run at least one pass on Obsidian 1.13.0, the version declared in `manifest.json`. If it is unavailable or any required flow fails, raise `minAppVersion` and the matching `versions.json` entry to the oldest version actually tested.
 - Use a Cloudflare account that is not owned by or a member of the OAuth-client publisher. Confirm the verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, Memberships Read, and Account Analytics Read.
 - Install `main.js`, `manifest.json`, and `styles.css` from the prepared release assets into a clean desktop vault. Complete OAuth, explicit initial upload, restart, reconnect, and server update.
-- On a physical iOS device, select **Connect with Cloudflare**, then **Open Cloudflare**. Complete authorization in the browser and confirm the callback reopens Obsidian (or **Open Obsidian** does). Join the existing server, then select **Crate: Sync now** in the command palette. Create, edit, rename, and delete Markdown and binary files; preserve a concurrent-edit conflict; background and resume Obsidian; then disable and re-enable Crate.
+- On a physical iOS device, select **Connect with Cloudflare**, then **Open Cloudflare**. Complete authorization in the browser and confirm the callback reopens Obsidian (or **Open Obsidian** does). Join the existing server, then select **Crate: Sync - sync now** in the command palette. Create, edit, rename, and delete Markdown and binary files; preserve a concurrent-edit conflict; background and resume Obsidian; then disable and re-enable Crate.
 - Repeat the same Cloudflare sign-in and existing-server flow on a physical Android device.
 - On both mobile platforms, create, edit, complete, reorder, and delete reminders. Install the reminders web app, enable push, receive both a test notification and a scheduled reminder, verify sign-out, and confirm a signed-out browser cannot use the previous session.
 - On both mobile platforms, exercise the settings tab: sync controls and exclusions, reminder and notification options, web app **Open app**, Reading **Open web reading**, connected devices, Cloudflare usage and dashboard, and recovery dialogs. Check link and clipboard fallbacks from the same phone. If Reading is enabled, test its library and a new browser setup link. Record any settings that cannot be reached or changed.
@@ -518,3 +518,15 @@ server-first updates, offline failures, and cross-device reconciliation;
 access, blocked Reading publication, retained jobs, and reminder resume without
 repeat delivery. The Reading capture browser test also pauses and resumes from a
 second client and verifies the current browser hides and restores Reading.
+
+## Plugin navigation parity
+
+After building the plugin, run
+`npx playwright test tests/visual/plugin-navigation.spec.ts tests/visual/plugin-navigation-webkit.spec.ts --workers=2`.
+The Shadow DOM fixture covers the production plugin navigation shell at narrow and
+wide widths, Today/Upcoming selection, project Back and retained scroll/focus,
+Reading search and article return, keyboard/held dock expansion, disabled features,
+rapid switching, reduced motion, and compact project sheets. Run `node scripts/pwa-dock-test.mjs` and
+`node scripts/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
+components’ PWA adapters. Actual Obsidian panes, popout windows and mobile navbar
+insets still require host/device acceptance.

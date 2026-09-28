@@ -17,6 +17,24 @@
 	@include card-interactions.styles;
 	@include card-presentation.styles;
 
+	// Obsidian headers need room for theme-scaled text and overdue badges.
+	&.reminders-shadow-root .reminders-view.is-primary {
+		.view-header {
+			padding-block: 20px 16px;
+			gap: 12px;
+		}
+
+		.view-header-title { line-height: 1.2; }
+
+		.view-header-meta {
+			height: auto;
+			min-height: 28px;
+			margin-top: 8px;
+			gap: 8px;
+			flex-wrap: wrap;
+		}
+	}
+
 	.crate-reminder-source-notice {
 		flex-shrink: 0;
 		margin: 8px 16px;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { highlightReadingCode } from './code-highlighting';
 
-describe('PWA article code highlighting', () => {
+describe('Article code highlighting', () => {
 	it.each(['javascript', 'js', 'typescript', 'ts'])('colors %s without changing copyable text', language => {
 		const source = 'const greeting = "hello <world> & friends";\n';
 		const html = highlightReadingCode(source, language);

@@ -1,3 +1,4 @@
+import { highlightReadingCode } from './code-highlighting';
 import { DEFAULT_READING_APPEARANCE, type ReadingAppearance } from './appearance';
 import { readerScrollElement } from './reader-scroll';
 import { useReaderNavigation } from './useReaderNavigation';
@@ -62,7 +63,7 @@ function renderReadingText(markdown: string, source: string, highlightCode?: (co
 	return container.innerHTML;
 }
 
-export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode, appearance, onAppearanceChange }: {
+export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange }: {
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
 	/** Keep article parsing and layout out of the host's opening slide. */

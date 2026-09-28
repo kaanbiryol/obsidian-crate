@@ -9,8 +9,9 @@
 		color: var(--text-normal); background: var(--crate-control-bg);
 		border: 1px solid var(--crate-divider); border-radius: var(--crate-field-radius, var(--crate-radius-control, 8px));
 		box-shadow: none;
+		&:focus { box-shadow: none; }
 		&::placeholder { color: var(--text-faint, var(--text-muted)); }
-		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; }
+		&:focus { border-color: var(--crate-focus-ring); }
 		&:disabled { opacity: .5; cursor: not-allowed; }
 		&[aria-invalid="true"] { border-color: var(--text-error); }
 	}
@@ -42,4 +43,13 @@
 		.crate-icon-button { flex: 0 0 44px; }
 		&.crate-field--with-action .crate-text-input::-webkit-search-cancel-button { display: none; }
 	}
+	// Override host and feature focus outlines only for text entry; buttons,
+	// links, selects and toggles retain their keyboard-focus rings.
+	:is(#{focus.$text-controls}):focus {
+		outline: none !important;
+		box-shadow: none !important;
+		border-color: var(--crate-focus-ring);
+	}
+	:is(#{focus.$text-controls})[aria-invalid="true"]:focus { border-color: var(--text-error); }
+
 }

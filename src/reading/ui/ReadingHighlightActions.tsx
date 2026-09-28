@@ -69,6 +69,12 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		if (!window) return;
 		let alive = true, held = false, nativeIntent = false, timer = 0, frame = 0, suppressClickUntil = 0, retryRemove = false, transferring = false;
 		let drag: { edge: 'start' | 'end'; pointer: number; initial: Editing; x: number; y: number; deltaY: number; target: HTMLElement } | null = null;
+		const eventTarget = (event: Event) => (event.composedPath()[0] ?? event.target) as HTMLElement;
+		const activeElement = () => {
+			let active = document.activeElement;
+			while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+			return active;
+		};
 		const edit = (value: Editing | null) => { editing.current = value; setDraft(value); };
 		const dismiss = () => { edit(null); setError(null); setFeedback(null); nativeIntent = false; window.clearTimeout(timer); };
 		const persist = async (value: Editing, remove = false) => {
@@ -121,8 +127,8 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			remove: () => { if (editing.current) void persist(editing.current, true); },
 		};
 		const finishNativeSelection = () => {
-			if (held || drag || !nativeIntent || saving.current || controls.current?.contains(document.activeElement)) return;
-			const highlight = selectedHighlight(text, document.getSelection());
+			if (held || drag || !nativeIntent || saving.current || controls.current?.contains(activeElement())) return;
+			const highlight = selectedHighlight(text);
 			if (!highlight) return;
 			nativeIntent = false; suppressClickUntil = Date.now() + 400;
 			const original = latest.current.highlights.find(entry => entry.start === highlight.start && entry.end === highlight.end) ?? null;
@@ -132,15 +138,15 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		};
 		const settle = () => { window.clearTimeout(timer); timer = window.setTimeout(finishNativeSelection, 120); };
 		const selectionChanged = () => {
-			if (controls.current?.contains(document.activeElement)) return;
-			if (selectedHighlight(text, document.getSelection())) nativeIntent = true;
+			if (controls.current?.contains(activeElement())) return;
+			if (selectedHighlight(text)) nativeIntent = true;
 			if (nativeIntent && !held) settle();
 		};
 		const activate = (event: MouseEvent | KeyboardEvent) => {
 			if ('key' in event && !['Enter', ' '].includes(event.key)) return;
-			const mark = (event.target as HTMLElement).closest<HTMLElement>('.crate-reading-reader__highlight');
+			const mark = eventTarget(event).closest<HTMLElement>('.crate-reading-reader__highlight');
 			if (!mark || !text.contains(mark)) return;
-			if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text, document.getSelection())) return;
+			if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text)) return;
 			event.preventDefault(); nativeIntent = false;
 			const start = Number(mark.dataset.highlightStart), end = Number(mark.dataset.highlightEnd);
 			const highlight = { start, end, text: (text.textContent ?? '').slice(start, end) };
@@ -169,7 +175,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		};
 		const down = (event: PointerEvent) => {
 			if (event.button !== 0) return;
-			const target = event.target as HTMLElement;
+			const target = eventTarget(event);
 			const handle = target.closest<HTMLElement>('[data-highlight-edge]');
 			if (handle && controls.current?.contains(handle) && editing.current && !saving.current && !latest.current.disabled) {
 				event.preventDefault(); nativeIntent = false; held = false;
@@ -207,19 +213,19 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		const touchCancel = () => { held = false; nativeIntent = false; endDrag(true); };
 		const keydown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') { endDrag(true); dismiss(); return; }
-			const edge = (event.target as HTMLElement).dataset.highlightEdge as 'start' | 'end' | undefined;
+			const edge = eventTarget(event).dataset.highlightEdge as 'start' | 'end' | undefined;
 			if (edge && editing.current && ['ArrowLeft', 'ArrowRight'].includes(event.key) && !latest.current.disabled && !saving.current) {
 				event.preventDefault(); const value = editing.current;
 				edit({ ...value, highlight: resizeHighlight(text.textContent ?? '', value.highlight, edge, value.highlight[edge] + (event.key === 'ArrowLeft' ? -1 : 1)) });
-			} else if (event.shiftKey && event.key.startsWith('Arrow') && !controls.current?.contains(event.target as Node)) nativeIntent = true;
+			} else if (event.shiftKey && event.key.startsWith('Arrow') && !controls.current?.contains(eventTarget(event))) nativeIntent = true;
 		};
 		const keyup = (event: KeyboardEvent) => {
-			if ((event.target as HTMLElement).dataset.highlightEdge && event.key.startsWith('Arrow') && editing.current) void persist(editing.current);
+			if (eventTarget(event).dataset.highlightEdge && event.key.startsWith('Arrow') && editing.current) void persist(editing.current);
 			else settle();
 		};
 		const relayout = () => { setLayout(value => value + 1); };
 		const scroll = (event: Event) => {
-			if (event.target !== document && event.target !== document.scrollingElement && !reader.contains(event.target as Node)) return;
+			if (event.target !== document && event.target !== document.scrollingElement && !reader.contains(eventTarget(event))) return;
 			// Handle auto-scroll is part of resizing, not a request to dismiss it.
 			if (drag) relayout();
 			else if (editing.current) dismiss();
