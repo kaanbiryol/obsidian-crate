@@ -16,7 +16,7 @@ export function createReadingNote(input: { id: string; url: string; title?: stri
 	const metadata = validateReadingMetadata({ crate_reading_version: 1, crate_reading_id: input.id,
 		title: input.title?.trim() || new URL(url).hostname, source_url: url, saved_at: input.savedAt,
 		reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'pending', capture_method: 'url' });
-	return `---\n${Object.entries(metadata).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n${ARTICLE_START}\n${ARTICLE_END}\n`;
+	return `---\n${Object.entries(metadata).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n${ARTICLE_START}\n${ARTICLE_END}\n`;
 }
 
 export function updateReadingNote(markdown: string, id: string, changes: ReadingChanges): string {
