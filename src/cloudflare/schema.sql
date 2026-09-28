@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 4, 4);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,

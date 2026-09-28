@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-Schema 4 is the fresh pre-launch baseline, including Reading storage and scoped credentials. The unused browser-rendering preference and the development migrations for schemas 1–3 have been removed. Those databases are unsupported and are never reset or interpreted as empty by the updater. Preserve any needed development data with its matching build, then create a fresh deployment.
+Schema 1 is the fresh pre-launch baseline, including Reading storage and scoped credentials. The unused browser-rendering preference and the development migrations for schemas 1–3 have been removed. Previous development databases must be recreated because schema numbering has restarted at 1. Restarting a vault does not reset server storage. Preserve any needed development data with its matching build, then create a fresh deployment.
 
 ## Independent versions
 
@@ -8,9 +8,8 @@ Schema 4 is the fresh pre-launch baseline, including Reading storage and scoped 
 
 - `revision` is a monotonically increasing server release number. Increment it whenever the deployable Worker, PWA, provisioning configuration, schema or migration plan changes for distribution. Never distribute different server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
-- `baselineSchemaVersion` is 4, the start of the launch migration chain. Keep it fixed for future releases.
-- `minimumSchemaVersion` is the oldest supported database source, currently 4. Retiring an old source version within the launch chain never deletes its migration history.
-- `migrations` is an ordered, contiguous registry, currently empty. Future entries start at schema 4. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
+- `minimumSchemaVersion` is the oldest supported database source, currently 1. Retiring an old source version within the launch chain never deletes its migration history.
+- `migrations` is an ordered, contiguous registry, currently empty. Future entries start at schema 1. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
 
 The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment.
 
@@ -53,7 +52,7 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 `npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently against uncommitted changes relative to `HEAD`; use `npm run check:server-revision -- --base <git-ref>` to check a complete branch or release. It rebuilds the server and follows the Worker, PWA, provisioner and build-script dependency graphs, including shared UI and transitive Sass imports. Database SQL, migration artifacts and compilation settings are included explicitly. Dependency-lock changes conservatively require a revision too; plugin package version and descriptive metadata changes alone do not.
 
-CI selects the complete comparison automatically: the PR base, the previous push tip, or the default branch for a new branch. Tag and manual release checks compare with the previous reachable release tag, falling back to the parent commit for the first release. Both workflows fetch full Git history. Missing references fail the check. A baseline predating the first release manifest is treated as its initial introduction. Revision decreases, schema edits without a schema version increase, and edits or removal of migrations within the supported baseline also fail. The pre-launch reset explicitly raises the baseline to 4 and rejects the retired schemas.
+CI selects the complete comparison automatically: the PR base, the previous push tip, or the default branch for a new branch. Tag and manual release checks compare with the previous reachable release tag, falling back to the parent commit for the first release. Both workflows fetch full Git history. Missing references fail the check. A baseline predating the first release manifest is treated as its initial introduction. Revision decreases, schema edits without a schema version increase, and edits or removal of migrations within the supported baseline also fail. The one-time pre-launch reset from the explicitly marked schema-4 baseline to schema 1 is allowed only with a higher server revision; normal downgrade checks remain enforced.
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.
 

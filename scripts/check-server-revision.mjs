@@ -77,7 +77,11 @@ export function checkServerRevision(root, base, inputs) {
 	if (!previousFiles.has(releasePath)) return { baseline: base, revision: current.revision, bootstrap: true, changed: [] };
 	const before = manifest(git(root, 'show', `${base}:${releasePath}`));
 	if (current.revision < before.revision) throw new Error('Server revision cannot decrease.');
-	if (current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
+	const launchReset = before.baselineSchemaVersion === 4 && before.schemaVersion === 4
+		&& before.minimumSchemaVersion === 4 && before.migrations.length === 0
+		&& current.baselineSchemaVersion === undefined && current.schemaVersion === 1
+		&& current.minimumSchemaVersion === 1 && current.migrations.length === 0 && current.revision > before.revision;
+	if (!launchReset && current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
 	const algorithm = git(root, 'rev-parse', '--show-object-format');
 	const changed = path => {
 		let contents;
@@ -86,13 +90,10 @@ export function checkServerRevision(root, base, inputs) {
 		const hash = createHash(algorithm).update(`blob ${contents.length}\0`).update(contents).digest('hex');
 		return hash !== previousFiles.get(path);
 	};
-	if (changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
+	if (!launchReset && changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
 	}
-	const baseline = current.baselineSchemaVersion ?? 1;
-	if (!Number.isSafeInteger(baseline) || baseline < (before.baselineSchemaVersion ?? 1) || baseline > current.minimumSchemaVersion) throw new Error('Invalid database schema baseline.');
-	// An explicit new baseline retires the old chain; those databases must be rejected.
-	for (const migration of before.migrations.filter(step => step.from >= baseline)) {
+	for (const migration of before.migrations) {
 		if (JSON.stringify(migration) !== JSON.stringify(current.migrations.find(step => step.id === migration.id)) || changed(`src/cloudflare/migrations/${migration.file}`)) {
 			throw new Error(`Released migration ${migration.id} cannot be edited or removed.`);
 		}

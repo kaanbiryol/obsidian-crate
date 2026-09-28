@@ -90,13 +90,13 @@ class ArchiveTests(unittest.TestCase):
         manifest_bytes = (self.directory / 'archive.json').read_bytes()
         _, original = verify(self.directory)
         self.addCleanup(original.close)
-        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 4)
+        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 4)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
@@ -115,7 +115,7 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 4)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         self.assertEqual(restored.execute('SELECT request_hash FROM upload_operations').fetchone()[0], 'hash')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertNotIn('files_storage_key_idx', indexes)
