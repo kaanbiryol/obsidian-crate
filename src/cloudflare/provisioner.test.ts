@@ -44,7 +44,7 @@ function createApi() {
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: 1, created_version: 1 }] }] : [])),
+		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] }] : [])),
 		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
     verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
@@ -136,7 +136,7 @@ describe('provisionCloudflareDeployment', () => {
 	it.each([
 		{ tables: ['files'], version: 999 },
 		{ tables: ['crate_schema'], version: 999 },
-		...[2, 3, 4, 5, 6].map(version => ({ tables: ['crate_schema'], version })),
+		...Array.from({ length: 5 }, (_, index) => SERVER_RELEASE.schemaVersion + index + 1).map(version => ({ tables: ['crate_schema'], version })),
 	])('rejects an unsupported existing database before uploading: %j', async ({ tables, version }) => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: tables.map(name => ({ name })) }]);
@@ -149,7 +149,17 @@ describe('provisionCloudflareDeployment', () => {
 	});
 
 
-  it('updates a baseline database without reapplying the fresh schema', async () => {
+  it('rejects an upgraded database with missing migration receipts before upload', async () => {
+    const api = createApi();
+    api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
+    api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 1 }] }]);
+    const metadata = createMetadata();
+    await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
+      .rejects.toThrow('Database migration history does not match');
+    expect(api.uploadWorker).not.toHaveBeenCalled();
+  });
+
+  it('updates a current database without reapplying the fresh schema', async () => {
     const api = createApi();
     const query = api.queryD1.getMockImplementation()!;
     api.queryD1.mockImplementation((account, database, sql, params) => sql.includes('sqlite_master')

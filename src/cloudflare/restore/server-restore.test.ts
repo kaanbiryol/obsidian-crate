@@ -10,7 +10,7 @@ import { provisionCloudflareDeployment } from '../provisioner';
 import { recoverDeployment } from '../deployment-recovery';
 import { completePublishedDeployment } from '../complete-published-deployment';
 import { listUpgradeBackups, restoreUpgradeBackup, rowSql } from './server-restore';
-import { hashBytes, parseBackupRows, readBackup } from './archive';
+import { hashBytes, parseBackupRows, prepareRows, readBackup } from './archive';
 import type { ServerRestoreState } from './state';
 import { normalizeCrateSettings } from '../../plugin/settings';
 
@@ -181,7 +181,7 @@ it('does not execute backup expressions and rejects unrecognized schemas', async
   expect(() => parseBackupRows('INSERT INTO "files" ("path") VALUES (readfile(\'/etc/passwd\'));')).toThrow('Non-literal');
   expect(() => parseBackupRows('DROP TABLE files;')).toThrow('Unsupported');
   const f = await fixture();
-  await f.rewriteSQL(sql => sql.replace('VALUES (1,1,1)', 'VALUES (1,99,99)'));
+  await f.rewriteSQL(sql => sql.replace(`VALUES (1,${SERVER_RELEASE.schemaVersion},${SERVER_RELEASE.schemaVersion})`, 'VALUES (1,99,99)'));
   await expect(f.run()).rejects.toThrow(); expect(f.api.createD1Database).not.toHaveBeenCalled();
 });
 
@@ -211,4 +211,35 @@ it('rejects oversized rows before creating resources and does not round unsafe i
   await f.rewriteSQL(sql => sql + `INSERT INTO "reminder_identities" ("reminder_id","created_operation_id") VALUES ('id','${'x'.repeat(71000)}');`);
   await expect(f.run()).rejects.toThrow('too large'); expect(f.api.createD1Database).not.toHaveBeenCalled();
   expect(() => parseBackupRows('INSERT INTO "sqlite_sequence" ("name","seq") VALUES (\'changelog\',9007199254740993);')).toThrow();
+});
+
+
+it('preserves queued schema-2 captures and their policy across a restore', async () => {
+  const f = await fixture();
+  await f.rewriteSQL(sql => sql + `INSERT INTO "reading_captures" ("id","generation","url_identity","note","attempts","available_at") VALUES ('pending','generation','https://example.com/article','queued note',2,123456789);`);
+  await f.run();
+  expect(f.databases.get(destination)!.prepare('SELECT * FROM reading_captures').all()).toEqual([
+    { id: 'pending', generation: 'generation', url_identity: 'https://example.com/article', note: 'queued note', attempts: 2, available_at: 123456789 },
+  ]);
+  expect(f.databases.get(destination)!.prepare('SELECT generation FROM reading_policy').get()).toEqual({ generation: 'generation' });
+});
+
+it('restores a schema-1 archive into schema 2 with an empty capture queue', async () => {
+  const f = await fixture();
+  await f.rewriteSQL(sql => sql.replace(`VALUES (1,${SERVER_RELEASE.schemaVersion},${SERVER_RELEASE.schemaVersion})`, 'VALUES (1,1,1)'));
+  await f.run();
+  expect(f.databases.get(destination)!.prepare('SELECT * FROM reading_captures').all()).toEqual([]);
+  expect(f.databases.get(destination)!.prepare('SELECT version FROM crate_schema').get()).toEqual({ version: 2 });
+});
+
+it('rejects a future restore target before allocating destination resources', async () => {
+  const f = await fixture();
+  const rows = parseBackupRows(new TextDecoder().decode(f.buckets.get(source.bucket)!.get(`${f.choice.prefix}/database.sql`)));
+  const version = SERVER_RELEASE.schemaVersion;
+  try {
+    SERVER_RELEASE.schemaVersion = 3;
+    expect(() => prepareRows(rows, f.choice.manifest, schema, f.state.restoredAt)).toThrow('newer in-app restore adapter');
+    await expect(f.run()).rejects.toThrow('newer in-app restore adapter');
+    expect(f.api.createD1Database).not.toHaveBeenCalled();
+  } finally { SERVER_RELEASE.schemaVersion = version; }
 });

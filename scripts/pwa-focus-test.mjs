@@ -208,6 +208,8 @@ for (const browserType of [chromium, webkit]) {
 			});
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('translate', 'none');
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
+			// Let opening settle: reversing before displacement starts needs no gap fill.
+			await expect.poll(() => page.locator('.pwa-reminder-sheet-stage').evaluate(element => element.getAnimations().length)).toBe(0);
 			// Closing the keyboard must keep the surface's bottom background covered.
 			const closingMotion = await page.evaluate(async () => {
 				const stage = document.querySelector('.pwa-reminder-sheet-stage');

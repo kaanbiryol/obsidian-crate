@@ -124,3 +124,13 @@ while paused. Resume queues existing schedules with the same identity, preserves
 completed deliveries, and wakes pending projections and extraction. Notification
 retry-age limits remain in effect; a pause does not make old notifications valid
 indefinitely. Requests already sent to websites or push providers cannot be recalled.
+
+## In-app checkpoint restore
+
+The in-app restore adapter supports source schemas 1 and 2 into the current
+schema-2 database. Schema 2 adds only the durable Reading capture queue, so restore
+preserves queued captures (including their retry state and notes) alongside the
+Reading policy and generation. Schema-1 archives restore with an empty capture
+queue. Credentials and derived extraction jobs are still reset, and migration
+receipts are validated before creating destination resources. Future target
+schemas remain blocked until their recovery adapter is implemented.

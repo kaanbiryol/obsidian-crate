@@ -184,11 +184,12 @@ try {
 			await expectNoTouchRing(darkTheme);
 			await expect(settings).toBeVisible();
 			const days = settings.getByRole('spinbutton', { name: 'Upcoming range (days)', exact: true });
-			const inputBorder = await days.evaluate(element => getComputedStyle(element).borderColor);
+			const wrapperBorder = await days.locator('..').evaluate(element => getComputedStyle(element).borderColor);
 			await days.tap();
 			await days.fill('12');
 			await expectNoTouchRing(days);
-			await expect(days).toHaveCSS('border-color', inputBorder);
+			await expect(days).toHaveCSS('border-width', '0px');
+			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
 			const select = settings.getByRole('combobox', { name: 'Default tab', exact: true });
 			await select.tap();
 			await expectNoTouchRing(select);
@@ -196,7 +197,8 @@ try {
 			await expect(settings).toBeVisible();
 
 			await tabTo(page, days);
-			await expectNeutralKeyboardRing(days.locator('..'));
+			await expect(days.locator('..')).toHaveCSS('outline-style', 'none');
+			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
 			await tabTo(page, settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await expectNeutralKeyboardRing(settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await darkTheme.tap();

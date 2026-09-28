@@ -3,6 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
+import worker from './index';
+import { sha256Hex } from './auth';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
 import { limitNotificationRequest, limitNotificationAction } from './rate-limit';
 beforeEach(async () => { for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -38,9 +41,6 @@ it('caps daily admissions across rotating addresses without growing or updating 
 });
 
 it('invalid bearers and enrollment grants cannot spend authenticated capacity', async () => {
-	const { default: worker } = await import('./index');
-	const { sha256Hex } = await import('./auth');
-	const { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } = await import('../../protocol');
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner')).run();
 	await env.DB.prepare("INSERT INTO request_rate_limits(key,count,expires_at) VALUES ('notification-daily',999,?)").bind(Date.now()+86400000).run();
 	const post = (path: string, token: string, body: unknown) => worker.fetch(new Request(`https://test${path}`, {
