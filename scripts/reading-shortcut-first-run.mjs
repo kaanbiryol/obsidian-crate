@@ -56,7 +56,7 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
     const exchangeUrl = add('text.replace', { WFReplaceTextFind: '#[a-f0-9]{64}$', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
     const grant = add('text.replace', { WFReplaceTextFind: '^.*#', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
     const response = add('downloadurl', { WFURL: text(exchangeUrl), WFHTTPMethod: 'POST', WFHTTPBodyType: 'JSON',
-      WFHTTPHeaders: dictionary([['X-Crate-Protocol', '11']]), WFJSONValues: dictionary([['token', grant]]) });
+      WFHTTPHeaders: dictionary([['X-Crate-Protocol', '1']]), WFJSONValues: dictionary([['token', grant]]) });
     const header = add('getvalueforkey', { WFInput: attachment(response), WFDictionaryKey: 'authorization', WFGetDictionaryValueType: 'Value' });
     authorization = validate(header, '^Bearer [a-f0-9]{64}$', 'Pairing did not finish. Create a new pairing code in Crate and try again. Your previous setup is unchanged.');
     // Derive the destination from the validated code, never from remote content.

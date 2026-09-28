@@ -25,7 +25,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); origin = `https://localhost:${server.address().port}`;
     const api = async (path, body, token = vault.token) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '11', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       assert.equal(response.status, 200, await response.clone().text()); return response.json();
     };
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });

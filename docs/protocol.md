@@ -1,6 +1,6 @@
 # Protocol contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 11 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The launch protocol is 1, with oldest compatible protocol 1. Earlier development protocols are unsupported. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -78,7 +78,7 @@ The file pointer, changelog entry and exact result receipt commit in the same D1
 
 ## Initial import readiness
 
-`resumable-initial-import-v2` uses protocol 10. `/sync/import/complete` seals the
+`resumable-initial-import-v2` is included in protocol 1. `/sync/import/complete` seals the
 file inventory and, when a reminder policy exists, records pending reminder setup.
 `POST /sync/import/readiness` checks the selected-folder scan and durable source,
 projection and schedule queues, then atomically acknowledges readiness. Probes
@@ -91,8 +91,7 @@ wait or the three-hour foreground wait bound leaves all progress intact.
 
 ## Shared history checkpoints
 
-Protocol 11 adds `shared-history-checkpoints-v1` without retiring ordinary protocol-7
-writers. Server-authored inventories are stored in R2 with a conditional shared
+Protocol 1 includes `shared-history-checkpoints-v1`. Server-authored inventories are stored in R2 with a conditional shared
 index, capped at 20 states and 30 days. Creation rejects a changing inventory;
 publication retries deduplicate by monotonic server generation. No database schema
 change or duplicate file-content storage is introduced. Retained-version expiry is

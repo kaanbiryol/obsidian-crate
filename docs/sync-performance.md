@@ -1,7 +1,7 @@
 # Initial upload performance
 
 An empty, never-populated remote uses the resumable initial import capability
-`resumable-initial-import-v2` (protocol 10). The first device uploads the vault,
+`resumable-initial-import-v2` (protocol 1). The first device uploads the vault,
 completes its initial sync, and then additional devices download that vault.
 
 Initial imports store file contents in R2 and current file metadata in D1. They
