@@ -1,4 +1,5 @@
 @use "../../../../ui/shared/styles/list-item";
+@use "../../../../ui/shared/styles/view-header";
 
 // Shared primary-screen density and hierarchy.
 // Each host supplies its own theme-aware surface, accent, and semantic colors.
@@ -10,9 +11,10 @@
     --crate-project-progress-width: 42px;
 
     .view-header {
-        min-height: 80px;
-        padding: var(--crate-primary-header-padding, 14px 16px 10px);
-        gap: 8px;
+        @include view-header.screen-spacing-tokens;
+        @include view-header.screen-spacing;
+        padding: var(--crate-view-header-padding);
+        gap: 10px;
     }
 
     .view-header-title {
@@ -23,9 +25,6 @@
     }
 
     .view-header-meta {
-        height: 21px;
-        min-height: 21px;
-        margin-top: 3px;
         gap: 6px;
     }
 

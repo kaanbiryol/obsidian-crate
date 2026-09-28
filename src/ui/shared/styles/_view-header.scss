@@ -1,3 +1,32 @@
+// Screen spacing is shared by Obsidian, live PWA screens, and launch shells.
+@mixin screen-spacing-tokens {
+    --crate-header-top-gap: 17px;
+    --crate-header-bottom-gap: 11px;
+    --crate-header-meta-height: 28px;
+    --crate-header-meta-gap: 6px;
+    --crate-view-header-padding: var(--crate-header-top-gap) 18px var(--crate-header-bottom-gap);
+
+    @media (max-width: 759px) {
+        --crate-header-top-gap: 4px;
+        --crate-header-bottom-gap: 8px;
+        --crate-header-meta-height: 20px;
+        --crate-header-meta-gap: 0px;
+    }
+}
+
+@mixin screen-spacing {
+    min-height: 0;
+    .view-header-meta {
+        height: var(--crate-header-meta-height);
+        min-height: var(--crate-header-meta-height);
+        margin-top: var(--crate-header-meta-gap);
+    }
+    // Preserve the PWA's 44px row at its 32px title size without reserving
+    // the same oversized row around Obsidian's smaller, theme-sized headings.
+    .view-header-title-row { min-height: calc(var(--crate-view-title-size) * 1.375); }
+    .view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
+}
+
 @mixin styles {
 .view-header {
     flex-shrink: 0;
