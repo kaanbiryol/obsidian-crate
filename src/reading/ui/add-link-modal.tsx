@@ -34,8 +34,8 @@ function LocalCapture({ plugin, onClose }: { plugin: CratePlugin; onClose: () =>
 		pending.current = true; setSaving(true); setError(null);
 		try {
 			const library = getReadingLibrary(plugin);
-			if (!library) throw new Error('Enable reading in Crate settings first.');
-			const result = await library.add(url);
+			if (!library) throw new Error('Reading is still starting. Try saving again shortly.');
+			const result = await library.add(url, undefined, true);
 			new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); onClose();
 		} catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save this link.'); }
 		finally { pending.current = false; setSaving(false); }

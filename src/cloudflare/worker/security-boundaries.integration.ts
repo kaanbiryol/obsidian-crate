@@ -40,7 +40,7 @@ it('binds reads, source edits, and enrollment permissions to the original folder
   await token('unbound', 'reminders', null);
   expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
 });
-it('uses an enrolled reminders session for Reading only while server Reading is enabled', async () => {
+it('keeps the Reading library accessible when article fetching is disabled', async () => {
   await token('browser'); await token('vault', 'vault', null);
   expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
   expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: true, folderPath: 'Reading', revision: null }), env)).status).toBe(200);
@@ -61,7 +61,31 @@ it('uses an enrolled reminders session for Reading only while server Reading is 
   expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
   const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
   expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
-  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(403);
+  expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(200);
+  expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+  const bookmark = await worker.fetch(request('/reading/capture', 'browser', {
+    url: 'https://example.invalid/bookmark', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+  }), env);
+  expect(bookmark.status).toBe(200);
+  const library = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+  const bookmarks = await library.json() as { items: { source_url: string; extraction_status: string }[] };
+  expect(bookmarks.items.find(item => item.source_url === 'https://example.invalid/bookmark')?.extraction_status).toBe('unavailable');
+  const permission = await worker.fetch(request('/reading/fetching', 'browser', undefined, 'GET'), env);
+  expect(permission.status).toBe(200);
+  const state = await permission.json() as { enabled: boolean; revision: string };
+  expect(state.enabled).toBe(false);
+  await token('capture-only', 'reading_capture', 'Reading');
+  expect((await worker.fetch(request('/reading/fetching', 'capture-only', { enabled: true, revision: state.revision }), env)).status).toBe(403);
+  expect((await worker.fetch(request('/reading/fetching', 'browser', { enabled: true, revision: 'stale' }), env)).status).toBe(409);
+  expect((await worker.fetch(request('/reading/fetching', 'browser', { enabled: true, revision: state.revision }), env)).status).toBe(200);
+  const explicitBookmark = await worker.fetch(request('/reading/capture', 'browser', {
+    url: 'https://example.invalid/offline-bookmark', fetchArticle: false,
+    operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
+  }), env);
+  expect(explicitBookmark.status).toBe(200);
+  const refreshed = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+  const savedItems = await refreshed.json() as { items: { source_url: string; extraction_status: string }[] };
+  expect(savedItems.items.find(item => item.source_url === 'https://example.invalid/offline-bookmark')?.extraction_status).toBe('unavailable');
   expect((await worker.fetch(request('/auth/session', 'browser', undefined, 'DELETE'), env)).status).toBe(200);
   expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(401);
 });

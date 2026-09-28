@@ -52,15 +52,24 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 ## Reading
 
-Enable **Settings → Crate → Reading → Enable reading on this device**. Use
+Reading and Reminders are included with Crate. Choose a folder under **Settings → Crate → Reading**. Use
 **Crate: Add reading link** to save a URL and **Crate: Open reading** for your
 inbox, favorites, archive, tags, and search. Reading metadata and article text
 live in ordinary Markdown notes, carried by normal vault sync.
 
-On a compatible server, select **Enable server reading**. A web app already
-connected for Reminders opens Reading with the same connection; select Reading
-in its **Reminders / Reading** switch. For a new browser without a Reminders
-connection, select **Open web reading** or **Copy setup link** in Obsidian.
+Reading and Reminders start enabled on new installs. Each has an **Enable reading**
+or **Enable reminders** switch in its settings. These switches apply to every device connected to this server.
+Pausing Reading stops scanning and article downloads; pausing Reminders stops
+scanning, processing, and notification delivery. Notes, indexes, device connections,
+and vault sync are preserved. Resume either feature without redeploying or setting
+it up again. Changes require a connection; plugins check on startup, focus, and
+every 30 seconds, and the web app checks on focus and every 15 seconds. Offline
+devices retain their last confirmed state until they reconnect.
+Saving a Reading link downloads the full article through your server; the save
+form explains this before you submit. There is no separate article-fetching switch.
+Notifications retain their own **Push notifications** opt-in.
+Under **Crate web app**, select **Open app** for this device, or **Connect another
+device** to show a QR code with a **Copy link** option. Reminders and Reading share the same web app.
 The web app works without Obsidian open.
 The server saves the bookmark first, then extracts article text with Defuddle.
 Your server contacts the saved website without browser cookies or Crate credentials;
@@ -242,7 +251,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Reminders
 
-Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
+Crate stores reminders as Markdown in a configurable vault folder. Reminders are included by default. Choose their folder in **Settings → Crate → Reminders**. Crate scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
 
 When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` and times without a timezone are resolved once in that device's timezone and saved as explicit dates or UTC timestamps. Recurring reminders also save their timezone and first occurrence. Existing reminder IDs, titles, and descriptions are preserved. Editing a saved date back to natural language resolves it again on the next scan. The web app reports an unresolved schedule until Obsidian saves it; vault file sync continues. This keeps the same saved reminder date across devices, reloads, and midnight.
 
@@ -264,7 +273,7 @@ The Worker schedules notifications from committed Markdown using a shared folder
 
 The web app checks browser permission and confirms push registration with the current server session when opened, resumed, or reconnected. **On** appears after confirmation. If registration fails, **Retry** repairs the existing browser subscription; if permission is blocked, allow notifications in browser settings and reopen Crate.
 
-To set up the web app on the same phone as Obsidian, select **Settings → Crate → Reminders web app → Open app**, then select **Open reminders**. For another device, use **Copy app link** or **Show QR code**. If clipboard access fails, Crate shows a link you can open or select and copy.
+To set up the web app on the same phone as Obsidian, select **Settings → Crate → Crate web app → Open app**. For another device, select **Connect another device**, then scan the QR code or select **Copy link**. If clipboard access fails, Crate shows a link you can open or select and copy.
 
 The reminders web app checks for updates during launch and when brought back to the foreground, including on iPhone Home Screen installs. During launch, it allows up to 2.5 seconds to prepare and safely apply an update before showing the list. If the check or download is slow, fails, or pending work prevents an update, the current app opens normally. Once the list is visible, updates download in the background and wait for you to select **Update**; reading, closing an editor, and returning to the app never trigger an automatic reload. Selecting **Update** shows the updating screen immediately and keeps it visible through download and reload. Its linear indicator advances through update stages and keeps its position across the reload. If the update fails, the screen closes and an error explains that you can retry. Offline launches use the existing app. An already-open editor in another tab is not reloaded.
 

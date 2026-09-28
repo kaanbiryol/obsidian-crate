@@ -1,4 +1,4 @@
-import { type App } from 'obsidian';
+import { Notice, Setting, type App } from 'obsidian';
 import { SharedModal } from './shared/SharedModal';
 import qrcode from 'qrcode-generator';
 
@@ -11,12 +11,12 @@ export class QRModal extends SharedModal {
 	}
 
 	onOpen(): void {
-		this.openLayout('Scan to set up');
+		this.openLayout('Connect another device');
 		const contentEl = this.bodyEl;
 		this.modalEl.addClass('crate-qr-modal');
 
 		contentEl.createEl('p', {
-			text: 'Scan this code with your other device to finish setup.',
+			text: 'Scan this code with your other device, or copy the link below. This setup link expires in 10 minutes.',
 			cls: 'crate-qr-desc',
 		});
 
@@ -32,10 +32,28 @@ export class QRModal extends SharedModal {
 
 		if (parsedSvg.tagName.toLowerCase() !== 'svg') {
 			wrapper.setText('Unable to render setup code.');
-			return;
+		} else {
+			wrapper.appendChild(document.importNode(parsedSvg, true));
 		}
 
-		wrapper.appendChild(document.importNode(parsedSvg, true));
+		const fallback = contentEl.createDiv({ cls: 'crate-qr-link-fallback' });
+		fallback.hide();
+		new Setting(contentEl).setName('Setup link')
+			.addButton(button => button.setButtonText('Copy link').onClick(async () => {
+				try {
+					await navigator.clipboard.writeText(this.data);
+					new Notice('Setup link copied');
+				} catch {
+					fallback.empty();
+					fallback.show();
+					new Setting(fallback).setName('Copy this link').addTextArea(text => {
+						text.setValue(this.data);
+						text.inputEl.readOnly = true;
+						text.inputEl.setAttribute('aria-label', 'Setup link');
+						text.inputEl.focus();
+					});
+				}
+			}));
 	}
 
 	onClose(): void {

@@ -1,3 +1,4 @@
+import { useSharedFeatures } from '../shared-features';
 import { DOCK_TABS, dockDestinationIndex, type DockTab } from '../dock-preferences';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import React, { useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
@@ -25,7 +26,9 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
 }) {
   const { preferences, updatePreferences } = usePwaPreferences();
   const { toast, showToast } = useToast();
-  const tabs = preferences.dockTabs;
+  const features = useSharedFeatures();
+  const allowed = (tab: string) => ['reading', 'favorites', 'archive', 'highlights'].includes(tab) ? features.reading : features.reminders;
+  const tabs = preferences.dockTabs.filter(allowed);
   const navigation = useContext(FeatureNavigationContext);
   const container = useRef<HTMLDivElement>(null);
   const [menuHeight, setMenuHeight] = useState(158);
@@ -44,7 +47,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
   const [previewTab, setPreviewTab] = useState<DockTab | null>(null);
   const activeIndex = dockDestinationIndex(tabs, section, activeTab);
   const currentTab = section === 'reading' ? activeTab === 'inbox' ? 'reading' : activeTab === 'archived' ? 'archive' : activeTab : activeTab === 'upcoming' ? 'today' : activeTab;
-  const overflowTabs = DOCK_TABS.filter(item => !tabs.includes(item.id));
+  const overflowTabs = DOCK_TABS.filter(item => allowed(item.id) && !tabs.includes(item.id));
   const indicatorIndex = navigation?.dockIndex ?? activeIndex;
   const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
   useLayoutEffect(() => {

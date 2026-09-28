@@ -1,5 +1,5 @@
 import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonComponent } from 'obsidian';
-import { createSettingsSectionHeading } from './section-helpers';
+import { createSettingsDisclosure, createSettingsSectionHeading } from './section-helpers';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import { normalizeTimeString } from '../../reminders/settings';
@@ -10,7 +10,6 @@ export interface NotificationsSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
 	rerender: () => void;
-	allDayTimeContainerEl?: HTMLElement;
 }
 
 export function renderNotificationsSection(context: NotificationsSectionContext): () => void {
@@ -36,9 +35,9 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
     policy = (await policyApi.updateNotificationPolicy({ ...policy, ...patch })).policy;
   };
   let enabledToggle: ToggleComponent;
-  createSettingsSectionHeading(containerEl, 'Reminder notifications');
+  createSettingsSectionHeading(containerEl, 'Notifications');
   new Setting(containerEl)
-    .setName('Send reminder notifications')
+    .setName('Push notifications')
     .setDesc('All devices · send reminder notifications to subscribed phones and browsers.')
     .addToggle(toggle => {
       enabledToggle = toggle;
@@ -56,12 +55,16 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
     });
   void openedPolicy.then(() => { if (active && policy) enabledToggle.setValue(policy.enabled !== false); });
 
+  const optionsContent = createSettingsDisclosure(containerEl, 'Notification options', {
+    summary: 'Schedule, timezone, and devices',
+    onOpen: options => {
+      if (!active) return;
   const saveAllDayTime = async (time: string | null) => {
     await savePolicy({ allDayTime: time });
     await plugin.writeRemindersSettings({ allDayNotificationTime: time });
   };
 	let timeInput: TextComponent;
-	const timeSetting = new Setting(context.allDayTimeContainerEl ?? containerEl)
+	const timeSetting = new Setting(options)
 		.setName('All-day notification time')
 		.setDesc('All devices · loading the notification timezone…')
 		.addText(text => {
@@ -118,13 +121,13 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
       ? 'Could not load the notification timezone. Reopen settings to retry.'
       : `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
   });
-  const policyDescription = containerEl.createEl('p', { cls: 'setting-item-description' });
+  const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
   void openedPolicy.then(() => {
     if (!active) return;
     policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
       : policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
   });
-  new Setting(containerEl).setName('Notification folder and timezone')
+  new Setting(options).setName('Notification folder and timezone')
     .setDesc(`All devices · set the notification folder to ${plugin.remindersSettings.remindersFolderPath} and timezone to ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`)
     .addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
       button.setDisabled(true);
@@ -135,7 +138,15 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
       finally { button.setDisabled(false); }
     }));
 	const apiClient = plugin.syncRuntime.getApiClient();
-	if (apiClient) renderEnabledDevices(containerEl, plugin, apiClient, isActive);
+	if (apiClient) renderEnabledDevices(options, plugin, apiClient, isActive);
+
+    },
+  });
+  const disclosure = optionsContent.parentElement;
+  if (disclosure) disclosure.hidden = !plugin.settings.pushEnabled;
+  void openedPolicy.then(() => {
+    if (active && disclosure && !loadError) disclosure.hidden = !(policy?.enabled ?? plugin.settings.pushEnabled);
+  });
 
 	return () => { active = false; };
 }

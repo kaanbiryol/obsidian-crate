@@ -1,3 +1,4 @@
+import { setReminderRibbon } from './visibility';
 import { addIcon, type MarkdownPostProcessorContext } from 'obsidian';
 import type CratePlugin from '../main';
 import { registerReminderCommands } from './commands';
@@ -47,10 +48,11 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 		VIEW_TYPE_REMINDERS,
 		(leaf) => new RemindersView(leaf, plugin),
 	);
-	plugin.addRibbonIcon(CRATE_ICON_ID, 'Open reminders', () => {
+	const ribbon = plugin.addRibbonIcon(CRATE_ICON_ID, 'Open reminders', () => {
 		void plugin.activateRemindersView();
 	});
 
+	setReminderRibbon(plugin, ribbon);
 	registerReminderCommands(plugin);
 
 	plugin.addCommand({

@@ -85,8 +85,12 @@ export function startReading(plugin: CratePlugin): void {
 
     if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
       checkedAt = Date.now();
-      void readingServerRequest<{ policy: { folder_path: string } | null }>(plugin, '/reading/policy').then(async ({ policy }) => {
+      void readingServerRequest<{ policy: { folder_path: string; enabled: number; revision: string } | null }>(plugin, '/reading/policy').then(async ({ policy }) => {
         if (controller.signal.aborted) return;
+        if (!policy || !policy.enabled) {
+          await readingServerRequest(plugin, '/reading/policy', { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
+          if (controller.signal.aborted) return;
+        }
         if (policy && policy.folder_path !== folder) {
           const reading = { ...plugin.settings.reading, folderPath: policy.folder_path };
           validateReadingConfiguration(plugin, reading); await plugin.writeSettings({ reading });

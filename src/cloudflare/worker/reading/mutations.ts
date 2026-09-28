@@ -1,3 +1,4 @@
+import { updatePolicy } from './access';
 import { createReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity, type ReadingChanges } from '@/reading/core/model';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
@@ -16,6 +17,12 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   if (action === 'capture') {
     let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
     if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 1000)) throw new ReadingError('Use a title shorter than 1,000 characters.');
+    // Saving a full article is the library user's explicit request to download its text.
+    if (!current.enabled && body.fetchArticle === true && principal.scope !== 'reading_capture') {
+      await updatePolicy(env.DB, { enabled: true, folderPath: current.folder_path, revision: current.revision });
+      current = { ...current, enabled: 1 };
+    }
+
     const { results } = await env.DB.prepare(`SELECT s.item_id FROM reading_sources s JOIN files f ON f.path=s.path AND f.storage_key=s.revision
       WHERE s.generation=? AND s.url_identity=? LIMIT 2`).bind(current.generation, readingUrlIdentity(url)).all<{ item_id: string }>();
     if (results.length > 1) throw new ReadingError('Several notes use this link. Review them in Obsidian before saving again.', 409);
@@ -25,9 +32,10 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       await env.DB.batch([operationStatement(env.DB, op, response)]);
       return readingResponse(response);
     }
-    if (await env.DB.prepare('SELECT count(*) AS count FROM reading_jobs HAVING count(*)>=1000').first()) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
+    if (current.enabled && body.fetchArticle !== false && await env.DB.prepare('SELECT count(*) AS count FROM reading_jobs HAVING count(*)>=1000').first()) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
     const id = crypto.randomUUID(), path = `${current.folder_path}/${id}.md`;
-    const content = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() });
+    const note = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() });
+    const content = current.enabled && body.fetchArticle !== false ? note : patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
     const response = { saved: true, alreadySaved: false, id };
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
     const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, effects: operationEffects(env.DB, op, response) });
@@ -37,6 +45,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   const source = await sourceById(env, current, body.id);
   let content: string;
   if (action === 'retry') {
+    if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
     if (source.item.capture_method !== 'url' || !managedArticle(source.content)) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
     content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
   } else {

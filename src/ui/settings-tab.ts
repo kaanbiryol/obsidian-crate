@@ -10,11 +10,13 @@ import type CratePlugin from '../main';
 import { renderForgetServerSetting } from './settings/server-selection-setting';
 import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/config-section';
 import { renderDevicesSection } from './settings/devices-section';
-import { renderInfrastructureSection } from './settings/infrastructure-section';
+import { renderInfrastructureSection, renderServerActions } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
+import { renderCrateWebApp } from './settings/reminders-web-app';
 import { renderReadingSettings } from '../reading/ui/settings-section';
+import { captureSettingsView, restoreSettingsView } from './settings/settings-view-state';
 import { getSettingsTabSections } from './settings/settings-tab-model';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -30,8 +32,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		this.cleanup();
 
 		const { containerEl } = this;
-		const openSections = new Map(Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))
-			.map(details => [details.querySelector('summary')?.textContent, details.open]));
+		const viewState = captureSettingsView(containerEl);
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
@@ -61,36 +62,56 @@ export class CrateSettingTab extends PluginSettingTab {
 			});
 		}
 
+		if (isConfigured) renderCrateWebApp(containerEl, this.plugin);
+
 		if (sections.showReminders) {
 			const remindersEl = containerEl.createDiv({ cls: 'crate-reminders-settings' });
-			let allDayTimeEl: HTMLElement | undefined;
 			this.cleanupFns.push(renderRemindersSection({
-				onAllDayTimeContainer: container => { allDayTimeEl = container; },
 				containerEl: remindersEl,
 				plugin: this.plugin,
 				rerender: () => this.update(),
 			}));
-			if (sections.showNotifications) {
-				this.cleanupFns.push(renderNotificationsSection({
-					allDayTimeContainerEl: allDayTimeEl,
-					containerEl: remindersEl,
-					plugin: this.plugin,
-					rerender: () => this.update(),
-				}));
-			}
 		}
 
 		if (sections.showReading) {
 			renderReadingSettings(containerEl, this.plugin, () => this.update());
 		}
 
+		if (sections.showNotifications) {
+			this.cleanupFns.push(renderNotificationsSection({
+				containerEl,
+				plugin: this.plugin,
+				rerender: () => this.update(),
+			}));
+		}
+
 		if (isConfigured) {
-			const accountEl = createSettingsDisclosure(containerEl, 'Account and devices');
-			renderConfigSection({ containerEl: accountEl, plugin: this.plugin, rerender: () => this.update() }, false);
-			this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
-			const serverEl = createSettingsDisclosure(containerEl, 'Server and usage');
-			renderServerSection({ containerEl: serverEl, plugin: this.plugin, rerender: () => this.update() });
-			this.cleanupFns.push(renderUsageSection(serverEl, this.plugin));
+			createSettingsDisclosure(containerEl, 'Account and devices', {
+				summary: this.plugin.settings.cloudflareDeployment?.accountName ?? 'Connection and sessions',
+				onOpen: accountEl => {
+					renderConfigSection({ containerEl: accountEl, plugin: this.plugin, rerender: () => this.update() }, false);
+					this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
+				},
+			});
+			const serverEl = createSettingsDisclosure(containerEl, 'Server', {
+				summary: 'Versions, usage, backups, and management',
+				onOpen: content => {
+					renderServerSection({ containerEl: content, plugin: this.plugin, rerender: () => this.update() });
+					this.cleanupFns.push(renderUsageSection(content, this.plugin));
+					renderServerActions({ containerEl: content, plugin: this.plugin, isConfigured, rerender: () => this.update() });
+				},
+			});
+			if (this.plugin.settings.cloudflareDeployment?.reset || this.plugin.settings.cloudflareRestore && this.plugin.settings.cloudflareRestore.phase !== 'complete') {
+				const attention = new Setting(containerEl).setName('Server recovery needs attention')
+					.setDesc('Review the saved server recovery operation.');
+				attention.addButton(button => button.setButtonText('Review recovery').onClick(() => {
+					const details = serverEl.parentElement as HTMLDetailsElement;
+					details.open = true;
+					details.dispatchEvent(new Event('toggle'));
+					details.querySelector('summary')?.focus();
+				}));
+				containerEl.prepend(attention.settingEl);
+			}
 		}
 
 		if (sections.showInfrastructure) {
@@ -101,10 +122,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				rerender: () => this.update(),
 			});
 		}
-		for (const details of Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))) {
-			const previous = openSections.get(details.querySelector('summary')?.textContent);
-			if (previous !== undefined) details.open = previous;
-		}
+		restoreSettingsView(containerEl, viewState);
 
 	}
 

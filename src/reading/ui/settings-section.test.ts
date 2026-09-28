@@ -1,51 +1,76 @@
-import { afterEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { FakeElement, MockSetting, openSettingsDisclosures, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
-const readingServerRequest = vi.fn(async (_plugin: unknown, path: string) => path === '/reading/access'
-	? { url: 'https://worker.example.com/reading?token=short-lived' }
-	: { policy: null });
-const openExternalBrowserModal = vi.fn();
+const request = vi.fn();
+const validate = vi.fn();
+const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision: 'r' };
 
+beforeEach(() => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	vi.doMock('../server', () => ({ readingServerRequest: request }));
+	vi.doMock('../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
+	vi.doMock('./reading-view', () => ({ READING_VIEW_TYPE: 'crate-reading' }));
+	request.mockImplementation(async (_plugin, path) => path === '/reading/fetching' ? { enabled: true, revision: 'r' } : { policy });
+});
 afterEach(() => {
 	resetObsidianUiMocks();
-	vi.unstubAllGlobals();
 	vi.resetModules();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../server');
-	vi.doUnmock('../../ui/external-browser-modal');
-	vi.doUnmock('../../ui/settings/input-helpers');
 	vi.doUnmock('../runtime');
-	vi.doUnmock('../register-integrations');
 	vi.doUnmock('./reading-view');
-	vi.doUnmock('./phone-setup');
-	readingServerRequest.mockClear();
-	openExternalBrowserModal.mockClear();
+	request.mockReset();
+	validate.mockReset();
 });
 
-it('offers tappable and selectable web reading links on mobile after obtaining access', async () => {
-	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: true } }));
-	vi.doMock('../server', () => ({ readingServerRequest }));
-	vi.doMock('../../ui/external-browser-modal', () => ({ openExternalBrowserModal }));
-	vi.doMock('../../ui/settings/input-helpers', () => ({ bindCommittedText: vi.fn() }));
-	vi.doMock('../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: vi.fn() }));
-	vi.doMock('../register-integrations', () => ({ openReading: vi.fn() }));
-	vi.doMock('./reading-view', () => ({ READING_VIEW_TYPE: 'crate-reading' }));
-	vi.doMock('./phone-setup', () => ({ ReadingPhoneSetup: class ReadingPhoneSetup {} }));
-	const openWindow = vi.fn();
-	vi.stubGlobal('window', { open: openWindow });
+async function setup(connected = true, enabled = true) {
+	const plugin = {
+		app: { workspace: { detachLeavesOfType: vi.fn() } },
+		remindersSettings: { enabled: true },
+		settings: { reading: { enabled, folderPath: 'Reading' }, workerUrl: connected ? 'https://crate.example' : '' },
+		writeSettings: vi.fn(async ({ reading }: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = reading; }),
+	};
+	const container = Object.assign(new FakeElement('div'), { isConnected: true });
+	const rerender = vi.fn();
 	const { renderReadingSettings } = await import('./settings-section');
-	const plugin = { app: {}, settings: { reading: { enabled: false, folderPath: 'Reading' }, workerUrl: 'https://worker.example.com' } };
-	renderReadingSettings(new FakeElement('div') as never, plugin as never, vi.fn());
-	const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Reading on the web');
-	setting?.buttons[0]?.click();
-	await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
-	expect(openExternalBrowserModal).toHaveBeenCalledWith(plugin.app,
-		'https://worker.example.com/reading?token=short-lived', expect.objectContaining({ linkText: 'Open reading' }));
-	expect(openWindow).not.toHaveBeenCalled();
+	renderReadingSettings(container as never, plugin as never, rerender);
+	expect(request).not.toHaveBeenCalled();
+	openSettingsDisclosures(container);
+	await new Promise(resolve => setTimeout(resolve, 0));
+	const toggle = MockSetting.instances.find(row => row.nameEl.textContent === 'Enable reading')!.toggles[0]!;
+	return { plugin, toggle, rerender };
+}
 
-	vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard denied')) } });
-	setting?.buttons[1]?.click();
-	await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledTimes(2));
-	expect(openExternalBrowserModal).toHaveBeenLastCalledWith(plugin.app,
-		'https://worker.example.com/reading?token=short-lived', expect.objectContaining({ showCopyableUrl: true }));
+
+it('shows Reading controls after expanding without fetching remote settings', async () => {
+ const { toggle } = await setup();
+ expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder']);
+ expect(toggle.value).toBe(true);
+ expect(request).not.toHaveBeenCalled();
+});
+
+it.each([true, false])('sets local Reading to %s without changing another device', async enabled => {
+ const { plugin, toggle, rerender } = await setup(false, !enabled);
+ toggle.change(enabled);
+ await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
+ expect(plugin.settings.reading).toEqual({ enabled, folderPath: 'Reading' });
+ expect(request).not.toHaveBeenCalled();
+ expect(plugin.app.workspace.detachLeavesOfType).toHaveBeenCalledWith('crate-reading');
+ const { startReading, stopReading } = await import('../runtime');
+ expect(stopReading).toHaveBeenCalledOnce();
+ expect(startReading).toHaveBeenCalledTimes(enabled ? 1 : 0);
+});
+
+it('hides preferences when Reading is disabled', async () => {
+ await setup(false, false);
+ expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading']);
+});
+
+it('keeps the feature enabled if saving its preference fails', async () => {
+ const { plugin, toggle, rerender } = await setup(false);
+ plugin.writeSettings.mockRejectedValue(new Error('Disk unavailable'));
+ toggle.change(false);
+ await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
+ expect(plugin.settings.reading.enabled).toBe(true);
+ expect(noticeMessages).toContain('Disk unavailable');
 });

@@ -1,3 +1,4 @@
+import { featureEnabled } from '../feature-policy';
 import { runReadingExtraction, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../history-checkpoints';
 import { withD1Usage } from '../d1-usage';
@@ -185,7 +186,7 @@ export class ReminderAlarm implements DurableObject {
 				await this.state.storage.put('reminder', body);
 				// A repeated command must not reset recipient progress or rearm a
 				// terminal failure. Exact retries repair publication without replay.
-				if (!sameOccurrence || !snapshot.deliveryFailure && (snapshot.alarmTime !== null || snapshot.reminder?.scheduleToken !== body.scheduleToken)) {
+				if (!sameOccurrence || !snapshot.deliveryFailure && (snapshot.alarmTime !== null || snapshot.reminder?.scheduleToken !== body.scheduleToken || parsedBody.value.resume === true)) {
 					await this.state.storage.setAlarm(sameOccurrence ? snapshot.alarmTime ?? alarmTime : alarmTime);
 				}
 				const failure = sameOccurrence ? snapshot.deliveryFailure : undefined;
@@ -265,6 +266,10 @@ export class ReminderAlarm implements DurableObject {
 
 	private async deliverAndCleanup(reminder: ReminderData): Promise<void> {
 		const db = this.env.DB;
+		if (!await featureEnabled(db, 'reminders')) {
+			await this.withStateLock(() => this.state.storage.deleteAlarm());
+			return;
+		}
 		const scheduled = await db.prepare(
 			`SELECT schedule_token, content, project, due_datetime
 			FROM scheduled_reminders WHERE reminder_id = ?`,
@@ -296,6 +301,7 @@ export class ReminderAlarm implements DurableObject {
 				if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, pendingSubscriptionIds))) return;
 			}
 			if (!await this.writeIfCurrent(reminder.scheduleToken, async () => {})) return;
+			if (!await featureEnabled(db, 'reminders')) return;
 			const delivery = await sendToAllSubscriptions(db, {
 				title: scheduled.content,
 				body: scheduled.project || '',

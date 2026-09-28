@@ -1,3 +1,4 @@
+import { featureEnabled } from '../../feature-policy';
 import type { Env } from '../../types';
 import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
@@ -14,6 +15,7 @@ export interface Publication { job: Job; result: ReturnType<typeof extractDocume
 /** Called under the file coordinator's lock. Never recreate a missing or changed source. */
 export async function publishExtraction(env: Env, publication: Publication): Promise<void> {
   const { job, result } = publication;
+  if (!await featureEnabled(env.DB, 'reading')) return;
   const current = await policy(env.DB);
   if (!current?.enabled || current.generation !== job.generation) return;
   const stored = await env.DB.prepare('SELECT source_revision FROM reading_jobs WHERE path=?').bind(job.path).first<{ source_revision: string }>();
@@ -42,6 +44,7 @@ export async function publishExtraction(env: Env, publication: Publication): Pro
 export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {
   // A persisted maintenance fence stops new network work during backup/upgrade.
   if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
+  if (!await featureEnabled(env.DB, 'reading')) return;
   const current = await policy(env.DB);
   if (!current?.enabled) return;
   await env.DB.prepare('DELETE FROM reading_jobs WHERE generation != ? OR NOT EXISTS (SELECT 1 FROM files WHERE files.path=reading_jobs.path)')
@@ -74,6 +77,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 }
 
 export async function scheduleReading(env: Env): Promise<boolean> {
+  if (!await featureEnabled(env.DB, 'reading')) return false;
   const current = await policy(env.DB);
   if (!current?.enabled) return false;
   const complete = await projectReading(env, current);

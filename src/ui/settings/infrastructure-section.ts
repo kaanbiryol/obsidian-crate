@@ -3,15 +3,17 @@ import { renderServerRepairSetting } from './server-repair-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
 import type { InfrastructureSectionContext } from './infrastructure-types';
-import { createSettingsDisclosure } from './section-helpers';
+import { createSettingsDisclosure, createSettingsSubsectionHeading } from './section-helpers';
 import { renderTroubleshootingSettings } from './troubleshooting-section';
 import { Setting } from 'obsidian';
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
-	const recoverySection = createSettingsDisclosure(containerEl, 'Recovery and troubleshooting');
+	const recoverySection = createSettingsDisclosure(containerEl, 'Troubleshooting', {
+		summary: 'Diagnostics, debug logs, and recovery tools',
+	});
 	if (context.isConfigured) {
-		const recoveryEl = createSettingsDisclosure(recoverySection, 'File history');
+		const recoveryEl = recoverySection;
 		const history = new Setting(recoveryEl)
 			.setName('File history')
 			.setDesc('Previous versions are kept for 30 days. Open a file’s context menu and select ');
@@ -27,16 +29,21 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 		history.descEl.appendText('.');
 
 	}
-	const troubleshootingEl = createSettingsDisclosure(recoverySection, 'Troubleshooting');
+	const troubleshootingEl = recoverySection;
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);
 	renderServerRepairSetting(troubleshootingEl, plugin);
+	if (!context.isConfigured) renderServerActions(context);
+}
+
+export function renderServerActions(context: InfrastructureSectionContext): void {
+	const { containerEl, plugin } = context;
 	if (context.isConfigured || plugin.settings.cloudflareDeployment?.d1DatabaseId) {
-		const advancedEl = createSettingsDisclosure(containerEl, 'Advanced server actions');
+		createSettingsSubsectionHeading(containerEl, 'Advanced server actions');
+		const advancedEl = containerEl.createDiv();
 		if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
 		const saved = plugin.settings.cloudflareDeployment;
 		if (context.isConfigured || saved?.reset?.deleteOnly) renderServerDeleteSetting(advancedEl, plugin);
-		if (!advancedEl.hasChildNodes()) advancedEl.parentElement?.remove();
 	}
 }
 export type { InfrastructureSectionContext } from './infrastructure-types';

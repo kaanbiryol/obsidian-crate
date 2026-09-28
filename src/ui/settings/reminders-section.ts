@@ -1,3 +1,4 @@
+import { setSharedFeature } from '../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
 import { changeReminderFolder } from '../../reminders/notification-policy-sync';
 import type CratePlugin from '../../main';
@@ -9,15 +10,13 @@ import {
 import type { TabId } from '../../reminders/ui/layoutConstants';
 import { errorMessage } from '../../plugin/logger';
 import { RemindersFolderSuggest } from './folder-suggest';
-import { renderRemindersWebApp } from './reminders-web-app';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
-import { createSettingsSectionHeading } from './section-helpers';
+import { createSettingsDisclosure } from './section-helpers';
 
 export interface RemindersSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
 	rerender: () => void;
-	onAllDayTimeContainer?: (container: HTMLElement) => void;
 }
 
 export function renderRemindersSection(context: RemindersSectionContext): () => void {
@@ -32,13 +31,22 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 		}
 	};
 
-	createSettingsSectionHeading(containerEl, 'Reminders');
-	let folderSuggest: RemindersFolderSuggest;
-	const enableEl = containerEl.createDiv();
+	let folderSuggest: RemindersFolderSuggest | undefined;
+	const preferences = createSettingsDisclosure(containerEl, 'Reminders', { summary: settings.enabled ? `Folder: ${settings.remindersFolderPath}` : 'Paused' });
 
-	new Setting(containerEl)
+	new Setting(preferences).setName('Enable reminders')
+		.setDesc('All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.')
+		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
+			toggle.setDisabled(true);
+			try { await setSharedFeature(plugin, 'reminders', enabled); }
+			catch (error) { new Notice(`Could not change reminders: ${errorMessage(error)}`); }
+			finally { rerender(); }
+		}));
+	if (!settings.enabled) return () => {};
+
+	new Setting(preferences)
 		.setName('Reminders folder')
-		.setDesc('The folder used for reminders on this device and the server. Changes save on this device immediately and reach the server when connected. Files are not moved.')
+		.setDesc('Crate scans this folder and adds hidden tracking IDs to checkbox lines. Changes reach the server when connected. Files are not moved.')
 		.addText(text => {
 			folderSuggest = new RemindersFolderSuggest(plugin.app, text.inputEl);
 
@@ -53,6 +61,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 
 				await changeReminderFolder(plugin, normalizedPath);
 				new Notice(`Reminders folder updated to "${normalizedPath}"`);
+				rerender();
 			};
 
 			text.setPlaceholder('Reminders')
@@ -71,37 +80,9 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 			});
 		});
 
-	new Setting(enableEl)
-		.setName('Enable reminders on this device')
-		.setDesc(settings.enabled
-			? 'This device · turn off to stop scanning and close reminder views. Files and ID comments are kept. Web reminders and server notifications stay active.'
-			: 'This device · use this folder for reminders. Crate scans its Markdown files and adds ID comments to checkbox lines to track reminders when they change.')
-		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
-			toggle.setDisabled(true);
-			try {
-				if (enabled) {
-					await plugin.enableReminders();
-					new Notice('Reminders enabled');
-				} else {
-					await plugin.disableReminders();
-				}
-				rerender();
-			} catch (error) {
-				new Notice(`Failed to ${enabled ? 'enable' : 'disable'} reminders: ${errorMessage(error)}`);
-				toggle.setValue(plugin.remindersSettings.enabled).setDisabled(false);
-			}
-		}));
+	const viewPreferences = preferences.createDiv();
 
-	renderRemindersWebApp(containerEl, plugin);
-	createSettingsSectionHeading(containerEl, 'Reminders preferences');
-	const preferences = containerEl.createDiv();
-	const allDayTimeEl = containerEl.createDiv();
-	context.onAllDayTimeContainer?.(allDayTimeEl);
-	const viewPreferences = containerEl.createDiv();
-
-	if (!settings.enabled) return () => folderSuggest.close();
-
-	new Setting(preferences)
+	new Setting(viewPreferences)
 		.setName('Default due date')
 		.setDesc('This device · choose the due date filled in for new reminders.')
 		.addDropdown(dropdown => {
@@ -152,5 +133,5 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 				value => parseSettingInteger(value, 1) !== null);
 		});
 
-	return () => folderSuggest.close();
+	return () => folderSuggest?.close();
 }

@@ -52,12 +52,14 @@ describe('normalizeRemindersSettings', () => {
 		});
 	});
 
-	it('keeps reminders disabled for a new install until the user opts in', () => {
+	it('enables reminders by default for new installs and missing preferences', () => {
+		expect(normalizeRemindersSettings(undefined).enabled).toBe(true);
+		expect(normalizeRemindersSettings({}).enabled).toBe(true);
 		expect(normalizeRemindersSettings(undefined)).toEqual(DEFAULT_REMINDERS_SETTINGS);
 		expect(normalizeRemindersSettings(null)).toEqual(DEFAULT_REMINDERS_SETTINGS);
 	});
 
-	it('preserves an explicit disabled setting', () => {
+	it('preserves explicitly disabled Reminders', () => {
 		expect(normalizeRemindersSettings({ enabled: false }).enabled).toBe(false);
 	});
 

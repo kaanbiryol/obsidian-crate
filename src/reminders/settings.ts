@@ -32,7 +32,7 @@ export type RemindersSettings = {
 };
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
-	enabled: false,
+	enabled: true,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
 	queryViewPreferences: {},
@@ -146,9 +146,7 @@ export function normalizeRemindersSettings(
 			&& typeof value.pendingServerFolder.folderPath === 'string'
 			? { pendingServerFolder: { id: value.pendingServerFolder.id, workerUrl: value.pendingServerFolder.workerUrl,
 				folderPath: normalizeRemindersFolderPath(value.pendingServerFolder.folderPath) } } : {}),
-		enabled: typeof value?.enabled === 'boolean'
-			? value.enabled
-			: DEFAULT_REMINDERS_SETTINGS.enabled,
+		enabled: typeof value?.enabled === 'boolean' ? value.enabled : true,
 
 		taskCreationDefaultDueDate: isDueDateDefaultSetting(value?.taskCreationDefaultDueDate)
 			? value.taskCreationDefaultDueDate

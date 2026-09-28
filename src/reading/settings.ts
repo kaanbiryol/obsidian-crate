@@ -1,7 +1,7 @@
 import { getPortablePathIssue, getSyncPathIssue, portablePathKey } from '../protocol/portable-path';
 
 export interface ReadingSettings { enabled: boolean; folderPath: string }
-export const DEFAULT_READING_SETTINGS: ReadingSettings = { enabled: false, folderPath: 'Reading' };
+export const DEFAULT_READING_SETTINGS: ReadingSettings = { enabled: true, folderPath: 'Reading' };
 
 export function validateReadingFolder(value: string, remindersFolder?: string, configDir?: string): string {
 	const folder = value.trim();
@@ -21,6 +21,6 @@ export function normalizeReadingSettings(value: unknown): ReadingSettings {
 	if (!value || typeof value !== 'object') return { ...DEFAULT_READING_SETTINGS };
 	const settings = value as Partial<ReadingSettings>;
 	try {
-		return { enabled: settings.enabled === true, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
+		return { enabled: typeof settings.enabled === 'boolean' ? settings.enabled : true, folderPath: validateReadingFolder(typeof settings.folderPath === 'string' ? settings.folderPath : 'Reading') };
 	} catch { return { ...DEFAULT_READING_SETTINGS }; }
 }

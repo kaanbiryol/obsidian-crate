@@ -1,3 +1,4 @@
+import { featureEnabled } from './feature-policy';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { corsResponse } from './cors';
 import { changedRows, queryRows } from './db';
@@ -79,6 +80,7 @@ export async function handleListSubscriptions(db: D1Database): Promise<Response>
 }
 
 export async function handleTestPush(db: D1Database, origin: string): Promise<Response> {
+	if (!await featureEnabled(db, 'reminders')) return corsResponse({ error: 'Reminders are paused.', code: 'feature_paused' }, 423);
 	const delivery = await sendToAllSubscriptions(db, {
 		title: 'Crate Test',
 		body: 'If you see this, push notifications are working!',

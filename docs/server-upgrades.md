@@ -80,3 +80,29 @@ different builds require a higher server revision before deployment. Neither
 case is labeled an available update or permits the ordinary update action.
 Matching live artifacts still route to publication recovery when saved deployment
 metadata has not been confirmed.
+
+## Revision 2: optional local features and full article saves
+
+Reading and Reminders start enabled in the plugin; explicit disabled preferences
+are preserved. Their switches stop local scanning without changing other devices.
+Reading saves request full article extraction. A library client's explicit full
+article save also enables extraction on servers with a legacy disabled policy.
+Capture-only Shortcut credentials cannot change that policy. Existing article
+access and legacy bookmark-only capture requests remain supported. No schema
+migration is needed.
+
+## Revision 3: shared feature pause/resume
+
+`shared-features-v1` adds a server-authoritative policy independent of push and
+article-extraction preferences. Both features default on. The policy is stored in
+`maintenance_state` under `crate_feature_policy`; no schema migration is needed.
+Plugin switches require this capability and do not pretend an older server was
+paused. Local enabled flags cache the server state rather than overwriting it.
+
+Pausing stops server APIs and background work without deleting sources, indexes,
+credentials, or queued work. Reading checks before fetching and publication;
+reminder alarms retain their occurrence and recipient progress without polling
+while paused. Resume queues existing schedules with the same identity, preserves
+completed deliveries, and wakes pending projections and extraction. Notification
+retry-age limits remain in effect; a pause does not make old notifications valid
+indefinitely. Requests already sent to websites or push providers cannot be recalled.

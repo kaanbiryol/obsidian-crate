@@ -14,7 +14,7 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
   try { folder = validateReadingFolder(body.folderPath, reminders?.folder_path); }
   catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Choose a valid Reading folder.'); }
   if (existing && folder !== existing.folder_path) {
-    if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then disable Reading before changing its folder.', 409);
+    if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
   }
   const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
     generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };
@@ -41,7 +41,7 @@ export async function issueReadingAccess(db: D1Database, current: ReadingPolicy,
 export async function exchangeReadingAccess(db: D1Database, body: Record<string, unknown>, request: Request) {
   if (typeof body.token !== 'string' || body.token.length > 256) throw new ReadingError('Open a fresh Reading setup link.', 401);
   const hash = await sha256Hex(body.token), current = await policy(db);
-  if (!current?.enabled) throw new ReadingError('Reading is disabled.', 403);
+  if (!current) throw new ReadingError('Choose a Reading folder in Obsidian first.', 403);
   const enrollment = await db.prepare('SELECT scope FROM reading_enrollments WHERE token_hash=? AND expires_at>? AND generation=?')
     .bind(hash, Date.now(), current.generation).first<{ scope: string }>();
   if (!enrollment || !['reading', 'reading_install'].includes(enrollment.scope)) throw new ReadingError('This setup link expired or was already used. Open a fresh one from Crate settings.', 401);

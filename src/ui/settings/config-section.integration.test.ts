@@ -195,7 +195,7 @@ describe('renderConfigSection integration', () => {
 		expect(rerender).toHaveBeenCalledTimes(1);
 	});
 
-	it('offers an in-place server update in the top notice when deployment metadata exists', async () => {
+	it('requires a live check before updating when the saved revision is missing', async () => {
 		const { renderServerUpdateNotice } = await loadConfigSectionModule();
 		const getVersionInfo = vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint }));
 		renderServerUpdateNotice({
@@ -214,8 +214,8 @@ describe('renderConfigSection integration', () => {
 		});
 
 		expect(getVersionInfo).not.toHaveBeenCalled();
-		getSettingByName('Cloudflare update available').buttons[0]?.click();
-		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
+		getSettingByName('Check server version').buttons[0]?.click();
+		expect(startCloudflareDeployment).not.toHaveBeenCalled();
 	});
 
 	it('checks the connected server version only when requested', async () => {
@@ -352,7 +352,7 @@ it('keeps a matching live build visible and routes it to recovery when saved dep
         syncRuntime: { isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
     };
     renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-    getSettingByName('Cloudflare update available').buttons[1]?.click();
+    getSettingByName('Check server version').buttons[1]?.click();
     await flushMicrotasks();
     const update = getSettingByName('Verify server update');
     expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');

@@ -1,3 +1,4 @@
+import { featureEnabled } from './feature-policy';
 import { planNotificationOperations, type NotificationOperation } from './notification-projection-plan';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
@@ -24,6 +25,7 @@ export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDa
 
 /** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
 export async function drainNotificationProjections(env: Env, limit = 4): Promise<void> {
+  if (!await featureEnabled(env.DB, 'reminders')) return;
   const policy = await getNotificationPolicy(env.DB);
   if (!policy) return;
   const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(

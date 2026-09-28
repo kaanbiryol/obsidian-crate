@@ -19,6 +19,12 @@ function harness() {
 const clip = '---\ncrate_reading_import: web-clipper-v1\ntitle: A clip\nsource_url: https://example.com\nsaved_at: 2026-09-21T12:00:00Z\n---\n\nExact clipped text.\n';
 
 describe('local Reading library', () => {
+	it('saves full articles by default and preserves explicit bookmark captures', async () => {
+		const { library } = harness();
+		expect((await library.add('https://example.com/bookmark', undefined, false)).item.extraction_status).toBe('unavailable');
+		expect((await library.add('https://example.com/article')).item.extraction_status).toBe('pending');
+	});
+
 	it('imports default clips and source-less notes together, preserving edits and duplicate captures', async () => {
 		const h = harness();
 		const ordinaryClip = '---\nsource: https://example.com/article\ntags: [clippings]\n---\n\nClipped text.';

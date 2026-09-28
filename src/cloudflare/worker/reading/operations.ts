@@ -24,7 +24,7 @@ export async function beginOperation(db: D1Database, principal: AuthPrincipal, c
 export function operationStatement(db: D1Database, op: ReadingOperation, response: unknown, predicate = '1', args: string[] = []) {
   return db.prepare(`INSERT INTO reading_operations(operation_id, principal_id, generation, request_hash, response_json, day)
     SELECT ?, ?, ?, ?, CASE WHEN ${REMINDER_OPERATION_VALID}
-      AND EXISTS (SELECT 1 FROM reading_policy WHERE enabled=1 AND generation=?)
+      AND EXISTS (SELECT 1 FROM reading_policy WHERE generation=?)
       AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at > ?))
       THEN ? ELSE NULL END, ? WHERE ${predicate}`)
     .bind(op.id, op.principal, op.generation, op.hash, op.day, op.day, op.generation, op.principal, Date.now(), JSON.stringify(response), op.day, ...args);

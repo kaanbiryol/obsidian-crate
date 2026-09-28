@@ -120,7 +120,7 @@ try {
 			console.log(`Server address to paste into Obsidian: ${quickServer.runtime.origin}\nInternal listener (diagnostics only): 127.0.0.1:${quickServer.server.address().port}\nData: ${dataDir}`);
 			if (quickServer.pairingCode) printPairing(quickServer.pairingCode);
 			else console.log('Existing device tokens remain valid. Update the server address in Crate to the URL above.');
-			console.log(`Connect in Obsidian → Settings → Crate → Connect to your server, then select Sync now.\nUse Copy app link or Show QR code in Crate to enroll the PWA. A new tunnel address requires fresh PWA enrollment.\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`);
+			console.log(`Connect in Obsidian → Settings → Crate → Connect to your server, then select Sync now.\nUse Copy setup link or Show QR code in Crate to enroll the PWA. A new tunnel address requires fresh PWA enrollment.\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`);
 			const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited]);
 			if (result && !shutdown.signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
 		} else {
@@ -168,7 +168,7 @@ try {
 				if (remote) tunnel = await startTunnel(dataDir, remote, shutdown.signal);
 				console.log(`Server address to paste into Obsidian: ${runtime.origin}\nInternal listener (diagnostics only): ${host}:${port}\nData: ${runtime.dataDir}\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Press Ctrl+C to stop safely.'}`);
 				if (origin.startsWith('https://')) readiness = monitorPublicReadiness({ origin, instance, signal: shutdown.signal, onChange: readinessChanged });
-				if (remote) console.log('Tunnel is starting; initial DNS/certificate propagation may take a few minutes.\nUse this HTTPS server address in Obsidian, then Copy app link or Show QR code to enroll the PWA.');
+				if (remote) console.log('Tunnel is starting; initial DNS/certificate propagation may take a few minutes.\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.');
 				const result = await Promise.race([stopped.then(() => null), ...(tunnel ? [tunnel.exited] : [])]);
 				if (result && !shutdown.signal.aborted) throw new Error(`Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);
 			}

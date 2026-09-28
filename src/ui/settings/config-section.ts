@@ -6,7 +6,7 @@ import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-u
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';
-import { createSettingsSectionHeading, createSettingsDisclosure } from './section-helpers';
+import { createSettingsSectionHeading } from './section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../external-browser-modal';
 
@@ -44,6 +44,7 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
         || !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
 
     let needsVerification = false;
+    let canUpdate = false;
     let updateButton: ButtonComponent;
     const update = new Setting(containerEl)
         .setName('Cloudflare update available')
@@ -51,6 +52,7 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
         .addButton(button => {
             updateButton = button;
             button.setButtonText('Update server').setCta().onClick(() => {
+                if (!needsVerification && !canUpdate) return;
                 if (needsVerification) void checkAndRecoverUpdate(plugin);
                 else void startCloudflareDeployment(plugin);
             });
@@ -59,7 +61,10 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
         needsVerification = true;
         update.setName('Verify server update')
             .setDesc('The live server matches this plugin, but the saved update has not been confirmed. Check its status and recover any interrupted update.');
-        updateButton.setButtonText('Check and recover update');
+        updateButton.setButtonText('Check and recover update').setDisabled(false);
+    }, available => {
+        canUpdate = available;
+        updateButton.setDisabled(!available);
     });
 }
 
@@ -80,7 +85,7 @@ export function renderServerSection(context: ConfigSectionContext): void {
                 .onClick(() => { void checkAndRecoverUpdate(plugin); }));
     }
     renderServerBackupSetting(context);
-	const details = createSettingsDisclosure(containerEl, 'Server details');
+	const details = containerEl;
 	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');
 	if (!deployment) {
 		renderSelfHostedAddressSetting({ ...context, containerEl: details });

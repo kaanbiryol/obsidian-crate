@@ -37,6 +37,8 @@ export interface ReadingLibraryProps {
 	onReaderClosed?: () => void;
 	notice?: React.ReactNode;
 	beforeListContent?: React.ReactNode;
+	/** Host-owned unavailable state, keeping library navigation mounted. */
+	listContent?: React.ReactNode;
 	pendingItemIds?: ReadonlySet<string>;
 }
 
@@ -45,7 +47,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
-export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, listContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
@@ -129,7 +131,7 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}
-					{snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
+					{listContent ?? (snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && <><HighlightList entries={excerpts.slice(0, visible)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />{!count && <div className="crate-reading__empty"><ThemeIcon id="highlighter" size="xl" aria-hidden="true" /><h2>{query || articleFilter || tag ? 'No matching highlights' : 'Keep the passages that stay with you'}</h2><p>{query || articleFilter || tag ? 'Try another passage, note, or article.' : 'Select text while reading. Your highlights appear here and in your Obsidian notes.'}</p></div>}</>}
 						{section !== 'highlights' && items.length === 0 && <div className="crate-reading__empty"><ThemeIcon id="book-open" size="xl" aria-hidden="true" /><h2>{query || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}</h2><p>{query || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}</p>{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}</div>}
 						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
@@ -138,7 +140,7 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 							</Button><IconButton size="large" icon="star" className="crate-reading__favorite" label={item.favorite ? 'Remove favorite' : 'Favorite'} aria-pressed={item.favorite} data-filled={item.favorite} disabled={pendingItemIds?.has(item.crate_reading_id)} aria-disabled={busy.has(item.crate_reading_id) || pendingItemIds?.has(item.crate_reading_id)} onClick={() => run(item.crate_reading_id, () => onUpdate(item, { favorite: !item.favorite }))} />
 						</li>)}</ul></section>)}
 						{visible < count && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
-					</>}
+					</>)}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" onClick={onAdd} animateOnMount={false} />}
 				</>)}

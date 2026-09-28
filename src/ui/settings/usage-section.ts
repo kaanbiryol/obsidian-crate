@@ -7,7 +7,7 @@ import { createSettingsDisclosure } from './section-helpers';
 export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin): () => void {
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;
 	if (!accountId) return () => {};
-	const container = createSettingsDisclosure(containerEl, 'Cloudflare usage');
+	const container = containerEl;
 	const connection = plugin.cloudflareUsageConnection;
 	let active = true;
 	const current = () => active && plugin.settings.cloudflareDeployment?.accountId === accountId;

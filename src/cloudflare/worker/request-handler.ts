@@ -55,7 +55,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 		}
 		const rateLimited = coordinatorState ? null : await limitNotificationRequest(request, db, env.NOTIFICATION_REQUEST_LIMITER);
 		if (rateLimited) return withRequestId(rateLimited, requestId, started);
-		if (path.startsWith('/reading/') && !coordinatorState) {
+		if ((path.startsWith('/reading/') || path === '/features') && !coordinatorState) {
  const forwarded = new Request(request); forwarded.headers.set('X-Crate-Internal-Mutation', '1');
  return env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded);
  }
@@ -74,7 +74,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 
     if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);
 		const mutation = isCrateMutation(path, method);
-    if (coordinatorState && path.startsWith('/reading/')) await armNotificationCoordinator(coordinatorState);
+    if (coordinatorState && (path.startsWith('/reading/') || path === '/features' && method === 'POST')) await armNotificationCoordinator(coordinatorState);
     const notificationMutation = await affectsNotifications(request);
 		if (notificationMutation && !coordinatorState) {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));

@@ -1,3 +1,4 @@
+import { featureEnabled } from './feature-policy';
 import { scheduleReading } from './reading/extraction/jobs';
 import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './notification-queue';
 import { getNotificationPolicy } from './notification-policy';
@@ -9,6 +10,10 @@ import { revalidateReminderSources } from './reminder-source-migration';
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
   let sourceWork = await scheduleReading(env);
+  if (!await featureEnabled(env.DB, 'reminders')) {
+    if (sourceWork) await state.storage.setAlarm(Date.now() + 1);
+    return;
+  }
   let hasPolicy = false;
   try {
     // Source verification and projection share this budget. Dispatch has its own

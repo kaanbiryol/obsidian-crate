@@ -8,7 +8,7 @@ Every mutation requires `X-Crate-Protocol: 7`; check `/.well-known/crate` before
 
 All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table. Authentication fails closed with `503` when D1 is unavailable.
 
-Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. When server Reading is enabled, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot issue Reading setup links or change the Reading policy, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot issue Reading setup links or change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 Self-hosted installations additionally have a Node gateway, outside the Worker:
 `GET /__crate/ready` returns a per-process readiness identifier, and
@@ -411,3 +411,39 @@ article source unchanged; native marker removal remains authoritative for entrie
 without these explicit fallback flags. The writer verifies rendered structure as
 well as text and falls back to text annotations when new markers would alter it.
 See [Reading highlights](reading-highlights.md).
+
+### Article fetching permission
+
+Server revision 2 advertises `reading-fetching-consent-v1`. Reading libraries remain
+accessible when article fetching is off. The legacy `reading_policy.enabled` field
+now controls extraction only; existing permissions are preserved. A newly configured
+plugin initializes extraction when Reading is enabled. A library capture with
+`fetchArticle: true` also enables extraction as part of that explicit save.
+Capture-only credentials cannot enable it. The plugin no longer exposes a separate
+fetching switch; the endpoint remains supported for existing clients.
+
+`GET /reading/fetching` returns `{ enabled, revision }`. `POST /reading/fetching`
+accepts `{ enabled: boolean, revision }` and returns the updated state. Vault, Reading,
+and reminders sessions can explicitly change this permission; capture-only credentials
+cannot. Stale revisions receive 409. This endpoint cannot change the Reading folder.
+
+With fetching off, new URL captures become bookmarks (`extraction_status: unavailable`),
+existing articles remain readable and editable, and retries are rejected. Capture
+requests may also supply `fetchArticle: false` to save a bookmark regardless of the
+shared permission, including when an offline save is replayed later. Omitting the
+field preserves existing client and Shortcut behavior under the shared permission.
+
+### Shared feature policy
+
+Revision 3 advertises `shared-features-v1`. `GET /features` returns
+`{ reading: boolean, reminders: boolean, revision: string | null }`. Vault,
+Reading-library and reminders credentials can read; only vault credentials can
+POST `{ feature: "reading" | "reminders", enabled: boolean, revision }`. Capture-only
+credentials cannot access this policy. Stale writes return 409. Reads and writes
+are serialized through the projection coordinator, and a successful write wakes
+background work. Both features default on until explicitly changed.
+
+Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
+access remain available. Legacy Reading policy/capture operations cannot override
+the shared pause. Push opt-in remains unchanged by reminder pause/resume. Queued
+operations, saved content, library identity, and scoped credentials are retained.

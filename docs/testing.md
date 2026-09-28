@@ -502,3 +502,19 @@ for shared empty/list reversals, immediate input, stable list geometry, progress
 fill geometry, restrained checkmarks and reduced motion. The plugin fixture uses
 Shadow DOM and also checks stationary centered dialogs. Actual installed iPhone
 and Obsidian rendering still requires device verification.
+
+## Reading fetching consent
+
+After `npm run build:worker`, run
+`node --test scripts/reading-consent.browser.test.mjs` for Chromium and WebKit
+coverage of the full article save disclosure, automatic extraction, legacy permission migration,
+and library access after fetching is disabled. Light/dark phone screenshots are
+written to `test-results/reading-consent/`. This uses a real local Worker; physical
+iPhone keyboard and VoiceOver checks remain separate.
+
+Shared feature regression coverage: `src/plugin/feature-settings.test.ts` checks
+server-first updates, offline failures, and cross-device reconciliation;
+`src/cloudflare/worker/feature-policy.integration.ts` checks stale edits, scoped
+access, blocked Reading publication, retained jobs, and reminder resume without
+repeat delivery. The Reading capture browser test also pauses and resumes from a
+second client and verifies the current browser hides and restores Reading.
