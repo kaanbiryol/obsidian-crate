@@ -93,12 +93,14 @@ export async function checkTabSettings(page, name) {
 	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await expect(sheet).toHaveCount(0);
 	await activeDock.getByRole('button', { name: 'Favorites', exact: true }).click();
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	const hiddenViews = page.getByRole('dialog', { name: 'More views', exact: true });
 	await expect(hiddenViews.getByRole('button')).toHaveText(['Inbox', 'Reminders', 'Reading']);
 	await hiddenViews.getByRole('button', { name: 'Reminders', exact: true }).click();
 	await expect(page.locator('.pwa-schedule-chip[aria-pressed="true"]')).toHaveText('Today');
 	await page.getByRole('group', { name: 'Reminder dates' }).getByRole('button', { name: 'Upcoming', exact: true }).click();
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await expect(dockTabs.nth(3)).toHaveAttribute('aria-label', 'Reminders');
 	await expect(dockTabs.nth(3)).toHaveAttribute('aria-current', 'page');
@@ -140,7 +142,8 @@ export async function checkTabSettings(page, name) {
 	await assertSwitcher('Favorites');
 	// Each new selection replaces slot four, across both features.
 	for (const [id, label] of [['archive', 'Archive'], ['browse', 'Projects'], ['highlights', 'Highlights']]) {
-		await dockTabs.nth(3).press('ArrowDown');
+		await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
+	await dockTabs.nth(3).press('ArrowDown');
 		await views.getByRole('button', { name: label, exact: true }).click();
 		await assertSwitcher(label);
 		await expect(dockTabs.nth(3)).toHaveAttribute('aria-current', 'page');
@@ -157,12 +160,14 @@ export async function checkTabSettings(page, name) {
 			return window.__tabStorageSetItem.call(this, key, value);
 		};
 	});
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await views.getByRole('button', { name: 'Archive', exact: true }).click();
 	await expect(page.getByRole('alert')).toHaveText('Could not save tabs on this device.');
 	await assertSwitcher('Highlights');
 	await expect(dockTabs.nth(2)).toHaveAttribute('aria-current', 'page');
 	await page.evaluate(() => { Storage.prototype.setItem = window.__tabStorageSetItem; delete window.__tabStorageSetItem; });
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await expect(views).toBeVisible();
 	await page.keyboard.press('Escape');
@@ -180,12 +185,14 @@ export async function checkTabSettings(page, name) {
 	await expect(sheet).toHaveCount(0);
 	await activeDock.getByRole('button', { name: 'Highlights', exact: true }).click();
 	await expect(page.getByRole('searchbox', { name: 'Search reading' })).toBeVisible();
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await expect(views.getByRole('button')).toHaveText(['Inbox', 'Favorites', 'Archive']);
 	await views.getByRole('button', { name: 'Inbox', exact: true }).click();
 	await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText('Inbox');
 	await page.reload();
 	await expect(dockTabs.nth(3)).toHaveAccessibleName('Inbox');
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await expect(views.getByRole('button')).toHaveText(['Reading', 'Favorites', 'Archive']);
 	await page.keyboard.press('Escape');
@@ -193,6 +200,7 @@ export async function checkTabSettings(page, name) {
 	await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
 	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await expect(sheet).toHaveCount(0);
+	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
 	await dockTabs.nth(3).press('ArrowDown');
 	await expect(views.getByRole('button')).toHaveText(['Favorites', 'Archive', 'Highlights']);
 	await page.keyboard.press('Escape');

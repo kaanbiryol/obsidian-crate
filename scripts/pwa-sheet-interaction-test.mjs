@@ -196,7 +196,7 @@ try {
 			await expect(settings).toBeVisible();
 
 			await tabTo(page, days);
-			await expectNeutralKeyboardRing(days);
+			await expectNeutralKeyboardRing(days.locator('..'));
 			await tabTo(page, settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await expectNeutralKeyboardRing(settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await darkTheme.tap();

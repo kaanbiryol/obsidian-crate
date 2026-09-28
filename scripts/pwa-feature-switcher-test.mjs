@@ -111,8 +111,12 @@ try {
             const before = Number(getComputedStyle(front).opacity);
             const zIndex = getComputedStyle(front).zIndex;
             await window.__switchFeature('Reminders');
-            await frame();
-            return { before, after: Number(getComputedStyle(front).opacity),
+            // Inspect the replacement transition's starting keyframe before
+            // a delayed CI frame can advance the return motion.
+            const painted = Number(getComputedStyle(front).opacity);
+            const reverse = front.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+            const after = reverse ? Number(reverse.effect.getKeyframes()[0].opacity) : painted;
+            return { before, after,
               sameLayer: getComputedStyle(front).zIndex === zIndex,
               active: front.dataset.active, inert: front.inert };
           });

@@ -39,7 +39,9 @@ for (const type of [chromium, webkit]) {
     await page.emulateMedia({ colorScheme });
     for (const width of [320, 390, 768]) {
      await page.setViewportSize({ width, height: 844 });
-     await expect(deleteAction).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+     // Destructive actions share the rounded sheet-header surface.
+     await expect(deleteAction).toHaveCSS('background-color', await confirmation.getByRole('button', { name: 'Cancel deletion', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor));
+     await expect(deleteAction).toHaveCSS('border-radius', '999px');
      await expect.poll(() => confirmation.locator('.pwa-delete-confirmation').evaluate(element => {
       const heading = element.querySelector('h2');
       const action = element.querySelector('[data-action="confirm-delete"]');

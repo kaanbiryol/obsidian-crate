@@ -27,7 +27,10 @@ try {
 				document.querySelector('[aria-label="Open settings"]').click();
 				let sheet;
 				while (!(sheet = document.querySelector('.pwa-modal-sheet__container'))) await new Promise(resolve => requestAnimationFrame(resolve));
-				await new Promise(resolve => setTimeout(resolve, 80));
+				// Wait for the entrance to paint instead of assuming CI starts it in 80ms.
+				const started = performance.now();
+				while (new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42 >= sheet.getBoundingClientRect().height - 1
+					&& performance.now() - started < 2000) await new Promise(requestAnimationFrame);
 				const y = () => new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42;
 				const before = y(), height = sheet.getBoundingClientRect().height;
 				sheet.querySelector('[aria-label="Close settings"]').click();

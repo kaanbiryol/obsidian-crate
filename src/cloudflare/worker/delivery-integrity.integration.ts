@@ -14,7 +14,7 @@ beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).
 afterEach(async () => { vi.clearAllMocks(); await reset(); });
 const id = '11111111-1111-4111-8111-111111111111';
 interface Command { reminderId: string; content: string; dueDatetime: string; project?: string; jobToken: string }
-const note = `- [ ] Old title @2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`;
+const note = `- [ ] Old title 2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`;
 function state() {
   const values = new Map<string, unknown>(); let alarmTime: number | null = null;
   return { storage: { get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); }, delete: async (key: string) => values.delete(key), deleteAll: async () => values.clear(), getAlarm: async () => alarmTime, setAlarm: async (value: number | Date) => { alarmTime = Number(value); }, deleteAlarm: async () => { alarmTime = null; } } };

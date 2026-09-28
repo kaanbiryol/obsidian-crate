@@ -194,7 +194,7 @@ for (const browserType of [chromium, webkit]) {
     }
     await page.locator('[data-action="switch-tab"][data-tab="projects"]').tap();
     await page.locator('[data-action="open-project"][data-project="Work"]').tap();
-    await page.locator('[data-action="open-create-modal"]').tap();
+    await page.locator('.pwa-project-fab[data-action="open-create-modal"]').tap();
     await replaceTitle('Inbox selection regression');
     const projectChip = page.locator('.reminder-action-chips [data-picker="project"]');
     await expect(projectChip).toHaveText('Work');
