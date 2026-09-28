@@ -17,10 +17,10 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
     (SELECT 1 FROM files WHERE path = reading_sources.path)`).bind(current.generation).run();
   const { results } = await db.prepare(`SELECT f.path, f.storage_key AS revision FROM files f LEFT JOIN reading_sources s ON s.path = f.path
     WHERE substr(f.path, 1, ?) = ? AND lower(substr(f.path, -3)) = '.md'
-    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 3) OR (s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
+    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 3) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
       AND json_extract(s.metadata_json, '$.capture_method')='url' AND NOT EXISTS(SELECT 1 FROM reading_jobs j WHERE j.path=f.path)
       AND (SELECT count(*) FROM reading_jobs)<1000)) ORDER BY f.path LIMIT 25`)
-    .bind(current.folder_path.length + 1, `${current.folder_path}/`, current.generation).all<{ path: string; revision: string }>();
+    .bind(current.folder_path.length + 1, `${current.folder_path}/`, current.generation, current.enabled).all<{ path: string; revision: string }>();
   for (const row of results) {
     let metadata: ReturnType<typeof parseReadingNote> = null, error: string | null = null;
     let job: { hash: string; url: string } | null = null;
@@ -28,7 +28,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
       const source = await readSource(env, row.path);
       if (source.file.storageKey !== row.revision) continue;
       metadata = parseReadingNote(source.content);
-      if (metadata?.capture_method === 'url' && metadata.extraction_status === 'pending') {
+      if (current.enabled && metadata?.capture_method === 'url' && metadata.extraction_status === 'pending') {
         const block = managedArticle(source.content);
         if (!block || block.text.trim()) error = 'Article text was edited. Set extraction_status to ready in Obsidian to keep it as your saved article.';
         else job = { hash: await sha256Hex(block.text), url: metadata.source_url };

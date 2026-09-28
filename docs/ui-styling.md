@@ -761,3 +761,39 @@ All PWA sheet header buttons use the shared rounded surface from
 `_sheet-headers.scss`, including close/back controls, text actions, and secondary
 icon actions. Save and destructive actions retain their semantic text colors;
 features must not opt in by action name or duplicate the surface styling.
+
+Disabled server Reading keeps the library header, search, sidebar, and tab bar.
+Show setup guidance inline in the list area with the shared empty-state styles,
+without an error alert. Keep navigation mounted while **Check again** is pending.
+
+## Plugin settings disclosure
+
+The plugin keeps sync status and feature switches visible.
+**Sync options**, **Reminders preferences**, **Notification options**,
+**Reading options** reveal secondary controls.
+The web-app row has two visible actions: **Open app** and **Connect another device**.
+Connecting another device opens a QR dialog with **Copy link**; if clipboard
+access fails, the same dialog reveals a read-only setup link.
+Collapsed folder and timing summaries show current choices. Reminder display
+preferences disappear when local reminders are off; folder selection stays
+available. Notifications remain independent of the local reminders switch.
+Reading folder selection stays available while disabled because server folder
+changes require Reading to be off.
+
+**Account and devices** and **Server** mount their contents on first expansion;
+notification schedule and device controls mount when **Notification options**
+opens. The visible notification toggle still checks the shared server policy.
+Device lists are not fetched for collapsed sections. Management sections avoid
+redundant nested accordions. Saved recovery operations surface a review action
+at the top; update notices remain visible outside **Server**.
+
+Native details/summary controls support keyboard expansion. Stable section keys
+preserve expansion, control focus, and scroll across settings rerenders, even
+when summary values change or expanded sections mount lazily.
+
+Plugin disclosure rows use the same 16px content inset as settings cards, a subtle
+border, a trailing CSS chevron, and smaller secondary summaries. Section headings
+use a 20px/8px spacing rhythm. Expanded controls sit inside the disclosure without
+nested card backgrounds. Narrow panes stack fields and multi-button actions below
+their labels; buttons retain 44px targets. All colors come from Obsidian theme
+variables and native summary keyboard behavior is preserved.

@@ -103,3 +103,13 @@ html.pwa-document-reader .crate-feature-shell > .crate-modal-canvas {
 	border-radius: 0;
 	transition: none;
 }
+
+.crate-feature-shell .pwa-feature-paused {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  text-align: center;
+}

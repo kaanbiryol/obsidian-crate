@@ -15,6 +15,11 @@ class FakeStyle {
 
 export class FakeElement {
 	readonly tagName: string;
+	parentElement: FakeElement | null = null;
+	isConnected = true;
+	open = false;
+	hidden = false;
+	private readonly listeners = new Map<string, Array<(event: Event) => unknown>>();
 	textContent = '';
 	readonly children: FakeElement[] = [];
 	readonly classNames = new Set<string>();
@@ -33,6 +38,7 @@ export class FakeElement {
 		if (info?.cls) {
 			child.addClasses(info.cls.split(/\s+/).filter(Boolean));
 		}
+		child.parentElement = this;
 		this.children.push(child);
 		return child;
 	}
@@ -46,6 +52,7 @@ export class FakeElement {
 	}
 
 	appendChild(child: FakeElement): FakeElement {
+		child.parentElement = this;
 		this.children.push(child);
 		return child;
 	}
@@ -92,7 +99,16 @@ export class FakeElement {
 		return this.attributes.get(name) ?? null;
 	}
 
-	addEventListener(_type: string, _listener: (event: Event) => unknown): void {}
+	addEventListener(type: string, listener: (event: Event) => unknown): void {
+		const listeners = this.listeners.get(type) ?? [];
+		listeners.push(listener);
+		this.listeners.set(type, listeners);
+	}
+
+	dispatchEvent(event: Event): boolean {
+		for (const listener of this.listeners.get(event.type) ?? []) listener(event);
+		return true;
+	}
 
 	show(): void {
 		this.setCssProps({ display: '' });
@@ -386,4 +402,12 @@ export function createObsidianUiModule(): Record<string, unknown> {
 			}
 		},
 	};
+}
+
+export function openSettingsDisclosures(container: FakeElement): void {
+	if (container.tagName === 'details' && !container.hidden) {
+		container.open = true;
+		container.dispatchEvent(new Event('toggle'));
+	}
+	for (const child of container.children) openSettingsDisclosures(child);
 }

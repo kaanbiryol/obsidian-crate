@@ -33,6 +33,15 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       if (request.method === 'POST') return await updatePolicy(env.DB, body);
     }
     const current = await authority(env.DB, principal);
+    if (path === '/reading/fetching' && principal.scope !== 'reading_capture') {
+      if (request.method === 'GET') return readingResponse({ enabled: Boolean(current.enabled), revision: current.revision });
+      if (request.method === 'POST') {
+        if (typeof body.enabled !== 'boolean') throw new ReadingError('Choose whether to fetch articles.');
+        await updatePolicy(env.DB, { enabled: body.enabled, folderPath: current.folder_path, revision: body.revision });
+        const updated = await policy(env.DB);
+        return readingResponse({ enabled: Boolean(updated?.enabled), revision: updated?.revision });
+      }
+    }
     if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
     if (path === '/reading/access' && request.method === 'POST' && principal.scope === 'vault') return await issueReadingAccess(env.DB, current, body, url.origin);
     if (path === '/reading/prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);

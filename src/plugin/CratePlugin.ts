@@ -1,8 +1,9 @@
+import { stopReminderBackend } from '../reminders/runtime';
+import { updateReminderVisibility } from '../reminders/visibility';
 /**
  * Crate - Sync your vault to Cloudflare R2 + Reminders
  */
 
-import { stopReminderBackend } from '../reminders/runtime';
 import { Notice, Plugin } from 'obsidian';
 import type { CloudflareUsageConnection } from '../cloudflare/usage-connection';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
@@ -127,36 +128,25 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	async enableReminders(): Promise<void> {
-		const signal = getPluginLifecycleSignal(this);
-		if (signal.aborted) return;
-		if (this.remindersSettings.enabled && this.reminderIndex) {
-			return;
+	async setRemindersEnabled(enabled: boolean): Promise<void> {
+		await this.writeRemindersSettings({ enabled });
+		if (enabled) {
+			try { await initializeReminders(this); }
+			catch (error) {
+				stopReminderBackend(this);
+				await this.writeRemindersSettings({ enabled: false });
+				updateReminderVisibility(this);
+				throw error;
+			}
+		} else {
+			stopReminderBackend(this);
+			this.app.workspace.detachLeavesOfType('reminders-view');
 		}
-
-		await this.writeRemindersSettings({ enabled: true });
-		if (signal.aborted) return;
-		try {
-			await initializeReminders(this);
-		} catch (error) {
-			if (signal.aborted) return;
-			this.remindersVaultWatcher?.unregister();
-			await this.writeRemindersSettings({ enabled: false });
-			throw error;
-		}
-	}
-
-	async disableReminders(): Promise<void> {
-		await this.writeRemindersSettings({ enabled: false });
-		stopReminderBackend(this);
-		this.app.workspace.detachLeavesOfType('reminders-view');
+		updateReminderVisibility(this);
 	}
 
 	async activateRemindersView(project?: string): Promise<void> {
-		if (!this.remindersSettings.enabled) {
-			new Notice('Enable reminders in Crate settings first.');
-			return;
-		}
+		if (!this.remindersSettings.enabled) { new Notice('Enable reminders in Crate settings first.'); return; }
 		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project, getPluginLifecycleSignal(this));
 	}
 

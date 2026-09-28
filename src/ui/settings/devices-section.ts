@@ -23,7 +23,7 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 	const isActive = () => !disposed && plugin.settingsUiState.devices === cache;
 	let refreshButton: ButtonComponent;
 
-	const devicesEl = createSettingsDisclosure(containerEl, 'Devices and sessions');
+	const devicesEl = containerEl;
 	new Setting(devicesEl)
 		.setName('Connected devices and sessions')
 		.setDesc('Browsers and home screen apps appear separately, even on the same device.')

@@ -1,6 +1,6 @@
 import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
-import { readReadingFrontmatter } from '../core/frontmatter';
+import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
@@ -91,7 +91,7 @@ export class ReadingLibrary {
 			throw error;
 		}
 	}
-	add(url: string, title?: string): Promise<{ item: ReadingItem; duplicate: boolean }> {
+	add(url: string, title?: string, fetchArticle = true): Promise<{ item: ReadingItem; duplicate: boolean }> {
 		return this.enqueue(async () => {
 			await this.scan();
 			const identity = readingUrlIdentity(url);
@@ -101,7 +101,8 @@ export class ReadingLibrary {
 			if (existing) return { item: existing, duplicate: true };
 			const id = crypto.randomUUID();
 			const path = `${this.folder}/${id}.md`;
-			const content = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
+			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
+			const content = fetchArticle ? note : patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
 			this.signal.throwIfAborted();
 			await this.vault.create(path, content);
 			await this.scan();

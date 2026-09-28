@@ -29,7 +29,7 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
   const hash = await sha256Hex(body.token);
   const grantSql = `FROM reading_enrollments e
     JOIN auth_tokens a ON e.scope='reading_capture:' || a.id
-    JOIN reading_policy p ON p.id=1 AND p.enabled=1 AND p.generation=e.generation
+    JOIN reading_policy p ON p.id=1 AND p.generation=e.generation
     WHERE e.token_hash=? AND e.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)
       AND (a.scope='vault' OR (a.scope='reminders' AND a.folder_path IS NOT NULL)
         OR (a.scope='reading' AND a.folder_path=p.folder_path AND a.reading_generation=p.generation))`;

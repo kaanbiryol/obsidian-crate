@@ -90,32 +90,6 @@ body.reduce-motion .crate-action-progress {
 	color: var(--text-error);
 }
 
-.crate-settings .crate-settings-disclosure {
-	margin: 8px 0;
-}
-
-.crate-settings .crate-settings-disclosure > summary {
-	padding: 10px 0;
-	font-size: var(--font-ui-medium);
-	line-height: 1.4;
-	font-weight: var(--font-semibold);
-	cursor: pointer;
-}
-
-.crate-settings .crate-settings-disclosure[open] > summary {
-	margin-bottom: 8px;
-}
-
-.crate-settings .crate-settings-disclosure > div > .crate-settings-disclosure {
-	margin: 4px 0;
-	padding-left: 12px;
-}
-
-.crate-settings .crate-settings-disclosure > summary:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: 2px;
-}
-
 .crate-settings .crate-sync-interval .setting-item-control {
 	flex-wrap: wrap;
 }
@@ -135,7 +109,12 @@ body.reduce-motion .crate-action-progress {
 
 .crate-settings .crate-device-description .crate-settings-disclosure {
 	margin: 0;
+	border: 0;
+	background: transparent;
 	> summary {
+		min-height: 32px;
+		border: 0;
+		font-size: var(--font-ui-smaller);
 		padding: 2px 0;
 		font-weight: var(--font-normal);
 		color: var(--text-muted);
@@ -165,3 +144,20 @@ body.reduce-motion .crate-action-progress {
 .crate-settings .crate-usage-metric .setting-item-description {
 	white-space: pre-line;
 }
+
+.crate-qr-link-fallback .setting-item {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.crate-qr-link-fallback :is(.setting-item-control, textarea) {
+	width: 100%;
+	max-width: 100%;
+}
+
+.crate-qr-link-fallback textarea {
+	min-height: 88px;
+	word-break: break-all;
+}
+
+.crate-qr-modal .setting-item button { min-height: 44px; }

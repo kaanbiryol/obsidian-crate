@@ -1,3 +1,4 @@
+import { featureEnabled, handleFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { parseJsonObject } from './utils';
 import { limitNotificationAction } from './rate-limit';
@@ -32,6 +33,8 @@ const REMINDERS_SCOPE_ROUTES = new Set([
 const READING_LIBRARY_ROUTES = new Set([
 	'POST /reading/shortcut-pairing',
 	'GET /reading/session',
+	'GET /reading/fetching',
+	'POST /reading/fetching',
 	'GET /reading/list',
 	'GET /reading/item',
 	'POST /reading/capture',
@@ -46,6 +49,7 @@ export function isAuthenticatedRouteAllowed(
 	method: RouteMethod,
 ): boolean {
 	if (principal.scope === 'vault') return true;
+	if (path === '/features' && method === 'GET' && ['reading', 'reminders'].includes(principal.scope)) return true;
  if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`) || READING_LIBRARY_ROUTES.has(`${method} ${path}`);
  if (principal.scope === 'reading_capture') return ['POST /reading/capture', 'POST /reading/prepare'].includes(`${method} ${path}`);
  if (principal.scope === 'reading') return READING_LIBRARY_ROUTES.has(`${method} ${path}`) || `${method} ${path}` === 'DELETE /auth/session';
@@ -64,6 +68,11 @@ export async function handleAuthenticatedRoute(
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
 	}
 
+	if (path === '/features' && ['GET', 'POST'].includes(method)) {
+		const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
+		return limited ?? handleFeaturePolicy(request, env.DB);
+	}
+	if (path.startsWith('/reminders/') && !await featureEnabled(env.DB, 'reminders')) return corsResponse({ error: 'Reminders are paused. Enable them in Crate settings.', code: 'feature_paused' }, 423);
 	if (principal.scope === 'reminders' && path.startsWith('/reminders/')) {
 		let folder: unknown = new URL(request.url).searchParams.get('folderPath');
 		if (method !== 'GET') {

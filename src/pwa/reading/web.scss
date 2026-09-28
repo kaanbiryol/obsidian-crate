@@ -249,3 +249,11 @@ html.pwa-document-reader {
 .crate-reminders-ui .crate-reading-web .crate-reading-reader[data-document-scroll="true"] .crate-reading-reader__floating {
   top: calc(100dvh - max(16px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom))) - 52px);
 }
+
+// Keep setup guidance inline in the normal library and its scroll area.
+.crate-reminders-ui .crate-reading-disabled {
+  p { max-width: 32ch; }
+  strong { color: var(--text-normal); font-weight: 500; }
+  button { min-width: 128px; }
+  p + p { margin-top: 16px; }
+}

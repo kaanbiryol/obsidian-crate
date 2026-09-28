@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	FakeElement,
+	openSettingsDisclosures,
 	MockSetting,
 	createObsidianUiModule,
 	noticeMessages,
@@ -14,7 +15,7 @@ async function flushMicrotasks(): Promise<void> {
 	for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
-async function loadNotificationsSectionModule() {
+async function loadNotificationsSectionModule(expand = true) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
@@ -26,7 +27,12 @@ async function loadNotificationsSectionModule() {
 	}));
 	vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
 
-	return { ...await import('./notifications-section'), ...await import('./reminders-web-app') };
+	const notifications = await import('./notifications-section');
+	return { ...await import('./reminders-web-app'), renderNotificationsSection: (context: Parameters<typeof notifications.renderNotificationsSection>[0]) => {
+		const cleanup = notifications.renderNotificationsSection(context);
+		if (expand) openSettingsDisclosures(context.containerEl as unknown as FakeElement);
+		return cleanup;
+	} };
 }
 
 function getSettingByName(name: string): MockSetting {
@@ -52,6 +58,21 @@ describe('renderNotificationsSection', () => {
 		vi.doUnmock('obsidian');
 		vi.doUnmock('../qr-modal');
 		vi.doUnmock('../external-browser-modal');
+	});
+
+	it('loads notification devices only after expanding options', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule(false);
+		const getPushSubscriptions = vi.fn(async () => ({ subscriptions: [] }));
+		const container = new FakeElement('div');
+		const cleanup = renderNotificationsSection({ containerEl: container as never, plugin: createPlugin({ getPushSubscriptions }), rerender: vi.fn() });
+		await flushMicrotasks();
+		expect(getPushSubscriptions).not.toHaveBeenCalled();
+		openSettingsDisclosures(container);
+		await flushMicrotasks();
+		expect(getPushSubscriptions).toHaveBeenCalledOnce();
+		openSettingsDisclosures(container);
+		expect(getPushSubscriptions).toHaveBeenCalledOnce();
+		cleanup();
 	});
 
 	it.each([null, '2026-09-06'])('shows notification enrollment and paused recovery state: %s', async disabled_at => {
@@ -80,8 +101,8 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(getSettingByName('Test notification').buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(Boolean(disabled_at));
-		expect(getSettingByName('Send reminder notifications')).toBeTruthy();
-		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders web app')).toBe(false);
+		expect(getSettingByName('Push notifications')).toBeTruthy();
+		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Crate web app')).toBe(false);
 		expect(getSettingByName('Notification devices').descEl.textContent).toContain('receive reminder push notifications');
 		expect(getSettingByName('iPhone').descEl.textContent).toContain(disabled_at ? 'Notifications paused. Remove this device' : 'Subscribed');
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
@@ -133,7 +154,7 @@ describe('renderNotificationsSection', () => {
 			plugin: plugin as never,
 			rerender: vi.fn(),
 		});
-		getSettingByName('Send reminder notifications').toggles[0]?.change(false);
+		getSettingByName('Push notifications').toggles[0]?.change(false);
 		await flushMicrotasks();
 
 		expect(updateNotificationPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, revision: 'policy-1' }));
@@ -160,11 +181,11 @@ describe('renderNotificationsSection', () => {
 			plugin: plugin as never,
 			rerender: vi.fn(),
 		});
-		getSettingByName('Send reminder notifications').toggles[0]?.change(false);
+		getSettingByName('Push notifications').toggles[0]?.change(false);
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-    expect(getSettingByName('Send reminder notifications').toggles[0]?.value).toBe(false);
+    expect(getSettingByName('Push notifications').toggles[0]?.value).toBe(false);
     expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});
 
@@ -224,8 +245,8 @@ describe('renderNotificationsSection', () => {
 	});
 
 	it('shows the Worker error when an app code cannot be created', async () => {
-		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
-		renderRemindersWebApp(new FakeElement('div') as never, createPlugin({
+		const { renderCrateWebApp } = await loadNotificationsSectionModule();
+		renderCrateWebApp(new FakeElement('div') as never, createPlugin({
 				createRemindersEnrollmentToken: vi.fn(async () => {
 					throw new Error('Invalid token');
 				}),
@@ -235,17 +256,17 @@ describe('renderNotificationsSection', () => {
 			}));
 		await flushMicrotasks();
 
-		const showCodeButton = getSettingByName('Reminders web app').buttons[1];
+		const showCodeButton = getSettingByName('Crate web app').buttons[1];
 		showCodeButton?.click();
 		await flushMicrotasks();
 
 		expect(noticeMessages).toContain('Could not create app code: Invalid token');
-		expect(showCodeButton?.buttonEl.textContent).toBe('Show QR code');
+		expect(showCodeButton?.buttonEl.textContent).toBe('Connect another device');
 		expect(showCodeButton?.buttonEl.classNames.has('is-disabled')).toBe(false);
 	});
 
 	it('builds the app code from the active API endpoint when persisted settings are stale', async () => {
-		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
+		const { renderCrateWebApp } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
 			getWorkerUrl: vi.fn(() => 'https://active-worker.example.com'),
 			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
@@ -255,10 +276,10 @@ describe('renderNotificationsSection', () => {
 		plugin.settings.workerUrl = '';
 		plugin.settings.pushEnabled = false;
 
-		renderRemindersWebApp(new FakeElement('div') as never, plugin as never);
+		renderCrateWebApp(new FakeElement('div') as never, plugin as never);
 		await flushMicrotasks();
 
-		getSettingByName('Reminders web app').buttons[1]?.click();
+		getSettingByName('Crate web app').buttons[1]?.click();
 		await flushMicrotasks();
 
 		expect(lastQrCodeData).toBe(
@@ -266,26 +287,20 @@ describe('renderNotificationsSection', () => {
 		);
 	});
 
-	it('opens the reminders app on the same phone after the enrollment request', async () => {
-		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
+	it('opens the reminders app directly in the browser after the enrollment request', async () => {
+		const { renderCrateWebApp } = await loadNotificationsSectionModule();
+		const open = vi.fn();
+		vi.stubGlobal('window', { open });
 		const plugin = createPlugin({}) as unknown as { app: unknown };
-		renderRemindersWebApp(new FakeElement('div') as never, plugin as never);
-		getSettingByName('Reminders web app').buttons[2]?.click();
-		await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
-		expect(openExternalBrowserModal).toHaveBeenCalledWith(plugin.app,
+		renderCrateWebApp(new FakeElement('div') as never, plugin as never);
+		getSettingByName('Crate web app').buttons[0]?.click();
+		await vi.waitFor(() => expect(open).toHaveBeenCalledOnce());
+		expect(open).toHaveBeenCalledWith(
 			expect.stringContaining('/notifications?token=install-token'),
-			expect.objectContaining({ linkText: 'Open reminders' }));
+			'_blank', 'noopener,noreferrer');
+		expect(openExternalBrowserModal).not.toHaveBeenCalled();
 	});
 
-	it('shows a usable link if mobile clipboard access fails', async () => {
-		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
-		vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard denied')) } });
-		const plugin = createPlugin({});
-		renderRemindersWebApp(new FakeElement('div') as never, plugin);
-		getSettingByName('Reminders web app').buttons[0]?.click();
-		await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
-		expect(noticeMessages).not.toContain('Could not create app link: Clipboard denied');
-	});
 });
 
 const updateNotificationPolicy = vi.fn(async (policy: Record<string, unknown>) => ({ policy: { ...policy, revision: 'policy-2' } }));

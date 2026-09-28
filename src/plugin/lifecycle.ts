@@ -1,3 +1,4 @@
+import { refreshSharedFeatures, registerSharedFeatures } from './feature-settings';
 import { Notice } from "obsidian";
 import { registerReading } from '../reading/register-integrations';
 import { stopReading } from '../reading/runtime';
@@ -34,6 +35,8 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
     return;
   }
 
+  await refreshSharedFeatures(plugin, false).catch(() => { /* Use cached settings while offline or before a server upgrade. */ });
+  if (signal.aborted) return;
   registerCheckpointBackupCleanup(plugin, signal);
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
@@ -44,6 +47,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
   if (signal.aborted) return;
   await initializePluginSync(plugin, signal);
   if (signal.aborted) return;
+  registerSharedFeatures(plugin);
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
@@ -139,7 +143,7 @@ function registerPluginProtocols(plugin: CratePlugin): void {
   });
   plugin.registerObsidianProtocolHandler("crate-reminders", (params) => {
     if (!plugin.remindersSettings.enabled) {
-      new Notice("Enable reminders in Crate settings before opening the reminders app.");
+      new Notice("Reminders are unavailable. Check your folder in Crate settings.");
       plugin.openSettingsTab();
       return;
     }

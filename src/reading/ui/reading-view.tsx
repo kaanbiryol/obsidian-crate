@@ -56,7 +56,7 @@ function LocalReadingLibrary({ plugin, library }: { plugin: CratePlugin; library
 		{adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => {
 			if (pending.current) return;
 			pending.current = true; setSaving(true); setError(null);
-			void library.add(url).then(result => { setAdding(false); setUrl(''); new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); })
+			void library.add(url, undefined, true).then(result => { setAdding(false); setUrl(''); new Notice(result.duplicate ? 'This link is already saved.' : 'Link saved to your reading inbox.'); })
 				.catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not save this link.'))
 				.finally(() => { pending.current = false; setSaving(false); });
 		}} /></ReadingDialog>}

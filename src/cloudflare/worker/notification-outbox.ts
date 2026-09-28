@@ -1,3 +1,4 @@
+import { featureEnabled } from './feature-policy';
 import { queryRows } from './db';
 import type { Env } from './types';
 
@@ -6,6 +7,7 @@ interface SchedulePayload {
 	content: string;
 	project?: string | null;
 	dueDatetime: string;
+	resume?: boolean;
 }
 
 interface NotificationJobRow {
@@ -78,6 +80,7 @@ async function processNotificationJob(
 }
 
 export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE): Promise<void> {
+  if (!await featureEnabled(env.DB, 'reminders')) return;
 	const jobs = await queryRows<Pick<NotificationJobRow, 'reminder_id' | 'job_token'>>(
 		env.DB.prepare(`SELECT reminder_id, job_token FROM notification_jobs
 			WHERE available_at >= 0 AND available_at <= ? ORDER BY available_at ASC LIMIT ?`)

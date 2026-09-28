@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+vi.mock('../feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
 import { ReminderAlarm } from './reminder-alarm';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
 vi.mock('./push', () => ({ listPushSubscriptionIds: vi.fn(), sendToAllSubscriptions: vi.fn() }));

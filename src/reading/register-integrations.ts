@@ -6,7 +6,7 @@ import { AddReadingLinkModal } from './ui/add-link-modal';
 import { READING_VIEW_TYPE, ReadingView } from './ui/reading-view';
 
 export async function openReading(plugin: CratePlugin): Promise<void> {
-	if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); plugin.openSettingsTab(); return; }
+	if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
 	const leaf = plugin.app.workspace.getLeavesOfType(READING_VIEW_TYPE)[0] ?? plugin.app.workspace.getLeaf('tab');
@@ -19,7 +19,7 @@ export function registerReading(plugin: CratePlugin): void {
 	plugin.registerView(READING_VIEW_TYPE, leaf => new ReadingView(leaf, plugin));
 	plugin.addCommand({ id: 'open-reading', name: 'Open reading', callback: () => openReading(plugin) });
 	plugin.addCommand({ id: 'add-reading-link', name: 'Add reading link', callback: () => {
-		if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); plugin.openSettingsTab(); return; }
+		if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
 		new AddReadingLinkModal(plugin).open();
 	} });
 	try { startReading(plugin); }

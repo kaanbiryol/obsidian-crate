@@ -24,7 +24,7 @@ Deferred: RSS, newsletters, PDFs, video transcripts, AI features, full-library b
 
 ### Enable Reading
 
-Reading is off by default. **Settings → Crate → Reading** enables it and selects a folder, defaulting to `Reading/`. Explain that saving a URL sends it to the user's Worker, which requests the source website and stores extracted text in their vault. The website sees the server request; extraction does not use the user's browser login.
+Reading is on by default. **Settings → Crate → Reading** can disable it or select a folder, defaulting to `Reading/`. Explain that saving a URL sends it to the user's Worker, which requests the source website and stores extracted text in their vault. The website sees the server request; extraction does not use the user's browser login.
 
 Validate the folder against portable sync paths and ignore rules. Do not allow overlap with the configured reminders folder. Adopt every Markdown note in the selected folder and its subfolders; never adopt notes outside it. Initial release folder changes require Reading to be disabled and pending work resolved; no automatic migration of notes or grants. Re-enabling for another folder requires fresh web/capture enrollment.
 

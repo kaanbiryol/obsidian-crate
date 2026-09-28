@@ -3,6 +3,16 @@ import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings }
 import { MAX_SYNC_HISTORY_PATHS } from './settings-types';
 
 describe('normalizeCrateSettings', () => {
+	it('enables reading by default for new installs and missing preferences', () => {
+		expect(normalizeCrateSettings(undefined, '.obsidian').reading.enabled).toBe(true);
+		expect(normalizeCrateSettings({ reading: { folderPath: 'Articles' } as never }, '.obsidian').reading)
+			.toEqual({ enabled: true, folderPath: 'Articles' });
+	});
+
+	it('preserves explicitly disabled Reading', () => {
+		expect(normalizeCrateSettings({ reading: { enabled: false, folderPath: 'Reading' } }, '.obsidian').reading.enabled).toBe(false);
+	});
+
 	it('migrates disabled startup and resume switches to manual-only sync', () => {
 		expect(normalizeCrateSettings({ syncOnStartup: false, syncOnResume: false }, '.obsidian').automaticSync).toBe(false);
 		expect(normalizeCrateSettings({}, '.obsidian').automaticSync).toBe(true);

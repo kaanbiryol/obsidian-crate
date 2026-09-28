@@ -45,6 +45,7 @@ class FakeDocumentFragment {
 }
 
 async function loadLifecycleModule() {
+	vi.doMock('./feature-settings', () => ({ refreshSharedFeatures: vi.fn(async () => {}), registerSharedFeatures: vi.fn() }));
 	vi.doMock('../reading/register-integrations', () => ({ registerReading: vi.fn() }));
 	vi.doMock('../reading/runtime', () => ({ stopReading: vi.fn() }));
 	vi.doMock('../sync/checkpoint-backup-cleanup', () => ({ registerCheckpointBackupCleanup: vi.fn() }));
@@ -253,7 +254,7 @@ describe('bootstrapPlugin', () => {
 		expect(plugin.activateRemindersView).not.toHaveBeenCalled();
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
 		expect(noticeMessages).toContain(
-			'Enable reminders in Crate settings before opening the reminders app.',
+			'Reminders are unavailable. Check your folder in Crate settings.',
 		);
 	});
 
