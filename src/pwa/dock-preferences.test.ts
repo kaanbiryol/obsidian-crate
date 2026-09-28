@@ -10,22 +10,24 @@ describe('dock destinations', () => {
 			expect(new Set(tabs).size).toBe(4);
 		}
 	});
-	it('selects pinned Reading destinations before falling back to the Reading picker', () => {
+	it('selects the exact Reading destination without reassigning another slot', () => {
 		const tabs = normalizeDockTabs(['highlights', 'archive', 'favorites', 'reading']);
 		expect(dockDestinationIndex(tabs, 'reading', 'highlights')).toBe(0);
 		expect(dockDestinationIndex(tabs, 'reading', 'archived')).toBe(1);
 		expect(dockDestinationIndex(tabs, 'reading', 'favorites')).toBe(2);
 		expect(dockDestinationIndex(tabs, 'reading', 'inbox')).toBe(3);
-		expect(dockDestinationIndex(['reading', 'inbox'], 'reading', 'favorites')).toBe(0);
+		expect(dockDestinationIndex(['reading', 'inbox'], 'reading', 'favorites')).toBe(-1);
 		expect(dockDestinationIndex(['favorites', 'inbox'], 'reading', 'inbox')).toBe(-1);
 	});
-	it('selects Today directly without treating it as an Upcoming fallback', () => {
-		expect(dockDestinationIndex(['today', 'today-view', 'upcoming', 'inbox'], 'reminders', 'today')).toBe(1);
-		expect(dockDestinationIndex(['today-view', 'inbox', 'browse', 'reading'], 'reminders', 'upcoming')).toBe(-1);
+	it('keeps both date views under the Reminders tab', () => {
+		for (const tab of ['today', 'upcoming']) {
+			expect(dockDestinationIndex(['inbox', 'today', 'reading', 'browse'], 'reminders', tab)).toBe(1);
+			expect(dockDestinationIndex(['inbox', 'favorites', 'reading', 'browse'], 'reminders', tab)).toBe(-1);
+		}
 	});
-	it('selects Upcoming separately when pinned, otherwise Reminders', () => {
-		expect(dockDestinationIndex(['today', 'upcoming'], 'reminders', 'upcoming')).toBe(1);
-		expect(dockDestinationIndex(['today'], 'reminders', 'upcoming')).toBe(0);
-		expect(dockDestinationIndex(['upcoming'], 'reminders', 'today')).toBe(-1);
+	it('migrates old date-view slots to Reminders and fills duplicate slots', () => {
+		expect(normalizeDockTabs(['archive', 'upcoming', 'favorites', 'highlights'])).toEqual(['archive', 'today', 'favorites', 'highlights']);
+		expect(normalizeDockTabs(['upcoming', 'today-view', 'inbox', 'reading'])).toEqual(['today', 'inbox', 'reading', 'browse']);
+		expect(normalizeDockTabs(['today-view', 'today', 'upcoming', 'reading'])).toEqual(['today', 'reading', 'inbox', 'browse']);
 	});
 });

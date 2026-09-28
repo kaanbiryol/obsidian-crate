@@ -43,7 +43,7 @@ it.each([
   [['unknown'], [...DEFAULT_DOCK_TABS]],
   [['reading', 'today', 'reading', null, 'bad'], ['reading', 'today', 'inbox', 'browse']],
   [['browse'], ['browse', 'inbox', 'today', 'reading']],
-  [['highlights', 'favorites', 'archive', 'upcoming', 'inbox'], ['highlights', 'favorites', 'archive', 'upcoming']],
+  [['highlights', 'favorites', 'archive', 'upcoming', 'inbox'], ['highlights', 'favorites', 'archive', 'today']],
 ])('normalizes dock preferences without losing their order: %j', (dockTabs, expected) => {
   storage(JSON.stringify({ dockTabs }));
   expect(loadPwaPreferences().dockTabs).toEqual(expected);

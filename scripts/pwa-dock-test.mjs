@@ -42,7 +42,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     page = await context.newPage(); page.setDefaultTimeout(7000); const errors = []; page.on('pageerror', error => errors.push(error.message));
     const dock = () => page.locator('.crate-feature-panel[data-active="true"] .pwa-dock');
-    const views = page.getByRole('dialog', { name: 'Reading views', exact: true });
+    const views = page.getByRole('dialog', { name: 'More views', exact: true });
     const geometry = () => dock().locator('.pwa-dock__bar, .pwa-dock__add').evaluateAll(elements => elements.map(el => {
       const { x, y, width, height } = el.getBoundingClientRect(); return { x, y, width, height };
     }));
@@ -94,11 +94,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     const openViews = async () => {
       const before = await geometry();
+      const visibleLabels = await dock().locator('nav > button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')));
       const start = await center(dock().locator('[data-dock-group]'));
       await page.mouse.move(start.x, start.y); await page.mouse.down();
       await page.waitForTimeout(480); await page.mouse.up();
       await expect(views).toBeVisible();
-      await expect(views.getByRole('button')).toHaveText(['Reading', 'Favorites', 'Archive', 'Highlights']);
+      await expect(views.getByRole('button')).toHaveText(['Inbox', 'Reminders', 'Projects', 'Reading', 'Favorites', 'Archive', 'Highlights'].filter(label => !visibleLabels.includes(label)));
       assert.deepEqual(await geometry(), before, 'Opening must not shift the page or add action');
       await expect(dock().locator('[data-dock-group]')).toHaveCSS('opacity', '0');
       await expect.poll(async () => {
@@ -192,14 +193,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // Reopen while dismissal is still settling; retain the same surface and
     // accept a choice immediately, including before its entrance has finished.
     for (let attempt = 0; attempt < 3; attempt++) {
+      const nextView = attempt % 2 === 0 ? 'Reading' : 'Favorites';
       await dock().locator('[data-dock-group]').press('ArrowDown');
       await page.waitForTimeout(50);
       await page.keyboard.press('Escape');
       await page.waitForTimeout(35);
       await dock().locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
       await expect(views).toBeVisible();
-      await views.getByRole('button', { name: 'Favorites', exact: true }).evaluate(button => button.click());
-      await closed(); await active('Favorites');
+      await views.getByRole('button', { name: nextView, exact: true }).evaluate(button => button.click());
+      await closed(); await active(nextView);
     }
     await direct('Reminders');
     // A live preference change must settle the entire reveal, not only the shell.
@@ -277,20 +279,22 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await dock().locator('[data-dock-group]').tap(); await closed();
     await openViews();
-    await checkScreenFade('[data-dock-destination="archived"]');
+    await checkScreenFade('[data-dock-destination="archive"]');
     await closed(); await active('Archive');
     if (process.env.PWA_DOCK_MOTION_ONLY === '1') {
       assert.deepEqual(errors, []);
       return;
     }
     const dragViews = async (input, { immediate = false, ending = 'select' } = {}) => {
+      if (await dock().getByRole('button', { name: 'Favorites', exact: true }).count()) await selectView('Reading');
       await direct('Reminders'); await page.mouse.move(-1, -1);
       const start = await center(dock().locator('[data-dock-group]'));
       await input.down(start);
       if (immediate) await input.move({ x: start.x, y: start.y - 18 });
       else await page.waitForTimeout(480);
       await expect(views).toBeVisible();
-      for (const label of ['Archive', 'Reading', 'Favorites']) {
+      const labels = await views.getByRole('button').allTextContents();
+      for (const label of [...labels.filter(label => label !== 'Favorites').slice(0, 2), 'Favorites']) {
         const choice = views.getByRole('button', { name: label, exact: true });
         await input.move(await center(choice));
         await expect(choice).toHaveAttribute('data-preview', 'true');
@@ -321,7 +325,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       } finally { await session.detach(); }
     }
     await selectView('Archive'); await openViews();
-    await expect(views.getByRole('button', { name: 'Archive', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(views.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
     await expect(views.locator('[data-icon="check"]')).toHaveCount(0);
     await page.mouse.click(8, 140); await closed(); await active('Archive');
     await selectView('Reading');
@@ -340,6 +344,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.setViewportSize(size); await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       const inset = size.width > size.height ? 21 : 34;
       const safeArea = await page.addStyleTag({ content: `:root { --pwa-safe-area-bottom: ${inset}px; }` });
+      if (await dock().getByRole('button', { name: 'Archive', exact: true }).count()) await selectView('Reading');
       await direct('Reminders');
       const [reminderBar] = await geometry();
       assert.ok(Math.abs(size.height - reminderBar.y - reminderBar.height - inset) < 1, 'Reminders dock respects the safe area without adding a second gap');

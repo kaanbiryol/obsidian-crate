@@ -12,8 +12,6 @@ const svg = openingIconSvg;
 const icons = {
 	inbox: svg('inbox', '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
 	today: svg('calendar', '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
-	'today-view': svg('calendar-check', '<path d="M8 2v4M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18m-12 6 2 2 4-4"/>'),
-	upcoming: svg('calendar-range', '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M17 14h-6"/><path d="M13 18H7"/><path d="M7 14h.01"/><path d="M17 18h.01"/>'),
 	browse: svg('folder-open', '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>'),
 	favorites: svg('star', '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>'),
 	archive: svg('archive', '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'),
@@ -24,7 +22,7 @@ const icons = {
 export function createPwaOpeningDockHtml(tab?: StartTab | 'reading', readingTab: ReadingSection = 'inbox'): string {
 	// A cached HTML shell cannot embed request-specific state. Its selection
 	// comes from the early bootstrap; React can override it once enrollment resolves.
-	const active = tab === 'reading' ? readingTab === 'inbox' ? 'reading' : readingTab === 'archived' ? 'archive' : readingTab : tab;
+	const active = tab === 'reading' ? readingTab === 'inbox' ? 'reading' : readingTab === 'archived' ? 'archive' : readingTab : tab === 'upcoming' ? 'today' : tab;
 	const index = tab ? ['inbox', 'today', 'browse', 'reading'].indexOf(tab === 'upcoming' ? 'today' : tab) : null;
 	return `<div class="crate-reminders-ui pwa-opening-dock"${tab ? ` data-opening-tab="${tab}" data-opening-selection="${active}" style="--pwa-opening-dock-index:var(--pwa-dock-${active}-active-order,${index});--pwa-opening-dock-indicator:var(--pwa-dock-${active}-active-indicator,${index === -1 ? 0 : 1})"` : ''} aria-hidden="true" inert>
 		<div class="pwa-dock pwa-dock--opening"><nav class="pwa-dock__bar">
