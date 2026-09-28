@@ -230,7 +230,8 @@ export class CloudflareDeploymentService {
 					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
 					const response = await this.options.transport(url, request);
 					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
-					if (savedLogin && (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
+					if (savedLogin && new URL(url).origin === 'https://api.cloudflare.com'
+						&& (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
 					return response;
 				}));
 			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');

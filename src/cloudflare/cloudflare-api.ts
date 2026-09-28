@@ -330,8 +330,8 @@ export class CloudflareApiClient {
 		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
 	}
 
-	async verifyResetWorker(origin: string, resetId: string): Promise<void> {
-		await verifyResetWorker(this.transport, origin, resetId);
+	async verifyResetWorker(origin: string, resetId: string, requireRecoveryObjects = false): Promise<boolean> {
+		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects);
 	}
 
 	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {

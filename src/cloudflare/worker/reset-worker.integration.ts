@@ -133,7 +133,30 @@ it('keeps normal sync and web routes offline and exposes only non-secret readine
 		expect((await worker.fetch(new Request(`${url}${path}`), h.bindings)).status).toBe(503);
 	}
 	const response = await worker.fetch(new Request(`${url}/.well-known/crate-reset`), h.bindings);
-	expect(await response.json()).toEqual({ service: 'crate-reset', protocol: 1, resetId });
+	expect(await response.json()).toEqual({ service: 'crate-reset', protocol: 1, resetId, recoveryObjects: true });
 	expect(response.headers.get('Cache-Control')).toBe('no-store');
+	expect(h.bucket.delete).not.toHaveBeenCalled();
+});
+
+it('advertises recovery-object cleanup and removes backups and history through the real Worker', async () => {
+	const id = '288f7648-db97-4f53-a162-95c692b8572f';
+	const prefix = `__crate__/backups/schema-upgrade-${id}`;
+	const keys = [`${prefix}/archive.json`, `${prefix}/database.sql`, `${prefix}/objects/${'a'.repeat(64)}`,
+		'__crate__/history/index.json', `__crate__/history/checkpoints/${id}.json`];
+	const h = await harness(keys);
+	for (const key of keys) await env.BUCKET.put(key, 'backup');
+	const info = await worker.fetch(new Request(`${url}/.well-known/crate-reset`), h.bindings);
+	expect(await info.json()).toMatchObject({ resetId, recoveryObjects: true });
+	expect((await h.fetch()).status).toBe(200);
+	expect((await env.BUCKET.list()).objects).toEqual([]);
+});
+
+it.each([
+	'__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/private.txt',
+	'__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/objects/not-a-hash',
+	'__crate__/history/checkpoints/personal.json',
+])('keeps unknown objects protected in recovery prefixes: %s', async key => {
+	const h = await harness([key]);
+	expect((await h.fetch()).status).toBe(403);
 	expect(h.bucket.delete).not.toHaveBeenCalled();
 });

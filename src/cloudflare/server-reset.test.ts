@@ -38,7 +38,7 @@ function harness() {
 			return { keys: [...objects].slice(offset, offset + 1000), ...(offset + 1000 < objects.size ? { cursor: String(offset + 1000) } : {}) };
 		}),
 		deleteR2Objects: vi.fn(async (_origin: string, _reset: string, _token: string, keys: string[]) => { keys.forEach(key => objects.delete(key)); }),
-		verifyResetWorker: vi.fn(async () => {}),
+		verifyResetWorker: vi.fn(async () => true),
 		getWorkersSubdomain: vi.fn(async () => 'example'),
 		deleteR2Bucket: vi.fn(async () => { bucket = null; }),
 		deleteD1Database: vi.fn(async () => { database = null; }),
@@ -492,4 +492,49 @@ it('shows an estimated time remaining once enough deletions have completed', asy
 	} finally {
 		clock.mockRestore();
 	}
+});
+
+
+it.each([resetCrateServer, deleteCrateServer])('cleans upgrade backups and shared history with the server', async cleanup => {
+	const h = harness();
+	const id = '288f7648-db97-4f53-a162-95c692b8572f';
+	const backup = `__crate__/backups/schema-upgrade-${id}`;
+	for (const key of [`${backup}/archive.json`, `${backup}/database.sql`, `${backup}/objects/${'a'.repeat(64)}`,
+		`__crate__/history/checkpoints/${id}.json`, '__crate__/history/index.json']) h.objects.add(key);
+	await cleanup(h.input);
+	expect(h.objects.size).toBe(0);
+	expect(h.api.deleteR2Bucket).toHaveBeenCalledOnce();
+});
+
+it.each([
+	'__crate__/backups/personal/archive.json',
+	'__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/private.txt',
+	'__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/objects/not-a-hash',
+	'__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/../archive.json',
+	'__crate__/history/checkpoints/personal.json',
+	'__crate__/history/private.json',
+])('preserves unknown objects inside Crate prefixes: %s', async key => {
+	const h = harness();
+	h.objects.add(key);
+	await expect(deleteCrateServer(h.input)).rejects.toThrow('Reset blocked');
+	expect(h.api.deleteR2Objects).not.toHaveBeenCalled();
+	expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
+	expect(h.api.deleteD1Database).not.toHaveBeenCalled();
+	expect(h.objects.has(key)).toBe(true);
+});
+
+it('resumes the held deletion by refreshing an older cleanup Worker before removing backups', async () => {
+	const h = harness();
+	h.objects.add('__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/archive.json');
+	h.api.deleteR2Objects.mockRejectedValueOnce(new Error('old cleanup response lost'));
+	await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+	h.api.verifyResetWorker.mockResolvedValueOnce(false).mockResolvedValue(true);
+	await deleteCrateServer(h.input);
+	expect(h.api.retireCrateWorker).toHaveBeenCalledTimes(2);
+	expect(h.api.retireCrateWorker.mock.calls[1]).toEqual([
+		h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true,
+	]);
+	expect(h.api.verifyResetWorker).toHaveBeenLastCalledWith(`https://${h.metadata.workerName}.example.workers.dev`, h.metadata.reset!.id, true);
+	expect(h.objects.size).toBe(0);
+	expect(h.api.deleteWorker).toHaveBeenCalledOnce();
 });

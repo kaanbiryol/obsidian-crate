@@ -70,3 +70,14 @@ it('bounds readiness retries when the old Worker keeps answering', async () => {
 	await rejection;
 	expect(transport).toHaveBeenCalledTimes(5);
 });
+
+it('waits for upgraded cleanup capabilities after refreshing an old retirement Worker', async () => {
+	vi.useFakeTimers();
+	const transport = vi.fn<HttpTransport>()
+		.mockResolvedValueOnce({ status: 200, text: JSON.stringify(metadata) })
+		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true }) });
+	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(origin, resetId, true);
+	await vi.runAllTimersAsync();
+	await expect(operation).resolves.toBe(true);
+	expect(transport).toHaveBeenCalledTimes(2);
+});

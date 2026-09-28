@@ -16,13 +16,14 @@ function info(text: string): Record<string, unknown> | null {
 	} catch { return null; }
 }
 
-export async function verifyResetWorker(transport: HttpTransport, origin: string, resetId: string): Promise<void> {
+export async function verifyResetWorker(transport: HttpTransport, origin: string, resetId: string, requireRecoveryObjects = false): Promise<boolean> {
 	const url = cleanupUrl(origin, '/.well-known/crate-reset');
 	// Publication can be visible in the management API before the public route.
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const response = await transport(url, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
 		const value = info(response.text);
-		if (response.status === 200 && value?.service === 'crate-reset' && value.protocol === 1 && value.resetId === resetId) return;
+		if (response.status === 200 && value?.service === 'crate-reset' && value.protocol === 1 && value.resetId === resetId
+			&& (!requireRecoveryObjects || value.recoveryObjects === true)) return value.recoveryObjects === true;
 		if (attempt < 4) await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
 	}
 	throw new Error('The cleanup Worker is not ready yet. Retry the server deletion or reset.');
