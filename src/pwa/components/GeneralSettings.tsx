@@ -1,4 +1,4 @@
-import { Toggle } from '@base-ui/react/toggle';
+import { Button } from '@/ui/shared/Button';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
@@ -13,10 +13,10 @@ export function GeneralSettings() {
 					{ value: 'system', label: 'System', icon: Monitor },
 					{ value: 'light', label: 'Light', icon: Sun },
 					{ value: 'dark', label: 'Dark', icon: Moon },
-				] as const).map(({ value, label, icon: Icon }) => <Toggle key={value}
+				] as const).map(({ value, label, icon: Icon }) => <Button key={value}
 					className={'settings-theme-option' + (themePreference === value ? ' is-active' : '')}
-					type="button" data-theme={value} pressed={themePreference === value}
-					onPressedChange={() => setThemePreference(value)}><Icon size={15} /><span>{label}</span></Toggle>)}
+					type="button" data-theme={value} aria-pressed={themePreference === value}
+					onClick={() => setThemePreference(value)}><Icon size={15} aria-hidden="true" /><span>{label}</span></Button>)}
 			</div>
 		</SettingsRow>
 	</SettingsSection>;

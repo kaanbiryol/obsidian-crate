@@ -9,7 +9,8 @@
     "scripts/pwa-settings-test.mjs": "local chromium/webkit run on 2026-09-27: 12.46 seconds",
     "scripts/pwa-update-notice-test.mjs": "local chromium/webkit run on 2026-09-27: 8.86 seconds",
     "scripts/reading-touch-test.mjs": "local chromium/webkit run on 2026-09-27: 17.99 seconds",
-    "scripts/shared-press-feedback-test.mjs": "local chromium/webkit run on 2026-09-27: 5.08 seconds"
+    "scripts/shared-press-feedback-test.mjs": "local chromium/webkit run on 2026-09-27: 5.08 seconds",
+    "scripts/reading-appearance-test.mjs": "local chromium/webkit coverage; conservative 30-second scheduling estimate"
   },
   "seconds": {
     "scripts/pwa-sheet-field-test.mjs": 8.91,
@@ -56,6 +57,7 @@
     "scripts/pwa-settings-test.mjs": 12.46,
     "scripts/pwa-update-notice-test.mjs": 8.86,
     "scripts/reading-touch-test.mjs": 17.99,
-    "scripts/shared-press-feedback-test.mjs": 5.08
+    "scripts/shared-press-feedback-test.mjs": 5.08,
+    "scripts/reading-appearance-test.mjs": 30
   }
 }

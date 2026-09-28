@@ -10,7 +10,6 @@
 @use '../../reminders/ui/shared/styles/primary-screen';
 @use './layout-modes';
 @use './mobile-layout';
-@use './sheet-headers';
 @use './navigation';
 @use './home-screen-install';
 @use './reminder-sync-notices';
@@ -30,13 +29,24 @@
 	@include layout-modes.styles;
 	@include primary-screen.styles;
 	@include mobile-layout.styles;
-	@include sheet-headers.styles;
 	@include navigation.styles;
 	@include home-screen-install.styles;
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
 	@include schedule-switcher.styles;
 
+	// Empty screens use the visible space above the overlapping dock. Keep
+	// short viewports scrollable instead of clipping the message at the top.
+	.pwa-reminders-view .reminders-empty-body {
+		display: grid;
+		grid-template-rows: minmax(min-content, 1fr);
+		min-height: 0;
+		overflow-y: auto;
+		padding-block: 16px calc(var(--pwa-dock-height) + 16px);
+	}
+	.pwa-reminders-view .reminders-empty-state {
+		height: auto;
+	}
 
 	.reminders-empty-state-icon,
 	.reminders-view.is-primary .reminders-empty-state-icon {

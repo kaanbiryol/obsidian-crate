@@ -47,6 +47,7 @@ export function ReminderActionChips({
     onTogglePriority,
 }: ReminderActionChipsProps) {
     const clock = useReminderClock();
+    const selectedProject = project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject;
     // A changed repeat rule deliberately clears the persisted occurrence in the
     // draft. Preview the same first occurrence that saving will calculate.
     let previewDate = dueDate;
@@ -81,10 +82,10 @@ export function ReminderActionChips({
                 onClick={onOpenProjectPicker}
                 data-action="toggle-picker" data-picker="project"
                 aria-haspopup="dialog"
-                className={`reminder-action-chip crate-semantic-token tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-secondary${selectedProject !== REMINDER_PICKER_COPY.editor.defaultProject ? ' is-active' : ''}`}
             >
                 <ThemeIcon size="xs" id="folder" />
-                {renderLabel(project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject)}
+                {renderLabel(selectedProject)}
             </Button>
 
             <ToggleButton

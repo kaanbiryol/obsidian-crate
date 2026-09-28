@@ -51,7 +51,7 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
         await expect(header).toHaveCSS('position', 'sticky');
         await expect(header).toHaveCSS('background-color', colorScheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)');
         await dock.locator('[data-dock-group]').focus(); await page.keyboard.press('ArrowDown');
-        const menu = page.getByRole('dialog', { name: 'Reading views', exact: true });
+        const menu = page.getByRole('dialog', { name: 'More views', exact: true });
         await expect(menu).toBeVisible();
         await expect.poll(async () => (await menu.boundingBox()).y).toBeGreaterThanOrEqual((await header.boundingBox()).y + (await header.boundingBox()).height);
         await page.keyboard.press('Escape'); await expect(menu).not.toBeVisible();

@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 // Follow the full drag and re-grab a sheet while it is settling. The library's
 // gesture-relative progress restarts at zero; the visible position must not.
-export async function checkSheetDragPosition(page, sheet) {
+export async function checkSheetDragPosition(page, sheet, { recedeCanvas = true } = {}) {
 	await page.mouse.move(-10, -10);
 	const frames = await sheet.evaluate(async popup => {
 		const target = popup.querySelector('.reminder-modal-header-title');
@@ -14,7 +14,9 @@ export async function checkSheetDragPosition(page, sheet) {
 		const sample = () => samples.push({
 			position: Math.max(0, Math.min(1, new DOMMatrix(getComputedStyle(popup).transform).f / travel())),
 			scale: new DOMMatrix(getComputedStyle(canvas).transform).a,
+			bounds: canvas.getBoundingClientRect().toJSON(),
 		});
+		sample();
 		const dispatch = async (type, y) => {
 			const touch = { identifier: 1, target, clientX: 180, clientY: y };
 			const event = new Event(type, { bubbles: true, cancelable: true });
@@ -36,6 +38,9 @@ export async function checkSheetDragPosition(page, sheet) {
 		await dispatch('touchend', start);
 		return samples;
 	});
-	for (const frame of frames) expect(Math.abs(frame.scale - (.94 + .06 * frame.position)), JSON.stringify(frame)).toBeLessThan(.002);
+	for (const frame of frames) {
+		expect(Math.abs(frame.scale - (recedeCanvas ? .94 + .06 * frame.position : 1)), JSON.stringify(frame)).toBeLessThan(.002);
+		if (!recedeCanvas) expect(frame.bounds).toEqual(frames[0].bounds);
+	}
 	await expect(sheet).toHaveCSS('transform', 'none');
 }

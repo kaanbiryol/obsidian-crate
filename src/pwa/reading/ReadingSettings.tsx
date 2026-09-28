@@ -14,6 +14,5 @@ export function ReadingSettings({ ready, connected, unavailable, onShortcut }: {
 			<span>Save from iPhone</span><ChevronRight size={16} aria-hidden="true" />
 		</Button>
 		{(!ready || !connected || unavailable) && <SettingsRow description={unavailable ?? (!ready ? 'Loading Reading settings…' : 'Enable server reading in Obsidian to connect your library.')} />}
-		<p className="settings-help">Opened articles are available offline.</p>
 	</SettingsSection>;
 }

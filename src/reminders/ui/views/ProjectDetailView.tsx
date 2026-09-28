@@ -19,6 +19,7 @@ export interface ProjectDetailViewProps {
   project: string;
   hideTitle?: boolean;
   backLabel?: string;
+  backControl?: React.ReactNode;
   navigationRightContent?: React.ReactNode;
   headerRightContent?: React.ReactNode;
   headerTitleContent?: React.ReactNode;
@@ -51,6 +52,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   project,
   hideTitle = false,
   backLabel = 'Projects',
+  backControl,
   navigationRightContent,
   headerRightContent,
   headerTitleContent,
@@ -105,11 +107,11 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       isDragging={order.isDragging}
       header={
         <>
-          <div className="project-detail-navigation">
-            <ShadowDOMNativeButton onClick={onBack} className="premium-back-button">
+          <div className="project-detail-navigation crate-detail-navigation">
+            {backControl ?? <ShadowDOMNativeButton onClick={onBack} className="premium-back-button">
               <ThemeIcon size="xs" id="chevron-left" />
               <span>{backLabel}</span>
-            </ShadowDOMNativeButton>
+            </ShadowDOMNativeButton>}
             {navigationRightContent}
           </div>
           <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} titleContent={headerTitleContent} rightContent={headerRightContent} metaContent={headerMetaContent} />

@@ -9,7 +9,7 @@ import { PwaSheetSurface } from './PwaSheetSurface';
 
 export function PwaModalSheet({
 	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, sheetClassName,
-	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, label, role = 'dialog', descriptionId,
+	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, recedeCanvas = true, label, role = 'dialog', descriptionId,
 }: {
 	isOpen: boolean;
 	/** Return false when dismissal navigates within the sheet instead of closing it. */
@@ -23,6 +23,8 @@ export function PwaModalSheet({
 	keyboardInset?: number;
 	/** Keep document-reader sheets outside the frozen app and its compositing layers. */
 	viewportPortal?: boolean;
+	/** A nested sheet leaves the underlying sheet's canvas depth in place. */
+	recedeCanvas?: boolean;
 	dismissible?: boolean;
 	label: string;
 	role?: 'dialog' | 'alertdialog';
@@ -41,11 +43,11 @@ export function PwaModalSheet({
 		stopPresentation.current = undefined;
 		popupRef.current = popup;
 		measureSheetTravel(popup);
-		if (popup) stopPresentation.current = trackSheetPresentation(popup);
+		if (popup) stopPresentation.current = trackSheetPresentation(popup, recedeCanvas);
 		// The portal can attach after the parent layout effect. Focus in its
 		// mount ref so a synchronous opening tap still activates the keyboard.
 		popup?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)')?.focus({ preventScroll: true });
-	}, []);
+	}, [recedeCanvas]);
 	useLayoutEffect(() => {
 		// Snapshot before exit, including the currently visible keyboard inset.
 		// Do not retarget travel on every frame of the keyboard animation.
@@ -98,7 +100,8 @@ export function PwaModalSheet({
 			}}
 		>
 			<Drawer.Portal container={mountPoint}>
-				<div className={`pwa-modal-sheet pwa-modal-sheet--${variant}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}>
+				<div data-recede-canvas={recedeCanvas ? '' : undefined}
+					className={`pwa-modal-sheet pwa-modal-sheet--${variant}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}>
 					<div className="pwa-modal-sheet__scroll-boundary" onTouchStartCapture={(event) => {
 						// WebKit focus can scroll this invisible one-pixel boundary to
 						// its end. Start header drags at its top so Base UI does not

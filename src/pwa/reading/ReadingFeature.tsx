@@ -3,7 +3,6 @@ import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
 import { PwaButton } from '../components/PwaButton';
 import { ReadingOpening } from './ReadingOpening';
-import { exportReadingData } from './storage';
 import { logoutReadingApp } from './logout';
 
 class ReadingLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -19,7 +18,7 @@ function ReadingUnavailable({ onRetry }: { onRetry: () => void }) {
 	useFeatureSettings('reading', {
 		ready: true, connected: false, unavailable: message,
 		status: { state: 'error', label: message }, attention: message, unsynced: true,
-		onRefresh: async () => onRetry(), onExport: exportReadingData,
+		onRefresh: async () => onRetry(),
 		onLogout: async () => { setSettingsOpen(false); setError(await logoutReadingApp()); },
 		shortcut: null, issues: null,
 	});

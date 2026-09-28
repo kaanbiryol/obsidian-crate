@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { expect } from '@playwright/test';
 
 // Desktop engines cannot animate an iPhone keyboard. Report its final viewport
 // at focus time and record the real sheet frames relative to that same gesture.
@@ -61,5 +62,10 @@ export async function checkPickerReturnTiming(page, reducedMotion, label) {
 	for (const frame of editor.filter(frame => frame.time >= settled.time)) {
 		assert.ok(Math.abs(frame.top - finalTop) < 1, `${label}: no late position correction after the return settles`);
 	}
+	// Restoring the real viewport above closes the simulated keyboard. Let that
+	// independent movement finish before the caller taps another chip or Close.
+	const stage = page.locator('.pwa-reminder-sheet-stage');
+	await expect(stage).toHaveCSS('padding-bottom', '0px');
+	await expect(stage).not.toHaveAttribute('data-keyboard-moving');
 	console.log(`${label}: focus ${Math.round(focusedAt)} ms, editor ${Math.round(editor[0].time)} ms, settled ${Math.round(settled.time)} ms`);
 }

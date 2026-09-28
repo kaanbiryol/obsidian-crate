@@ -1,4 +1,12 @@
 @mixin styles {
+  @media (hover: none), (pointer: coarse) {
+    // History captures the list as soon as a project opens. A release fade
+    // would leave a highlighted/shrunken card in the native Back preview.
+    .premium-project-card:not([data-press-active]) .premium-project-content {
+      transition: none;
+    }
+  }
+
   .pwa-navigation-viewport {
     position: relative;
     flex: 1;
@@ -19,10 +27,6 @@
   .pwa-navigation-screen--project {
     padding-top: var(--pwa-safe-area-top, 0px);
     box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
-
-    .premium-back-button {
-      margin-top: 8px;
-    }
   }
 
   .pwa-project-layer {
@@ -51,13 +55,5 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 14px 0;
-
-    .premium-back-button { margin: 0; }
-  }
-
-  // The project layer already accounts for the top safe area.
-  .pwa-reminders-view .pwa-navigation-screen--project .premium-back-button {
-    margin-top: 0;
   }
 }

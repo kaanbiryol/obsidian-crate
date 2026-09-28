@@ -117,7 +117,12 @@ try {
       await expect(page.getByRole('heading', { name: 'Errands', exact: true })).toBeVisible();
       await expect(page.locator('.pwa-screen > .pwa-dock')).toHaveAttribute('inert', '');
       await checkBackGesture(page, '.pwa-project-layer', true);
-      await expect(page.locator('.project-detail-navigation .premium-back-button')).toHaveText('Back');
+      await expect(page.getByRole('button', { name: 'Back to projects', exact: true })).toBeVisible();
+      await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveText('');
+      await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('width', '44px');
+      await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('border-radius', '999px');
+      await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('background-image', /linear-gradient/);
+      await expect(page.locator('.project-detail-header')).toHaveCSS('margin-top', '28px');
       await expect(page.locator('.project-detail-navigation .pwa-sync-indicator')).toBeVisible();
       await expect(page.locator('.project-detail-header .pwa-sync-indicator')).toHaveCount(0);
       const captureStyle = element => {
@@ -149,7 +154,7 @@ try {
       assert.equal(listState.top, before.scrollTop, 'Project navigation should preserve list scroll');
       assert.deepEqual(listState.borders, before.borders, 'Group borders and surfaces should remain stable');
 
-      await page.locator('.pwa-project-layer .premium-back-button').click();
+      await page.locator('.pwa-project-layer .crate-back-button').click();
       await expect(page.locator('.pwa-navigation-screen--project')).toHaveCount(0);
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
       await expect(page.locator('.pwa-screen > .pwa-dock')).not.toHaveAttribute('inert', '');
@@ -167,7 +172,7 @@ try {
         const screen = document.querySelector('.pwa-navigation-screen--project');
         const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;
         const before = x(), width = screen.getBoundingClientRect().width;
-        screen.querySelector('.premium-back-button').click();
+        screen.querySelector('.crate-back-button').click();
         await new Promise(resolve => requestAnimationFrame(resolve));
         const after = x(), samples = [after], started = performance.now();
         while (screen.isConnected && performance.now() - started < 900) {

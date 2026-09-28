@@ -1,3 +1,21 @@
+// Fill the space below search and filters; dock.scss reserves the dock overlap.
+.crate-reminders-ui.pwa-reading-root {
+  .crate-reading__list-scroll:has(> .crate-reading__empty) {
+    display: flex;
+    flex-direction: column;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    > * { flex-shrink: 0; }
+  }
+  .crate-reading__empty {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+}
 // The reader supplies selection actions; keep saved passages selectable for resizing.
 #app .crate-reading-reader__body, #app .crate-reading-reader__highlight { user-select: text; -webkit-user-select: text; -webkit-touch-callout: none; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }
@@ -81,7 +99,8 @@
   top: var(--reader-navigation-inset);
   opacity: var(--reader-navigation-visibility, 1);
   transform: translateY(calc((1 - var(--reader-navigation-visibility, 1)) * (-100% - var(--reader-navigation-inset))));
-  transition: opacity 120ms linear, transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);
+  // Scroll already supplies continuous progress; easing every update adds lag.
+  transition: none;
   &[data-scroll-hidden="true"] { pointer-events: none; }
   &:has(:focus-visible) { opacity: 1; transform: none; pointer-events: auto; }
   @media (prefers-reduced-motion: reduce) {
@@ -96,6 +115,14 @@
 .crate-reminders-ui .crate-reading-web .crate-reading-reader[data-document-scroll="true"] .crate-reading-reader__nav {
   --reader-navigation-inset: var(--pwa-safe-area-top, env(safe-area-inset-top));
   top: var(--reader-navigation-inset);
+  // Carry the opaque navigation surface behind the status bar as it reappears.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--reader-navigation-inset)) 0 100%;
+    background: inherit;
+    pointer-events: none;
+  }
 }
 
 .crate-reminders-ui.pwa-reading-root .crate-reading-reader__body pre code {
@@ -111,6 +138,10 @@
 html.pwa-document-reader {
   overflow-x: clip;
   overflow-y: auto;
+  // Allow native vertical rubber-banding only while the article is unlocked.
+  &:not(:has(body.pwa-sheet-scroll-locked)) {
+    &, body { overscroll-behavior-y: contain; }
+  }
   body, #app, .crate-feature-shell,
   .crate-feature-panel[data-crate-section="reading"],
   .crate-reading-web, .crate-reading-workspace, .crate-reading__layout { overflow: visible; }
@@ -137,22 +168,20 @@ html.pwa-document-reader {
   --reader-control-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
   --reader-control-shadow: 0 3px 12px #00000014, inset 0 1px 0 #ffffff08;
 
-  &__nav { min-height: 64px; border-bottom: 0; }
-  &__nav > .crate-icon-button { justify-self: start; }
-  & .crate-reading-reader__nav > .crate-icon-button[data-variant], &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
+  &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
     border: 1px solid var(--reader-control-border);
     border-radius: 999px;
     background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--reader-control-surface);
     box-shadow: var(--reader-control-shadow);
   }
-  &__nav > .crate-icon-button, &__quick-actions, &__tools > button, &__highlights-button {
+  &__quick-actions, &__tools > button, &__highlights-button {
     backdrop-filter: blur(24px) saturate(1.35);
     -webkit-backdrop-filter: blur(24px) saturate(1.35);
   }
   &__quick-actions { padding: 2px; gap: 2px; }
   &__quick-actions:empty { display: none; }
   &__quick-actions > button { border-radius: 50%; }
-  &__page { padding-top: 28px; }
+  &__page { padding-top: var(--pwa-detail-heading-gap); }
   &__page:not(:has(> .crate-reading-reader__header)) { padding-top: 0; }
   &__header { margin-bottom: 20px; }
   &__source { margin-bottom: 18px; }
@@ -173,7 +202,7 @@ html.pwa-document-reader {
   }
   @media (prefers-reduced-transparency: reduce) {
     --reader-control-surface: var(--background-primary-alt);
-    &__nav > .crate-icon-button, &__quick-actions, &__tools > button, &__highlights-button { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    &__quick-actions, &__tools > button, &__highlights-button { backdrop-filter: none; -webkit-backdrop-filter: none; }
   }
 }
 
@@ -189,7 +218,7 @@ html.pwa-document-reader {
   pointer-events: none;
   opacity: var(--reader-floating-visibility, 1);
   transform: translateY(calc((1 - var(--reader-floating-visibility, 1)) * 12px));
-  transition: opacity 120ms linear, transform var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease);
+  transition: none;
   &[data-scroll-hidden="true"] .crate-reading-reader__highlights-button { pointer-events: none; }
   &:has(:focus-visible) { opacity: 1; transform: none; }
   &:has(:focus-visible) .crate-reading-reader__highlights-button { pointer-events: auto; }

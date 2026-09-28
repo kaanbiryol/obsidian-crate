@@ -6,7 +6,7 @@ import type { resolvePwaOpeningDestination } from './opening-destination';
 const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;
 
 const settings = openingIconSvg('settings', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>');
-const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" aria-hidden="true">${icon}</span>`;
+const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" data-variant="ghost" aria-hidden="true">${icon}</span>`;
 const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="pwa-sync-indicator__button"><span class="crate-sync-indicator" data-sync-state="syncing" data-visual-state="syncing"><span class="crate-sync-indicator__halo"></span><span class="crate-sync-indicator__dot"></span><span class="crate-sync-indicator__ripple"></span></span></span></span>`;
 
 function header(reading = false) {
@@ -32,7 +32,7 @@ const reading = `<div class="crate-reminders-ui pwa-reading-root" data-pwa-stati
 const project = `<div class="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-pwa-static-shell><main class="pwa-screen reminders-view is-primary is-modal is-fullscreen pwa-mode-opening pwa-opening-screen is-project-detail">
 	<div class="pwa-project-layer" data-project-open="true"><div class="pwa-navigation-screen pwa-navigation-screen--project">
 		<div class="reminders-content"><div class="flex flex-col h-full relative min-h-0">
-			<div class="project-detail-navigation"><span class="premium-back-button" aria-hidden="true">${openingIconSvg('chevron-left', '<path d="m15 18-6-6 6-6"/>')}<span>Back</span></span><div class="crate-view-header-actions">${sync}</div></div>
+			<div class="project-detail-navigation crate-detail-navigation">${iconButton(openingIconSvg('chevron-left', '<path d="m15 18-6-6 6-6"/>', '', 24), 'crate-back-button')}<div class="crate-view-header-actions">${sync}</div></div>
 			<div class="project-detail-header"><div class="project-detail-header-top"><div class="project-detail-title-row"><h1 class="project-detail-title" data-pwa-launch-title>Reminders</h1></div></div></div>
 			<div class="flex-1 min-h-0 overflow-y-auto ios-scroll reminders-view-scroll has-fab">${loadingIndicator('Loading reminders')}</div>
 		</div></div>

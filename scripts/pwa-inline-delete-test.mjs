@@ -18,6 +18,8 @@ for (const type of [chromium, webkit]) {
    await card.tap();
    const title = page.locator('[aria-label="Reminder title"]');
    await title.fill('My preserved draft');
+   const editorClose = page.getByRole('button', { name: 'Close reminder editor', exact: true });
+   const editorCloseBackground = await editorClose.evaluate(element => getComputedStyle(element).backgroundColor);
    await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
    const confirmation = page.getByRole('alertdialog');
    await expect(confirmation).toHaveCount(0);
@@ -28,6 +30,44 @@ for (const type of [chromium, webkit]) {
    await expect(confirmation).toContainText('My preserved draft');
    await expect(page.locator('.pwa-modal-sheet')).toHaveCount(1);
    await waitForStageOpen();
+   const deleteAction = confirmation.getByRole('button', { name: 'Delete reminder', exact: true });
+   await expect(deleteAction).toHaveText('Delete');
+   await expect(confirmation.locator('.pwa-delete-confirmation-body button')).toHaveCount(0);
+   await expect(confirmation.getByRole('button')).toHaveCount(2);
+   await page.addStyleTag({ content: '.test-danger-color-probe { color: var(--crate-danger); }' });
+   for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme });
+    for (const width of [320, 390, 768]) {
+     await page.setViewportSize({ width, height: 844 });
+     await expect(deleteAction).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+     await expect.poll(() => confirmation.locator('.pwa-delete-confirmation').evaluate(element => {
+      const heading = element.querySelector('h2');
+      const action = element.querySelector('[data-action="confirm-delete"]');
+      const close = element.querySelector('.reminder-modal-header-close');
+      const range = document.createRange();
+      range.selectNodeContents(heading);
+      const title = heading.getBoundingClientRect();
+      const text = range.getBoundingClientRect();
+      const lines = new Set(Array.from(range.getClientRects(), rect => Math.round(rect.top))).size;
+      const button = action.getBoundingClientRect();
+      const closeBounds = close.getBoundingClientRect();
+      const colorProbe = document.createElement('span');
+      colorProbe.className = 'test-danger-color-probe';
+      element.append(colorProbe);
+      const dangerColor = getComputedStyle(colorProbe).color;
+      colorProbe.remove();
+      return {
+       lines,
+       fits: text.width <= title.width + 1,
+       centered: Math.abs(title.x + title.width / 2 - innerWidth / 2) < 1,
+       separated: text.right <= button.left && text.left >= closeBounds.right,
+       touchTargets: [button, closeBounds].every(rect => rect.width >= 44 && rect.height >= 44),
+       dangerColor: getComputedStyle(action).color === dangerColor,
+      };
+     })).toEqual({ lines: 1, fits: true, centered: true, separated: true, touchTargets: true, dangerColor: true });
+    }
+   }
+   await page.setViewportSize({ width: 390, height: 844 });
    if (type === webkit) await page.screenshot({ path: '/tmp/crate-inline-delete.png' });
    const dismissConfirmation = async action => {
     // Sample inside the browser so automation latency cannot skip the closing frames.
@@ -47,7 +87,7 @@ for (const type of [chromium, webkit]) {
     expect(frames.every(opacity => opacity === '0')).toBe(true);
     await expect(title).toBeFocused();
    };
-   await dismissConfirmation(() => confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap());
+   await dismissConfirmation(() => confirmation.getByRole('button', { name: 'Cancel deletion', exact: true }).tap());
    await expect(title).toBeVisible();
    await waitForStageOpen();
    await expect(title).toBeFocused();
@@ -62,9 +102,9 @@ for (const type of [chromium, webkit]) {
     await waitForStageOpen();
     await expect(title).toBeFocused();
     await expect(title).toHaveText('My preserved draft');
-    const editorClose = page.getByRole('button', { name: 'Close reminder editor', exact: true });
     await expect(editorClose).not.toBeFocused();
-    await expect(editorClose).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(editorClose).toHaveCSS('background-color', editorCloseBackground);
    }
    await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
    await expect(confirmation).toBeVisible();

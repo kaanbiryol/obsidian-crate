@@ -1,3 +1,5 @@
+@use "rounded-sheet-control";
+
 @mixin styles {
   :is(.pwa-modal-sheet, .pwa-reading-root .crate-reading-dialog, .reading-gallery .crate-reading-dialog) .reminder-modal-header {
     --crate-icon-button-size: 44px;
@@ -15,22 +17,19 @@
       text-align: center;
     }
 
+    // Every header control shares one surface, including secondary and danger actions.
+    .reminder-modal-header-side > button {
+      @include rounded-sheet-control.surface;
+      min-height: 44px;
+
+      &:not(:disabled)[data-press-active] { opacity: .5; }
+    }
+
     .reminder-modal-header-close {
       --crate-icon-button-control-size: 44px;
       min-height: 44px;
       padding: 0;
       color: var(--text-muted);
-
-      // Touch browsers can retain hover at the old confirmation close button.
-      @media (hover: none) {
-        @media (hover: hover) and (pointer: fine) {
-          &:hover:not(:focus-visible) {
-            border-color: transparent !important;
-            background: transparent !important;
-            color: var(--text-muted);
-          }
-        }
-      }
 
       @media (hover: hover) and (pointer: fine) {
         &:hover:not(:disabled) { color: var(--text-normal); }
@@ -46,9 +45,9 @@
     }
 
     .reminder-modal-header-action {
-      min-width: 44px;
+      min-width: 64px;
       min-height: 44px;
-      padding-inline: 4px;
+      padding-inline: 12px;
     }
 
     .reminder-modal-header-title {

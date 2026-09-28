@@ -26,7 +26,7 @@ export async function checkSettingsMotion(browser, origin) {
 		await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
 		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(1);
 		await slow.evaluate(el => el.remove());
-		await checkSettingsPush(page);
+		await checkShortcutSheet(page);
 		for (let cycle = 0; cycle < 2; cycle++) {
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).evaluate(el => el.click());
 			await expect(sheet).toHaveAttribute('data-ending-style', '');
@@ -152,56 +152,30 @@ export async function checkSettingsMotion(browser, origin) {
 	} finally { await context.close(); }
 }
 
-// Check painted intermediate frames: matching durations alone would miss a
-// stationary header, transparent detail or a disappearing parent screen.
-async function checkSettingsPush(page) {
+// Shortcut setup is its own sheet; Settings retains its scroll and canvas depth.
+async function checkShortcutSheet(page) {
 	const trigger = page.getByRole('button', { name: 'Set up iPhone shortcut', exact: true });
+	const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
+	const canvas = page.locator('.crate-modal-canvas');
 	await trigger.scrollIntoViewIfNeeded();
 	await trigger.focus();
 	const scrollTop = await page.locator('.settings-main').evaluate(el => el.scrollTop);
-	for (const direction of ['push', 'pop']) {
-		const button = direction === 'push' ? trigger : page.getByRole('button', { name: 'Back to settings' });
-		const frames = await button.evaluate(async el => {
-			const stack = el.closest('.pwa-push-stack');
-			el.click();
-			const samples = [];
-			const started = performance.now();
-			while (performance.now() - started < 650) {
-				await new Promise(resolve => requestAnimationFrame(resolve));
-				const root = stack.querySelector('.pwa-push-stack__root');
-				const detail = stack.querySelector('.pwa-push-stack__detail');
-				const header = detail.querySelector('.reminder-modal-header');
-				const body = detail.querySelector('.pwa-push-stack__body');
-				const bounds = stack.getBoundingClientRect();
-				samples.push({
-					width: bounds.width, x: detail.getBoundingClientRect().x - bounds.x,
-					rootX: root.getBoundingClientRect().x - bounds.x, rootOpacity: Number(getComputedStyle(root).opacity),
-					opacity: Number(getComputedStyle(detail).opacity), background: getComputedStyle(detail).backgroundColor,
-					headerX: header ? header.getBoundingClientRect().x - bounds.x : null,
-					bodyX: body ? body.getBoundingClientRect().x - bounds.x : null,
-				});
-			}
-			return samples;
-		});
-		const moving = frames.filter(frame => frame.x > 2 && frame.x < frame.width - 2);
-		if (!moving.length) throw new Error(`${direction} did not slide: ${JSON.stringify(frames.filter((_, i) => i % 5 === 0))}`);
-		for (const frame of moving) {
-			expect(frame.rootX).toBeCloseTo(0, 0);
-			expect(frame.rootOpacity).toBe(1);
-			expect(frame.opacity).toBe(1);
-			expect(frame.background).not.toBe('rgba(0, 0, 0, 0)');
-			expect(frame.headerX).toBeCloseTo(frame.x, 0);
-			expect(frame.bodyX).toBeCloseTo(frame.x, 0);
-		}
-		expect(frames.at(-1).x).toBeCloseTo(direction === 'push' ? 0 : frames.at(-1).width, 0);
-		if (direction === 'push') {
-			await expect(page.getByRole('button', { name: 'Back to settings' })).toBeFocused();
-			const header = page.locator('.pwa-push-stack__detail .reminder-modal-header');
-			const before = await header.boundingBox();
-			await page.locator('.settings-detail').evaluate(el => { el.scrollTop = el.scrollHeight; });
-			expect((await header.boundingBox()).y).toBe(before.y);
-		}
+	for (const method of ['button', 'swipe', 'escape']) {
+		await trigger.click();
+		await expect.poll(() => shortcut.evaluate(el => el.getAnimations().some(a => a.playState === 'running'))).toBe(true);
+		await expect(shortcut).toHaveCSS('transform', 'none');
+		const header = shortcut.locator('.reminder-modal-header');
+		const before = await header.boundingBox();
+		await shortcut.locator('.settings-shortcut-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+		expect((await header.boundingBox()).y).toBe(before.y);
+		await expect(page.locator('.settings-page-stack')).toHaveAttribute('inert', '');
+		if (method === 'button') await shortcut.getByRole('button', { name: 'Close shortcut setup' }).click();
+		// Begin tracking while still over the header, before crossing scrolled content.
+		else if (method === 'swipe') await swipe(page, header, 540, 300, 36);
+		else await page.keyboard.press('Escape');
+		await expect(shortcut, method + " should dismiss only shortcut setup").toHaveCount(0);
+		await expect(trigger).toBeFocused();
+		expect(await page.locator('.settings-main').evaluate(el => el.scrollTop)).toBe(scrollTop);
+		expect(await canvas.evaluate(el => new DOMMatrix(getComputedStyle(el).transform).a)).toBeCloseTo(.94, 3);
 	}
-	await expect(trigger).toBeFocused();
-	expect(await page.locator('.settings-main').evaluate(el => el.scrollTop)).toBe(scrollTop);
 }

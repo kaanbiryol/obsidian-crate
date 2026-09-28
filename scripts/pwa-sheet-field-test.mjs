@@ -43,6 +43,16 @@ try {
 			const popup = page.getByRole('dialog', { name: 'Save a link', exact: true });
 			const field = page.getByLabel('Link', { exact: true });
 			await expect(popup).toHaveCSS('transform', 'none');
+			await field.fill('https://example.com/header-focus');
+			await field.evaluate(element => element.setSelectionRange(8, 15));
+			for (const interaction of ['tap', 'click']) {
+				await popup.getByRole('heading', { name: 'Save a link', exact: true })[interaction]();
+				await expect(field).toBeFocused();
+				await popup.locator('.reminder-modal-header')[interaction]({ position: { x: 85, y: 28 } });
+				await expect(field).toBeFocused();
+				await expect(popup).toBeVisible();
+				expect(await field.evaluate(element => [element.selectionStart, element.selectionEnd])).toEqual([8, 15]);
+			}
 			await checkSheetDragPosition(page, popup);
 			await expect(field).toBeFocused();
 			await expect(field).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');

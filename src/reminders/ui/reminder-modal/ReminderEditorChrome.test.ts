@@ -24,6 +24,25 @@ vi.mock('../../components/BaseModal', () => ({
 
 describe('reminder editor chrome', () => {
     it.each([
+        ['Reading', 'Reading', 'Reading', true],
+        ['', 'Reading', 'Reading', true],
+        ['Reading', 'Inbox', 'Reading', true],
+        ['Inbox', 'Reading', 'Inbox', false],
+        ['Inbox', 'Inbox', 'Inbox', false],
+        ['', '', 'Inbox', false],
+    ])('colors the selected project independently of the starting project (%j, %j)', (project, defaultProject, label, active) => {
+        const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
+            dueDate: null, project, defaultProject, priority: 4,
+            onOpenDatePicker: vi.fn(), onOpenProjectPicker: vi.fn(),
+            onOpenRecurrencePicker: vi.fn(), onTogglePriority: vi.fn(),
+        }));
+        const chip = markup.match(/<button[^>]*data-picker="project"[^>]*>[\s\S]*?<\/button>/)?.[0];
+        expect(chip).toBeDefined();
+        expect(chip).toContain(`>${label}</span>`);
+        expect(chip?.includes('tone-secondary is-active')).toBe(active);
+    });
+
+    it.each([
         ['monthly on the 32nd', 'Choose a monthly day from 1 to 31'],
         ['every 0 days', 'Repeat intervals must be positive'],
     ])('shows an invalid schedule as an editor error: %s', (schedule, error) => {

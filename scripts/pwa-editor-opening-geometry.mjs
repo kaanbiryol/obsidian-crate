@@ -69,14 +69,14 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 		await expect(stage).toHaveCSS('transform', 'none');
 		await stage.tap({ trial: true });
 		const original = await stage.boundingBox();
-		const fullHeight = await stage.evaluate(el => Boolean(el.closest('.is-full-height-editor')));
+		assert.ok(original.height < 400, 'A short reminder opens as a compact sheet');
 		await page.evaluate(() => {
 			window.editorKeyboardHeight = 532;
 			window.visualViewport.dispatchEvent(new Event('resize'));
 		});
 		// Wait for the first keyboard movement, then model its final 30px report
 		// arriving after the drawer's entrance transition has already finished.
-		await expect.poll(async () => Math.round((await stage.boundingBox()).y)).toBe(Math.round(fullHeight ? original.y : original.y - 336));
+		await expect.poll(async () => Math.round((await stage.boundingBox()).y)).toBe(Math.round(original.y - 336));
 		await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
 		const lateFrames = await page.evaluate(async () => {
 			const stage = document.querySelector('.pwa-reminder-sheet-stage');
@@ -94,15 +94,27 @@ export async function checkEditorOpeningGeometry(browser, origin, reducedMotion)
 			});
 			return positions;
 		});
-		assert.ok(Math.abs(lateFrames[0] - lateFrames.at(-1) - (fullHeight ? 0 : 30)) < 1, 'Tall editors keep their header anchored; compact editors move above the keyboard');
-		if (fullHeight) {
-			await expect(stage).toHaveCSS('padding-bottom', '350px');
-			assert.ok(Math.abs((await stage.boundingBox()).height - original.height) < 1, 'Keyboard padding must not grow the tall sheet');
-		}
-		if (!fullHeight && reducedMotion === 'no-preference') {
+		assert.ok(Math.abs(lateFrames[0] - lateFrames.at(-1) - 30) < 1, 'Compact editors move above the keyboard');
+		if (reducedMotion === 'no-preference') {
 			assert.ok(lateFrames.some(y => y < lateFrames[0] - 1 && y > lateFrames.at(-1) + 1),
 				`late keyboard geometry must move through intermediate frames instead of snapping (${lateFrames})`);
 		}
+		// A short visible viewport must scroll the fields without hiding actions.
+		await page.getByRole('textbox', { name: 'Reminder title', exact: true }).fill('A long reminder title '.repeat(30));
+		await page.getByRole('textbox', { name: 'Reminder description', exact: true }).fill('Description line\n'.repeat(20));
+		await page.evaluate(() => {
+			window.editorKeyboardHeight = 300;
+			window.visualViewport.dispatchEvent(new Event('resize'));
+		});
+		await expect(stage).toHaveCSS('padding-bottom', '552px');
+		await expect.poll(() => stage.evaluate(el => el.getAnimations().length)).toBe(0);
+		const chips = page.locator('.reminder-action-chips');
+		const beforeScroll = await chips.boundingBox();
+		assert.ok(beforeScroll.y > 0 && beforeScroll.y + beforeScroll.height <= 300, 'Chips stay above the keyboard');
+		const body = page.locator('.reminder-modal-body');
+		await body.evaluate(el => { el.scrollTop = el.scrollHeight; });
+		assert.ok(await body.evaluate(el => el.scrollTop > 0), 'Long fields have usable scrolling in a short viewport');
+		assert.deepEqual(await chips.boundingBox(), beforeScroll, 'Scrolling fields must not move the chip row');
 		await page.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
 		await expect(page.locator('.pwa-modal-sheet')).toHaveCount(0);
 	} finally {

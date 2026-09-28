@@ -51,7 +51,7 @@ export const BrowseView = memo(function BrowseView({
     return (
       <div className={`reminders-browse-view flex flex-col h-full ${className}`}>
         {showHeader && headerContent}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="reminders-empty-body flex-1 flex items-center justify-center">
           <EmptyState
             icon="folder-open"
             title="No projects yet"

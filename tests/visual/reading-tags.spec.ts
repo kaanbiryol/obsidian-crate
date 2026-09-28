@@ -1,18 +1,42 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, chromium, webkit } from '@playwright/test';
 
+for (const browserName of ['chromium', 'webkit'] as const) test.describe(browserName, () => {
 for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
-	test(`${host} article tags at ${width}px`, async ({ page }) => {
+	test(`${host} article tags at ${width}px`, async ({ baseURL }) => {
+		const browser = await ({ chromium, webkit })[browserName].launch();
+		try {
+		const page = await browser.newPage({ baseURL, reducedMotion: 'reduce' });
 		await page.route(/^https:\/\/[^/]+\/favicon\.ico(?:\?.*)?$/, route => route.abort());
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto(`/?host=${host}&scene=reading&theme=light`);
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
 		const article = page.locator('.crate-reading-reader');
 		const edit = article.getByRole('button', { name: 'Edit article tags' });
-		await expect(edit).toHaveText('Tags');
+
 		await edit.click();
-		const input = page.getByRole('textbox', { name: 'Tags, separated by commas' });
-		await expect(input).toHaveValue('essays, reading');
-		await input.fill('#design, design, later, topics/books');
+		const input = page.getByRole('textbox', { name: 'Tags' });
+		const dialog = page.getByRole('dialog', { name: 'Article tags' });
+		await expect(dialog.locator('.crate-dialog-actions')).toHaveCount(0);
+		await expect(dialog.locator('.reminder-modal-header').getByRole('button', { name: 'Save tags' })).toHaveText('Save');
+		await input.fill('discarded');
+		await dialog.getByRole('button', { name: 'Close article tags' }).click();
+		await edit.click();
+		await expect(input).toHaveValue('');
+		const chips = page.getByRole('button', { name: /^Remove tag / });
+		await expect(chips).toHaveText(['#essays', '#reading']);
+		await expect(input).toHaveValue('');
+		while (await chips.count()) await chips.first().click();
+		await input.pressSequentially('#design ');
+		await expect(chips).toHaveText(['#design']);
+		await input.pressSequentially('design later ');
+		await expect(chips).toHaveText(['#design', '#later']);
+		await input.press('Backspace');
+		await expect(input).toHaveValue('later');
+		await input.press('Enter');
+		await expect(input).toHaveValue('');
+		await expect(chips).toHaveText(['#design', '#later']);
+		await input.fill('topics/books');
+		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-input-${browserName}-${host}-${width}.png` });
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
 		await expect(article.locator('.crate-reading-reader__tags span')).toHaveText(['#design', '#later', '#topics/books']);
 		expect(await article.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
@@ -29,8 +53,8 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-filter-${host}-${width}.png` });
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
 		await edit.click();
-		await expect(input).toHaveValue('design, later, topics/books');
-		await input.fill('');
+		await expect(chips).toHaveText(['#design', '#later', '#topics/books']);
+		while (await chips.count()) await chips.first().click();
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
 		await expect(article.locator('.crate-reading-reader__tags')).toHaveCount(0);
 		await article.getByRole('button', { name: 'Back to reading' }).click();
@@ -39,5 +63,8 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await expect(page.locator('.crate-reading__open')).toHaveCount(6);
 		await expect(page.locator('.crate-reading__tag-filter')).toHaveCount(0);
 		if (width < 1100) await expect(page.getByRole('combobox', { name: 'Filter by tag' })).toHaveValue('');
+		} finally { await browser.close(); }
 	});
 }
+
+});

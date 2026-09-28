@@ -10,6 +10,7 @@ import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDra
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
+import { usePreserveFieldFocus } from '@/ui/shared/usePreserveFieldFocus';
 import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
 import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActionChips';
@@ -64,31 +65,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const editorRef = useRef<HTMLDivElement | null>(null);
 	const fieldActivation = useEditorFieldActivation();
 	useEditorSheetHeight(editorRef, isActive);
-	useEffect(() => {
-		const editor = editorRef.current;
-		if (!editor) return;
-		let moved = false;
-		const startTouch = () => { moved = false; };
-		const moveTouch = () => { moved = true; };
-		const keepEditorFocus = (event: Event) => {
-			if (event.type === 'touchend' && moved) return;
-			if (!(event.target instanceof Element)) return;
-			const control = event.target.closest('button, input, textarea, select, a[href], label, [contenteditable="true"], [role="button"], [role="option"]');
-			if (!control) event.preventDefault();
-		};
-		// Cancel the tap's focus transfer, not touchstart, so drags on empty
-		// sheet space can still scroll. Actual fields and actions stay native.
-		editor.addEventListener('touchstart', startTouch, { passive: true });
-		editor.addEventListener('touchmove', moveTouch, { passive: true });
-		editor.addEventListener('touchend', keepEditorFocus, { passive: false });
-		editor.addEventListener('mousedown', keepEditorFocus);
-		return () => {
-			editor.removeEventListener('touchstart', startTouch);
-			editor.removeEventListener('touchmove', moveTouch);
-			editor.removeEventListener('touchend', keepEditorFocus);
-			editor.removeEventListener('mousedown', keepEditorFocus);
-		};
-	}, []);
+	usePreserveFieldFocus(editorRef);
 
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLDivElement | null>(null);
@@ -169,6 +146,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		>
 			<form
 				className="modal-form"
+				style={{
+					'--reminder-project-color': getProjectColor(draft.project || draft.defaultProject)[colorScheme].accent,
+				} as React.CSSProperties}
 				autoComplete="off"
 				onSubmit={(event) => {
 					event.preventDefault();
@@ -202,9 +182,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
 					}}
 				/>
-				<div className="reminder-modal-body" data-base-ui-swipe-ignore="" style={{
-					'--reminder-project-color': getProjectColor(draft.project || draft.defaultProject)[colorScheme].accent,
-				} as React.CSSProperties}>
+				<div className="reminder-modal-body" data-base-ui-swipe-ignore="">
 					<ReminderEditorFields
 						content={draft.content}
 						onContentChange={(content) => onPatchDraft({ content })}
@@ -228,23 +206,23 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							className: 'pwa-editor-description-input',
 						}}
 					/>
-					<ReminderActionChips
-						animateLabels
-						dueDate={draft.dueDate || null}
-						dueDateLabel={draft.dueDate ? formatModalDueSummary(draft) : undefined}
-						project={draft.project}
-						defaultProject={draft.defaultProject || 'Inbox'}
-						priority={draft.priority}
-						recurrence={draft.recurrence}
-						disabled={saving}
-						inert={!canInteract || isClosing}
-						preventFocusOnPress
-						onOpenDatePicker={() => onOpenPicker('date')}
-						onOpenProjectPicker={() => onOpenPicker('project')}
-						onOpenRecurrencePicker={() => onOpenPicker('recurrence')}
-						onTogglePriority={togglePriority}
-					/>
 				</div>
+				<ReminderActionChips
+					animateLabels
+					dueDate={draft.dueDate || null}
+					dueDateLabel={draft.dueDate ? formatModalDueSummary(draft) : undefined}
+					project={draft.project}
+					defaultProject={draft.defaultProject || 'Inbox'}
+					priority={draft.priority}
+					recurrence={draft.recurrence}
+					disabled={saving}
+					inert={!canInteract || isClosing}
+					preventFocusOnPress
+					onOpenDatePicker={() => onOpenPicker('date')}
+					onOpenProjectPicker={() => onOpenPicker('project')}
+					onOpenRecurrencePicker={() => onOpenPicker('recurrence')}
+					onTogglePriority={togglePriority}
+				/>
 			</form>
 
 		</div>

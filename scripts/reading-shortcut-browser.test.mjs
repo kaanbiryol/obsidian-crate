@@ -80,7 +80,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await dialog.getByRole('heading', { name: '3. Save your first article', exact: true }).scrollIntoViewIfNeeded();
     await expect(dialog.getByRole('heading', { name: '3. Save your first article', exact: true })).toBeVisible();
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
-    const closeBox = await dialog.getByRole('button', { name: 'Back to settings' }).boundingBox();
+    const closeBox = await dialog.getByRole('button', { name: 'Close shortcut setup' }).boundingBox();
     assert.ok(closeBox && closeBox.y >= 0 && closeBox.y + closeBox.height <= 568, 'The close control must stay visible while scrolling');
     await page.screenshot({ path: `test-results/reading/${name}-shortcut-small.png`, fullPage: true, animations: 'disabled' });
     await page.clock.setFixedTime(new Date(Date.now() + 11 * 60_000));
@@ -88,7 +88,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(dialog.getByText('This pairing code expired.', { exact: false })).toBeVisible();
     await expect(input).toHaveCount(0);
     await page.clock.setFixedTime(new Date());
-    await dialog.getByRole('button', { name: 'Back to settings' }).click();
+    await dialog.getByRole('button', { name: 'Close shortcut setup' }).click();
     await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Set up iPhone shortcut', exact: true }).click();
     await expect(input).toHaveCount(0);

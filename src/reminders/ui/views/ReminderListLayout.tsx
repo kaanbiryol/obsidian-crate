@@ -89,7 +89,7 @@ export function ReminderListLayout({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={transition}
-            className="flex-1 flex items-center justify-center"
+            className="reminders-empty-body flex-1 flex items-center justify-center"
           >{emptyState}</ListState>
         )}
       </AnimatePresence>
