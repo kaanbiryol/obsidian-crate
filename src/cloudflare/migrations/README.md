@@ -1,8 +1,8 @@
 # Database migrations
 
-Schema 1 is the pre-launch baseline. There are no historical migrations.
-Previous development databases are unsupported; use their matching build to
-recover data or create a fresh deployment. No data is automatically reset.
+Schema 1 is the pre-launch baseline. `002-reading-captures.sql` upgrades it to
+schema 2 with a durable queue for captures awaiting extraction. Existing file
+hashes, storage references, and receipts are preserved.
 
-Future migrations start at schema 1 and are registered in `server-release.json`.
-Keep the baseline fixed when adding migrations. See `docs/server-upgrades.md`.
+Migrations are registered with checksums in `server-release.json`. Keep released
+steps unchanged. See `docs/server-upgrades.md` for backup and recovery requirements.

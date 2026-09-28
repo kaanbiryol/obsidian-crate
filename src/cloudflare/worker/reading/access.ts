@@ -14,7 +14,7 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
   try { folder = validateReadingFolder(body.folderPath, reminders?.folder_path); }
   catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Choose a valid Reading folder.'); }
   if (existing && folder !== existing.folder_path) {
-    if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
+    if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs UNION ALL SELECT 1 FROM reading_captures LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
   }
   const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
     generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };

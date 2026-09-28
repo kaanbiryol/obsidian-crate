@@ -10,7 +10,7 @@ import type { Publication } from './reading/extraction/jobs';
 import { policy } from './reading/common';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { adoptReadingClip, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
+import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { commitFileDelete } from './sync-mutations';
 import { getStoredFileRow } from './sync-storage';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
@@ -48,8 +48,9 @@ it('projects folder imports without extraction and syncs their reading metadata'
   expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
 async function capture() {
-  const response = await command('capture', { url: 'https://example.com/article', operationId: id() });
-  expect(response.status, await response.clone().text()).toBe(200);
+  // Legacy files and explicit retries retain their original path during extraction.
+  const note = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/article', savedAt: new Date().toISOString() });
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Existing.md', note, null);
   await projectReading(env, (await policy(env.DB))!);
   return (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
 }
@@ -94,7 +95,7 @@ it('keeps failed extractions as useful bookmarks and never extracts clipper note
   expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
 it('replays a lost receipt even after deletion and rejects expired operation identities', async () => {
-  const body = { url: 'https://example.com/retry', operationId: id() };
+  const body = { url: 'https://example.com/retry', fetchArticle: false, operationId: id() };
   const first = await command('capture', body); const payload: unknown = await first.json();
   const file = (await env.DB.prepare('SELECT path FROM files').first<{ path: string }>())!, stored = (await getStoredFileRow(env.DB, file.path))!;
   await commitFileDelete(env.BUCKET, env.DB, { path: file.path, previousFile: stored, expectedHash: stored.hash, expectedRevision: stored.storageKey });

@@ -30,7 +30,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     const capture = await request('/reading/access', vault.token, { kind: 'capture' });
     assert.equal((await request('/reading/list', capture.body.token)).status, 403);
     assert.equal((await request('/sync/manifest', browser.body.token)).status, 403);
-    const body = { url: 'https://example.invalid/article?secret=never-log-me', operationId: operation() };
+    const body = { url: 'https://example.invalid/article?secret=never-log-me', fetchArticle: false, operationId: operation() };
     const first = await request('/reading/capture', capture.body.token, body);
     assert.equal(first.status, 200, JSON.stringify(first)); assert.ok(first.body.saved);
     assert.deepEqual(await request('/reading/capture', capture.body.token, body), first);
@@ -57,7 +57,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     assert.equal(page.headers.get('Cache-Control'), 'no-store'); assert.match(await page.text(), /Saving to Crate/);
     const manifest = await (await runtime.mf.dispatchFetch('http://localhost:8787/notifications/manifest.json')).json();
     assert.equal(manifest.id, '/notifications'); assert.equal(manifest.share_target.action, '/notifications/share/reading');
-    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 2);
+    assert.equal((await runtime.db.prepare('SELECT (SELECT count(*) FROM files)+(SELECT count(*) FROM reading_captures) AS count').first()).count, 2);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 

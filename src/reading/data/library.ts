@@ -1,9 +1,14 @@
+import { readingCapturePath } from '../core/filename';
+import { portablePathKey } from '@/protocol/portable-path';
 import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
+	pendingCaptures?(): Promise<ReadingItem[]>;
+	queueCapture?(url: string, title?: string): Promise<ReadingItem>;
+	occupied?(path: string): boolean;
 	files(): ReadingFile[];
 	read(file: ReadingFile): Promise<string>;
 	/** Must apply synchronously to current bytes and reject deleted/replaced files. */
@@ -76,6 +81,14 @@ export class ReadingLibrary {
 					issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Could not read this note.' });
 				}
 			}
+			try {
+				for (const pending of await this.vault.pendingCaptures?.() ?? []) {
+					if (!items.some(item => item.crate_reading_id === pending.crate_reading_id || item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(pending.source_url))) items.push(pending);
+				}
+			} catch (error) {
+				this.signal.throwIfAborted();
+				issues.push({ path: this.folder, message: error instanceof Error ? error.message : 'Pending Reading saves need recovery.' });
+			}
 			const counts = new Map<string, number>();
 			for (const item of items) counts.set(item.crate_reading_id, (counts.get(item.crate_reading_id) ?? 0) + 1);
 			const unique = items.filter(item => {
@@ -99,10 +112,15 @@ export class ReadingLibrary {
 			if (matches.length > 1) throw new Error('Multiple notes already save this link. Open reading to choose one.');
 			const existing = matches[0];
 			if (existing) return { item: existing, duplicate: true };
+			if (fetchArticle && this.vault.queueCapture) {
+				const item = await this.vault.queueCapture(url, title);
+				await this.scan();
+				return { item, duplicate: false };
+			}
 			const id = crypto.randomUUID();
-			const path = `${this.folder}/${id}.md`;
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
-			const content = fetchArticle ? note : patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
+			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
+			const path = await readingCapturePath(this.folder, parseReadingNote(content)!.title, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
 			this.signal.throwIfAborted();
 			await this.vault.create(path, content);
 			await this.scan();
@@ -111,6 +129,7 @@ export class ReadingLibrary {
 	}
 	read(item: ReadingItem): Promise<{ item: ReadingItem; markdown: string }> {
 		return this.enqueue(async () => {
+			if (!item.path) return { item, markdown: '' };
 			const file = this.vault.files().find(file => file.path === item.path);
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			const content = await this.vault.read(file);
@@ -121,6 +140,7 @@ export class ReadingLibrary {
 		});
 	}
 	update(item: ReadingItem, changes: ReadingChanges): Promise<void> {
+		if (!item.path) return Promise.reject(new Error('The article is still being saved. Try again after it syncs.'));
 		return this.enqueue(async () => {
 			await this.scan();
 			if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict. Refresh before trying again.');

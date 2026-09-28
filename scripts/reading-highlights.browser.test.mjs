@@ -35,14 +35,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const operationId = `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
-    const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Highlight article', operationId });
+    const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Highlight article', fetchArticle: false, operationId });
     // Seed actual vault Markdown so the browser and mutation writer use the same bytes.
-    const download = () => runtime.mf.dispatchFetch(`${origin}/sync/download?path=${encodeURIComponent(`Reading/${saved.id}.md`)}`, { headers: { Authorization: `Bearer ${vault.token}` } });
+    const download = () => runtime.mf.dispatchFetch(`${origin}/sync/download?path=${encodeURIComponent(`Reading/Highlight article - ${saved.id.slice(0, 8)}.md`)}`, { headers: { Authorization: `Bearer ${vault.token}` } });
     const replaceArticle = async markdown => {
       const current = await download(), source = await current.text();
       const content = source.slice(0, source.indexOf('\n---\n') + 5).replace(/extraction_status: .*/, 'extraction_status: "ready"')
         + `\n<!-- crate:article:start -->\n${markdown}\n<!-- crate:article:end -->\n`;
-      const response = await runtime.mf.dispatchFetch(`${origin}/sync/upload?path=${encodeURIComponent(`Reading/${saved.id}.md`)}`, { method: 'PUT', headers: {
+      const response = await runtime.mf.dispatchFetch(`${origin}/sync/upload?path=${encodeURIComponent(`Reading/Highlight article - ${saved.id.slice(0, 8)}.md`)}`, { method: 'PUT', headers: {
         Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'text/markdown',
         'X-File-Hash': createHash('sha256').update(content).digest('hex'), 'X-File-Size': String(Buffer.byteLength(content)),
         'X-Crate-Expected-Hash': current.headers.get('X-File-Hash'),

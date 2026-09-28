@@ -5,11 +5,12 @@ import { sha256Hex } from './deployment-artifacts';
 const step: DatabaseMigration = { id: 'add-example', from: 1, to: 2, file: 'add-example.sql', checksum: 'a'.repeat(64) };
 const future = { revision: 2, minimumSchemaVersion: 1, schemaVersion: 2, migrations: [step] };
 
-it('ships the first schema with no historical migrations', () => {
-  expect(SERVER_RELEASE).toMatchObject({ schemaVersion: 1, minimumSchemaVersion: 1, migrations: [] });
+it('upgrades the launch schema with the durable Reading capture queue', () => {
+  expect(SERVER_RELEASE).toMatchObject({ schemaVersion: 2, minimumSchemaVersion: 1 });
   expect(planDatabaseUpgrade(null)).toEqual([]);
-  expect(planDatabaseUpgrade(1)).toEqual([]);
-  for (const version of [0, 2, 3, 4, 5, 999, NaN]) expect(() => planDatabaseUpgrade(version)).toThrow('Unsupported database schema');
+  expect(planDatabaseUpgrade(1)).toEqual(SERVER_RELEASE.migrations);
+  expect(planDatabaseUpgrade(2)).toEqual([]);
+  for (const version of [0, 3, 4, 5, 999, NaN]) expect(() => planDatabaseUpgrade(version)).toThrow('Unsupported database schema');
   expect(() => validateMigrationHistory(1, 0, [])).toThrow('baseline');
 });
 
