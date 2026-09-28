@@ -112,7 +112,13 @@ export async function resetCrateServer(input: {
 		await assertUnsharedResources(api, metadata, namespaceId);
 		if (bucket && check) {
 			if (!fence) throw new Error('Reset blocked: missing deployment fence for file removal.');
-			await api.verifyResetWorker(origin, checkpoint.id);
+			if (!await api.verifyResetWorker(origin, checkpoint.id)) {
+				input.onProgress?.('Updating the cleanup Worker to remove recovery backups…');
+				// Keep the same reset identity and existing fence. The namespace is
+				// already retired; this only refreshes the temporary cleanup code.
+				await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name, true);
+				await api.verifyResetWorker(origin, checkpoint.id, true);
+			}
 			await clearBucketObjects(input.api, accountId, name, check, verifyTarget,
 				async keys => fence.mutate(() => input.api.deleteR2Objects(origin, checkpoint.id, cleanupToken, keys),
 					'deleteR2Objects', await sha256Hex(JSON.stringify(keys))), objectCount, input.onProgress);

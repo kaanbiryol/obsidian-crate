@@ -1,8 +1,11 @@
 import type { ResetApi } from './reset-ownership';
 
 // Include orphaned uploads with Crate's generated key format, retained versions,
-// shared settings, and legacy keys explicitly referenced by Crate's database.
+// shared settings, recovery backups, history checkpoints, and legacy keys
+// explicitly referenced by Crate's database. Match generated formats only.
 const MANAGED_OBJECT = /^__crate__\/files\/[a-f0-9]{64}\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const UPGRADE_BACKUP_OBJECT = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\/(?:archive\.json|database\.sql|objects\/[a-f0-9]{64})$/;
+const HISTORY_CHECKPOINT_OBJECT = /^__crate__\/history\/checkpoints\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.json$/;
 
 export async function createObjectOwnershipCheck(api: ResetApi, accountId: string, databaseId: string, tables: string[]): Promise<(key: string) => Promise<void>> {
 	const sources: Array<{ table: string; column: string }> = [];
@@ -16,7 +19,8 @@ export async function createObjectOwnershipCheck(api: ResetApi, accountId: strin
 	}
 	return async key => {
 		if (key.split('/').some(segment => segment === '.' || segment === '..')) throw new Error('Reset blocked: unsafe R2 object key.');
-		if (MANAGED_OBJECT.test(key) || key === '__crate__/settings.json') return;
+		if (MANAGED_OBJECT.test(key) || UPGRADE_BACKUP_OBJECT.test(key) || HISTORY_CHECKPOINT_OBJECT.test(key)
+			|| key === '__crate__/settings.json' || key === '__crate__/history/index.json') return;
 		for (const source of sources) {
 			const rows = await api.queryD1(accountId, databaseId,
 				`SELECT 1 AS found FROM ${source.table} WHERE ${source.column} = ? LIMIT 1;`, [key]);

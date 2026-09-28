@@ -12,6 +12,12 @@ import { DEPLOYMENT_FENCE_KEY } from '../deployment-fence';
 import { SERVER_RELEASE } from '../database-upgrades';
 import type { CloudflareDeploymentMetadata } from '../deployment-types';
 
+// Recovery tests exercise an older publication, independently of the launch revision.
+vi.mock('../server-release.json', async importOriginal => {
+  const { default: release } = await importOriginal<{ default: typeof import('../server-release.json') }>();
+  return { default: { ...release, revision: 2 } };
+});
+
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 function deferred() {
 	let resolve!: () => void;
@@ -46,7 +52,7 @@ async function harness(empty = false) {
 			for (const statement of sql.split(';').map(value => value.trim()).filter(Boolean)) results.push(await env.DB.prepare(statement).bind(...params ?? []).all());
 			return results;
 		}),
-		verifyWorkerDeployment: vi.fn(async () => {}), verifyResetWorker: vi.fn(async () => {}),
+		verifyWorkerDeployment: vi.fn(async () => {}), verifyResetWorker: vi.fn(async () => true),
 		verifyPublishedWorkerDeployment: vi.fn(async () => ({ revision: SERVER_RELEASE.revision - 1, schemaVersion: SERVER_RELEASE.schemaVersion })),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
 		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),

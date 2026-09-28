@@ -42,7 +42,7 @@ function harness() {
 		if (path === '/oauth2/revoke') return { status: 200, text: '{}' };
 		if (path === '/client/v4/memberships') return json([{ status: 'accepted', account: { id: accountId, name: 'Personal' } }]);
 		if (path.endsWith('/workers/subdomain')) return json({ subdomain: 'example' });
-		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id }) };
+		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id, recoveryObjects: true }) };
 		if (path === '/__crate__/reset/objects' && request.method === 'POST' && typeof request.body === 'string') {
 			const [result] = fence.query('SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence'])!;
 			const record = JSON.parse(result!.results[0]!.value as string) as Record<string, unknown>;
@@ -179,4 +179,18 @@ it('deletes with saved credentials through the real deletion path without openin
 	expect(h.settings.cloudflareDeployment).toBeNull();
 	expect(h.remote).toMatchObject({ worker: false, database: false, bucket: false });
 	expect(h.transport.mock.calls.some(([url]) => url.includes('/oauth2/'))).toBe(false);
+});
+
+it('keeps cleanup capability rejection distinct from account OAuth and allows deletion retry', async () => {
+	const h = harness();
+	let rejectCleanup = true;
+	const { service } = h.createService(async (url, request) => {
+		if (rejectCleanup && url.endsWith('/__crate__/reset/objects')) return { status: 403, text: 'Object not owned' };
+		return h.transport(url, request);
+	});
+	const authorize = <T>(operation: (tokens: { accessToken: string }) => Promise<T>) => operation({ accessToken: 'saved' });
+	await expect(service.deployWithSavedAuthorization('delete', authorize)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
+	expect(h.remote).toMatchObject({ worker: true, database: true, bucket: true });
+	rejectCleanup = false;
+	await expect(service.deployWithSavedAuthorization('delete', authorize)).resolves.toMatchObject({ deleted: true });
 });

@@ -3,6 +3,8 @@
 /** @typedef {{ DB: D1Database, BUCKET: Pick<R2Bucket, 'delete'>, CRATE_RESET_ID: string }} ResetEnv */
 const fenceKey = 'crate_deployment_fence';
 const managedObject = /^__crate__\/files\/[a-f0-9]{64}\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const upgradeBackupObject = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\/(?:archive\.json|database\.sql|objects\/[a-f0-9]{64})$/;
+const historyCheckpointObject = /^__crate__\/history\/checkpoints\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.json$/;
 const headers = { 'Cache-Control': 'no-store' };
 
 /** @param {D1Database} db */
@@ -47,7 +49,8 @@ async function readKeys(request) {
  * @param {string[]} keys
  */
 async function ownsObjects(db, keys) {
-	const pending = new Set(keys.filter(key => !managedObject.test(key) && key !== '__crate__/settings.json'));
+	const pending = new Set(keys.filter(key => !managedObject.test(key) && !upgradeBackupObject.test(key) && !historyCheckpointObject.test(key)
+		&& key !== '__crate__/settings.json' && key !== '__crate__/history/index.json'));
 	if (!pending.size) return true;
 	for (const table of ['files', 'file_versions', 'object_cleanup_queue']) {
 		const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
@@ -70,7 +73,7 @@ export default {
 	async fetch(request, env) {
 		const path = new URL(request.url).pathname;
 		if (path === '/.well-known/crate-reset' && request.method === 'GET') {
-			return Response.json({ service: 'crate-reset', protocol: 1, resetId: env.CRATE_RESET_ID }, { headers });
+			return Response.json({ service: 'crate-reset', protocol: 1, resetId: env.CRATE_RESET_ID, recoveryObjects: true }, { headers });
 		}
 		if (path !== '/__crate__/reset/objects' || request.method !== 'POST') {
 			return new Response('Crate server reset in progress', { status: 503, headers });
