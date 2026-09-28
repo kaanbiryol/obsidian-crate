@@ -80,7 +80,9 @@ export class CrateSettingTab extends PluginSettingTab {
 			}
 		}
 
-		renderReadingSettings(containerEl, this.plugin, () => this.update());
+		if (sections.showReading) {
+			renderReadingSettings(containerEl, this.plugin, () => this.update());
+		}
 
 		if (isConfigured) {
 			const accountEl = createSettingsDisclosure(containerEl, 'Account and devices');
