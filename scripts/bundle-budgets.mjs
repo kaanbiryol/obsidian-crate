@@ -3,22 +3,19 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Reading includes the local library, safe reader and compressed server extraction:
-		// about 3.16 MB raw / 1.67 MB gzip, including Defuddle's full Markdown bundle.
-		// Defuddle/DOM code runs only on the server. In-app backup restore adds
-		// about 40 KB raw / 9 KB gzip; the combined plugin is about 3.29 MB / 1.72 MB.
-		// Markdown source mapping and the embedded Highlights PWA bring this to
-		// about 3.50 MB raw / 1.85 MB gzip. The reader uses no full DOM runtime.
-		// Updated dependencies and shared controls: measured 3.64 MB raw / 1.94 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3680000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1960000', 10),
+		// Shared navigation and reader highlighting measured 3.82 MB / 2.00 MB gzip.
+		// Direct desktop capture bundles Defuddle and its inert DOM parser locally:
+		// measured 4.74 MB raw / 2.28 MB gzip. Extraction initializes on demand.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '4800000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2320000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
-		// measured 267 KB raw / 34.5 KB gzip. The same styles ship to both hosts.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '270000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '35000', 10),
+		// Shared plugin navigation and reader highlighting now measure 286 KB raw /
+		// 37.5 KB gzip. Desktop fetching itself adds no stylesheet.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '290000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '38000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

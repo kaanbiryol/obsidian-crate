@@ -65,8 +65,12 @@ and vault sync are preserved. Resume either feature without redeploying or setti
 it up again. Changes require a connection; plugins check on startup, focus, and
 every 30 seconds, and the web app checks on focus and every 15 seconds. Offline
 devices retain their last confirmed state until they reconnect.
-Saving a Reading link downloads the full article through your server; the save
-form explains this before you submit. There is no separate article-fetching switch.
+On desktop Obsidian, saving a Reading link first writes a bookmark into your vault,
+then downloads and extracts the article on that device. No Crate server connection
+is required for that save; the resulting note uses normal vault sync. Failed or
+offline downloads keep the bookmark and offer **Try again** in the reader. Mobile
+Obsidian and PWA saves use server extraction. Each save form explains which device
+downloads the article. There is no separate article-fetching switch.
 Notifications retain their own **Push notifications** opt-in.
 Under **Crate web app**, select **Open app** for this device, or **Connect another
 device** to show a QR code with a **Copy link** option. Reminders and Reading share the same web app.

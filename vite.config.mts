@@ -6,9 +6,11 @@ import { resolve } from "node:path";
 import { builtinModules } from "node:module";
 import { testVaultDeployPlugin } from "./scripts/test-vault-vite-plugin.mjs";
 import { cloudflareArtifactsPlugin } from "./scripts/cloudflare-artifacts-vite-plugin.mjs";
+import { readingExtractionVitePlugin } from "./scripts/reading-extraction-build.mjs";
 
 export default defineConfig(({ mode }) => ({
 	plugins: [
+		readingExtractionVitePlugin(),
 		cloudflareArtifactsPlugin({ rootDir: __dirname }),
 		react(),
 		replace({

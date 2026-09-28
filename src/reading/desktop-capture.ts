@@ -1,0 +1,40 @@
+import { requestUrl } from 'obsidian';
+import type { CapturedArticle } from './extraction/types';
+import { extractionUrl } from './extraction/url';
+
+const MAX_BYTES = 2 * 1024 * 1024;
+const TIMEOUT_MS = 15_000;
+
+/** Obsidian's native HTTP client bypasses browser CORS; no vault credentials are sent. */
+export async function captureDesktopArticle(source: string, signal: AbortSignal): Promise<CapturedArticle> {
+  signal.throwIfAborted();
+  const url = extractionUrl(source).href;
+  let timeout: number | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    // requestUrl cannot abort an in-flight download or expose its final redirect URL.
+    // Bound the wait and reject late results before parsing or writing to the vault.
+    const response = await Promise.race([
+      requestUrl({ url, method: 'GET', throw: false, headers: { Accept: 'text/html, application/xhtml+xml' } }),
+      new Promise<never>((_resolve, reject) => {
+        timeout = window.setTimeout(() => reject(new Error('Article download timed out. Try again.')), TIMEOUT_MS);
+        onAbort = () => reject(signal.reason instanceof Error ? signal.reason : new Error('Reading was closed.'));
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+    signal.throwIfAborted();
+    const headers = new Headers(response.headers);
+    if (response.status < 200 || response.status >= 300 || !/^(text\/html|application\/xhtml\+xml)\b/i.test(headers.get('Content-Type') ?? '')) {
+      throw new Error('The website did not return a readable article.');
+    }
+    if (response.arrayBuffer.byteLength > MAX_BYTES) throw new Error('This article exceeds the 2 MB download limit.');
+    const charset = /charset=["']?([\w-]+)/i.exec(headers.get('Content-Type') ?? '')?.[1] ?? 'utf-8';
+    const html = new TextDecoder(charset).decode(response.arrayBuffer);
+    const { extractDocument } = await import('./extraction/document');
+    signal.throwIfAborted();
+    return extractDocument(html, url);
+  } finally {
+    window.clearTimeout(timeout);
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  }
+}

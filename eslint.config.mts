@@ -156,9 +156,8 @@ export default tseslint.config(
 		},
 	},
 	{
-		// This DOM adapter is shared with the standalone PWA, where Obsidian's
-		// element helpers do not exist.
-		files: ['src/reminders/components/richTextInputDom.ts', 'src/reading/ui/reader-highlights.ts'],
+		// Shared and inert document adapters cannot use Obsidian's element helpers.
+		files: ['src/reminders/components/richTextInputDom.ts', 'src/reading/ui/reader-highlights.ts', 'src/reading/extraction/**/*.ts'],
 		rules: {
 			'obsidianmd/prefer-create-el': 'off',
 		},
