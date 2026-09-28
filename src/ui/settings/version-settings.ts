@@ -60,8 +60,12 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 			return versions;
 		}
 		if (revision === release.revision) {
+			if (!fingerprint) {
+				setting.setName('Check server version');
+				return `${versions}. Select Check live server to compare builds.`;
+			}
 			setting.setName('Server build differs');
-			return `${versions}. A newer server release is needed.`;
+			return `${versions}. Update the plugin to get a newer server release.`;
 		}
 		if (revision > release.revision) {
 			setting.setName('Plugin update required');

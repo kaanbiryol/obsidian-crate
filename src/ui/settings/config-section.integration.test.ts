@@ -384,3 +384,25 @@ it.each([undefined, 'copying', 'complete'])('offers restore, resume or review fr
   expect(button.buttonEl.textContent).toBe(phase === 'complete' ? 'View restored server' : phase ? 'Resume restore' : 'Restore backup…');
   button.click(); await vi.waitFor(() => expect(openServerRestore).toHaveBeenCalledWith(plugin));
 });
+
+
+it('allows an installed revision 1 server to update to the current bundle', async () => {
+  const { renderServerUpdateNotice } = await loadConfigSectionModule();
+  const plugin = {
+    settings: {
+      workerUrl: 'https://crate-0123456789abcdef.example.workers.dev',
+      cloudflareDeployment: {
+        workerName: 'crate-0123456789abcdef', workersSubdomain: 'example',
+        lastKnownRevision: 1, lastDeployedVersion: embeddedArtifact.version,
+        lastDeployedFingerprint: 'a'.repeat(64),
+      },
+    },
+    syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn() },
+  };
+  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+  const row = getSettingByName('Cloudflare update available');
+  expect(row.descEl.textContent).toContain('Current version: 1');
+  row.buttons[0]!.click();
+  expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin);
+  expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+});
