@@ -5,6 +5,7 @@ export interface SettingsTabModelInput {
 
 export interface SettingsTabSections {
 	showReminders: boolean;
+	showReading: boolean;
 	showSync: boolean;
 	showNotifications: boolean;
 	showInfrastructure: boolean;
@@ -15,6 +16,7 @@ export function getSettingsTabSections(input: SettingsTabModelInput): SettingsTa
 
 	return {
 		showReminders: isConfigured,
+		showReading: isConfigured,
 		showSync: isConfigured,
 		showNotifications: isConfigured,
 		showInfrastructure: isConfigured || input.hasDeployment === true,
