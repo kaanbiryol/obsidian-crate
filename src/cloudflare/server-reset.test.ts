@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
@@ -537,4 +538,15 @@ it('resumes the held deletion by refreshing an older cleanup Worker before remov
 	expect(h.api.verifyResetWorker).toHaveBeenLastCalledWith(`https://${h.metadata.workerName}.example.workers.dev`, h.metadata.reset!.id, true);
 	expect(h.objects.size).toBe(0);
 	expect(h.api.deleteWorker).toHaveBeenCalledOnce();
+});
+
+
+it('recognizes every current Crate table when verifying a reset target', async () => {
+  const h = harness();
+  const tables = [...readFileSync('src/cloudflare/schema.sql', 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => ({ name: match[1] }));
+  const query = h.api.queryD1.getMockImplementation()!;
+  h.api.queryD1.mockImplementation((account, database, sql, params) => sql.includes("type = 'table'")
+    ? Promise.resolve([{ results: tables }]) : query(account, database, sql, params));
+  await resetCrateServer(h.input);
+  expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
 });

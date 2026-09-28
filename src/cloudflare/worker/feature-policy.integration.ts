@@ -5,6 +5,8 @@ import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import { featurePolicy, handleFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
+import { createReadingNote } from '@/reading/core/notes';
+import type { PendingCapture } from './reading/captures';
 import { projectReading } from './reading/projection';
 import { policy } from './reading/common';
 import { publishExtraction, type Publication } from './reading/extraction/jobs';
@@ -39,7 +41,7 @@ it('defaults on, rejects stale edits, and limits writes to vault credentials', a
 });
 it('blocks capture and publication while paused and resumes the retained article job', async () => {
   await reading('policy', { enabled: true, folderPath: 'Reading', revision: null });
-  expect((await reading('capture', { url: 'https://example.invalid/article', operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) })).status).toBe(200);
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Article.md', createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/article', savedAt: new Date().toISOString() }), null);
   await projectReading(env, (await policy(env.DB))!);
   const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
   const original = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, job.path);
@@ -84,4 +86,20 @@ it('retains notification state while paused, rearms on resume, and never repeats
   await toggle('reminders', false); await toggle('reminders', true);
   await alarm.alarm();
   expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+});
+
+
+it('retains queued captures while paused and publishes them after resume', async () => {
+  await reading('policy', { enabled: true, folderPath: 'Reading', revision: null });
+  expect((await reading('capture', { url: 'https://example.invalid/queued', operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) })).status).toBe(200);
+  const capture = (await env.DB.prepare('SELECT * FROM reading_captures').first<PendingCapture>())!;
+  await toggle('reading', false);
+  await publishExtraction(env, { captureId: capture.id, generation: capture.generation, result: { markdown: 'Saved article text', title: 'Article' } });
+  expect(await env.DB.prepare('SELECT * FROM reading_captures').first()).toEqual(capture);
+  expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
+  await toggle('reading', true);
+  await publishExtraction(env, { captureId: capture.id, generation: capture.generation, result: { markdown: 'Saved article text', title: 'Article' } });
+  expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
+  const file = (await env.DB.prepare('SELECT path FROM files').first<{ path: string }>())!;
+  expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, file.path))?.content).toContain('Saved article text');
 });

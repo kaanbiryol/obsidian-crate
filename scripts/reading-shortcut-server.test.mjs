@@ -70,9 +70,10 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     await runtime.db.prepare('UPDATE auth_tokens SET expires_at=0 WHERE id=?').bind(second.id).run();
     assert.equal((await request('/reading/shortcut-exchange', '', expiredIssuer)).status, 410);
     await runtime.db.prepare('UPDATE auth_tokens SET expires_at=? WHERE id=?').bind(second.expiresAt, second.id).run();
+    // Fetching consent does not revoke permission to pair and save bookmarks.
     const disabled = await pair(second);
     await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
-    assert.equal((await request('/reading/shortcut-exchange', '', disabled)).status, 410);
+    assert.equal((await request('/reading/shortcut-exchange', '', disabled)).status, 200);
     await runtime.db.prepare('UPDATE reading_policy SET enabled=1').run();
     const changed = await pair(second);
     await runtime.db.prepare("UPDATE reading_policy SET generation='changed'").run();
@@ -82,6 +83,6 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     // Pairing does not save files or leak into an article handoff.
     assert.equal((await request('/reading/handoff', grant.token)).status, 401);
     assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 0);
-    assert.equal((await runtime.db.prepare("SELECT count(*) AS count FROM auth_tokens WHERE scope='reading_capture'").first()).count, 2);
+    assert.equal((await runtime.db.prepare("SELECT count(*) AS count FROM auth_tokens WHERE scope='reading_capture'").first()).count, 3);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });

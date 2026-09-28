@@ -237,7 +237,7 @@ async function sheetAppearance(page) {
     const header = sheet.querySelector('.reminder-modal-header');
     const close = header.querySelector('.crate-icon-button');
     const icon = close.querySelector('svg');
-    const action = sheet.querySelector('.settings-action-button');
+    const action = [...sheet.querySelectorAll('button')].find(button => button.textContent.trim() === 'Refresh all');
     return { radius: getComputedStyle(sheet).borderTopLeftRadius, surface: getComputedStyle(sheet).backgroundColor,
       headerHeight: header.getBoundingClientRect().height, titleSize: getComputedStyle(header.querySelector('h2')).fontSize,
       closeSize: close.getBoundingClientRect().width, icon: icon.outerHTML,
@@ -259,6 +259,18 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         if (req.url === '/reading/update' && !response.ok) console.log('Reading update failed:', response.status, await response.clone().text());
         if (req.url === '/reading/update' && holdUpdate) { const held = holdUpdate; holdUpdate = null; held.started(); await held.release; }
         if (req.url === '/reading/list' && holdList) { const held = holdList; holdList = null; held.started(); await held.release; }
+        // Complete this reader fixture through the real publication endpoint;
+        // invalid-domain retries otherwise delay the deferred capture for minutes.
+        if (req.url === '/reading/capture' && response.ok && JSON.parse(Buffer.concat(chunks).toString()).url === 'https://browser.example.invalid/browser') {
+          const queued = await runtime.db.prepare('SELECT id,generation FROM reading_captures WHERE url_identity=?').bind('https://browser.example.invalid/browser').first();
+          if (queued) {
+            const { REMINDER_ALARMS } = await runtime.mf.getBindings();
+            const published = await REMINDER_ALARMS.get(REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/reading-publish', {
+              method: 'POST', body: JSON.stringify({ captureId: queued.id, generation: queued.generation, result: null }),
+            });
+            assert.equal(published.status, 204);
+          }
+        }
         if (req.url === '/reading/capture') { sent.push(Buffer.concat(chunks).toString()); if (loseCaptureReply) { loseCaptureReply = false; res.writeHead(503, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:"Save acknowledgement interrupted"})); return; } }
         res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
       } catch (error) { if (res.headersSent) res.destroy(error); else { res.writeHead(500); res.end('Test server failed'); } }
@@ -296,13 +308,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(enrollment.url);
     await expect(page.locator('.pwa-reading-opening__header')).toBeVisible();
     await expect(page.locator('.pwa-reading-opening__header [data-icon="settings"]')).toBeVisible();
-    const headerGeometry = () => page.locator('.crate-reading__header').evaluate(header => {
+    const headerGeometry = () => page.locator('.crate-reading__header:visible').evaluate(header => {
       const box = selector => { const r = header.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
       const icon = header.querySelector('[data-icon="settings"]'), style = getComputedStyle(icon);
       return { height: header.getBoundingClientRect().height, title: box('.view-header-title'), meta: box('.view-header-meta'), switcher: box('.pwa-feature-switch-button'),
         settings: box('[aria-label="Open settings"]'), settingsIcon: icon.outerHTML, settingsColor: style.color, settingsOpacity: style.opacity };
     });
-    const openingHeader = await headerGeometry();
+    let openingHeader;
+    await expect.poll(async () => { openingHeader = await headerGeometry(); return openingHeader.height; }).toBeGreaterThan(0);
     await expect(page.locator('.pwa-dock .pwa-mode-opening__shape')).toHaveCount(0);
     const openingDock = await dockAppearance(page);
     exchangeReleased.resolve();
@@ -466,7 +479,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Favorite', exact: true }).click();
     for (const [section, title] of [['favorites', 'Favorites'], ['inbox', 'Reading'], ['favorites', 'Favorites'], ['inbox', 'Reading']]) {
       await page.locator('.pwa-reading-root [data-dock-group]').click({ button: 'right' });
-      await page.locator(`[data-dock-destination="${section}"]`).click();
+      await page.locator(`[data-dock-destination="${section === 'inbox' ? 'reading' : section}"]`).click();
       await page.waitForFunction(() => !document.querySelector('.pwa-reading-root [data-leaving="true"]'));
       await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
       for (let visit = 0; visit < 2; visit++) {
@@ -717,13 +730,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')),null);
-    // An already enrolled Reminders PWA opens Reading with the same browser credential.
+    // An enrolled Reminders PWA opens Reading even when article fetching is off.
     await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
     const remindersEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
     await page.goto(`${origin}/notifications?browserToken=${remindersEnrollment.browserToken}`);
     await page.waitForFunction(() => !!localStorage.getItem('crate-reminders-auth-token'));
     await page.goto(`${origin}/notifications?section=reading`);
-    await page.getByText('Reading is disabled. Enable it in Crate settings.', { exact: false }).waitFor();
+    await page.getByRole('searchbox', { name: 'Search reading' }).waitFor();
     await runtime.db.prepare('UPDATE reading_policy SET enabled=1').run();
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await page.getByRole('searchbox',{name:'Search reading'}).waitFor();

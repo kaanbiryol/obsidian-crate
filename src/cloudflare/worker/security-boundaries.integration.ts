@@ -56,7 +56,8 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
   }), env);
   expect(capture.status).toBe(200);
   const saved = await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/%'").first<{ path: string }>();
-  expect(saved?.path).toMatch(/^Reading\//);
+  expect(saved).toBeNull();
+  expect(await env.DB.prepare('SELECT url_identity FROM reading_captures').first()).toEqual({ url_identity: 'https://example.invalid/shared-pwa' });
   expect((await worker.fetch(request('/reading/access', 'browser', { kind: 'reading' }), env)).status).toBe(403);
   expect((await worker.fetch(request('/reading/policy', 'browser', { enabled: false, folderPath: 'Reading' }), env)).status).toBe(403);
   const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();

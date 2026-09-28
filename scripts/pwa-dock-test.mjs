@@ -129,19 +129,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     for (const [index, label] of ['Inbox', 'Reminders', 'Projects'].entries()) {
       await direct(label);
       await dock().locator('[data-dock-group]').tap(); await closed(); await active('Favorites');
-      const { positions, coverage } = await page.evaluate(async label => {
+      const { positions, coverage } = await page.evaluate(async ({ label, index }) => {
         const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
         panel.querySelector(`.pwa-dock [aria-label="${label}"]`).click();
         const positions = [], coverage = []; const started = performance.now();
-        while (performance.now() - started < 280) {
+        while (performance.now() - started < 750) {
           await new Promise(resolve => requestAnimationFrame(resolve));
           const indicators = [...document.querySelectorAll('.crate-feature-panel .pwa-dock__indicator')];
           positions.push(indicators.map(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width));
           const panels = [...document.querySelectorAll('.crate-feature-panel')];
           coverage.push(1 - panels.reduce((unpainted, element) => unpainted * (1 - Number(getComputedStyle(element).opacity)), 1));
+          if (positions.at(-1).every(value => Math.abs(value - index) < .01)) break;
         }
         return { positions, coverage };
-      }, label);
+      }, { label, index });
       assert.ok(coverage.every(value => value === 1), 'Section switching must never expose the backdrop');
       assert.ok(positions.some(pair => pair.every(value => value > index + .05 && value < 2.95)), `${name}: fourth-to-${label} must slide: ${JSON.stringify(positions)}`);
       assert.ok(positions.every(pair => Math.abs(pair[0] - pair[1]) < .03), 'Both docks must share one highlight position during the fade');
