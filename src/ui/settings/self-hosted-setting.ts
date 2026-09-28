@@ -30,7 +30,9 @@ export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }
 
 export function renderSelfHostedSetting({ containerEl, plugin, rerender }: ConfigSectionContext, reconnect = false): void {
 	if ((!reconnect && plugin.syncRuntime.isConfigured()) || plugin.settings.cloudflareDeployment) return;
-	const container = createSettingsDisclosure(containerEl, reconnect ? 'Reconnect' : 'Connect to your server');
+	const container = createSettingsDisclosure(containerEl, reconnect ? 'Reconnect' : 'Connect to your server', {
+		summary: reconnect ? undefined : 'Connect to a self-hosted Crate server.',
+	});
 	let address = reconnect ? plugin.settings.workerUrl : '';
 	let token = '';
 	let addressInput: TextComponent;
