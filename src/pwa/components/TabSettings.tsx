@@ -43,15 +43,16 @@ export function TabSettings({ preferences, onChange }: {
 }) {
 	const tabs = preferences.dockTabs;
 	const description = useId();
+	const customized = tabs.some((tab, index) => tab !== DEFAULT_DOCK_TABS[index]);
 	const changeTabs = (dockTabs: DockTab[]) => onChange({ dockTabs });
-	return <SettingsSection title="Tabs" action={<Button variant="ghost" size="touch" className="settings-tabs-reset" onClick={() => changeTabs([...DEFAULT_DOCK_TABS])}>Reset tabs</Button>}>
-		<SettingsRow as="label" className="settings-row--preference" title="Default tab" description="Opens at startup.">
+	return <SettingsSection title="Tabs" action={customized && <Button variant="ghost" size="touch" className="settings-tabs-reset" onClick={() => changeTabs([...DEFAULT_DOCK_TABS])}>Reset tabs</Button>}>
+		<SettingsRow as="label" className="settings-row--preference" title="Default tab">
 			<span className="settings-preference-control settings-preference-control--select">
 				<select aria-label="Default tab" className="settings-preference-input" value={preferences.defaultScreen}
 					onChange={event => onChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] })}>
-					<option value="today">Reminders</option>
+					<option value="today">Reminders — Today</option>
 					<option value="inbox">Inbox</option>
-					<option value="upcoming">Upcoming</option>
+					<option value="upcoming">Reminders — Upcoming</option>
 					<option value="browse">Projects</option>
 					<option value="reading">Reading</option>
 					<option value="favorites">Favorites</option>
@@ -60,7 +61,6 @@ export function TabSettings({ preferences, onChange }: {
 				<ChevronDown size={14} aria-hidden="true" />
 			</span>
 		</SettingsRow>
-		<p className="settings-help">Drag to reorder. Select to change.</p>
 		<span id={description} className="pwa-dock__sr">Drag to reorder, or use the Up and Down arrow keys.</span>
 		<Reorder.Group axis="y" values={tabs} onReorder={changeTabs} className="settings-tab-list" aria-label="Your tabs">
 			{tabs.map(tab => <TabRow key={tab} tab={tab} tabs={tabs} onChange={changeTabs} description={description} />)}

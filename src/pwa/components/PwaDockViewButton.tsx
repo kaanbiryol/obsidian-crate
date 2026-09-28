@@ -94,6 +94,6 @@ export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, 
       }}>
       <ThemeIcon key={icon} id={icon} size="l" className="pwa-dock__view-icon" style={icon === initialIcon.current ? { animation: 'none' } : undefined} aria-hidden="true" /><span className="pwa-dock__group-hint" aria-hidden="true"><ChevronsUpDown size={12} strokeWidth={1.8} /></span>
     </Button>
-    <span id={description} className="pwa-dock__sr">Tap to open {label}. Hold or slide up, then drag to a view and release to select. Press Down arrow to choose Reading, Favorites, Archive, or Highlights.</span>
+    <span id={description} className="pwa-dock__sr">Tap to open {label}. Hold or slide up, then drag to a view and release to select. Press Down arrow to choose a view not shown in the bottom bar.</span>
   </>;
 }

@@ -26,15 +26,6 @@
     z-index: 5;
     pointer-events: none;
   }
-  .pwa-dock::before {
-    content: '';
-    position: absolute;
-    inset: auto 0 0;
-    // Soften details in the gap beside the add button, then hide them below.
-    height: calc(60px + var(--dock-bottom-inset));
-    background: linear-gradient(transparent, color-mix(in srgb, var(--background-primary) 85%, transparent) 30px, var(--background-primary) 60px);
-    pointer-events: none;
-  }
   .pwa-dock__bar, .pwa-dock__add { pointer-events: auto; }
   .pwa-dock__surface, .pwa-dock__add {
     background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--dock-surface);
@@ -150,7 +141,7 @@
     transition: none;
   }
 }
-@each $tab in inbox, today, today-view, upcoming, browse, reading, favorites, archive, highlights {
+@each $tab in inbox, today, browse, reading, favorites, archive, highlights {
   .pwa-opening-dock [data-opening-destination="#{$tab}"] {
     order: var(--pwa-dock-#{$tab}-order, 0);
     display: var(--pwa-dock-#{$tab}-display, none);

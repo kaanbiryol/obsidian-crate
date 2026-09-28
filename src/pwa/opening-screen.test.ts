@@ -34,7 +34,7 @@ it.each([
 	}
 	const isProject = Boolean(document.documentElement.dataset.pwaOpeningProject);
 	expect(document.querySelectorAll('[data-icon="settings"]')).toHaveLength(isProject ? 0 : 1);
-	expect(document.querySelectorAll('.pwa-dock__tab > svg, .pwa-dock__add > svg')).toHaveLength(isProject ? 0 : 10);
+	expect(document.querySelectorAll('.pwa-dock__tab > svg, .pwa-dock__add > svg')).toHaveLength(isProject ? 0 : 8);
 	expect(document.querySelectorAll('.crate-content-loading')).toHaveLength(1);
 	expect(document.querySelector('work')).toBeNull();
 });
@@ -73,18 +73,18 @@ it('selects a pinned Reading subview in the cached shell', () => {
 	expect(style.getPropertyValue('--pwa-dock-favorites-active-order')).toBe('2');
 });
 
-it('selects a pinned Today tab in the cached launch shell', () => {
+it.each(['today', 'upcoming'])('migrates date-view slots and selects Reminders for %s in the cached shell', tab => {
 	const { document } = parseHTML('<html><body></body></html>');
 	new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
-		document, URLSearchParams, location: { search: '?tab=today' },
+		document, URLSearchParams, location: { search: `?tab=${tab}` },
 		localStorage: { getItem: () => JSON.stringify({ dockTabs: ['upcoming', 'today-view', 'inbox', 'reading'] }) },
 	});
-	expect(document.documentElement.dataset.pwaOpeningDockTab).toBe('today-view');
-	expect(document.documentElement.style.getPropertyValue('--pwa-dock-today-active-order')).toBe('1');
+	expect(document.documentElement.dataset.pwaOpeningDockTab).toBe('today');
+	expect(document.documentElement.style.getPropertyValue('--pwa-dock-today-active-order')).toBe('0');
 });
 
 it('marks only the last saved dock slot with the startup switch badge', () => {
-	for (const dockTabs of [['reading', 'inbox', 'today', 'browse'], ['archive', 'favorites', 'highlights', 'upcoming']]) {
+	for (const dockTabs of [['reading', 'inbox', 'today', 'browse'], ['archive', 'favorites', 'highlights', 'today']]) {
 		const { document } = parseHTML(`<html><body>${createPwaOpeningScreenHtml()}</body></html>`);
 		new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
 			document, URLSearchParams, location: { search: '' }, localStorage: { getItem: () => JSON.stringify({ dockTabs }) },
