@@ -62,7 +62,7 @@ function renderReadingText(markdown: string, source: string, highlightCode?: (co
 	return container.innerHTML;
 }
 
-export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode, appearance, onAppearanceChange }: {
+export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode, appearance, onAppearanceChange }: {
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
 	/** Keep article parsing and layout out of the host's opening slide. */
@@ -75,6 +75,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	highlightCode?: (code: string, language: string) => string | undefined;
 	loadingError?: string; onRetryOpen?: () => void;
 	focusHighlight?: ReadingHighlight; autoHideNavigation?: boolean; floatingHighlights?: boolean;
+	pendingMessage?: string;
 	status?: string; onRetry?: () => Promise<void>; notice?: React.ReactNode; mutationPending?: boolean; highlightsPending?: boolean;
 }) {
 	const body = useRef<HTMLDivElement>(null);
@@ -205,7 +206,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{!floatingHighlights && <div className="crate-reading-reader__tabs" role="group" aria-label="Article view"><ToggleButton pressed={mode === 'article'} onPressedChange={() => setMode('article')}>Article</ToggleButton><ToggleButton pressed={mode === 'highlights'} onPressedChange={() => setMode('highlights')}>Highlights{item.highlights?.length ? ` (${item.highlights.length})` : ''}</ToggleButton></div>}
 			{!floatingHighlights && mode === 'highlights' && renderHighlights()}
 			<div hidden={mode !== 'article'}>
-			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">{item.extraction_status === 'pending' ? 'Your link is saved. Article text is on its way.' : item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.'}{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Try again</Button>}</p>}
+			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">{item.extraction_status === 'pending' ? pendingMessage : item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.'}{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Try again</Button>}</p>}
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
 					: <LoadingIndicator label="Loading article" />}
