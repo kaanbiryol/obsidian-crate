@@ -9,16 +9,16 @@ export const bundleBudgets = {
 		// about 40 KB raw / 9 KB gzip; the combined plugin is about 3.29 MB / 1.72 MB.
 		// Markdown source mapping and the embedded Highlights PWA bring this to
 		// about 3.50 MB raw / 1.85 MB gzip. The reader uses no full DOM runtime.
-		// Expanded PWA code grammars embedded for deployment: about 3.58 MB / 1.91 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3620000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1930000', 10),
+		// Updated dependencies and shared controls: measured 3.64 MB raw / 1.94 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '3680000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1960000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
-		// about 244 KB raw / 32 KB gzip. The same styles ship to both hosts.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '255000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '33500', 10),
+		// measured 267 KB raw / 34.5 KB gzip. The same styles ship to both hosts.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '270000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '35000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -26,24 +26,25 @@ export const bundleBudgets = {
 		// Reading with Defuddle's upstream Markdown/math support and the PWA:
 		// about 3.30 MB raw / 1.19 MB gzip, including the numbered shortcut setup and expanding navigation dock.
 		// Source-preserving highlights and the deferred review UI: about 3.57 MB / 1.30 MB.
-		// Expanded PWA-only code grammars bring the embedded Worker to about 3.74 MB / 1.35 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3780000', 10),
+		// Updated dependencies and PWA controls measure 3.85 MB raw / 1.375 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3900000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1380000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Includes React DOM and shared Base UI controls; about 343 KB raw / 109 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '345000', 10),
+		// Includes React DOM and shared Base UI controls; measured 349 KB raw / 110 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '355000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '110000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
 		// Unified settings, offline Reading fallback and complete loading chrome measure
-		// 1.032 MB raw / 343.8 KB gzip. Retain a small, explicit growth margin.
+		// 1.104 MB raw / 366.1 KB gzip with the updated dependencies and controls.
+		// Retain a small, explicit growth margin.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1040000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '347000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1120000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '375000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

@@ -28,6 +28,7 @@
 		"src/cloudflare/worker/raw-text.d.ts"
 	],
 	"ignoreDependencies": [
+		"@plugin-build/styles.css",
 		"cloudflare",
 		"electron",
 		"tailwindcss"
