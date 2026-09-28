@@ -6,7 +6,7 @@ import type { FileEntry } from '../protocol/sync-types';
 import type { TransferContext } from './transfer-types';
 
 function toArrayBuffer(text: string): ArrayBuffer {
-	return new TextEncoder().encode(text).buffer as ArrayBuffer;
+	return new TextEncoder().encode(text).buffer;
 }
 
 function fromArrayBuffer(buffer: ArrayBuffer): string {

@@ -31,7 +31,8 @@ test('packed npx installation starts without repository files and preserves data
 	const install = join(cache, '_npx', cacheKey, 'node_modules', '@kaanbiryol', 'crate-server');
 	const cli = join(install, 'scripts/crate-server.mjs');
 	const miniflareRequire = createRequire(join(install, 'vendor/miniflare/dist/src/index.js'));
-	assert.equal(miniflareRequire('sharp').versions.sharp, '0.35.4');
+	const repositoryPackage = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+	assert.equal(miniflareRequire('sharp').versions.sharp, repositoryPackage.overrides.miniflare.sharp);
 	await assert.rejects(stat(join(install, 'src')), { code: 'ENOENT' });
 	const bin = join(directory, 'bin');
 	await mkdir(bin);

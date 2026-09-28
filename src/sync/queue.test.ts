@@ -176,7 +176,7 @@ describe('queue event handlers', () => {
 	it('queues file changes for syncable paths', () => {
 		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
 
-		onFileChange(context, { path: 'notes/a.md' } as never);
+		onFileChange(context, { path: 'notes/a.md' });
 
 		expect(pendingPaths.has('notes/a.md')).toBe(true);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
@@ -185,7 +185,7 @@ describe('queue event handlers', () => {
 	it('queues delete markers for syncable paths', () => {
 		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
 
-		onFileDelete(context, { path: 'notes/a.md' } as never);
+		onFileDelete(context, { path: 'notes/a.md' });
 
 		expect(pendingPaths.has('delete:notes/a.md')).toBe(true);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
@@ -379,8 +379,8 @@ describe('clearSyncedPendingPaths', () => {
 
 	it('coalesces opposite upload and delete events for one path', () => {
 		const eventContext = createEventContext();
-		onFileDelete(eventContext.context, { path: 'notes/a.md' } as never);
-		onFileChange(eventContext.context, { path: 'notes/a.md' } as never);
+		onFileDelete(eventContext.context, { path: 'notes/a.md' });
+		onFileChange(eventContext.context, { path: 'notes/a.md' });
 
 		expect([...eventContext.pendingPaths]).toEqual(['notes/a.md']);
 		expect([...eventContext.pendingRevisions.keys()]).toEqual(['notes/a.md']);
@@ -403,7 +403,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				mtime: 1,
@@ -466,7 +466,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				mtime: 1,
@@ -497,7 +497,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				contentType: 'text/plain',
@@ -522,7 +522,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				contentType: 'text/plain',
@@ -572,7 +572,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				contentType: 'text/plain',
@@ -597,7 +597,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
-				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('hello').buffer,
 				hash: 'abc123',
 				size: 5,
 				mtime: 1,

@@ -55,7 +55,7 @@ describe('createFullSyncPlan', () => {
 				vault: {
 					adapter: {
 						readBinary: vi.fn(async (path: string) =>
-							new TextEncoder().encode(path.includes('conflict') ? 'c' : 'u').buffer as ArrayBuffer,
+							new TextEncoder().encode(path.includes('conflict') ? 'c' : 'u').buffer,
 						),
 					},
 				} as never,
@@ -104,9 +104,9 @@ describe('createFullSyncPlan', () => {
 	});
 
 	it('hashes every file during full reconciliation regardless of matching metadata', async () => {
-		const unchangedContent = new TextEncoder().encode('unchanged').buffer as ArrayBuffer;
+		const unchangedContent = new TextEncoder().encode('unchanged').buffer;
 		const unchangedHash = await computeHash(unchangedContent);
-		const newContent = new TextEncoder().encode('new-file').buffer as ArrayBuffer;
+		const newContent = new TextEncoder().encode('new-file').buffer;
 
 		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
 			{ path: 'notes/unchanged.md', size: 9, mtime: 1000, extension: 'md' },

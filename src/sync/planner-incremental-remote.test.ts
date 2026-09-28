@@ -87,7 +87,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 	});
 
 	it('applies remote delete changes through local trash', async () => {
-		const content = new TextEncoder().encode('remote delete base').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('remote delete base').buffer;
 		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
@@ -123,7 +123,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 	});
 
 	it('trashes hidden files for remote delete changes', async () => {
-		const content = new TextEncoder().encode('hidden base').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('hidden base').buffer;
 		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
@@ -164,8 +164,8 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		{ path: 'notes/edited-during-sync.md', hidden: false },
 		{ path: '.vault-config/edited-during-sync.json', hidden: true },
 	])('preserves a newer local edit before applying a remote delete ($path)', async ({ path, hidden }) => {
-		const baseContent = new TextEncoder().encode('planned content').buffer as ArrayBuffer;
-		const changedContent = new TextEncoder().encode('edited during sync').buffer as ArrayBuffer;
+		const baseContent = new TextEncoder().encode('planned content').buffer;
+		const changedContent = new TextEncoder().encode('edited during sync').buffer;
 		const baseHash = await computeHash(baseContent);
 		const changedHash = await computeHash(changedContent);
 		const prepared: PreparedUpload = {
@@ -261,7 +261,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 	});
 
 	it('skips download when remote put hash matches local content', async () => {
-		const content = new TextEncoder().encode('same').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('same').buffer;
 		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 2 },
@@ -300,7 +300,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 	it('uploads local-only changes not present in the remote changelog', async () => {
 		const prepared: PreparedUpload = {
 			path: 'notes/new.md',
-			content: new TextEncoder().encode('hello world').buffer as ArrayBuffer,
+			content: new TextEncoder().encode('hello world').buffer,
 			hash: 'local-hash',
 			size: 11,
 			contentType: 'text/markdown',
@@ -331,7 +331,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 	it('keeps local edits when a remote delete arrives and re-uploads the path', async () => {
 		const prepared: PreparedUpload = {
 			path: 'notes/live.md',
-			content: new TextEncoder().encode('keep local').buffer as ArrayBuffer,
+			content: new TextEncoder().encode('keep local').buffer,
 			hash: 'local-hash',
 			size: 10,
 			contentType: 'text/markdown',

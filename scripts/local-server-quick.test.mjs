@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { quickTunnelOrigin, startQuickTunnel } from './local-server-quick.mjs';
-import { installCloudflared } from './local-server-cloudflared.mjs';
+import { cloudflaredVersion, installCloudflared } from './local-server-cloudflared.mjs';
 
 test('Quick Tunnel discovery accepts only complete HTTPS trycloudflare origins', () => {
 	assert.equal(quickTunnelOrigin('Visit https://clear-blue-sky.trycloudflare.com\n'), 'https://clear-blue-sky.trycloudflare.com');
@@ -19,7 +19,7 @@ test('automatic installation refuses an unverified download', async t => {
 	const run = async () => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); };
 	await assert.rejects(installCloudflared({ cacheDir, platform: 'linux', arch: 'x64', run,
 		fetchAsset: async () => new Response('invalid binary') }), /checksum mismatch/);
-	assert.deepEqual(await readdir(join(cacheDir, '2026.9.1', 'linux-x64')), []);
+	assert.deepEqual(await readdir(join(cacheDir, cloudflaredVersion, 'linux-x64')), []);
 });
 
 test('Quick Tunnel reads split output, isolates configuration, and stops its child', async t => {

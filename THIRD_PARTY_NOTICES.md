@@ -11,52 +11,58 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
 | @floating-ui/utils | 0.2.12 | MIT |
-| @internationalized/date | 3.12.0 | Apache-2.0 |
-| @lexical/a11y | 0.50.0 | MIT |
-| @lexical/clipboard | 0.50.0 | MIT |
-| @lexical/dragon | 0.50.0 | MIT |
-| @lexical/extension | 0.50.0 | MIT |
-| @lexical/history | 0.50.0 | MIT |
-| @lexical/html | 0.50.0 | MIT |
-| @lexical/internal | 0.50.0 | MIT |
-| @lexical/link | 0.50.0 | MIT |
-| @lexical/list | 0.50.0 | MIT |
-| @lexical/plain-text | 0.50.0 | MIT |
-| @lexical/selection | 0.50.0 | MIT |
-| @lexical/utils | 0.50.0 | MIT |
+| @internationalized/date | 3.12.4 | Apache-2.0 |
+| @lexical/a11y | 0.52.0 | MIT |
+| @lexical/clipboard | 0.52.0 | MIT |
+| @lexical/dragon | 0.52.0 | MIT |
+| @lexical/extension | 0.52.0 | MIT |
+| @lexical/history | 0.52.0 | MIT |
+| @lexical/html | 0.52.0 | MIT |
+| @lexical/internal | 0.52.0 | MIT |
+| @lexical/link | 0.52.0 | MIT |
+| @lexical/list | 0.52.0 | MIT |
+| @lexical/plain-text | 0.52.0 | MIT |
+| @lexical/selection | 0.52.0 | MIT |
+| @lexical/utils | 0.52.0 | MIT |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
 | @preact/signals-core | 1.14.4 | MIT |
 | @swc/helpers | 0.5.19 | Apache-2.0 |
-| @types/react | 19.2.14 | MIT |
+| @types/react | 19.3.0 | MIT |
 | @types/trusted-types | 2.0.7 | MIT |
 | @xmldom/xmldom | 0.9.12 | MIT |
 | agent-base | 7.1.4 | MIT |
 | asn1.js | 5.4.1 | MIT |
 | bn.js | 4.12.5 | MIT |
-| boolbase | 1.0.0 | ISC |
+| boolbase | 2.0.0 | ISC |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
-| chrono-node | 2.9.0 | MIT |
+| chrono-node | 2.10.1 | MIT |
 | classnames | 2.5.1 | MIT |
 | commander | 12.1.0 | MIT |
-| css-select | 5.2.2 | BSD-2-Clause |
-| css-what | 6.2.2 | BSD-2-Clause |
+| css-select | 7.0.0 | BSD-2-Clause |
+| css-what | 8.0.0 | BSD-2-Clause |
 | cssom | 0.5.0 | MIT |
 | csstype | 3.2.3 | MIT |
-| date-fns | 4.1.0 | MIT |
+| date-fns | 4.4.0 | MIT |
 | debug | 4.4.3 | MIT |
 | defuddle | 0.19.4 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
+| dom-serializer | 3.1.1 | MIT |
 | dom-serializer | 2.0.0 | MIT |
+| domelementtype | 3.0.0 | BSD-2-Clause |
 | domelementtype | 2.3.0 | BSD-2-Clause |
+| domhandler | 6.0.1 | BSD-2-Clause |
 | domhandler | 5.0.3 | BSD-2-Clause |
-| dompurify | 3.4.15 | (MPL-2.0 OR Apache-2.0) |
+| dompurify | 3.4.16 | (MPL-2.0 OR Apache-2.0) |
+| domutils | 4.0.2 | BSD-2-Clause |
 | domutils | 3.2.2 | BSD-2-Clause |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
+| entities | 8.1.0 | BSD-2-Clause |
 | entities | 4.5.0 | BSD-2-Clause |
 | entities | 7.0.1 | BSD-2-Clause |
-| framer-motion | 12.38.0 | MIT |
+| framer-motion | 13.4.4 | MIT |
 | highlight.js | 11.12.0 | BSD-3-Clause |
 | html-escaper | 3.0.3 | MIT |
+| htmlparser2 | 12.0.0 | MIT |
 | htmlparser2 | 10.1.0 | MIT |
 | http_ece | 1.2.0 | MIT |
 | https-proxy-agent | 7.0.6 | MIT |
@@ -64,37 +70,36 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | inherits | 2.0.4 | ISC |
 | jwa | 2.0.1 | MIT |
 | jws | 4.0.1 | MIT |
-| lexical | 0.50.0 | MIT |
-| linkedom | 0.18.12 | ISC |
-| lucide-react | 0.562.0 | ISC |
-| marked | 16.3.0 | MIT |
+| lexical | 0.52.0 | MIT |
+| linkedom | 0.18.13 | ISC |
+| lucide-react | 1.48.0 | ISC |
+| marked | 18.0.14 | MIT |
 | mathml-to-latex | 1.8.0 | MIT |
 | minimalistic-assert | 1.0.1 | ISC |
 | minimist | 1.2.8 | MIT |
-| motion | 12.38.0 | MIT |
-| motion-dom | 12.38.0 | MIT |
-| motion-utils | 12.36.0 | MIT |
+| motion | 13.4.4 | MIT |
+| motion-dom | 13.4.4 | MIT |
+| motion-utils | 13.3.0 | MIT |
 | ms | 2.1.3 | MIT |
-| nth-check | 2.1.1 | BSD-2-Clause |
+| nth-check | 3.0.1 | BSD-2-Clause |
 | qrcode-generator | 2.0.4 | MIT |
-| react | 19.2.4 | MIT |
-| react-dom | 19.2.4 | MIT |
+| react | 19.3.0 | MIT |
+| react-dom | 19.3.0 | MIT |
 | reselect | 5.3.0 | MIT |
 | safe-buffer | 5.2.1 | MIT |
 | safer-buffer | 2.1.2 | MIT |
-| scheduler | 0.27.0 | MIT |
+| scheduler | 0.28.0 | MIT |
 | temml | 0.13.5 | MIT |
 | tslib | 2.8.1 | 0BSD |
-| tslib | 2.4.0 | 0BSD |
 | turndown | 7.2.4 | MIT |
-| typescript | 5.8.3 | Apache-2.0 |
+| typescript | 6.0.3 | Apache-2.0 |
 | uhyphen | 0.2.0 | ISC |
 | use-sync-external-store | 1.7.0 | MIT |
 | valibot | 1.5.0 | MIT |
 | web-push | 3.6.7 | MPL-2.0 |
 | web-push-browser | 1.4.2 | ISC |
 | yaml | 2.9.1 | ISC |
-| zustand | 5.0.12 | MIT |
+| zustand | 5.0.15 | MIT |
 
 ## @babel/runtime@7.29.7
 
@@ -303,7 +308,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## @internationalized/date@3.12.0
+## @internationalized/date@3.12.4
 
 Declared license: Apache-2.0
 
@@ -513,7 +518,7 @@ Apache License
    limitations under the License.
 ```
 
-## @lexical/a11y@0.50.0
+## @lexical/a11y@0.52.0
 
 Declared license: MIT
 
@@ -543,7 +548,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/clipboard@0.50.0
+## @lexical/clipboard@0.52.0
 
 Declared license: MIT
 
@@ -573,7 +578,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/dragon@0.50.0
+## @lexical/dragon@0.52.0
 
 Declared license: MIT
 
@@ -603,7 +608,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/extension@0.50.0
+## @lexical/extension@0.52.0
 
 Declared license: MIT
 
@@ -633,7 +638,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/history@0.50.0
+## @lexical/history@0.52.0
 
 Declared license: MIT
 
@@ -663,7 +668,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/html@0.50.0
+## @lexical/html@0.52.0
 
 Declared license: MIT
 
@@ -693,7 +698,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/internal@0.50.0
+## @lexical/internal@0.52.0
 
 Declared license: MIT
 
@@ -723,7 +728,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/link@0.50.0
+## @lexical/link@0.52.0
 
 Declared license: MIT
 
@@ -753,7 +758,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/list@0.50.0
+## @lexical/list@0.52.0
 
 Declared license: MIT
 
@@ -783,7 +788,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/plain-text@0.50.0
+## @lexical/plain-text@0.52.0
 
 Declared license: MIT
 
@@ -813,7 +818,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/selection@0.50.0
+## @lexical/selection@0.52.0
 
 Declared license: MIT
 
@@ -843,7 +848,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/utils@0.50.0
+## @lexical/utils@0.52.0
 
 Declared license: MIT
 
@@ -1147,7 +1152,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-## @types/react@19.2.14
+## @types/react@19.3.0
 
 Declared license: MIT
 
@@ -1313,28 +1318,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## boolbase@1.0.0
+## boolbase@2.0.0
 
 Declared license: ISC
 
-### ISC.txt
+### LICENSE
 
 ```text
-Copyright (c) Felix Boehm <me@feedic.com>
-
-ISC License
+Copyright (c) 2014-2015, Felix Boehm <me@feedic.com>
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ## buffer-equal-constant-time@1.0.1
@@ -1358,7 +1361,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## chrono-node@2.9.0
+## chrono-node@2.10.1
 
 Declared license: MIT
 
@@ -1449,7 +1452,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## css-select@5.2.2
+## css-select@7.0.0
 
 Declared license: BSD-2-Clause
 
@@ -1469,7 +1472,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## css-what@6.2.2
+## css-what@8.0.0
 
 Declared license: BSD-2-Clause
 
@@ -1546,7 +1549,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## date-fns@4.1.0
+## date-fns@4.4.0
 
 Declared license: MIT
 
@@ -1672,6 +1675,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## dom-serializer@3.1.1
+
+Declared license: MIT
+
+### LICENSE
+
+```text
+Copyright © 2022 The Cheerio contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
 ## dom-serializer@2.0.0
 
 Declared license: MIT
@@ -1692,7 +1711,47 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## domelementtype@3.0.0
+
+Declared license: BSD-2-Clause
+
+### LICENSE
+
+```text
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 ## domelementtype@2.3.0
+
+Declared license: BSD-2-Clause
+
+### LICENSE
+
+```text
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## domhandler@6.0.1
 
 Declared license: BSD-2-Clause
 
@@ -1732,7 +1791,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## dompurify@3.4.15
+## dompurify@3.4.16
 
 Declared license: (MPL-2.0 OR Apache-2.0)
 
@@ -1940,6 +1999,26 @@ Apache License
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+```
+
+## domutils@4.0.2
+
+Declared license: BSD-2-Clause
+
+### LICENSE
+
+```text
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ## domutils@3.2.2
@@ -2172,6 +2251,26 @@ Apache License
    limitations under the License.
 ```
 
+## entities@8.1.0
+
+Declared license: BSD-2-Clause
+
+### LICENSE
+
+```text
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 ## entities@4.5.0
 
 Declared license: BSD-2-Clause
@@ -2212,7 +2311,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## framer-motion@12.38.0
+## framer-motion@13.4.4
 
 Declared license: MIT
 
@@ -2306,6 +2405,33 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+## htmlparser2@12.0.0
+
+Declared license: MIT
+
+### LICENSE
+
+```text
+Copyright 2010, 2011, Chris Winberry <chris@winberry.net>. All rights reserved.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
 ```
 
 ## htmlparser2@10.1.0
@@ -2487,7 +2613,7 @@ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TOR
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## lexical@0.50.0
+## lexical@0.52.0
 
 Declared license: MIT
 
@@ -2517,7 +2643,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## linkedom@0.18.12
+## linkedom@0.18.13
 
 Declared license: ISC
 
@@ -2541,7 +2667,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## lucide-react@0.562.0
+## lucide-react@1.48.0
 
 Declared license: ISC
 
@@ -2550,7 +2676,7 @@ Declared license: ISC
 ```text
 ISC License
 
-Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2023 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2025.
+Copyright (c) 2026 Lucide Icons and Contributors
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -2566,9 +2692,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-The MIT License (MIT) (for portions derived from Feather)
+The following Lucide icons are derived from the Feather project:
 
-Copyright (c) 2013-2023 Cole Bemis
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2589,11 +2719,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## marked@16.3.0
+## marked@18.0.14
 
 Declared license: MIT
 
-### LICENSE.md
+### LICENSE
 
 ```text
 # License information
@@ -2721,7 +2851,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## motion@12.38.0
+## motion@13.4.4
 
 Declared license: MIT
 
@@ -2751,7 +2881,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-dom@12.38.0
+## motion-dom@13.4.4
 
 Declared license: MIT
 
@@ -2781,7 +2911,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-utils@12.36.0
+## motion-utils@13.3.0
 
 Declared license: MIT
 
@@ -2841,7 +2971,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## nth-check@2.1.1
+## nth-check@3.0.1
 
 Declared license: BSD-2-Clause
 
@@ -2891,7 +3021,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## react@19.2.4
+## react@19.3.0
 
 Declared license: MIT
 
@@ -2921,7 +3051,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## react-dom@19.2.4
+## react-dom@19.3.0
 
 Declared license: MIT
 
@@ -3041,7 +3171,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## scheduler@0.27.0
+## scheduler@0.28.0
 
 Declared license: MIT
 
@@ -3122,27 +3252,6 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## tslib@2.4.0
-
-Declared license: 0BSD
-
-### LICENSE.txt
-
-```text
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-```
-
 ## turndown@7.2.4
 
 Declared license: MIT
@@ -3173,7 +3282,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## typescript@5.8.3
+## typescript@6.0.3
 
 Declared license: Apache-2.0
 
@@ -3369,7 +3478,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-## zustand@5.0.12
+## zustand@5.0.15
 
 Declared license: MIT
 

@@ -24,9 +24,7 @@ async function range(editor: Locator, anchor: number, focus = anchor) {
 }
 async function expectCaret(editor: Locator, offset: number) {
   await expect.poll(() => editor.evaluate(element => {
-    const selection = element.ownerDocument.getSelection() as (Selection & {
-      getComposedRanges?: (options: { shadowRoots: ShadowRoot[] }) => StaticRange[];
-    }) | null;
+    const selection = element.ownerDocument.getSelection();
     if (!selection?.rangeCount) return -1;
     let selected: AbstractRange | undefined = selection.getRangeAt(0);
     const root = element.getRootNode();

@@ -198,7 +198,7 @@ it('resumes and verifies after Cloudflare publishes an upload but its response i
     });
     await expect(provisionCloudflareDeployment(input)).rejects.toThrow('Lost upload response');
     expect(api.uploadWorker).toHaveBeenCalledTimes(1);
-    const recovery = await recoverDeployment(api as never, metadata, artifacts.fingerprint);
+    const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
     expect(recovery.status).toBe('resume');
     await provisionCloudflareDeployment({ ...input, resumeUpdateValue: recovery.resumeValue });
     expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();

@@ -45,7 +45,7 @@ export function createTransferHarness() {
 	};
 	const retryWithBackoff = vi.fn(async (fn: () => Promise<unknown>) => fn());
 	const retryWithBackoffTyped = <T>(fn: () => Promise<T>): Promise<T> =>
-		retryWithBackoff(fn as () => Promise<unknown>) as Promise<T>;
+		retryWithBackoff(fn) as Promise<T>;
 	const getModifiedIso = vi.fn(async () => '2026-02-15T00:00:00.000Z');
 
 	return {

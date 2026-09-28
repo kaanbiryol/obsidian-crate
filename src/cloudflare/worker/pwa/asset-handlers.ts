@@ -149,7 +149,7 @@ export function handleIcon(request: Request): Response {
 	});
 }
 
-function pngAssetResponse(request: Request, asset: Uint8Array): Response {
+function pngAssetResponse(request: Request, asset: Uint8Array<ArrayBuffer>): Response {
 	return new Response(asset, {
 		headers: {
 			'Content-Type': 'image/png',

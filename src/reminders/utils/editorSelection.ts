@@ -1,4 +1,4 @@
-type ComposedSelection = Selection & {
+type ComposedSelection = Omit<Selection, 'getComposedRanges'> & {
 	getComposedRanges?(options: { shadowRoots: ShadowRoot[] } | ShadowRoot): StaticRange[];
 };
 

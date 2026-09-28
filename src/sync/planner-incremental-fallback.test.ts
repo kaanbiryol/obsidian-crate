@@ -75,7 +75,7 @@ it('falls back to full sync when cursor is expired', async () => {
 
 	it('reclassifies own queue uploads as local changes instead of conflicts', async () => {
 		const queueUploadHash = 'abc123';
-		const newLocalContent = new TextEncoder().encode('edited-after-queue').buffer as ArrayBuffer;
+		const newLocalContent = new TextEncoder().encode('edited-after-queue').buffer;
 		const newLocalHash = await computeHash(newLocalContent);
 		const settings = createSettings({ lastSeq: 10 });
 		const localManifest = {
@@ -159,7 +159,7 @@ it('falls back to full sync when cursor is expired', async () => {
 	it('still detects true conflicts when changelog hash differs from manifest', async () => {
 		const manifestHash = 'manifest-hash';
 		const remoteHash = 'other-device-hash';
-		const localContent = new TextEncoder().encode('local-edit').buffer as ArrayBuffer;
+		const localContent = new TextEncoder().encode('local-edit').buffer;
 		const localHash = await computeHash(localContent);
 		const settings = createSettings({ lastSeq: 10 });
 		const localManifest = {

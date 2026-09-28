@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:26.8.2-bookworm-slim AS build
+FROM node:26.10.0-bookworm-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -9,7 +9,7 @@ RUN npm run build:server \
 # Reuse the CLI's pinned release and checksum verification at image build time.
 RUN node --input-type=module -e "import { installCloudflared } from './scripts/local-server-cloudflared.mjs'; import { copyFile } from 'node:fs/promises'; await copyFile(await installCloudflared(), '/tmp/cloudflared');"
 
-FROM node:26.8.2-bookworm-slim AS runtime
+FROM node:26.10.0-bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates util-linux \
     && rm -rf /var/lib/apt/lists/*

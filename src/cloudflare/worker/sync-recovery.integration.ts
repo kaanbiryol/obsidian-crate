@@ -23,7 +23,7 @@ afterEach(async () => {
 	await reset();
 });
 
-async function retain(path: string, content: Uint8Array) {
+async function retain(path: string, content: Uint8Array<ArrayBuffer>) {
 	const hash = await sha256HexBytes(content);
 	const key = `__crate__/files/${hash}/retained`;
 	await bucket.put(key, content, { httpMetadata: { contentType: 'application/octet-stream' }, customMetadata: { hash } });

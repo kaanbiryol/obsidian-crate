@@ -31,7 +31,7 @@ describe('transfer upload helpers', () => {
 		const prepared: PreparedUpload[] = [
 			{
 				path: 'notes/a.md',
-				content: new TextEncoder().encode('x').buffer as ArrayBuffer,
+				content: new TextEncoder().encode('x').buffer,
 				hash: 'expected-hash',
 				size: 1,
 				contentType: 'text/plain',
@@ -65,7 +65,7 @@ describe('transfer upload helpers', () => {
 		// Create three batches of five small files.
 		const prepared: PreparedUpload[] = Array.from({ length: 15 }, (_, i) => ({
 			path: `file-${i}.md`,
-			content: new TextEncoder().encode('x').buffer as ArrayBuffer,
+			content: new TextEncoder().encode('x').buffer,
 			hash: `hash-${i}`,
 			size: 1,
 			contentType: 'text/plain',
@@ -130,7 +130,7 @@ describe('transfer upload helpers', () => {
 
 		await uploadPreparedFiles(harness.context, [{
 			path: 'notes/a.md',
-			content: new TextEncoder().encode('local').buffer as ArrayBuffer,
+			content: new TextEncoder().encode('local').buffer,
 			hash: 'local-hash',
 			size: 5,
 			expectedHash: 'base-hash',

@@ -121,7 +121,7 @@ function createEnvDefaults(): Env {
 		REMINDER_ALARMS: {
 			idFromName: vi.fn(),
 			get: vi.fn(),
-		} as unknown as DurableObjectNamespace,
+		},
 	};
 }
 
@@ -166,7 +166,7 @@ describe('worker entrypoint', () => {
 	it('serves server metadata at the root without a public claim page', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/'),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(response.status).toBe(200);
@@ -178,8 +178,8 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/setup/status', {
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
-			}) as never,
-			createEnv() as never,
+			}),
+			createEnv(),
 		);
 
 		expect(response.status).toBe(404);
@@ -196,7 +196,7 @@ describe('worker entrypoint', () => {
 				},
 				body: JSON.stringify({ enrollmentTokenHash: 'a'.repeat(64) }),
 			}),
-			createEnv() as never,
+			createEnv(),
 		);
 		const tokenResponse = await worker.fetch(
 			new Request('https://worker.test/auth/tokens', {
@@ -207,7 +207,7 @@ describe('worker entrypoint', () => {
 				},
 				body: JSON.stringify({ token_hash: 'a'.repeat(64) }),
 			}),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(enrollmentResponse.status).toBe(404);
@@ -224,7 +224,7 @@ describe('worker entrypoint', () => {
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
         body: JSON.stringify({ folderPath: 'Reminders' }),
 			}),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }),
 		);
 
 		expect(response.status).toBe(200);
@@ -246,7 +246,7 @@ describe('worker entrypoint', () => {
 				method: 'POST',
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer reminders-token' },
 			}),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }),
 		);
 
 		expect(response.status).toBe(403);
@@ -259,7 +259,7 @@ describe('worker entrypoint', () => {
 	it('publishes unauthenticated server compatibility metadata', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/.well-known/crate'),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(response.status).toBe(200);
@@ -270,7 +270,7 @@ describe('worker entrypoint', () => {
 	it('serves PWA version metadata without authentication', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/version.json'),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(response.status).toBe(200);
@@ -280,7 +280,7 @@ describe('worker entrypoint', () => {
 	it('allows the service worker to control the exact notifications route', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/sw.js'),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(response.status).toBe(200);
@@ -290,19 +290,19 @@ describe('worker entrypoint', () => {
 	it('serves PWA scripts from same-origin assets under a strict CSP', async () => {
 		const pageResponse = await worker.fetch(
 			new Request('https://worker.test/notifications'),
-			createEnv() as never,
+			createEnv(),
 		);
 		const handoffResponse = await worker.fetch(
 			new Request('https://worker.test/notifications/open-obsidian?project=Work'),
-			createEnv() as never,
+			createEnv(),
 		);
 		const themeScriptResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 		const handoffScriptResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/open-obsidian.js?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		const pageHtml = await pageResponse.text();
@@ -321,31 +321,31 @@ describe('worker entrypoint', () => {
 	it('uses immutable caching for versioned PWA app assets only', async () => {
 		const versionedAppResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/app.js?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 		const unversionedAppResponse = await worker.fetch(
 			new Request('https://worker.test/notifications/app.js'),
-			createEnv() as never,
+			createEnv(),
 		);
 		const staleVersionAppResponse = await worker.fetch(
 			new Request('https://worker.test/notifications/app.js?v=stale'),
-			createEnv() as never,
+			createEnv(),
 		);
 		const versionedThemeResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 		const versionedIconResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/icon.svg?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 		const versionedCrateIconResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 		const versionedTouchIconResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
@@ -364,7 +364,7 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/health', {
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer ' },
 			}),
-			createEnv() as never,
+			createEnv(),
 		);
 
 		expect(response.status).toBe(401);
@@ -377,7 +377,7 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/sync/manifest', {
 				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
 			}),
-			createEnv({ DB: null as never }) as never,
+			createEnv({ DB: null as never }),
 		);
 
 		expect(response.status).toBe(503);
@@ -389,7 +389,7 @@ describe('worker entrypoint', () => {
 		try {
 			const response = await worker.fetch(
 				new Request('https://worker.test/notifications/vapid-public-key'),
-				createEnv({ DB: null as never }) as never,
+				createEnv({ DB: null as never }),
 			);
 
 			expect(response.status).toBe(500);
@@ -410,7 +410,7 @@ describe('worker entrypoint', () => {
 				},
 				body: 'hello',
 			}),
-			createEnv({ DB: null as never }) as never,
+			createEnv({ DB: null as never }),
 		);
 
 		expect(response.status).toBe(503);
@@ -420,13 +420,13 @@ describe('worker entrypoint', () => {
 	it('requires an authenticated session to subscribe', async () => {
 		const request = createSubscriptionRequest();
 		request.headers.delete('Authorization');
-		const response = await worker.fetch(request, createEnv() as never);
+		const response = await worker.fetch(request, createEnv());
 		expect(response.status).toBe(401);
 	});
 
 	it('registers a push subscription owned by the authenticated session', async () => {
 		const db = createDb({ authenticatedScope: 'reminders' });
-		const response = await worker.fetch(createSubscriptionRequest(), createEnv({ DB: db.db as unknown as D1Database }) as never);
+		const response = await worker.fetch(createSubscriptionRequest(), createEnv({ DB: db.db as unknown as D1Database }));
 		expect(response.status).toBe(200);
 		expect(db.subscriptions.size).toBe(1);
 	});
@@ -457,7 +457,7 @@ describe('worker entrypoint', () => {
 				},
 				body: JSON.stringify({ endpoint: 'https://fcm.googleapis.com/subscription' }),
 			}),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }),
 		);
 
 		expect(response.status).toBe(200);

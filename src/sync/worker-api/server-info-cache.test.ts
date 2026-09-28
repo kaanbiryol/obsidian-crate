@@ -7,7 +7,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function harness() {
   const transport = vi.fn<ApiHttpTransport>(async () => {
     const text = JSON.stringify({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] });
-    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
   });
   return { transport, http: new WorkerApiHttpClient('https://test', 'token', transport) };
 }
@@ -56,7 +56,7 @@ it('rejects a check superseded by new credentials', async () => {
 it('blocks mutations when the cached metadata is incompatible', async () => {
   const { http, transport } = harness();
   const text = JSON.stringify({ service: 'crate', serverVersion: 'future', protocol: { current: 99, oldestCompatible: 99 }, capabilities: [] });
-  transport.mockResolvedValue({ status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer });
+  transport.mockResolvedValue({ status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer });
   await http.getServerInfo();
   await expect(http.requestJson('/sync/batch-upload', { method: 'POST' })).rejects.toMatchObject({ code: 'protocol_incompatible' });
   expect(transport).toHaveBeenCalledTimes(1);

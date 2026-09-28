@@ -1,7 +1,7 @@
 import { corsResponse } from './cors';
 
 type LimitedBodyResult =
-	| { ok: true; bytes: Uint8Array }
+	| { ok: true; bytes: Uint8Array<ArrayBuffer> }
 	| { ok: false; response: Response };
 
 export async function readLimitedRequestBody(
@@ -23,7 +23,7 @@ export async function readLimitedRequestBody(
 	if (!request.body) return { ok: true, bytes: new Uint8Array() };
 
 	const reader = request.body.getReader();
-	const chunks: Uint8Array[] = [];
+	const chunks: Uint8Array<ArrayBuffer>[] = [];
 	let totalBytes = 0;
 	try {
 		while (true) {

@@ -114,7 +114,7 @@ it('recovers 24 small uploads in three requests using their original identities 
   const original = await manifest.uploadJournal.prepare(Array.from({ length: 24 }, (_, i) => ({ ...file, path: `${i}.md` })), 20000);
   const batchUpload = vi.fn(async (files: typeof original) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
   const uploadFile = vi.fn(); const getServerInfo = vi.fn(); const progress = vi.fn();
-  const recovery = new DurableUploads(manifest, { batchUpload, uploadFile, getServerInfo } as never, { putBase: async () => {} } as never, crypto.randomUUID());
+  const recovery = new DurableUploads(manifest, { batchUpload, uploadFile, getServerInfo }, { putBase: async () => {} } as never, crypto.randomUUID());
   await recovery.recover(progress);
   expect(batchUpload.mock.calls.map(([files]) => files.length)).toEqual([8, 8, 8]);
   expect(batchUpload.mock.calls.flatMap(([files]) => files.map(f => [f.operationId, f.content, f.expectedHash]))).toEqual(original.map(f => [f.operationId, f.content, f.expectedHash]));

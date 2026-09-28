@@ -53,7 +53,7 @@ it('freezes old writers, verifies paired bytes, migrates atomically and restores
     db.exec(`BEGIN; ${removeUpgradeGuards('auth_tokens')} ${await migrationTransaction(step, sql)} ${upgradeGuards('auth_tokens')} COMMIT;`);
     expect(db.prepare('SELECT version FROM crate_schema').get()).toMatchObject({ version: step.to });
     expect(db.prepare('SELECT scope FROM auth_tokens').get()).toMatchObject({ scope: 'vault' });
-    await releaseUpgradeGuards(api as unknown as CloudflareApiClient, 'account', 'database', fence);
+    await releaseUpgradeGuards(api, 'account', 'database', fence);
     expect(() => db.exec("UPDATE auth_tokens SET device_name='Updated'")).not.toThrow();
   } finally { now.mockRestore(); db.close(); }
 });

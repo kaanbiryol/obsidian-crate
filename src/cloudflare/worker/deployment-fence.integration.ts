@@ -265,7 +265,7 @@ it('keeps a failed live check locked until the published build is verified', asy
   const record = JSON.parse((await held())!.value) as Record<string, unknown>;
   expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
   expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('verify');
-  const recovery = await recoverDeployment(h.api as never, h.metadata, artifact().fingerprint);
+  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
   expect(recovery.status).toBe('verify');
   expect(await held()).not.toBeNull();
   await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);

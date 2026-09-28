@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { discoverFaviconUrl } from './favicon';
 
-const document = (head: string) => parseHTML(`<html><head>${head}</head><body></body></html>`).document as unknown as Document;
+const document = (head: string) => parseHTML(`<html><head>${head}</head><body></body></html>`).document;
 
 describe('favicon discovery', () => {
   it('resolves a declared icon against the final page URL and favors a general bitmap', () => {

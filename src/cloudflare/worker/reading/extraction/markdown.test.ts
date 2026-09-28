@@ -9,7 +9,7 @@ describe('Defuddle conversion failure', () => {
   it('rejects upstream HTML fallback without exposing article content in the error', () => {
     const document = parseHTML('<html><body><p>Private article text</p></body></html>').document;
     vi.mocked(createMarkdownContent).mockReturnValue('Partial conversion completed with errors. Original HTML:\n\n<p>Private article text</p>');
-    expect(() => articleMarkdown(document.body as unknown as HTMLElement, 'https://example.com/'))
+    expect(() => articleMarkdown(document.body, 'https://example.com/'))
       .toThrow('Article Markdown conversion failed');
   });
 });

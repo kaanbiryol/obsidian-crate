@@ -7,7 +7,7 @@ import { hasLocalFileChanges } from './local-file-changes';
 import { LocalManifest } from './manifest';
 import { processDiff } from './transfer-process';
 
-const bytes = (text: string) => new TextEncoder().encode(text).buffer as ArrayBuffer;
+const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 
 it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even after a persisted checkpoint restart', async mode => {
   const h = createTransferHarness();

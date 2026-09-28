@@ -49,8 +49,8 @@ describe('planner local diff helpers', () => {
 	});
 
 	it('detects changed local files by hash and skips unchanged ones', async () => {
-		const unchangedContent = new TextEncoder().encode('same').buffer as ArrayBuffer;
-		const changedContent = new TextEncoder().encode('changed').buffer as ArrayBuffer;
+		const unchangedContent = new TextEncoder().encode('same').buffer;
+		const changedContent = new TextEncoder().encode('changed').buffer;
 		const unchangedHash = await computeHash(unchangedContent);
 
 		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([

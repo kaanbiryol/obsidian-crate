@@ -20,7 +20,7 @@ describe('transfer download/process helpers', () => {
 	it('saves downloaded content and records manifest entry', async () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
-		const content = new TextEncoder().encode('hello').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('hello').buffer;
 
 		harness.vault.createBinary.mockImplementation(async () => { harness.adapter.readBinary.mockResolvedValue(content); });
 		const hash = await computeHash(content);
@@ -37,8 +37,8 @@ describe('transfer download/process helpers', () => {
 
 	it('processes conflict diffs by writing conflict copy and remote replacement', async () => {
 		const harness = createTransferHarness();
-		const local = new TextEncoder().encode('local').buffer as ArrayBuffer;
-		const remote = new TextEncoder().encode('remote').buffer as ArrayBuffer;
+		const local = new TextEncoder().encode('local').buffer;
+		const remote = new TextEncoder().encode('remote').buffer;
 		harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/a.md', extension: 'md' });
 		harness.adapter.readBinary.mockResolvedValue(local);
 		harness.api.downloadFile.mockResolvedValue({
@@ -69,7 +69,7 @@ describe('transfer download/process helpers', () => {
 
 	it('uploads planned full-sync diffs even when the local manifest hash already matches', async () => {
 		const harness = createTransferHarness();
-		const content = new TextEncoder().encode('local').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('local').buffer;
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/a.md',
 			extension: 'md',
@@ -108,7 +108,7 @@ describe('transfer download/process helpers', () => {
 
 	it('flags a successful upload that resolves a concurrent remote delete', async () => {
 		const harness = createTransferHarness();
-		const content = new TextEncoder().encode('local edit').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('local edit').buffer;
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/a.md',
 			extension: 'md',
@@ -144,7 +144,7 @@ describe('transfer download/process helpers', () => {
 
 	it('moves a local file to trash when the remote delete wins', async () => {
 		const harness = createTransferHarness();
-		const content = new TextEncoder().encode('base').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('base').buffer;
 		const hash = await computeHash(content);
 		const file = { path: 'notes/a.md', extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(file);
@@ -169,8 +169,8 @@ describe('transfer download/process helpers', () => {
 
 	it('uploads a local edit made after a full-sync remote delete was planned', async () => {
 		const harness = createTransferHarness();
-		const baseContent = new TextEncoder().encode('base').buffer as ArrayBuffer;
-		const changedContent = new TextEncoder().encode('edited during sync').buffer as ArrayBuffer;
+		const baseContent = new TextEncoder().encode('base').buffer;
+		const changedContent = new TextEncoder().encode('edited during sync').buffer;
 		const baseHash = await computeHash(baseContent);
 		const changedHash = await computeHash(changedContent);
 		const file = {
@@ -236,9 +236,9 @@ describe('transfer download/process helpers', () => {
 
 	it('defers a remote download when the local file changed after planning', async () => {
 		const harness = createTransferHarness();
-		const plannedLocal = new TextEncoder().encode('planned local').buffer as ArrayBuffer;
-		const changedLocal = new TextEncoder().encode('changed during sync').buffer as ArrayBuffer;
-		const remote = new TextEncoder().encode('remote').buffer as ArrayBuffer;
+		const plannedLocal = new TextEncoder().encode('planned local').buffer;
+		const changedLocal = new TextEncoder().encode('changed during sync').buffer;
+		const remote = new TextEncoder().encode('remote').buffer;
 		const path = 'notes/race.md';
 		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
 		harness.adapter.readBinary.mockResolvedValue(changedLocal);
@@ -269,8 +269,8 @@ describe('transfer download/process helpers', () => {
 
 	it('returns a deferred outcome when a locally deleted path is recreated during download', async () => {
 		const harness = createTransferHarness();
-		const lateLocal = new TextEncoder().encode('created during sync').buffer as ArrayBuffer;
-		const remote = new TextEncoder().encode('remote edit').buffer as ArrayBuffer;
+		const lateLocal = new TextEncoder().encode('created during sync').buffer;
+		const remote = new TextEncoder().encode('remote edit').buffer;
 		const path = 'notes/race.md';
 		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
 		harness.adapter.readBinary
@@ -310,7 +310,7 @@ describe('transfer download/process helpers', () => {
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.api.batchDownload.mockRejectedValue(new Error('batch endpoint not available'));
 		harness.api.downloadFile.mockResolvedValue({
-			content: new TextEncoder().encode('ok').buffer as ArrayBuffer,
+			content: new TextEncoder().encode('ok').buffer,
 			contentType: 'text/plain',
 			size: 2,
 		});

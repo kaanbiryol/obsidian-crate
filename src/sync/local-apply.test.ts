@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from './local-apply';
 import { computeHash } from './hasher';
 
-const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer as ArrayBuffer;
+const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer;
 const decode = (content: ArrayBuffer): string => new TextDecoder('utf-8', { ignoreBOM: true }).decode(content);
 
 function harness(path: string, initial: ArrayBuffer) {
