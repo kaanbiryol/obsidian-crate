@@ -1,3 +1,4 @@
+import { parseDevelopmentBuild, type DevelopmentBuild } from './cloudflare/server-build';
 export const CRATE_SERVICE_ID = 'crate';
 
 export interface CrateProtocolRange {
@@ -12,6 +13,7 @@ export interface CrateServerInfo {
 	readonly capabilities: readonly string[];
 	readonly reminderOperationDay?: number;
 	readonly serverRevision?: number;
+	readonly developmentBuild?: DevelopmentBuild;
 	readonly pwaAssetVersion?: string;
 	readonly deploymentFingerprint?: string;
 }
@@ -72,6 +74,7 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		},
 		capabilities: [...info.capabilities],
 		...(typeof info.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(info.pwaAssetVersion) ? { pwaAssetVersion: info.pwaAssetVersion } : {}),
+		...(parseDevelopmentBuild(info.developmentBuild) ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}),
 		...(isPositiveInteger(info.serverRevision) ? { serverRevision: info.serverRevision } : {}),
 		...(typeof info.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
 		...(isPositiveInteger(info.reminderOperationDay) ? { reminderOperationDay: info.reminderOperationDay } : {}),

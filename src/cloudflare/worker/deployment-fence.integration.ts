@@ -572,3 +572,42 @@ it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_
   expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'retained-test'").first()).toEqual({ value: 'retained' });
   expect(h.api.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
  });
+
+it('deploys successive development builds, promotes to stable, and rejects reuse or rollback', async () => {
+  const h = await harness();
+  const dev = (number: number, hash: string) => ({ ...artifact('0.1.0', hash.repeat(64)), development: { number, worker: h.metadata.workerName } });
+  await h.deploy(dev(1, 'a'));
+  await h.deploy(dev(2, 'b'));
+  await expect(h.deploy(dev(1, 'a'))).rejects.toThrow('different build');
+  await expect(h.deploy(dev(2, 'c'))).rejects.toThrow('different build');
+  expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision, fingerprint: 'b'.repeat(64) });
+  const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
+  expect(JSON.parse(saved!.value)).toEqual({ fingerprint: 'b'.repeat(64), development: { number: 2, worker: h.metadata.workerName } });
+  await h.deploy(artifact('0.1.0', 'c'.repeat(64)));
+  await expect(h.deploy(dev(3, 'd'))).rejects.toThrow('different build');
+  await expect(h.deploy(artifact('0.1.0', 'e'.repeat(64)))).rejects.toThrow('different build');
+  expect(await held()).toBeNull();
+});
+
+it('rejects development publication to another Worker before any provider mutation', async () => {
+  const h = await harness();
+  await expect(h.deploy({ ...artifact(), development: { number: 1, worker: `crate-${'b'.repeat(16)}` } } as ReturnType<typeof artifact>)).rejects.toThrow('designated Worker');
+  expect(h.api.queryD1).not.toHaveBeenCalled();
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+});
+
+it('retains a development identity when an interrupted publication is completed by a stable plugin', async () => {
+  const h = await harness();
+  const development = { number: 7, worker: h.metadata.workerName };
+  const build = { ...artifact('0.1.0', 'a'.repeat(64)), development };
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('route not ready'));
+  await expect(h.deploy(build)).rejects.toThrow();
+  h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion, developmentBuild: development } as Awaited<ReturnType<typeof h.api.verifyPublishedWorkerDeployment>>);
+  const pending = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+  await completePublishedDeployment(h.api, h.metadata, artifact(), pending.resumeValue!);
+  const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();
+  expect(JSON.parse(saved!.value)).toEqual({ fingerprint: build.fingerprint, development });
+  expect(h.api.uploadWorker).toHaveBeenCalledOnce();
+  expect(await held()).toBeNull();
+  await h.deploy(artifact());
+});

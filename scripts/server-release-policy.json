@@ -1,0 +1,5 @@
+{
+  "baselineCommit": "e220ae615a7c3727b98564fa3603bc4c28709a4c",
+  "reason": "Start public revisions at 1 after the intentional pre-launch reset. Older prereleases belong to the retired numbering sequence.",
+  "initialRevision": 1
+}

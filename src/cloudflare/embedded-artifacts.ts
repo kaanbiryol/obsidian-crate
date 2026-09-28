@@ -1,3 +1,4 @@
+import { DEVELOPMENT_BUILD } from './server-build';
 import {
 	artifactFingerprint,
 	artifactVersion,
@@ -11,12 +12,14 @@ import { decodeAndVerifyArtifacts, type CloudflareDeploymentArtifacts } from './
 let decodedArtifacts: Promise<CloudflareDeploymentArtifacts> | null = null;
 
 export const EMBEDDED_CLOUDFLARE_ARTIFACT = Object.freeze({
-	version: artifactVersion,
+	development: DEVELOPMENT_BUILD ?? undefined,
+		version: artifactVersion,
 	fingerprint: artifactFingerprint,
 });
 
 export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentArtifacts> {
 	decodedArtifacts ??= decodeAndVerifyArtifacts({
+		development: DEVELOPMENT_BUILD ?? undefined,
 		version: artifactVersion,
 		fingerprint: artifactFingerprint,
 		workerBundleGzipBase64,

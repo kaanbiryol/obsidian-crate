@@ -76,7 +76,7 @@ async function runBuild() {
 			buildQueued = false;
 			console.log('Building development plugin...');
 
-			const workerExitCode = await runNpmScript('build:worker');
+			const workerExitCode = await runNpmScript('build:worker:dev');
 			if (workerExitCode !== 0) {
 				console.error(`Worker build failed with exit code ${workerExitCode}. Watching for changes...`);
 				continue;

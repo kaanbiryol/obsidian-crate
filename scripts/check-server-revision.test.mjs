@@ -32,7 +32,7 @@ function fixture() {
 	const check = () => checkServerRevision(root, base, inputs);
 	const ci = (name, event, extra = {}) => {
 		write('.event.json', event);
-		return revisionBase(root, { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: name, GITHUB_EVENT_PATH: join(root, '.event.json'), ...extra });
+		return revisionBase(root, { CRATE_PUBLISHED_RELEASES: JSON.stringify(git('tag').split('\n').filter(Boolean).map(tagName => ({ tagName, isDraft: false }))), GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: name, GITHUB_EVENT_PATH: join(root, '.event.json'), ...extra });
 	};
 	return { root, write, git, commit, release, base, inputs, check, ci };
 }
@@ -95,8 +95,8 @@ test('recognizes the initial manifest without silently accepting a missing Git b
 	const base = h.commit();
 	h.release();
 	assert.equal(checkServerRevision(h.root, base, h.inputs).bootstrap, true);
-	assert.throws(() => revisionBase(h.root, {}, 'missing-ref'));
-	assert.equal(revisionBase(h.root, {}), base);
+	assert.throws(() => revisionBase(h.root, { CRATE_PUBLISHED_RELEASES: '[]' }, 'missing-ref'));
+	assert.equal(revisionBase(h.root, { CRATE_PUBLISHED_RELEASES: '[]' }), h.base);
 });
 
 test('checks an entire multi-commit PR and push, including when the last commit changes only docs', () => {
@@ -121,7 +121,7 @@ test('uses the default branch for a first branch push and previous release for t
 	assert.equal(h.ci('push', { ref: 'refs/heads/feature', before: '0'.repeat(40), repository: { default_branch: 'main' } }), h.base);
 	assert.equal(h.ci('push', { ref: 'refs/tags/0.2.0' }), h.base);
 	assert.equal(h.ci('workflow_dispatch', {}, { RELEASE_TAG: '0.2.0' }), h.base);
-	assert.throws(() => h.ci('unknown', {}), /No server revision baseline/);
+	assert.equal(h.ci('unknown', {}), h.base);
 });
 
 test('collects transitive deployment/build imports plus runtime graph and raw Sass files', async () => {
@@ -147,4 +147,64 @@ test('allows only the marked pre-launch baseline to reset to schema one', () => 
 	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
 	h.release({ revision: 3, schemaVersion: 2, minimumSchemaVersion: 1 });
 	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
+});
+
+
+test('keeps one public revision across development commits and rejects skipped release numbers', () => {
+  const h = fixture();
+  h.git('tag', '0.1.0');
+  h.release({ revision: 2 });
+  h.write('src/shared.ts', 'first development change');
+  h.commit();
+  h.write('src/shared.ts', 'tenth development change');
+  h.commit();
+  const baseline = h.ci('push', { ref: 'refs/heads/main', before: h.git('rev-parse', 'HEAD^') });
+  assert.equal(baseline, h.base);
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  h.release({ revision: 3 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /exactly one/);
+});
+
+test('ignores draft release tags when selecting the published baseline', () => {
+  const h = fixture();
+  h.git('tag', '0.1.0');
+  h.release({ revision: 2 }); h.commit(); h.git('tag', '0.2.0');
+  assert.equal(revisionBase(h.root, { CRATE_PUBLISHED_RELEASES: JSON.stringify([
+    { tagName: '0.1.0', isDraft: false }, { tagName: '0.2.0', isDraft: true },
+  ]) }), h.base);
+});
+
+
+test('pins an explicit post-reset baseline until a new release is published', () => {
+  const h = fixture();
+  h.git('tag', '0.1.0');
+  h.release({ revision: 2 });
+  const baseline = h.commit();
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline });
+  h.release({ revision: 3 });
+  h.commit();
+  assert.equal(h.ci('push', {}), baseline);
+  h.git('tag', '0.2.0');
+  assert.equal(h.ci('push', {}), h.git('rev-parse', 'HEAD'));
+  h.write('scripts/server-release-policy.json', { baselineCommit: 'missing' });
+  assert.throws(() => h.ci('push', {}), /Invalid server release baseline/);
+});
+
+
+test('starts an explicit pre-launch reset at one and enforces increments after publication', () => {
+  const h = fixture();
+  h.release({ revision: 3 });
+  const baseline = h.commit();
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 1 });
+  h.release({ revision: 1 });
+  h.write('src/shared.ts', 'new launch implementation');
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  h.release({ revision: 2 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /first public server release/);
+  h.release({ revision: 1 });
+  const published = h.commit();
+  h.write('src/shared.ts', 'next release implementation');
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /without increasing revision/);
+  h.release({ revision: 2 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
 });

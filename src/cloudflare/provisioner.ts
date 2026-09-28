@@ -126,6 +126,7 @@ export async function provisionCloudflareDeployment(input: {
   beforeDatabaseUpgrade?: (migrations: readonly DatabaseMigration[]) => Promise<void>;
   resumeUpdateValue?: string;
 }): Promise<string> {
+  if (input.artifacts.development && input.artifacts.development.worker !== input.metadata.workerName) throw new Error('This development build is restricted to its designated Worker.');
   if (input.resumeUpdateValue) {
     const record = JSON.parse(input.resumeUpdateValue) as Record<string, unknown>;
     if (record.kind !== 'update' || record.worker !== input.metadata.workerName

@@ -1,3 +1,4 @@
+import { readBuiltIdentity } from './development-build.mjs';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
@@ -24,7 +25,8 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 			const workerBundleSha256 = sha256(workerBundle);
 			const d1Schema = readFileSync(resolve(rootDir, 'src/cloudflare/schema.sql'), 'utf8');
 			const d1SchemaSha256 = sha256(d1Schema);
-			const serverRelease = JSON.parse(readFileSync(resolve(rootDir, 'src/cloudflare/server-release.json'), 'utf8'));
+			if (readBuiltIdentity(rootDir).development && process.env.CRATE_ALLOW_DEV_BUILD !== '1') throw new Error('Development Worker cannot be packaged as a stable plugin. Use npm run build:dev.');
+      const serverRelease = JSON.parse(readFileSync(resolve(rootDir, 'src/cloudflare/server-release.json'), 'utf8'));
       if (!Number.isSafeInteger(serverRelease.revision) || serverRelease.revision < 1
         || !Number.isSafeInteger(serverRelease.schemaVersion) || serverRelease.schemaVersion < 1
         || !Number.isSafeInteger(serverRelease.minimumSchemaVersion) || serverRelease.minimumSchemaVersion < 1

@@ -29,7 +29,7 @@
 		"test:server-package": "npm run build:server && node --test scripts/server-package.test.mjs",
 		"test:docker": "docker compose build && node --test scripts/docker-server.test.mjs",
 		"build:plugin": "vite build",
-		"build:plugin:dev": "vite build --mode development",
+		"build:plugin:dev": "CRATE_ALLOW_DEV_BUILD=1 vite build --mode development",
 		"preview:pwa": "node scripts/pwa-preview.mjs",
 		"test:pwa-preview": "node scripts/pwa-smoke-test.mjs",
 		"test:pwa-browser": "node scripts/pwa-browser-tests.mjs",
@@ -69,7 +69,7 @@
 		"benchmark:sync": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync-capacity.integration.ts --reporter=verbose",
 		"release:candidate": "node scripts/release-candidate.mjs",
 		"check:server-revision": "npm run build:worker && node scripts/check-server-revision.mjs",
-		"test:server-revision": "node --test scripts/check-server-revision.test.mjs",
+		"test:server-revision": "node --test scripts/check-server-revision.test.mjs scripts/development-build.test.mjs",
 		"test:file-history-browser": "node scripts/file-history-test.mjs",
 		"test:activity-browser": "node scripts/activity-empty-layout-test.mjs && node scripts/activity-diff-test.mjs && node scripts/conflict-review-test.mjs",
 		"test:editor-compat": "node scripts/editor-contract-compare.mjs",
@@ -80,7 +80,9 @@
 		"test:reading-extraction": "tsc -p tests/reading-extraction/tsconfig.json --noEmit && node --test scripts/reading-extraction.test.mjs",
 		"test:reading": "npm run build:worker && npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-shortcut-server.test.mjs scripts/reading-browser.test.mjs scripts/reading-consent.browser.test.mjs scripts/reading-optimistic.browser.test.mjs scripts/reading-highlights.browser.test.mjs scripts/reading-shortcut-browser.test.mjs",
 		"build:reading-shortcut": "node scripts/sign-reading-shortcut.mjs",
-		"preview:reading": "npm run build:worker && node scripts/reading-preview.mjs"
+		"preview:reading": "npm run build:worker && node scripts/reading-preview.mjs",
+		"build:worker:dev": "node scripts/build-worker.mjs --development",
+		"build:dev": "npm run build:worker:dev && npm run typecheck && CRATE_ALLOW_DEV_BUILD=1 npm run build:plugin:dev"
 	},
 	"keywords": [
 		"obsidian",

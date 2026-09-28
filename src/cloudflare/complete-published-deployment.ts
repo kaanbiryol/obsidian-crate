@@ -1,8 +1,9 @@
+import { canReplaceServerBuild } from './server-build';
 import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
-import { inspectDeploymentDatabase, recordDeploymentRelease } from './deployment-database';
+import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild } from './deployment-database';
 import { SERVER_RELEASE } from './database-upgrades';
 import { type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation, withDeploymentFence } from './deployment-fence';
 
@@ -51,15 +52,19 @@ export async function completePublishedDeployment(
 			|| db?.type !== 'd1' || db.id !== databaseId || bucket?.type !== 'r2_bucket' || bucket.bucket_name !== target.r2BucketName) {
 			throw new Error('The published Worker or its storage changed. Recovery stopped.');
 		}
-		const schema = { api, accountId, databaseId, artifacts: publishedArtifacts };
+		const live = await api.verifyPublishedWorkerDeployment(`https://${target.workerName}.${target.workersSubdomain}.workers.dev`, fingerprint);
+    if (live.developmentBuild && live.developmentBuild.worker !== target.workerName) throw new Error('The published development build belongs to another Worker.');
+    publishedArtifacts.development = live.developmentBuild;
+    const schema = { api, accountId, databaseId, artifacts: publishedArtifacts };
 		if (await inspectDeploymentDatabase(schema) !== SERVER_RELEASE.schemaVersion) {
 			throw new Error('The published database needs a different schema. Use its matching recovery build.');
 		}
 		await api.queryD1(accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
-		const live = await api.verifyPublishedWorkerDeployment(`https://${target.workerName}.${target.workersSubdomain}.workers.dev`, fingerprint);
 		const releases = (await api.queryD1(accountId, databaseId, 'SELECT revision, fingerprint FROM crate_release WHERE id = 1;')).flatMap(row => row.results ?? []);
 		if (live.schemaVersion !== SERVER_RELEASE.schemaVersion || !Number.isSafeInteger(live.revision) || live.revision < 1 || live.revision > SERVER_RELEASE.revision
-			|| releases.some(saved => Number(saved.revision) > live.revision || saved.revision === live.revision && saved.fingerprint !== fingerprint)) {
+			|| (await Promise.all(releases.map(async saved => !canReplaceServerBuild({ revision: Number(saved.revision), fingerprint: String(saved.fingerprint),
+        development: await readDeploymentBuild(schema, String(saved.fingerprint)) },
+        { revision: live.revision, fingerprint, development: live.developmentBuild })))).some(Boolean)) {
 			throw new Error('The published release conflicts with the saved database release. Recovery stopped.');
 		}
 		await releaseUpgradeGuards(api, accountId, databaseId, fence);

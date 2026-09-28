@@ -395,7 +395,7 @@ export class CloudflareApiClient {
     await verifyWorkerDeployment(this.transport, origin, fingerprint);
   }
 
-  async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number }> {
+  async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: import('./server-build').DevelopmentBuild }> {
     return verifyWorkerDeployment(this.transport, origin, fingerprint, true);
   }
 

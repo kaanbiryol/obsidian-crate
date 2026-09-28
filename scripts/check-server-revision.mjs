@@ -8,35 +8,29 @@ const schemaPath = 'src/cloudflare/schema.sql';
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trimEnd();
 const commit = (root, ref) => git(root, 'rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`);
 
-/** CI must compare the complete change, not just the tip commit of a PR/push. */
+/** Published releases, rather than development commits, define the revision baseline. */
 export function revisionBase(root, env = process.env, explicit) {
-	if (explicit) return commit(root, explicit);
-	if (env.GITHUB_ACTIONS !== 'true') return commit(root, 'HEAD');
-	const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
-	if (env.GITHUB_EVENT_NAME === 'pull_request') {
-		return git(root, 'merge-base', 'HEAD', commit(root, event.pull_request.base.sha));
-	}
-	if (env.GITHUB_EVENT_NAME === 'push' && event.ref?.startsWith('refs/heads/')) {
-		if (event.before && !/^0+$/.test(event.before)) return commit(root, event.before);
-		// The first push of a branch has no "before" commit.
-		const branch = event.repository?.default_branch;
-		if (branch) {
-			const base = git(root, 'merge-base', 'HEAD', commit(root, `refs/remotes/origin/${branch}`));
-			if (base !== commit(root, 'HEAD')) return base;
-		}
-	} else if (!(env.GITHUB_EVENT_NAME === 'push' && event.ref?.startsWith('refs/tags/'))
-		&& !(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.RELEASE_TAG)) {
-		throw new Error('No server revision baseline for this CI event; supply --base explicitly.');
-	}
-	const parents = git(root, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ').slice(1);
-	if (!parents.length) return commit(root, 'HEAD'); // First repository commit.
-	// Releases also catch changes accumulated since the previous release tag.
-	if (event.ref?.startsWith('refs/tags/') || env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
-		const tags = git(root, 'tag', '--merged', parents[0], '--sort=-version:refname').split('\n');
-		const previous = tags.find(tag => /^\d+\.\d+\.\d+$/.test(tag));
-		if (previous) return commit(root, previous);
-	}
-	return parents[0];
+  if (explicit) return commit(root, explicit);
+  const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')) : {};
+  const releaseRun = Boolean(env.RELEASE_TAG) || event.ref?.startsWith('refs/tags/');
+  const head = commit(root, 'HEAD');
+  let baseline;
+  try {
+    const policy = JSON.parse(readFileSync(resolve(root, 'scripts/server-release-policy.json'), 'utf8'));
+    if (!/^[a-f0-9]{40}$/.test(policy.baselineCommit)) throw new Error('Invalid server release baseline');
+    baseline = commit(root, policy.baselineCommit);
+    if (git(root, 'merge-base', head, baseline) !== baseline) throw new Error('Server release baseline is not an ancestor of HEAD');
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const releases = env.CRATE_PUBLISHED_RELEASES !== undefined ? JSON.parse(env.CRATE_PUBLISHED_RELEASES)
+    : JSON.parse(execFileSync('gh', ['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  const published = new Set(releases.filter(release => !release.isDraft).map(release => release.tagName));
+  const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag) && (!baseline || git(root, 'merge-base', baseline, commit(root, tag)) === baseline));
+  const previous = tags.find(tag => /^\d+\.\d+\.\d+$/.test(tag) && (!releaseRun || commit(root, tag) !== head));
+  if (previous) return commit(root, previous);
+  if (baseline) return baseline;
+  // Before the first release, freeze the earliest manifest as the development baseline.
+  const introductions = git(root, 'log', '--reverse', '--format=%H', '--diff-filter=A', 'HEAD', '--', releasePath).split('\n').filter(Boolean);
+  return introductions[0] ?? head;
 }
 
 function manifest(text) {
@@ -76,6 +70,19 @@ export function checkServerRevision(root, base, inputs) {
 	const current = manifest(read(releasePath));
 	if (!previousFiles.has(releasePath)) return { baseline: base, revision: current.revision, bootstrap: true, changed: [] };
 	const before = manifest(git(root, 'show', `${base}:${releasePath}`));
+  // The pinned pre-launch commit is a source/schema baseline, not a published release.
+  let initialRevision;
+  try {
+    const policy = JSON.parse(readFileSync(resolve(root, 'scripts/server-release-policy.json'), 'utf8'));
+    if (policy.baselineCommit === base && policy.initialRevision !== undefined) {
+      if (policy.initialRevision !== 1) throw new Error('The initial public server revision must be 1.');
+      initialRevision = policy.initialRevision;
+    }
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (initialRevision !== undefined) {
+    if (current.revision !== initialRevision) throw new Error('The first public server release must use revision 1.');
+    before.revision = 0;
+  }
 	if (current.revision < before.revision) throw new Error('Server revision cannot decrease.');
 	const launchReset = before.baselineSchemaVersion === 4 && before.schemaVersion === 4
 		&& before.minimumSchemaVersion === 4 && before.migrations.length === 0
@@ -106,6 +113,7 @@ export function checkServerRevision(root, base, inputs) {
 	if (changedPaths.length && current.revision <= before.revision) {
 		throw new Error(`Server inputs changed without increasing revision in ${releasePath}:\n${changedPaths.map(path => `  ${path}`).join('\n')}`);
 	}
+	if (current.revision > before.revision + 1) throw new Error('Public server revision must advance by exactly one from the release baseline.');
 	return { baseline: base, revision: current.revision, bootstrap: false, changed: changedPaths };
 }
 

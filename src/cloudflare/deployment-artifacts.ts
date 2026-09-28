@@ -1,4 +1,6 @@
+import type { DevelopmentBuild } from './server-build';
 export interface CloudflareDeploymentArtifacts {
+	development?: DevelopmentBuild;
 	version: string;
 	fingerprint: string;
 	workerBundle: string;
@@ -24,6 +26,7 @@ export async function sha256Hex(content: string): Promise<string> {
 }
 
 export async function decodeAndVerifyArtifacts(input: {
+	development?: DevelopmentBuild;
 	version: string;
 	fingerprint: string;
 	workerBundleGzipBase64: string;
@@ -46,6 +49,7 @@ export async function decodeAndVerifyArtifacts(input: {
 	}
 
 	return {
+		development: input.development,
 		version: input.version,
 		fingerprint: input.fingerprint,
 		workerBundle,
