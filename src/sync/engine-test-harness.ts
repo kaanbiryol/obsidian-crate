@@ -168,7 +168,7 @@ function createSettings(): CrateSettings {
 }
 
 export function toArrayBuffer(text: string): ArrayBuffer {
-	return new TextEncoder().encode(text).buffer as ArrayBuffer;
+	return new TextEncoder().encode(text).buffer;
 }
 
 export function createNamedAbortError(message = 'Sync request aborted'): Error {

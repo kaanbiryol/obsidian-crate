@@ -83,7 +83,7 @@ it('rechecks ownership after validating keys before dispatching the delete', asy
 			if (++reads === 2) await h.save({ ...h.record, owner: crypto.randomUUID() });
 			return statement.bind(...args).first();
 		} }) } as D1PreparedStatement;
-	} } as D1Database;
+	} };
 	expect((await worker.fetch(h.request(), { ...h.bindings, DB: db })).status).toBe(409);
 	expect(h.bucket.delete).not.toHaveBeenCalled();
 });

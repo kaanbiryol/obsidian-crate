@@ -19,7 +19,7 @@ describe('discoverCloudflareDeployments', () => {
 			})),
 		};
 
-		const result = await discoverCloudflareDeployments(api as never, {
+		const result = await discoverCloudflareDeployments(api, {
 			id: 'account-id',
 			name: 'Personal',
 		});

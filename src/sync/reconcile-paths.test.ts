@@ -7,7 +7,7 @@ import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import type { SyncResult } from './types';
 
 function bytes(text: string): ArrayBuffer {
-	return new TextEncoder().encode(text).buffer as ArrayBuffer;
+	return new TextEncoder().encode(text).buffer;
 }
 
 async function createHarness(options: {

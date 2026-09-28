@@ -45,9 +45,9 @@ export async function sendPushNotificationWithoutContact(
 ): Promise<Response> {
 	if (new TextEncoder().encode(payload).byteLength > MAX_PUSH_PAYLOAD_BYTES) throw new PushPayloadError('Push payload exceeds the Web Push byte limit');
 	if (!isValidPushEndpoint(subscription.endpoint)) throw new Error('Push service is not supported');
-	const [jwt, encryptedPayload, exportedPublicKey] = await Promise.all([
+	const encryptedPayload = encrypt(subscription.keys.p256dh, subscription.keys.auth, payload, 'aes128gcm').cipherText;
+	const [jwt, exportedPublicKey] = await Promise.all([
 		createVapidAuthorizationToken(vapidKeys.privateKey, new URL(subscription.endpoint)),
-		encrypt(subscription.keys.p256dh, subscription.keys.auth, payload, 'aes128gcm').cipherText,
 		crypto.subtle.exportKey('raw', vapidKeys.publicKey),
 	]);
 	const headers = new Headers({
@@ -65,6 +65,6 @@ export async function sendPushNotificationWithoutContact(
 		redirect: 'manual',
 		signal: AbortSignal.timeout(10_000),
 		headers,
-		body: encryptedPayload,
+		body: new Uint8Array(encryptedPayload),
 	}));
 }

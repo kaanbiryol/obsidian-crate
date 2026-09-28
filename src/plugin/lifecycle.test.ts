@@ -137,7 +137,7 @@ beforeEach(() => {
 	cloudflareDeploymentDestroy.mockReset();
 	createCloudflareDeploymentService.mockClear();
 	secretStorageHas.mockReset().mockReturnValue(false);
-	vi.stubGlobal('DocumentFragment', FakeDocumentFragment as unknown as typeof DocumentFragment);
+	vi.stubGlobal('DocumentFragment', FakeDocumentFragment);
 });
 
 afterEach(() => {

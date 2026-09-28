@@ -191,9 +191,9 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					}
 					return {};
 				}),
-				first: vi.fn(async <T = Record<string, unknown>>() => {
-					if (sql.startsWith('SELECT 1 WHERE')) return { valid: 1 } as T;
-					if (sql.startsWith('SELECT request_hash, response_json FROM upload_operations')) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null)) as T | null;
+				first: vi.fn(async () => {
+					if (sql.startsWith('SELECT 1 WHERE')) return { valid: 1 };
+					if (sql.startsWith('SELECT request_hash, response_json FROM upload_operations')) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null));
 					if (sql.includes('FROM files WHERE portable_path = ? AND path = ?')) {
 						const path = getBoundString(statement._args, 1);
 						const file = files.get(path);
@@ -205,7 +205,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 							hash: file.hash,
 							size: file.size,
 							storage_key: file.storageKey,
-						} as T;
+						};
 					}
 
 					return null;
@@ -223,14 +223,14 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 								storage_key: file.storageKey,
 							}] : [];
 						});
-						return { results: results as T[] };
+						return { results: results };
 					}
 					return { results: [] as T[] };
 				}) as MockD1Statement['all'],
 			};
 			return statement;
 		}),
-		batch: vi.fn(async <T = unknown>(statements: CompatibleD1PreparedStatement[]) => {
+		batch: vi.fn(async (statements: CompatibleD1PreparedStatement[]) => {
 			if (options?.failBatch) {
 				throw new Error('D1 unavailable');
 			}
@@ -284,7 +284,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 				results.push({ meta: { changes } });
 			}
 
-			return results as T[];
+			return results;
 		}) as MockD1Database['batch'],
 		exec: vi.fn(async () => ({})),
 	};

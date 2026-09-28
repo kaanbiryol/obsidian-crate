@@ -16,7 +16,7 @@ describe('registerCloudflareAuthorizedDevice', () => {
 			.mockResolvedValueOnce([]);
 
 		await registerCloudflareAuthorizedDevice({
-			api: { queryD1 } as never,
+			api: { queryD1 },
 			accountId: 'account-id',
 			databaseId: 'database-id',
 			device,
@@ -38,7 +38,7 @@ describe('registerCloudflareAuthorizedDevice', () => {
 			.mockResolvedValueOnce([]);
 
 		await registerCloudflareAuthorizedDevice({
-			api: { queryD1 } as never,
+			api: { queryD1 },
 			accountId: 'account-id',
 			databaseId: 'database-id',
 			device,

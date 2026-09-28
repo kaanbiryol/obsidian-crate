@@ -28,7 +28,7 @@ describe('transfer prepare helpers', () => {
 
 	it('skips upload when manifest hash already matches', async () => {
 		const harness = createTransferHarness();
-		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('same').buffer as ArrayBuffer);
+		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('same').buffer);
 		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 4, mtime: 1 });
 		harness.localManifest.hashMatches.mockReturnValue(true);
 
@@ -45,7 +45,7 @@ describe('transfer prepare helpers', () => {
 
 	it('prepares text files with ArrayBuffer content and content type', async () => {
 		const harness = createTransferHarness();
-		const content = new TextEncoder().encode('hello world').buffer as ArrayBuffer;
+		const content = new TextEncoder().encode('hello world').buffer;
 		harness.adapter.readBinary.mockResolvedValue(content);
 		const mtime = Date.now();
 		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 11, mtime });
@@ -89,7 +89,7 @@ describe('transfer prepare helpers', () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 7, mtime: 123 });
-		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('{"a":1}').buffer as ArrayBuffer);
+		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('{"a":1}').buffer);
 
 		const result = await prepareUploadFromPath(harness.context, HIDDEN_CONFIG_PATH);
 

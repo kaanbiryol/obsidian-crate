@@ -56,7 +56,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       if (!['favorite', 'tags', 'reading_status', 'highlights'].includes(field)) throw new ReadingError('Unsupported Reading change.');
       if (JSON.stringify(source.item[field as keyof ReadingChanges]) !== JSON.stringify(before[field])) throw new ReadingError('This item changed on another device. Refresh before editing it.', 409, 'reading_conflict');
     }
-    try { content = updateReadingNote(source.content, source.item.crate_reading_id, changes as ReadingChanges); }
+    try { content = updateReadingNote(source.content, source.item.crate_reading_id, changes); }
     catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Invalid Reading change.'); }
   }
   const response = { saved: true, id: source.item.crate_reading_id };

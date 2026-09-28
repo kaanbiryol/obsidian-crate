@@ -9,7 +9,7 @@ function mockTransport(...responses: Response[]) {
 	return vi.fn<ApiHttpTransport>(async request => {
     if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
       const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
-      return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+      return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
     }
 		const response = responses[responseIndex++];
 		if (!response) throw new Error('No mock response available');
@@ -58,7 +58,7 @@ describe('SyncApiClient', () => {
 		let remoteFiles: Record<string, { hash: string; size: number; modified: string; revision: string }> = {};
 		const response = (data: unknown): ApiHttpResponse => {
 			const text = JSON.stringify(data);
-			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 		};
 		const transport: ApiHttpTransport = async request => {
 			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
@@ -413,7 +413,7 @@ it.each([false, true, 'bulk'] as const)('negotiates larger asset uploads with se
       value = { success: true, results: files.map(file => ({ path: file.path, success: true, hash: 'h', revision: 'r' })) };
     }
     const text = JSON.stringify(value);
-    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
   };
   const client = new SyncApiClient('https://worker.example', 'token', transport);
   const response = await client.batchUpload(Array.from({ length: 8 }, (_, index) => ({

@@ -7,7 +7,7 @@ export interface CloudflareDeploymentArtifacts {
 	d1SchemaSha256: string;
 }
 
-function decodeBase64(value: string): Uint8Array {
+function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
 	const binary = atob(value);
 	const decoded = new Uint8Array(binary.length);
 	for (let index = 0; index < binary.length; index++) {

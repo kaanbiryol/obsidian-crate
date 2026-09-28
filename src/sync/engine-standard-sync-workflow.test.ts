@@ -118,7 +118,7 @@ describe('runSyncWorkflow', () => {
 	it('records an edit/delete conflict after the remote edit is restored', async () => {
 		const { context } = createContext();
 		const path = 'notes/restored.md';
-		const remoteContent = new TextEncoder().encode('remote edit').buffer as ArrayBuffer;
+		const remoteContent = new TextEncoder().encode('remote edit').buffer;
 		const downloadDiff: FileDiff = {
 			path,
 			action: 'download',

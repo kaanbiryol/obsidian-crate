@@ -79,8 +79,8 @@ it('migrates overlapping legacy selections as one passage without blocking ordin
 });
 it('highlights across formatting and paragraphs without altering text or links', () => {
 	const { document } = parseHTML('<html><body><div>Hello <em>world</em>!</div><p>Next paragraph.</p></body></html>');
-	const body = document.body as unknown as HTMLElement;
-	const text = body.textContent!;
+	const body = document.body;
+	const text = body.textContent;
 	paintHighlights(body, [{ start: 3, end: 15, text: text.slice(3, 15) }, { start: 6, end: 11, text: 'world' }]);
 	expect(body.textContent).toBe(text);
 	expect(body.querySelector('em mark')?.textContent).toBe('world');
@@ -88,7 +88,7 @@ it('highlights across formatting and paragraphs without altering text or links',
 });
 it('keeps adjacent highlights separate and identifies every formatted fragment', () => {
 	const { document } = parseHTML('<html><body><p>Hello <em>world</em>!</p></body></html>');
-	const body = document.body as unknown as HTMLElement;
+	const body = document.body;
 	paintHighlights(body, [{ start: 0, end: 6, text: 'Hello ' }, { start: 6, end: 12, text: 'world!' }]);
 	const marks = Array.from(body.querySelectorAll('mark'));
 	expect(marks.map(mark => [mark.dataset.highlightStart, mark.dataset.highlightEnd])).toEqual([['0', '6'], ['6', '12'], ['6', '12']]);

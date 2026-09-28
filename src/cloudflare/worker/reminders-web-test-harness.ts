@@ -33,7 +33,7 @@ function createBucket(
 		store,
 		bucket: {
 			put: vi.fn(async (key: string, body: ArrayBuffer | Uint8Array, options?: StoredObject) => {
-				const normalizedBody = body instanceof Uint8Array ? body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) : body;
+				const normalizedBody = body instanceof Uint8Array ? new Uint8Array(body).buffer : body;
 				const content = new TextDecoder().decode(normalizedBody);
 				if (config?.failPutWhen?.(key, content)) {
 					throw new Error('forced put failure');

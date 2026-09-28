@@ -5,7 +5,7 @@ import { computeHash } from './hasher';
 import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer-download';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
-const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer as ArrayBuffer;
+const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer;
 
 function harness() {
     const h = createTransferHarness();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mergeMarkdownContent } from './markdown-merge';
 
 function toArrayBuffer(text: string): ArrayBuffer {
-	return new TextEncoder().encode(text).buffer as ArrayBuffer;
+	return new TextEncoder().encode(text).buffer;
 }
 
 function fromArrayBuffer(buffer: ArrayBuffer): string {

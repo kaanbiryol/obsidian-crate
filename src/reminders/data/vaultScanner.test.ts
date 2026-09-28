@@ -6,7 +6,7 @@ import { createReminderIndex } from './reminder-index';
 // String fixtures model bytes explicitly; production never falls back to read().
 function withBinaryReads(app: App): App {
   app.vault.adapter = { ...app.vault.adapter, readBinary: async (path: string) =>
-    new TextEncoder().encode(await app.vault.read(makeMockFile(path))).buffer } as App['vault']['adapter'];
+    new TextEncoder().encode(await app.vault.read(makeMockFile(path))).buffer };
   return app;
 }
 

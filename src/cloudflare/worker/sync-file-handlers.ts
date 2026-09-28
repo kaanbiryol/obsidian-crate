@@ -99,7 +99,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				hash,
 				size,
 				objectKey,
-				content: body,
+				content: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
 				expectedHash: expectedRemoteHash,
 				previousFile,
 				operation,

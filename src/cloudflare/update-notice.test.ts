@@ -74,7 +74,7 @@ function createPlugin(overrides: {
 
 beforeEach(() => {
 	notices.length = 0;
-	vi.stubGlobal('DocumentFragment', FakeDocumentFragment as unknown as typeof DocumentFragment);
+	vi.stubGlobal('DocumentFragment', FakeDocumentFragment);
 });
 
 afterEach(() => {
