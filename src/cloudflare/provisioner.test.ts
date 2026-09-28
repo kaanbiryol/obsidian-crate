@@ -1,3 +1,4 @@
+import { SERVER_RELEASE } from './database-upgrades';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiError, type CloudflareWorkerSettings } from './cloudflare-api';
@@ -76,6 +77,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.enableWorkerSubdomain).not.toHaveBeenCalled();
 		expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
 		expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
+		expect(metadata.lastKnownRevision).toBe(SERVER_RELEASE.revision);
 	});
 
 	it('disables preview URLs even when the main address is already enabled', async () => {

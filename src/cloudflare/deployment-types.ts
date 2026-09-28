@@ -9,6 +9,8 @@ export interface CloudflareDeploymentMetadata {
 	d1DatabaseId: string | null;
 	r2BucketName: string;
 	workersSubdomain: string | null;
+	/** Last verified revision, for display only; never authorizes an update. */
+	lastKnownRevision?: number;
 	lastDeployedVersion: string | null;
 	lastDeployedFingerprint: string | null;
 	reset?: {

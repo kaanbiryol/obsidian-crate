@@ -87,6 +87,8 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 		workersSubdomain,
 		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
 		lastDeployedFingerprint,
+		...(typeof value.lastKnownRevision === 'number' && Number.isSafeInteger(value.lastKnownRevision) && value.lastKnownRevision > 0
+			? { lastKnownRevision: value.lastKnownRevision } : {}),
 		...(isRecord(value.reset) && typeof value.reset.id === 'string' && /^[a-f0-9]{32}$/.test(value.reset.id)
 			&& (value.reset.phase === 'clearing' || value.reset.phase === 'rebuilding')
 			&& typeof value.reset.databaseId === 'string' && /^[a-f0-9-]{36}$/i.test(value.reset.databaseId)

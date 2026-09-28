@@ -3,15 +3,35 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import release from '../../cloudflare/server-release.json';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
 
+function localRevision(plugin: CratePlugin): number | undefined {
+	const deployment = plugin.settings.cloudflareDeployment;
+	if (!deployment || plugin.settings.workerUrl !== `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`) return undefined;
+	return deployment.lastKnownRevision;
+}
+
+async function checkVersion(plugin: CratePlugin) {
+	const deployment = plugin.settings.cloudflareDeployment;
+	const url = plugin.settings.workerUrl;
+	const info = await plugin.syncRuntime.getVersionInfo();
+	if (deployment && deployment === plugin.settings.cloudflareDeployment && url === plugin.settings.workerUrl
+		&& url === `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`
+		&& info.serverRevision && deployment.lastKnownRevision !== info.serverRevision) {
+		await plugin.writeSettings({ cloudflareDeployment: { ...deployment, lastKnownRevision: info.serverRevision } });
+	}
+	return info;
+}
+
 export function renderVersionSettings(container: HTMLElement, plugin: CratePlugin): void {
 	new Setting(container).setName('Plugin version').setDesc(plugin.manifest.version);
 	new Setting(container).setName('Bundled server').setDesc(`Revision ${release.revision}`);
-	const server = new Setting(container).setName('Connected server').setDesc('Select the button to check the server version.');
+	const revision = localRevision(plugin);
+	const server = new Setting(container).setName('Connected server').setDesc(revision
+		? `Last known server revision: ${revision}.` : 'No saved server revision. Select the button to check.');
 	server.addButton(button => button.setButtonText('Check version').onClick(async () => {
 		button.setDisabled(true);
 		server.setDesc('Checking version…');
 		try {
-			const info = await plugin.syncRuntime.getVersionInfo();
+			const info = await checkVersion(plugin);
 			const version = info.serverRevision ? `Revision ${info.serverRevision}` : 'Revision unknown';
 			const comparison = info.deploymentFingerprint
 				? info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint
@@ -19,28 +39,53 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 				: 'Build comparison unavailable.';
 			server.setDesc(`${version} · ${comparison}`);
 		} catch {
-			server.setDesc('Version unavailable. Connect to the server to check.');
+			server.setDesc(`${localRevision(plugin) ? `Last known server revision: ${localRevision(plugin)}. ` : ''}Could not check the live server. Try again when connected.`);
 		} finally {
 			button.setDisabled(false);
 		}
 	}));
 }
 
-export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMatchingServer: () => void): void {
-	const target = `revision ${release.revision} (${EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint.slice(0, 8)})`;
-	setting.setDesc(`Server revision unknown → ${target}. Update your sync server and reminders web app, or check if the update already completed.`);
+export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMatchingServer: () => void, onAvailability?: (available: boolean) => void): void {
+	const describe = (revision: number | undefined) => {
+		const versions = `Current version: ${revision ?? 'Unknown'} · Bundled version: ${release.revision}`;
+		const available = revision !== undefined && revision < release.revision;
+		onAvailability?.(available);
+		if (revision === undefined) {
+			setting.setName('Check server version');
+			return versions;
+		}
+		if (revision === release.revision) {
+			setting.setName('Server build differs');
+			return `${versions}. A newer server release is needed.`;
+		}
+		if (revision > release.revision) {
+			setting.setName('Plugin update required');
+			return `${versions}. Update the plugin first.`;
+		}
+		setting.setName('Cloudflare update available');
+		return versions;
+	};
+	let saved = describe(localRevision(plugin));
+	setting.setDesc(saved);
 	setting.addButton(button => button.setButtonText('Check live server').onClick(async () => {
 		button.setDisabled(true);
 		setting.setDesc('Checking live server…');
 		try {
-			const info = await plugin.syncRuntime.getVersionInfo();
+			const info = await checkVersion(plugin);
 			if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) {
 				onMatchingServer();
 				return;
 			}
-			setting.setDesc(`Server ${info.serverRevision ? `revision ${info.serverRevision}` : 'revision unknown'} → ${target}. Update your sync server and reminders web app.`);
+			saved = describe(info.serverRevision);
+			if (!info.deploymentFingerprint) {
+				onAvailability?.(false);
+				setting.setName('Check server version');
+				saved = `Current version: ${info.serverRevision ?? 'Unknown'} · Bundled version: ${release.revision}. Build unverified.`;
+			}
+			setting.setDesc(saved);
 		} catch {
-			setting.setDesc(`Could not check the live server. Update it to ${target}, or try checking again.`);
+			setting.setDesc(`${saved}. Could not check the server. Try again.`);
 		} finally {
 			button.setDisabled(false);
 		}
