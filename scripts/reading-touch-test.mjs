@@ -201,7 +201,9 @@ try {
       await expect(workspace).toHaveAttribute('data-reader-open', 'false');
       await expect(button).toBeFocused();
       await expect(card).toHaveAttribute('data-selected', 'false');
-      // Split view still identifies the article beside its visible library.
+      // Wait for the app Back traversal before opening another article.
+      await expect(workspace).toHaveAttribute('data-reader-motion', 'none');
+      // The PWA keeps the stacked reader flow at desktop widths, without a selected-card surface.
       await page.setViewportSize({ width: 1280, height: 900 });
       const wideResting = await appearance(card);
       await button.tap();
@@ -209,9 +211,9 @@ try {
       await card.evaluate(async element => {
         await Promise.allSettled(element.getAnimations().map(animation => animation.finished));
       });
-      assert.notEqual((await appearance(card)).background, wideResting.background);
+      assert.equal((await appearance(card)).background, wideResting.background);
       assert.deepEqual(errors, []);
-      console.log(`${engine.name()}: Reading return frames, split-view selection, touch cancellation, scroll, hover, and keyboard checks passed`);
+      console.log(`${engine.name()}: Reading return frames, desktop reader selection, touch cancellation, scroll, hover, and keyboard checks passed`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

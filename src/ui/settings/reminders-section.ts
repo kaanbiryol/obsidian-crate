@@ -9,7 +9,7 @@ import {
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
 import { errorMessage } from '../../plugin/logger';
-import { RemindersFolderSuggest } from './folder-suggest';
+import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { createSettingsDisclosure } from './section-helpers';
 
@@ -31,7 +31,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 		}
 	};
 
-	let folderSuggest: RemindersFolderSuggest | undefined;
+	let folderSuggest: FolderSuggest | undefined;
 	const preferences = createSettingsDisclosure(containerEl, 'Reminders', { summary: settings.enabled ? `Folder: ${settings.remindersFolderPath}` : 'Paused' });
 
 	new Setting(preferences).setName('Enable reminders')
@@ -48,7 +48,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 		.setName('Reminders folder')
 		.setDesc('Crate scans this folder and adds hidden tracking IDs to checkbox lines. Changes reach the server when connected. Files are not moved.')
 		.addText(text => {
-			folderSuggest = new RemindersFolderSuggest(plugin.app, text.inputEl);
+			folderSuggest = new FolderSuggest(plugin.app, text.inputEl);
 
 			const commitFolderPath = async (): Promise<void> => {
 				const normalizedPath = normalizeRemindersFolderPath(text.inputEl.value);

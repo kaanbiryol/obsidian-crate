@@ -60,16 +60,21 @@ describe('renderNotificationsSection', () => {
 		vi.doUnmock('../external-browser-modal');
 	});
 
-	it('loads notification devices only after expanding options', async () => {
+	it('keeps the push toggle and device controls inside the Notifications disclosure', async () => {
 		const { renderNotificationsSection } = await loadNotificationsSectionModule(false);
 		const getPushSubscriptions = vi.fn(async () => ({ subscriptions: [] }));
 		const container = new FakeElement('div');
 		const cleanup = renderNotificationsSection({ containerEl: container as never, plugin: createPlugin({ getPushSubscriptions }), rerender: vi.fn() });
 		await flushMicrotasks();
 		expect(getPushSubscriptions).not.toHaveBeenCalled();
+		expect(MockSetting.instances).toHaveLength(0);
+		expect(container.children[0]?.attributes.get('data-settings-section')).toBe('Notifications');
+		expect(container.collectText()).toContain('On · schedule, timezone, and devices');
 		openSettingsDisclosures(container);
 		await flushMicrotasks();
 		expect(getPushSubscriptions).toHaveBeenCalledOnce();
+		expect(getSettingByName('Push notifications')).toBeTruthy();
+		expect(container.collectText()).not.toContain('Notification options');
 		openSettingsDisclosures(container);
 		expect(getPushSubscriptions).toHaveBeenCalledOnce();
 		cleanup();

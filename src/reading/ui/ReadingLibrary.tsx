@@ -2,7 +2,6 @@ import { TextField } from '../../ui/shared/TextField';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
-import { ToggleButton } from '../../ui/shared/ToggleButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
 import type { NavigationItem } from '../../ui/shared/NavigationBar';
 import { NavigationBar } from '../../ui/shared/NavigationBar';
@@ -46,7 +45,7 @@ const sectionIcons = { inbox: 'inbox', favorites: 'star', archived: 'archive', h
 const navigationItems = readingSections.map(item => ({ ...item, iconName: sectionIcons[item.id] }));
 const PAGE_SIZE = 100;
 
-/** Shared workspace. Its container width, rather than the host viewport, chooses the layout. */
+/** Shared workspace. Uses the same stacked app layout at every width. */
 export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, listContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
@@ -108,16 +107,8 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && !!reader}>
-				<div className="crate-reading__brand"><ThemeIcon id="book-open" size="l" aria-hidden="true" /><span>Reading</span><span className="crate-reading__byline">by Crate</span></div>
-				<nav className="crate-reading__tabs" aria-label="Reading filters">
-					{readingSections.map(({ id, label }) => {
-						const count = id === 'highlights' ? snapshot.items.reduce((count, item) => count + (item.highlights?.length ?? 0), 0) : snapshot.items.filter(item => id === 'favorites' ? item.favorite : item.reading_status === id).length;
-						return <ToggleButton key={id} aria-label={label} pressed={section === id} onPressedChange={() => selectSection(id)}><ThemeIcon id={sectionIcons[id]} size="l" aria-hidden="true" /><span>{label}</span><span className="crate-reading__nav-count" aria-hidden="true">{count || ''}</span></ToggleButton>;
-					})}
-				</nav>
 				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
-				{tags.length > 0 && <div className="crate-reading__tag-nav"><h2>Tags</h2>{tags.map(value => <Button key={value} aria-pressed={tag === value} onClick={() => { setTag(tag === value ? null : value); resetList(); }}><ThemeIcon id="hash" size="m" aria-hidden="true" /><span>{value}</span></Button>)}</div>}
-				<div className="crate-reading__sidebar-bottom"><ThemeIcon id="book-open" size="s" aria-hidden="true" /><span>A little space to read.</span></div>
+
 			</aside>
 			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && !!reader}>
 				{renderLibrary(<>
@@ -147,7 +138,7 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 			</div>
 			<div className="crate-reading__reader-pane" inert={readerMotion !== undefined && !reader} aria-hidden={readerMotion !== undefined && !reader} onTransitionEnd={event => {
 				if (event.target === event.currentTarget && event.propertyName === 'transform' && !reader) { setExitingReader(null); onReaderClosed?.(); }
-			}}>{reader ?? (retainReaderOnClose ? exitingReader : null) ?? <div className="crate-reading__reader-empty"><ThemeIcon id="book-open" size="xl" aria-hidden="true" /><h2>Make time for a good read.</h2><p>Pick something from your library.<br />Everything else can wait a moment.</p></div>}</div>
+			}}>{reader ?? (retainReaderOnClose ? exitingReader : null)}</div>
 		</div>
 	</section>;
 }

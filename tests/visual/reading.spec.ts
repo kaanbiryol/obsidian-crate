@@ -17,7 +17,19 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
 		const article = page.locator('article.crate-reading-reader');
 		await expect(article.getByRole('heading', { name: 'The pleasure of reading slowly' })).toBeVisible();
+		if (host === 'plugin') {
+			await expect(page.locator('.crate-reading__library')).toBeHidden();
+			await expect(page.locator('.crate-reading__sidebar')).toBeHidden();
+		}
 		await expect(surface).toHaveScreenshot(`reading-reader-${host}-${theme}-${width}.png`, { animations: 'disabled' });
+		await expect(article.getByRole('group', { name: 'Article view' })).toHaveCount(0);
+		const highlights = article.getByRole('button', { name: 'Highlights (0)', exact: true });
+		await expect(highlights).toBeInViewport();
+		await highlights.click();
+		const highlightsDialog = page.getByRole('dialog', { name: 'Highlights', exact: true });
+		await expect(highlightsDialog.getByText('Select a passage in the article to save your first highlight.')).toBeVisible();
+		await highlightsDialog.getByRole('button', { name: 'Close highlights', exact: true }).click();
+		await expect(highlightsDialog).toHaveCount(0);
 		await article.getByRole('button', { name: 'Favorite article', exact: true }).click();
 		await article.getByRole('button', { name: 'Archive article', exact: true }).click();
 		await article.getByRole('button', { name: 'Edit article tags' }).click();
@@ -30,7 +42,7 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await page.getByRole('searchbox', { name: 'Search reading' }).fill('essays');
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
 		await article.getByRole('button', { name: 'Back to reading' }).click();
-		await expect(page.getByRole('button', { name: 'Archive', exact: true })).toHaveAttribute(width < 1100 ? 'aria-current' : 'aria-pressed', width < 1100 ? 'page' : 'true');
+		await expect(page.getByRole('button', { name: 'Archive', exact: true })).toHaveAttribute('aria-current', 'page');
 		await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('essays');
 	});
 }
@@ -107,12 +119,13 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	await expect(page.getByLabel('Link', { exact: true })).toHaveValue('https://example.com/later');
 	await page.getByLabel('Link', { exact: true }).focus();
 	await page.evaluate(() => { Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 484 }); window.visualViewport!.dispatchEvent(new Event('resize')); });
-	await expect.poll(async () => page.getByRole('dialog', { name: 'Save a link' }).evaluate(element => {
-		const bounds = element.getBoundingClientRect();
+	await expect.poll(async () => page.getByRole('dialog', { name: 'Save a link' }).evaluate((element, host) => {
+		const surface = host === 'pwa' ? element.querySelector<HTMLElement>('.pwa-reading-sheet')! : element;
+		const bounds = surface.getBoundingClientRect();
 		let active = document.activeElement;
 		while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
-		return { bottom: Math.round(bounds.bottom), inset: element.closest<HTMLElement>('.base-modal-container, .pwa-modal-sheet__container')?.style.bottom, active: active?.tagName };
-	})).toEqual({ bottom: 484, inset: '360px', active: 'INPUT' });
+		return { bottom: Math.round(bounds.bottom), inset: host === 'pwa' ? getComputedStyle(surface.parentElement!).paddingBottom : element.closest<HTMLElement>('.base-modal-container')?.style.bottom, active: active?.tagName };
+	}, host)).toEqual({ bottom: 484, inset: '360px', active: 'INPUT' });
 });
 
 test('a narrow Obsidian pane uses phone navigation and preserves a long list position', async ({ page }) => {

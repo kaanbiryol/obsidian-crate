@@ -81,7 +81,7 @@ export function registerControlTests() {
       if (host === 'pwa') {
         if (width < 760) {
           expect((await loadedHeader.boundingBox())!.height).toBeLessThanOrEqual(78);
-          await expect(loadedHeader.locator('.view-header-title')).toHaveCSS('font-size', '26px');
+          await expect(loadedHeader.locator('.view-header-title')).toHaveCSS('font-size', '32px');
           await expect(loadedHeader.locator('.view-header-meta')).toHaveCSS('height', '20px');
         }
         // Mounting two feature settings panels must not create duplicate section IDs.

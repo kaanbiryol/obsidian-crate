@@ -132,7 +132,7 @@ describe('settings controls', () => {
 	});
 
 	it('uses a startup toggle and preserves the saved reminder defaults', async () => {
-		vi.doMock('./folder-suggest', () => ({ RemindersFolderSuggest: class { close() {} } }));
+		vi.doMock('./folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 		vi.doMock('./reminders-web-app', () => ({ renderCrateWebApp: vi.fn() }));
 		const { renderRemindersSection } = await import('./reminders-section');
 		const plugin = {
