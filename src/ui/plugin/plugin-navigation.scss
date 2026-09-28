@@ -15,6 +15,18 @@
   --pwa-safe-area-bottom: 0px;
   --pwa-dock-bottom-inset: max(10px, var(--reminders-host-bottom-inset, 0px));
 
+  // Floating controls need an opaque base beneath Obsidian's translucent tints.
+  .crate-reading-reader__highlights-button:not(:disabled) {
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background: linear-gradient(var(--crate-control-hover-bg), var(--crate-control-hover-bg)) var(--crate-app-bg);
+      }
+    }
+    &[data-press-active] {
+      background: linear-gradient(var(--crate-control-active-bg), var(--crate-control-active-bg)) var(--crate-app-bg);
+    }
+  }
+
   // Obsidian's pane compositing can prevent backdrop blur from hiding list text.
   // Give both the navigation surface and add button an opaque theme background.
   .pwa-dock {
