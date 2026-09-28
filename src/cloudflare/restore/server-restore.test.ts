@@ -25,15 +25,15 @@ const database = () => { const db = new DatabaseSync(':memory:'); openDatabases.
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(recoverDeployment).mockResolvedValue({ status: 'ready', message: '', diagnostics: '' }); });
 afterEach(() => { openDatabases.splice(0).forEach(db => db.close()); });
 
-async function fixture(version = 1, extraRows = 0) {
-  const original = database(); original.exec(version === SERVER_RELEASE.schemaVersion ? schema : readFileSync(`src/cloudflare/migrations/schema-v${version}.sql`, 'utf8'));
+async function fixture(extraRows = 0) {
+  const original = database(); original.exec(schema);
   const bytes = new TextEncoder().encode("Private 'note';\n日本語"), oldBytes = new Uint8Array([0, 255, 12, 99]);
   original.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run("Reminders/a's.md", "reminders/a's.md", await hashBytes(bytes), bytes.length, 'live-object');
   original.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('old-object', "Reminders/a's.md", await hashBytes(oldBytes), oldBytes.length, 'replaced', 1);
   original.exec("INSERT INTO auth_tokens(id,token_hash) VALUES ('old-device','private-token'); INSERT INTO notification_policy(id,folder_path,timezone,revision) VALUES(1,'Reminders','Europe/Berlin','policy'); INSERT INTO changelog(seq,path,action) VALUES(90,'test.md','put'); DELETE FROM changelog;");
   original.prepare('INSERT INTO reminder_operations(operation_id,request_hash,response_json) VALUES (?,?,?)').run('op', 'request-hash', JSON.stringify({ text: "'hello'; 日本語\n\"world\"" }));
   original.exec("INSERT INTO maintenance_state(key,value) VALUES ('retained','hello'),('reminder_source_scan_old','obsolete');");
-  if (version >= 2) original.exec("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','generation','revision');");
+  original.exec("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','generation','revision');");
   for (let index = 0; index < extraRows; index++) original.prepare('INSERT INTO reminder_identities(reminder_id,created_operation_id) VALUES (?,?)').run(`id-${index}`, 'operation');
   const buckets = new Map<string, Map<string, Uint8Array>>([[source.bucket, new Map([['live-object', bytes], ['old-object', oldBytes], ['__crate__/settings.json', new TextEncoder().encode('{"setting":true}')]])]]);
   const databases = new Map([[source.database, original]]);
@@ -86,8 +86,8 @@ async function fixture(version = 1, extraRows = 0) {
   return { api, client, state, choice, artifacts, run, snapshots, buckets, original, databases, rewriteSQL, interrupt: (handler: (sql: string) => void) => { afterQuery = handler; } };
 }
 
-it.each(Array.from({ length: SERVER_RELEASE.schemaVersion }, (_, index) => index + 1))('restores real schema-%i checkpoints, keeps history and receipts, and requires fresh enrollment', async version => {
-  const f = await fixture(version);
+it('restores launch-baseline checkpoints, keeps history and receipts, and requires fresh enrollment', async () => {
+  const f = await fixture();
   const sourceBytes = [...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]]);
   expect(await f.run()).toBe(`https://${f.state.target.workerName}.test.workers.dev`);
   const restored = f.databases.get(destination)!;
@@ -98,7 +98,7 @@ it.each(Array.from({ length: SERVER_RELEASE.schemaVersion }, (_, index) => index
   expect(restored.prepare('SELECT * FROM auth_tokens').all()).toEqual([]);
   expect(restored.prepare('SELECT * FROM sqlite_sequence').get()).toEqual({ name: 'changelog', seq: 90 });
   expect(restored.prepare('SELECT path,job_token FROM notification_projection_jobs').get()).toEqual({ path: "Reminders/a's.md", job_token: 'live-object' });
-  if (version >= 2 && SERVER_RELEASE.schemaVersion >= 3) expect(restored.prepare('SELECT browser_rendering FROM reading_policy').get()).toEqual({ browser_rendering: 0 });
+  expect(restored.prepare('SELECT folder_path FROM reading_policy').get()).toEqual({ folder_path: 'Reading' });
   expect([...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]])).toEqual(sourceBytes);
   expect(f.api.queryD1.mock.calls.every(([, id]) => id === destination)).toBe(true);
   expect(f.api.putRecoveryObject).not.toHaveBeenCalled();
@@ -181,7 +181,7 @@ it('does not execute backup expressions and rejects unrecognized schemas', async
   expect(() => parseBackupRows('INSERT INTO "files" ("path") VALUES (readfile(\'/etc/passwd\'));')).toThrow('Non-literal');
   expect(() => parseBackupRows('DROP TABLE files;')).toThrow('Unsupported');
   const f = await fixture();
-  await f.rewriteSQL(sql => sql.replace('VALUES (1,1,1)', 'VALUES (1,99,99)'));
+  await f.rewriteSQL(sql => sql.replace('VALUES (1,4,4)', 'VALUES (1,99,99)'));
   await expect(f.run()).rejects.toThrow(); expect(f.api.createD1Database).not.toHaveBeenCalled();
 });
 
@@ -200,7 +200,7 @@ it('guards every imported row against replay after a batch advances', () => {
 });
 
 it('resumes multiple batches from a later checkpoint without missing or duplicating rows', async () => {
-  const f = await fixture(SERVER_RELEASE.schemaVersion, 130); let batches = 0;
+  const f = await fixture(130); let batches = 0;
   f.interrupt(sql => { if (sql.includes('UPDATE maintenance_state SET value=') && ++batches === 2) throw new Error('Later batch interrupted'); });
   await expect(f.run()).rejects.toThrow('Later batch interrupted');
   await f.run();

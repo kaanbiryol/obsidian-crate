@@ -8,7 +8,7 @@ import type { CloudflareApiClient } from './cloudflare-api';
 import type { DeploymentFence } from './deployment-fence';
 
 it('freezes old writers, verifies paired bytes, migrates atomically and restores an independently readable archive', async () => {
-  const db = new DatabaseSync(':memory:'); db.exec(readFileSync('src/cloudflare/migrations/schema-v1.sql', 'utf8'));
+  const db = new DatabaseSync(':memory:'); db.exec(readFileSync('src/cloudflare/schema.sql', 'utf8'));
   const bytes = new TextEncoder().encode('Existing note.'); const digest = await sha256Hex('Existing note.');
   const historyBytes = new TextEncoder().encode('Earlier note.'); const historyDigest = await sha256Hex('Earlier note.');
   db.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run('note.md','note.md',digest,bytes.length,'existing-object');
@@ -48,8 +48,10 @@ it('freezes old writers, verifies paired bytes, migrates atomically and restores
     const restored = new DatabaseSync(':memory:'); restored.exec(new TextDecoder().decode(objects.get(`${prefix}/database.sql`)));
     expect(restored.prepare('SELECT scope FROM auth_tokens').get()).toMatchObject({ scope: 'vault' });
     expect(restored.prepare('SELECT storage_key FROM files').get()).toMatchObject({ storage_key: 'existing-object' }); restored.close();
-    db.exec(`BEGIN; ${removeUpgradeGuards('auth_tokens')} ${await migrationTransaction(SERVER_RELEASE.migrations[0]!)} ${upgradeGuards('auth_tokens')} COMMIT;`);
-    expect(db.prepare('SELECT version FROM crate_schema').get()).toMatchObject({ version: 2 });
+    const sql = 'ALTER TABLE auth_tokens ADD COLUMN example TEXT;';
+    const step = { id: 'example', file: 'example.sql', from: SERVER_RELEASE.schemaVersion, to: SERVER_RELEASE.schemaVersion + 1, checksum: await sha256Hex(sql) };
+    db.exec(`BEGIN; ${removeUpgradeGuards('auth_tokens')} ${await migrationTransaction(step, sql)} ${upgradeGuards('auth_tokens')} COMMIT;`);
+    expect(db.prepare('SELECT version FROM crate_schema').get()).toMatchObject({ version: step.to });
     expect(db.prepare('SELECT scope FROM auth_tokens').get()).toMatchObject({ scope: 'vault' });
     await releaseUpgradeGuards(api as unknown as CloudflareApiClient, 'account', 'database', fence);
     expect(() => db.exec("UPDATE auth_tokens SET device_name='Updated'")).not.toThrow();

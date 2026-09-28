@@ -6,6 +6,7 @@ export async function migrateLocalDatabase(db, root, packaged, release) {
   if (!marker || !Number.isSafeInteger(marker.version) || marker.version < release.minimumSchemaVersion || marker.version > release.schemaVersion) throw new Error('Unsupported local schema. Restore using the matching server build.');
   const verify = async () => {
     const current = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();
+    if (!Number.isSafeInteger(current.created_version) || current.created_version < (release.baselineSchemaVersion ?? 1) || current.created_version > current.version) throw new Error('Unsupported local schema baseline.');
     const receipts = (await db.prepare('SELECT id, checksum FROM crate_migrations').all()).results;
     const expected = release.migrations.filter(step => step.from >= current.created_version && step.to <= current.version);
     if (receipts.length !== expected.length || expected.some(step => !receipts.some(row => row.id === step.id && row.checksum === step.checksum))) throw new Error('Local migration history does not match this build.');

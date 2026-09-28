@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Server revision 66 upgrades schema 1 to schema 2; protocol 11 stays compatible.
+This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-4 launch baseline; protocol 11 stays compatible.
 
 ## Try the browser now
 
@@ -46,9 +46,11 @@ Install the enrolled Crate web app in a browser supporting Web Share Target. **S
 
 ## Existing server upgrade
 
-Cloudflare updates take a verified paired database/file checkpoint before applying the migration. Database triggers pause writes by the old Worker while the checkpoint and migration run. The update retains its deployment fence after an uncertain failure; use the existing **Check and recover update** flow. The backup prefix is recorded in `maintenance_state` as `crate_upgrade_checkpoint`. `scripts/crate-recovery.py download-checkpoint --help` describes copying it into the ordinary paired recovery archive format. Backups consume additional R2 storage and are retained for recovery.
+Development schemas 1–3 are unsupported; preserve needed data with their matching build and create a fresh deployment. There is no automatic reset or historical upgrade path.
 
-For a self-hosted server, stop it first, then run:
+For future registered migrations, Cloudflare updates take a verified paired database/file checkpoint before applying the migration. Database triggers pause writes by the old Worker while the checkpoint and migration run. The update retains its deployment fence after an uncertain failure; use the existing **Check and recover update** flow. The backup prefix is recorded in `maintenance_state` as `crate_upgrade_checkpoint`. `scripts/crate-recovery.py download-checkpoint --help` describes copying it into the ordinary paired recovery archive format. Backups consume additional R2 storage and are retained for recovery.
+
+For a future supported self-hosted upgrade, stop the server first, then run:
 
 ```sh
 npm run server -- check-upgrade --data-dir /path/to/server-data

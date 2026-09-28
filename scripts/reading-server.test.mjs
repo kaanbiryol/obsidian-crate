@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
@@ -61,33 +61,24 @@ test('built server captures, replays, isolates scopes and confirms browser hando
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-test('populated schema 1 upgrades only after a verified stopped backup, preserves data and retries safely', { timeout: 60000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-upgrade-')), dataDir = join(dir, 'data'); let runtime;
+test('rejects an old development database without changing its data', { timeout: 60000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-baseline-')); let runtime;
   try {
-    runtime = await openLocalRuntime({ dataDir, administrative: true });
-    const db = runtime.db;
-    const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all()).results;
-    for (const { name } of tables) await db.prepare(`DROP TABLE "${name}"`).run();
-    const baseline = await readFile(new URL('../src/cloudflare/migrations/schema-v1.sql', import.meta.url), 'utf8');
-    await db.batch(baseline.split(';').map(s => s.trim()).filter(Boolean).map(s => db.prepare(s)));
-    await issueLocalDevice(db, 'Existing device');
-    await db.prepare("INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES ('test.md','test.md','hash',5,'old-key')").run();
-    await db.prepare("INSERT INTO web_enrollment_tokens(token_hash,folder_path,expires_at) VALUES ('old-enrollment','Reminders',9999999999999)").run();
+    runtime = await openLocalRuntime({ dataDir: dir, administrative: true });
+    await runtime.db.prepare("INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES ('test.md','test.md','hash',5,'old-key')").run();
     await runtime.close(); runtime = null;
-    const metadataPath = join(dataDir, 'server.json');
+    const metadataPath = join(dir, 'server.json');
     const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
-    metadata.schemaHash = createHash('sha256').update(baseline).digest('hex'); metadata.serverRevision = 59;
+    const currentMetadata = { ...metadata };
+    metadata.schemaHash = 'old-development-schema';
     await writeFile(metadataPath, JSON.stringify(metadata));
-    await assert.rejects(openLocalRuntime({ dataDir }), /tested migration/);
-    runtime = await openLocalRuntime({ dataDir, administrative: true, upgradeBackup: join(dir, 'backup') });
-    assert.equal((await runtime.db.prepare('SELECT version FROM crate_schema').first()).version, 3);
-    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM auth_tokens').first()).count, 1);
+    await assert.rejects(openLocalRuntime({ dataDir: dir }), /tested migration/);
+    await assert.rejects(openLocalRuntime({ dataDir: dir, administrative: true, upgradeBackup: join(dir, 'backup') }), /tested migration/);
+    assert.deepEqual(JSON.parse(await readFile(metadataPath, 'utf8')), metadata);
+    // Restore only the test's fabricated marker and inspect the original rows.
+    await writeFile(metadataPath, JSON.stringify(currentMetadata));
+    runtime = await openLocalRuntime({ dataDir: dir, administrative: true });
     assert.equal((await runtime.db.prepare('SELECT storage_key FROM files').first()).storage_key, 'old-key');
-    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM web_enrollment_tokens').first()).count, 1);
-    await runtime.close(); runtime = null;
-    const saved = JSON.parse(await readFile(join(dir, 'backup/data/server.json'), 'utf8')); assert.equal(saved.schemaHash, metadata.schemaHash);
-    runtime = await openLocalRuntime({ dataDir, administrative: true });
-    assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM crate_migrations').first()).count, 2);
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
