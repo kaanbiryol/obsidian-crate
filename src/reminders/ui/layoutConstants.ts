@@ -13,7 +13,7 @@ import type { Easing } from 'motion/react';
 export const EASE_EXPO_OUT: Easing = [0.16, 1, 0.3, 1];
 
 // Material Design standard easing (used for exits)
-export const EASE_STANDARD: Easing = [0.4, 0, 0.2, 1];
+const EASE_STANDARD: Easing = [0.4, 0, 0.2, 1];
 
 // Page-level transition duration (slightly faster)
 export const PAGE_TRANSITION_DURATION = 0.18;
