@@ -1,9 +1,17 @@
+// Native text-entry controls share a single focused border. Other controls keep rings.
+$text-controls: 'input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="hidden"]), textarea';
+
 // Compound controls paint one focus cue around the whole field. The PWA
 // enables it only for keyboard navigation; plugin hosts keep their usual cue.
 @mixin within {
   &:focus-within {
     outline: 2px var(--crate-compound-focus-style, solid) var(--crate-focus-ring);
     outline-offset: 2px;
+  }
+
+  &:has(:is(#{$text-controls}):focus) {
+    outline: none;
+    border-color: var(--crate-focus-ring);
   }
 
   :is(input, select, textarea):focus {

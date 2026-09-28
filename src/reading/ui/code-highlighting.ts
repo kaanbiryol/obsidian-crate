@@ -43,7 +43,7 @@ for (const [name, grammar] of Object.entries({ javascript, typescript, python, b
 
 hljs.registerAliases('objective-c', { languageName: 'objectivec' });
 
-/** Runs only in the PWA. Highlight.js escapes source text before adding token spans. */
+/** Shared by both Reading hosts. Highlight.js escapes source text before adding token spans. */
 export function highlightReadingCode(code: string, language: string): string | undefined {
 	if (!code.trim() || code.length > 20_000) return undefined;
 	if (language && !hljs.getLanguage(language)) return undefined;

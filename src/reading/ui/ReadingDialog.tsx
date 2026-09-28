@@ -7,10 +7,13 @@ export interface ReadingDialogProps {
 	className?: string;
 	contentClassName?: string;
 	title: string;
+	/** Plugin modal shells match the reminder editor on desktop and mobile. */
+	variant?: 'centered' | 'bottom-sheet';
+	showBackdrop?: boolean;
 	action?: React.ComponentProps<typeof ModalHeader>['action'];
 	onClose: () => void;
 	busy?: boolean;
-	/** Use the PWA settings page height instead of sizing to the contents. */
+	/** Use a full-width, tall sheet instead of sizing to the contents. */
 	fullHeight?: boolean;
 	children: React.ReactNode | ((close: () => void) => React.ReactNode);
 }
@@ -24,10 +27,10 @@ export function ReadingDialog(props: ReadingDialogProps) {
 }
 
 /** Base UI keeps plugin portals inside the same document and Obsidian shadow root. */
-function PluginReadingDialog({ title, action, onClose, busy = false, children, className = '', contentClassName = 'crate-reading' }: ReadingDialogProps) {
+function PluginReadingDialog({ title, action, variant = 'bottom-sheet', showBackdrop = true, fullHeight = false, onClose, busy = false, children, className = '', contentClassName = 'crate-reading' }: ReadingDialogProps) {
 	const marker = useRef<HTMLDivElement>(null);
 	const keyboardInset = useKeyboardHeight(true);
-	return <div ref={marker}><BaseModal onClose={onClose} dismissible={!busy} ariaLabel={title} variant="bottom-sheet" className={`crate-reading-dialog ${className}`}
+	return <div ref={marker}><BaseModal onClose={onClose} dismissible={!busy} ariaLabel={title} variant={variant} showBackdrop={showBackdrop} className={`crate-reading-dialog${fullHeight ? ' crate-reading-dialog--full' : ''} ${className}`}
 		style={{ bottom: keyboardInset }} contentStyle={{ maxHeight: `calc(100dvh - ${keyboardInset + 20}px - env(safe-area-inset-top))` }}>
 		<ModalHeader action={action} title={title} closeLabel={`Close ${title.toLowerCase()}`} closeDisabled={busy} onClose={onClose} />
 		<div className={`crate-modal-body ${contentClassName}`}>{typeof children === 'function' ? children(onClose) : children}</div>

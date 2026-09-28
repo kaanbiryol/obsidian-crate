@@ -1,10 +1,12 @@
-import { PWA_SURFACE_SPRING } from '../motion';
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { PWA_SURFACE_SPRING } from './motion';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useMotionValueEvent, useSpring } from 'motion/react';
 
 /** One damped spring preserves both shape and velocity when the target changes. */
 export function useDockMorph(open: boolean, menuHeight: number) {
   const surface = useRef<HTMLSpanElement>(null);
+  const reduceMotion = useObsidianReducedMotion();
   const target = open ? menuHeight : 60;
   const height = useSpring(60, PWA_SURFACE_SPRING);
   const paint = useCallback((value: number) => {
@@ -24,14 +26,8 @@ export function useDockMorph(open: boolean, menuHeight: number) {
   useMotionValueEvent(height, 'change', paint);
   useLayoutEffect(() => { paint(height.get()); }, [height, paint]);
   useLayoutEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) height.jump(target);
+    if (reduceMotion) height.jump(target);
     else height.set(target);
-  }, [height, target]);
-  useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onPreference = () => { if (reduced.matches) height.jump(target); };
-    reduced.addEventListener('change', onPreference);
-    return () => reduced.removeEventListener('change', onPreference);
-  }, [height, target]);
+  }, [height, target, reduceMotion]);
   return surface;
 }

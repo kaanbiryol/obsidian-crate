@@ -10,8 +10,16 @@ import { ReadingLibrary, type ReadingFile } from './data/library';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
 const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () => void }>();
+const listeners = new WeakMap<CratePlugin, Set<() => void>>();
+export function subscribeReadingRuntime(plugin: CratePlugin, listener: () => void): () => void {
+  let current = listeners.get(plugin);
+  if (!current) { current = new Set(); listeners.set(plugin, current); }
+  current.add(listener);
+  return () => { current.delete(listener); };
+}
+function notifyRuntime(plugin: CratePlugin): void { listeners.get(plugin)?.forEach(listener => listener()); }
 export function getReadingLibrary(plugin: CratePlugin): ReadingLibrary | undefined { return runtimes.get(plugin)?.library; }
-export function stopReading(plugin: CratePlugin): void { runtimes.get(plugin)?.stop(); runtimes.delete(plugin); }
+export function stopReading(plugin: CratePlugin): void { runtimes.get(plugin)?.stop(); runtimes.delete(plugin); notifyRuntime(plugin); }
 
 function allowedReadingPath(plugin: CratePlugin, path: string): boolean {
 	return !shouldIgnoreSyncPath(path, {
@@ -167,5 +175,6 @@ export function startReading(plugin: CratePlugin): void {
 	};
 	lifetime.addEventListener('abort', stop, { once: true });
 	runtimes.set(plugin, { library, stop });
+	notifyRuntime(plugin);
 	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }

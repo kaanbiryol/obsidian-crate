@@ -1,0 +1,7 @@
+.crate-reminders-ui .crate-reading-reader__body pre code {
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-meta { color: var(--reading-code-keyword, var(--code-keyword, var(--text-accent))); }
+  .hljs-string, .hljs-regexp, .hljs-addition { color: var(--reading-code-string, var(--code-string, var(--text-accent))); }
+  .hljs-title, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-selector-class, .hljs-selector-id, .hljs-section { color: var(--reading-code-symbol, var(--code-function, var(--text-accent))); }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-variable, .hljs-deletion { color: var(--reading-code-number, var(--code-value, var(--text-accent))); }
+  .hljs-comment, .hljs-quote { color: var(--text-muted); font-style: italic; }
+}

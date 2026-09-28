@@ -20,6 +20,11 @@
 	width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain;
 	background: var(--crate-modal-bg); border-radius: var(--crate-radius-sheet, 16px);
 	> .crate-reading, > .base-modal-content > .crate-reading { padding: 20px; background: transparent; }
+	&.crate-reading-dialog--full.is-bottom-sheet {
+		width: 100%;
+		height: 90dvh;
+		border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0;
+	}
 	@media (max-width: 600px) {
 		&.is-bottom-sheet { width: 100%; max-height: calc(100dvh - env(safe-area-inset-top) - 20px); padding-bottom: 0; border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0; }
 		> .base-modal-content > .crate-reading { padding-bottom: max(24px, env(safe-area-inset-bottom)); }

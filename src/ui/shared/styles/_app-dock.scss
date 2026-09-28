@@ -1,0 +1,126 @@
+.crate-reminders-ui {
+  --pwa-dock-bottom-inset: max(10px, var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)));
+  --pwa-dock-height: calc(70px + var(--pwa-dock-bottom-inset));
+
+  // Let the viewport fill the screen; the dock overlaps its last portion.
+  :is(.pwa-reminders-view, .pwa-mode-opening) > .pwa-dock { margin-top: calc(0px - var(--pwa-dock-height)); }
+  .pwa-navigation-viewport .reminders-view-scroll {
+    padding-bottom: calc(var(--pwa-dock-height) + 16px);
+    scroll-padding-bottom: calc(var(--pwa-dock-height) + 16px);
+  }
+  .pwa-dock {
+    // Stay opaque when backdrop filtering is unavailable.
+    --dock-surface: var(--background-primary-alt);
+    --dock-surface-hover: var(--background-primary-alt);
+    --dock-bottom-inset: var(--pwa-dock-bottom-inset);
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 10px;
+    padding: 10px 16px var(--dock-bottom-inset);
+    color: var(--text-normal);
+    z-index: 5;
+    pointer-events: none;
+  }
+  .pwa-dock__bar, .pwa-dock__add { pointer-events: auto; }
+  .pwa-dock__surface, .pwa-dock__add {
+    background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--dock-surface);
+    border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+    box-shadow: 0 6px 20px #0000001a;
+    backdrop-filter: blur(24px) saturate(1.35);
+    -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .pwa-dock {
+      --dock-surface: color-mix(in srgb, var(--background-primary-alt) 72%, transparent);
+      --dock-surface-hover: color-mix(in srgb, var(--background-primary-alt) 84%, transparent);
+    }
+  }
+  .pwa-dock__bar { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; height: 60px; padding: 4px; border: 1px solid transparent; border-radius: 32px; }
+  // One persistent surface grows upward into the picker without shifting content.
+  .pwa-dock__surface { position: absolute; left: -1px; right: -1px; bottom: -1px; height: 60px; border-radius: 32px; pointer-events: none; transform-origin: bottom right; }
+  .pwa-dock__tab { display: flex; align-items: center; justify-content: center; flex: 1; gap: 5px; min-width: 44px; position: relative; z-index: 1; height: 50px; padding: 0; border: 0; border-radius: 26px; box-shadow: none; background: transparent; color: var(--text-muted); touch-action: manipulation; }
+  .pwa-dock__tab { opacity: var(--dock-tabs-opacity, 1); }
+  .pwa-dock[data-views-open="true"] .pwa-dock__tab { pointer-events: none; }
+  .pwa-dock__tab > svg:first-child { width: 23px; height: 23px; }
+  .pwa-dock__tab.is-active { color: var(--text-normal); }
+  .pwa-dock__indicator {
+    position: absolute; left: 4px; top: 4px; height: 50px; border-radius: 26px;
+    // Keep fractional-pixel edges on the same layer when the slide settles.
+    will-change: transform;
+    background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+    opacity: var(--dock-tabs-opacity, 1);
+    // A full tab-width move needs visible travel before settling, unlike a
+    // small control's quick feedback. CSS retargets from the painted position.
+    pointer-events: none; transition: transform var(--pwa-motion-dock-duration) var(--pwa-motion-dock-ease);
+  }
+  .pwa-dock__group { gap: 4px; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  .pwa-dock__view-icon { animation: pwa-dock-icon-in var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease); }
+  @keyframes pwa-dock-icon-in { from { opacity: .25; } to { opacity: 1; } }
+  // The cue sits beside the centered destination without moving its icon.
+  .pwa-dock__group-hint { position: absolute; left: calc(50% + 13px); top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 12px; height: 12px; color: var(--text-muted); pointer-events: none; }
+  .pwa-dock__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .pwa-dock__add { display: flex; flex: 0 0 60px; align-items: center; justify-content: center; height: 60px; padding: 0; border-radius: 50%; color: var(--text-normal); touch-action: manipulation; }
+  .pwa-dock__add > svg { width: 25px; height: 25px; }
+  .pwa-dock__add:disabled { opacity: .4; }
+  // An absolute portal keeps the menu out of the dock's flex layout.
+  .pwa-dock__portal { position: absolute; inset: 0; pointer-events: none; }
+  .pwa-dock__portal > * { pointer-events: auto; }
+  .pwa-dock__backdrop { position: fixed; inset: 0; z-index: 19; background: transparent; }
+  .pwa-dock__menu { position: absolute; z-index: 20; left: 16px; right: 86px; bottom: var(--dock-bottom-inset); max-height: calc(100dvh - var(--pwa-safe-area-top, 0px) - var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) - 32px); overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid transparent; border-radius: 28px; background: transparent;
+    // Reveal along the same edge as the surface, without translating the menu
+    // or delaying input. The short exit fade lets Base UI finish its lifecycle.
+    clip-path: inset(var(--dock-menu-inset, 0px) 0 0 round 28px);
+    opacity: 1;
+    transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-fade-ease);
+  }
+  .pwa-dock__menu[data-starting-style], .pwa-dock__menu[data-ending-style] { opacity: 0; }
+  .pwa-dock__menu[data-ending-style] { pointer-events: none; }
+  .pwa-dock__choices { opacity: var(--dock-menu-opacity, 0); }
+  .pwa-dock__menu[data-dragging="true"] { user-select: none; -webkit-user-select: none; }
+  .pwa-dock__destination { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 22px; background: transparent; color: var(--text-normal); box-shadow: none; text-align: left; font-size: 15px; touch-action: manipulation; }
+  .pwa-dock__destination > span { flex: 1; }
+  .pwa-dock__destination[aria-current="page"] { background: color-mix(in srgb, var(--text-normal) 9%, transparent); }
+  .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination { background: transparent; }
+  .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination[data-preview="true"] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
+  .pwa-dock :is(button):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+  .pwa-dock :is(button)[data-press-active] { opacity: .65; }
+  .pwa-dock .pwa-dock__tab[data-press-active] { opacity: calc(var(--dock-tabs-opacity, 1) * .65); }
+  @media (hover: hover) and (pointer: fine) {
+    .pwa-dock :is(button):hover { background-color: color-mix(in srgb, var(--text-normal) 7%, transparent); }
+
+
+    .pwa-dock .pwa-dock__add:hover { background-color: var(--dock-surface-hover); }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .pwa-dock { --dock-surface: var(--background-primary-alt); --dock-surface-hover: var(--background-primary-alt); }
+    .pwa-dock__surface, .pwa-dock__add { background: var(--dock-surface); border-color: var(--text-muted); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .pwa-dock__indicator { background: color-mix(in srgb, var(--text-normal) 16%, var(--background-primary-alt)); box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pwa-dock__view-icon { animation: none; } .pwa-dock__surface, .pwa-dock__tab, .pwa-dock__indicator, .pwa-dock__menu { transition: none; } }
+}
+// Reading uses the same PWA dock at every window width.
+.crate-reminders-ui .pwa-dock.crate-reading__mobile-nav { display: flex; padding-bottom: var(--dock-bottom-inset); }
+.crate-reminders-ui .crate-reading__header .pwa-feature-switch-button { display: none; }
+.crate-reminders-ui.pwa-reading-root .crate-reading__layout:has(.pwa-dock) {
+  .crate-reading__library { grid-row: 1 / 3; }
+  .crate-reading__sidebar { background: transparent; pointer-events: none; }
+  .crate-reading__list-scroll {
+    padding-bottom: calc(var(--pwa-dock-height) + 16px);
+    scroll-padding-bottom: calc(var(--pwa-dock-height) + 16px);
+  }
+}
+.crate-reminders-ui.pwa-reading-root .crate-reading__sidebar:has(.pwa-dock) { overflow: visible; z-index: 1; }
+
+.crate-reminders-ui .pwa-reading-opening .pwa-feature-switch-button { display: none; }
+
+
+@media (max-width: 360px) {
+  .crate-reminders-ui .pwa-dock { padding-inline: 12px; gap: 8px; }
+  .crate-reminders-ui .pwa-dock__add { flex-basis: 52px; height: 52px; }
+  .crate-reminders-ui .pwa-dock__menu { left: 12px; right: 72px; }
+}

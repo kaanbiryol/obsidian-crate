@@ -1,3 +1,4 @@
+@use '../../ui/shared/styles/reading-navigation';
 // Fill the space below search and filters; dock.scss reserves the dock overlap.
 .crate-reminders-ui.pwa-reading-root {
   .crate-reading__list-scroll:has(> .crate-reading__empty) {
@@ -25,39 +26,7 @@
 .crate-reminders-ui .pwa-reading-article-opening__body { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--text-muted); text-align: center; }
 .crate-reminders-ui .pwa-reading-article-opening__body p { max-width: 32ch; margin: 0; font-size: 14px; line-height: 1.5; }
 
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar) {
-  // Keep the tab bar's own z-index inside the library layer throughout navigation.
-  z-index: 0;
-  display: flex;
-}
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__sidebar { z-index: 1; }
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace .crate-reading__reader-pane {
-  position: absolute;
-  grid-area: 1 / 1 / -1 / -1;
-  inset: 0;
-  z-index: 2;
-  display: block;
-  visibility: hidden;
-  pointer-events: none;
-  height: 100%;
-  background: var(--crate-app-bg);
-  box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
-  transform: translate3d(100%, 0, 0);
-  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s linear var(--pwa-motion-navigation-duration);
-}
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane {
-  visibility: visible;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0);
-  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s;
-}
-// Browser history gestures already animate the page; do not replay the slide afterward.
-.crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-motion="none"] .crate-reading__reader-pane { transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
-  .crate-reminders-ui.pwa-reading-root .crate-reading-workspace[data-reader-open="true"] :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
-}
+.crate-reminders-ui.pwa-reading-root { @include reading-navigation.styles; }
 .crate-reminders-ui .crate-reading-welcome { position: relative; max-width: 440px; margin: 0 auto; padding: 80px 28px 40px; overflow-y: auto; max-height: 100%; }
 .crate-reminders-ui .crate-reading-welcome h1 { font-size: 34px; font-weight: 550; line-height: 1.2; letter-spacing: -.04em; }
 .crate-reminders-ui .crate-reading-welcome p { color: var(--text-muted); line-height: 1.8; font-size: 14px; }
@@ -124,13 +93,7 @@
   }
 }
 
-.crate-reminders-ui.pwa-reading-root .crate-reading-reader__body pre code {
-  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-meta { color: var(--reading-code-keyword); }
-  .hljs-string, .hljs-regexp, .hljs-addition { color: var(--reading-code-string); }
-  .hljs-title, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-selector-class, .hljs-selector-id, .hljs-section { color: var(--reading-code-symbol); }
-  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-variable, .hljs-deletion { color: var(--reading-code-number); }
-  .hljs-comment, .hljs-quote { color: var(--text-muted); font-style: italic; }
-}
+
 
 // Only the open reader escapes the app's fixed-height scroll containers.
 // Keep their heights so the library retains its geometry and list scroll offset.

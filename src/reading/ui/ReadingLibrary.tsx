@@ -18,7 +18,7 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 export interface ReadingLibraryProps {
 	snapshot: ReadingSnapshot;
 	initialSection?: ReadingSection;
-	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; disabled: boolean }) => React.ReactNode;
+	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; onAdd: () => void; inert: boolean; disabled: boolean }) => React.ReactNode;
 	/** Host-owned transitions can retain the previous library while changing sections. */
 	renderLibraryContent?: (section: ReadingSection, content: React.ReactNode) => React.ReactNode;
 	onAdd: () => void;
@@ -107,7 +107,7 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && !!reader}>
-				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
+				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, onAdd, inert: !!reader, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
 
 			</aside>
 			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && !!reader}>

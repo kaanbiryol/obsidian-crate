@@ -1,0 +1,76 @@
+@use '../shared/styles/navigation-motion';
+@use '../shared/styles/reading-navigation';
+@use '../shared/styles/app-dock';
+@use '../shared/styles/navigation';
+@use '../shared/styles/schedule-switcher';
+@use '../shared/styles/tab-transition';
+
+.crate-reminders-ui {
+  @include navigation.styles;
+  @include schedule-switcher.styles;
+
+  // The host pane owns its viewport and bottom obstruction, including popouts.
+  --pwa-control-active-surface: var(--background-modifier-hover);
+  --pwa-safe-area-top: 0px;
+  --pwa-safe-area-bottom: 0px;
+  --pwa-dock-bottom-inset: max(10px, var(--reminders-host-bottom-inset, 0px));
+
+  // Obsidian's pane compositing can prevent backdrop blur from hiding list text.
+  // Give both the navigation surface and add button an opaque theme background.
+  .pwa-dock {
+    --dock-surface: var(--background-primary-alt);
+    --dock-surface-hover: var(--background-primary-alt);
+  }
+
+  .plugin-workspace-navigation { position: relative; flex: 1; height: 100%; min-height: 0; overflow: hidden; container-type: size; }
+  .plugin-workspace-navigation[data-fullscreen] { --pwa-dock-bottom-inset: max(10px, var(--navbar-height, calc(40px + env(safe-area-inset-bottom)))); }
+  .plugin-workspace-panel { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; background: var(--background-primary); }
+  .plugin-workspace-panel[data-active='false'] { pointer-events: none; }
+  .plugin-workspace-panel { @include reading-navigation.styles; }
+  .plugin-workspace-navigation .pwa-dock__menu { max-height: calc(100cqh - var(--pwa-dock-bottom-inset) - 32px); }
+  .plugin-workspace-panel > .crate-reading { height: 100%; }
+  .plugin-workspace-panel .crate-reading__layout:has(.pwa-dock) {
+    .crate-reading__library { grid-row: 1 / 3; }
+    .crate-reading__sidebar { background: transparent; pointer-events: none; overflow: visible; z-index: 1; }
+    .crate-reading__list-scroll { padding-bottom: calc(var(--pwa-dock-height) + 16px); scroll-padding-bottom: calc(var(--pwa-dock-height) + 16px); }
+  }
+  .plugin-workspace-panel .crate-reading__library { display: flex; flex-direction: column; }
+  .plugin-workspace-panel .crate-reading__list-scroll { flex: 1; }
+
+  .plugin-reminders-navigation {
+    height: 100%;
+    --reminders-tabbar-height: 0px;
+    --reminders-tabbar-overlay: 0px;
+    --reminders-safe-area: 0px;
+    --reminders-bottom-gap: 16px;
+    .plugin-reminders-body { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .plugin-reminders-body > .pwa-dock { margin-top: calc(0px - var(--pwa-dock-height)); }
+    .pwa-navigation-viewport { display: flex; flex-direction: column; }
+    .pwa-project-layer { --reminders-safe-area: 0px; }
+    .pwa-project-layer .reminders-view-scroll { padding-bottom: calc(var(--pwa-dock-height) + 16px); }
+    .pwa-project-layer .reminders-content { display: flex; flex: 1; min-height: 0; }
+    .pwa-project-layer .reminders-content > * { flex: 1; min-width: 0; }
+    .reminders-empty-body { display: grid; grid-template-rows: minmax(min-content, 1fr); min-height: 0; overflow: auto; padding-block: 16px calc(var(--pwa-dock-height) + 16px); }
+    .reminders-empty-state { height: auto; }
+    &.is-compact .pwa-navigation-viewport .reminders-view-scroll { padding-bottom: 16px; }
+  }
+  @container (max-width: 360px) {
+    .pwa-dock { padding-inline: 12px; gap: 8px; }
+    .pwa-dock__add { flex-basis: 52px; height: 52px; }
+    .pwa-dock__menu { left: 12px; right: 72px; }
+  }
+  .is-reduced-motion, .plugin-workspace-navigation[data-reduced-motion] {
+    --pwa-motion-fade-duration: 0ms;
+    --pwa-motion-feedback-duration: 0ms;
+    --pwa-motion-control-duration: 0ms;
+    --pwa-motion-dock-duration: 0ms;
+    --pwa-motion-navigation-duration: 0ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    --pwa-motion-fade-duration: 0ms;
+    --pwa-motion-feedback-duration: 0ms;
+    --pwa-motion-control-duration: 0ms;
+    --pwa-motion-dock-duration: 0ms;
+    --pwa-motion-navigation-duration: 0ms;
+  }
+}

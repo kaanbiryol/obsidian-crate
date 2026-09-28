@@ -3,16 +3,15 @@ import { Platform } from "obsidian";
 import type CratePlugin from "@/main";
 import { BaseModal } from "@/reminders/components/BaseModal";
 import { ModalHeader } from "@/reminders/components/ModalHeader";
-import { RemindersViewContent } from "./reminders-view";
+import { RemindersViewContent } from "./RemindersViewContent";
 
 interface ProjectSheetProps {
   plugin: CratePlugin;
-  shadowRoot: ShadowRoot;
   initialProject?: string;
   onClose: () => void;
 }
 
-export function ProjectSheet({ plugin, shadowRoot, initialProject, onClose }: ProjectSheetProps) {
+export function ProjectSheet({ plugin, initialProject, onClose }: ProjectSheetProps) {
   const [isOpen, setIsOpen] = useState(true);
   const close = () => setIsOpen(false);
 
@@ -31,13 +30,12 @@ export function ProjectSheet({ plugin, shadowRoot, initialProject, onClose }: Pr
     >
       <RemindersViewContent
         plugin={plugin}
-        shadowRoot={shadowRoot}
         isFullScreen
         isModal
         initialTab="browse"
         initialProject={initialProject}
         hideTabBar
-        renderHeader={() => <ModalHeader closeLabel="Close projects" onClose={close} />}
+        renderHeader={(_title, actions) => <ModalHeader closeLabel="Close projects" onClose={close} secondaryActions={actions} />}
       />
     </BaseModal>
   );

@@ -39,10 +39,11 @@ both hosts together.
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-- Reading search and Save a link fields opt into `crate-field--rounded`: 16px
+- Reading search and PWA Save a link fields opt into `crate-field--rounded`: 16px
   corners, 48px minimum height, and 16px horizontal padding. Their filled
   surfaces, borders, and focus rings retain shared theme colors. Reminder
-  editor fields retain their existing geometry.
+  editor fields retain their existing geometry. Plugin Save a link uses the standard
+  shared text field and reminder header Save action, with no footer actions.
 - `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
   `usePressFeedback` owns momentary interaction state for buttons, reminder cards,
   and native picker rows. Style it with `data-press-active`; never use CSS
@@ -55,8 +56,10 @@ both hosts together.
   native field editing independent of press feedback. Icons use the
   existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
   Compound fields use `focus.within` from `src/ui/shared/styles/_focus.scss`
-  for one outline around the whole control. Settings selectors, number fields,
-  and search boxes share it. The PWA enables that outline only after keyboard
+  for one focus cue around the whole control. Text inputs, textareas and compound
+  text fields change their existing border color on focus without an outer ring.
+  Buttons, links, tabs and non-text selectors retain visible keyboard-focus rings.
+  Settings selectors, number fields, and search boxes share the focus mixin. The PWA enables that outline only after keyboard
   navigation through `--crate-compound-focus-style`; touch and mouse focus stay
   undecorated without blurring controls. Obsidian retains its normal focus cue.
   Reading form actions use `crate-dialog-actions`
@@ -280,11 +283,11 @@ A small, muted up/down chevron pair marks this control, vertically centered besi
 the destination icon without shifting it or adding a badge background. The cached
 launch shell uses the same order, visibility, and selection before React starts.
 
-The PWA's **Reminders** screen contains a compact **Today / Upcoming** segmented
+Both hosts’ **Reminders** screens contain a compact **Today / Upcoming** segmented
 control with a shared frosted track and sliding selection. It uses 13px labels
 and a 32px visible track within 44px touch targets.
-`PwaScheduleSwitcher` keeps the controls mounted while the shared reminder panels
-change. Their content reuses `PwaTabTransition` for the same stationary dissolve
+`ScheduleSwitcher` in `src/ui/shared/navigation/` keeps the controls mounted while the shared reminder panels
+change. Their content reuses the shared `TabTransition` for the same stationary dissolve
 as dock navigation, while the heading and segmented control stay mounted.
 Upcoming retains its configured range, date groups, and launch links;
 Both views select Reminders in the default dock; a pinned Upcoming tab has its own selection. The opening shell reserves the chips' final space
@@ -294,8 +297,7 @@ and dock stay painted; reduced motion reveals content immediately, and backgroun
 refreshes do not replay the entrance. `scripts/pwa-schedule-test.mjs` checks cold
 and cached launches with overdue reminders, coordinated reveal, selection,
 keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
-empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin
-retains its separate Upcoming navigation.
+empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin uses the same dock, date switcher and project transition components. `PluginWorkspaceNavigation` retains both features inside one pane, while `PluginRemindersAppShell` manages local project navigation without browser history. Compact project sheets keep their own header and omit the main dock. Plugin pane geometry and Obsidian bottom obstructions live in `src/ui/plugin/plugin-navigation.scss`; dock, schedule and navigation presentation lives in the shared Sass modules. Dock destinations persist through Obsidian device-local storage.
 
 The shared components and semantic tokens are Crate's design system. Extend
 them for common controls and states; keep feature layouts and article typography
@@ -689,15 +691,17 @@ A failed save retains the selected range with an error and retry action. Highlig
 remain note metadata shared by both reader hosts; changed article text is never
 marked unless it still matches the saved text at the saved offsets.
 
-### PWA article code examples
+### Article code examples
 
-The PWA passes `highlightReadingCode` to the shared reader. Syntax grammars stay
-in the deferred Reading bundle; the Obsidian reader does not enable them. Code
+The shared reader enables `highlightReadingCode` for both the plugin and PWA.
+Syntax grammars stay in the PWA’s deferred Reading bundle and are bundled into
+the plugin. Code
 uses language labels where available and bounded detection for short unlabelled
 blocks. Unsupported languages and oversized examples remain plain text. Highlighted
 markup is sanitized and accepted only if it preserves the exact original text,
 so copying and annotation offsets remain stable. Colors use `--reading-code-*`
-palette tokens in both PWA themes.
+palette tokens in both PWA themes, with Obsidian’s `--code-*` theme tokens as
+the plugin fallback.
 
 Supported article code languages and formats: JavaScript (including JSX),
 TypeScript (including TSX), Python, Bash, shell sessions, Swift, Java, Kotlin,

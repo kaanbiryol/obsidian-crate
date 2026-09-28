@@ -43,7 +43,6 @@ class CompactReminderModal extends BaseUiModal {
       <PluginContext.Provider value={this.plugin}>
         <ProjectSheet
           plugin={this.plugin}
-          shadowRoot={shadowMount.shadowRoot}
           onClose={close}
           initialProject={this.initialProject}
         />

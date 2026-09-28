@@ -4,7 +4,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, updateReadingNote } from './core/notes';
-import { getReadingLibrary, startReading, stopReading } from './runtime';
+import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime } from './runtime';
 
 function harness() {
 	vi.useFakeTimers(); vi.stubGlobal('window', globalThis);
@@ -35,6 +35,23 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Reading runtime lifecycle', () => {
+  it('updates mounted workspaces when the local library is replaced or stopped', () => {
+    const h = harness();
+    const listener = vi.fn(() => getReadingLibrary(h.plugin));
+    const unsubscribe = subscribeReadingRuntime(h.plugin, listener);
+    startReading(h.plugin);
+    const first = getReadingLibrary(h.plugin);
+    expect(listener).toHaveLastReturnedWith(first);
+    startReading(h.plugin);
+    expect(getReadingLibrary(h.plugin)).not.toBe(first);
+    expect(listener).toHaveLastReturnedWith(getReadingLibrary(h.plugin));
+    stopReading(h.plugin);
+    expect(listener).toHaveLastReturnedWith(undefined);
+    unsubscribe(); listener.mockClear();
+    startReading(h.plugin);
+    expect(listener).not.toHaveBeenCalled();
+    stopReading(h.plugin);
+  });
 	it('discovers a normal clip after the vault is ready without a template marker', async () => {
 		const h = harness();
 		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');

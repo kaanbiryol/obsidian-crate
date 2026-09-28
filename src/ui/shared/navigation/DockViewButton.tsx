@@ -7,19 +7,20 @@ type Point = { x: number; y: number };
 type Gesture = { pointerId: number; button: HTMLButtonElement; start: Point; choosing: boolean; moved: boolean };
 
 /** Tap selects the slot’s destination; hold or slide up to choose in one gesture. */
-export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, onOpen, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
+export function DockViewButton({ label, icon, active, open, inert, onSelect, onOpen, onDragStart, onDragMove, onDragEnd, onDragCancel }: {
   label: string; icon: string; active: boolean; open: boolean; inert: boolean;
   onSelect: () => void; onOpen: () => void;
   onDragStart: () => void; onDragMove: (point: Point) => void;
   onDragEnd: (point: Point, moved: boolean) => void; onDragCancel: () => void;
 }) {
   const description = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const initialIcon = useRef(icon);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<number | null>(null);
   const gesture = useRef<Gesture | null>(null);
   const suppressClick = useRef(false);
   const clear = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current);
+    if (timer.current !== null) (buttonRef.current?.ownerDocument.defaultView ?? window).clearTimeout(timer.current);
     timer.current = null;
     const current = gesture.current;
     gesture.current = null;
@@ -33,15 +34,17 @@ export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, 
   }, [clear, onDragCancel]);
   useEffect(() => {
     if (inert) cancel();
-    window.addEventListener('blur', cancel);
-    document.addEventListener('visibilitychange', cancel);
-    return () => { clear(); window.removeEventListener('blur', cancel); document.removeEventListener('visibilitychange', cancel); };
+    const doc = buttonRef.current?.ownerDocument ?? document;
+    const owner = doc.defaultView ?? window;
+    owner.addEventListener('blur', cancel);
+    doc.addEventListener('visibilitychange', cancel);
+    return () => { clear(); owner.removeEventListener('blur', cancel); doc.removeEventListener('visibilitychange', cancel); };
   }, [cancel, clear, inert]);
   useEffect(() => { if (!open && gesture.current?.choosing) clear(); }, [open, clear]);
   const beginChoosing = () => {
     const current = gesture.current;
     if (!current || !current.button.isConnected || current.button.closest('[inert]')) return;
-    if (timer.current !== null) clearTimeout(timer.current);
+    if (timer.current !== null) (buttonRef.current?.ownerDocument.defaultView ?? window).clearTimeout(timer.current);
     timer.current = null;
     current.choosing = true;
     suppressClick.current = true;
@@ -49,7 +52,7 @@ export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, 
   };
   // Covered navigation stays painted; inert blocks input without disabled dimming.
   return <>
-    <Button className={`pwa-dock__tab pwa-dock__group${active ? ' is-active' : ''}`} data-dock-group="true" data-dock-switcher="true" data-dock-active={active ? 'true' : undefined} aria-current={active ? 'page' : undefined} aria-label={label} aria-describedby={description} aria-haspopup="dialog" aria-expanded={open} inert={inert} title={`${label} · Hold or slide up to switch views`}
+    <Button ref={buttonRef} className={`pwa-dock__tab pwa-dock__group${active ? ' is-active' : ''}`} data-dock-group="true" data-dock-switcher="true" data-dock-active={active ? 'true' : undefined} aria-current={active ? 'page' : undefined} aria-label={label} aria-describedby={description} aria-haspopup="dialog" aria-expanded={open} inert={inert} title={`${label} · Hold or slide up to switch views`}
       onPointerDown={event => {
         cancel();
         suppressClick.current = false;
@@ -57,7 +60,7 @@ export function PwaDockViewButton({ label, icon, active, open, inert, onSelect, 
         const button = event.currentTarget;
         button.setPointerCapture(event.pointerId);
         gesture.current = { pointerId: event.pointerId, button, start: { x: event.clientX, y: event.clientY }, choosing: false, moved: false };
-        timer.current = setTimeout(beginChoosing, 420);
+        timer.current = (button.ownerDocument.defaultView ?? window).setTimeout(beginChoosing, 420);
       }}
       onPointerMove={event => {
         const current = gesture.current;

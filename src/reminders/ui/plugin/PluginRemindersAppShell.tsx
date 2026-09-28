@@ -1,17 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppDock, DockAddButton } from '@/ui/shared/navigation/AppDock';
+import { DOCK_TABS } from '@/ui/shared/navigation/dock-destinations';
+import { ScheduleSwitcher } from '@/ui/shared/navigation/ScheduleSwitcher';
+import { TabTransition } from '@/ui/shared/navigation/TabTransition';
+import { NavigationScreen } from '@/ui/shared/navigation/NavigationScreen';
+import { PWA_CONTROL_SPRING } from '@/ui/shared/navigation/motion';
+import { BackButton } from '@/ui/shared/BackButton';
+import { ProjectDetailView } from '../views';
+import type { TabId } from '../layoutConstants';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 
-import { BottomTabBar } from "@/reminders/components/BottomTabBar";
-import { FloatingActionButton } from "@/reminders/components/FloatingActionButton";
-import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
-import { ThemeIconProvider } from "@/reminders/components/theme-icon";
+import { ThemeIcon } from "@/reminders/components/theme-icon";
+
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ViewHeader } from "@/reminders/components/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
-import {
-  PAGE_TRANSITION_DURATION,
-  type TabId,
-} from "@/reminders/ui/layoutConstants";
 import { RemindersViewPanels } from "@/reminders/ui/RemindersViewPanels";
 import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
 import { useReminderClock } from '../useReminderClock';
@@ -44,9 +47,11 @@ interface PluginRemindersAppShellProps {
   hideTabBar?: boolean;
   upcomingDays: number;
   loadingContent?: React.ReactNode;
-  loadingTransition?: boolean;
+  activeTab?: TabId;
+  onTabChange?: (tab: TabId) => void;
+  renderNavigation?: (tab: TabId, onChange: (tab: TabId) => void, onAdd: (() => void) | undefined, inert: boolean) => React.ReactNode;
   headerRightContent?: React.ReactNode;
-  renderHeader?: (title: string) => React.ReactNode;
+  renderHeader?: (title: string, actions: React.ReactNode) => React.ReactNode;
   belowHeaderContent?: React.ReactNode;
   topOverlay?: React.ReactNode;
   children?: React.ReactNode;
@@ -59,7 +64,7 @@ interface PluginRemindersAppShellProps {
   reorderInteraction?: 'drag' | 'long-press';
 }
 
-/** Obsidian-owned reminders chrome. Shared reminder content lives below this shell. */
+/** Local navigation state with the same dock, date switcher and transitions as the PWA. */
 export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = ({
   reminders,
   projects: providedProjects,
@@ -73,7 +78,9 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   hideTabBar = false,
   upcomingDays,
   loadingContent,
-  loadingTransition = false,
+  activeTab,
+  onTabChange,
+  renderNavigation,
   headerRightContent,
   renderHeader,
   belowHeaderContent,
@@ -87,56 +94,43 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   onReorderDragActiveChange,
   reorderInteraction = 'drag',
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const transitionTimeoutRef = useRef<number | null>(null);
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
   const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
+  const [closingProject, setClosingProject] = useState(false);
+  const [direction, setDirection] = useState<-1 | 0 | 1>(0);
+  const shell = useRef<HTMLDivElement>(null);
+  const lastProject = useRef(initialProject);
+  const restoreProjectFocus = useRef(false);
   const prefersReducedMotion = useObsidianReducedMotion();
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimeoutRef.current) {
-        window.clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const projects = useMemo(() => {
-    return providedProjects ?? getReminderProjects(reminders);
-  }, [providedProjects, reminders]);
-
-  const startTransition = useCallback(() => {
-    if (prefersReducedMotion) {
-      setIsTransitioning(false);
-      return;
-    }
-
-    setIsTransitioning(true);
-
-    if (transitionTimeoutRef.current) {
-      window.clearTimeout(transitionTimeoutRef.current);
-    }
-
-    transitionTimeoutRef.current = window.setTimeout(() => {
-      setIsTransitioning(false);
-    }, PAGE_TRANSITION_DURATION * 1000);
-  }, [prefersReducedMotion]);
-
+  const viewMode = activeTab ?? localViewMode;
+  const setViewMode = useCallback((tab: TabId) => {
+    setLocalViewMode(tab);
+    onTabChange?.(tab);
+  }, [onTabChange]);
+  const projects = useMemo(() => providedProjects ?? getReminderProjects(reminders), [providedProjects, reminders]);
   const handleViewModeChange = useCallback((mode: ViewMode) => {
-    startTransition();
     setViewMode(mode);
     setSelectedProject(null);
-  }, [startTransition]);
-
+  }, [setViewMode]);
   const handleProjectSelect = useCallback((project: string) => {
-    startTransition();
+    lastProject.current = project;
+    setDirection(1);
     setSelectedProject(project);
-  }, [startTransition]);
-
+  }, []);
   const handleBackToProjects = useCallback(() => {
-    startTransition();
+    restoreProjectFocus.current = true;
+    setDirection(-1);
+    setClosingProject(true);
     setSelectedProject(null);
-  }, [startTransition]);
+  }, []);
+  const finishProjectClose = () => setClosingProject(false);
+  useLayoutEffect(() => {
+    if (selectedProject || closingProject || !restoreProjectFocus.current) return;
+    restoreProjectFocus.current = false;
+    const button = Array.from(shell.current?.querySelectorAll<HTMLElement>('[data-action="open-project"]') ?? [])
+      .find(candidate => candidate.dataset.project === lastProject.current);
+    button?.focus({ preventScroll: true });
+  }, [selectedProject, closingProject]);
 
   const clock = useReminderClock(reminders);
   const headerData = useMemo(() => {
@@ -148,6 +142,8 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   }, [headerData, viewMode]);
 
   const showFab = shouldShowReminderFab(viewMode, selectedProject);
+  const primaryTab = viewMode === 'upcoming' ? 'today' : viewMode;
+  const rootCovered = Boolean(selectedProject) || closingProject;
 
   const handleAdd = useCallback(() => {
     onAdd(getReminderCreateProject(viewMode, selectedProject));
@@ -173,10 +169,10 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       endContent={
         <motion.span
           animate={{ rotate: showCompleted ? 180 : 0 }}
-          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}
+          transition={prefersReducedMotion ? { duration: 0 } : PWA_CONTROL_SPRING}
           className="inline-flex"
         >
-          <ObsidianIcon size="m" id="chevron-down" />
+          <ThemeIcon size="m" id="chevron-down" />
         </motion.span>
       }
     >
@@ -194,129 +190,71 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   }, [currentProject, onReorder]);
 
   const viewPanels = (
-    <AnimatePresence mode="sync">
-      <RemindersViewPanels
-        viewMode={viewMode}
-        selectedProject={selectedProject}
-        hideProjectTitle={Boolean(renderHeader)}
-        isInitialLoadComplete={isInitialLoadComplete}
-        reminders={reminders}
-        projects={projects}
-        showFab={showFab}
-        upcomingDays={upcomingDays}
-        renderCard={panelCardRenderer}
-        renderToggleButton={renderToggleButton}
-        onProjectSelect={handleProjectSelect}
-        onBackToProjects={handleBackToProjects}
-        onReorder={handleReorder}
-        onReorderDragActiveChange={onReorderDragActiveChange}
-        colorScheme={isDarkMode ? "dark" : "light"}
-        reorderInteraction={reorderInteraction}
-        animationsEnabled={!prefersReducedMotion}
-      />
-    </AnimatePresence>
+    <RemindersViewPanels
+      viewMode={viewMode}
+      selectedProject={null}
+      isInitialLoadComplete={isInitialLoadComplete}
+      reminders={reminders}
+      projects={projects}
+      showFab={!suppressFab}
+      upcomingDays={upcomingDays}
+      renderCard={(reminder, index) => renderCard({ reminder, index, hideProject: false })}
+      renderToggleButton={renderToggleButton}
+      onProjectSelect={handleProjectSelect}
+      onBackToProjects={handleBackToProjects}
+      onReorder={handleReorder}
+      onReorderDragActiveChange={onReorderDragActiveChange}
+      colorScheme={isDarkMode ? 'dark' : 'light'}
+      reorderInteraction={reorderInteraction}
+      pageTransitionsEnabled={false}
+      animationsEnabled={!prefersReducedMotion}
+    />
   );
-
-  const loadingCrossfade = prefersReducedMotion
-    ? { duration: 0 }
-    : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
-
-  return (
-    <ThemeIconProvider renderer={ObsidianIcon}>
-      <MotionConfig reducedMotion={prefersReducedMotion ? "always" : "user"}>
-        <div
-        className={[
-          "reminders-view",
-          "is-primary",
-          isDarkMode ? "dark" : "light",
-          isFullScreen ? "is-fullscreen" : "",
-          isModal ? "is-modal" : "",
-          isCompact || hideTabBar ? "is-compact" : "",
-          prefersReducedMotion ? "is-reduced-motion" : "",
-          viewMode === "browse" && selectedProject ? "is-project-detail" : `is-${viewMode}`,
-          className,
-        ].filter(Boolean).join(" ")}
-      >
-        {renderHeader?.(selectedProject ?? currentHeader.title)}
-        {topOverlay}
-
-        <AnimatePresence initial={false}>
-          {!renderHeader && !(viewMode === "browse" && selectedProject) && (
-            <motion.div
-              key="view-header"
-              initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={prefersReducedMotion ? { duration: 0 } : {
-                height: { duration: PAGE_TRANSITION_DURATION, ease: "easeOut" },
-                opacity: { duration: 0.18, ease: "easeOut" },
-              }}
-              className="overflow-hidden"
-            >
-              <ViewHeader
-                {...currentHeader}
-                countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
-                large={isFullScreen}
-                showMeta={isInitialLoadComplete && !loadingContent}
-                rightContent={headerRightContent}
-              />
-            </motion.div>
-          )}
+  const add = !loadingContent && !suppressFab ? handleAdd : undefined;
+  return <MotionConfig reducedMotion={prefersReducedMotion ? 'always' : 'user'}>
+    <div ref={shell} className={[
+      'reminders-view is-primary plugin-reminders-navigation',
+      isDarkMode ? 'dark' : 'light', isFullScreen ? 'is-fullscreen' : '',
+      isModal ? 'is-modal' : '', isCompact || hideTabBar ? 'is-compact' : '',
+      prefersReducedMotion ? 'is-reduced-motion' : '',
+      selectedProject ? 'is-project-detail' : `is-${viewMode}`, className,
+    ].filter(Boolean).join(' ')}>
+      {renderHeader?.(selectedProject ?? currentHeader.title, headerRightContent)}
+      {topOverlay}
+      <div className="plugin-reminders-body">
+      <div className="pwa-navigation-viewport" inert={rootCovered} aria-hidden={rootCovered || undefined}>
+        <TabTransition viewKey={primaryTab}>
+          {!renderHeader && <ViewHeader {...currentHeader} title={primaryTab === 'today' ? 'Reminders' : currentHeader.title}
+            countUnit={viewMode === 'browse' ? 'project' : 'reminder'} large={isFullScreen}
+            showMeta={isInitialLoadComplete && !loadingContent} rightContent={headerRightContent} />}
+          {(viewMode === 'today' || viewMode === 'upcoming') && <ScheduleSwitcher value={viewMode} onChange={handleViewModeChange} />}
+          {belowHeaderContent}
+          <div className="reminders-content">
+            {loadingContent ?? (primaryTab === 'today' ? <TabTransition viewKey={viewMode}>{viewPanels}</TabTransition> : viewPanels)}
+          </div>
+        </TabTransition>
+      </div>
+      {!hideTabBar && (renderNavigation?.(viewMode, handleViewModeChange, add, rootCovered)
+        ?? <AppDock section="reminders" tabs={['inbox', 'today', 'browse']} destinations={DOCK_TABS.filter(item => ['inbox', 'today', 'browse'].includes(item.id))}
+          activeTab={primaryTab} onSelect={tab => handleViewModeChange(tab as TabId)} onPin={tab => handleViewModeChange(tab as TabId)} onAdd={add} inert={rootCovered} />)}
+      <div className="pwa-project-layer" data-project-open={rootCovered}>
+        <AnimatePresence initial={false} custom={{ direction, reduceMotion: prefersReducedMotion }} onExitComplete={finishProjectClose}>
+          {selectedProject && <NavigationScreen key={selectedProject} motion={{ direction, reduceMotion: prefersReducedMotion }} isProjectDetail>
+            <div className="reminders-content">
+              <ProjectDetailView project={selectedProject} hideTitle={Boolean(renderHeader)}
+                backControl={<BackButton label="Back to projects" onClick={handleBackToProjects} />}
+                navigationRightContent={renderHeader ? undefined : headerRightContent} belowHeaderContent={belowHeaderContent}
+                reminders={reminders} loadingContent={loadingContent} onBack={handleBackToProjects}
+                animationConfig={{ enabled: !prefersReducedMotion }} renderCard={panelCardRenderer}
+                hasFab={showFab && !suppressFab} onReorder={handleReorder} onReorderDragActiveChange={onReorderDragActiveChange}
+                colorScheme={isDarkMode ? 'dark' : 'light'} reorderInteraction={reorderInteraction} />
+            </div>
+            {add && <div className="pwa-dock pwa-project-dock"><DockAddButton section="reminders" onClick={add} /></div>}
+          </NavigationScreen>}
         </AnimatePresence>
-
-        {belowHeaderContent}
-
-        <div className={`reminders-content${isTransitioning ? " is-transitioning" : ""}${loadingTransition ? " has-loading-transition" : ""}`}>
-          {loadingTransition ? (
-            <AnimatePresence initial={false} mode="sync">
-              {loadingContent ? (
-                <motion.div
-                  key="initial-loading"
-                  className="reminders-loading-transition-layer"
-                  initial={false}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={loadingCrossfade}
-                >
-                  {loadingContent}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="initial-content"
-                  className="reminders-loading-transition-layer"
-                  initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 3 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={loadingCrossfade}
-                >
-                  {viewPanels}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          ) : loadingContent ? loadingContent : viewPanels}
-        </div>
-
-        {!hideTabBar && (
-          <BottomTabBar
-            activeTab={viewMode}
-            onTabChange={handleViewModeChange}
-            className="animated-tab-bar animated-tab-bar-bottom"
-            animateActiveIndicator={!prefersReducedMotion}
-          />
-        )}
-
-        <AnimatePresence>
-          {showFab && !loadingContent && !suppressFab && (
-            <FloatingActionButton
-              onClick={handleAdd}
-              className="fab"
-              data-action="open-create-modal"
-            />
-          )}
-        </AnimatePresence>
-
-        {children}
-        </div>
-      </MotionConfig>
-    </ThemeIconProvider>
-  );
+      </div>
+      </div>
+      {children}
+    </div>
+  </MotionConfig>;
 };

@@ -5,12 +5,11 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { BaseUiModal } from '../../ui/shared/BaseUiModal';
 import { hideNativeModalCloseButton } from '../../reminders/ui/adapters/modalShell';
 import { getReadingLibrary } from '../runtime';
-import { ReadingDialog } from './ReadingDialog';
-import { SaveLinkForm } from './SaveLinkForm';
+import { SaveLinkDialog } from './SaveLinkDialog';
 import { ThemeIconProvider } from '../../reminders/components/theme-icon';
 import { ObsidianIcon } from '../../reminders/components/obsidian-icon';
 
-/** The command uses Obsidian's modal shell with the same capture fields as the PWA. */
+/** Plugin capture uses Obsidian's modal shell with the same capture fields as the PWA. */
 export class AddReadingLinkModal extends BaseUiModal {
 	private root?: Root;
 	constructor(private plugin: CratePlugin) { super(plugin.app); }
@@ -40,5 +39,6 @@ function LocalCapture({ plugin, onClose }: { plugin: CratePlugin; onClose: () =>
 		} catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save this link.'); }
 		finally { pending.current = false; setSaving(false); }
 	};
-	return <ReadingDialog title="Save a link" busy={saving} onClose={onClose}><SaveLinkForm url={url} onUrl={setUrl} saving={saving} error={error} onCancel={onClose} onSave={() => void save()} /></ReadingDialog>;
+	return <SaveLinkDialog variant={Platform.isMobile ? 'bottom-sheet' : 'centered'} showBackdrop={Platform.isMobile}
+		url={url} onUrl={setUrl} saving={saving} error={error} onClose={onClose} onSave={() => void save()} />;
 }

@@ -114,7 +114,7 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	await page.keyboard.press('Enter');
 	await expect(page.getByRole('dialog', { name: 'Save a link' })).toBeVisible();
 	await page.getByLabel('Link', { exact: true }).fill('https://example.com/later');
-	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await page.getByRole('button', { name: host === 'plugin' ? 'Close save a link' : 'Cancel', exact: true }).click();
 	await page.getByRole('button', { name: 'Save a link', exact: true }).click();
 	await expect(page.getByLabel('Link', { exact: true })).toHaveValue('https://example.com/later');
 	await page.getByLabel('Link', { exact: true }).focus();

@@ -1,0 +1,35 @@
+@mixin styles {
+.crate-reading-workspace .crate-reading__layout { position: relative; isolation: isolate; }
+.crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar) {
+  // Keep the tab bar's own z-index inside the library layer throughout navigation.
+  z-index: 0;
+  display: flex;
+}
+.crate-reading-workspace .crate-reading__sidebar { z-index: 1; }
+.crate-reading-workspace .crate-reading__reader-pane {
+  position: absolute;
+  grid-area: 1 / 1 / -1 / -1;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  visibility: hidden;
+  pointer-events: none;
+  height: 100%;
+  background: var(--crate-app-bg);
+  box-shadow: -14px 0 32px rgba(0, 0, 0, .1);
+  transform: translate3d(100%, 0, 0);
+  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s linear var(--pwa-motion-navigation-duration);
+}
+.crate-reading-workspace[data-reader-open="true"] .crate-reading__reader-pane {
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--pwa-motion-navigation-duration) var(--pwa-motion-surface-ease), visibility 0s;
+}
+// Browser history gestures already animate the page; do not replay the slide afterward.
+.crate-reading-workspace[data-reader-motion="none"] .crate-reading__reader-pane { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .crate-reading-workspace :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
+  .crate-reading-workspace[data-reader-open="true"] :is(.crate-reading__library, .crate-reading__sidebar, .crate-reading__reader-pane) { transition: none; }
+}
+}

@@ -136,7 +136,7 @@ The service uses Obsidian's official `App.secretStorage` type and scopes the syn
 
 The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML, styles, install assets, and service worker live in `src/cloudflare/worker/pwa/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes the deployable module to `.generated/cloudflare/worker.mjs`.
 
-The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome. Both hosts compile the same semantic theme tokens and reminder-card styles; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
+The Obsidian plugin and PWA share dock presentation, the Today/Upcoming switcher, tab dissolves, and project push/pop transitions in `src/ui/shared/navigation/`, alongside reminder panels, cards, and view-model logic. Host adapters retain viewport, safe-area, modal, persistence, and history behavior. `PluginWorkspace` keeps visited Reminders and Reading screens mounted in the same Obsidian pane, reads local vault repositories, and stores dock choices in Obsidian device-local storage. Existing view types and commands remain supported. Reading runtime subscriptions replace or remove the mounted library when its configuration changes. Both hosts compile the same semantic theme tokens; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
 
 Reading and Reminders share the feature-independent view header, navigation bar,
 buttons, icon buttons, and modal header under `src/ui/shared/`. Feature adapters

@@ -1,8 +1,9 @@
+import { getEditorSelectionRange } from '../../reminders/utils/editorSelection';
 import { matchingHighlights, type ReadingHighlight } from '../core/highlights';
 
-export function selectedHighlight(body: HTMLElement, selection: Selection | null): ReadingHighlight | null {
-	if (!selection?.rangeCount || selection.isCollapsed) return null;
-	const range = selection.getRangeAt(0);
+export function selectedHighlight(body: HTMLElement): ReadingHighlight | null {
+	const range = getEditorSelectionRange(body);
+	if (!range || range.collapsed) return null;
 	if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return null;
 	const prefix = range.cloneRange();
 	prefix.selectNodeContents(body); prefix.setEnd(range.startContainer, range.startOffset);
