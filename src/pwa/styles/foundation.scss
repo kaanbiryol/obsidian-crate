@@ -20,18 +20,13 @@
 	--crate-view-title-weight: 700;
 	--crate-view-title-spacing: -.04em;
 	--crate-view-title-leading: 1.12;
-	--pwa-header-top-gap: 17px;
-	--pwa-header-bottom-gap: 11px;
-	--pwa-header-meta-height: 28px;
-	--pwa-header-meta-gap: 6px;
-	--crate-view-header-padding: var(--pwa-header-top-gap) 18px var(--pwa-header-bottom-gap);
+	@include view-header.screen-spacing-tokens;
+	// Standalone safe-area and launch-shell styles consume these host aliases.
+	--pwa-header-top-gap: var(--crate-header-top-gap);
+	--pwa-header-bottom-gap: var(--crate-header-bottom-gap);
 	@media (max-width: 759px) {
 		--crate-view-title-size: 26px;
 		--crate-view-title-spacing: -.03em;
-		--pwa-header-top-gap: 4px;
-		--pwa-header-bottom-gap: 8px;
-		--pwa-header-meta-height: 20px;
-		--pwa-header-meta-gap: 0px;
 	}
 	@include controls.styles;
 	@include fields.styles;
@@ -53,14 +48,11 @@
 // The host selector takes precedence over shared .reminders-view.is-primary
 // geometry even when a feature stylesheet is loaded after this foundation.
 .crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) :is(.pwa-reminders-view.is-primary, .pwa-opening-screen, .crate-reading-web) .view-header {
-	min-height: 0;
+	@include view-header.screen-spacing;
 	.view-header-title {
 		font-size: var(--crate-view-title-size);
 		font-weight: var(--crate-view-title-weight);
 		letter-spacing: var(--crate-view-title-spacing);
 		line-height: var(--crate-view-title-leading);
 	}
-	.view-header-meta { height: var(--pwa-header-meta-height); min-height: var(--pwa-header-meta-height); margin-top: var(--pwa-header-meta-gap); }
-	.view-header-title-row { min-height: 44px; }
-	.view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
 }
