@@ -8,10 +8,14 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
+      - "scripts/download-release-shortcut.mjs"
+      - "scripts/shortcut-release.mjs"
       - "scripts/sign-reading-shortcut.mjs"
       - "scripts/reading-shortcut-first-run.mjs"
       - "scripts/reading-shortcut.test.mjs"
       - "docs/shortcuts/save-to-crate.plist"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -23,13 +27,13 @@ concurrency:
 
 jobs:
   build:
-    # The pairing template uses iOS 27 shortcut-scoped storage. Signing it
-    # requires macOS 27; macos-26 rejects its minimum client version.
-    runs-on: xcode-27
+    # Template tests use macOS plutil; signing runs only on the maintainer’s Mac.
+    runs-on: macos-26
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: master
           fetch-depth: 0
           persist-credentials: false
       - name: Use Node.js
@@ -43,12 +47,13 @@ jobs:
         run: npm run security:check
       - name: Build site styles
         run: npm run build:site
-      - name: Verify and sign the public iPhone shortcut
-        run: |
-          node --test scripts/reading-shortcut.test.mjs
-          npm run build:reading-shortcut -- --pairing
-          mkdir -p site/shortcuts/v1
-          cp "dist/Save to Crate (iOS 27).shortcut" "site/shortcuts/v1/Save to Crate (iOS 27).shortcut"
+      - name: Verify shortcut template
+        run: node --test scripts/reading-shortcut.test.mjs
+      - name: Download the latest published shortcut
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/download-release-shortcut.mjs published site/shortcuts/v1
       - name: Upload static site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
