@@ -55,7 +55,7 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-top-notices{background:var(--background-primary)}
 .pwa-status-line,.pwa-notification-prompt{background:rgba(255,255,255,.76);border-color:var(--background-modifier-border);color:var(--text-normal)}
 .pwa-status-line.is-live{background:var(--pwa-light-surface-soft)}
-.pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage,.modal-card,.settings-sheet{background:var(--pwa-sheet-surface);border-color:var(--background-modifier-border)}
+.pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage,.modal-card{background:var(--pwa-sheet-surface);border-color:var(--background-modifier-border)}
 .pwa-modal-sheet{color:var(--text-normal);color-scheme:light}
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.18)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{box-shadow:0 -24px 70px rgba(24,24,27,.16)}

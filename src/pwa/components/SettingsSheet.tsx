@@ -24,7 +24,7 @@ import { PwaUpdateNotice, PwaUpdateFeedback } from './PwaUpdateNotice';
 import type { PwaPreferences } from '../preferences';
 import type { CrateSection } from './FeatureSwitcherButton';
 
-type SettingsAction = 'refresh' | 'export-reminders' | 'update' | 'logout';
+type SettingsAction = 'refresh' | 'export-reminders' | 'logout';
 
 export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd, navigation }: { navigation: PushedScreenHistory<'shortcut' | 'logout'>; activeSection: CrateSection; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
@@ -39,7 +39,7 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd, nav
 	const [pending, setPending] = useState<ReadonlySet<SettingsAction>>(new Set());
 	const working = useRef(new Set<SettingsAction>());
 	const busy = pending.size > 0;
-	const exclusive = appUpdate.updating || pending.has('update') || pending.has('logout');
+	const exclusive = appUpdate.updating || pending.has('logout');
 	const [message, setMessage] = useState<string | null>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const ready = Boolean(reminders?.ready && reading?.ready);
@@ -51,8 +51,8 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd, nav
 		else navigation.push(next);
 	};
 	const run = async (key: SettingsAction, action: () => void | Promise<unknown>) => {
-		if (working.current.has(key) || working.current.has('update') || working.current.has('logout')
-			|| ((key === 'update' || key === 'logout') && working.current.size > 0)) return;
+		if (working.current.has(key) || working.current.has('logout')
+			|| (key === 'logout' && working.current.size > 0)) return;
 		working.current.add(key); setPending(new Set(working.current)); setMessage(null);
 		try { await action(); }
 		catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not complete this action. Try again.'); }
@@ -128,8 +128,6 @@ export function SettingsSheet({ activeSection, onReviewReminders, onOpenEnd, nav
 					{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
 					<SettingsSection title="About">
 						<VersionSettings />
-						{!appUpdate.version && <SettingsAction disabled={busy || unsynced || exclusive} onClick={() => void run('update', appUpdate.update)}>{appUpdate.updating ? 'Updating…' : 'Update app'}</SettingsAction>}
-						{unsynced && !appUpdate.version && <p className="settings-help">Sync pending changes before updating.</p>}
 					</SettingsSection>
 					<div className="settings-account"><SettingsAction tone="danger" data-action="logout" disabled={exclusive || !ready} onClick={() => navigate('logout')}>Log out</SettingsAction></div>
 			</PwaPushStack>

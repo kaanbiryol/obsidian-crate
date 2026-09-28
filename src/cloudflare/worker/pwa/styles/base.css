@@ -44,7 +44,7 @@ body.pwa-sheet-scroll-locked .pwa-modal-sheet__container--reminder{max-height:ca
 .toast.is-success::before{background:var(--text-success);box-shadow:0 0 0 3px color-mix(in srgb,var(--text-success) 10%,transparent)}
 .toast.is-error::before{background:var(--text-error);box-shadow:0 0 0 3px color-mix(in srgb,var(--text-error) 10%,transparent)}
 .toast.is-info::before{background:var(--interactive-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--interactive-accent) 10%,transparent)}
-.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:var(--pwa-sheet-surface);border:0;border-radius:0;padding:0;box-shadow:none}
+.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;border:0;border-radius:0;padding:0;box-shadow:none}
 .settings-panel{display:flex;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;flex:1 1 auto;flex-direction:column;gap:22px;padding:22px 18px calc(20px + env(safe-area-inset-bottom));background:none;border:0;-webkit-overflow-scrolling:touch}
 .settings-panel__section{margin:0}
 .settings-panel__title{margin:0 0 9px 2px;color:var(--text-faint);font-size:var(--pwa-font-caption);font-weight:600;line-height:1.25;letter-spacing:0}

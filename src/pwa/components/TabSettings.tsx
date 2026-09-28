@@ -50,9 +50,9 @@ export function TabSettings({ preferences, onChange }: {
 			<span className="settings-preference-control settings-preference-control--select">
 				<select aria-label="Default tab" className="settings-preference-input" value={preferences.defaultScreen}
 					onChange={event => onChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] })}>
-					<option value="today">Reminders — Today</option>
+					<option value="today">Today</option>
 					<option value="inbox">Inbox</option>
-					<option value="upcoming">Reminders — Upcoming</option>
+					<option value="upcoming">Upcoming</option>
 					<option value="browse">Projects</option>
 					<option value="reading">Reading</option>
 					<option value="favorites">Favorites</option>

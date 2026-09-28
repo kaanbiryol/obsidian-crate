@@ -1,3 +1,4 @@
+import { checkDisabledReading } from './pwa-reading-disabled-checks.mjs';
 import { checkTabSettings } from './pwa-tab-settings-checks.mjs';
 import { checkCompoundFocus, checkSettingsFocus } from './pwa-compound-focus-checks.mjs';
 import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
@@ -42,7 +43,7 @@ try {
 			await expect(sheet.getByRole('button', { name: 'Export Reading data', exact: true })).toHaveCount(0);
 			await expect(sheet.getByText('Up to date.', { exact: true })).toHaveCount(0);
 			await expect(sheet.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible();
-			await expect(sheet.getByRole('button', { name: 'Update app', exact: true })).toBeVisible();
+			await expect(sheet.getByRole('button', { name: 'Update app', exact: true })).toHaveCount(0);
 			for (const colorScheme of ['light', 'dark']) {
 				await page.emulateMedia({ colorScheme });
 				await sheet.locator('.settings-main').evaluate(element => { element.scrollTop = 0; });
@@ -245,17 +246,7 @@ try {
 			await expect.poll(() => page.evaluate(() => [localStorage.getItem('crate-reminders-auth-token'), localStorage.getItem('crate-reading-session-v1')])).toEqual([null, null]);
 			expect(errors).toEqual([]);
 			await context.close();
-			// Reading is optional: a disabled server feature is not an unsynced error.
-			const disabledContext = await browser.newContext({ serviceWorkers: 'block' });
-			const disabledPage = await disabledContext.newPage();
-			await disabledPage.route('**/reading/session', route => route.fulfill({ status: 403, json: { error: 'Reading is disabled. Enable it in Crate settings.' } }));
-			await disabledPage.goto(origin + '/notifications?tab=inbox');
-			await disabledPage.getByRole('button', { name: 'Open settings', exact: true }).click();
-			const disabledSheet = disabledPage.getByRole('dialog', { name: 'Settings', exact: true });
-			await expect(disabledSheet.getByRole('button', { name: 'Update app', exact: true })).toBeEnabled();
-			await expect(disabledSheet.locator('.settings-attention')).toHaveCount(0);
-			await expect(disabledSheet.getByRole('button', { name: 'Set up iPhone shortcut', exact: true })).toBeDisabled();
-			await disabledContext.close();
+			await checkDisabledReading(browser, origin, name);
 			const offlineContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, serviceWorkers: 'block' });
 			const offlinePage = await offlineContext.newPage();
 			await offlinePage.goto(origin + '/notifications?tab=inbox');
