@@ -89,8 +89,11 @@ export function checkServerRevision(root, base, inputs) {
 	if (changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
 	}
-	for (const [index, migration] of before.migrations.entries()) {
-		if (JSON.stringify(migration) !== JSON.stringify(current.migrations[index]) || changed(`src/cloudflare/migrations/${migration.file}`)) {
+	const baseline = current.baselineSchemaVersion ?? 1;
+	if (!Number.isSafeInteger(baseline) || baseline < (before.baselineSchemaVersion ?? 1) || baseline > current.minimumSchemaVersion) throw new Error('Invalid database schema baseline.');
+	// An explicit new baseline retires the old chain; those databases must be rejected.
+	for (const migration of before.migrations.filter(step => step.from >= baseline)) {
+		if (JSON.stringify(migration) !== JSON.stringify(current.migrations.find(step => step.id === migration.id)) || changed(`src/cloudflare/migrations/${migration.file}`)) {
 			throw new Error(`Released migration ${migration.id} cannot be edited or removed.`);
 		}
 	}

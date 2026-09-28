@@ -136,3 +136,14 @@ test('collects transitive deployment/build imports plus runtime graph and raw Sa
 	for (const file of ['src/shared.ts', 'scripts/helper.mjs', 'src/pwa/main.tsx', 'src/reminders/shared.ts', 'src/styles/shared.scss']) assert.ok(inputs.includes(file), file);
 	assert.ok(!inputs.some(path => path.startsWith('node_modules/') || path.startsWith('<')));
 });
+
+test('allows an explicit new baseline to retire unsupported development migrations', () => {
+	const h = fixture();
+	const migration = { id: 'example', from: 1, to: 2, file: 'example.sql', checksum: 'a'.repeat(64) };
+	h.release({ revision: 2, schemaVersion: 2, migrations: [migration] });
+	const base = h.commit();
+	h.release({ revision: 3, schemaVersion: 4, minimumSchemaVersion: 4, baselineSchemaVersion: 4 });
+	assert.doesNotThrow(() => checkServerRevision(h.root, base, h.inputs));
+	h.release({ revision: 3, schemaVersion: 4, minimumSchemaVersion: 1, baselineSchemaVersion: 4 });
+	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /Invalid database schema baseline/);
+});

@@ -80,9 +80,9 @@ export function parseBackupRows(sql: string): BackupRow[] {
 const record = (row: BackupRow): Record<string, Cell> => Object.fromEntries(row.columns.map((column, index) => [column, row.values[index]!]));
 const RESET = new Set(['crate_schema', 'crate_release', 'crate_migrations', 'auth_tokens', 'push_subscriptions', 'web_enrollment_tokens', 'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache', 'object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state', 'reading_sources', 'reading_jobs', 'reading_enrollments', 'reading_handoffs']);
 export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentSchema: string, restoredAt: number): BackupRow[] {
-  // Schema 1→2 adds Reading tables; 2→3 adds a defaulted column. Future data
-  // transformations must add an explicit recovery adapter before enabling them.
-  if (SERVER_RELEASE.schemaVersion > 3) throw new Error('This schema needs a newer in-app restore adapter');
+  // Future data transformations beyond the launch baseline must add an
+  // explicit recovery adapter before enabling them.
+  if (SERVER_RELEASE.schemaVersion > 4) throw new Error('This schema needs a newer in-app restore adapter');
   const allowed = new Set([...currentSchema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]));
   allowed.add('sqlite_sequence');
   if (rows.some(row => !allowed.has(row.table))) throw new Error('Unknown backup table');

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 3, 3);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 4, 4);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,8 +260,7 @@ CREATE TABLE IF NOT EXISTS crate_migrations (
 
 CREATE TABLE IF NOT EXISTS reading_policy (
  id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL,
- folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL,
- browser_rendering INTEGER NOT NULL DEFAULT 0 CHECK (browser_rendering IN (0, 1))
+ folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS reading_sources (
  path TEXT PRIMARY KEY, revision TEXT NOT NULL, generation TEXT NOT NULL,

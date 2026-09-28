@@ -1,3 +1,5 @@
+> Historical implementation plan. The pre-launch cleanup replaces schemas 1–3 and their migrations with a fresh schema-4 baseline. Migration requirements below describe the earlier implementation, not a supported upgrade path.
+
 # Read-it-later implementation plan
 
 Planning baseline: 2026-09-21, `master` at `48b9a902`, plugin 0.3.0 / server revision 59 / schema 1 / protocol 11. Implementation is ready for integrated testing on `codex/read-it-later`. Product behavior and the Markdown example live in [the feature spec](read-it-later-spec.md).
