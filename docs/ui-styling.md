@@ -180,6 +180,8 @@ both hosts together.
   replacements inside one drawer, not additional stacked dialogs.
   Stationary tab dissolves and toasts share a 160ms fade. Press feedback uses
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
+  The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
+  changes retain visible travel instead of spending almost all their time settling.
   Dock expansion uses the surface spring; native dragging remains immediate.
   Shared control tokens inherit these PWA defaults without changing Obsidian.
   Shared navigation indicators use a critically damped spring. Centered Obsidian

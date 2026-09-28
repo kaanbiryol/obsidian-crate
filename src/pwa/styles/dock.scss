@@ -54,7 +54,9 @@
     will-change: transform;
     background: color-mix(in srgb, var(--text-normal) 10%, transparent);
     opacity: var(--dock-tabs-opacity, 1);
-    pointer-events: none; transition: transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease);
+    // A full tab-width move needs visible travel before settling, unlike a
+    // small control's quick feedback. CSS retargets from the painted position.
+    pointer-events: none; transition: transform var(--pwa-motion-dock-duration) var(--pwa-motion-dock-ease);
   }
   .pwa-dock__group { gap: 4px; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
   .pwa-dock__view-icon { animation: pwa-dock-icon-in var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease); }
