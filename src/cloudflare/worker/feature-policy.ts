@@ -2,7 +2,7 @@ import { corsResponse } from './cors';
 import { parseJsonObject } from './utils';
 
 export interface FeaturePolicy { reading: boolean; reminders: boolean; revision: string | null }
-export const FEATURE_POLICY_KEY = 'crate_feature_policy';
+const FEATURE_POLICY_KEY = 'crate_feature_policy';
 export async function featurePolicy(db: D1Database): Promise<FeaturePolicy> {
   const row = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(FEATURE_POLICY_KEY).first<{ value: string }>();
   if (!row) return { reading: true, reminders: true, revision: null };

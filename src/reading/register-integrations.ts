@@ -5,7 +5,7 @@ import { startReading, stopReading } from './runtime';
 import { AddReadingLinkModal } from './ui/add-link-modal';
 import { READING_VIEW_TYPE, ReadingView } from './ui/reading-view';
 
-export async function openReading(plugin: CratePlugin): Promise<void> {
+async function openReading(plugin: CratePlugin): Promise<void> {
 	if (!plugin.settings.reading.enabled) { new Notice('Enable reading in Crate settings first.'); return; }
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;

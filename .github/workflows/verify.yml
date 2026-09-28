@@ -128,7 +128,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
       - name: Compare shared UI screenshots
         run: npx playwright test --shard=${{ matrix.shard }}/2
@@ -144,9 +144,13 @@ jobs:
           retention-days: 7
 
   editor:
-    name: Editor and activity browser tests
+    name: Editor and activity browser tests (${{ matrix.shard }}/2)
     runs-on: macos-26
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,14 +165,15 @@ jobs:
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
       - name: Check editor contracts
-        run: npx playwright test --config tests/editor-contract/playwright.config.ts
+        run: npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/2
       - name: Check activity browser behavior
+        if: matrix.shard == 1
         run: npm run test:activity-browser
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: editor-activity
+          name: editor-activity-${{ matrix.shard }}
           path: |
             .generated/editor-contract/current/
             .generated/activity-diff/
