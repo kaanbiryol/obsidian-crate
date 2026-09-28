@@ -1,9 +1,10 @@
+import { parseDevelopmentBuild, type DevelopmentBuild } from './server-build';
 import { CRATE_SERVICE_ID } from '../protocol';
 import release from './server-release.json';
 import type { HttpTransport } from './http';
 
 /** Wait for the public route to serve the uploaded build, without repeating mutations. */
-export async function verifyWorkerDeployment(transport: HttpTransport, origin: string, fingerprint: string, published = false): Promise<{ revision: number; schemaVersion: number }> {
+export async function verifyWorkerDeployment(transport: HttpTransport, origin: string, fingerprint: string, published = false): Promise<{ revision: number; schemaVersion: number; developmentBuild?: DevelopmentBuild }> {
 	let observed = '';
 	for (let attempt = 0; attempt < 8; attempt++) {
 		// Never forward management credentials to the public Worker.
@@ -18,7 +19,9 @@ export async function verifyWorkerDeployment(transport: HttpTransport, origin: s
 		if (response.status === 200 && info?.service === CRATE_SERVICE_ID
 			&& info.deploymentFingerprint === fingerprint
 			&& (published ? Number.isSafeInteger(info.serverRevision) && Number(info.serverRevision) > 0 && Number(info.serverRevision) <= release.revision : info.serverRevision === release.revision)
-			&& info.schemaVersion === release.schemaVersion) return { revision: Number(info.serverRevision), schemaVersion: release.schemaVersion };
+			&& info.schemaVersion === release.schemaVersion
+      && (info.developmentBuild === undefined || parseDevelopmentBuild(info.developmentBuild))) return { revision: Number(info.serverRevision), schemaVersion: release.schemaVersion,
+        ...(info.developmentBuild ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}) };
 		// Report only bounded deployment identity, never response bodies or credentials.
 		const revision = Number.isSafeInteger(info?.serverRevision) ? String(info?.serverRevision) : 'missing';
 		const schema = Number.isSafeInteger(info?.schemaVersion) ? String(info?.schemaVersion) : 'missing';

@@ -1,3 +1,4 @@
+import { readBuiltIdentity } from "./scripts/development-build.mjs";
 import replace from "@rollup/plugin-replace";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -17,6 +18,7 @@ export default defineConfig(({ mode }) => ({
 		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: __dirname })] : []),
 	],
 	define: {
+    __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(readBuiltIdentity(__dirname).development ?? null),
 		__CRATE_CLOUDFLARE_OAUTH_CLIENT_ID__: JSON.stringify(
 			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "9c474af284e49ff0201106f3b42cca05",
 		),

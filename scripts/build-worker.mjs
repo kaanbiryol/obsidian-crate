@@ -1,6 +1,8 @@
 import { build } from 'esbuild';
+import { createDevelopmentBuild } from './development-build.mjs';
 import { builtinModules } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
@@ -12,6 +14,7 @@ import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const generatedDir = resolve(root, '.generated/cloudflare');
+const development = process.argv.includes('--development') ? createDevelopmentBuild(root, process.env.CRATE_DEV_WORKER) : undefined;
 // This identifies the Cloudflare service, not the Obsidian plugin release.
 // Keeping it stable prevents an otherwise unrelated plugin version bump from
 // changing the Worker bundle and prompting users to redeploy their server.
@@ -48,6 +51,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 		loader: { '.png': 'binary' },
 		define: {
 			__CRATE_SERVER_VERSION__: JSON.stringify(serverVersion),
+      __CRATE_DEVELOPMENT_BUILD__: JSON.stringify(development ?? null),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaAssetVersion),
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
@@ -81,3 +85,5 @@ async function buildPwaClientBundle() {
 const pwaClient = await buildPwaClientBundle();
 const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets);
 writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile], rawInputs));
+
+writeGeneratedJson('build-identity.json', { development: development ?? null, workerSha256: createHash('sha256').update(readFileSync(resolve(generatedDir, 'worker.mjs'))).digest('hex'), release: JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8')) });

@@ -1,3 +1,4 @@
+import { DEVELOPMENT_BUILD } from '../server-build';
 import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import release from '../server-release.json';
@@ -44,5 +45,5 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 });
 
 export function handleServerInfo(env: Env): Response {
-	return corsResponse({ ...CRATE_SERVER_INFO, serverRevision: release.revision, schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
+	return corsResponse({ ...CRATE_SERVER_INFO, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

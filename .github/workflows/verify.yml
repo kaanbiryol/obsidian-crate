@@ -38,6 +38,8 @@ jobs:
       - name: Check dependencies and source security
         run: npm run security:check
       - name: Check source, server revision and unit tests
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run check:source
       - name: Check visual and editor types
         run: npm run typecheck:visual

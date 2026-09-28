@@ -6,12 +6,12 @@ Schema 1 is the fresh pre-launch baseline, including Reading storage and scoped 
 
 `src/cloudflare/server-release.json` is shared by the plugin, Worker build and recovery tools:
 
-- `revision` is a monotonically increasing server release number. Increment it whenever the deployable Worker, PWA, provisioning configuration, schema or migration plan changes for distribution. Never distribute different server artifacts under the same revision. The plugin package version can change independently.
+- `revision` is the public server release number. Advance it exactly once from the last published release when server inputs change, and keep it fixed throughout development of that release. Never distribute different stable server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
 - `minimumSchemaVersion` is the oldest supported database source, currently 1. Retiring an old source version within the launch chain never deletes its migration history.
 - `migrations` is an ordered, contiguous registry, currently empty. Future entries start at schema 1. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
 
-The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment.
+The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different stable fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment. Development builds additionally store a fingerprint-bound identity in `maintenance_state`, in the same transaction as the verified release record.
 
 Wire protocol ranges, capabilities, parser versions and browser/local storage envelopes remain separate compatibility contracts. A server revision does not establish API compatibility. Keep old writers only while they preserve current invariants, and preserve exact pending operation bodies and IDs.
 
@@ -50,9 +50,25 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 ## Release evidence
 
-`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently against uncommitted changes relative to `HEAD`; use `npm run check:server-revision -- --base <git-ref>` to check a complete branch or release. It rebuilds the server and follows the Worker, PWA, provisioner and build-script dependency graphs, including shared UI and transitive Sass imports. Database SQL, migration artifacts and compilation settings are included explicitly. Dependency-lock changes conservatively require a revision too; plugin package version and descriptive metadata changes alone do not.
+`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source/schema baseline after the intentional pre-launch reset; earlier prereleases belong to the retired sequence. Its `initialRevision: 1` starts the first public candidate at revision 1, independently of that baseline commit’s development revision. Once a release is published after that baseline, subsequent checks use that release. Keep the baseline fixed. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
-CI selects the complete comparison automatically: the PR base, the previous push tip, or the default branch for a new branch. Tag and manual release checks compare with the previous reachable release tag, falling back to the parent commit for the first release. Both workflows fetch full Git history. Missing references fail the check. A baseline predating the first release manifest is treated as its initial introduction. Revision decreases, schema edits without a schema version increase, and edits or removal of migrations within the supported baseline also fail. The one-time pre-launch reset from the explicitly marked schema-4 baseline to schema 1 is allowed only with a higher server revision; normal downgrade checks remain enforced.
+A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
+
+## Testing development deployments
+
+Choose the next public revision once in `src/cloudflare/server-release.json`. Build for your specific Cloudflare test Worker:
+
+```sh
+CRATE_DEV_WORKER=crate-0123456789abcdef npm run build:dev
+```
+
+Replace the example name with your development Worker's name. `npm run dev` uses the same variable for its watch builds. The existing development-vault configuration controls where the plugin is copied. Reload the plugin, select **Check live server**, then **Update server**. The bundled and live version displays include labels such as `3-dev.1` and `3-dev.2`.
+
+The ignored root file `server-development.local.json` holds a readable version such as `{ "version": "1-dev.2" }`. Each development Worker build increments it automatically; it can also be edited locally without committing it. A new public revision starts its own development sequence at 1. Stable builds leave this file untouched. Keep it across builds, including when cleaning `.generated/`. If it is lost or you change computers, set its version to at least the last deployed development build for the current public revision before rebuilding. Concurrent builds should use separate checkouts. A reused number with different bytes and older build numbers are rejected.
+
+Development artifacts are restricted to the exact Worker named at build time. The first development build must target a revision newer than the installed stable release. Successive development builds can replace each other within that revision; `npm run build` produces a stable build that can replace the development build at the same revision. Once stable is installed, start development of the next revision. Stable plugin/server packaging and release verification reject development artifacts.
+
+Development updates retain schema checks, migration receipts, verified backups when required, deployment ownership, exact-artifact recovery and live verification. Do not edit migrations already applied to a database you retain. Protocol, parser and stored-format versions remain independent of the development counter. This workflow targets plugin-managed Cloudflare deployments; the self-hosted storage compatibility contract is unchanged.
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.
 
@@ -75,9 +91,11 @@ are informational; deployment verification and update authorization still inspec
 the live server.
 
 Settings distinguish a newer revision from a fingerprint mismatch. Missing saved
-revision metadata prompts a manual live check; matching revision numbers with
-different builds require a higher server revision before deployment. Neither
-case is labeled an available update or permits the ordinary update action.
+revision metadata prompts a manual live check. Matching stable revision numbers
+with different builds require a higher server revision. For a development server,
+a live check can enable a newer development build or promotion to stable within
+the same revision; the database and deployment fence recheck eligibility before
+publication. Cached revision numbers alone cannot authorize that replacement.
 Matching live artifacts still route to publication recovery when saved deployment
 metadata has not been confirmed.
 

@@ -1,3 +1,4 @@
+import { readBuiltIdentity } from './development-build.mjs';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
@@ -22,6 +23,8 @@ async function readJson(path) {
 function assert(condition, message) {
 	if (!condition) throw new Error(message);
 }
+
+if (readBuiltIdentity(process.cwd()).development) throw new Error('Development builds cannot be published. Run npm run build first.');
 
 const [packageJson, manifest, versions, wrangler, pluginBundle, styles, workerBundle, d1Schema] = await Promise.all([
 	readJson('package.json'),

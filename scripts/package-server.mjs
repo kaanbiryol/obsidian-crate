@@ -1,8 +1,11 @@
+import { readBuiltIdentity } from './development-build.mjs';
 import { chmod, copyFile, cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+if (readBuiltIdentity(process.cwd()).development) throw new Error('Development builds cannot be published. Run npm run build first.');
+
 const destination = join(root, 'dist', 'server');
 const packageInfo = JSON.parse(await readFile(join(root, 'packages/server/package.json'), 'utf8'));
 const repositoryInfo = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));

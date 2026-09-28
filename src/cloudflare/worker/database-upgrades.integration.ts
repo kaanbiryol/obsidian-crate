@@ -3,7 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import currentSchema from '../schema.sql?raw';
-import { migrationTransaction, planDatabaseUpgrade } from '../database-upgrades';
+import { migrationTransaction, planDatabaseUpgrade, SERVER_RELEASE } from '../database-upgrades';
 import { sha256Hex } from '../deployment-artifacts';
 import { inspectDeploymentDatabase } from '../deployment-database';
 
@@ -14,8 +14,8 @@ it('accepts the launch baseline without rewriting it', async () => {
   await env.DB.batch(statements(currentSchema));
   await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','generation','revision')").run();
   const schemaHash = await sha256Hex(currentSchema);
-  await env.DB.prepare('INSERT INTO crate_release(id,revision,fingerprint,schema_version,schema_hash) VALUES (1,108,?,1,?)')
-    .bind('fa545843b4883f775e970cdf4b8d4760fe1a8f199a28052fe635c4f03c5df45e', schemaHash).run();
+  await env.DB.prepare('INSERT INTO crate_release(id,revision,fingerprint,schema_version,schema_hash) VALUES (1,?,?,1,?)')
+    .bind(SERVER_RELEASE.revision, 'f'.repeat(64), schemaHash).run();
   const queries: string[] = [];
   const input = {
     api: { queryD1: async (_account: string, _database: string, sql: string) => {
