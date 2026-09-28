@@ -51,3 +51,20 @@ class FutureSchemaTests(unittest.TestCase):
         self.db.execute('UPDATE crate_schema SET version = 2')
         with self.assertRaisesRegex(ValueError, 'history'):
             schema.validate_schema(self.db)
+
+
+class ReadingCaptureMigrationTests(unittest.TestCase):
+    def test_upgrade_preserves_files_and_is_repeatable(self):
+        db = sqlite3.connect(':memory:')
+        self.addCleanup(db.close)
+        db.executescript((schema.SOURCE / 'schema.sql').read_text())
+        db.execute('DROP TABLE reading_captures')
+        db.execute('UPDATE crate_schema SET version=1, created_version=1')
+        db.execute("INSERT INTO files(path,portable_path,hash,storage_key) VALUES ('Reading/Existing.md','reading/existing.md','original-hash','original-key')")
+        db.commit()
+        schema.upgrade_schema(db)
+        schema.upgrade_schema(db)
+        self.assertEqual(schema.validate_schema(db), 2)
+        self.assertEqual(db.execute('SELECT hash,storage_key FROM files').fetchone(), ('original-hash', 'original-key'))
+        self.assertEqual(db.execute('SELECT count(*) FROM reading_captures').fetchone()[0], 0)
+        self.assertEqual(db.execute('SELECT count(*) FROM crate_migrations').fetchone()[0], 1)

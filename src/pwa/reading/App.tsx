@@ -305,7 +305,7 @@ function ReadingAppContent() {
   useEffect(() => {
     if (!reader || reader.item.path) return;
     const saved = cache?.items.find(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(reader.item.source_url));
-    if (saved) void open(saved, false);
+    if (saved && (saved.path || saved.crate_reading_id !== reader.item.crate_reading_id)) void open(saved, false);
   }, [cache, reader, open]);
   useEffect(() => {
     let historyFrame = 0;
@@ -393,8 +393,8 @@ function ReadingAppContent() {
   const visibleReader = useMemo(() => reader && presentReadingItems([reader.item], pending)[0], [reader, pending]);
   // Ordinary edits remain usable while sending. New links need their server ID,
   // and rejected changes or text extraction require settlement before further edits.
-  const blockedItemIds = useMemo(() => new Set(pending.flatMap(op => op.action === 'capture' ? [op.id]
-    : (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])), [pending]);
+  const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
+    : (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
   const migratingHighlights = Boolean(visibleReader && !visibleReader.highlight_format && visibleReader.highlights?.length
     && pending.some(op => op.intent.id === visibleReader.crate_reading_id));
   const confirmed = Boolean(session && syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation);
@@ -437,7 +437,7 @@ function ReadingAppContent() {
         </div> : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(() => refresh())} />}
         headerStatus={<><PwaUpdateButton />{session && <ReadingSyncIndicator pending={pending} isOffline={isOffline} loading={!cache} refreshing={syncing} confirmed={syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation} error={error} recovery={recovery} onShowStatus={(label, state) => showToast(state === 'error' ? 'error' : state === 'synced' ? 'success' : 'info', `Reading: ${label}`, state)} />}</>}
-        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights highlightCode={highlightReadingCode} autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? 'Saved on this device' : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange('retry', { id: reader.item.crate_reading_id }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
+        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights highlightCode={highlightReadingCode} autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? 'Fetching article' : 'Saved on this device') : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange('retry', { id: reader.item.crate_reading_id }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
       {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
 
     </>}

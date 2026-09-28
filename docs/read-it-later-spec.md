@@ -28,11 +28,11 @@ Reading is on by default. **Settings → Crate → Reading** can disable it or s
 
 Validate the folder against portable sync paths and ignore rules. Do not allow overlap with the configured reminders folder. Adopt every Markdown note in the selected folder and its subfolders; never adopt notes outside it. Initial release folder changes require Reading to be disabled and pending work resolved; no automatic migration of notes or grants. Re-enabling for another folder requires fresh web/capture enrollment.
 
-Local Reading notes and views work without a server. Server extraction and phone-to-server capture require a connected, compatible deployment. A local URL-only save creates a bookmark that can be enriched after it reaches the server; Web Clipper supplies its own extracted content.
+Local Reading notes and views work without a server. Server extraction and phone-to-server capture require a connected, compatible deployment. With a configured server, local URL saves persist in a device outbox until the final note arrives through sync. Without a server, a local save creates a bookmark immediately; Web Clipper supplies its own extracted content.
 
 ### Save and read
 
-**Reading → Add link** accepts an HTTP(S) URL and an optional title. Saving commits a bookmark before attempting extraction. Show **Saved — preparing article**, then **Ready to read**, or **Link saved — article unavailable** with **Retry extraction** and **Open original**.
+**Reading → Add link** accepts an HTTP(S) URL and an optional title. Saving first persists the capture, then creates its Markdown note after extraction succeeds or exhausts its retries. Show **Saved — preparing article**, then **Ready to read**, or **Link saved — article unavailable** with **Retry extraction** and **Open original**.
 
 Inbox contains unarchived items, newest saved first. Favorites includes favorited items regardless of archive status. Opening an article does not archive it automatically. Archive is reversible; permanent deletion in the first release uses the Obsidian file workflow. Source deletion removes the item from web listings after projection and invalidates cached content during reconciliation.
 
@@ -102,7 +102,7 @@ A shared link never carries authorization. Require an enrolled Reading session b
 
 ## Markdown contract
 
-One article per file. Crate-created captures generate a stable UUID at creation and use `Reading/<uuid>.md` so titles do not cause renames or filename collisions. Imported Web Clipper notes retain their existing filenames and receive an ID during normalization. Display the title from frontmatter. Users may rename files; identity comes from `crate_reading_id`, not the path.
+One article per file. Crate-created captures generate a stable UUID when queued and use `Reading/<title> - <short-id>.md` after extraction finishes. The short ID starts with eight hexadecimal characters and extends on collision; the filename is never automatically renamed afterward. Imported Web Clipper notes retain their existing filenames and receive an ID during normalization. Display the title from frontmatter. Users may rename files; identity comes from `crate_reading_id`, not the path.
 
 ```markdown
 ---
@@ -272,3 +272,13 @@ Desktop acceptance: use the default Clipper template to save an article into the
 - [Defuddle documentation](https://github.com/kepano/defuddle/tree/a0984a817518565cedd0f89423c85cfff9e8ba45): preferred extraction dependency; documents DOM inputs, Markdown output, and the `useAsync` option. Worker compatibility remains to be tested.
 - [Apple Shortcuts share-sheet input](https://support.apple.com/en-au/guide/shortcuts/apd350ce757a/ios).
 - [Web share target](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target): installed-app receiving mechanism. Android Chrome supports it; Safari/iOS does not in the compatibility data reviewed on 2026-09-14. Recheck support during implementation.
+
+## Deferred capture and stable filenames
+
+New article captures persist in `reading_captures` with their full UUID and an atomic operation receipt. They appear in Reading with an empty `path` while fetching, so the UI keeps article edits disabled until the file exists. The sync manifest and changelog contain no placeholder file. Successful extraction publishes `Reading/Article title - a1b2c3d4.md` once; failed extraction publishes a bookmark using the supplied title or hostname. Titles are sanitized and bounded for portable filenames. Case-insensitive and Unicode-normalized collisions extend the UUID suffix by four hexadecimal characters, up to its full 32 characters, without replacing an occupied path.
+
+The full `crate_reading_id` remains in frontmatter. Existing notes, Clipper filenames, manual renames, and retry extraction keep their paths. No automatic filename migration occurs. Capture publication and queue removal share the file transaction; repeated or lost responses cannot recreate a deleted completed note. Disabling fetching turns outstanding captures into fallback bookmarks, and folder changes wait for the queue to finish.
+
+The PWA retains its existing durable offline outbox until the server accepts the save. Obsidian stores immutable pending requests under its plugin directory in `reading-captures/`, bound to server credentials and the Reading folder, and retries the exact operation until normal sync brings the note into the vault. These records survive plugin reloads and network failures. Damaged or differently scoped records remain in place for recovery and block dispatch. The `reading-deferred-captures-v1` capability gates plugin dispatch to compatible servers.
+
+Schema 2 adds the durable queue through the registered `002-reading-captures` migration from schema 1. Backup and restore retain pending captures; extraction jobs for existing files remain rebuildable projections.

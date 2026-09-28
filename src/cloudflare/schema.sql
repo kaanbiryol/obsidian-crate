@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 2, 2);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -287,3 +287,10 @@ CREATE TABLE IF NOT EXISTS reading_handoffs (
  token_hash TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
  body TEXT NOT NULL, expires_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reading_captures (
+ id TEXT PRIMARY KEY, generation TEXT NOT NULL, url_identity TEXT NOT NULL,
+ note TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL,
+ UNIQUE(generation, url_identity)
+);
+CREATE INDEX IF NOT EXISTS reading_captures_due_idx ON reading_captures(available_at);

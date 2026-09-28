@@ -15,8 +15,8 @@ preconditions; edits made during a request queue behind its immutable request bo
 Interrupted requests get the same short, bounded retries as Reminders, using those
 exact bytes and their original operation identity.
 Rejected edits and their dependents remain available for export in settings.
-New links appear immediately; editing them becomes available when the server
-assigns their article identity. Article extraction still requires a connection.
+New links appear immediately; editing them becomes available when extraction finishes and the server
+publishes their Markdown note. Article extraction still requires a connection.
 
 ## Unified PWA settings
 

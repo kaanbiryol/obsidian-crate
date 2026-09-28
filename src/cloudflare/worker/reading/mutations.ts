@@ -1,5 +1,6 @@
+import { capturePath } from './captures';
 import { updatePolicy } from './access';
-import { createReadingNote, updateReadingNote } from '@/reading/core/notes';
+import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
 import { readingUrl, readingUrlIdentity, type ReadingChanges } from '@/reading/core/model';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../markdown-file-staging';
@@ -15,6 +16,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   if (op instanceof Response) return op;
   if (!await projectReading(env, current)) throw new ReadingError('Your Reading library is being indexed. Retry this saved change shortly.', 503);
   if (action === 'capture') {
+    if (body.destinationFolder !== undefined && body.destinationFolder !== current.folder_path) throw new ReadingError('The Reading folder changed. Restore the original destination to finish this save.', 409);
     let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
     if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 1000)) throw new ReadingError('Use a title shorter than 1,000 characters.');
     // Saving a full article is the library user's explicit request to download its text.
@@ -32,11 +34,31 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       await env.DB.batch([operationStatement(env.DB, op, response)]);
       return readingResponse(response);
     }
-    if (current.enabled && body.fetchArticle !== false && await env.DB.prepare('SELECT count(*) AS count FROM reading_jobs HAVING count(*)>=1000').first()) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
-    const id = crypto.randomUUID(), path = `${current.folder_path}/${id}.md`;
-    const note = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() });
-    const content = current.enabled && body.fetchArticle !== false ? note : patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
+    const queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
+      .bind(current.generation, readingUrlIdentity(url)).first<{ id: string }>();
+    if (queued) {
+      const response = { saved: true, alreadySaved: true, id: queued.id };
+      await env.DB.batch([operationStatement(env.DB, op, response)]);
+      return readingResponse(response);
+    }
+    if (await env.DB.prepare('SELECT 1 WHERE (SELECT count(*) FROM reading_jobs)+(SELECT count(*) FROM reading_captures)>=1000').first()) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
+    const id = typeof body.captureId === 'string' ? body.captureId : crypto.randomUUID();
+    let note: string;
+    try { note = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() }); }
+    catch { throw new ReadingError('Invalid Reading capture.'); }
+    if (parseReadingNote(note)!.crate_reading_id !== id) throw new ReadingError('Use a lowercase Reading ID.');
+    if (await env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_sources WHERE item_id=? LIMIT 1').bind(id, id).first()) throw new ReadingError('This Reading ID already exists.', 409);
     const response = { saved: true, alreadySaved: false, id };
+    if (current.enabled && body.fetchArticle !== false) {
+      await env.DB.batch([
+        env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,?)')
+          .bind(id, current.generation, readingUrlIdentity(url), note, Date.now()),
+        operationStatement(env.DB, op, response),
+      ]);
+      return readingResponse(response);
+    }
+    const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
+    const path = await capturePath(env, current.folder_path, parseReadingNote(content)!.title, id);
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
     const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null, effects: operationEffects(env.DB, op, response) });
     if (!result.committed) throw new ReadingError('This note changed. Retry the same save.', 409);

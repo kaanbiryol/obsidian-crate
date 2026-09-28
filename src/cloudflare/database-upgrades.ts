@@ -18,8 +18,7 @@ export interface DatabaseRelease {
 
 export const SERVER_RELEASE: DatabaseRelease = release;
 
-// Empty until the first released schema actually needs an upgrade. These SQL
-// assets are bundled locally, never fetched or evaluated from a remote source.
+// Migration SQL is bundled locally, never fetched or evaluated from a remote source.
 const sources = import.meta.glob<string>('./migrations/*.sql', { query: '?raw', import: 'default', eager: true });
 
 export function planDatabaseUpgrade(version: number | null, target: DatabaseRelease = SERVER_RELEASE): DatabaseMigration[] {

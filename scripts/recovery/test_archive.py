@@ -90,13 +90,13 @@ class ArchiveTests(unittest.TestCase):
         manifest_bytes = (self.directory / 'archive.json').read_bytes()
         _, original = verify(self.directory)
         self.addCleanup(original.close)
-        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
+        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
         for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
@@ -115,7 +115,7 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
         self.assertEqual(restored.execute('SELECT request_hash FROM upload_operations').fetchone()[0], 'hash')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertNotIn('files_storage_key_idx', indexes)
@@ -189,6 +189,16 @@ class ArchiveTests(unittest.TestCase):
     def test_export_sql_cannot_attach_an_external_database(self):
         with self.assertRaises(sqlite3.DatabaseError):
             load_database(b"ATTACH DATABASE '/tmp/crate-unwanted.db' AS other;")
+
+    def test_restore_preserves_pending_reading_captures(self):
+        self.remote.sql += b"\nINSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','generation','https://example.com','pending note',1);"
+        recovery.backup(self.remote, self.directory)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        recovery.restore(target, self.directory)
+        restored = load_database(target.sql)
+        self.addCleanup(restored.close)
+        self.assertEqual(tuple(restored.execute('SELECT id,note FROM reading_captures').fetchone()), ('capture', 'pending note'))
 
 
 if __name__ == '__main__':

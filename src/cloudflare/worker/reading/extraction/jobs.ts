@@ -1,3 +1,4 @@
+import { publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled } from '../../feature-policy';
 import type { Env } from '../../types';
 import { policy, readSource } from '../common';
@@ -13,7 +14,11 @@ interface Job { path: string; item_id: string; generation: string; source_revisi
 export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }
 
 /** Called under the file coordinator's lock. Never recreate a missing or changed source. */
-export async function publishExtraction(env: Env, publication: Publication): Promise<void> {
+export async function publishExtraction(env: Env, publication: Publication | CapturePublication): Promise<void> {
+  if ('captureId' in publication) {
+    if (await featureEnabled(env.DB, 'reading')) await publishCapture(env, publication.captureId, publication.generation, publication.result, publication.resolvedUrl);
+    return;
+  }
   const { job, result } = publication;
   if (!await featureEnabled(env.DB, 'reading')) return;
   const current = await policy(env.DB);
@@ -46,11 +51,12 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
   if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
   if (!await featureEnabled(env.DB, 'reading')) return;
   const current = await policy(env.DB);
-  if (!current?.enabled) return;
+  if (!current) return;
+  try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
   await env.DB.prepare('DELETE FROM reading_jobs WHERE generation != ? OR NOT EXISTS (SELECT 1 FROM files WHERE files.path=reading_jobs.path)')
     .bind(current.generation).run();
   const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
-  if (job) {
+  if (job && current.enabled) {
     // Lease before network access: a crash or restart repeats safely after one minute.
     await env.DB.prepare('UPDATE reading_jobs SET available_at=?, attempts=attempts+1 WHERE path=?').bind(Date.now() + 60_000, job.path).run();
     await state.storage.setAlarm(Date.now() + 60_000);
@@ -72,16 +78,16 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
   // Wake the serialized projector after a stale source or publication; no future browser visit is required.
   const wake = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/project', { method: 'POST' });
   if (!wake.ok) throw new Error('Reading projection wake failed');
-  const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM reading_jobs').first<{ at: number | null }>();
+  const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM (SELECT available_at FROM reading_captures UNION ALL SELECT available_at FROM reading_jobs WHERE ?=1)').bind(current.enabled).first<{ at: number | null }>();
   if (next?.at != null) await state.storage.setAlarm(Math.max(Date.now() + 1000, next.at));
 }
 
 export async function scheduleReading(env: Env): Promise<boolean> {
   if (!await featureEnabled(env.DB, 'reading')) return false;
   const current = await policy(env.DB);
-  if (!current?.enabled) return false;
+  if (!current) return false;
   const complete = await projectReading(env, current);
-  if (await env.DB.prepare('SELECT 1 FROM reading_jobs LIMIT 1').first()) {
+  if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
     const response = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/reading')).fetch('https://do/reading-wake', { method: 'POST' });
     if (!response.ok) throw new Error('Could not schedule Reading');
   }

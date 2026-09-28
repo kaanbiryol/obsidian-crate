@@ -1,3 +1,6 @@
+import { ReadingCaptureOutbox } from './data/capture-outbox';
+import { SECRET_KEYS } from '../plugin/settings-types';
+import { portablePathKey } from '@/protocol/portable-path';
 import { readingServerRequest } from './server';
 import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
@@ -62,7 +65,35 @@ export function startReading(plugin: CratePlugin): void {
 	let policyChecked = !plugin.settings.workerUrl;
  let checkedAt = 0;
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
-	const library = new ReadingLibrary({ files, read: async file => { const content = await vault.read(resolve(file)); resolve(file); return content; },
+	let outboxPromise: Promise<ReadingCaptureOutbox> | undefined;
+	const outbox = () => outboxPromise ??= (async () => {
+		const origin = plugin.settings.workerUrl, token = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+		const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([origin, token])));
+		controller.signal.throwIfAborted();
+		const authority = Array.from(new Uint8Array(bytes), value => value.toString(16).padStart(2, '0')).join('');
+		const directory = `${vault.configDir}/plugins/${plugin.manifest.id}/reading-captures`;
+		const guard = () => {
+			controller.signal.throwIfAborted();
+			if (plugin.settings.workerUrl !== origin || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== token) throw new Error('The Reading server connection changed. Reopen Reading.');
+		};
+		return new ReadingCaptureOutbox({
+			list: async () => { guard(); return await vault.adapter.exists(directory) ? (await vault.adapter.list(directory)).files.filter(path => path.endsWith('.json')).map(path => path.slice(directory.length + 1)) : []; },
+			read: async key => { guard(); return vault.adapter.read(`${directory}/${key}`); },
+			write: async (key, value) => {
+				guard(); if (!await vault.adapter.exists(directory)) await vault.adapter.mkdir(directory);
+				guard(); await vault.adapter.write(`${directory}/${key}`, value);
+				if (await vault.adapter.read(`${directory}/${key}`) !== value) throw new Error('Could not verify the saved Reading link.');
+			},
+			remove: async key => { guard(); await vault.adapter.remove(`${directory}/${key}`); },
+		}, authority, folder, controller.signal);
+	})();
+	const library = new ReadingLibrary({ files,
+		occupied: path => vault.getAllLoadedFiles().some(file => portablePathKey(file.path) === portablePathKey(path)),
+		...(plugin.settings.workerUrl ? {
+			pendingCaptures: async () => (await outbox()).list(),
+			queueCapture: async (url: string, title?: string) => { const item = await (await outbox()).add(url, title); schedule(); return item; },
+		} : {}),
+		read: async file => { const content = await vault.read(resolve(file)); resolve(file); return content; },
 		process: (file, update) => vault.process(resolve(file), current => { resolve(file); return update(current); }),
 		create: async (path, content) => {
       if (!policyChecked) throw new Error('Connect to your Crate server once to confirm the Reading folder before saving.');
@@ -80,6 +111,10 @@ export function startReading(plugin: CratePlugin): void {
 		},
 	}, folder, controller.signal, canAdopt);
 	let timer: number | undefined;
+	let lastErrorAt = 0;
+	let draining = false;
+	const polling = plugin.settings.workerUrl ? window.setInterval(() => { if (library.getSnapshot().items.some(item => !item.path)) schedule(); }, 15_000) : undefined;
+	if (polling !== undefined) plugin.registerInterval(polling);
 	const refresh = () => {
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
 
@@ -99,7 +134,11 @@ export function startReading(plugin: CratePlugin): void {
         policyChecked = true; schedule();
       }).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
     }
-		void library.refresh().catch(() => { if (!controller.signal.aborted) new Notice('Could not refresh reading notes. Open reading for details.'); });
+		void library.refresh().then(async () => {
+			if (!plugin.settings.workerUrl || !policyChecked || controller.signal.aborted || draining) return;
+			draining = true;
+			try { await (await outbox()).drain(library.getSnapshot().items, body => readingServerRequest(plugin, '/reading/capture', body)); } finally { draining = false; }
+		}).catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not finish pending Reading saves.'); } });
 	};
 	const schedule = () => {
 		if (controller.signal.aborted) return;
@@ -121,7 +160,7 @@ export function startReading(plugin: CratePlugin): void {
 	for (const ref of refs) plugin.registerEvent(ref);
 	plugin.syncRuntime.addStateChangeListener(schedule);
 	const stop = () => {
-		controller.abort(); window.clearTimeout(timer);
+		controller.abort(); window.clearTimeout(timer); window.clearInterval(polling);
 		for (const ref of refs) vault.offref(ref);
 		plugin.syncRuntime.removeStateChangeListener(schedule);
 		lifetime.removeEventListener('abort', stop);

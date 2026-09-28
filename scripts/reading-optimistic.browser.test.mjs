@@ -60,8 +60,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.equal(response.status, 200, await response.clone().text()); return response.json();
     };
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
-    const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Optimistic article', operationId: operationId() });
-    const path = `Reading/${saved.id}.md`;
+    const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Optimistic article', fetchArticle: false, operationId: operationId() });
+    const path = `Reading/Optimistic article - ${saved.id.slice(0, 8)}.md`;
     const download = await runtime.mf.dispatchFetch(`${origin}/sync/download?path=${encodeURIComponent(path)}`, { headers: { Authorization: `Bearer ${vault.token}` } });
     const source = await download.text();
     const content = source.slice(0, source.indexOf('\n---\n') + 5).replace(/extraction_status: .*/, 'extraction_status: "ready"') + 'A useful ==article excerpt==.\n\nAnother paragraph to read.';
@@ -137,13 +137,24 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const capture = hold('/reading/capture');
     await saveLink('https://queued.example.invalid/queued');
     await capture.started;
-    const row = page.getByRole('button', { name: 'queued.example.invalid queued.example.invalid', exact: true });
+    let row = page.getByRole('button', { name: 'queued.example.invalid queued.example.invalid', exact: true });
     await expect(row).toBeVisible();
     await row.click();
     await expect(page.getByRole('heading', { name: 'queued.example.invalid', exact: true })).toBeVisible();
     await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
     capture.release();
+    await expect(page.getByText('Fetching article', { exact: true })).toBeVisible();
+    const queued = await runtime.db.prepare('SELECT id,generation FROM reading_captures WHERE url_identity=?').bind('https://queued.example.invalid/queued').first();
+    assert.ok(queued, 'The acknowledged link must stay in the durable server queue');
+    const { REMINDER_ALARMS } = await runtime.mf.getBindings();
+    const published = await REMINDER_ALARMS.get(REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/reading-publish', {
+      method: 'POST', body: JSON.stringify({ captureId: queued.id, generation: queued.generation, result: { title: 'Fetched article title', markdown: 'The article arrived after its durable capture was acknowledged.' } }),
+    });
+    assert.equal(published.status, 204);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(page.getByRole('heading', { name: 'Fetched article title', exact: true })).toBeVisible();
     await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+    row = page.getByRole('button', { name: 'queued.example.invalid Fetched article title', exact: true });
     assert.notEqual(new URL(page.url()).searchParams.get('item'), (await pending(page))[0]?.id);
     await back();
     await expect(row).toHaveCount(1);

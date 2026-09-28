@@ -47,12 +47,12 @@ function LocalReadingLibrary({ plugin, library }: { plugin: CratePlugin; library
 		void library.read(item).then(updated => { if (active) setArticle(updated); }).catch(() => { if (active) new Notice('Reopen the article to read its latest text and highlights.'); });
 		return () => { active = false; };
 	}, [article, item, library]);
-	return <><ReadingLibraryPanel snapshot={snapshot}
+	return <><ReadingLibraryPanel snapshot={snapshot} pendingItemIds={new Set(snapshot.items.filter(item => !item.path).map(item => item.crate_reading_id))}
 		onAdd={() => { setError(null); setAdding(true); }}
 		onOpen={async (item, highlight) => { setFocusHighlight(highlight); setArticle(await library.read(item)); }}
 		onUpdate={(item, changes) => library.update(item, changes)}
 		onRefresh={() => library.refresh()} onSettings={() => plugin.openSettingsTab()} activeId={item?.crate_reading_id}
-		reader={article && item && <ReadingReader floatingHighlights focusHighlight={focusHighlight} item={item} markdown={article.markdown} status="Saved in your vault" pendingMessage="Article text is fetched on your Crate server. Sync this vault to send the link, then sync again to receive the text." onUpdate={async changes => { await library.update(item, changes); const updated = await library.read({ ...item, ...changes }); setArticle(current => current?.item.crate_reading_id === item.crate_reading_id ? updated : current); }} onBack={() => setArticle(null)} onEdit={() => { void plugin.app.workspace.openLinkText(item.path, '', true).catch(() => { new Notice('Could not open the reading note. It may have moved.'); }); }} />} />
+		reader={article && item && <ReadingReader floatingHighlights focusHighlight={focusHighlight} item={item} markdown={article.markdown} status={item.path ? "Saved in your vault" : "Waiting for article"} mutationPending={!item.path} highlightsPending={!item.path} pendingMessage="Your link is saved. Crate will fetch the article and create its note, then normal sync will bring it into your vault." onUpdate={async changes => { await library.update(item, changes); const updated = await library.read({ ...item, ...changes }); setArticle(current => current?.item.crate_reading_id === item.crate_reading_id ? updated : current); }} onBack={() => setArticle(null)} onEdit={item.path ? () => { void plugin.app.workspace.openLinkText(item.path, '', true).catch(() => { new Notice('Could not open the reading note. It may have moved.'); }); } : undefined} />} />
 		{adding && <ReadingDialog title="Save a link" busy={saving} onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} saving={saving} error={error} onCancel={() => setAdding(false)} onSave={() => {
 			if (pending.current) return;
 			pending.current = true; setSaving(true); setError(null);
