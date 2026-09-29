@@ -91,6 +91,15 @@ not protect against a public-looking hostname resolving to a private address.
 
 ### Reading capture handoffs
 
+Reading list and mutation requests return 503 while source indexing is incomplete
+or source bytes cannot be verified. A temporary D1/R2 failure does not mark the
+source revision as successfully indexed or permit capture deduplication against
+an incomplete index. Background storage-failure retries use a 30-second delay;
+ordinary bounded indexing backlog can continue immediately. Verified malformed or
+oversized notes instead produce stable source issues until the source changes.
+Legacy rows that conflated a read failure with invalid properties are revisited
+without requiring a source edit. The wire protocol and database schema are unchanged.
+
 `POST /reading/prepare` accepts vault, reminders, Reading, and capture credentials
 when the Reading library is configured and available. Its five-minute launch URL
 contains an opaque capability in the fragment. `POST /reading/handoff` redeems it

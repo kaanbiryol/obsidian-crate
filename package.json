@@ -86,7 +86,7 @@
 		"build:worker:dev": "node scripts/build-worker.mjs --development",
 		"build:dev": "npm run build:worker:dev && npm run typecheck && CRATE_ALLOW_DEV_BUILD=1 npm run build:plugin:dev",
 		"test:reading-server": "npm run test:reading-extraction && node --test scripts/reading-server.test.mjs scripts/reading-shortcut-server.test.mjs scripts/reading-shortcut.test.mjs",
-		"test:reading-browser": "node --test --test-concurrency=1 scripts/reading-browser.test.mjs scripts/reading-consent.browser.test.mjs scripts/reading-optimistic.browser.test.mjs scripts/reading-highlights.browser.test.mjs scripts/reading-shortcut-browser.test.mjs"
+		"test:reading-browser": "node --test --test-concurrency=1 scripts/reading-browser.test.mjs scripts/reading-consent.browser.test.mjs scripts/reading-optimistic.browser.test.mjs scripts/reading-cache-recovery.browser.test.mjs scripts/reading-highlights.browser.test.mjs scripts/reading-shortcut-browser.test.mjs"
 	},
 	"keywords": [
 		"obsidian",

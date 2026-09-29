@@ -1,5 +1,20 @@
 # Testing
 
+## Structured merge and Reading recovery
+
+`markdown-merge-transitions.test.ts` protects newly added, moved and removed code
+fences and indented blocks, alongside ordinary prose and independent-block controls.
+`sync-engine.integration.ts` checks authored conflict copies across both arrival
+orders, restart, retry and a third device. `reading-projection-recovery.integration.ts`
+injects R2 failures, missing/invalid bytes, legacy error rows and permanent parse
+errors; it checks duplicate-capture prevention, healthy-source progress, retained
+identity and delayed coordinator retry.
+
+`node --test scripts/reading-cache-recovery.browser.test.mjs` exercises the production
+Reading loader and native IndexedDB in Chromium/WebKit. It covers old-server source
+issues, retained offline articles/list entries, definitive deletion, quota rollback
+and malformed-record preservation. It is included in `npm run test:reading-browser`.
+
 ## Optimistic Reading actions
 
 After building the Worker, run `node --test scripts/reading-optimistic.browser.test.mjs`

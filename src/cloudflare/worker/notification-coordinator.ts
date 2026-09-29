@@ -9,9 +9,10 @@ import { revalidateReminderSources } from './reminder-source-migration';
 
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
-  let sourceWork = await scheduleReading(env);
+  const readingAt = await scheduleReading(env);
+  let sourceWork = false;
   if (!await featureEnabled(env.DB, 'reminders')) {
-    if (sourceWork) await state.storage.setAlarm(Date.now() + 1);
+    if (readingAt !== null) await state.storage.setAlarm(readingAt);
     return;
   }
   let hasPolicy = false;
@@ -20,7 +21,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     // invocation so a reminder backlog does not compete with source scans.
     const policy = await getNotificationPolicy(env.DB);
     hasPolicy = Boolean(policy);
-    sourceWork = (await revalidateReminderSources(env, 2, { folder: policy?.folderPath ?? null })) || sourceWork;
+    sourceWork = await revalidateReminderSources(env, 2, { folder: policy?.folderPath ?? null });
     if (hasPolicy) {
       await drainNotificationProjections(env, 1);
       await dispatchNotificationJobs(env);
@@ -33,7 +34,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
         .first<{ retryAt: number | null }>();
       const pending = hasPolicy ? await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL)
         .first<{ ready: number; projectionRetry: number | null; dispatchAt: number | null }>() : null;
-      const deadlines = [source?.retryAt, pending?.projectionRetry, pending?.dispatchAt,
+      const deadlines = [readingAt, source?.retryAt, pending?.projectionRetry, pending?.dispatchAt,
         ...(pending?.ready ? [0] : [])].filter((value): value is number => typeof value === 'number');
       // Continue ready work immediately in a fresh invocation with its own budget.
       // Idle coordinators leave no alarm behind; failed jobs sleep until due.

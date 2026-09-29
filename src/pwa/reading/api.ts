@@ -2,10 +2,10 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
-import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingSession, writeValue, type ReadingSession, type ReadingCache } from './storage';
+import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingSession, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
-import { isReadingCache } from './storage-validation';
+import { isReadingArticleCache, isReadingCache } from './storage-validation';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -49,9 +49,27 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
   if (!isReadingCache(cache, session.folderPath)) throw new Error('Reading library response is unreadable.');
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite'), prefix = `article:${session.id}:`;
-  const ids = new Set(cache.items.map(item => item.crate_reading_id));
-  for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !ids.has(key.slice(prefix.length))) await tx.store.delete(key);
-  await tx.done;
-  await writeValue(`list:${session.id}`, cache, session);
+  try {
+    const ids = new Set(cache.items.map(item => item.crate_reading_id));
+    const uncertain = new Set(cache.issues.map(issue => issue.path));
+    const previous = await tx.store.get(`list:${session.id}`);
+    if (isReadingCache(previous, session.folderPath)) for (const item of previous.items) {
+      if (uncertain.has(item.path) && !ids.has(item.crate_reading_id)) {
+        cache.items.push(item); ids.add(item.crate_reading_id);
+      }
+    }
+    for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !ids.has(key.slice(prefix.length))) {
+      const article = await tx.store.get(key);
+      // Unknown records remain exportable; source issues are not deletions.
+      if (isReadingArticleCache(article, session.folderPath) && !uncertain.has(article.item.path)) await tx.store.delete(key);
+    }
+    assertReadingSession(session);
+    await tx.store.put(cache, `list:${session.id}`);
+    await tx.done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already have aborted. */ }
+    await tx.done.catch(() => {});
+    throw error;
+  }
   return cache;
 }

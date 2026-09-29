@@ -96,11 +96,18 @@ keys. The merged header must match one authored input. Competing edits inside
 one fenced block also remain conflicts, including fences inside callouts,
 blockquotes, and lists. Literal quote/list markers within a fence do not end its
 protected region. Ambiguous or unterminated fences are treated conservatively
-through the end of the document. Indented code retains the line-level
-policy. Inline refinement
+through the end of the document. Indented code is also treated conservatively as
+an atomic region. The resulting fenced and indented blocks are checked with the
+Markdown tokenizer; each code body and language must match an authored input
+(ignoring the tokenizer's terminal-newline delimiter). Newly introduced blocks
+must also survive as code, including their multiplicity. This protects newly added
+or moved fences that did not exist in the base; unrelated prose and independent
+whole code blocks can still merge. Inline refinement
 is limited to 16,000 combined characters per line and 128,000 per merge.
 
-Line and word changes are computed with jsdiff. Each comparison permits at most
+Automatic Markdown merging is limited to 1 MiB per input and 20,000 lines; larger
+notes keep the recoverable conflict path. Line and word changes are computed with
+jsdiff. Each comparison permits at most
 2,000 token insertions/deletions; exceeding that budget falls back to conflict
 handling without applying a partial merge. The limit is based on edit count,
 not elapsed time, so device speed does not change the decision. Repeated lines

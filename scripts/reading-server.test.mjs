@@ -7,6 +7,43 @@ import { randomUUID } from 'node:crypto';
 import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from './local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
+test('Reading recovers an unavailable source across server restart without duplicate capture', { timeout: 60000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-recovery-')); let runtime;
+  try {
+    runtime = await openLocalRuntime({ dataDir: dir });
+    const vault = await issueLocalDevice(runtime.db, 'Reading recovery');
+    const request = async (path, body) => {
+      const response = await runtime.mf.dispatchFetch(`http://localhost:8787${path}`, { method: body === undefined ? 'GET' : 'POST',
+        headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      return { status: response.status, body: await response.json() };
+    };
+    assert.equal((await request('/reading/policy', { enabled: false, folderPath: 'Reading', revision: null })).status, 200);
+    const capture = { url: 'https://example.invalid/recovery', fetchArticle: false, operationId: operation() };
+    const saved = await request('/reading/capture', capture);
+    assert.equal(saved.status, 200);
+    const file = await runtime.db.prepare('SELECT path,storage_key FROM files').first();
+    const bucket = await runtime.mf.getR2Bucket('BUCKET');
+    const bytes = await (await bucket.get(file.storage_key)).arrayBuffer();
+    // The next projection must read this source; simulate temporary loss of its object.
+    await runtime.db.prepare('DELETE FROM reading_sources').run();
+    await bucket.delete(file.storage_key);
+    assert.equal((await request('/reading/list')).status, 503);
+    const retry = { ...capture, operationId: operation() };
+    assert.equal((await request('/reading/capture', retry)).status, 503);
+    await runtime.close(); runtime = await openLocalRuntime({ dataDir: dir });
+    await (await runtime.mf.getR2Bucket('BUCKET')).put(file.storage_key, bytes);
+    const listed = await request('/reading/list');
+    assert.equal(listed.status, 200); assert.equal(listed.body.items.length, 1);
+    assert.equal(listed.body.items[0].crate_reading_id, saved.body.id);
+    const deduplicated = await request('/reading/capture', retry);
+    assert.equal(deduplicated.status, 200); assert.equal(deduplicated.body.alreadySaved, true);
+    assert.equal(deduplicated.body.id, saved.body.id);
+    assert.equal((await runtime.db.prepare('SELECT count(*) AS n FROM files').first()).n, 1);
+    assert.equal((await runtime.db.prepare('SELECT storage_key FROM files').first()).storage_key, file.storage_key);
+  } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
 test('built server captures, replays, isolates scopes and confirms browser handoffs', { timeout: 60000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-reading-')); let runtime;
   try {

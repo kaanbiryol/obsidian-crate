@@ -12,7 +12,10 @@ vi.mock('./storage', () => ({
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async (session: ReadingSession) => structuredClone(storage.values.get(`pending:${session.id}`) ?? []) as PendingReading[],
 	writeValue: vi.fn(async (key: string, value: unknown) => { storage.values.set(key, structuredClone(value)); }),
-	readingDatabase: async () => ({ transaction: () => ({ store: { getAllKeys: async () => [] }, done: Promise.resolve() }) }),
+	readingDatabase: async () => ({ transaction: () => ({ store: {
+		getAllKeys: async () => [], get: async (key: string) => storage.values.get(key),
+		put: async (value: unknown, key: string) => { storage.values.set(key, structuredClone(value)); },
+	}, done: Promise.resolve() }) }),
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });

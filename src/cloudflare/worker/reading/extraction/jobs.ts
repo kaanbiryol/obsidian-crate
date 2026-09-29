@@ -82,14 +82,15 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
   if (next?.at != null) await state.storage.setAlarm(Math.max(Date.now() + 1000, next.at));
 }
 
-export async function scheduleReading(env: Env): Promise<boolean> {
-  if (!await featureEnabled(env.DB, 'reading')) return false;
+/** Return the next projection deadline, distinguishing a backlog from an outage. */
+export async function scheduleReading(env: Env): Promise<number | null> {
+  if (!await featureEnabled(env.DB, 'reading')) return null;
   const current = await policy(env.DB);
-  if (!current) return false;
-  const complete = await projectReading(env, current);
+  if (!current) return null;
+  const projection = await projectReading(env, current);
   if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
     const response = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/reading')).fetch('https://do/reading-wake', { method: 'POST' });
     if (!response.ok) throw new Error('Could not schedule Reading');
   }
-  return !complete;
+  return projection === 'complete' ? null : Date.now() + (projection === 'unavailable' ? 30_000 : 1);
 }

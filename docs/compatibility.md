@@ -25,6 +25,12 @@ No unsupported database or checkpoint is silently interpreted as empty. Signing 
 
 ## Upgrade order
 
+The structured-code merge fix runs in the plugin. Updating only the server cannot
+change merge decisions made by an older plugin. Before resuming a shared vault,
+update every participating plugin to a release containing the fix, and update the
+PWA for the Reading cache protections. The server-side Reading retry fix remains
+compatible with existing protocol-1 clients; unknown source state returns 503.
+
 1. Preserve device vaults and pending browser text. Create and verify a paired D1/R2 archive with recovery tools that support the source schema. The current tools support schemas 1 and 2 in the current migration chain. Record the deployed artifact and resource identities.
 2. Pause sync on every device, close editing web tabs, and allow in-flight writes to finish before publishing the new Worker. Preserve and compare any unresolved older upload: the server cannot reconstruct an identity for a request made by an older client, and replacing the Worker does not cancel its already-running requests. Also stop deployment/reset activity on older devices and direct account administration. Current deployment ownership cannot fence an older client or dashboard action that ignores it. Resolve any uncertain accepted provider request before proceeding.
 3. Install the intended plugin and select **Authorize update**. The client verifies the live bindings, acquires the D1 deployment owner, and checks the current artifact again. It initializes empty databases or follows the explicit upgrade plan, publishes the Worker/PWA, and verifies the live release before unlocking writes. Interruption leaves owned recovery state; do not lower a marker or discard a deployment fence to force a retry.

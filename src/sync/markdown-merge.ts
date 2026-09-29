@@ -1,7 +1,7 @@
 import { diffSequence } from './text-diff';
 import { mergeSequences } from './text-merge';
 import { createInlineMerger } from './markdown-inline-merge';
-import { frontmatter, hasCompetingFenceEdits } from './markdown-merge-structure';
+import { frontmatter, hasCompetingCodeEdits, preservesAuthoredCode } from './markdown-merge-structure';
 
 interface MarkdownMergeSuccess {
 	success: true;
@@ -17,6 +17,7 @@ interface MarkdownMergeConflict {
 type MarkdownMergeResult = MarkdownMergeSuccess | MarkdownMergeConflict;
 
 const MAX_MERGE_LINES = 20_000;
+const MAX_MERGE_BYTES = 1024 * 1024;
 
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const encoder = new TextEncoder();
@@ -26,6 +27,9 @@ export function mergeMarkdownContent(
 	localContent: ArrayBuffer,
 	remoteContent: ArrayBuffer,
 ): MarkdownMergeResult {
+	if ([baseContent, localContent, remoteContent].some(content => content.byteLength > MAX_MERGE_BYTES)) {
+		return { success: false, reason: 'too-large' };
+	}
 	let baseText: string;
 	let localText: string;
 	let remoteText: string;
@@ -53,14 +57,15 @@ export function mergeMarkdownContent(
 	if (!localHunks || !remoteHunks) return { success: false, reason: 'too-large' };
 	const baseHeader = frontmatter(baseLines), localHeader = frontmatter(localLines), remoteHeader = frontmatter(remoteLines);
 	if (localHeader !== remoteHeader && localHeader !== baseHeader && remoteHeader !== baseHeader
-		|| hasCompetingFenceEdits(baseLines, localHunks, remoteHunks)) {
+		|| hasCompetingCodeEdits(baseLines, localHunks, remoteHunks)) {
 		return { success: false, reason: 'overlap' };
 	}
 	const mergedLines = mergeSequences(baseLines, localHunks, remoteHunks, {
 		mergeOverlap: createInlineMerger(baseLines),
 	});
 	const expectedHeader = localHeader === baseHeader ? remoteHeader : localHeader;
-	if (!mergedLines || frontmatter(mergedLines) !== expectedHeader) {
+	if (!mergedLines || frontmatter(mergedLines) !== expectedHeader
+		|| !preservesAuthoredCode(mergedLines, baseLines, localLines, remoteLines)) {
 		return { success: false, reason: 'overlap' };
 	}
 

@@ -14,7 +14,7 @@ import { projectReading, managedArticle } from './projection';
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
   const op = await beginOperation(env.DB, principal, current, body, action);
   if (op instanceof Response) return op;
-  if (!await projectReading(env, current)) throw new ReadingError('Your Reading library is being indexed. Retry this saved change shortly.', 503);
+  if (await projectReading(env, current) !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Retry this saved change shortly.', 503);
   if (action === 'capture') {
     if (body.destinationFolder !== undefined && body.destinationFolder !== current.folder_path) throw new ReadingError('The Reading folder changed. Restore the original destination to finish this save.', 409);
     let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }

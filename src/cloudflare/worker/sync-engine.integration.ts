@@ -59,22 +59,24 @@ async function expectConvergence(replicas: readonly SyncTestDevice[], expected: 
 }
 
 describe('multiple real sync engines across Worker and storage boundaries', () => {
-	it.each([false, true])('preserves both authored callout versions across conflict, restart and retry (reversed: %s)', async reversed => {
-		const base = '> [!example]\n> ```yaml\n> name: example\n> ```\n';
-		const clients = await replicas('note.md', base);
-		const variants = [base.replace('> name: example', '> enabled: true\n> name: example'),
-			base.replace('> name: example', '> name: example\n> enabled: false')];
+	it.each(['existing callout', 'introduced fence'].flatMap(kind => [false, true].map(reversed => ({ kind, reversed }))))('preserves both authored $kind versions across conflict, restart and retry (reversed: $reversed)', async ({ kind, reversed }) => {
+		const path = `note-${reversed}.md`;
+		const base = kind === 'existing callout' ? '> [!example]\n> ```yaml\n> name: example\n> ```\n' : 'name: example\n';
+		const clients = await replicas(path, base);
+		const variants = kind === 'existing callout' ? [base.replace('> name: example', '> enabled: true\n> name: example'),
+			base.replace('> name: example', '> name: example\n> enabled: false')]
+			: ['```yaml\nenabled: true\nname: example\n```\n', '```yaml\nname: example\nenabled: false\n```\n'];
 		if (reversed) variants.reverse();
-		clients[0].disk.write('note.md', variants[0]!);
-		clients[1].disk.write('note.md', variants[1]!);
+		clients[0].disk.write(path, variants[0]!);
+		clients[1].disk.write(path, variants[1]!);
 		await sync(clients[0]);
 		const result = await clients[1].engine.sync();
 		expect(result.merged).toBe(0);
-		expect(new TextDecoder().decode((await clients[0].api.downloadFile('note.md')).content)).toBe(variants[0]);
+		expect(new TextDecoder().decode((await clients[0].api.downloadFile(path)).content)).toBe(variants[0]);
 		const conflict = clients[1].engine.getActiveConflicts()[0]!;
 		expect(conflict).toBeDefined();
 		expect(clients[1].disk.text(conflict.conflictPath)).toBe(variants[1]);
-		expect(clients[1].disk.text('note.md')).toBe(variants[0]);
+		expect(clients[1].disk.text(path)).toBe(variants[0]);
 		const paths = clients[1].disk.paths();
 		clients[1].close();
 		await clients[1].open();
@@ -82,7 +84,7 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		expect(clients[1].disk.paths()).toEqual(paths);
 		expect(clients[1].disk.text(conflict.conflictPath)).toBe(variants[1]);
 		await sync(clients[2]);
-		expect(clients[2].disk.text('note.md')).toBe(variants[0]);
+		expect(clients[2].disk.text(path)).toBe(variants[0]);
 	});
 	it.each(['current', 'both'] as const)('honors %s for an incoming binary review across the next sync', async choice => {
 		const original = new Uint8Array([255, 1]).buffer, incoming = new Uint8Array([255, 2]).buffer;

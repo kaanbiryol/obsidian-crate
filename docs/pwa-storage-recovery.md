@@ -65,6 +65,15 @@ the retained data before changing browser storage; reload after repairing storag
 preservation. `scripts/reading-optimistic.browser.test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
+Reading refresh commits the list and article removals in one IndexedDB transaction.
+A failed list write leaves the previous list and articles intact. A source issue
+does not authorize removing that source's cached article or its last verified list
+entry; the issue remains visible while the saved copy is retained. Unknown article
+records remain available for export. A complete response without that source or
+an issue still removes its derived offline copy. HTTP failures preserve the prior
+snapshot. `scripts/reading-cache-recovery.browser.test.mjs` tests these boundaries
+in native Chromium and WebKit storage, including a quota failure after pruning.
+
 Reading enrollment captures the current credentials and logout marker before
 exchanging a setup grant. A delayed response cannot replace a newer session or
 restore access after logout. Unused returned credentials are revoked on a best-effort
