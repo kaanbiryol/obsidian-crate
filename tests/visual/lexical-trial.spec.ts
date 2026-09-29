@@ -1,4 +1,4 @@
-import { selectRange } from './editor-helpers';
+import { selectRange, settleEditor } from './editor-helpers';
 import { chromium, webkit, expect, test, type Browser, type Page } from '@playwright/test';
 
 
@@ -234,8 +234,16 @@ for (const browserName of ['chromium', 'webkit'] as const) {
         for (const value of ['https://example.com', '[docs](https://example.org)', 'javascript:alert(1)', 'Read https://example.com tomorrow']) {
           await description.focus();
           await description.press('ControlOrMeta+a');
+          // Native selection changes are delivered separately from key events.
+          // Let Lexical observe Select All before the following native deletion.
+          await expect.poll(() => description.evaluate(element =>
+            document.getSelection()?.toString() === element.textContent)).toBe(true);
+          await settleEditor(page);
           await description.press('Backspace');
           await expect(description).toHaveText('');
+          // A synthetic paste has no native beforeinput boundary. Wait until the
+          // controlled field has acknowledged deletion, not just its DOM mutation.
+          await expect(description).toHaveAttribute('data-placeholder', 'Description');
           await description.evaluate((element, text) => {
             const data = new DataTransfer();
             data.setData('text/plain', text);

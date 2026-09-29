@@ -140,7 +140,7 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 // opacity: swapping two partly faded layers can flash while both look animated.
 async function checkRapidSwitches(page, dock = false) {
 	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-	const frames = await page.evaluate(async dock => {
+	const frames = await page.evaluate(async ({ dock, reducedMotion }) => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector(dock
 			? '.pwa-navigation-viewport > .pwa-tab-transition'
@@ -148,7 +148,7 @@ async function checkRapidSwitches(page, dock = false) {
 		const sequence = dock
 			? ['projects', 'inbox', 'today', 'inbox', 'projects', 'today']
 			: ['today', 'upcoming', 'today', 'upcoming', 'today', 'upcoming'];
-		const sample = () => {
+		const sample = time => {
 			const panels = [...container.children].sort((a, b) => Number(getComputedStyle(b).zIndex) - Number(getComputedStyle(a).zIndex));
 			let uncovered = 1;
 			const weights = {}, cards = {};
@@ -161,22 +161,40 @@ async function checkRapidSwitches(page, dock = false) {
 					if (rect.top >= 0 && rect.bottom <= innerHeight) cards[`${panel.dataset.tabView}:${row.dataset.reminderId}`] = [rect.y, rect.height];
 				}
 			}
-			return { time: performance.now(), weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
+			return { time, weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
 		};
-		const frames = [sample()], start = performance.now();
+		// Seek the real transitions at known intervals. Compositor time and a
+		// delayed rAF callback's performance.now() can disagree under CI load.
+		// Keep the actual easing and reversal behavior; do not replace animations.
+		const animations = new Map();
+		const advance = async time => {
+			await Promise.resolve();
+			if (reducedMotion) { await new Promise(requestAnimationFrame); return; }
+			for (const panel of container.children) for (const animation of panel.getAnimations()) {
+				if (animation.transitionProperty !== 'opacity') continue;
+				if (!animations.has(animation)) { animation.pause(); animations.set(animation, time); }
+				animation.currentTime = Math.min(time - animations.get(animation), Number(animation.effect.getTiming().duration));
+			}
+		};
+		const frames = [sample(0)];
 		let step = 0;
-		while (performance.now() - start < 750) {
-			if (step < sequence.length && performance.now() - start >= step * 60) {
+		for (let time = 0; time <= 760; time += 20) {
+			await advance(time);
+			frames.push(sample(time));
+			if (step < sequence.length && time >= step * 60) {
 				const view = sequence[step++];
 				const button = dock ? shell.querySelector(`.pwa-dock [data-tab="${view}"]`)
 					: [...shell.querySelectorAll('.pwa-schedule-chip')].find(button => button.textContent.toLowerCase() === view);
 				button.click();
+				await advance(time);
+				frames.push(sample(time));
 			}
-			await new Promise(requestAnimationFrame);
-			frames.push(sample());
+		}
+		for (const animation of container.getAnimations({ subtree: true })) {
+			if (animations.has(animation)) animation.finish();
 		}
 		return frames;
-	}, dock);
+	}, { dock, reducedMotion });
 	const geometry = new Map();
 	for (let index = 0; index < frames.length; index++) {
 		const frame = frames[index], previous = frames[index - 1];
@@ -187,9 +205,9 @@ async function checkRapidSwitches(page, dock = false) {
 		}
 		if (previous && !reducedMotion) for (const view of new Set([...Object.keys(frame.weights), ...Object.keys(previous.weights)])) {
 			const change = Math.abs((frame.weights[view] ?? 0) - (previous.weights[view] ?? 0));
-			// Allow one compositor frame of sampling skew. A third dock screen
-			// can also contribute two overlapping fades at once.
-			assert.ok(change <= .04 + (frame.time - previous.time + 17) / (dock ? 40 : 80),
+			// A third dock screen can contribute two overlapping fades at once.
+			// Same-time samples also catch a discontinuity exactly at reversal.
+			assert.ok(change <= .04 + (frame.time - previous.time) / (dock ? 40 : 80),
 				`${view} flashed by ${change.toFixed(3)} in ${(frame.time - previous.time).toFixed(1)}ms`);
 		}
 		for (const [id, rect] of Object.entries(frame.cards)) {
@@ -198,6 +216,8 @@ async function checkRapidSwitches(page, dock = false) {
 			geometry.set(id, rect);
 		}
 	}
+	assert.equal(frames.some(frame => Object.values(frame.weights).some(weight => weight > 0 && weight < 1)), !reducedMotion,
+		'Rapid switches must exercise the dissolve only when motion is enabled');
 	assert.equal(frames.at(-1).weights[dock ? 'today' : 'upcoming'], 1, 'Settle on the latest requested screen');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }

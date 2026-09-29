@@ -364,6 +364,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.getByRole('button',{name:'Open settings',exact:true}).click();
       const sheet = page.getByRole('dialog',{name:'Settings',exact:true});
       await expect(sheet).toHaveClass(/pwa-modal-sheet__container--settings/);
+      // The portal exists before Base UI starts its entrance transition.
+      // An empty animation list in that frame does not mean it is on screen.
+      await expect(sheet).toHaveCSS('transform', 'none');
       await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
       for (const title of ['General', 'Tabs', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
