@@ -64,3 +64,9 @@ the retained data before changing browser storage; reload after repairing storag
 `src/pwa/reading/storage.test.ts` covers malformed durable records and exact-byte
 preservation. `scripts/reading-optimistic.browser.test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
+
+Reading enrollment captures the current credentials and logout marker before
+exchanging a setup grant. A delayed response cannot replace a newer session or
+restore access after logout. Unused returned credentials are revoked on a best-effort
+basis without storing their install grant or hydrating private data.
+`scripts/pwa-auth-recovery-test.mjs` checks these cross-tab races in Chromium and WebKit.

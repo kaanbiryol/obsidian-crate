@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { registerPwaServiceWorker } from '../api';
-import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, isStandaloneApp } from '../config';
+import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, isStandaloneApp } from '../config';
+import { capturePwaSession } from '../session-generation';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { connectReadingFromReminders, readingRequest } from './api';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, hasEarlierReadingChanges, pendingReading, readingSession,
@@ -81,8 +83,20 @@ export function useReadingSession() {
     alive.current = true;
     let cancelled = false;
     const lifetime = generation;
+    const revision = lifetime.current;
+    const pwaCurrent = capturePwaSession();
+    let bootstrapCurrent = () => !cancelled && revision === lifetime.current;
     void run(async () => {
       try {
+        const logout = localStorage.getItem(PWA_LOGOUT_KEY);
+        let expectedSession = localStorage.getItem(READING_SESSION_KEY);
+        bootstrapCurrent = () => {
+          try {
+            return !cancelled && revision === lifetime.current && pwaCurrent()
+              && logout === localStorage.getItem(PWA_LOGOUT_KEY)
+              && expectedSession === localStorage.getItem(READING_SESSION_KEY);
+          } catch { return false; }
+        };
         const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
         if (manifest) manifest.href = manifestHrefForUrl(location.href);
         const fragment = new URLSearchParams(location.hash.slice(1)), installed = isStandaloneApp();
@@ -91,24 +105,40 @@ export function useReadingSession() {
         if (grant) {
           history.replaceState(null, '', '/notifications?section=reading');
           const { installToken, ...next } = await readingRequest<ReadingSession & { installToken?: string }>('/reading/exchange', null, JSON.stringify({ token: grant }));
-          if (cancelled) return;
           if (!isReadingSession(next)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
-          localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
+          if (!bootstrapCurrent()) {
+            // Logout cannot revoke a credential whose exchange was still pending.
+            // Discard and best-effort revoke only this unused response's token.
+            void fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10_000),
+              headers: { Authorization: `Bearer ${next.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) },
+            }).catch(() => undefined);
+            return;
+          }
+          const serialized = JSON.stringify(next);
+          localStorage.setItem(READING_SESSION_KEY, serialized);
+          expectedSession = serialized;
           document.cookie = 'crate-reading-install=; Max-Age=0; Path=/notifications; SameSite=Strict; Secure';
           if (!installed && installToken) document.cookie = `crate-reading-install=${installToken}; Max-Age=600; Path=/notifications; SameSite=Strict; Secure`;
         }
         const current = readingSession();
         if (current) await hydrate(current);
-        else setRecovery(await hasEarlierReadingChanges());
-        if (cancelled) return;
+        else {
+          const earlier = await hasEarlierReadingChanges();
+          if (!bootstrapCurrent()) return;
+          setRecovery(earlier);
+        }
+        if (!bootstrapCurrent()) return;
         const shareId = new URL(location.href).searchParams.get('share');
         if (shareId) {
           const draft = await readReadingDraft(`share:${shareId}`);
-          if (cancelled) return;
+          if (!bootstrapCurrent()) return;
           if (draft) { setUrl(draft.url); setAdding(true); setShare(shareId); }
         }
         await registerPwaServiceWorker();
+        if (!bootstrapCurrent()) return;
         navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
+      } catch (cause) {
+        if (bootstrapCurrent()) throw cause;
       } finally { if (!cancelled) setReady(true); }
     });
     return () => { cancelled = true; alive.current = false; lifetime.current++; };

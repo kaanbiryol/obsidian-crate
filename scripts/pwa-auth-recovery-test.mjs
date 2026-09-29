@@ -3,6 +3,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { previewAuthToken } from './pwa-preview-fixtures.mjs';
+import { verifyReadingEnrollmentAuthority } from './pwa-reading-session-checks.mjs';
 
 const assets = await buildPwaPreviewAssets({ assetVersion: 'auth-recovery-regression' });
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
@@ -251,6 +252,7 @@ try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
     try {
+      await verifyReadingEnrollmentAuthority(browser, origin);
       for (const kind of ['create', 'update']) {
         for (const failure of ['before', 'after']) await verifyRecovery(browser, kind, failure);
       }
@@ -260,7 +262,7 @@ try {
       await verifyFolderReplacement(browser, true);
       await verifyUnsavedDraft(browser);
       await verifyRenewalWithExpiringPeer(browser);
-      console.log(`${browserType.name()}: expired auth and same-folder renewal retain creates, updates and drafts; explicit review retries identical commands, lost responses deduplicate, other folders stay isolated, and logout clears every tab`);
+      console.log(`${browserType.name()}: expired auth and same-folder renewal retain creates, updates and drafts; explicit review retries identical commands, lost responses deduplicate, other folders stay isolated, logout clears every tab, and delayed Reading enrollment cannot restore an obsolete session`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

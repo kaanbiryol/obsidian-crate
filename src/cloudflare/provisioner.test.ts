@@ -39,10 +39,10 @@ function createApi() {
 		getWorkerSettings: vi.fn(async (): Promise<CloudflareWorkerSettings> => ({ annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` }, bindings: [
 			{ type: 'd1', name: 'DB', id: metadata.d1DatabaseId! }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName },
 		] })),
-		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId, name: metadata.d1DatabaseName })),
+		getD1Database: vi.fn(async (_accountId: string, databaseId: string): ReturnType<CloudflareApiClient['getD1Database']> => ({ uuid: databaseId, name: metadata.d1DatabaseName })),
 		findD1Database: vi.fn(async () => ({ uuid: metadata.d1DatabaseId!, name: metadata.d1DatabaseName })),
 		createD1Database: vi.fn(),
-		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
+		getR2Bucket: vi.fn(async (): ReturnType<CloudflareApiClient['getR2Bucket']> => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] }] : [])),
 		uploadWorker: vi.fn(async (_input: Parameters<CloudflareApiClient['uploadWorker']>[0]) => {}),
@@ -56,6 +56,33 @@ function createApi() {
 }
 
 describe('provisionCloudflareDeployment', () => {
+	it.each(['ordinary update', 'clearing reset', 'deletion', 'missing replacement', 'changed worker', 'old bucket'] as const)(
+		'does not substitute storage for %s', async scenario => {
+			const api = createApi();
+			const metadata = createMetadata();
+			const originalId = metadata.d1DatabaseId!;
+			api.getD1Database.mockResolvedValue(null);
+			if (scenario !== 'ordinary update') {
+				metadata.reset = { id: 'b'.repeat(32), phase: scenario === 'clearing reset' ? 'clearing' : 'rebuilding',
+					databaseId: originalId, bucketCreatedAt: '2026-01-01', namespaceId: 'c'.repeat(32),
+					...(scenario === 'deletion' ? { deleteOnly: true as const } : {}) };
+				api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': `Crate reset ${metadata.reset.id}` },
+					bindings: [{ type: 'd1', name: 'DB', id: originalId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName }] });
+			}
+			if (scenario === 'missing replacement') metadata.d1DatabaseId = 'fedcba98-7654-3210-fedc-ba9876543210';
+			if (scenario === 'changed worker') {
+				const settings = await api.getWorkerSettings();
+				api.getWorkerSettings.mockResolvedValue({ ...settings, annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` } });
+			}
+			if (scenario === 'old bucket') api.getR2Bucket.mockResolvedValue({ name: metadata.r2BucketName, creation_date: metadata.reset!.bucketCreatedAt });
+			await expect(provisionCloudflareDeployment({ api: api as never, metadata, accountId: metadata.accountId!, artifacts, onMetadataChanged: vi.fn() })).rejects.toThrow();
+			expect(api.createD1Database).not.toHaveBeenCalled();
+			expect(api.createR2Bucket).not.toHaveBeenCalled();
+			expect(api.queryD1).not.toHaveBeenCalled();
+			expect(api.uploadWorker).not.toHaveBeenCalled();
+		},
+	);
+
 	it('preserves the remote vault name when updating from a differently named local copy', async () => {
 		const api = createApi();
 		const settings = await api.getWorkerSettings();

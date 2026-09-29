@@ -109,6 +109,7 @@ export class CloudflareDeploymentService {
 	private readonly now: () => number;
 	private readonly lifetime = new AbortController();
 	private pendingSession: PendingOAuthSession | null = null;
+	private authorizationGeneration = 0;
 	private handlingCallback = false;
 
 	constructor(private readonly options: CloudflareDeploymentServiceOptions) {
@@ -137,8 +138,11 @@ export class CloudflareDeploymentService {
 			? { ...existingMetadata }
 			: createCloudflareDeploymentMetadata(this.options.getVaultName?.());
 
+		this.cancelPendingDeployment();
+		const generation = this.authorizationGeneration;
 		const { verifier, challenge } = await createPkcePair();
 		this.lifetime.signal.throwIfAborted();
+		if (generation !== this.authorizationGeneration) return;
 		const state = randomBase64Url(32);
 		this.pendingSession = {
 			verifier,
@@ -368,7 +372,7 @@ export class CloudflareDeploymentService {
 		if (!metadata?.accountId) throw new Error('Connect a Cloudflare server first.');
 		this.checkSavedTarget(metadata, intent);
 		if ((intent === 'reset' || intent === 'delete') && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
-		this.pendingSession = null;
+		this.cancelPendingDeployment();
 		this.handlingCallback = true;
 		const pending: PendingOAuthSession = {
 			metadata: structuredClone(metadata), intent, discoverExisting: false,
@@ -395,6 +399,7 @@ export class CloudflareDeploymentService {
         if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
         const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
         if (!source?.accountId || !source.d1DatabaseId || source.reset) throw new Error('Select the source Cloudflare server and finish any deletion first.');
+        this.cancelPendingDeployment();
         this.handlingCallback = true;
         try {
             return await withAuthorization(tokens => operation(new CloudflareApiClient(tokens.accessToken, async (url, request) => {
@@ -446,6 +451,7 @@ export class CloudflareDeploymentService {
         const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
         if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
         this.checkSavedTarget(metadata, 'update');
+        this.cancelPendingDeployment();
         this.handlingCallback = true;
         try {
             return await withAuthorization(async tokens => {
@@ -487,6 +493,7 @@ export class CloudflareDeploymentService {
 
 	cancelPendingDeployment(): void {
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
+		this.authorizationGeneration++;
 		this.pendingSession = null;
 	}
 
