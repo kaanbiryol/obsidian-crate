@@ -9,6 +9,7 @@ import { randomHex } from './pkce';
 import { deployedArtifact } from './deployment-discovery';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
 import { withDeploymentFence, isRejectedWorkerUpload, type DeploymentFence } from './deployment-fence';
+import { assertWorkerTarget } from './reset-ownership';
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -22,7 +23,20 @@ async function ensureD1Database(
 			if (existingById.name !== metadata.d1DatabaseName || named?.uuid !== existingById.uuid) throw new Error('The deployment database identity is ambiguous or changed. Reconnect to the intended server.');
 			return existingById.uuid;
 		}
-    throw new Error('The saved server database is missing. Restore its data or explicitly create a new server.');
+		const reset = metadata.reset;
+		if (reset?.phase !== 'rebuilding' || reset.deleteOnly || metadata.d1DatabaseId !== reset.databaseId) {
+			throw new Error('The saved server database is missing. Restore its data or explicitly create a new server.');
+		}
+		// Only the verified reset stub may replace the database it retired. Keep
+		// the original ID in the checkpoint until the replacement ID is persisted,
+		// so a lost creation response can resume by its stable resource name.
+		const worker = await api.getWorkerSettings(accountId, metadata.workerName);
+		if (worker.annotations?.['workers/message'] !== `Crate reset ${reset.id}`) {
+			throw new Error('Reset blocked: the Worker changed before rebuilding its database.');
+		}
+		assertWorkerTarget(worker, metadata, true);
+		const bucket = await api.getR2Bucket(accountId, metadata.r2BucketName);
+		if (bucket?.creation_date === reset.bucketCreatedAt) throw new Error('Reset blocked: the old bucket still exists.');
 	}
 
 	const existingByName = await api.findD1Database(accountId, metadata.d1DatabaseName);

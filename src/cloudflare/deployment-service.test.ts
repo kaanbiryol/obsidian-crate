@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../plugin/settings';
 import type { HttpTransport } from './http';
 import type { DiscoveredCloudflareDeployment } from './deployment-discovery';
@@ -127,6 +127,7 @@ beforeEach(() => {
 	resetCrateServer.mockReset();
 	deleteCrateServer.mockReset();
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe('CloudflareDeploymentService', () => {
 	it('opens Cloudflare authorization with PKCE S256 and minimum scopes', async () => {
@@ -289,6 +290,44 @@ function resetHarness() {
 const resetDevice = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
 
 describe('Cloudflare deployment lifetime', () => {
+	it('does not reopen authorization cancelled during PKCE generation', async () => {
+		const h = createHarness();
+		const pending = h.service.startDeployment('create');
+		h.service.cancelPendingDeployment();
+		await pending;
+		expect(h.opened).toEqual([]);
+		expect(h.service.pendingIntent).toBeNull();
+		await h.service.startDeployment('connect');
+		expect(h.opened).toHaveLength(1);
+		expect(h.service.pendingIntent).toBe('connect');
+	});
+
+	it('keeps the latest authorization when PKCE requests finish out of order', async () => {
+		const pending: Array<(value: ArrayBuffer) => void> = [];
+		vi.spyOn(crypto.subtle, 'digest').mockImplementation(() => new Promise(resolve => { pending.push(resolve); }));
+		const h = createHarness();
+		const older = h.service.startDeployment('create');
+		const newer = h.service.startDeployment('connect');
+		pending[1]!(new ArrayBuffer(32));
+		await newer;
+		pending[0]!(new ArrayBuffer(32));
+		await older;
+		expect(h.opened).toHaveLength(1);
+		expect(h.service.pendingIntent).toBe('connect');
+	});
+
+	it('invalidates a pending PKCE request when saved authorization takes over', async () => {
+		let release!: (value: ArrayBuffer) => void;
+		vi.spyOn(crypto.subtle, 'digest').mockImplementation(() => new Promise(resolve => { release = resolve; }));
+		const h = resetHarness();
+		const pending = h.service.startDeployment('reset');
+		await h.service.deployWithSavedAuthorization('reconnect', operation => operation({ accessToken: 'saved' }));
+		release(new ArrayBuffer(32));
+		await pending;
+		expect(h.opened).toEqual([]);
+		expect(h.service.pendingIntent).toBeNull();
+	});
+
 	it.each(['connect', 'update', 'reset', 'delete'] as const)('revokes a late OAuth token without starting %s after destruction', async intent => {
 		const h = intent === 'connect' ? createHarness() : resetHarness();
 		let release!: () => void;

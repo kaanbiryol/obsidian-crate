@@ -5,14 +5,19 @@ import type { CloudflareWorkerSettings } from './cloudflare-api';
 import type { HttpTransport } from './http';
 import { createFenceQueryHarness } from './deployment-fence-test-harness';
 import { sha256Hex } from './deployment-artifacts';
+import { SERVER_RELEASE } from './database-upgrades';
 
 // Exercise the real service, API client and reset/delete implementation through
 // a local transport. Remote mutations happen before their response is released.
 function harness() {
 	const fence = createFenceQueryHarness();
+	const replacementFence = createFenceQueryHarness();
 	const accountId = 'a'.repeat(32);
 	const name = 'crate-0123456789abcdef';
 	const databaseId = '01234567-89ab-cdef-0123-456789abcdef';
+	const replacementId = 'fedcba98-7654-3210-fedc-ba9876543210';
+	let replacementCreated = false;
+	let initialized = false;
 	const settings: CrateSettings = {
 		...DEFAULT_SETTINGS,
 		cloudflareDeployment: {
@@ -42,6 +47,16 @@ function harness() {
 		if (path === '/oauth2/revoke') return { status: 200, text: '{}' };
 		if (path === '/client/v4/memberships') return json([{ status: 'accepted', account: { id: accountId, name: 'Personal' } }]);
 		if (path.endsWith('/workers/subdomain')) return json({ subdomain: 'example' });
+		if (path.endsWith(`/workers/scripts/${name}/subdomain`)) return json({ enabled: true, previews_enabled: false });
+		if (path.endsWith('/schedules')) return json({});
+		if (path === '/.well-known/crate') return { status: 200, text: JSON.stringify({ service: 'crate', deploymentFingerprint: 'f'.repeat(64), serverRevision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion }) };
+		if (path.endsWith('/d1/database')) {
+			if (request.method === 'POST') { replacementCreated = true; mutations.push('create-database'); }
+			const database = { uuid: replacementId, name };
+			return json(request.method === 'POST' ? database : replacementCreated ? [database] : []);
+		}
+		if (path.endsWith(`/d1/database/${replacementId}`)) return json(replacementCreated ? { uuid: replacementId, name } : null, replacementCreated ? 200 : 404);
+		if (path.endsWith('/r2/buckets') && request.method === 'POST') { remote.bucket = true; mutations.push('create-bucket'); return json({ name }); }
 		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id, recoveryObjects: true }) };
 		if (path === '/__crate__/reset/objects' && request.method === 'POST' && typeof request.body === 'string') {
 			const [result] = fence.query('SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence'])!;
@@ -67,6 +82,13 @@ function harness() {
 		}
 		if (request.method === 'PUT' && path.endsWith(`/workers/scripts/${name}`)) {
 			mutations.push(path);
+			if (replacementCreated) {
+				expect(new TextDecoder().decode(request.body as ArrayBuffer)).toContain(replacementId);
+				worker.annotations = { 'workers/message': `Crate 0.1.0 ${'f'.repeat(64)}` };
+				worker.bindings = [{ type: 'd1', name: 'DB', id: replacementId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: name },
+					{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm', namespace_id: 'e'.repeat(32) }];
+				return json({});
+			}
 			remote.retired = true;
 			worker.annotations = { 'workers/message': `Crate reset ${settings.cloudflareDeployment!.reset!.id}` };
 			worker.bindings = [...worker.bindings!.filter(binding => ['d1', 'r2_bucket'].includes(binding.type!)),
@@ -74,7 +96,7 @@ function harness() {
 			return json({});
 		}
 		if (path.endsWith(`/d1/database/${databaseId}`)) return remote.database ? json({ uuid: databaseId, name }) : json(null, 404);
-		if (path.endsWith(`/r2/buckets/${name}`)) return remote.bucket ? json({ name, creation_date: '2026-01-01' }) : json(null, 404);
+		if (path.endsWith(`/r2/buckets/${name}`)) return remote.bucket ? json({ name, creation_date: replacementCreated ? '2026-09-29' : '2026-01-01' }) : json(null, 404);
 		if (path.endsWith('/objects')) {
 			const offset = Number(new URL(url).searchParams.get('cursor') ?? 0);
 			return { status: 200, text: JSON.stringify({ success: true, result: [...objects].slice(offset, offset + 1000).map(key => ({ key })),
@@ -82,8 +104,13 @@ function harness() {
 		}
 		if (path.endsWith('/query') && typeof request.body === 'string') {
 			const { sql, params } = JSON.parse(request.body) as { sql: string; params?: string[] };
-			const fenced = fence.query(sql, params);
+			const fenced = (path.includes(replacementId) ? replacementFence : fence).query(sql, params);
 			if (fenced) return json(fenced);
+			if (path.includes(replacementId)) {
+				if (sql === 'fresh-schema') initialized = true;
+				return json([{ results: sql.includes('sqlite_master') ? initialized ? [{ name: 'crate_schema' }] : []
+					: sql.startsWith('SELECT version') ? [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] : [] }]);
+			}
 			return json([{ results: sql.startsWith('PRAGMA') ? [{ name: 'storage_key' }] : ['files', 'auth_tokens'].map(name => ({ name })) }]);
 		}
 		throw new Error(`Unexpected request: ${request.method} ${path}`);
@@ -93,7 +120,7 @@ function harness() {
 		const opened: string[] = [];
 		const service = new CloudflareDeploymentService({
 			clientId: 'd'.repeat(32), settingsOwner: { settings, writeSettings }, transport: send,
-			loadArtifacts: async () => ({ version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }),
+			loadArtifacts: async () => ({ version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: 'fresh-schema', d1SchemaSha256: '' }),
 			openExternal: url => { opened.push(url); }, selectDeployment: async () => null, beforeServerReset,
 		});
 		return {
@@ -104,12 +131,51 @@ function harness() {
 			},
 		};
 	}
-	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService };
+	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService, replacementId, databaseId };
 }
 
 const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
 
 describe('Cloudflare deployment interruption and recovery', () => {
+	it.each(['oauth', 'saved'] as const)('rebuilds after reset with %s authorization', async authorization => {
+		const h = harness();
+		const { service, authorize } = h.createService();
+		const result = authorization === 'oauth' ? await service.handleCallback(await authorize('reset'), device)
+			: await service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
+		expect(result.workerUrl).toContain('.workers.dev');
+		expect(h.settings.cloudflareDeployment).toMatchObject({ d1DatabaseId: h.replacementId, lastKnownRevision: SERVER_RELEASE.revision });
+		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
+		expect(h.mutations.filter(value => value === 'create-database')).toHaveLength(1);
+		expect(h.transport.mock.calls.some(([url, request]) => url.includes(h.replacementId) && typeof request.body === 'string' && request.body.includes('INSERT INTO auth_tokens'))).toBe(true);
+	});
+
+	it.each(['lost creation response', 'failed checkpoint'] as const)('resumes the replacement database after %s without repeating deletion', async failure => {
+		const h = harness();
+		let fail = true;
+		if (failure === 'failed checkpoint') {
+			const save = h.writeSettings.getMockImplementation()!;
+			h.writeSettings.mockImplementation(async update => {
+				if (fail && update.cloudflareDeployment?.d1DatabaseId === h.replacementId) { fail = false; throw new Error('disk full'); }
+				await save(update);
+			});
+		}
+		const first = h.createService(async (url, request) => {
+			const response = await h.transport(url, request);
+			if (failure === 'lost creation response' && fail && request.method === 'POST' && url.endsWith('/d1/database')) { fail = false; throw new Error('response lost'); }
+			return response;
+		});
+		await expect(first.service.handleCallback(await first.authorize('reset'), device)).rejects.toThrow(failure === 'failed checkpoint' ? 'disk full' : 'response lost');
+		expect(h.settings.cloudflareDeployment).toMatchObject({ d1DatabaseId: h.databaseId, reset: { phase: 'rebuilding', databaseId: h.databaseId } });
+		expect(h.mutations).not.toContain('create-bucket');
+		const deletions = h.transport.mock.calls.filter(([, request]) => request.method === 'DELETE').length;
+		const retry = h.createService();
+		await retry.service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
+		expect(h.settings.cloudflareDeployment!.d1DatabaseId).toBe(h.replacementId);
+		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
+		expect(h.mutations.filter(value => value === 'create-database')).toHaveLength(1);
+		expect(h.transport.mock.calls.filter(([, request]) => request.method === 'DELETE')).toHaveLength(deletions);
+	});
+
 	it.each(['reset', 'delete'] as const)('stops %s during object clearing and preserves the saved recovery checkpoint', async intent => {
 		const h = harness();
 		for (let i = 0; i < 1498; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
