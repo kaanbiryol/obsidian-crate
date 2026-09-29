@@ -235,6 +235,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
           await description.focus();
           await description.press('ControlOrMeta+a');
           await description.press('Backspace');
+          await expect(description).toHaveText('');
           await description.evaluate((element, text) => {
             const data = new DataTransfer();
             data.setData('text/plain', text);

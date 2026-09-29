@@ -101,8 +101,14 @@ try {
       assert.ok(before.scrollTop > 0, 'Exercise a scrolled Projects list');
       const opening = await page.evaluate(async () => {
         document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        // Reopening refreshes the history entry before mounting the screen.
+        // That traversal is asynchronous and can take more than one frame.
+        const deadline = performance.now() + 5000;
+        while (!document.querySelector('.pwa-navigation-screen--project') && performance.now() < deadline) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+        }
         const screen = document.querySelector('.pwa-navigation-screen--project');
+        if (!screen) throw new Error('Project did not mount after its history traversal');
         const samples = [];
         const x = () => { const transform = getComputedStyle(screen).transform; return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m41; };
         const started = performance.now();
@@ -174,7 +180,7 @@ try {
         const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;
         const before = x(), width = screen.getBoundingClientRect().width;
         screen.querySelector('.crate-back-button').click();
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        await Promise.resolve();
         const after = x(), samples = [after], started = performance.now();
         while (screen.isConnected && performance.now() - started < 900) {
           await new Promise(resolve => requestAnimationFrame(resolve));

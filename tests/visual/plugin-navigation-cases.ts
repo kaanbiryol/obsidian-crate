@@ -5,40 +5,50 @@ export function registerPluginNavigationTests() {
       test(`plugin icon emphasis follows the moving highlight at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.clock.install({ time: new Date('2026-09-26T12:00:00Z') });
         await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
         const workspace = page.locator('.plugin-workspace-navigation');
         await expect(workspace.locator('.pwa-dock')).toBeVisible();
-        const result = await workspace.evaluate(async root => {
+        // Drive the real Motion spring one frame at a time. A slow CI runner
+        // must not skip its whole travel before the first color sample.
+        await page.clock.pauseAt(new Date('2026-09-26T12:01:00Z'));
+        const sampler = await workspace.evaluateHandle(root => {
           const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
           const context = canvas.getContext('2d')!;
           const rgb = (color: string) => {
             context.fillStyle = color; context.fillRect(0, 0, 1, 1);
             return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
           };
-          const frames: { position: number; emphasis: number[] }[][] = [];
-          const selected: string[] = [];
-          for (const [label, duration] of [['Projects', 480], ['Reading', 480], ['Inbox', 45], ['Projects', 45], ['Reminders', 480]] as const) {
-            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
-            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); button.click();
-            const start = performance.now();
-            do {
-              await new Promise(requestAnimationFrame);
-              frames.push(Array.from(root.querySelectorAll('.pwa-dock')).map(dock => {
-                const style = getComputedStyle(dock);
-                const normal = rgb(style.getPropertyValue('--text-normal')), muted = rgb(style.getPropertyValue('--text-muted'));
-                const distance = normal.map((channel, index) => channel - muted[index]!);
-                const indicator = dock.querySelector('.pwa-dock__indicator')!;
-                return { position: new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width,
-                  emphasis: Array.from(dock.querySelectorAll('.pwa-dock__bar > button')).map(tab => {
-                    const color = rgb(getComputedStyle(tab).color);
-                    return color.reduce((sum, channel, index) => sum + (channel - muted[index]!) * distance[index]!, 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0);
-                  }) };
-              }));
-            } while (performance.now() - start < duration);
-            selected.push(root.querySelector('.plugin-workspace-panel[data-active="true"] [aria-current="page"]')!.getAttribute('aria-label')!);
-          }
-          return { frames, selected };
+          return {
+            select: (label: string) => {
+              const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+              button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); button.click();
+            },
+            selected: () => root.querySelector('.plugin-workspace-panel[data-active="true"] [aria-current="page"]')!.getAttribute('aria-label')!,
+            sample: () => Array.from(root.querySelectorAll('.pwa-dock')).map(dock => {
+              const style = getComputedStyle(dock);
+              const normal = rgb(style.getPropertyValue('--text-normal')), muted = rgb(style.getPropertyValue('--text-muted'));
+              const distance = normal.map((channel, index) => channel - muted[index]!);
+              const indicator = dock.querySelector('.pwa-dock__indicator')!;
+              return { position: new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width,
+                emphasis: Array.from(dock.querySelectorAll('.pwa-dock__bar > button')).map(tab => {
+                  const color = rgb(getComputedStyle(tab).color);
+                  return color.reduce((sum, channel, index) => sum + (channel - muted[index]!) * distance[index]!, 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0);
+                }) };
+            }),
+          };
         });
+        const result: { frames: { position: number; emphasis: number[] }[][]; selected: string[] } = { frames: [], selected: [] };
+        for (const [label, duration] of [['Projects', 480], ['Reading', 480], ['Inbox', 45], ['Projects', 45], ['Reminders', 480]] as const) {
+          await sampler.evaluate((sampler, label) => sampler.select(label), label);
+          for (let time = 0; time < duration; time += 16) {
+            await page.clock.runFor(Math.min(16, duration - time));
+            result.frames.push(await sampler.evaluate(sampler => sampler.sample()));
+          }
+          result.selected.push(await sampler.evaluate(sampler => sampler.selected()));
+        }
+        await sampler.dispose();
+        await page.clock.resume();
         expect(result.selected).toEqual(['Projects', 'Reading', 'Inbox', 'Projects', 'Reminders']);
         expect(result.frames.flat().some(frame => frame.emphasis.some(value => value > .1 && value < .9)), 'Icon emphasis should visibly blend during travel').toBe(true);
         for (const frame of result.frames.flat()) for (const [index, emphasis] of frame.emphasis.entries()) {
