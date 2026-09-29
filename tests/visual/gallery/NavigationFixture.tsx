@@ -6,6 +6,7 @@ import { DEFAULT_DOCK_TABS, type DockTab } from '@/ui/shared/navigation/dock-des
 import { ReminderCard } from '@/reminders/components/ReminderCard';
 import type { Reminder } from '@/reminders/types/reminder';
 import { ReadingFixture } from './ReadingFixture';
+import { TabTransition } from '@/ui/shared/navigation/TabTransition';
 
 const reminders: Reminder[] = Array.from({ length: 36 }, (_, index) => ({
   id: String(index), content: `Reminder ${index + 1}`, completed: false, priority: 4,
@@ -31,5 +32,6 @@ export function NavigationFixture({ isDark, onAdd }: { isDark: boolean; onAdd: (
   if (compact) return renderShell();
   return <PluginWorkspaceNavigation tabs={tabs} onTabsChange={setTabs} remindersEnabled readingEnabled={readingEnabled}
     renderReminders={(tab, onChange, renderNavigation) => renderShell({ activeTab: tab, onTabChange: onChange, renderNavigation })}
-    renderReading={renderNavigation => <ReadingFixture onAdd={() => onAdd('reading')} renderNavigation={props => renderNavigation(props)} />} />;
+    renderReading={renderNavigation => <ReadingFixture onAdd={() => onAdd('reading')} renderNavigation={props => renderNavigation(props)}
+      renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>} />} />;
 }

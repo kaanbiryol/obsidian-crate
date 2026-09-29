@@ -68,5 +68,5 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
     }
     selectDockTab(tab);
   };
-  return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} inert={inert} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
+  return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} inert={inert || navigation?.active === false} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
 }

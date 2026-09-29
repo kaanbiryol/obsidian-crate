@@ -118,7 +118,27 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await direct('Reminders');
     // A reading destination must survive its first lazy mount.
-    await selectView('Favorites');
+    await openViews();
+    const handoff = await views.evaluate(async menu => {
+      const labels = () => [...menu.querySelectorAll('button')].map(button => button.textContent);
+      const before = labels();
+      menu.querySelector('[data-dock-destination="favorites"]').click();
+      const frames = [], start = performance.now();
+      while (performance.now() - start < 600) {
+        await new Promise(requestAnimationFrame);
+        frames.push({ labels: menu.isConnected ? labels() : before,
+          docks: [...document.querySelectorAll('.crate-feature-panel .pwa-dock')].map(dock => ({
+            height: dock.querySelector('.pwa-dock__surface').getBoundingClientRect().height,
+            opacity: Number(getComputedStyle(dock.querySelector('.pwa-dock__indicator')).opacity),
+          })) });
+      }
+      return { before, frames };
+    });
+    assert.ok(handoff.frames.every(frame => JSON.stringify(frame.labels) === JSON.stringify(handoff.before)), 'Closing menu choices must remain still');
+    assert.ok(handoff.frames.some(frame => frame.docks.length === 2), 'The incoming feature must share the dock');
+    assert.ok(handoff.frames.every(frame => frame.docks.length < 2 || Math.abs(frame.docks[0].height - frame.docks[1].height) < .5), `The incoming surface must continue the current shrink: ${JSON.stringify(handoff.frames.map(frame => frame.docks))}`);
+    assert.ok(handoff.frames.every(frame => frame.docks.length < 2 || Math.abs(frame.docks[0].opacity - frame.docks[1].opacity) < .01), 'Both indicators must reveal with the closing surface');
+    await closed(); await active('Favorites');
     await expect(dock().locator('[data-dock-group]')).toBeFocused();
     await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');
     await page.getByRole('searchbox', { name: 'Search reading' }).fill('remember this');
@@ -399,7 +419,8 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
             const indicator = element.querySelector('.pwa-dock__indicator');
             const position = () => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41;
             const start = position();
-            element.querySelector(`[aria-label="${label}"]`).click();
+            const tab = element.querySelector(`[aria-label="${label}"]`);
+            tab.click();
             await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
             const slide = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform');
             if (!slide) throw new Error('Expected a sliding tab indicator');
@@ -412,6 +433,21 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
             slide.currentTime = 60;
             const progress = (position() - start) / (end - start);
             if (progress < .2 || progress > .65) throw new Error(`Tab slide needs visible early travel: ${progress}`);
+            const tint = tab.getAnimations().find(animation => animation.transitionProperty === 'color');
+            if (!tint) throw new Error('Expected the selected icon to blend with the slide');
+            tint.pause(); tint.currentTime = 60;
+            const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+            const context = canvas.getContext('2d');
+            const rgb = color => {
+              context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+              return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+            };
+            const style = getComputedStyle(tab);
+            const normal = rgb(style.getPropertyValue('--text-normal')), muted = rgb(style.getPropertyValue('--text-muted'));
+            const distance = normal.map((channel, index) => channel - muted[index]);
+            const emphasis = rgb(style.color).reduce((sum, channel, index) => sum + (channel - muted[index]) * distance[index], 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0);
+            if (Math.abs(emphasis - progress) > .04) throw new Error(`Icon emphasis ${emphasis} must match slide progress ${progress}`);
+            tint.finish();
             slide.currentTime = duration - .001;
             return slide;
           }, label);
@@ -449,6 +485,7 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await dock().getByRole('button', { name: 'Reminders', exact: true }).tap();
         await expect(dock().locator('.pwa-dock__indicator')).toHaveCSS('transition-duration', '0s');
+        await expect(dock().getByRole('button', { name: 'Reminders', exact: true })).toHaveCSS('transition-duration', '0s');
         assert.equal(await dock().locator('.pwa-dock__indicator').evaluate(element => element.getAnimations().length), 0);
       } finally { await browser.close(); }
     }

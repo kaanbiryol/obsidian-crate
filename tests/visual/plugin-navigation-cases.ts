@@ -2,6 +2,260 @@ import { test, expect } from '@playwright/test';
 
 export function registerPluginNavigationTests() {
     for (const width of [320, 1280]) {
+      test(`plugin icon emphasis follows the moving highlight at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        await expect(workspace.locator('.pwa-dock')).toBeVisible();
+        const result = await workspace.evaluate(async root => {
+          const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          const rgb = (color: string) => {
+            context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+            return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
+          };
+          const frames: { position: number; emphasis: number[] }[][] = [];
+          const selected: string[] = [];
+          for (const [label, duration] of [['Projects', 480], ['Reading', 480], ['Inbox', 45], ['Projects', 45], ['Reminders', 480]] as const) {
+            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); button.click();
+            const start = performance.now();
+            do {
+              await new Promise(requestAnimationFrame);
+              frames.push(Array.from(root.querySelectorAll('.pwa-dock')).map(dock => {
+                const style = getComputedStyle(dock);
+                const normal = rgb(style.getPropertyValue('--text-normal')), muted = rgb(style.getPropertyValue('--text-muted'));
+                const distance = normal.map((channel, index) => channel - muted[index]!);
+                const indicator = dock.querySelector('.pwa-dock__indicator')!;
+                return { position: new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width,
+                  emphasis: Array.from(dock.querySelectorAll('.pwa-dock__bar > button')).map(tab => {
+                    const color = rgb(getComputedStyle(tab).color);
+                    return color.reduce((sum, channel, index) => sum + (channel - muted[index]!) * distance[index]!, 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0);
+                  }) };
+              }));
+            } while (performance.now() - start < duration);
+            selected.push(root.querySelector('.plugin-workspace-panel[data-active="true"] [aria-current="page"]')!.getAttribute('aria-label')!);
+          }
+          return { frames, selected };
+        });
+        expect(result.selected).toEqual(['Projects', 'Reading', 'Inbox', 'Projects', 'Reminders']);
+        expect(result.frames.flat().some(frame => frame.emphasis.some(value => value > .1 && value < .9)), 'Icon emphasis should visibly blend during travel').toBe(true);
+        for (const frame of result.frames.flat()) for (const [index, emphasis] of frame.emphasis.entries()) {
+          expect(Math.abs(emphasis - Math.max(0, 1 - Math.abs(frame.position - index))), `Icon ${index} must follow the painted highlight at ${frame.position}`).toBeLessThan(.04);
+        }
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        await active.getByRole('button', { name: 'Reading', exact: true }).click();
+        await expect(active.getByRole('button', { name: 'Reading', exact: true })).toHaveCSS('transition-duration', '0s');
+        await expect.poll(() => active.locator('.pwa-dock__indicator').evaluate(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width)).toBeCloseTo(3, 2);
+      });
+      test(`plugin picker selection keeps one closing surface at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        await active.getByRole('button', { name: 'Projects', exact: true }).click();
+        for (const label of ['Highlights', 'Favorites', 'Archive']) {
+          if (label === 'Archive') await active.getByRole('button', { name: 'Inbox', exact: true }).click();
+          await active.locator('[data-dock-group]').press('ArrowDown');
+          const menu = page.getByRole('dialog', { name: 'More views' });
+          await expect(active.locator('.pwa-dock__tab').first()).toHaveCSS('opacity', '0');
+          await expect.poll(() => active.locator('.pwa-dock').evaluate(dock => parseFloat(getComputedStyle(dock).getPropertyValue('--dock-menu-inset')))).toBeLessThan(.2);
+          const frames = await menu.evaluate(async (menu, label) => {
+            const root = menu.closest('.plugin-workspace-navigation')!;
+            const labels = () => Array.from(menu.querySelectorAll('button')).map(button => button.textContent);
+            const before = labels();
+            Array.from(menu.querySelectorAll('button')).find(button => button.textContent === label)!.click();
+            const frames = [], start = performance.now();
+            while (performance.now() - start < 600) {
+              await new Promise(requestAnimationFrame);
+              frames.push({ labels: menu.isConnected ? labels() : before,
+                docks: Array.from(root.querySelectorAll('.pwa-dock')).map(dock => ({
+                  height: dock.querySelector('.pwa-dock__surface')!.getBoundingClientRect().height,
+                  tabs: Number(getComputedStyle(dock.querySelector('.pwa-dock__tab')!).opacity),
+                  indicator: Number(getComputedStyle(dock.querySelector('.pwa-dock__indicator')!).opacity),
+                })) });
+            }
+            return { before, frames };
+          }, label);
+          expect(frames.frames.every(frame => JSON.stringify(frame.labels) === JSON.stringify(frames.before)), 'Closing choices must not be replaced by the displaced tab').toBe(true);
+          expect(frames.frames.every(frame => frame.docks.length === 2 && Math.abs(frame.docks[0]!.height - frame.docks[1]!.height) < .5), `Feature surfaces must shrink together: ${JSON.stringify(frames.frames)}`).toBe(true);
+          expect(frames.frames.every(frame => frame.docks.every(dock => Math.abs(dock.tabs - dock.indicator) < .01))).toBe(true);
+          expect(frames.frames.every(frame => Math.abs(frame.docks[0]!.tabs - frame.docks[1]!.tabs) < .01), 'Both bars must reveal their icons and indicator together').toBe(true);
+          expect(frames.frames.some(frame => frame.docks.every(dock => dock.height > 65))).toBe(true);
+          await expect(active.locator('.view-header-title')).toHaveText(label);
+          await expect(active.locator('[data-dock-group]')).toBeFocused();
+          await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
+        }
+        // Reopening during the shrink uses the updated destinations immediately.
+        await active.locator('[data-dock-group]').press('ArrowDown');
+        await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: 'Reading', exact: true }).click();
+        await active.locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
+        const reopened = active.getByRole('dialog', { name: 'More views' });
+        await expect(reopened.getByRole('button')).toHaveText(['Favorites', 'Archive', 'Highlights']);
+        await reopened.getByRole('button', { name: 'Highlights', exact: true }).click();
+        await expect(active.getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
+        await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
+        await active.getByRole('button', { name: 'Inbox', exact: true }).click();
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await active.locator('[data-dock-group]').press('ArrowDown');
+        await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: 'Favorites', exact: true }).click();
+        await expect(active.locator('.view-header-title')).toHaveText('Favorites');
+        await expect(page.getByRole('dialog', { name: 'More views' })).toHaveCount(0);
+        for (const surface of await workspace.locator('.pwa-dock__surface').all()) await expect(surface).toHaveCSS('height', '60px');
+      });
+      test(`plugin dock highlight takes one continuous path at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        await active.getByRole('button', { name: 'Projects', exact: true }).click();
+        await expect.poll(() => active.locator('.pwa-dock__indicator').evaluate(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width)).toBeCloseTo(2, 2);
+        // Include Reading's first mount, switches to remembered tabs, and local changes.
+        for (const [label, index] of [['Reading', 3], ['Inbox', 0], ['Projects', 2], ['Reminders', 1], ['Reading', 3], ['Projects', 2], ['Reading', 3]] as const) {
+          const frames = await workspace.evaluate(async (root, label) => {
+            const position = (indicator: Element) => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width;
+            const before = position(root.querySelector('.plugin-workspace-panel[data-active="true"] .pwa-dock__indicator')!);
+            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+            button.click();
+            const positions: number[][] = [], start = performance.now();
+            while (performance.now() - start < 480) {
+              await new Promise(requestAnimationFrame);
+              positions.push(Array.from(root.querySelectorAll('.plugin-workspace-panel .pwa-dock__indicator')).map(position));
+            }
+            return { before, positions };
+          }, label);
+          expect(frames.positions.length).toBeGreaterThan(1);
+          expect(frames.positions.every(pair => pair.length === 2 && Math.abs(pair[0]! - pair[1]!) < .03), `${label} must share one painted highlight: ${JSON.stringify(frames.positions)}`).toBe(true);
+          const low = Math.min(frames.before, index), high = Math.max(frames.before, index);
+          expect(frames.positions.every(pair => pair.every(position => position >= low - .01 && position <= high + .01))).toBe(true);
+          expect(frames.positions.some(pair => pair.every(position => position > low + .05 && position < high - .05)), `${label} must visibly slide`).toBe(true);
+          for (const position of frames.positions.at(-1)!) expect(position).toBeCloseTo(index, 2);
+        }
+        const reversed = await workspace.evaluate(async root => {
+          const positions: number[][] = [];
+          const sample = () => positions.push(Array.from(root.querySelectorAll('.plugin-workspace-panel .pwa-dock__indicator')).map(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width));
+          for (const label of ['Inbox', 'Projects', 'Reminders', 'Reading', 'Inbox']) {
+            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+            button.click();
+            const start = performance.now();
+            do { await new Promise(requestAnimationFrame); sample(); } while (performance.now() - start < 45);
+          }
+          const start = performance.now();
+          while (performance.now() - start < 480) { await new Promise(requestAnimationFrame); sample(); }
+          return positions;
+        });
+        expect(reversed.every(pair => Math.abs(pair[0]! - pair[1]!) < .03), `Reversals must share one painted highlight: ${JSON.stringify(reversed)}`).toBe(true);
+        for (const position of reversed.at(-1)!) expect(position).toBeCloseTo(0, 2);
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await active.getByRole('button', { name: 'Reading', exact: true }).click();
+        await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll(indicators => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width - 3) < .01 && indicator.getAnimations().length === 0))).toBe(true);
+      });
+      test(`plugin prepares every dock destination during feature switches at ${width}px`, async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'dark' : 'light'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        const panels = active.locator('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving]), .crate-reading__library > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])');
+        const reminders = [{ label: 'Inbox', key: 'inbox' }, { label: 'Reminders', key: 'today' }, { label: 'Projects', key: 'browse' }];
+        const reading = [{ label: 'Reading', key: 'inbox' }, { label: 'Favorites', key: 'favorites' }, { label: 'Archive', key: 'archived' }, { label: 'Highlights', key: 'highlights' }];
+        for (const destination of reading) {
+          if (destination.label === 'Reading') await active.getByRole('button', { name: destination.label, exact: true }).click();
+          else {
+            await active.locator('[data-dock-group]').press('ArrowDown');
+            await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: destination.label, exact: true }).click();
+          }
+          await expect(panels).toHaveCount(1);
+          await expect(panels).toHaveAttribute('data-tab-view', destination.key);
+          for (const [index, target] of reminders.entries()) {
+            await active.getByRole('button', { name: reminders[(index + 1) % reminders.length]!.label, exact: true }).click();
+            await expect(panels).toHaveCount(1);
+            for (const delay of [240, 35]) {
+              const frames = await workspace.evaluate(async (root, { reading, target, delay }) => {
+                const select = (name: string) => {
+                  const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${name}"]`)!;
+                  button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+                  button.click();
+                };
+                select(reading.label);
+                await new Promise(requestAnimationFrame);
+                const readingViews = Array.from(root.querySelectorAll<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-tab-panel')).map(panel => panel.dataset.tabView!);
+                if (!root.querySelector('.plugin-workspace-panel[data-active="true"] .crate-reading')) throw new Error(`${reading.label} did not open`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                select(target.label);
+                const frames: string[][] = [], start = performance.now();
+                while (performance.now() - start < 220) {
+                  await new Promise(requestAnimationFrame);
+                  frames.push(Array.from(root.querySelectorAll<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel')).map(panel => panel.dataset.tabView!));
+                }
+                return { readingViews, frames };
+              }, { reading: destination, target, delay });
+              expect(frames.readingViews).toEqual([destination.key]);
+              expect(frames.frames.length).toBeGreaterThan(1);
+              expect(frames.frames.every(frame => frame.length === 1 && frame[0] === target.key), `${destination.label} → ${target.label} after ${delay}ms: ${JSON.stringify(frames.frames)}`).toBe(true);
+            }
+          }
+        }
+      });
+      test(`plugin reveals Inbox directly when returning from Reading at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        const panels = active.locator('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel');
+        // Exercise both a settled feature switch and a reversal during its fade.
+        for (const readingTime of [240, 35]) {
+          await active.getByRole('button', { name: 'Projects', exact: true }).click();
+          await expect(panels).toHaveCount(1);
+          await expect(panels).toHaveAttribute('data-tab-view', 'browse');
+          const frames = await workspace.evaluate(async (root, delay) => {
+            const select = (name: string) => {
+              const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${name}"]`)!;
+              button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+              button.click();
+            };
+            select('Reading');
+            await new Promise(resolve => setTimeout(resolve, delay));
+            if (!root.querySelector('.plugin-workspace-panel[data-active="true"] .crate-reading')) throw new Error('Reading did not open before returning to Inbox');
+            select('Inbox');
+            const frames: string[][] = [], start = performance.now();
+            while (performance.now() - start < 240) {
+              await new Promise(requestAnimationFrame);
+              frames.push(Array.from(root.querySelectorAll<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel'))
+                .map(panel => panel.dataset.tabView!));
+            }
+            return frames;
+          }, readingTime);
+          expect(frames.length).toBeGreaterThan(1);
+          expect(frames.every(frame => frame.length === 1 && frame[0] === 'inbox'), `Reading return after ${readingTime}ms: ${JSON.stringify(frames)}`).toBe(true);
+          await expect(active.getByRole('button', { name: 'Inbox', exact: true })).toBeFocused();
+        }
+        // Ordinary reminder tab changes still use their own dissolve.
+        const leaving = await workspace.evaluate(async root => {
+          root.querySelector<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="Projects"]')!.click();
+          await new Promise(requestAnimationFrame);
+          const panel = root.querySelector<HTMLElement>('.pwa-tab-panel[data-tab-view="inbox"]')!;
+          return { inert: panel.inert, opacity: Number(getComputedStyle(panel).opacity) };
+        });
+        expect(leaving.inert).toBe(true);
+        expect(leaving.opacity).toBeGreaterThan(0);
+        await expect(panels).toHaveCount(1);
+
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await active.getByRole('button', { name: 'Reading', exact: true }).click();
+        await active.getByRole('button', { name: 'Inbox', exact: true }).click();
+        await expect(panels).toHaveCount(1);
+        await expect(panels).toHaveAttribute('data-tab-view', 'inbox');
+        await expect(active).toHaveCSS('opacity', '1');
+      });
       test(`plugin dock, date views, feature retention and project Back at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto('/?host=plugin&scene=navigation&theme=light');

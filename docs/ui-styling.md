@@ -532,6 +532,10 @@ edge, so text stays inside the material and held-finger targets remain stationar
 A short, reversible popup fade handles dismissal without delaying input. Reduced
 motion jumps to the final shape and reveals the choices immediately;
 increased contrast or reduced transparency uses an opaque surface.
+Choosing a destination commits immediately while retaining the closing menu's rows.
+Retained feature docks share the surface spring and reveal progress, so a feature
+switch continues the current shrink before revealing its icons and selection.
+Reopening during dismissal uses the updated choices and reverses the same spring.
 The compact dropdown has no visible header or close button. Tapping outside or
 pressing Escape dismisses it. A background highlight marks the selected reading
 view, and a muted highlight follows the held finger. Release commits the preview;
@@ -542,7 +546,10 @@ cancels the selection. The add button and page layout stay in place.
 Ordinary tab buttons select their view; the sliding highlight follows the active
 destination. Both feature docks share the indicator position, so it slides from
 the selected slot when switching features, even when returning to a view that
-was already selected before the switch. Reminder tabs,
+was already selected before the switch. Plugin icon emphasis follows that spring's
+painted position; the PWA's icon colors use the indicator's duration and easing.
+Selection and keyboard semantics update immediately, while visible emphasis blends
+with the highlight and follows interruptions. Reminder tabs,
 Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
 stationary dissolve. Tab panels and feature layers use reversible CSS opacity
 transitions and retain their paint order until the switch settles, so a rapid

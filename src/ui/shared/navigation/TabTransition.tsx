@@ -35,7 +35,7 @@ export function TabTransition({ viewKey, children }: TabContent) {
 
 	useLayoutEffect(() => {
 		// The feature shell already owns the dissolve when returning from Reading.
-		if (container.current?.closest('.crate-feature-panel')?.getAttribute('data-entering') === 'true') {
+		if (container.current?.closest('.crate-feature-panel, .plugin-workspace-panel')?.getAttribute('data-entering') === 'true') {
 			discardDepartedLayers();
 			return;
 		}

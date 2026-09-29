@@ -56,7 +56,7 @@ const reading = ['one good thing', 'another'];
 <form action="https://tracking.invalid"><input autofocus name="name"></form>
 `;
 
-export function ReadingFixture({ onAdd, renderNavigation }: { onAdd: () => void; renderNavigation?: ReadingLibraryProps['renderNavigation'] }) {
+export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent }: { onAdd: () => void; renderNavigation?: ReadingLibraryProps['renderNavigation']; renderLibraryContent?: ReadingLibraryProps['renderLibraryContent'] }) {
 	const immediateReaderReturn = new URLSearchParams(location.search).has('reading-back');
 	const [items, setItems] = useState(() => new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
@@ -68,7 +68,7 @@ export function ReadingFixture({ onAdd, renderNavigation }: { onAdd: () => void;
 			}, { once: true }));
 		}
 		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
-	return <><ReadingLibraryPanel renderNavigation={renderNavigation} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
+	return <><ReadingLibraryPanel renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
 		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status="Available offline" onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
 		{adding && (new URLSearchParams(location.search).get('host') === 'plugin' ? <SaveLinkDialog variant={innerWidth > 600 ? 'centered' : 'bottom-sheet'} url={url} onUrl={setUrl} saving={false} onClose={() => setAdding(false)} onSave={() => setAdding(false)} /> : <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>)}

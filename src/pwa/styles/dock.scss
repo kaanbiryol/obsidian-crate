@@ -11,7 +11,7 @@
   .pwa-dock__indicator {
     width: calc((100% - 8px) / var(--pwa-dock-count, 4));
     transform: translateX(calc(var(--pwa-opening-dock-index, 1) * 100%));
-    opacity: var(--pwa-opening-dock-indicator, 1);
+    opacity: calc(var(--pwa-opening-dock-indicator, 1) * var(--dock-tabs-opacity, 1));
     transition: none;
   }
 }

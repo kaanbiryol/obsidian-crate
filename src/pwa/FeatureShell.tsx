@@ -19,6 +19,7 @@ import { resolvePwaOpeningDestination } from './opening-destination';
 import { createSettingsStore } from './settings-store';
 import { SettingsContext, useSettingsOpen, useSettingsStore } from './settings-context';
 import { SettingsSheet } from './components/SettingsSheet';
+import { DockMorphContext, useDockMorphState } from '@/ui/shared/navigation/useDockMorph';
 
 const currentSection = (): CrateSection => new URL(location.href).searchParams.get('section') === 'reading' ? 'reading' : 'reminders';
 const MODE_TRANSITION_FALLBACK_MS = 1_000;
@@ -30,6 +31,7 @@ export function FeatureShell({ reminders }: { reminders: React.ReactNode }) {
 
 function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const features = useServerFeatures();
+	const dockMorph = useDockMorphState();
 	useLayoutEffect(installDetailHistory, []);
 	usePwaInputModality();
 	const [launch] = useState(() => resolvePwaOpeningDestination(location.search, loadPwaPreferences().defaultScreen));
@@ -162,7 +164,7 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		<p>Enable it in Crate settings in Obsidian. Your notes and setup are preserved.</p>
 		{features[feature === 'reading' ? 'reminders' : 'reading'] && <Button onClick={() => switchSection(feature === 'reading' ? 'reminders' : 'reading')}>Open {feature === 'reading' ? 'Reminders' : 'Reading'}</Button>}
 	</div>;
-	return <SharedFeaturesContext.Provider value={features}><ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><div ref={root} className="crate-feature-shell" onTransitionEnd={event => {
+	return <DockMorphContext.Provider value={dockMorph}><SharedFeaturesContext.Provider value={features}><ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><div ref={root} className="crate-feature-shell" onTransitionEnd={event => {
 		const panel = event.target as HTMLElement;
 		if (event.propertyName === 'opacity' && panel.dataset.crateSection === frontSection) finishSettledSection();
 	}}>
@@ -171,5 +173,5 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" style={panelStyle('reminders')} data-front={frontSection === 'reminders'} data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{features.reminders ? visited.has('reminders') && reminders : paused('reminders')}</FeatureNavigationContext.Provider></div>
 		</div>
 		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet navigation={settingsNavigation} onOpenEnd={settingsOpened} activeSection={section} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
-	</div></PwaUpdateProvider></ThemeIconProvider></SharedFeaturesContext.Provider>;
+	</div></PwaUpdateProvider></ThemeIconProvider></SharedFeaturesContext.Provider></DockMorphContext.Provider>;
 }
