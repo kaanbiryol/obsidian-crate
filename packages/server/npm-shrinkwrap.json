@@ -14,7 +14,7 @@
         "undici": "7.29.1",
         "workerd": "1.20260926.1",
         "ws": "8.21.0",
-        "youch": "4.1.0-beta.10"
+        "youch": "4.1.1"
       },
       "bin": {
         "crate-server": "scripts/crate-server.mjs"
@@ -708,9 +708,9 @@
       }
     },
     "node_modules/@poppinss/dumper": {
-      "version": "0.6.5",
-      "resolved": "https://registry.npmjs.org/@poppinss/dumper/-/dumper-0.6.5.tgz",
-      "integrity": "sha512-NBdYIb90J7LfOI32dOewKI1r7wnkiH6m920puQ3qHUeZkxNkQiFnXVWoE6YtFSv6QOiPPf7ys6i+HWWecDz7sw==",
+      "version": "0.7.0",
+      "resolved": "https://registry.npmjs.org/@poppinss/dumper/-/dumper-0.7.0.tgz",
+      "integrity": "sha512-0UTYalzk2t6S4rA2uHOz5bSSW2CHdv4vggJI6Alg90yvl0UgXs6XSXpH96OH+bRkX4J/06djv29pqXJ0lq5Kag==",
       "license": "MIT",
       "dependencies": {
         "@poppinss/colors": "^4.1.5",
@@ -742,18 +742,11 @@
       "integrity": "sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw==",
       "license": "CC0-1.0"
     },
-    "node_modules/cookie": {
-      "version": "1.1.1",
-      "resolved": "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz",
-      "integrity": "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==",
-      "license": "MIT",
-      "engines": {
-        "node": ">=18"
-      },
-      "funding": {
-        "type": "opencollective",
-        "url": "https://opencollective.com/express"
-      }
+    "node_modules/cookie-es": {
+      "version": "3.1.1",
+      "resolved": "https://registry.npmjs.org/cookie-es/-/cookie-es-3.1.1.tgz",
+      "integrity": "sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==",
+      "license": "MIT"
     },
     "node_modules/detect-libc": {
       "version": "2.1.2",
@@ -913,15 +906,15 @@
       }
     },
     "node_modules/youch": {
-      "version": "4.1.0-beta.10",
-      "resolved": "https://registry.npmjs.org/youch/-/youch-4.1.0-beta.10.tgz",
-      "integrity": "sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==",
+      "version": "4.1.1",
+      "resolved": "https://registry.npmjs.org/youch/-/youch-4.1.1.tgz",
+      "integrity": "sha512-mxW3qiSnl+GRxXsaUMzv2Mbada1Y8CDltET9UxejDQe6DBYlSekghl5U5K0ReAikcHDi0G1vKZEmmo/NWAGKLA==",
       "license": "MIT",
       "dependencies": {
-        "@poppinss/colors": "^4.1.5",
-        "@poppinss/dumper": "^0.6.4",
-        "@speed-highlight/core": "^1.2.7",
-        "cookie": "^1.0.2",
+        "@poppinss/colors": "^4.1.6",
+        "@poppinss/dumper": "^0.7.0",
+        "@speed-highlight/core": "^1.2.14",
+        "cookie-es": "^3.0.1",
         "youch-core": "^0.3.3"
       }
     },
