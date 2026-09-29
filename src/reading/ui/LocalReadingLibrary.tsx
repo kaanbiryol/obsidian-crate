@@ -1,4 +1,4 @@
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
@@ -11,7 +11,7 @@ import './reading.scss';
 
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';
 export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plugin: CratePlugin; library: ReadingLibrary; renderNavigation?: ReadingLibraryProps['renderNavigation'] }) {
-	const reduceMotion = useObsidianReducedMotion();
+	const reduceMotion = useReducedMotion();
 	const snapshot = useSyncExternalStore(library.subscribe, library.getSnapshot);
 	const [article, setArticle] = useState<Awaited<ReturnType<ReadingLibrary['read']>> | null>(null);
 	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();

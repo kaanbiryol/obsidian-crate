@@ -1,9 +1,15 @@
 import type CratePlugin from './CratePlugin';
-import { readingServerRequest } from '../reading/server';
+import { serverRequest } from './server-request';
 import { startReading, stopReading } from '../reading/runtime';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 
 interface Features { reading: boolean; reminders: boolean; revision: string | null }
+function requestFeatures(plugin: CratePlugin, body?: unknown): Promise<Features> {
+  return serverRequest(plugin, '/features', body, {
+    timeout: 5_000,
+    capabilities: { 'shared-features-v1': 'Update your Crate server to share feature settings.' },
+  });
+}
 const tasks = new WeakMap<CratePlugin, Promise<void>>();
 async function apply(plugin: CratePlugin, policy: Features, activate: boolean): Promise<void> {
   if (typeof policy.reading !== 'boolean' || typeof policy.reminders !== 'boolean') throw new Error('Could not read shared feature settings.');
@@ -26,7 +32,7 @@ function serialize(plugin: CratePlugin, action: () => Promise<void>): Promise<vo
 export function refreshSharedFeatures(plugin: CratePlugin, activate = true): Promise<void> {
   return serialize(plugin, async () => {
     if (!plugin.settings.workerUrl || getPluginLifecycleSignal(plugin).aborted) return;
-    const policy = await readingServerRequest<Features>(plugin, '/features');
+    const policy = await requestFeatures(plugin);
     const changed = policy.reading !== plugin.settings.reading.enabled || policy.reminders !== plugin.remindersSettings.enabled;
     await apply(plugin, policy, activate);
     if (changed && activate) plugin.refreshSettingsTab();
@@ -38,8 +44,8 @@ export function setSharedFeature(plugin: CratePlugin, feature: 'reading' | 'remi
       await apply(plugin, { reading: plugin.settings.reading.enabled, reminders: plugin.remindersSettings.enabled, revision: null, [feature]: enabled }, true);
       return;
     }
-    const current = await readingServerRequest<Features>(plugin, '/features');
-    const policy = await readingServerRequest<Features>(plugin, '/features', { feature, enabled, revision: current.revision });
+    const current = await requestFeatures(plugin);
+    const policy = await requestFeatures(plugin, { feature, enabled, revision: current.revision });
     await apply(plugin, policy, true);
   });
 }

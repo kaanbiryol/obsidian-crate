@@ -1,5 +1,6 @@
+import type { ConfirmedReminderSnapshot } from './useReminderSync';
 import { useMemo, useRef } from 'react';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { newReminderOperationId } from '../reminder-operation-id';
 import { discardReminderDraft } from '../reminder-drafts';
@@ -19,11 +20,9 @@ export function useReminderMutations(options: {
 	ensureCanMutate: () => boolean;
 	reminders: ReminderRecord[];
 	projects: string[];
-	projectsRef: MutableRefObject<string[]>;
-	remindersRef: MutableRefObject<ReminderRecord[]>;
+	getSnapshot: () => ConfirmedReminderSnapshot;
 	selectedProject: string | null;
-	setProjects: Dispatch<SetStateAction<string[]>>;
-	setReminders: Dispatch<SetStateAction<ReminderRecord[]>>;
+	refreshPresentation: () => void;
 	setSaving: Dispatch<SetStateAction<boolean>>;
 	showToast: ShowToast;
 	loadReminders: LoadReminders;
@@ -31,7 +30,7 @@ export function useReminderMutations(options: {
 	canRecover?: boolean;
 }) {
 	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
-	const { closeModal, config, ensureCanMutate, projects, remindersRef, selectedProject, setReminders, setSaving, showToast } = options;
+	const { closeModal, config, ensureCanMutate, projects, getSnapshot, selectedProject, refreshPresentation, setSaving, showToast } = options;
 	const preparingRef = useRef(false);
 	const pendingPreparations = useRef(0);
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
@@ -49,7 +48,7 @@ export function useReminderMutations(options: {
 		try {
 			const { createSaveReminderChange } = await import('../save-reminder-command');
 			if (!sessionCurrent()) return;
-			const previous = remindersRef.current.find(item => item.id === modal.reminderId);
+			const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
 			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
 			if (!sessionCurrent()) return;
 			enqueue(change);
@@ -61,7 +60,7 @@ export function useReminderMutations(options: {
 	};
 
 	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
-		const previous = remindersRef.current.find(item => item.id === id);
+		const previous = getSnapshot().reminders.find(item => item.id === id);
 		if (!previous) throw new Error('Refresh reminders before changing this reminder.');
 		const operationId = await newReminderOperationId();
 		return {
@@ -78,7 +77,7 @@ export function useReminderMutations(options: {
 		const current = capturePwaSession();
 		pendingPreparations.current += 1;
 		try {
-			const previous = remindersRef.current.find(item => item.id === id);
+			const previous = getSnapshot().reminders.find(item => item.id === id);
 			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
 			const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
 			if (current()) {
@@ -102,7 +101,7 @@ export function useReminderMutations(options: {
 		finally { pendingPreparations.current -= 1; }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
-		if (!ensureCanMutate()) { setReminders(current => [...current]); return; }
+		if (!ensureCanMutate()) { refreshPresentation(); return; }
 		const current = capturePwaSession();
 		pendingPreparations.current += 1;
 		try {
@@ -111,10 +110,10 @@ export function useReminderMutations(options: {
 			enqueue({
 				operationId, kind: 'reorder', project, orderedIds: [...orderedIds], path: '/reminders/reorder', method: 'POST',
 				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds,
-					expectedOrder: remindersRef.current.filter(item => item.project === project).map(item => item.id), operationId }),
+					expectedOrder: getSnapshot().reminders.filter(item => item.project === project).map(item => item.id), operationId }),
 				status: 'pending', attempts: 0, retryAt: 0,
 			});
-		} catch (error) { if (current()) { setReminders(reminders => [...reminders]); report(error); } }
+		} catch (error) { if (current()) { refreshPresentation(); report(error); } }
 		finally { pendingPreparations.current -= 1; }
 	};
 	const retryChange = (operationId: string) => {
@@ -129,7 +128,7 @@ export function useReminderMutations(options: {
 		const change = changes.find(item => item.operationId === operationId && item.status === 'failed' && !item.ambiguous && item.kind === 'save');
 		if (!change?.modal) return null;
 		const modal = JSON.parse(JSON.stringify(change.modal)) as ModalState;
-		const current = remindersRef.current.find(item => item.id === change.recordId);
+		const current = getSnapshot().reminders.find(item => item.id === change.recordId);
 		if (modal.mode === 'edit' && !current) {
 			modal.mode = 'create';
 			delete modal.reminderId;

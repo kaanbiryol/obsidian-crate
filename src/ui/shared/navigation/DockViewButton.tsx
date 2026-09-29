@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/ui/shared/Button';
-import { ThemeIcon } from '@/reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
 type Point = { x: number; y: number };
 type Gesture = { pointerId: number; button: HTMLButtonElement; start: Point; choosing: boolean; moved: boolean };

@@ -21,3 +21,9 @@ export const PWA_CONTROL_SPRING = {
 /** The picker handoff keeps focus restoration inside the initiating gesture. */
 export const PWA_PICKER_EXIT = { duration: 0.18, ease: [0.4, 0, 1, 1] } as const;
 export const PWA_PICKER_RETURN = { ...PWA_PICKER_EXIT, duration: 0.08 } as const;
+
+export const SPRING_CONFIG = {
+  stiffness: 500,
+  damping: 40,
+  mass: 0.8
+} as const;

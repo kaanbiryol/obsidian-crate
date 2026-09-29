@@ -1,16 +1,8 @@
+import { handleCoordinatorRequest } from '../coordinator-requests';
+import { runCoordinatorAlarm } from '../coordinator-alarms';
 import { featureEnabled } from '../feature-policy';
-import { runReadingExtraction, publishExtraction, type Publication } from '../reading/extraction/jobs';
-import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../history-checkpoints';
 import { withD1Usage } from '../d1-usage';
-import { drainNotificationJobs } from '../notification-outbox';
-import { uploadInitialFiles } from '../initial-import-upload';
-import { handleBatchDownload } from '../sync-batch/download';
-import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../bulk-upload-dispatch';
-import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../staged-upload-dispatch';
 import { PushPayloadError } from './payload-budget';
-import { runBoundedNotificationCoordinator } from '../notification-lifecycle';
-import { handleCoordinatorRequest } from '../notification-dispatch';
-import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import type { Env } from '../types';
 import { changedRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
@@ -92,48 +84,12 @@ export class ReminderAlarm implements DurableObject {
     return withD1Usage(this.env as Env, env => this.fetchMeasured(request, env));
   }
 
-  private async fetchMeasured(request: Request, env: Env): Promise<Response> {
-    if (new URL(request.url).pathname === '/reading-wake' && request.method === 'POST') return this.withStateLock(async () => {
- await this.state.storage.put('readingCoordinator', true);
- if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(Date.now() + 100);
- return new Response(null, { status: 204 });
- });
- if (new URL(request.url).pathname === '/reading-publish' && request.method === 'POST') return this.withStateLock(async () => {
- await publishExtraction(env, await request.json() as Publication);
- return new Response(null, { status: 204 });
- });
-    if (new URL(request.url).pathname === '/dispatch-jobs' && request.method === 'POST') {
-      return this.withStateLock(async () => {
-        await drainNotificationJobs(env);
-        return new Response(null, { status: 204 });
-      });
-    }
-    if (new URL(request.url).pathname === '/history-checkpoint-create' && request.method === 'POST') return this.withStateLock(() => createSharedCheckpoint(env.BUCKET, env.DB));
-    if (new URL(request.url).pathname === '/history-checkpoint' && request.method === 'GET') return this.withStateLock(() => getSharedCheckpoint(request, env.BUCKET));
-    if (new URL(request.url).pathname === '/history-checkpoint-file' && request.method === 'GET') return this.withStateLock(() => downloadCheckpointFile(request, env.BUCKET, env.DB));
-    if (new URL(request.url).pathname === '/batch-download' && request.method === 'POST') {
-      return this.withStateLock(() => handleBatchDownload(request, env.BUCKET, env.DB));
-    }
-    if (new URL(request.url).pathname === '/import-upload' && ['POST', 'PUT'].includes(request.method)) {
-      // One decoded batch at a time bounds memory even for large attachments.
-      // This is only the unpublished import; its generation/lease guards still apply.
-      return this.withStateLock(() => uploadInitialFiles(request, env.BUCKET, env.DB));
-    }
-    if (new URL(request.url).pathname === '/commit-new-files' && request.method === 'POST') {
-      const prepared = await prepareCoordinatedNewFiles(request, env);
-      return this.withStateLock(() => commitCoordinatedNewFiles(prepared, this.state, env));
-    }
-    if (new URL(request.url).pathname === '/commit-upload' && request.method === 'POST') {
-      const prepared = await prepareCoordinatedUpload(request, env);
-      if (prepared instanceof Response) return prepared;
-      return this.withStateLock(() => commitCoordinatedUpload(prepared, this.state, env));
-    }
-		return this.withStateLock(() => this.handleFetch(request, env));
-	}
+  private fetchMeasured(request: Request, env: Env): Promise<Response> {
+    return handleCoordinatorRequest(request, this.state, env,
+      action => this.withStateLock(action), () => this.handleFetch(request, env));
+  }
 
 	private async handleFetch(request: Request, env: Env): Promise<Response> {
-		const coordinatorResponse = await handleCoordinatorRequest(request, this.state, env);
-		if (coordinatorResponse) return coordinatorResponse;
 		const method = request.method;
 
 		if (method === 'PUT') {
@@ -242,18 +198,7 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async handleAlarm(): Promise<void> {
- if (await this.state.storage.get<boolean>('readingCoordinator')) { await runReadingExtraction(this.state, this.env as Env); return; }
-		if (await this.state.storage.get<boolean>('maintenanceCoordinator')) {
-			await this.withStateLock(() => runMaintenanceEpisode(this.state, this.env as Env));
-			return;
-		}
-		if (await this.state.storage.get<boolean>('projectionCoordinator')) {
-			if (!this.env.BUCKET || !this.env.REMINDER_ALARMS) throw new Error('Projection bindings unavailable');
-			// Serialize wakeups with the final idle/retry decision so new work cannot
-			// lose its immediate alarm to an older pass scheduling a later retry.
-			await this.withStateLock(() => runBoundedNotificationCoordinator(this.state, this.env as Env));
-			return;
-		}
+		if (await runCoordinatorAlarm(this.state, this.env as Env, action => this.withStateLock(action))) return;
 		const reminder = await this.withStateLock(() => this.state.storage.get<ReminderData>('reminder'));
 		if (!reminder) return;
 

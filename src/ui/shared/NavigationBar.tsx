@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { SPRING_CONFIG } from '../../reminders/ui/layoutConstants';
-import { useObsidianReducedMotion } from '../../reminders/ui/useObsidianReducedMotion';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { SPRING_CONFIG } from './navigation/motion';
+import { useReducedMotion } from './useReducedMotion';
+import { ThemeIcon } from './ThemeIcon';
 import { Button } from './Button';
 
 export interface NavigationItem<T extends string> {
@@ -24,7 +24,7 @@ export function NavigationBar<T extends string>({ items, activeTab, onTabChange,
   inert?: boolean;
   action?: string;
 }) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const activeIndex = Math.max(0, items.findIndex(tab => tab.id === activeTab));
   const indicatorStyle = { gridColumn: activeIndex + 1 };
   return <nav inert={inert} className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`} aria-label={label}>

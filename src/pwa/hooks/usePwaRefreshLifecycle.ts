@@ -1,17 +1,16 @@
 import { useEffect } from 'react';
-import type { MutableRefObject } from 'react';
 import type { LoadReminders } from '../types';
 
 export function usePwaRefreshLifecycle({
 	authToken,
 	bootstrapped,
-	hydratedCacheRef,
+	hasHydratedCache,
 	loadReminders,
 	refreshPushState,
 }: {
 	authToken: string | null;
 	bootstrapped: boolean;
-	hydratedCacheRef: MutableRefObject<boolean>;
+	hasHydratedCache: () => boolean;
 	loadReminders: LoadReminders;
 	refreshPushState: () => Promise<void>;
 }) {
@@ -19,15 +18,16 @@ export function usePwaRefreshLifecycle({
 	useEffect(() => {
 		if (!bootstrapped || !authToken) return;
 		void Promise.all([
-			loadReminders({ silent: hydratedCacheRef.current }),
+			loadReminders({ silent: hasHydratedCache() }),
 			refreshPushState().catch(() => undefined),
 		]);
-	}, [authToken, bootstrapped, hydratedCacheRef, loadReminders, refreshPushState]);
+	}, [authToken, bootstrapped, hasHydratedCache, loadReminders, refreshPushState]);
 
 	useEffect(() => {
-		const resume = () => {
+		const resume = (event?: Event) => {
 			if (!bootstrapped || !authToken) return;
-			void loadReminders({ silent: true, maxAgeMs: 30_000 });
+			// Reconnection must recover changes missed offline, even after a recent read.
+			void loadReminders({ silent: true, maxAgeMs: event?.type === 'online' ? 0 : 30_000 });
 			void refreshPushState().catch(() => undefined);
 		};
 		const handleVisibilityChange = () => {

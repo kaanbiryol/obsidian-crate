@@ -160,7 +160,20 @@ It first runs the npm advisory audit (including development dependencies, failin
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, two visual shards, two editor shards (with activity tests on the first), and four PWA browser shards run as separate jobs. Capacity benchmarks remain in the release gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, two visual shards, two editor shards (activity on the first, file/vault history on the second), a Reading browser job, and four PWA browser shards run as separate jobs. Capacity benchmarks remain in the release gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+
+Reading checks use the same named groups locally and in CI: `test:reading-server`
+covers extraction, server behavior, and shortcut contracts; `test:reading-browser`
+covers the library, consent, optimistic changes, highlights, and shortcut browser
+flows, one browser script at a time to avoid competing selection and focus tests.
+Both groups require Chromium/WebKit and a built Worker. `test:reading` builds the
+Worker and runs both groups.
+File/vault history browser checks also run in `release:check`.
+
+`useReminderSync.test.ts` and `useReminderEditor.test.ts` render real React hooks
+with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifetime.
+Browser focus and persistent storage behavior remain covered by Chromium/WebKit
+checks against the built PWA.
 
 Release runs resolve the tag to one commit before starting verification. Every job checks out that commit, and publishing waits for all verification jobs plus a separate clean-install rebuild that must reproduce the original plugin and CSS hashes. Assets uploaded by the source-check job cannot be published when any other check fails.
 

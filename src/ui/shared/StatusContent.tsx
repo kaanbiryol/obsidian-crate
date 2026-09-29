@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from './ThemeIcon';
 
 export interface StatusContentProps {
     state: 'working' | 'success' | 'error';

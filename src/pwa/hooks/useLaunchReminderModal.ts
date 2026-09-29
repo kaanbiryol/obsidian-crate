@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { buildModalDraft } from '../reminder-modal-draft';
 import type {
 	DataMode,
-	ModalState,
 	ReminderRecord,
 } from '../types';
 
@@ -19,10 +17,8 @@ export function useLaunchReminderModal({
 	reminders,
 	selectedProject,
 	setLaunchReminderId,
-	setModal,
-	setSaving,
+	openReminder,
 	setSelectedProject,
-	setSettingsOpen,
 	showToast,
 }: {
 	authToken: string | null;
@@ -36,10 +32,8 @@ export function useLaunchReminderModal({
 	reminders: ReminderRecord[];
 	selectedProject: string | null;
 	setLaunchReminderId: Dispatch<SetStateAction<string | null>>;
-	setModal: Dispatch<SetStateAction<ModalState | null>>;
-	setSaving: Dispatch<SetStateAction<boolean>>;
+	openReminder: (mode: 'edit', reminder: ReminderRecord, project: string | null, synchronous?: boolean) => void;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
-	setSettingsOpen: Dispatch<SetStateAction<boolean>>;
 	showToast: (kind: 'info' | 'success' | 'error', message: string) => void;
 }): void {
 	useEffect(() => {
@@ -62,16 +56,7 @@ export function useLaunchReminderModal({
 			return;
 		}
 
-		setSettingsOpen(false);
-		setSaving(false);
-		setModal({
-			mode: 'edit',
-			reminderId: reminder.id,
-			expectedRevision: reminder.revision,
-			filePath: reminder.filePath,
-			operationId: crypto.randomUUID(),
-			draft: buildModalDraft(reminder, reminder.project || selectedProject),
-		});
+		openReminder('edit', reminder, reminder.project || selectedProject, false);
 		setLaunchReminderId(null);
 	}, [
 		authToken,
@@ -85,10 +70,8 @@ export function useLaunchReminderModal({
 		reminders,
 		selectedProject,
 		setLaunchReminderId,
-		setModal,
-		setSaving,
+		openReminder,
 		setSelectedProject,
-		setSettingsOpen,
 		showToast,
 	]);
 }

@@ -1,198 +1,188 @@
+import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { renderHook } from '../../test/react-hooks';
 import { useReminderSync } from './useReminderSync';
 import { invalidatePwaSession } from '../session-generation';
 import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import type { ApiFetch, ReminderRecord } from '../types';
 
-const hookState = vi.hoisted(() => ({ setters: [] as Array<ReturnType<typeof vi.fn>> }));
-
-vi.mock('react', () => ({
-	useCallback: (callback: unknown) => callback,
-	useEffect: () => {},
-	useRef: (current: unknown) => ({ current }),
-	useState: (initial: unknown) => {
-		const setState = vi.fn();
-		hookState.setters.push(setState);
-		return [typeof initial === 'function' ? (initial as () => unknown)() : initial, setState];
-	},
-}));
 vi.mock('../reminder-cache', () => ({
 	loadCachedReminderSnapshot: vi.fn(async () => null),
 	refreshCachedReminderSnapshot: vi.fn(async () => {}),
 	saveCachedReminderSnapshot: vi.fn(async () => {}),
 }));
-afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.clearAllMocks(); });
 
 function reminder(id: string, overrides: Partial<ReminderRecord> = {}): ReminderRecord {
 	return { id, content: id, completed: false, priority: 4, revision: `${id}-original`,
 		filePath: 'Reminders/Inbox.md', project: 'Inbox', ...overrides };
 }
-
 function response(reminders: ReminderRecord[], projects = ['Inbox']) {
 	return new Response(JSON.stringify({ reminders, projects }), { headers: { ETag: 'latest-list' } });
 }
-
 function harness() {
-	hookState.setters = [];
 	const requests: Array<{ resolve: (value: Response) => void }> = [];
-	const apiFetch = vi.fn<ApiFetch>(() => new Promise<Response>(resolve => { requests.push({ resolve }); }));
-	// eslint-disable-next-line react-hooks/rules-of-hooks -- React is mocked above; this harness exercises hook logic without a React render.
-	const hook = useReminderSync({
-		apiFetch, authToken: 'token', bootstrapped: true,
+	const options = {
+		apiFetch: vi.fn<ApiFetch>(() => new Promise<Response>(resolve => { requests.push({ resolve }); })),
+		authToken: 'token',
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn(),
-	});
+	};
+	const rendered = renderHook(() => useReminderSync(options));
 	const original = reminder('one');
-	hook.hydrateCachedSnapshot({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 1 });
-	return { hook, requests, original, setRefreshing: hookState.setters[3]!, setIssues: hookState.setters[8]! };
+	act(() => rendered.current.hydrateCachedSnapshot({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 1 }));
+	const load = () => {
+		let promise: Promise<void>;
+		act(() => { promise = rendered.current.loadReminders({ silent: true }); });
+		return promise!;
+	};
+	const settle = async (index: number, result: Response, pending: Promise<void>) => {
+		await act(async () => { requests[index]!.resolve(result); await pending; });
+	};
+	const commit = (records: ReminderRecord[]) => act(() => rendered.current.commitReminderState(records));
+	return { rendered, options, requests, original, load, settle, commit };
 }
 
 describe('PWA reminder refresh around local writes', () => {
-	it('retains structured source issues through local acknowledgements and 304 until a complete read repairs them', async () => {
-		const { hook, requests, original, setIssues } = harness();
+	it('retains source issues through acknowledgements and 304 until a complete read repairs them', async () => {
+		const { rendered, original, load, settle, commit } = harness();
 		const issues = [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }];
-		const partial = hook.loadReminders();
-		requests[0]!.resolve(new Response(JSON.stringify({ reminders: [original], projects: ['Inbox'], issues })));
-		await partial;
-		expect(setIssues).toHaveBeenLastCalledWith(issues);
+		await settle(0, new Response(JSON.stringify({ reminders: [original], projects: ['Inbox'], issues })), load());
+		expect(rendered.current.issues).toEqual(issues);
 		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original], ['Inbox'], expect.any(Number), undefined, issues);
 		const corrected = { ...original, content: 'Healthy reminder stays editable' };
-		await hook.commitReminderState([corrected]);
+		await commit([corrected]);
+		expect(rendered.current.reminders).toEqual([corrected]);
 		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), undefined, issues);
-		const unchanged = hook.loadReminders();
-		requests[1]!.resolve(new Response(null, { status: 304 }));
-		await unchanged;
-		expect(setIssues).toHaveBeenLastCalledWith(issues);
-		const repaired = hook.loadReminders();
-		requests[2]!.resolve(response([corrected]));
-		await repaired;
-		expect(setIssues).toHaveBeenLastCalledWith([]);
+		await settle(1, new Response(null, { status: 304 }), load());
+		expect(rendered.current.issues).toEqual(issues);
+		await settle(2, response([corrected]), load());
+		expect(rendered.current.issues).toEqual([]);
 		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), 'latest-list', []);
 	});
 
-	it('restores omitted-source explanations with a cached snapshot after a network error and clears them on logout', async () => {
-		const { hook, requests, original, setIssues } = harness();
+	it('restores cached source issues after a network error and clears them on logout', async () => {
+		const { rendered, original, load, settle } = harness();
 		const issues = [{ path: 'Reminders/Copy.md', reason: 'Duplicate reminder ID' }];
 		vi.mocked(loadCachedReminderSnapshot).mockResolvedValueOnce({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 123, issues });
-		const failed = hook.loadReminders();
-		requests[0]!.resolve(new Response('Offline', { status: 503 }));
-		await failed;
-		expect(hook.remindersRef.current).toEqual([original]);
-		expect(setIssues).toHaveBeenLastCalledWith(issues);
-		expect(hookState.setters[4]).toHaveBeenLastCalledWith('Offline');
-		hook.resetReminderState();
-		expect(setIssues).toHaveBeenLastCalledWith([]);
+		await settle(0, new Response('Offline', { status: 503 }), load());
+		expect(rendered.current.reminders).toEqual([original]);
+		expect(rendered.current.issues).toEqual(issues);
+		expect(rendered.current.error).toBe('Offline');
+		act(() => rendered.current.resetReminderState());
+		expect(rendered.current.issues).toEqual([]);
+		expect(rendered.current.hasHydratedCache()).toBe(false);
 	});
 
-	it.each([true, false])('starts a fresh read after a write while an invalidated read is unresolved (stale first=%s)', async staleFirst => {
-		const { hook, requests, original } = harness();
-		const staleRead = hook.loadReminders({ silent: true });
-		expect(hook.loadReminders({ silent: true })).toBe(staleRead);
+	it.each([true, false])('starts a fresh read after a write (stale read finishes first=%s)', async staleFirst => {
+		const { rendered, requests, original, load, settle, commit } = harness();
+		const staleRead = load();
+		expect(load()).toBe(staleRead);
 		expect(requests).toHaveLength(1);
-
-		const finish = hook.beginLocalMutation();
+		const finish = rendered.current.beginLocalMutation();
 		const local = { ...original, completed: true, revision: 'one-confirmed' };
-		await hook.commitReminderState([local]);
+		await commit([local]);
 		finish();
-		const freshRead = hook.loadReminders({ silent: true });
+		const freshRead = load();
 		expect(freshRead).not.toBe(staleRead);
 		expect(requests).toHaveLength(2);
-
-		const fullList = [local, reminder('remote', { description: 'Added on another device', project: 'Work' })];
+		const fullList = [local, reminder('remote', { project: 'Work' })];
 		if (staleFirst) {
-			requests[0]!.resolve(response([], []));
-			await staleRead;
-			expect(hook.remindersRef.current).toEqual([local]);
-			// Finishing an invalidated read must not clear the newer in-flight read.
-			expect(hook.loadReminders({ silent: true })).toBe(freshRead);
-			expect(requests).toHaveLength(2);
+			await settle(0, response([], []), staleRead);
+			expect(rendered.current.reminders).toEqual([local]);
+			expect(load()).toBe(freshRead);
 		}
-		requests[1]!.resolve(response(fullList, ['Inbox', 'Work']));
-		await freshRead;
-		if (!staleFirst) {
-			requests[0]!.resolve(response([], []));
-			await staleRead;
-		}
-
-		expect(hook.remindersRef.current).toEqual(fullList);
-		expect(hook.projectsRef.current).toEqual(['Inbox', 'Work']);
+		await settle(1, response(fullList, ['Inbox', 'Work']), freshRead);
+		if (!staleFirst) await settle(0, response([], []), staleRead);
+		expect(rendered.current.getSnapshot()).toEqual({ reminders: fullList, projects: ['Inbox', 'Work'] });
+		expect(rendered.current.reminders).toEqual(fullList);
+		expect(rendered.current.projects).toEqual(['Inbox', 'Work']);
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledTimes(2);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', fullList, ['Inbox', 'Work'], expect.any(Number), 'latest-list', []);
 	});
 
 	it('detaches reads both when a write begins and when it finishes', async () => {
-		const { hook, requests, original } = harness();
-		const beforeWrite = hook.loadReminders({ silent: true });
-		const finish = hook.beginLocalMutation();
-		const duringWrite = hook.loadReminders({ silent: true });
-		expect(duringWrite).not.toBe(beforeWrite);
-		expect(requests).toHaveLength(2);
-
+		const { rendered, requests, original, load, settle, commit } = harness();
+		const before = load();
+		const finish = rendered.current.beginLocalMutation();
+		const during = load();
+		expect(during).not.toBe(before);
 		const local = { ...original, content: 'Saved correction', revision: 'one-confirmed' };
-		await hook.commitReminderState([local]);
+		await commit([local]);
 		finish();
-		const afterWrite = hook.loadReminders({ silent: true });
-		expect(afterWrite).not.toBe(duringWrite);
+		const after = load();
+		expect(after).not.toBe(during);
+		await settle(1, response([], []), during);
+		await settle(0, response([original]), before);
+		expect(rendered.current.reminders).toEqual([local]);
+		expect(load()).toBe(after);
 		expect(requests).toHaveLength(3);
-
-		requests[1]!.resolve(response([], []));
-		requests[0]!.resolve(response([original]));
-		await Promise.all([beforeWrite, duringWrite]);
-		expect(hook.remindersRef.current).toEqual([local]);
-		expect(hook.loadReminders({ silent: true })).toBe(afterWrite);
-		expect(requests).toHaveLength(3);
-
 		const fullList = [local, reminder('remote')];
-		requests[2]!.resolve(response(fullList));
-		await afterWrite;
-		expect(hook.remindersRef.current).toEqual(fullList);
+		await settle(2, response(fullList), after);
+		expect(rendered.current.reminders).toEqual(fullList);
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledTimes(2);
 	});
 
-	it.each([true, false])('isolates a new session from a previous session mutation (old write finishes first=%s)', async oldWriteFirst => {
-		const { hook, requests, original, setRefreshing } = harness();
-		const oldRead = hook.loadReminders({ silent: true });
-		const finishOldWrite = hook.beginLocalMutation();
+	it.each([true, false])('isolates a new session from an old mutation (old write finishes first=%s)', async oldWriteFirst => {
+		const { rendered, original, load, settle } = harness();
+		const oldRead = load();
+		const finishOldWrite = rendered.current.beginLocalMutation();
 		invalidatePwaSession();
-		hook.resetReminderState();
-		const newRead = hook.loadReminders({ silent: true });
-		expect(requests).toHaveLength(2);
-
+		act(() => rendered.current.resetReminderState());
+		const newRead = load();
 		if (oldWriteFirst) finishOldWrite();
-		expect(hook.loadReminders({ silent: true })).toBe(newRead);
-		expect(requests).toHaveLength(2);
-		requests[0]!.resolve(response([original]));
-		await oldRead;
-		expect(hook.remindersRef.current).toEqual([]);
-		expect(setRefreshing).toHaveBeenLastCalledWith(true);
-		expect(hook.loadReminders({ silent: true })).toBe(newRead);
-
-		const newSessionRecords = [reminder('new-session-reminder', { project: 'Work' })];
-		requests[1]!.resolve(response(newSessionRecords, ['Work']));
-		await newRead;
-		expect(hook.remindersRef.current).toEqual(newSessionRecords);
-		expect(hook.projectsRef.current).toEqual(['Work']);
-		expect(setRefreshing).toHaveBeenLastCalledWith(false);
+		expect(load()).toBe(newRead);
+		await settle(0, response([original]), oldRead);
+		expect(rendered.current.reminders).toEqual([]);
+		expect(rendered.current.refreshing).toBe(true);
+		expect(load()).toBe(newRead);
+		const records = [reminder('new-session-reminder', { project: 'Work' })];
+		await settle(1, response(records, ['Work']), newRead);
+		expect(rendered.current.reminders).toEqual(records);
+		expect(rendered.current.projects).toEqual(['Work']);
+		expect(rendered.current.refreshing).toBe(false);
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
 		if (!oldWriteFirst) finishOldWrite();
 	});
 
-	it('ignores a late error from the invalidated read without restoring an older cached snapshot', async () => {
-		const { hook, requests, original } = harness();
-		const staleRead = hook.loadReminders({ silent: true });
-		const finish = hook.beginLocalMutation();
+	it('ignores late errors from invalidated reads without restoring an older cache', async () => {
+		const { rendered, original, load, settle, commit } = harness();
+		const staleRead = load();
+		const finish = rendered.current.beginLocalMutation();
 		const local = { ...original, completed: true };
-		await hook.commitReminderState([local]);
+		await commit([local]);
 		finish();
-		const freshRead = hook.loadReminders({ silent: true });
-
+		const freshRead = load();
 		const fullList = [local, reminder('remote')];
-		requests[1]!.resolve(response(fullList));
-		await freshRead;
-		requests[0]!.resolve(new Response('Old read failed', { status: 503 }));
-		await staleRead;
-
-		expect(hook.remindersRef.current).toEqual(fullList);
+		await settle(1, response(fullList), freshRead);
+		await settle(0, new Response('Old read failed', { status: 503 }), staleRead);
+		expect(rendered.current.reminders).toEqual(fullList);
 		expect(loadCachedReminderSnapshot).not.toHaveBeenCalled();
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not persist a response after unmount', async () => {
+		const { rendered, load, settle } = harness();
+		const pending = load();
+		rendered.unmount();
+		await settle(0, response([reminder('late')]), pending);
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+	});
+
+	it('does not start a new request through a callback retained after unmount', async () => {
+		const { rendered, options } = harness();
+		const load = rendered.current.loadReminders;
+		rendered.unmount();
+		await load();
+		expect(options.apiFetch).not.toHaveBeenCalled();
+	});
+
+	it('detaches old API client reads when the same token is re-enrolled', async () => {
+		const { rendered, options, load, settle } = harness();
+		const previous = load();
+		options.apiFetch = vi.fn(async () => response([reminder('new')]));
+		rendered.rerender();
+		await act(() => rendered.current.loadReminders());
+		await settle(0, response([reminder('old')]), previous);
+		expect(rendered.current.reminders.map(item => item.id)).toEqual(['new']);
+		expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
 	});
 });

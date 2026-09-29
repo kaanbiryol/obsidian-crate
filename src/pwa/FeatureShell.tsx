@@ -7,7 +7,7 @@ import { dockDestinationIndex } from './dock-preferences';
 import { usePwaPreferences } from './hooks/usePwaPreferences';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext, type CrateSection, type DockDestination } from './components/FeatureSwitcherButton';
-import { ThemeIconProvider } from '@/reminders/components/theme-icon';
+import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { PwaThemeProvider } from './components/PwaThemeProvider';
 import { PwaThemeIcon } from './components/PwaThemeIcon';

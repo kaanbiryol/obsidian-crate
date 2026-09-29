@@ -4,7 +4,7 @@ import { ChevronDown, GripVertical } from 'lucide-react';
 import { Reorder, useDragControls, useReducedMotion } from 'motion/react';
 import { DEFAULT_DOCK_TABS, DOCK_TABS, type DockTab } from '../dock-preferences';
 import type { PwaPreferences } from '../preferences';
-import { ThemeIcon } from '@/reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { PwaButton as Button } from './PwaButton';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';

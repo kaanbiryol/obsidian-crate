@@ -2,7 +2,7 @@ import React from 'react';
 import type { ReadingHighlight } from '../core/highlights';
 import type { ReadingMetadata } from '../core/model';
 import { Button } from '../../ui/shared/Button';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
 export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, disabled = false }: {
 	entries: { item: T; highlight: ReadingHighlight }[];

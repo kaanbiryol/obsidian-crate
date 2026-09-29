@@ -408,11 +408,11 @@ describe('plugin reminder layout styles', () => {
 
   it('uses Obsidian icon geometry instead of a bundled icon style', async () => {
     const iconStyles = await readFile(
-      new URL('../components/obsidian-icon/styles.scss', import.meta.url),
+      new URL('../../ui/obsidian-icon/styles.scss', import.meta.url),
       'utf8',
     );
     const iconComponent = await readFile(
-      new URL('../components/obsidian-icon/index.tsx', import.meta.url),
+      new URL('../../ui/obsidian-icon/index.tsx', import.meta.url),
       'utf8',
     );
 

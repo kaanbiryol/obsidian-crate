@@ -1,6 +1,6 @@
 import React, { useId, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
 function parseTags(value: string): string[] {
 	return value.split(/[\s,]+/u).map(tag => tag.replace(/^#+/, '')).filter(Boolean);

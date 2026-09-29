@@ -82,8 +82,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:worker-runtime
-      - name: Verify shortcut pairing and template
-        run: node --test scripts/reading-shortcut-server.test.mjs scripts/reading-shortcut.test.mjs
+      - name: Install browser runtimes for desktop extraction checks
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+      - name: Verify Reading extraction, server and shortcut contracts
+        run: npm run test:reading-server
       - name: Verify persistent local hosting
         run: node --test scripts/local-server.test.mjs scripts/local-server-tunnel.test.mjs scripts/local-server-quick.test.mjs scripts/local-server-pairing.test.mjs scripts/local-server-backup.test.mjs
       - name: Verify standalone npx server package
@@ -169,6 +171,9 @@ jobs:
       - name: Check activity browser behavior
         if: matrix.shard == 1
         run: npm run test:activity-browser
+      - name: Check file and vault history browser behavior
+        if: matrix.shard == 2
+        run: npm run test:file-history-browser
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -178,6 +183,7 @@ jobs:
             .generated/editor-contract/current/
             .generated/activity-diff/
             .generated/conflict-review/
+            .generated/file-history/
           include-hidden-files: true
           retention-days: 7
 
@@ -203,9 +209,6 @@ jobs:
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Run browser group
         run: npm run test:pwa-browser -- --shard=${{ matrix.shard }}/4
-      - name: Verify iPhone shortcut setup
-        if: matrix.shard == 1
-        run: node --test scripts/reading-shortcut-browser.test.mjs
       - name: Upload browser failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -215,4 +218,30 @@ jobs:
             .generated/browser-failures/
             test-results/reading/
           include-hidden-files: true
+          retention-days: 7
+
+  reading:
+    name: Reading browser tests
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+      - run: npm run build:worker
+      - run: npm run test:reading-browser
+      - name: Upload Reading browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reading-browser
+          path: test-results/
           retention-days: 7

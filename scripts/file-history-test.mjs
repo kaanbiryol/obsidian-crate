@@ -227,7 +227,8 @@ for(const browserType of [chromium,webkit]) {
    const timeline=activityRoot.locator('.crate-history-timeline');
    const details=timeline.locator('details[data-history-key*=":12345678-"]');
    const browseVault=activityRoot.getByRole('button',{name:'Browse vault history',exact:true});
-   await expect(timeline.locator('.crate-history-entry')).toHaveCount(2);
+   // Shared checkpoints without local transfers belong in Vault history only.
+   await expect(timeline.locator('.crate-history-entry')).toHaveCount(1);
    await expect(details).not.toHaveAttribute('open');
    await details.locator('summary').click();
    await expect(details.getByRole('button',{name:'File history for Today.md',exact:true})).toBeVisible();

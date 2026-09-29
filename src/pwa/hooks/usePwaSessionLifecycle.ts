@@ -6,7 +6,7 @@ import { clearReminderDrafts } from '../reminder-drafts';
 import { clearReminderOutbox } from '../reminder-outbox-storage';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
-import type { ApiFetch, ModalState, ShowToast, StoredConfig } from '../types';
+import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;
@@ -41,26 +41,24 @@ export async function performPwaLogout({
 
 export function usePwaSessionLifecycle({
 	apiFetch,
-	cancelModalClose,
+	resetEditor,
 	disablePushNotifications,
 	handleUnauthorizedRef,
 	resetReminderState,
 	setAuthToken,
 	setConfig,
-	setError,
-	setModal,
+	reportError,
 	setSettingsOpen,
 	showToast,
 }: {
 	apiFetch: ApiFetch;
-	cancelModalClose: () => void;
+	resetEditor: () => void;
 	disablePushNotifications: () => Promise<void>;
 	handleUnauthorizedRef: MutableRefObject<() => void>;
 	resetReminderState: () => void;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
-	setError: Dispatch<SetStateAction<string | null>>;
-	setModal: Dispatch<SetStateAction<ModalState | null>>;
+	reportError: (message: string | null) => void;
 	setSettingsOpen: Dispatch<SetStateAction<boolean>>;
 	showToast: ShowToast;
 }): {
@@ -81,9 +79,8 @@ export function usePwaSessionLifecycle({
 		invalidatePwaSession();
 		setAuthToken(nextToken);
 		resetReminderState();
-		cancelModalClose();
+		resetEditor();
 		setSettingsOpen(false);
-		setModal(null);
 		// Revoke in-memory authority before touching fallible browser storage.
 		try { if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY); }
 		catch { reportCleanupFailure('The saved sign-in could not be removed. Clear this site’s data in browser settings and revoke this browser session in Obsidian.'); }
@@ -96,10 +93,9 @@ export function usePwaSessionLifecycle({
 			reportCleanupFailure('Offline data could not be cleared. Close other Crate tabs, then clear this site’s data in browser settings.');
 		}
 	}, [
-		cancelModalClose,
+		resetEditor,
 		resetReminderState,
 		setAuthToken,
-		setModal,
 		setSettingsOpen,
 		reportCleanupFailure,
 	]);
@@ -116,9 +112,9 @@ export function usePwaSessionLifecycle({
 	useEffect(() => {
 		handleUnauthorizedRef.current = () => {
 			void suspendLocalSession();
-			setError(SESSION_RECOVERY_MESSAGE);
+			reportError(SESSION_RECOVERY_MESSAGE);
 		};
-	}, [suspendLocalSession, handleUnauthorizedRef, setError]);
+	}, [suspendLocalSession, handleUnauthorizedRef, reportError]);
 
 	useEffect(() => {
 		let explicitLogout = false;
@@ -132,24 +128,24 @@ export function usePwaSessionLifecycle({
 					if (localStorage.getItem(AUTH_TOKEN_KEY)) return;
 					explicitLogout = true;
 					invalidatePwaSession();
-					setError(null);
+					reportError(null);
 					return;
 				}
 				if ((event.key === AUTH_TOKEN_KEY && event.newValue !== event.oldValue) || event.key === null) {
 					if (event.key !== null && event.newValue !== localStorage.getItem(AUTH_TOKEN_KEY)) return;
 					setConfig(loadStoredConfig());
 					void resetLocalSession(event.newValue, event.key === null);
-					setError(event.key !== null && event.newValue === null && !explicitLogout ? SESSION_RECOVERY_MESSAGE : null);
+					reportError(event.key !== null && event.newValue === null && !explicitLogout ? SESSION_RECOVERY_MESSAGE : null);
 					explicitLogout = false;
 				}
 			} catch {
 				void resetLocalSession(null, event.key === PWA_LOGOUT_KEY || event.key === null);
-				setError('Browser storage is unavailable. Close other Crate tabs and clear this site’s data in browser settings.');
+				reportError('Browser storage is unavailable. Close other Crate tabs and clear this site’s data in browser settings.');
 			}
 		};
 		window.addEventListener('storage', onStorage);
 		return () => window.removeEventListener('storage', onStorage);
-	}, [resetLocalSession, setConfig, setError]);
+	}, [resetLocalSession, setConfig, reportError]);
 
 	const logOut = useCallback(async () => {
 		if (loggingOut) return;
@@ -161,7 +157,7 @@ export function usePwaSessionLifecycle({
 				clearLocalSession,
 				disablePushNotifications,
 			});
-			setError([cleanupWarning.current, remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null].filter(Boolean).join(' ') || null);
+			reportError([cleanupWarning.current, remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null].filter(Boolean).join(' ') || null);
 			showToast(
 				cleanupWarning.current ? 'error' : 'info',
 				cleanupWarning.current ?? (remoteCleanupFailed
@@ -171,7 +167,7 @@ export function usePwaSessionLifecycle({
 		} finally {
 			setLoggingOut(false);
 		}
-	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, setError, showToast]);
+	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, reportError, showToast]);
 
 	return { loggingOut, logOut, clearLocalSession, suspendLocalSession };
 }

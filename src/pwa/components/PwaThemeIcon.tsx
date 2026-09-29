@@ -44,7 +44,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import type { ThemeIconProps, ThemeIconSize } from '@/reminders/components/theme-icon';
+import type { ThemeIconProps, ThemeIconSize } from '@/ui/shared/ThemeIcon';
 
 const ICONS: Record<string, LucideIcon> = {
   archive: Archive,
