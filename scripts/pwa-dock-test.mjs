@@ -487,10 +487,19 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
           slide.pause(); slide.currentTime = 60;
           const before = position();
           element.querySelector('[aria-label="Inbox"]').click();
-          await frame();
+          await Promise.resolve();
+          const reversed = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform' && animation !== slide);
+          if (!reversed) throw new Error('Expected the slide to reverse');
+          // Compare the actual start of the reversal, then sample its native curve.
+          // A late rAF includes valid movement away from the starting position.
+          reversed.pause(); reversed.currentTime = 0;
           const after = position(), samples = [];
-          const start = performance.now();
-          while (performance.now() - start < 350) { await frame(); samples.push(position()); }
+          const duration = Number(reversed.effect.getTiming().duration);
+          for (let step = 1; step <= 10; step++) {
+            reversed.currentTime = duration * step / 10;
+            samples.push(position());
+          }
+          reversed.finish();
           return { before, after, samples };
         });
         assert.ok(Math.abs(reversal.after - reversal.before) < .2, `${name}: reversal must continue from the painted position`);
