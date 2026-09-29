@@ -510,13 +510,19 @@ native input editing. It is included in `npm run test:pwa-browser`.
 
 ## Motion continuity
 
+Use `node scripts/visual-test-run.mjs [Playwright arguments]` for gallery tests.
+The launcher assigns an isolated output directory and port before starting Playwright;
+the configuration itself performs no network work, so static analysis and
+`npx playwright test --list` can read it directly. Preview build/serve lifecycle
+remains in `scripts/visual-preview.mjs`.
+
 `node scripts/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
 mid-fade reversals, delayed animation cleanup, lazy-loading surfaces, immediate
 reduced-motion switching and focus in Chromium/WebKit. Build the Worker first,
 or let its preview harness build it.
 
 After `npm run build:plugin`, run
-`npx playwright test tests/visual/motion.spec.ts tests/visual/motion-webkit.spec.ts --workers=1`
+`node scripts/visual-test-run.mjs tests/visual/motion.spec.ts tests/visual/motion-webkit.spec.ts --workers=1`
 for shared empty/list reversals, immediate input, stable list geometry, progress
 fill geometry, restrained checkmarks and reduced motion. The plugin fixture uses
 Shadow DOM and also checks stationary centered dialogs. Actual installed iPhone
@@ -541,7 +547,7 @@ second client and verifies the current browser hides and restores Reading.
 ## Plugin navigation parity
 
 After building the plugin, run
-`npx playwright test tests/visual/plugin-navigation.spec.ts tests/visual/plugin-navigation-webkit.spec.ts --workers=2`.
+`node scripts/visual-test-run.mjs tests/visual/plugin-navigation.spec.ts tests/visual/plugin-navigation-webkit.spec.ts --workers=2`.
 The Shadow DOM fixture covers the production plugin navigation shell at narrow and
 wide widths, Today/Upcoming selection, project Back and retained scroll/focus,
 Reading search and article return, keyboard/held dock expansion, disabled features,

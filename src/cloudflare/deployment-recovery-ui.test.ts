@@ -9,6 +9,7 @@ vi.mock('obsidian', () => ({ Notice: class {} }));
 vi.mock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
+import { CloudflareReauthorizationRequired } from './oauth-client';
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 function plugin(status: 'blocked' | 'recovered') {
@@ -50,6 +51,13 @@ it('explains a retained verification lock without misreporting it as a network f
     await checkAndRecoverUpdate(instance as never, mocks.start);
     expect(mocks.modal.fail).toHaveBeenCalledWith('Could not check the server', expect.stringContaining('lock remains held'), undefined,
         { technicalDetails: 'Public fingerprint mismatch' });
+});
+
+it('explains how to renew a denied saved login', async () => {
+    const instance = plugin('recovered');
+    instance.cloudflareDeploymentService.recoverUpdate.mockRejectedValue(new CloudflareReauthorizationRequired());
+    await checkAndRecoverUpdate(instance as never, mocks.start);
+    expect(mocks.modal.fail).toHaveBeenCalledWith('Could not check the server', expect.stringContaining('login needs renewing'), undefined, expect.any(Object));
 });
 
 

@@ -1,0 +1,10 @@
+{
+  "discardedKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_restore_progress", "reminder_source_scan_fixture"],
+  "retainedState": {"reminder_operation_floor": "20524", "crate_feature_policy": "{\"reading\":false}"},
+  "emptyTables": ["auth_tokens", "reading_jobs", "reading_enrollments"],
+  "preservedRows": {
+    "reading_captures": {"id": "fixture-capture", "note": "queued note", "attempts": 2, "available_at": 123456789},
+    "reading_operations": {"operation_id": "fixture-reading-receipt", "request_hash": "request", "response_json": "{}"},
+    "upload_operations": {"operation_id": "fixture-upload-receipt", "request_hash": "request", "response_json": "{}"}
+  }
+}

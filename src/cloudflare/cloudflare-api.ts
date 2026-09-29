@@ -299,7 +299,7 @@ export class CloudflareApiClient {
     const response = await this.transport(`${API_BASE_URL}/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
       method: 'GET', headers: { Authorization: `Bearer ${this.accessToken}` },
     });
-    if (response.status !== 200 || !response.arrayBuffer) throw new Error(`Recovery object unavailable (${response.status})`);
+    if (response.status !== 200 || !response.arrayBuffer) throw new CloudflareApiError(`Recovery object unavailable (${response.status})`, response.status, null);
     return new Uint8Array(response.arrayBuffer);
   }
   async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {

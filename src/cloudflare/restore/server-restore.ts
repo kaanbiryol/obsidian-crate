@@ -1,10 +1,11 @@
+import { prepareRows } from './prepare-rows';
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from '../deployment-artifacts';
 import { sha256Hex } from '../deployment-artifacts';
 import { provisionCloudflareDeployment } from '../provisioner';
 import { recoverDeployment } from '../deployment-recovery';
 import { completePublishedDeployment } from '../complete-published-deployment';
-import { hashBytes, literal, parseBackupRows, PREFIX, prepareRows, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
+import { hashBytes, literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 
 export async function listUpgradeBackups(api: CloudflareApiClient, source: BackupSource): Promise<BackupChoice[]> {
@@ -126,7 +127,7 @@ export async function restoreUpgradeBackup(input: {
       let bytes: Uint8Array;
       try { bytes = await api.getRecoveryObject(account, target.r2BucketName, item.key); }
       catch (error) {
-        if (!(error instanceof Error && error.message === 'Recovery object unavailable (404)')) throw error;
+        if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
         const original = await api.getRecoveryObject(account, source.bucket, await backupKey(item.key));
         if (original.length !== item.size || await hashBytes(original) !== item.sha256) throw new Error('Backup file changed during restore');
         await api.putRestoredObject(account, source.bucket, target.r2BucketName, item.key, original);

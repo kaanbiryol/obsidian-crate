@@ -4,7 +4,7 @@ import { expect, it, vi } from 'vitest';
 import { createUpgradeCheckpoint, releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from './upgrade-checkpoint';
 import { migrationTransaction, SERVER_RELEASE } from './database-upgrades';
 import { sha256Hex } from './deployment-artifacts';
-import type { CloudflareApiClient } from './cloudflare-api';
+import { CloudflareApiError, type CloudflareApiClient } from './cloudflare-api';
 import type { DeploymentFence } from './deployment-fence';
 
 it('freezes old writers, verifies paired bytes, migrates atomically and restores an independently readable archive', async () => {
@@ -21,7 +21,7 @@ it('freezes old writers, verifies paired bytes, migrates atomically and restores
       if (params.length) db.prepare(sql).run(...params); else db.exec(sql);
       return [{ results: [] }];
     }),
-    getRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string) => { const value = objects.get(key); if (!value) throw new Error('Recovery object unavailable (404)'); return value; }),
+    getRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string) => { const value = objects.get(key); if (!value) throw new CloudflareApiError('Object not found', 404, null); return value; }),
     putRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string, value: Uint8Array) => { objects.set(key, value); }),
   };
   const fence = { requireVerification: vi.fn(), mutate: <T>(fn: () => Promise<T>) => fn() } as unknown as DeploymentFence;

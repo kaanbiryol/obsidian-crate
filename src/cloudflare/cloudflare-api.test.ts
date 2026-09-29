@@ -13,6 +13,14 @@ const artifacts = {
 };
 
 describe('CloudflareApiClient', () => {
+	it.each([404, 403, 503])('preserves the recovery object HTTP status %s independently of its message', async status => {
+		const api = new CloudflareApiClient('synthetic', async () => ({ status, text: 'Unavailable' }));
+		await expect(api.getRecoveryObject('account', 'bucket', 'key')).rejects.toMatchObject({ name: 'CloudflareApiError', status });
+	});
+	it('does not treat a missing recovery response body as a missing object', async () => {
+		const api = new CloudflareApiClient('synthetic', async () => ({ status: 200, text: '' }));
+		await expect(api.getRecoveryObject('account', 'bucket', 'key')).rejects.toMatchObject({ status: 200 });
+	});
 	it('preserves the experimental safety namespace without binding it to active requests', () => {
 		const body = new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
 			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef' }).body);

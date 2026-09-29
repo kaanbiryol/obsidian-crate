@@ -384,7 +384,7 @@ After building, open `npm run preview:ui` with
 `/?scene=controls&host=pwa&theme=dark` for the control gallery. Switch `host` to
 `plugin` for the Shadow DOM fixture or `theme` to `light`. It includes outlined,
 primary, ghost, danger, disabled, icon, long-label, and host-adapter examples.
-`npx playwright test tests/visual/controls*.spec.ts` checks both browser engines,
+`node scripts/visual-test-run.mjs tests/visual/controls*.spec.ts` checks both browser engines,
 hosts, themes, and widths, including keyboard activation and Reading's empty-state
 capture flow. Screenshots are attached to the report for review, without changing
 approved visual baselines.
