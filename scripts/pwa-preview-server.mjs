@@ -173,6 +173,11 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 			return;
 		}
 
+		if (method === 'GET' && path === '/reading/session') {
+			sendJson(res, 403, { error: 'Choose a Reading folder in Obsidian’s Crate settings first.', code: 'reading_not_configured' });
+			return;
+		}
+
 		if (method === 'GET' && path === '/health') {
 			const delay = Math.max(0, previewLoadingUntil - Date.now());
 			if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));

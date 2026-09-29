@@ -9,6 +9,7 @@ export const browserScripts = [
 	'scripts/base-ui-plugin-test.mjs',
 	'scripts/pwa-storage-safety-test.mjs',
 	'scripts/pwa-settings-test.mjs',
+	'scripts/pwa-sync-coordinator-test.mjs',
 	'scripts/pwa-startup-empty-test.mjs',
 	'scripts/pwa-schedule-test.mjs',
 	'scripts/pwa-cache-test.mjs',

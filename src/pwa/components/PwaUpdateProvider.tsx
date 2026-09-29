@@ -1,3 +1,4 @@
+import { pwaSyncState } from '../sync/state';
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { fetchPwaAssetVersion } from '../api';
@@ -51,8 +52,7 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 	const canApply = () => {
 		const current = store.getSnapshot();
 		return navigator.onLine && document.visibilityState === 'visible'
-			&& Boolean(current[activeSection]?.ready)
-			&& [current.reminders, current.reading].every(model => !model || (model.ready && !model.unsynced && model.updateReady !== false))
+			&& pwaSyncState(current).canUpdate
 			&& !document.querySelector('.pwa-modal-sheet--reminder, .pwa-reading-sheet, [role="alertdialog"]');
 	};
 	const { updating, update, launchPending } = usePwaUpdate(showToast, Boolean(models[activeSection]?.updateContentReady ?? models[activeSection]?.ready), {
@@ -62,8 +62,8 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 		canManuallyApply: canApply,
 	});
 	const blockedReason = !online ? 'Connect to the internet to update.'
-		: !models[activeSection]?.ready || [models.reminders, models.reading].some(model => model && !model.ready) ? 'Checking saved changes…'
-		: [models.reminders, models.reading].some(model => model?.unsynced || model?.updateReady === false) ? 'Finish editing or syncing before updating.' : null;
+		: !pwaSyncState(models).ready ? 'Checking saved changes…'
+		: !pwaSyncState(models).canUpdate ? 'Finish editing or syncing before updating.' : null;
 	const value = useMemo(() => ({ version, updating, update, launchPending, blockedReason, feedback: toast }), [version, updating, update, launchPending, blockedReason, toast]);
 	return <UpdateContext.Provider value={value}>
 		{children}

@@ -100,11 +100,27 @@ The engine retains cancellation, exclusive-operation checks and active-work trac
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
+The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
+Reading and Reminders runtimes independently of their lazy screens, so pending work
+resumes without visiting either section. Feature adapters retain their existing
+queues, storage formats, API endpoints and confirmation rules. Pausing a feature
+stops new sends and refreshes while retaining its local hydration, recovery state
+and settings actions; already dispatched operations can still settle safely.
+
+`pwa/sync/state.ts` derives the overall indicator and update readiness from both
+runtime registrations. An uninitialized feature is unverified, while a hydrated
+paused feature remains ready for settings and logout. Paused or disconnected
+pending work still blocks updates. Both headers open the shared sync details;
+refresh dispatches independently to enabled features, and logout clears both
+private views while credential revocation and storage cleanup finish. Sync feedback
+also lives above the feature screens, including remote logout warnings. The final
+update path also rechecks durable queues, independently of the status model.
+
 Reading's PWA adapter composes three hooks: `useReadingSession` owns enrollment,
 session invalidation and durable hydration; `useReadingSync` owns refresh serialization,
 retry scheduling and foreground/cross-tab refresh; `useReadingArticle` owns article loading,
-browser history and stale navigation guards. The application component owns presentation
-and feature composition. Durable Reading records are validated at the storage boundary
+browser history and stale navigation guards. The runtime provider owns feature composition and settings publication; the
+application component owns article presentation and navigation. Durable Reading records are validated at the storage boundary
 before the hooks publish them or the queue dispatches them. `reading/outbox.ts` owns
 typed commands, exact dispatch bytes, dependent-edit ordering and retry eligibility;
 automatic refreshes honor the persisted deadline and three-attempt budget, while an

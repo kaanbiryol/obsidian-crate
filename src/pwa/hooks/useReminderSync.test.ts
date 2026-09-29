@@ -186,3 +186,18 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
 	});
 });
+
+it('does not start reminder refreshes while paused, including retained callbacks', async () => {
+	const options = { enabled: false, apiFetch: vi.fn<ApiFetch>(async () => response([])), authToken: 'token',
+		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn() };
+	const rendered = renderHook(() => useReminderSync(options));
+	const retained = rendered.current.loadReminders;
+	await act(async () => retained());
+	expect(options.apiFetch).not.toHaveBeenCalled();
+	options.enabled = true; rendered.rerender();
+	await act(async () => retained());
+	expect(options.apiFetch).toHaveBeenCalledOnce();
+	options.enabled = false; rendered.rerender();
+	await act(async () => retained());
+	expect(options.apiFetch).toHaveBeenCalledOnce();
+});

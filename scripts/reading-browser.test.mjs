@@ -327,7 +327,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('status',{name:'Loading Reading'})).toBeVisible();
     await expect(page.locator('.crate-content-loading')).toHaveCount(1);
     await expect(readingSync).toHaveAttribute('data-sync-state','syncing');
-    await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Loading Reading');
+    await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Refreshing Crate');
     const header = page.locator('.crate-reading__header');
     const loadingHeader = await header.boundingBox();
     listReleased.resolve();
@@ -341,7 +341,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const target = await readingSync.getByRole('button').boundingBox();
     assert.equal(target.width,44); assert.equal(target.height,44);
     await readingSync.getByRole('button').click();
-    await expect(page.locator('.pwa-reading-root .toast')).toHaveText('Reading: All changes synced');
+    await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close settings', exact: true }).click();
     assert.equal(await page.locator('.crate-feature-nav').count(), 0);
     await page.getByRole('searchbox',{name:'Search reading'}).fill('kept while switching');
     await switchFeature(page, 'Reminders');
@@ -729,9 +730,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await phone.reload(); await phone.getByRole('heading',{name:'Saved to Crate ✓'}).waitFor();
     await page.getByRole('button',{name:'Open settings'}).click();
     await page.getByRole('button',{name:'Log out',exact:true}).click();
+    const readingToken = await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1')).token);
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')),null);
+    await expect.poll(async () => (await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${readingToken}` } })).status).toBe(401);
     // An enrolled Reminders PWA opens Reading even when article fetching is off.
     await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
     const remindersEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
@@ -763,7 +766,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reminders-auth-token')), null);
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')), null);
-    assert.equal((await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status, 401);
+    // Private views clear immediately; remote revocation completes independently.
+    await expect.poll(async () => (await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status).toBe(401);
     assert.deepEqual(errors,[]);
   } catch (error) { console.error('Reading failure assertion:', error); await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
 });

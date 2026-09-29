@@ -10,6 +10,7 @@ import { useReminderOutbox } from './useReminderOutbox';
 import type { ApiFetch, LoadReminders, ModalState, ReminderRecord, ShowToast, StoredConfig } from '../types';
 
 export function useReminderMutations(options: {
+	enabled?: boolean;
 	apiFetch: ApiFetch;
 	authToken: string | null;
 	bootstrapped: boolean;

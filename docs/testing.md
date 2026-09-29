@@ -39,6 +39,20 @@ Rejected edits and their dependents remain available for export in settings.
 New links appear immediately; editing them becomes available when extraction finishes and the server
 publishes their Markdown note. Article extraction still requires a connection.
 
+## PWA sync coordinator
+
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-sync-coordinator-test.mjs`.
+It exercises the built app in Chromium and WebKit with native IndexedDB and localStorage:
+Reading dispatch while only Reminders is rendered, reminder dispatch while only Reading
+is rendered, a Reading refresh failure that does not block reminders, shared header
+status, and paused queues retained through reload and resumed without opening their
+screens, plus immediate logout and remote cleanup feedback with the other screen
+unmounted. A blocked Reminders screen chunk must leave sync, settings and Reading
+usable. The preview supplies synthetic domain APIs; existing receipt and auth recovery
+suites cover their separate server and session guarantees. Settings opens sync details
+without mounting the other feature's screen. Physical installed-app acceptance remains
+a device check.
+
 ## Unified PWA settings
 
 After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`

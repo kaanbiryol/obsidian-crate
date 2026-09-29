@@ -1,39 +1,32 @@
-import { useReadingSession } from './useReadingSession';
-import { useReadingSync } from './useReadingSync';
-import { useReadingArticle } from './useReadingArticle';
-import { useReadingAppearance } from './appearance';
-import { PwaUpdateButton } from '../components/PwaUpdateNotice';
-import { useDocumentReaderScroll } from './useDocumentReaderScroll';
-import { PwaToast } from '../components/PwaToast';
-import { PwaTabTransition } from '../components/PwaTabTransition';
-import { ShortcutSetup } from './ShortcutSetup';
-import { logoutReadingApp } from './logout';
-import { PwaDock } from '../components/PwaDock';
-import { FeatureSwitcherButton, FeatureNavigationContext } from '../components/FeatureSwitcherButton';
-import { PwaPullRefreshIndicator } from '../components/PwaChrome';
-import { ReadingOpening } from './ReadingOpening';
-import { ReadingSyncIndicator, readingSyncStatus } from './ReadingSyncIndicator';
-import { AUTH_TOKEN_KEY } from '../config';
-import React, { useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
-import { ReadingReader } from '@/reading/ui/Reader';
-import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
-import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
 import type { ReadingHighlight } from '@/reading/core/highlights';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
-import type { ReadingItem, ReadingChanges } from '@/reading/core/model';
+import type { ReadingChanges, ReadingItem } from '@/reading/core/model';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
-import { Button } from '@/ui/shared/Button';
+import { ReadingReader } from '@/reading/ui/Reader';
+import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
+import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
+import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
+import { Button } from '@/ui/shared/Button';
+import { useContext, useId, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { FeatureNavigationContext, FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
+import { PwaPullRefreshIndicator } from '../components/PwaChrome';
+import { PwaDock } from '../components/PwaDock';
+import { PwaTabTransition } from '../components/PwaTabTransition';
+import { PwaUpdateButton } from '../components/PwaUpdateNotice';
+import { AUTH_TOKEN_KEY } from '../config';
+import { useSettingsOpen } from '../settings-context';
+import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { PwaReadingDialog } from './PwaReadingDialog';
-import { useFeatureSettings, useSettingsOpen } from '../settings-context';
-import { SettingsRow } from '../components/SettingsRow';
-import { useToast } from '../hooks/useToast';
-import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
+import { ReadingOpening } from './ReadingOpening';
+import { useReadingRuntime } from './ReadingRuntime';
+import { useReadingAppearance } from './appearance';
 import { queueReading, type ReadingCommand } from './outbox';
-import { assertReadingSession, writeValue, exportReadingData } from './storage';
 import { presentReadingItems } from './pending-view';
+import { assertReadingSession, exportReadingData, writeValue } from './storage';
+import { useDocumentReaderScroll } from './useDocumentReaderScroll';
+import { useReadingArticle } from './useReadingArticle';
 
 export default function ReadingApp() {
   return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
@@ -44,29 +37,13 @@ function ReadingAppContent() {
   const captureFormId = useId();
   const featureNavigation = useContext(FeatureNavigationContext);
   const active = featureNavigation?.active !== false;
-  const { toast, showToast } = useToast();
-  const connection = useReadingSession();
-  const { session, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState,
-    adding, setAdding, url, setUrl, share, setShare, alive, run, connect, resetSession } = connection;
-  const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection);
+  const { connection, sync, showToast, saving, setSaving, savingRef } = useReadingRuntime();
+  const { session, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
+  const { refresh, refreshManually, isOffline } = sync;
   const { reader, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, alive, setError, run });
   const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
   const [settingsOpen, setSettingsOpen] = useSettingsOpen();
-  const previousSession = useRef(session);
-  useEffect(() => {
-    if (previousSession.current && !session) setSettingsOpen(false);
-    previousSession.current = session;
-  }, [session, setSettingsOpen]);
   useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
-  useSyncFailureToast({
-    scope: session ? JSON.stringify([session.id, session.token, session.generation]) : null,
-    ready,
-    operationIds: pending.filter(op => op.sessionId === session?.id && (op.review || op.error && (op.retryAt === undefined || (op.attempts ?? 0) >= 3))).map(op => op.id),
-    feature: 'Reading', showToast,
-    isCurrent: () => { if (!session) return false; try { assertReadingSession(session); return true; } catch { return false; } },
-  });
   const queueChange = async (command: ReadingCommand) => {
     if (!session) throw new Error('Connect Reading before saving changes.');
     try {
@@ -128,26 +105,7 @@ function ReadingAppContent() {
     : (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
   const migratingHighlights = Boolean(visibleReader && !visibleReader.highlight_format && visibleReader.highlights?.length
     && pending.some(op => op.action !== 'capture' && op.intent.id === visibleReader.crate_reading_id));
-  const confirmed = Boolean(session && syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation);
-  const status = readingSyncStatus({ pending, isOffline, loading: !cache, refreshing: syncing, confirmed, error, recovery });
   const readingDisabled = !session && connectionState !== 'available';
-  useFeatureSettings('reading', {
-    ready: ready && !connecting, connected: Boolean(session), status,
-    updateContentReady: ready && !connecting && (!session || Boolean(cache) || Boolean(error)),
-    updateReady: ready && !connecting && !adding && !saving && !syncing && !isOffline,
-    attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
-    unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),
-    onRefresh: () => session ? refreshManually() : connect(),
-    onLogout: async () => {
-      setSettingsOpen(false); resetSession();
-      setError(await logoutReadingApp());
-    },
-    shortcut: session ? <ShortcutSetup session={session} /> : null,
-    issues: <>
-      {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}
-      {pending.filter(op => op.error || op.review).map(op => <SettingsRow key={op.id} title={op.review ? 'Change needs review' : 'Couldn’t sync'} description={op.error || 'This change is still stored on this device.'} />)}
-    </>,
-  });
   if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
   const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const syncIssue = pending.find(op => op.error || op.review);
@@ -167,11 +125,10 @@ function ReadingAppContent() {
           {isOffline && <p role="status">Connect to the internet to check again.</p>}
         </div> : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
-        headerStatus={<><PwaUpdateButton />{session && <ReadingSyncIndicator pending={pending} isOffline={isOffline} loading={!cache} refreshing={syncing} confirmed={syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation} error={error} recovery={recovery} onShowStatus={(label, state) => showToast(state === 'error' ? 'error' : state === 'synced' ? 'success' : 'info', `Reading: ${label}`, state)} />}</>}
+        headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
         reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? 'Fetching article' : 'Saved on this device') : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange({ action: 'retry', intent: { id: reader.item.crate_reading_id } }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
       {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
 
     </>}
-    <PwaToast toast={toast} />
   </main>;
 }

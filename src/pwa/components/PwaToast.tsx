@@ -3,7 +3,7 @@ import { SyncIndicator } from '@/ui/shared/SyncIndicator';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ToastState } from '../types';
 
-/** Shared presentation; each feature keeps its own toast lifetime and messages. */
+/** Shared presentation for application feedback and update notices. */
 export function PwaToast({ toast }: { toast: ToastState | null }) {
 	const reduceMotion = useReducedMotion();
 	const isError = toast?.kind === 'error';

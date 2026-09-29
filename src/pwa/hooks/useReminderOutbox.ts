@@ -11,6 +11,7 @@ import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../type
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
 
 export function useReminderOutbox(options: {
+	enabled?: boolean;
 	authToken: string | null;
 	bootstrapped: boolean;
 	folderPath: string;
@@ -59,7 +60,7 @@ export function useReminderOutbox(options: {
 			const outbox = createReminderOutbox({
 				storage, apiFetch: optionsRef.current.apiFetch, isCurrent,
 				withLock: work => navigator.locks.request('crate-reminder-outbox', work),
-				canSend: () => optionsRef.current.hasSnapshot !== false,
+				canSend: () => optionsRef.current.enabled !== false && optionsRef.current.hasSnapshot !== false,
 				beginMutation: () => optionsRef.current.beginLocalMutation(),
 				onChange: next => { setChanges(next); refreshQuarantine(); },
 			onError: message => { setStorageError(message); optionsRef.current.showToast('error', message); },
@@ -105,7 +106,7 @@ export function useReminderOutbox(options: {
 				try {
 					// Resume durable attempts when the app is reopened or connectivity returns.
 					for (const change of outbox.refresh()) {
-						if (change.status === 'uncertain') outbox.retry(change.operationId);
+						if (optionsRef.current.enabled !== false && change.status === 'uncertain') outbox.retry(change.operationId);
 					}
 					void outbox.drain();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
@@ -167,16 +168,16 @@ export function useReminderOutbox(options: {
 	}, [authToken, bootstrapped, folderPath, initialization]);
 
 	useEffect(() => {
-		if (ready && options.hasSnapshot !== false) void outboxRef.current?.drain();
-	}, [ready, options.hasSnapshot]);
+		if (ready && options.enabled !== false && options.hasSnapshot !== false) void outboxRef.current?.drain();
+	}, [ready, options.enabled, options.hasSnapshot]);
 
 	useEffect(() => {
-		if (!ready || !navigator.onLine) return;
+		if (!ready || options.enabled === false || !navigator.onLine) return;
 		const retryTimes = changes.filter(change => change.status === 'uncertain' && change.attempts < 3).map(change => change.retryAt);
 		if (retryTimes.length === 0) return;
 		const timer = window.setTimeout(() => { void outboxRef.current?.drain(); }, Math.max(0, Math.min(...retryTimes) - Date.now()));
 		return () => window.clearTimeout(timer);
-	}, [changes, ready]);
+	}, [changes, ready, options.enabled]);
 	const currentOutbox = outboxRef.current;
 	useSyncFailureToast({
 		scope: authToken ? JSON.stringify([authToken, folderPath]) : null,
@@ -188,6 +189,6 @@ export function useReminderOutbox(options: {
 
 	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1),
 		quarantinedChanges, removeQuarantinedChanges: (entries: QuarantinedReminderEntry[]) => removeQuarantinedRef.current?.(entries) ?? Promise.resolve(false),
-		recoveryChanges: options.canRecover === false || options.hasSnapshot === false ? [] : recoveryChanges,
+		recoveryChanges: options.enabled !== false && (options.canRecover === false || options.hasSnapshot === false) ? [] : recoveryChanges,
 		recoverChanges: () => { void recoverRef.current?.(); } };
 }

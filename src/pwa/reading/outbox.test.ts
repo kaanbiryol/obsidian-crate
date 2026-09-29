@@ -177,3 +177,17 @@ it('does not automatically retry permanent authorization failures or manually re
 		}
 	}
 });
+
+it('settles an in-flight receipt after pause without sending the remaining commands', async () => {
+	await queueReading(session, { action: 'capture', intent: { url: 'https://example.com/first' } });
+	await queueReading(session, { action: 'capture', intent: { url: 'https://example.com/second' } });
+	const started = deferred<void>(), release = deferred<Response>();
+	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
+		.mockImplementationOnce(() => { started.resolve(); return release.promise; });
+	let enabled = true;
+	const draining = drainReading(session, 'automatic', () => enabled);
+	await started.promise; enabled = false;
+	release.resolve(response({ saved: true })); await draining;
+	expect(network.mock.calls.filter(([path]) => path === '/reading/capture')).toHaveLength(1);
+	expect(await pendingReading(session)).toMatchObject([{ intent: { url: 'https://example.com/second' } }]);
+});

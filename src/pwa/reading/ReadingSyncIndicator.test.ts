@@ -1,14 +1,17 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ReadingSyncIndicator } from './ReadingSyncIndicator';
+import { PwaSyncStatusIndicator } from '../components/PwaSyncStatusIndicator';
+import { readingSyncStatus } from '../sync/reading-status';
 import type { PendingReading } from './outbox';
 
 const change: PendingReading = { id: 'change', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } };
-function render(props: Partial<React.ComponentProps<typeof ReadingSyncIndicator>> = {}) {
-	return renderToStaticMarkup(React.createElement(ReadingSyncIndicator, {
+function render(props: Partial<Parameters<typeof readingSyncStatus>[0]> = {}) {
+	return renderToStaticMarkup(React.createElement(PwaSyncStatusIndicator, {
+		...readingSyncStatus({
 		pending: [], isOffline: false, loading: false, refreshing: false, confirmed: true,
-		error: null, recovery: false, onShowStatus: () => undefined, ...props,
+		error: null, recovery: false, ...props,
+		}), onShowStatus: () => undefined,
 	}));
 }
 

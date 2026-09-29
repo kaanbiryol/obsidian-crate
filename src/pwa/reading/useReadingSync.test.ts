@@ -17,19 +17,20 @@ vi.mock('./storage', () => ({
   readingLock: async <T>(action: () => Promise<T>) => action(),
   readingDrainLock: async <T>(action: () => Promise<T>) => action(),
   pendingReading: async () => structuredClone(stored.queue),
+  readReadingCache: async () => cache,
   writeValue: async (_key: string, value: PendingReading[]) => { stored.queue = structuredClone(value); },
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'one', folderPath: 'Reading', expiresAt: 1 };
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
 const resetSession = vi.fn();
-function renderSync() {
+function renderSync(enabled = () => true) {
   return renderHook(() => {
     const [pending, setPending] = useState(stored.queue);
     const [, setCache] = useState<ReadingCache | null>(null), [error, setError] = useState<string | null>(null);
     const alive = useRef(true);
     useEffect(() => () => { alive.current = false; }, []);
     const run = useRef(async (action: () => Promise<void>) => { try { await action(); } catch (cause) { setError(String(cause)); } }).current;
-    return { ...useReadingSync({ session, ready: true, pending, setPending, setCache, setError, alive, run, resetSession }), pending, error };
+    return { ...useReadingSync({ session, ready: true, pending, setPending, setCache, setError, alive, run, resetSession }, enabled()), pending, error };
   }, () => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }));
 }
 beforeEach(() => {
@@ -101,5 +102,34 @@ it('does not publish a delayed refresh or run its queued retry after unmount', a
   rendered.unmount();
   await act(async () => { release(cache); });
   expect(sent()).toHaveLength(1);
+  expect(rendered.current.syncedSession).toBeNull();
+});
+
+it('keeps paused queues intact and resumes them without remounting a screen', async () => {
+  let enabled = false;
+  const rendered = renderSync(() => enabled);
+  await act(async () => {});
+  await act(async () => rendered.current.refreshManually());
+  await act(async () => window.dispatchEvent(new window.Event('online')));
+  expect(readingRequest).not.toHaveBeenCalled();
+  expect(loadReading).not.toHaveBeenCalled();
+  expect(stored.queue).toHaveLength(1);
+  enabled = true; rendered.rerender();
+  await act(async () => {});
+  expect(sent()).toHaveLength(1);
+});
+
+it('does not start a mutation or list fetch when paused during a session check', async () => {
+  let release!: (value: unknown) => void;
+  vi.mocked(readingRequest).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  let enabled = true;
+  const rendered = renderSync(() => enabled);
+  await act(async () => {});
+  enabled = false; rendered.rerender();
+  await act(async () => { release({ generation: session.generation, day: 20_000 }); });
+  expect(sent()).toHaveLength(0);
+  expect(loadReading).not.toHaveBeenCalled();
+  expect(stored.queue).toHaveLength(1);
+  expect(rendered.current.error).toBeNull();
   expect(rendered.current.syncedSession).toBeNull();
 });

@@ -16,7 +16,7 @@ export async function checkSettingsMotion(browser, origin) {
 		const gear = page.getByRole('button', { name: 'Open settings', exact: true });
 		await gear.waitFor();
 		// Lengthen just this entrance so the intermediate state is deterministic
-		// even on a loaded CI host. Initialization must follow animation completion.
+		// even on a loaded CI host. Sync is independent of the sheet animation.
 		const slow = await page.addStyleTag({ content: '.pwa-settings-root .pwa-modal-sheet__container--settings:not([data-starting-style]) { transition-duration: 900ms; }' });
 		await gear.click();
 		const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
@@ -24,7 +24,8 @@ export async function checkSettingsMotion(browser, origin) {
 		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(0);
 		await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
 		await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
-		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(1);
+		// Sync initializes independently; opening settings must not render the library.
+		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(0);
 		await slow.evaluate(el => el.remove());
 		await checkShortcutSheet(page);
 		for (let cycle = 0; cycle < 2; cycle++) {

@@ -39,12 +39,16 @@ export function useReminderSync({
 	authToken,
 	config,
 	setSelectedProject,
+	enabled = true,
 }: {
+	enabled?: boolean;
 	apiFetch: ApiFetch;
 	authToken: string | null;
 	config: StoredConfig;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 }): ReminderSyncState {
+	const enabledRef = useRef(enabled);
+	enabledRef.current = enabled;
 	const [snapshot, setSnapshot] = useState<ConfirmedReminderSnapshot>({ reminders: [], projects: [] });
 	const { reminders, projects } = snapshot;
 	const [loading, setLoading] = useState(true);
@@ -105,7 +109,7 @@ export function useReminderSync({
 	}, [publishSnapshot]);
 
 	const loadReminders = useCallback((options: { silent?: boolean; maxAgeMs?: number } = {}) => {
-		if (!authToken) return Promise.resolve();
+		if (!authToken || !enabledRef.current) return Promise.resolve();
 		if (
 			options.maxAgeMs !== undefined
 			&& lastCheckedAtRef.current !== null

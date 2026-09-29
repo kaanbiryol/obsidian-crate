@@ -2,18 +2,20 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { PendingReminderChange } from '../reminder-outbox-types';
-import { PwaSyncIndicator } from './PwaSyncIndicator';
+import { PwaSyncStatusIndicator } from './PwaSyncStatusIndicator';
+import { reminderSyncStatus } from '../sync/reminder-status';
 
 const pending: PendingReminderChange = {
 	operationId: 'operation', kind: 'save', status: 'pending', path: '/reminders/create',
 	method: 'POST', body: '{}', attempts: 1, retryAt: 0,
 };
 
-function render(overrides: Partial<React.ComponentProps<typeof PwaSyncIndicator>> = {}) {
-	return renderToStaticMarkup(React.createElement(PwaSyncIndicator, {
+function render(overrides: Partial<Parameters<typeof reminderSyncStatus>[0]> = {}) {
+	return renderToStaticMarkup(React.createElement(PwaSyncStatusIndicator, {
+		...reminderSyncStatus({
 		changes: [], isOffline: false, refreshing: false, dataMode: 'live', error: null, storageError: null,
-		onShowStatus: () => undefined,
 		...overrides,
+		}), onShowStatus: () => undefined,
 	}));
 }
 

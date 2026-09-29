@@ -1,6 +1,7 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/35513593114",
   "additionalSources": {
+    "scripts/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds",
     "scripts/pwa-sheet-field-test.mjs": "local chromium/webkit run on 2026-09-27: 8.91 seconds",
     "scripts/pwa-ios27-header-test.mjs": "local chromium/webkit run on 2026-09-26: 6.42 seconds",
     "scripts/pwa-dock-test.mjs": "local chromium/webkit run on 2026-09-26: 21 seconds",
@@ -13,6 +14,7 @@
     "scripts/reading-appearance-test.mjs": "local chromium/webkit coverage; conservative 30-second scheduling estimate"
   },
   "seconds": {
+    "scripts/pwa-sync-coordinator-test.mjs": 12.4,
     "scripts/pwa-sheet-field-test.mjs": 8.91,
     "scripts/pwa-ios27-header-test.mjs": 6.42,
     "scripts/pwa-dock-test.mjs": 21,

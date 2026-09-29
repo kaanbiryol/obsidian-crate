@@ -16,8 +16,8 @@ export function useSettingsOpen() {
 
 export function useFeatureSettings<K extends 'reading' | 'reminders'>(feature: K, value: SettingsSnapshot[K]) {
 	const store = useSettingsStore();
-	// Publish after each feature commit. Only the sheet subscribes to these models;
-	// feature views subscribe to the open boolean, so publication cannot loop.
+	// Publish after each feature commit. Status, settings and update UI subscribe
+	// to the models; runtimes observe only the open boolean, avoiding a loop.
 	useLayoutEffect(() => { store.setFeature(feature, value); });
 	useLayoutEffect(() => () => store.setFeature(feature, null), [feature, store]);
 }

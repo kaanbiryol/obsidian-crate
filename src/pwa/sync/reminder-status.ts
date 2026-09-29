@@ -1,6 +1,4 @@
-import React from 'react';
 import type { SyncIndicatorState } from '../../ui/shared/SyncIndicator';
-import { PwaSyncStatusIndicator } from './PwaSyncStatusIndicator';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { DataMode } from '../types';
 
@@ -12,10 +10,9 @@ interface PwaSyncIndicatorProps {
 	dataMode: DataMode;
 	error: string | null;
 	storageError: string | null;
-	onShowStatus: (label: string, state: SyncIndicatorState) => void;
 }
 
-export function reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: Omit<PwaSyncIndicatorProps, 'onShowStatus'>): { state: SyncIndicatorState; label: string } {
+export function reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: PwaSyncIndicatorProps): { state: SyncIndicatorState; label: string } {
 	const pendingCount = changes.filter(change => change.status === 'pending').length;
 	const errorCount = changes.length - pendingCount;
 	const pendingLabel = `${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'}`;
@@ -28,13 +25,8 @@ export function reminderSyncStatus({ changes, isOffline, refreshing, loading, da
 		};
 	}
 	if (isOffline) return { state: 'offline', label: pendingCount ? `Offline: ${pendingLabel} waiting to sync` : 'Offline: showing saved reminders' };
-	if (loading) return { state: 'syncing', label: 'Loading reminders' };
+	if (loading && !pendingCount) return { state: 'syncing', label: 'Loading reminders' };
 	if (pendingCount || refreshing) return { state: 'syncing', label: pendingCount ? `Syncing ${pendingLabel}` : 'Refreshing reminders' };
 	if (dataMode === 'cached') return { state: 'cached', label: 'Showing saved reminders: waiting to refresh' };
 	return { state: 'synced', label: 'All changes synced' };
-}
-
-/** Stable header space keeps background saves from moving the reminder list. */
-export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
-	return <PwaSyncStatusIndicator {...reminderSyncStatus(props)} onShowStatus={props.onShowStatus} />;
 }

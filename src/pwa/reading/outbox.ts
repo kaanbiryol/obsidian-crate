@@ -50,20 +50,22 @@ export async function queueReading(session: ReadingSession, input: ReadingComman
     return queue;
   });
 }
-export async function drainReading(session: ReadingSession, mode: ReadingRetryMode = 'automatic'): Promise<ReadingCache | undefined> {
-  if (!navigator.onLine) return undefined;
+export async function drainReading(session: ReadingSession, mode: ReadingRetryMode = 'automatic', canSend = () => true): Promise<ReadingCache | undefined> {
+  if (!navigator.onLine || !canSend()) return undefined;
   return readingDrainLock(async () => {
     assertReadingSession(session);
     const queue = await pendingReading(session);
     if (!queue.some(op => canDispatch(op, mode))) return undefined;
+    if (!canSend()) return undefined;
     const info = await readingRequest<{ day: number; generation: string }>('/reading/session', session);
     if (info.generation !== session.generation) throw new Error('Reading destination changed. Export and review pending work.');
     const confirmed = new Set<string>();
     for (const candidate of queue) {
+      if (!canSend()) break;
       if (!canDispatch(candidate, mode)) continue;
       const op = await readingLock(async () => {
         const current = await pendingReading(session), next = current.find(entry => entry.id === candidate.id);
-        if (!next || !canDispatch(next, mode)) return null;
+        if (!canSend() || !next || !canDispatch(next, mode)) return null;
         // A paused or uncertain predecessor still owns this article's base value.
         // Independent articles may proceed while dependent edits wait for settlement.
         if (next.action !== 'capture' && current.slice(0, current.indexOf(next)).some(entry =>
@@ -76,6 +78,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
         return next;
       });
       if (!op) continue;
+      if (!canSend()) break;
       try {
         await readingRequest(`/reading/${op.action}`, session, op.body);
         confirmed.add(op.id);

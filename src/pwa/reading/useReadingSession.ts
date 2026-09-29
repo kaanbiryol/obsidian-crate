@@ -13,7 +13,7 @@ import { READING_SESSION_KEY, assertReadingSession, hasEarlierReadingChanges, pe
 import { isReadingSession } from './storage-validation';
 
 /** Owns enrollment, session invalidation and hydration of this session's durable data. */
-export function useReadingSession() {
+export function useReadingSession(enabled = true) {
   const [session, setSession] = useState<ReadingSession | null>(null);
   const [ready, setReady] = useState(false), [connecting, setConnecting] = useState(false);
   const [cache, setCache] = useState<ReadingCache | null>(null), [pending, setPending] = useState<PendingReading[]>([]);
@@ -65,7 +65,7 @@ export function useReadingSession() {
     }
   }, []);
   const connect = useCallback(async () => {
-    if (connectingRef.current || !navigator.onLine || !localStorage.getItem(AUTH_TOKEN_KEY)) return;
+    if (!enabled || connectingRef.current || !navigator.onLine || !localStorage.getItem(AUTH_TOKEN_KEY)) return;
     const revision = generation.current;
     connectingRef.current = true; setConnecting(true);
     try {
@@ -79,7 +79,7 @@ export function useReadingSession() {
         setError(cause instanceof Error ? cause.message : 'Reading is unavailable.');
       }
     } finally { connectingRef.current = false; if (alive.current) setConnecting(false); }
-  }, [hydrate]);
+  }, [enabled, hydrate]);
   useEffect(() => {
     alive.current = true;
     let cancelled = false;

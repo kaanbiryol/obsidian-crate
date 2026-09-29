@@ -7,7 +7,8 @@ const { outputFiles } = await build({
 	stdin: { contents: `
 		import React from 'react';
 		import { createRoot } from 'react-dom/client';
-		import { PwaSyncIndicator } from './src/pwa/components/PwaSyncIndicator';
+		import { PwaSyncStatusIndicator } from './src/pwa/components/PwaSyncStatusIndicator';
+		import { reminderSyncStatus } from './src/pwa/sync/reminder-status';
 		import { ViewHeader } from './src/reminders/components/ViewHeader';
 		import { ProjectDetailHeader } from './src/reminders/ui/views/ProjectDetailHeader';
 		function Harness() {
@@ -15,9 +16,9 @@ const { outputFiles } = await build({
 			window.setSyncProps = setProps;
 			const [header, setHeader] = React.useState({title:'Upcoming',project:false});
 			window.setHeaderProps = setHeader;
-			const indicator = React.createElement(PwaSyncIndicator, {
+			const indicator = React.createElement(PwaSyncStatusIndicator, { ...reminderSyncStatus({
 				changes: [], isOffline: false, refreshing: false, dataMode: 'live',
-				error: null, storageError: null, onShowStatus: label => { window.lastSyncStatus = label; }, ...props,
+				error: null, storageError: null, ...props }), onShowStatus: label => { window.lastSyncStatus = label; },
 			});
 			return header.project
 				? React.createElement(ProjectDetailHeader, {project:header.title,header:{total:0},titleContent:indicator})
@@ -32,9 +33,10 @@ const css = compileString(`
 	@use 'src/pwa/styles/reminder-sync-notices' as indicator;
 	@use 'src/reminders/ui/shared/styles/shell';
 	@use 'src/reminders/ui/shared/styles/project-detail';
+	@use 'src/ui/shared/styles/view-header';
 	body { margin:0; font-family:Arial,sans-serif; }
 	#root { --reminder-font-title:32px; --text-normal:#eee; --text-muted:#999; background:#202020;
-		@include shell.styles; @include project-detail.styles; @include indicator.styles;
+		@include shell.styles; @include view-header.styles; @include project-detail.styles; @include indicator.styles;
 	}
 `, { loadPaths: [process.cwd()] }).css;
 
