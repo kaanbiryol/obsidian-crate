@@ -84,8 +84,9 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	async writeSettings(update: Partial<CrateSettings>): Promise<void> {
+	async writeSettings(update: Partial<CrateSettings>, assertCurrent?: () => void): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
+			assertCurrent?.();
 			const nextSettings = normalizeCrateSettings(
 				{ ...this.settings, ...update },
 				this.app.vault.configDir,
@@ -95,12 +96,14 @@ export default class CratePlugin extends Plugin {
 				reminders: this.remindersSettings,
 			});
 			signal.throwIfAborted();
+			assertCurrent?.();
 			Object.assign(this.settings, nextSettings);
 		});
 	}
 
-	async writeRemindersSettings(update: Partial<RemindersSettings> | ((current: RemindersSettings) => Partial<RemindersSettings>)): Promise<void> {
+	async writeRemindersSettings(update: Partial<RemindersSettings> | ((current: RemindersSettings) => Partial<RemindersSettings>), assertCurrent?: () => void): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
+			assertCurrent?.();
 			const nextSettings = normalizeRemindersSettings({
 				...this.remindersSettings,
 				...(typeof update === 'function' ? update(this.remindersSettings) : update),
@@ -110,6 +113,7 @@ export default class CratePlugin extends Plugin {
 				reminders: nextSettings,
 			});
 			signal.throwIfAborted();
+			assertCurrent?.();
 			useRemindersSettingsStore.setState(nextSettings, true);
 		});
 	}
@@ -128,13 +132,16 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	async setRemindersEnabled(enabled: boolean): Promise<void> {
-		await this.writeRemindersSettings({ enabled });
+	async setRemindersEnabled(enabled: boolean, assertCurrent?: () => void): Promise<void> {
+		await this.writeRemindersSettings({ enabled }, assertCurrent);
+		assertCurrent?.();
 		if (enabled) {
 			try { await initializeReminders(this); }
 			catch (error) {
+				assertCurrent?.();
 				stopReminderBackend(this);
-				await this.writeRemindersSettings({ enabled: false });
+				await this.writeRemindersSettings({ enabled: false }, assertCurrent);
+				assertCurrent?.();
 				updateReminderVisibility(this);
 				throw error;
 			}
@@ -142,6 +149,7 @@ export default class CratePlugin extends Plugin {
 			stopReminderBackend(this);
 			this.app.workspace.detachLeavesOfType('reminders-view');
 		}
+		assertCurrent?.();
 		updateReminderVisibility(this);
 	}
 

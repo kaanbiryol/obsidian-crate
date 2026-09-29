@@ -3,13 +3,14 @@ import type CratePlugin from './CratePlugin';
 import { refreshSharedFeatures, setSharedFeature } from './feature-settings';
 import { startReading, stopReading } from '../reading/runtime';
 import { serverRequest } from './server-request';
-vi.mock('./server-request', () => ({ serverRequest: vi.fn() }));
+vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
 function fixture() {
   const plugin = {
     settings: { workerUrl: 'https://crate.example', reading: { enabled: true, folderPath: 'Reading' } },
     remindersSettings: { enabled: true },
+    secretStorage: { get: () => 'synthetic' },
     app: { workspace: { detachLeavesOfType: vi.fn() } }, refreshSettingsTab: vi.fn(),
     writeSettings: vi.fn(async (value: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = value.reading; }),
     setRemindersEnabled: vi.fn(async (enabled: boolean) => { plugin.remindersSettings.enabled = enabled; }),
@@ -48,6 +49,6 @@ it('resumes local backends when another device resumes the server features', asy
   vi.mocked(serverRequest).mockResolvedValue({ reading: true, reminders: true, revision: 'one' });
   await refreshSharedFeatures(plugin as unknown as CratePlugin);
   expect(startReading).toHaveBeenCalledOnce();
-  expect(plugin.setRemindersEnabled).toHaveBeenCalledWith(true);
+  expect(plugin.setRemindersEnabled).toHaveBeenCalledWith(true, expect.any(Function));
   expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
 });

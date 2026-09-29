@@ -64,7 +64,7 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
 | **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, reminder alarm records, and parsed reminder caches |
-| **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the build-time Worker and initial schema, then revokes the temporary token |
+| **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the bundled Worker and schema; retains account authorization in secret storage for explicit management and usage requests |
 | **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
 
@@ -123,7 +123,9 @@ immediate index updates authoritative over older asynchronous reads.
 The sync HTTP client binds compatibility checks, dispatch and response publication
 to one connection generation. Replacing credentials or the lifecycle signal
 invalidates older work, including mutations waiting on cached compatibility data.
-Already dispatched Obsidian requests remain non-cancellable; ordinary durable
+Shared-feature operations also retain that identity across consecutive requests,
+queued settings writes and backend/UI publication. Already dispatched Obsidian
+requests remain non-cancellable; ordinary durable
 operation reconciliation still handles uncertain remote writes.
 
 ## Authentication
@@ -132,10 +134,10 @@ operation reconciliation still handles uncertain remote writes.
 
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
-3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
+3. The plugin verifies `state` before exchanging the authorization code. The deployment service uses the exchanged tokens for the selected account operation.
 4. The plugin discovers Crate Workers in the selected account. Joining a saved or discovered deployment registers this device without uploading code or changing schema. Creating a deployment initializes the current schema; explicit updates require its schema marker before uploading code; request cold starts never mutate the schema. Updates reject an authoritative remote version newer than the installed artifact.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
-6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
+6. After a successful operation, `CloudflareUsageConnection` retains the access and refresh tokens in Obsidian secret storage, scoped to the Cloudflare account. Explicit usage, reconnect, update, reset, deletion and recovery operations reuse this login and renew it when needed. Failed operations with newly exchanged tokens revoke them; a failed operation using the saved login keeps that shared login. Plugin settings contain only non-secret deployment metadata and the cached usage snapshot. Revocation is available in Cloudflare.
 
 ### Device authorization
 

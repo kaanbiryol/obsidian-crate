@@ -9,24 +9,30 @@ interface ServerRequestOptions {
 	capabilities?: Readonly<Record<string, string>>;
 }
 
-/** Bind every request in a feature operation to the plugin's original connection. */
+/** Capture once for operations that span requests, queued saves and UI publication. */
+export function captureServerConnection(plugin: CratePlugin) {
+	const signal = getPluginLifecycleSignal(plugin);
+	signal.throwIfAborted();
+	const origin = plugin.settings.workerUrl;
+	const token = origin ? plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) : null;
+	const assertCurrent = () => {
+		signal.throwIfAborted();
+		if (plugin.settings.workerUrl !== origin || origin && plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== token) {
+			throw new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
+		}
+	};
+	return { signal, origin, token, assertCurrent };
+}
+
+/** Bind request dispatch and response publication to the same connection. */
 export async function serverRequest<T>(
 	plugin: CratePlugin,
 	path: string,
 	body?: unknown,
 	{ timeout = 30_000, capabilities = {} }: ServerRequestOptions = {},
 ): Promise<T> {
-	const signal = getPluginLifecycleSignal(plugin);
-	signal.throwIfAborted();
-	const origin = plugin.settings.workerUrl;
-	const token = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+	const { signal, origin, token, assertCurrent } = captureServerConnection(plugin);
 	if (!origin || !token) throw new Error('Connect Crate to your server first.');
-	const assertCurrent = () => {
-		signal.throwIfAborted();
-		if (plugin.settings.workerUrl !== origin || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== token) {
-			throw new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
-		}
-	};
 	const client = new WorkerApiHttpClient(origin, token, async request => {
 		assertCurrent();
 		try { return await obsidianHttpTransport(request); }

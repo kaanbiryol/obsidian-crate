@@ -2,6 +2,7 @@ import { ReadingCaptureOutbox } from './data/capture-outbox';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { portablePathKey } from '@/protocol/portable-path';
 import { readingServerRequest } from './server';
+import { captureServerConnection } from '../plugin/server-request';
 import { Notice, Platform, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
@@ -132,19 +133,22 @@ export function startReading(plugin: CratePlugin): void {
 
     if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
       checkedAt = Date.now();
-      void readingServerRequest<{ policy: { folder_path: string; enabled: number; revision: string } | null }>(plugin, '/reading/policy').then(async ({ policy }) => {
-        if (controller.signal.aborted) return;
+      void (async () => {
+        const connection = captureServerConnection(plugin);
+        const assertCurrent = () => { controller.signal.throwIfAborted(); connection.assertCurrent(); };
+        const { policy } = await readingServerRequest<{ policy: { folder_path: string; enabled: number; revision: string } | null }>(plugin, '/reading/policy');
+        assertCurrent();
         if (!policy || !policy.enabled) {
           await readingServerRequest(plugin, '/reading/policy', { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
-          if (controller.signal.aborted) return;
+          assertCurrent();
         }
         if (policy && policy.folder_path !== folder) {
           const reading = { ...plugin.settings.reading, folderPath: policy.folder_path };
-          validateReadingConfiguration(plugin, reading); await plugin.writeSettings({ reading });
-          if (!controller.signal.aborted) startReading(plugin); return;
+          validateReadingConfiguration(plugin, reading); await plugin.writeSettings({ reading }, assertCurrent);
+          assertCurrent(); startReading(plugin); return;
         }
         policyChecked = true; schedule();
-      }).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
+      })().catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
     }
 		void library.refresh().then(async () => {
 			if (!plugin.settings.workerUrl || !policyChecked || controller.signal.aborted || draining) return;
