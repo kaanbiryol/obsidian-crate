@@ -106,6 +106,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.mouse.move(start.x + .2, start.y); await page.mouse.down();
       await page.mouse.move(end.x, end.y, { steps: 8 });
       assert.equal(await page.locator('.crate-reading-reader__highlight').count(), existing, 'Selection is not saved while the pointer is held');
+      const expected = await page.locator('.crate-reading-reader__body').evaluate((body, { offset, length }) => body.textContent.slice(offset, offset + length), { offset, length });
+      await expect.poll(() => page.evaluate(() => getSelection().toString())).toBe(expected);
       await page.mouse.up();
       await expect(page.getByRole('button', { name: 'Copy text', exact: true })).toBeVisible();
     };
@@ -413,6 +415,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Delete highlight', exact: true }).tap();
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights).toEqual([]);
 
+    // Server acknowledgement can precede repainting and removal of the old
+    // selection controls. Finish deletion in the reader before selecting again.
+    await expect(marks).toHaveCount(0);
+    await expect(actions).toHaveCount(0);
     await context.setOffline(true);
     await select(inlineStart + 6, 6);
     await expect(marks).toHaveText('Button');

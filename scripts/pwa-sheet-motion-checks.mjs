@@ -64,5 +64,6 @@ export async function trackSheetDismissal(sheet, { minimumSettleMs = 0, recedeCa
 			const settled = visible.find(frame => frame.sheet >= start.sheet + (1 - start.sheet) * .9);
 			expect(settled.time - start.time).toBeGreaterThanOrEqual(minimumSettleMs);
 		}
+		return frames;
 	};
 }
