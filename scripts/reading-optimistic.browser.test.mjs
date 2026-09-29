@@ -255,6 +255,37 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const rejected = await pending(page);
     assert.equal(rejected.length, 2); assert.ok(rejected.every(op => op.review));
     assert.equal(requests.length, beforeConflict, 'Dependent updates must not be sent after a rejected predecessor');
+    // Damaged durable data survives hydration and retries without dispatch or
+    // replacement by the empty capture form, in native IndexedDB on both engines.
+    const damaged = [{ id: 'damaged', sessionId: 'wrong-session', action: 'update', intent: { privateText: '保留 unsent text' }, body: '{broken' }];
+    const damagedDraft = { url: { privateText: '保留 draft' } };
+    const damagedKeys = await page.evaluate(async ({ damaged, damagedDraft }) => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('crate-reading-v1', 1);
+        request.onsuccess = () => resolve(request.result); request.onerror = reject;
+      });
+      const id = JSON.parse(localStorage.getItem('crate-reading-session-v1')).id;
+      const keys = [`pending:${id}`, `draft:${id}`];
+      const tx = db.transaction('values', 'readwrite');
+      tx.objectStore('values').put(damaged, keys[0]); tx.objectStore('values').put(damagedDraft, keys[1]);
+      await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; }); db.close();
+      return keys;
+    }, { damaged, damagedDraft });
+    const sentBeforeRecovery = requests.length;
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Export earlier changes', exact: true })).toBeVisible();
+    await page.locator('.crate-reading-web').getByRole('button', { name: 'Retry', exact: true }).click();
+    assert.deepEqual(await pending(page), damaged);
+    const retainedDraft = await page.evaluate(async key => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('crate-reading-v1', 1);
+        request.onsuccess = () => resolve(request.result); request.onerror = reject;
+      });
+      return new Promise(resolve => { const request = db.transaction('values').objectStore('values').get(key);
+        request.onsuccess = () => { db.close(); resolve(request.result); }; });
+    }, damagedKeys[1]);
+    assert.deepEqual(retainedDraft, damagedDraft);
+    assert.equal(requests.length, sentBeforeRecovery);
     assert.deepEqual(errors, []);
   } catch (error) {
     await mkdir('test-results/reading', { recursive: true });

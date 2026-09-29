@@ -47,3 +47,20 @@ Removal verifies the enrolled folder, storage key and full exported string immed
 **Settings → Sync and device → Export unsynced reminders** saves all current-session pending changes with their exact request bodies and operation IDs. The export contains private reminder text but no session credential. It does not discard anything or replay the export. Keep it outside browser storage and compare with current reminders before recovering text; uncertain operations may already have committed. Routine pending changes use the header sync indicator without a separate notice, including while offline.
 
 Logout invalidates in-memory authority and removes private rendered content before attempting any storage deletion. Token, draft, queue and cache cleanup run independently; failures leave a persistent sign-in-screen warning and direct the user to clear site data and revoke the browser session in Obsidian. A failed token removal cannot guarantee that reloading the browser will forget that credential. `pwa-storage-safety-test.mjs` injects these failures in the built Chromium and WebKit clients, checks persistence grant/denial/unavailability and downloads an ordinary pending export.
+
+## Reading storage validation
+
+Reading validates session fields, list and article caches, drafts and pending commands
+when reading browser storage. A damaged pending queue blocks dispatch and retains its
+original records for **Export earlier changes** or **Export Reading data**. Validation
+preserves exact dispatched request bodies, operation IDs and unknown metadata. It never
+repairs an uncertain command or interprets an unreadable queue as empty.
+
+Hydration reads the cache, queue and draft independently. A damaged cache can be replaced
+by a confirmed server refresh without discarding pending work. A damaged draft remains
+untouched: the empty capture form cannot overwrite it during startup. Export and review
+the retained data before changing browser storage; reload after repairing storage.
+
+`src/pwa/reading/storage.test.ts` covers malformed durable records and exact-byte
+preservation. `scripts/reading-optimistic.browser.test.mjs` also verifies native
+IndexedDB preservation through reload and retry in Chromium and WebKit.

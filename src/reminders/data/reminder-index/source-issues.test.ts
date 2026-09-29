@@ -55,7 +55,7 @@ describe('incomplete reminder sources', () => {
 		await h.index.rescanFile(file);
 		expect(h.index.isComplete).toBe(true);
 		h.vault.adapter.readBinary.mockRejectedValueOnce(new Error('Read failed again'));
-		await h.index.rescanFile(file, true);
+		await h.index.rescanFile(file);
 		await h.vault.adapter.remove(a);
 		h.index.removeFile(a);
 		expect(h.index.sourceIssues).toEqual([]);
@@ -84,5 +84,27 @@ describe('incomplete reminder sources', () => {
 		await h.index.rescanFile(h.files.get(renamed)!);
 		expect(h.index.isComplete).toBe(true);
 		expect(h.index.getById('one')?.filePath).toBe(renamed);
+	});
+
+	it.each(['file', 'vault'])('does not normalize a moved-out note after an owner read during a %s scan', async mode => {
+		const h = await workspace();
+		const content = '- [ ] Copied task <!-- crate-id:two -->\n';
+		const file = await h.put(a, content);
+		let announce!: () => void, release!: () => void;
+		const started = new Promise<void>(resolve => { announce = resolve; });
+		const gate = new Promise<void>(resolve => { release = resolve; });
+		h.vault.adapter.readBinary.mockImplementation(async path => {
+			if (path === b) { announce(); await gate; }
+			return h.read(path);
+		});
+		const scanning = mode === 'file' ? h.index.rescanFile(file) : h.index.load();
+		await started;
+		await h.vault.adapter.rename(a, 'Outside.md');
+		h.index.removeFile(a);
+		release();
+		await scanning;
+		expect(await h.readBytes('Outside.md')).toEqual(Buffer.from(content));
+		expect(h.vault.process).not.toHaveBeenCalled();
+		expect(h.index.getByFile(a)).toEqual([]);
 	});
 });

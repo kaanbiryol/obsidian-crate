@@ -4,7 +4,7 @@ import type CratePlugin from "@/main";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import type { TabId } from "@/reminders/ui/layoutConstants";
-import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
+import { openReminderCreationModal } from "@/reminders/ui/adapters/reminderEditorModals";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import { RemindersViewCloseButton } from "@/reminders/ui/RemindersViewCloseButton";
 import {

@@ -5,7 +5,9 @@ import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
 import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingDrainLock, readingLock, readingSession, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
-export class ReadingApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+import { ReadingApiError } from './api-error';
+export { ReadingApiError } from './api-error';
+import { isReadingCache, isReadingIntent } from './storage-validation';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -13,9 +15,9 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
   const sessionCurrent = capturePwaSession();
   const response = await fetch('/reading/session', { cache: 'no-store', signal: AbortSignal.timeout(20_000),
     headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
-  const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string };
+  const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string; code?: string };
   if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) return readingSession();
-  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status);
+  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status, data.code);
   if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
     || typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
     throw new Error('Update your Crate server to use Reading with this app.');
@@ -33,9 +35,9 @@ export async function readingRequest<T>(path: string, session: ReadingSession | 
   if (session) assertReadingSession(session);
   const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),
     headers: { ...(session ? { Authorization: `Bearer ${session.token}` } : {}), 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) }, body });
-  const data = await response.json() as T & { error?: string };
+  const data = await response.json() as T & { error?: string; code?: string };
   if (session) assertReadingSession(session);
-  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status);
+  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
   return data;
 }
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
@@ -46,6 +48,7 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
     cache.items.push(...page.items.map(item => ({ ...validateReadingMetadata(item), path: String(item.path) }))); cache.issues.push(...page.issues);
     if (page.cursor && page.cursor === cursor) throw new Error('Reading library did not advance.'); cursor = page.cursor;
   } while (cursor);
+  if (!isReadingCache(cache, session.folderPath)) throw new Error('Reading library response is unreadable.');
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite'), prefix = `article:${session.id}:`;
   const ids = new Set(cache.items.map(item => item.crate_reading_id));
@@ -59,6 +62,7 @@ export async function queueReading(session: ReadingSession, action: PendingReadi
     intent = { ...intent, url: readingUrl(intent.url) };
     if (intent.title !== undefined && (typeof intent.title !== 'string' || intent.title.length > 1000)) throw new Error('Use a title shorter than 1,000 characters.');
   }
+  if (!isReadingIntent(action, intent)) throw new Error('Invalid Reading change. Reopen this article before editing.');
   return readingLock(async () => {
     assertReadingSession(session); const queue = await pendingReading(session);
     const previous = action === 'capture' ? [] : queue.filter(op => op.intent.id === intent.id);

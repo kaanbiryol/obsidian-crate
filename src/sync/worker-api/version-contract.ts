@@ -1,4 +1,4 @@
-import { isRecord } from '../../plugin/settings';
+import { isRecord } from '../../platform/validation';
 import { isSyncDate, isSyncHash, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 

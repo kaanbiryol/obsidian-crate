@@ -1,5 +1,5 @@
 import { SHARED_CHECKPOINT_CAPABILITY, parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
-import { isRecord } from '../../plugin/settings';
+import { isRecord } from '../../platform/validation';
 import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';

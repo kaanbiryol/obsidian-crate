@@ -1,5 +1,5 @@
 import type { App, PluginManifest } from 'obsidian';
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import type { ConflictRecord } from './types';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';

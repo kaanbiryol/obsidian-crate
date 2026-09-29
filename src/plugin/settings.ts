@@ -1,3 +1,4 @@
+import { isRecord } from '../platform/validation';
 import { validRestoreState } from '../cloudflare/restore/state';
 import { normalizeVaultName } from '../cloudflare/vault-name';
 import { normalizeReadingSettings } from '../reading/settings';
@@ -17,10 +18,6 @@ import {
 	MAX_SYNC_HISTORY,
 	MAX_SYNC_HISTORY_PATHS,
 } from './settings-types';
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function normalizeString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value.trim() : fallback;

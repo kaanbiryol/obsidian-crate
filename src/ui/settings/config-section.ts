@@ -53,7 +53,7 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
             updateButton = button;
             button.setButtonText('Update server').setCta().onClick(() => {
                 if (!needsVerification && !canUpdate) return;
-                if (needsVerification) void checkAndRecoverUpdate(plugin);
+                if (needsVerification) void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); });
                 else void startCloudflareDeployment(plugin);
             });
         });
@@ -82,7 +82,7 @@ export function renderServerSection(context: ConfigSectionContext): void {
         new Setting(containerEl).setName('Interrupted server update')
             .setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')
             .addButton(button => button.setButtonText('Check and recover update')
-                .onClick(() => { void checkAndRecoverUpdate(plugin); }));
+                .onClick(() => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); }));
     }
     renderServerBackupSetting(context);
 	const details = containerEl;

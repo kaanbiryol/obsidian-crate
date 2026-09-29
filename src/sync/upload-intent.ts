@@ -1,5 +1,5 @@
 import type { BatchUploadFile } from '../protocol/sync-types';
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { isUploadSession } from './upload-diagnostics';
 import { isSyncDate, isSyncHash, isSyncPath, isSyncSequence } from '../protocol/sync-validation';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';

@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { reminderOperationDay } from '../protocol/reminder-operation';
 import { isSyncDate, isSyncHash, isSyncSequence } from '../protocol/sync-validation';
 

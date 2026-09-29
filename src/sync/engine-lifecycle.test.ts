@@ -2,9 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	createHarness,
 	createNamedAbortError,
-	getConsecutiveCheckFailures,
-	runPeriodicCheck,
-	setEngineLocalManifest,
 	spyOnConflictRecovery,
 	spyOnIncrementalSync,
 	spyOnPrepareUploadsFromVaultFiles,
@@ -184,14 +181,22 @@ describe('SyncEngine abort-on-destroy', () => {
 
 describe('SyncEngine periodic check backoff', () => {
 	it('resets backoff on updateSettings', async () => {
+		vi.useFakeTimers();
 		const harness = createHarness({ syncInterval: 60 });
-		setEngineLocalManifest(harness.engine, harness.localManifest);
 		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
-
-		await runPeriodicCheck(harness.engine);
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
-
-		harness.engine.updateSettings({ ...harness.settings, syncInterval: 60 });
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(0);
+		try {
+			await harness.engine.initialize();
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(harness.api.checkForChanges).toHaveBeenCalledTimes(1);
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(harness.api.checkForChanges).toHaveBeenCalledTimes(2);
+			harness.engine.updateSettings({ ...harness.settings, syncInterval: 60 });
+			// Two failures would ordinarily defer the next request for 120 seconds.
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(harness.api.checkForChanges).toHaveBeenCalledTimes(3);
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
 	});
 });

@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { reminderOperationDay } from '../protocol/reminder-operation';
 import { isSyncHash, isSyncRevision } from '../protocol/sync-validation';
 import type { RemoteFileVersion, RestoreFileRequest } from '../protocol/sync-types';

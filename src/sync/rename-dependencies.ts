@@ -2,7 +2,7 @@ import type { Vault } from 'obsidian';
 import type { LocalManifest } from './manifest';
 import { readLocalFileEntry } from './local-file-entry';
 import { getSyncPathIssue } from '@/protocol/portable-path';
-import { isRecord } from '@/plugin/settings';
+import { isRecord } from '@/platform/validation';
 
 export function parseRenameDependencies(value: unknown): Map<string, string> {
 	if (value === undefined) return new Map();

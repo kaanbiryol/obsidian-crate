@@ -1,6 +1,6 @@
 import type { DataAdapter } from 'obsidian';
 import { createReminderOperationId, reminderOperationDay } from '@/protocol/reminder-operation';
-import { isRecord } from '@/plugin/settings';
+import { isRecord } from '@/platform/validation';
 import { validateUploadIntent, type IntendedUpload, type JournalUpload } from './upload-intent';
 
 /** One immutable file per dispatched upload, separate from the large manifest.

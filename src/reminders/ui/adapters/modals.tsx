@@ -1,6 +1,5 @@
 export {
   openReminderCreationModal,
-  openReminderEditModal,
 } from "./reminderEditorModals";
 export {
   openCompactReminderModal,

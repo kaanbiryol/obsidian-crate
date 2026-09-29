@@ -20,10 +20,10 @@ async function workspace(source = 'A', destination = 'Z') {
 		if (!(current instanceof TFile)) throw new Error('Test file is missing');
 		return current;
 	}
-	await index.rescanFile(file(sourcePath), true);
-	await index.rescanFile(file(destinationPath), true);
+	await index.rescanFile(file(sourcePath));
+	await index.rescanFile(file(destinationPath));
 	const writer = createMarkdownWriter(app, index);
-	writer.setOnFileWritten(written => index.rescanFile(written, true));
+	writer.setOnFileWritten(written => index.rescanFile(written));
 	return { app, files, vault, index, writer, file, sourcePath, destinationPath, lifetime, setStatus: (next: string) => { status = next; } };
 }
 
@@ -49,8 +49,8 @@ describe('reminder identity ownership during moves', () => {
 		app.vault.cachedRead = cachedRead;
 		files.set(sourcePath, unrelated);
 		files.set(destinationPath, task);
-		const sourceScan = () => index.rescanFile(file(sourcePath), true);
-		const destinationScan = () => index.rescanFile(file(destinationPath), true);
+		const sourceScan = () => index.rescanFile(file(sourcePath));
+		const destinationScan = () => index.rescanFile(file(destinationPath));
 		if (order === 'concurrent') await Promise.all([destinationScan(), sourceScan()]);
 		else if (order === 'source first') { await sourceScan(); await destinationScan(); }
 		else { await destinationScan(); await sourceScan(); }
@@ -65,7 +65,7 @@ describe('reminder identity ownership during moves', () => {
 		const { files, index, file, sourcePath, destinationPath } = await workspace();
 		files.delete(sourcePath);
 		files.set(destinationPath, task);
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 		index.removeFile(sourcePath);
 
 		expect(files.get(destinationPath)).toBe(task);
@@ -75,7 +75,7 @@ describe('reminder identity ownership during moves', () => {
 	it.each([['A', 'Z'], ['Z', 'A']])('still assigns a fresh ID to a genuine duplicate from %s into %s', async (source, destination) => {
 		const { files, index, file, sourcePath, destinationPath } = await workspace(source, destination);
 		files.set(destinationPath, task.replace('Task', 'Pasted task'));
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 
 		expect(files.get(sourcePath)).toBe(task + unrelated);
 		expect(files.get(destinationPath)).not.toContain('crate-id:stable-id');
@@ -90,7 +90,7 @@ describe('reminder identity ownership during moves', () => {
 			if (current.path === sourcePath) throw new Error('Owner temporarily unreadable');
 			return files.get(current.path) ?? '';
 		});
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 
 		expect(files.get(destinationPath)).toBe(task);
 		expect(vault.process).not.toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe('reminder identity ownership during moves', () => {
 		const { files, index, file, sourcePath, destinationPath, setStatus } = await workspace();
 		setStatus('syncing');
 		files.set(destinationPath, task);
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 		expect(files.get(destinationPath)).toBe(task);
 		if (finalStatus !== 'idle') {
 			setStatus(finalStatus);
@@ -111,7 +111,7 @@ describe('reminder identity ownership during moves', () => {
 			setStatus('syncing');
 		}
 		files.set(sourcePath, unrelated);
-		await index.rescanFile(file(sourcePath), true);
+		await index.rescanFile(file(sourcePath));
 		setStatus('idle');
 		await index.flushDeferredScans();
 
@@ -125,7 +125,7 @@ describe('reminder identity ownership during moves', () => {
 		setStatus('syncing');
 		files.set(sourcePath, unrelated.replace('Unrelated', 'Locally edited'));
 		files.set(destinationPath, task + '- [ ] Local new task\n');
-		await Promise.all([index.rescanFile(file(sourcePath), true), index.rescanFile(file(destinationPath), true)]);
+		await Promise.all([index.rescanFile(file(sourcePath)), index.rescanFile(file(destinationPath))]);
 		lifetime.abort();
 		setStatus('idle');
 		await index.flushDeferredScans();
@@ -139,7 +139,7 @@ describe('reminder identity ownership during moves', () => {
 		setStatus('syncing');
 		files.set(sourcePath, unrelated.replace('Unrelated', 'Locally edited'));
 		files.set(destinationPath, task + '- [ ] Local new task\n');
-		await Promise.all([index.rescanFile(file(sourcePath), true), index.rescanFile(file(destinationPath), true)]);
+		await Promise.all([index.rescanFile(file(sourcePath)), index.rescanFile(file(destinationPath))]);
 		setStatus('idle');
 		await index.flushDeferredScans();
 
@@ -156,7 +156,7 @@ describe('reminder identity ownership during moves', () => {
 			setStatus('syncing');
 			return files.get(current.path) ?? '';
 		});
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 		expect(files.get(destinationPath)).toBe(task);
 		files.set(sourcePath, unrelated);
 		setStatus('idle');
@@ -176,7 +176,7 @@ describe('reminder identity ownership during moves', () => {
 			files.set(target.path, next);
 			return next;
 		});
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 		expect(files.get(destinationPath)).toBe(task);
 		await index.flushDeferredScans();
 		expect(files.get(destinationPath)).toBe(task);
@@ -193,7 +193,7 @@ describe('reminder identity ownership during moves', () => {
 			files.set(target.path, next);
 			return next;
 		});
-		await index.rescanFile(file(destinationPath), true);
+		await index.rescanFile(file(destinationPath));
 		expect(files.get(destinationPath)).toBe(concurrentContent);
 		expect(index.getById('stable-id')?.filePath).toBe(sourcePath);
 		await index.flushDeferredScans();
@@ -222,7 +222,7 @@ describe('reminder identity ownership during moves', () => {
 		expect(files.get('Reminders/B.md')).toBe(task);
 		const duplicateFile = entries.find(entry => entry.path === 'Reminders/B.md');
 		if (!duplicateFile) throw new Error('Test duplicate file is missing');
-		await index.rescanFile(duplicateFile, true);
+		await index.rescanFile(duplicateFile);
 		expect(index.getById('stable-id')).toBeUndefined();
 		expect(files.get('Reminders/B.md')).toBe(task);
 		files.set('Reminders/A.md', unrelated);

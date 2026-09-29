@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { isSyncSequence, parseSyncFiles } from '../protocol/sync-validation';
 import { reminderOperationDay } from '../protocol/reminder-operation';
 import type { FileManifest } from '../protocol/sync-types';

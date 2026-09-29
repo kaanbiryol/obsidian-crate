@@ -1,13 +1,13 @@
 import type { AuthPrincipal } from '../authenticate';
 import {
 	handleCreateRemindersEnrollmentToken,
-} from '../notifications';
+} from '../notification-enrollment-handlers';
 import {
 	handleListSubscriptions,
 	handleSubscribe,
 	handleTestPush,
 	handleUnsubscribe,
-} from '../notifications';
+} from '../notification-subscription-handlers';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 

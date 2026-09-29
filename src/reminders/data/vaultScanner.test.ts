@@ -251,7 +251,7 @@ it.each([
   expect(index.getAll().map(item => [item.id, item.filePath])).toEqual([['rem-1', live.path]]);
   expect(index.getProjects()).toEqual(['Work']);
   expect(index.isReminderFile(conflictPath)).toBe(false);
-  await index.rescanFile(conflict, true);
+  await index.rescanFile(conflict);
   await scanFile(app, conflict, 'Reminders');
   expect(read).toHaveBeenCalledTimes(1);
   expect(process).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { isRecord } from '../../plugin/settings';
+import { isRecord } from '../../platform/validation';
 import { isSyncDate, isSyncHash, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
 import type { ChangesResponse, CheckResponse, FileManifest, FileMetadataResponse } from '../../protocol/sync-types';
 

@@ -2,11 +2,10 @@ import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare-deployment-modal';
-import { startCloudflareDeployment } from './plugin-integration';
 import { CloudflareReauthorizationRequired } from './oauth-client';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
 
-export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> {
+export async function checkAndRecoverUpdate(plugin: CratePlugin, onUpdate: () => void): Promise<void> {
     const signal = getPluginLifecycleSignal(plugin);
     if (signal.aborted) return;
     if (revealCloudflareOperation(plugin.app, plugin.getSettingsDocument())) return;
@@ -26,13 +25,13 @@ export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> 
             progress.fail(result.title ?? 'Could not recover update yet', result.message, undefined, {
                 technicalDetails: result.diagnostics,
                 dismissLabel: 'Cancel',
-                action: { label: 'Check again', onClick: () => { void checkAndRecoverUpdate(plugin); } },
+                action: { label: 'Check again', onClick: () => { void checkAndRecoverUpdate(plugin, onUpdate); } },
             });
         } else if (result.status === 'completed') {
             progress.succeed('Server updated', result.message);
         } else {
             progress.succeed('Server update checked', result.message, {
-                action: { label: 'Update server', onClick: () => { void startCloudflareDeployment(plugin, 'update'); } },
+                action: { label: 'Update server', onClick: onUpdate },
             });
         }
     } catch (error) {
