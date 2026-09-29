@@ -71,6 +71,8 @@
 		color: var(--text-normal);
 		cursor: pointer;
 		border-radius: inherit;
+		background: transparent;
+		box-shadow: none;
 
 		&::-webkit-details-marker { display: none; }
 		&::marker { content: ''; }
@@ -129,9 +131,16 @@
 	line-height: 1.4;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
 	.crate-settings .crate-settings-disclosure > summary:hover {
 		background: var(--background-modifier-hover);
+	}
+
+	/* Inline details sit below a row title, rather than owning the whole row. */
+	.crate-settings .setting-item-description .crate-settings-disclosure > summary:hover {
+		background: transparent;
+		color: var(--text-normal);
+		&::after { border-color: var(--text-normal); }
 	}
 }
 
