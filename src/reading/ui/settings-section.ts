@@ -1,4 +1,5 @@
 import { setSharedFeature } from '../../plugin/feature-settings';
+import { captureServerConnection } from '../../plugin/server-request';
 import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../ui/settings/section-helpers';
@@ -29,18 +30,23 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 				text.setValue(plugin.settings.reading.folderPath).setPlaceholder('Reading');
 				bindCommittedText(text, () => plugin.settings.reading.folderPath, async folderPath => {
 					try {
+						const { assertCurrent } = captureServerConnection(plugin);
 						const reading = { enabled: true, folderPath };
 						validateReadingConfiguration(plugin, reading);
 						if (plugin.settings.workerUrl) {
 							const { policy } = await readingServerRequest<{ policy: ServerReadingPolicy | null }>(plugin, '/reading/policy');
+							assertCurrent();
 							if (policy?.enabled && policy.folder_path !== folderPath) {
 								const paused = await readingServerRequest<{ policy: ServerReadingPolicy }>(plugin, '/reading/policy', { enabled: false, folderPath: policy.folder_path, revision: policy.revision });
+								assertCurrent();
 								policy.revision = paused.policy.revision;
 								policy.enabled = 0;
 							}
 							await readingServerRequest(plugin, '/reading/policy', { enabled: Boolean(policy?.enabled), folderPath, revision: policy?.revision ?? null });
 						}
-						await plugin.writeSettings({ reading });
+						assertCurrent();
+						await plugin.writeSettings({ reading }, assertCurrent);
+						assertCurrent();
 						stopReading(plugin); plugin.app.workspace.detachLeavesOfType(READING_VIEW_TYPE); startReading(plugin);
 						rerender();
 					} catch (error) { new Notice(error instanceof Error ? error.message : 'Could not change the Reading folder.'); }

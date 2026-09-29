@@ -29,6 +29,7 @@ async function setup(connected = true, enabled = true) {
 	const plugin = {
 		app: { workspace: { detachLeavesOfType: vi.fn() } },
 		remindersSettings: { enabled: true },
+		secretStorage: { get: () => 'synthetic' },
 		settings: { reading: { enabled, folderPath: 'Reading' }, workerUrl: connected ? 'https://crate.example' : '' },
 		writeSettings: vi.fn(async ({ reading }: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = reading; }),
 	};
@@ -75,4 +76,21 @@ it('keeps the feature enabled if saving its preference fails', async () => {
  await vi.waitFor(() => expect(rerender).toHaveBeenCalled());
  expect(plugin.settings.reading.enabled).toBe(true);
  expect(noticeMessages).toContain('Disk unavailable');
+});
+
+it.each(['read', 'pause', 'update'])('does not continue a folder change after switching servers during %s', async step => {
+ const { plugin } = await setup();
+ const calls = { read: 1, pause: 2, update: 3 };
+ request.mockImplementation(async () => {
+  if (request.mock.calls.length === calls[step as keyof typeof calls]) plugin.settings.workerUrl = 'https://replacement.example';
+  return { policy: { ...policy } };
+ });
+ const folder = MockSetting.instances.find(row => row.nameEl.textContent === 'Reading folder')!.texts[0]!;
+ folder.inputEl.value = 'New reading';
+ folder.inputEl.blur();
+ await vi.waitFor(() => expect(noticeMessages.some(message => message.includes('connection changed'))).toBe(true));
+ expect(request).toHaveBeenCalledTimes(calls[step as keyof typeof calls]);
+ expect(plugin.writeSettings).not.toHaveBeenCalled();
+ const { startReading } = await import('../runtime');
+ expect(startReading).not.toHaveBeenCalled();
 });

@@ -6,8 +6,10 @@ import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
 import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime } from './runtime';
+import { readingServerRequest } from './server';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
+vi.mock('./server', () => ({ readingServerRequest: vi.fn() }));
 
 function harness() {
 	vi.useFakeTimers(); vi.stubGlobal('window', globalThis);
@@ -35,9 +37,27 @@ function harness() {
 		edit: (update: (source: string) => string) => { content = update(content); for (const listener of events.get('modify') ?? []) listener(file); },
 	};
 }
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('Reading runtime lifecycle', () => {
+  it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
+    const h = harness();
+    h.plugin.settings.workerUrl = 'https://original.example';
+    h.workspace.layoutReady = true;
+    const writeSettings = vi.fn();
+    Object.assign(h.plugin, { secretStorage: { get: () => 'synthetic' }, registerInterval: vi.fn(), writeSettings });
+    vi.mocked(readingServerRequest).mockImplementationOnce(async () => {
+      h.plugin.settings.workerUrl = 'https://replacement.example';
+      return { policy: kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', revision: 'old' } };
+    });
+    startReading(h.plugin);
+    try {
+      await vi.advanceTimersByTimeAsync(400);
+      expect(readingServerRequest).toHaveBeenCalledOnce();
+      expect(writeSettings).not.toHaveBeenCalled();
+      expect(h.plugin.settings.reading.folderPath).toBe('Reading');
+    } finally { stopReading(h.plugin); }
+  });
   it('saves and extracts on desktop before checking a configured server policy', async () => {
     const h = harness(), saved = new Map<string, string>();
     const root = h.vault.getAbstractFileByPath('Reading');
