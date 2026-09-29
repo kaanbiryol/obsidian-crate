@@ -31,8 +31,8 @@ import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { SettingsRow } from '../components/SettingsRow';
 import { useToast } from '../hooks/useToast';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
-import { queueReading } from './api';
-import { assertReadingSession, writeValue, exportReadingData, type PendingReading } from './storage';
+import { queueReading, type ReadingCommand } from './outbox';
+import { assertReadingSession, writeValue, exportReadingData } from './storage';
 import { presentReadingItems } from './pending-view';
 
 export default function ReadingApp() {
@@ -48,7 +48,7 @@ function ReadingAppContent() {
   const connection = useReadingSession();
   const { session, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState,
     adding, setAdding, url, setUrl, share, setShare, alive, run, connect, resetSession } = connection;
-  const { refresh, syncing, syncedSession, isOffline } = useReadingSync(connection);
+  const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection);
   const { reader, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, alive, setError, run });
   const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
   const [saving, setSaving] = useState(false);
@@ -67,10 +67,10 @@ function ReadingAppContent() {
     feature: 'Reading', showToast,
     isCurrent: () => { if (!session) return false; try { assertReadingSession(session); return true; } catch { return false; } },
   });
-  const queueChange = async (action: PendingReading['action'], intent: Record<string, unknown>) => {
+  const queueChange = async (command: ReadingCommand) => {
     if (!session) throw new Error('Connect Reading before saving changes.');
     try {
-      const work = await queueReading(session, action, intent);
+      const work = await queueReading(session, command);
       assertReadingSession(session);
       return work;
     } catch (cause) {
@@ -87,12 +87,12 @@ function ReadingAppContent() {
     // without waiting for that first request to return.
     if (!item.highlight_format && item.highlights?.length && changes.highlights === undefined
       && reader?.item.crate_reading_id === item.crate_reading_id && reader.markdown !== null
-      && !pending.some(op => op.intent.id === item.crate_reading_id)) {
+      && !pending.some(op => op.action !== 'capture' && op.intent.id === item.crate_reading_id)) {
       changes = { ...changes, highlights: writeMarkdownHighlights(reader.markdown, item.highlights).highlights };
     }
     validateReadingMetadata({ ...item, ...changes });
     const before = Object.fromEntries(Object.keys(changes).map(key => [key, item[key as keyof ReadingChanges]]));
-    const work = await queueChange('update', { id: item.crate_reading_id, changes, before });
+    const work = await queueChange({ action: 'update', intent: { id: item.crate_reading_id, changes, before } });
     assertReadingSession(session);
     setPending(work);
     void run(() => refresh(session));
@@ -107,7 +107,7 @@ function ReadingAppContent() {
     savingRef.current = true; setSaving(true); setError(null);
     try {
       const fetchArticle = true;
-      const work = await queueChange('capture', { url: link, fetchArticle });
+      const work = await queueChange({ action: 'capture', intent: { url: link, fetchArticle } });
       assertReadingSession(session);
       if (share) await writeValue(`share:${share}`, null, session);
       setPending(work); setUrl(''); setShare(null);
@@ -127,7 +127,7 @@ function ReadingAppContent() {
   const blockedItemIds = useMemo(() => new Set([...visibleItems.filter(item => !item.path).map(item => item.crate_reading_id), ...pending.flatMap(op => op.action === 'capture' ? [op.id]
     : (op.review || op.action === 'retry') && typeof op.intent.id === 'string' ? [op.intent.id] : [])]), [pending, visibleItems]);
   const migratingHighlights = Boolean(visibleReader && !visibleReader.highlight_format && visibleReader.highlights?.length
-    && pending.some(op => op.intent.id === visibleReader.crate_reading_id));
+    && pending.some(op => op.action !== 'capture' && op.intent.id === visibleReader.crate_reading_id));
   const confirmed = Boolean(session && syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation);
   const status = readingSyncStatus({ pending, isOffline, loading: !cache, refreshing: syncing, confirmed, error, recovery });
   const readingDisabled = !session && connectionState !== 'available';
@@ -137,7 +137,7 @@ function ReadingAppContent() {
     updateReady: ready && !connecting && !adding && !saving && !syncing && !isOffline,
     attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
     unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),
-    onRefresh: () => session ? refresh() : connect(),
+    onRefresh: () => session ? refreshManually() : connect(),
     onLogout: async () => {
       setSettingsOpen(false); resetSession();
       setError(await logoutReadingApp());
@@ -152,12 +152,12 @@ function ReadingAppContent() {
   const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const syncIssue = pending.find(op => op.error || op.review);
   const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
-    {error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(() => refresh()); else void connect(); }}>Retry</Button></p>}
+    {error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>Retry</Button></p>}
     {!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
   </>;
   return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
     {!session && !readingDisabled ? <section className="crate-reading crate-reading-welcome"><div className="pwa-feature-welcome-action"><FeatureSwitcherButton /></div><h1>Your reading, everywhere</h1><p>{remindersConnected ? 'Reading uses this app’s existing connection. Open Obsidian once to confirm your Reading folder.' : 'In Obsidian, open Crate settings → Crate web app → Open app to connect this browser.'}</p>{share && <p>Your shared link is kept on this device. Connect Reading here, then return to save it.</p>}{!remindersConnected && <p>To install on iPhone, open your Crate setup link in Safari, then use Share → Add to Home Screen within 10 minutes.</p>}{notices}</section> : <>
-      <ReadingLibraryPanel initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <PwaTabTransition viewKey={section}>{content}</PwaTabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onUpdate={update} onRefresh={refresh} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} pendingItemIds={blockedItemIds} onReaderClosed={finishReaderClose} readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
+      <ReadingLibraryPanel initialSection={featureNavigation?.readingTab} renderLibraryContent={(section, content) => <PwaTabTransition viewKey={section}>{content}</PwaTabTransition>} renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader} onAdd={openCapture} />} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length, error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }} onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }} onUpdate={update} onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />} notice={!reader && notices} activeId={reader?.item.crate_reading_id} pendingItemIds={blockedItemIds} onReaderClosed={finishReaderClose} readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
         listContent={readingDisabled ? <div className="crate-reading__empty crate-reading-disabled">
           <ThemeIcon id="book-open" size="xl" aria-hidden="true" />
           <h2>Connect your Reading folder</h2>
@@ -166,9 +166,9 @@ function ReadingAppContent() {
           <Button variant="outline" size="touch" disabled={connecting || isOffline} aria-busy={connecting} onClick={() => void connect()}>{connecting ? 'Checking…' : 'Check again'}</Button>
           {isOffline && <p role="status">Connect to the internet to check again.</p>}
         </div> : undefined}
-        beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(() => refresh())} />}
+        beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
         headerStatus={<><PwaUpdateButton />{session && <ReadingSyncIndicator pending={pending} isOffline={isOffline} loading={!cache} refreshing={syncing} confirmed={syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation} error={error} recovery={recovery} onShowStatus={(label, state) => showToast(state === 'error' ? 'error' : state === 'synced' ? 'success' : 'info', `Reading: ${label}`, state)} />}</>}
-        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? 'Fetching article' : 'Saved on this device') : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange('retry', { id: reader.item.crate_reading_id }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
+        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? 'Fetching article' : 'Saved on this device') : reader.availableOffline ? 'Available offline' : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange({ action: 'retry', intent: { id: reader.item.crate_reading_id } }); assertReadingSession(session); setPending(work); showToast('info', 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
       {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
 
     </>}

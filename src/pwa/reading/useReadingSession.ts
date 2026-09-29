@@ -1,3 +1,4 @@
+import type { PendingReading } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
@@ -8,7 +9,7 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { connectReadingFromReminders, readingRequest } from './api';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, hasEarlierReadingChanges, pendingReading, readingSession,
-  readReadingCache, readReadingDraft, writeValue, type PendingReading, type ReadingCache, type ReadingSession } from './storage';
+  readReadingCache, readReadingDraft, writeValue, type ReadingCache, type ReadingSession } from './storage';
 import { isReadingSession } from './storage-validation';
 
 /** Owns enrollment, session invalidation and hydration of this session's durable data. */

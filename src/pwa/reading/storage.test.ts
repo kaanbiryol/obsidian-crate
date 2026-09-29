@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { drainReading } from './api';
+import { drainReading } from './outbox';
 import { exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY, type ReadingSession } from './storage';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
@@ -38,6 +38,7 @@ it.each([
   null,
   { ...command(), intent: [] },
   { ...command(), intent: { ...intent, changes: { favorite: 'yes' } } },
+  { ...command(), intent: { ...intent, changes: { favorite: 'yes', tags: [42], reading_status: 'deleted' } } },
   { ...command(), attempts: -1 },
   { ...command(), retryAt: 'soon' },
   { ...command(), review: 'false' },

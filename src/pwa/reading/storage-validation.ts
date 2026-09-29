@@ -1,8 +1,9 @@
+import type { PendingReading, ReadingCommand } from './outbox';
 import { isRecord } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
 import { readingTimestamp, readingUrl, validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
-import type { PendingReading, ReadingCache, ReadingSession } from './storage';
+import type { ReadingCache, ReadingSession } from './storage';
 
 const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const nonNegativeNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -50,7 +51,9 @@ function isChangeField(key: string, value: unknown, before: boolean): boolean {
   return false;
 }
 
-export function isReadingIntent(action: PendingReading['action'], value: unknown): value is Record<string, unknown> {
+export function isReadingCommand(command: unknown): command is ReadingCommand {
+  if (!isRecord(command) || (command.action !== 'capture' && command.action !== 'update' && command.action !== 'retry')) return false;
+  const { action, intent: value } = command;
   if (!isRecord(value) || 'operationId' in value) return false;
   if (action === 'capture') {
     try { readingUrl(value.url); } catch { return false; }
@@ -76,9 +79,7 @@ function sameJson(left: unknown, right: unknown): boolean {
 
 /** Validate in place. Dispatch bytes and unknown metadata are never rewritten. */
 export function isPendingReading(value: unknown, sessionId: string): value is PendingReading {
-  if (!isRecord(value) || !nonEmptyString(value.id) || value.sessionId !== sessionId
-    || !['capture', 'update', 'retry'].includes(String(value.action))) return false;
-  if (!isReadingIntent(value.action as PendingReading['action'], value.intent)) return false;
+  if (!isRecord(value) || !nonEmptyString(value.id) || value.sessionId !== sessionId) return false;
   if (value.error !== undefined && typeof value.error !== 'string'
     || value.review !== undefined && typeof value.review !== 'boolean'
     || value.attempts !== undefined && (!nonNegativeNumber(value.attempts) || !Number.isSafeInteger(value.attempts))
@@ -92,5 +93,5 @@ export function isPendingReading(value: unknown, sessionId: string): value is Pe
     const { operationId: _operationId, ...intent } = body;
     if (!sameJson(intent, value.intent)) return false;
   }
-  return true;
+  return isReadingCommand(value);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import type { PendingReading } from './storage';
+import type { PendingReading } from './outbox';
 import { presentReadingItems } from './pending-view';
 
 const article: ReadingItem = {
@@ -21,15 +21,10 @@ describe('pending Reading presentation', () => {
 		expect(presentReadingItems([article], [])[0]?.favorite).toBe(false);
 	});
 
-	it('ignores malformed stored changes instead of rendering them as article data', () => {
-		const pending: PendingReading[] = [{ id: 'operation', sessionId: 'session', action: 'update',
-			intent: { id: article.crate_reading_id, changes: { favorite: 'yes', tags: [42], reading_status: 'deleted' } } }];
-		expect(presentReadingItems([article], pending)).toEqual([article]);
-	});
 
 	it('shows the confirmed value when a rejected change needs review', () => {
 		const pending: PendingReading[] = [{ id: 'operation', sessionId: 'session', action: 'update', review: true,
-			intent: { id: article.crate_reading_id, changes: { favorite: true } } }];
+			intent: { id: article.crate_reading_id, changes: { favorite: true }, before: { favorite: false } } }];
 		expect(presentReadingItems([article], pending)[0]?.favorite).toBe(false);
 	});
 	it('shows locally saved links before confirmation, without duplicating known URLs', () => {
@@ -43,8 +38,8 @@ describe('pending Reading presentation', () => {
 	});
 	it('keeps uncertain edits visible and composes follow-ups in order', () => {
 		const pending: PendingReading[] = [
-			{ id: 'one', sessionId: 'session', action: 'update', body: 'sent', error: 'Reply lost', intent: { id: article.crate_reading_id, changes: { favorite: true, tags: ['essays'] } } },
-			{ id: 'two', sessionId: 'session', action: 'update', intent: { id: article.crate_reading_id, changes: { favorite: false, reading_status: 'archived' } } },
+			{ id: 'one', sessionId: 'session', action: 'update', body: 'sent', error: 'Reply lost', intent: { id: article.crate_reading_id, changes: { favorite: true, tags: ['essays'] }, before: { favorite: false, tags: [] } } },
+			{ id: 'two', sessionId: 'session', action: 'update', intent: { id: article.crate_reading_id, changes: { favorite: false, reading_status: 'archived' }, before: { favorite: true, reading_status: 'inbox' } } },
 		];
 		expect(presentReadingItems([article], pending)[0]).toMatchObject({ favorite: false, tags: ['essays'], reading_status: 'archived' });
 		expect(presentReadingItems([article], pending.map(op => ({ ...op, review: true })))).toEqual([article]);

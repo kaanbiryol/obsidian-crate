@@ -1,9 +1,10 @@
+import type { PendingReading } from './outbox';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { readingRequest } from './api';
-import { assertReadingSession, readingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache, type PendingReading } from './storage';
+import { assertReadingSession, readingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
 import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './article-history';
 

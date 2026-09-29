@@ -1,7 +1,7 @@
 import React from 'react';
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import { PwaSyncStatusIndicator } from '../components/PwaSyncStatusIndicator';
-import type { PendingReading } from './storage';
+import type { PendingReading } from './outbox';
 
 interface ReadingSyncIndicatorProps {
 	pending: PendingReading[];

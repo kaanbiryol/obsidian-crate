@@ -1,28 +1,35 @@
+import { drainReading, readingRetryAt, type ReadingRetryMode } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PWA_AUTH_CHANGED_EVENT } from '../config';
-import { connectReadingFromReminders, drainReading, loadReading } from './api';
+import { connectReadingFromReminders, loadReading } from './api';
 import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, type ReadingCache, type ReadingSession } from './storage';
 import type { useReadingSession } from './useReadingSession';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
-export function useReadingSync({ session, ready, pending, setCache, setPending, setError, alive, run, resetSession }: ReturnType<typeof useReadingSession>) {
+export function useReadingSync({ session, ready, pending, setCache, setPending, setError, alive, run, resetSession }: Pick<ReturnType<typeof useReadingSession>,
+  'session' | 'ready' | 'pending' | 'setCache' | 'setPending' | 'setError' | 'alive' | 'run' | 'resetSession'>) {
   const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
-  const refreshing = useRef(false), refreshQueued = useRef<ReadingSession | null>(null);
+  const refreshing = useRef(false), refreshQueued = useRef<{ session: ReadingSession; mode: ReadingRetryMode } | null>(null);
   useEffect(() => {
     const changed = () => { setIsOffline(!navigator.onLine); setSyncedSession(null); };
     window.addEventListener('online', changed); window.addEventListener('offline', changed);
     return () => { window.removeEventListener('online', changed); window.removeEventListener('offline', changed); };
   }, []);
-  const refresh = useCallback(async (current = session) => {
+  const refresh = useCallback(async (current = session, mode: ReadingRetryMode = 'automatic') => {
     if (!current) return;
-    if (refreshing.current) { refreshQueued.current = current; return; }
+    if (refreshing.current) {
+      const queued = refreshQueued.current;
+      const sameSession = queued?.session.id === current.id && queued.session.token === current.token && queued.session.generation === current.generation;
+      refreshQueued.current = { session: current, mode: sameSession && queued.mode === 'manual' ? 'manual' : mode };
+      return;
+    }
     refreshing.current = true; setSyncing(true); setSyncedSession(null);
     try {
       let data: ReadingCache | undefined;
       let completed = false;
       try {
-        const confirmed = await drainReading(current);
+        const confirmed = await drainReading(current, mode);
         data = navigator.onLine ? confirmed ?? await loadReading(current) : await readReadingCache(current);
         completed = true;
       } finally {
@@ -47,11 +54,11 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
       refreshQueued.current = null;
       if (queued && alive.current) {
         const latest = readingSession();
-        if (latest?.id === queued.id && latest.token === queued.token && latest.generation === queued.generation) void run(() => refresh(queued));
+        if (latest?.id === queued.session.id && latest.token === queued.session.token && latest.generation === queued.session.generation) void run(() => refresh(queued.session, queued.mode));
       }
     }
   }, [session, run, alive, setCache, setPending, setError]);
-  const retryAt = Math.min(...pending.filter(op => op.error && !op.review && (op.attempts ?? 0) < 3 && op.retryAt !== undefined).map(op => op.retryAt!));
+  const retryAt = Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity));
   useEffect(() => {
     if (!session || !ready || isOffline || !Number.isFinite(retryAt)) return;
     // Match Reminders' short, bounded retries for interrupted requests. Their
@@ -78,5 +85,6 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
     window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
     return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
   }, [session, ready, refresh, run, resetSession]);
-  return { refresh, syncing, syncedSession, isOffline };
+  const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
+  return { refresh, refreshManually, syncing, syncedSession, isOffline };
 }

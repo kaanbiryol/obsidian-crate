@@ -2,9 +2,9 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ReadingSyncIndicator } from './ReadingSyncIndicator';
-import type { PendingReading } from './storage';
+import type { PendingReading } from './outbox';
 
-const change: PendingReading = { id: 'change', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { favorite: true } } };
+const change: PendingReading = { id: 'change', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } };
 function render(props: Partial<React.ComponentProps<typeof ReadingSyncIndicator>> = {}) {
 	return renderToStaticMarkup(React.createElement(ReadingSyncIndicator, {
 		pending: [], isOffline: false, loading: false, refreshing: false, confirmed: true,

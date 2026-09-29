@@ -25,7 +25,7 @@ async function pending(page) {
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading optimistic actions ${name}`, { timeout: 120000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-reading-optimistic-'));
-  let runtime, server, browser, held, loseCaptureReply = false;
+  let runtime, server, browser, held, loseCaptureReply = false, loseUpdateReplies = false, listResponses = 0;
   const releases = [], requests = [];
   const hold = path => {
     const started = Promise.withResolvers(), release = Promise.withResolvers();
@@ -48,6 +48,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
           loseCaptureReply = false;
           res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Save acknowledgement interrupted' })); return;
         }
+        if (req.url === '/reading/update' && loseUpdateReplies) {
+          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Update acknowledgement interrupted' })); return;
+        }
+        if (req.url.startsWith('/reading/list')) listResponses++;
         res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
       } catch { if (!res.headersSent) res.writeHead(500); res.end(); }
     });
@@ -237,6 +241,41 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
     await expect(sync).toHaveAttribute('data-sync-state', 'synced', { timeout: 10000 });
     await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
+
+    // Persisted retry limits survive background events and reload. A manual
+    // refresh resends the exact receipt bytes after the automatic budget stops.
+    await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
+    await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+    loseUpdateReplies = true;
+    const beforeRetry = requests.filter(req => req.path === '/reading/update').length;
+    await setTags('retry-budget');
+    await expect.poll(async () => (await pending(page))[0]?.attempts, { timeout: 15000 }).toBe(3);
+    const exactRetryBody = (await pending(page))[0].body;
+    let refreshed = listResponses;
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('online'));
+      window.dispatchEvent(new Event('storage'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => listResponses).toBeGreaterThan(refreshed);
+    assert.equal(requests.filter(req => req.path === '/reading/update').length, beforeRetry + 3);
+    await back();
+    refreshed = listResponses;
+    await page.reload();
+    await expect.poll(() => listResponses).toBeGreaterThan(refreshed);
+    assert.equal(requests.filter(req => req.path === '/reading/update').length, beforeRetry + 3);
+    loseUpdateReplies = false;
+    await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Refresh all', exact: true }).click();
+    await expect.poll(async () => (await pending(page)).length).toBe(0);
+    const retried = requests.filter(req => req.path === '/reading/update').slice(beforeRetry);
+    assert.equal(retried.length, 4);
+    assert.ok(retried.every(req => req.body === exactRetryBody));
+    await page.getByRole('button', { name: 'Close settings', exact: true }).click();
+    await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
+    await setTags('offline');
+    await expect.poll(async () => (await pending(page)).length).toBe(0);
+    await back();
 
     // A real compare-and-swap conflict rolls back optimistic dependents, retaining their bytes.
     await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();

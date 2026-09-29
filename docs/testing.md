@@ -13,7 +13,13 @@ Reading persists changes locally before updating the UI and sends them in the
 background, like Reminders. Unsent edits combine while preserving their original
 preconditions; edits made during a request queue behind its immutable request body.
 Interrupted requests get the same short, bounded retries as Reminders, using those
-exact bytes and their original operation identity.
+exact bytes and their original operation identity. Automatic retry limits survive
+foreground events and reload; **Settings → Sync and device → Refresh all** can
+retry uncertain changes explicitly. The browser test covers this against real
+server receipts, including repeated lost acknowledgements.
+`useReadingSession.test.ts` and `useReadingSync.test.ts` use real React effects and
+rerenders. `useLocalReadingArticle.test.ts` covers competing opens, Back, library
+replacement, unmount and late update completions.
 Rejected edits and their dependents remain available for export in settings.
 New links appear immediately; editing them becomes available when extraction finishes and the server
 publishes their Markdown note. Article extraction still requires a connection.

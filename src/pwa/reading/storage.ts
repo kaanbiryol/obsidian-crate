@@ -1,3 +1,4 @@
+import type { PendingReading } from './outbox';
 import { isPendingReading, isReadingArticleCache, isReadingCache, isReadingDraft, isReadingSession } from './storage-validation';
 import { downloadJson } from '../download';
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
@@ -5,7 +6,6 @@ import type { ReadingItem } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 export const READING_SESSION_KEY = 'crate-reading-session-v1';
 export interface ReadingSession { token: string; id: string; folderPath: string; generation: string; expiresAt: number; source?: 'reminders' }
-export interface PendingReading { id: string; sessionId: string; action: 'capture' | 'update' | 'retry'; intent: Record<string, unknown>; queuedAt?: string; body?: string; error?: string; review?: boolean; attempts?: number; retryAt?: number }
 export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number }
 interface ReadingDatabase extends DBSchema { values: { key: string; value: unknown } }
 let opening: Promise<IDBPDatabase<ReadingDatabase>> | undefined;

@@ -1,92 +1,130 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderHook } from '../../test/react-hooks';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY, PWA_LOGOUT_KEY } from '../config';
-import { READING_SESSION_KEY, readReadingCache, type ReadingSession } from './storage';
+import { READING_SESSION_KEY, readReadingCache, readReadingDraft, writeValue, type ReadingSession } from './storage';
+import { connectReadingFromReminders } from './api';
 import { invalidatePwaSession } from '../session-generation';
 
-const hooks = vi.hoisted(() => ({ effects: [] as Array<() => (() => void) | undefined>, setters: [] as Array<ReturnType<typeof vi.fn>> }));
-vi.mock('react', () => ({
-  useCallback: (fn: unknown) => fn,
-  useRef: (current: unknown) => ({ current }),
-  useState: (initial: unknown) => { const setter = vi.fn(); hooks.setters.push(setter); return [initial, setter]; },
-  useEffect: (effect: () => (() => void) | undefined) => { hooks.effects.push(effect); },
-}));
 vi.mock('../api', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
+vi.mock('./api', async importOriginal => ({
+  ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),
+}));
 vi.mock('./storage', async importOriginal => ({
   ...await importOriginal<typeof import('./storage')>(),
   readReadingCache: vi.fn(async () => undefined), pendingReading: vi.fn(async () => []),
   readReadingDraft: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
+  writeValue: vi.fn(async () => {}),
 }));
 
 const session: ReadingSession = { token: 'enrolled-token', id: 'enrolled-session', folderPath: 'Reading', generation: 'one', expiresAt: 1 };
 const replacement = { ...session, token: 'replacement-token', id: 'replacement-session' };
 const values = new Map<string, string>();
 const network = vi.fn<typeof fetch>();
-
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
 beforeEach(() => {
-  values.clear(); hooks.effects = []; hooks.setters = []; vi.clearAllMocks(); network.mockReset();
+  values.clear(); vi.clearAllMocks(); network.mockReset();
   vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
-  vi.stubGlobal('document', { querySelector: () => null, cookie: '' });
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
   vi.stubGlobal('navigator', { onLine: true });
   vi.stubGlobal('location', { hash: '#reading=grant', href: 'https://example.test/notifications?section=reading#reading=grant' });
   vi.stubGlobal('history', { replaceState: vi.fn() });
   vi.stubGlobal('fetch', network);
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-
+function renderSession() {
+  return renderHook(useReadingSession, () => {
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) });
+    document.cookie = '';
+  });
+}
 function start() {
-  let release!: (value: Response) => void;
-  network.mockImplementationOnce(() => new Promise<Response>(resolve => { release = resolve; }))
-    .mockResolvedValue(new Response(null, { status: 204 }));
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- Exercise the real hook with controlled React effects.
-  const hook = useReadingSession();
-  const cleanup = hooks.effects[0]!()!;
-  return { hook, cleanup, release, ready: () => expect(hooks.setters[1]).toHaveBeenCalledWith(true) };
+  const exchange = deferred<Response>();
+  network.mockImplementationOnce(() => exchange.promise).mockResolvedValue(new Response(null, { status: 204 }));
+  return { rendered: renderSession(), release: exchange.resolve };
 }
 
 describe('Reading enrollment authority', () => {
-  it('persists a current enrollment before hydrating its data', async () => {
+  it('persists enrollment, hydrates a saved draft, and saves edits after rerender', async () => {
+    vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/article' });
     const h = start();
-    h.release(new Response(JSON.stringify({ ...session, installToken: 'install-token' })));
-    await vi.waitFor(h.ready);
+    await act(async () => { h.release(new Response(JSON.stringify({ ...session, installToken: 'install-token' }))); });
     expect(JSON.parse(localStorage.getItem(READING_SESSION_KEY)!)).toEqual(session);
-    expect(hooks.setters[0]).toHaveBeenCalledWith(session);
+    expect(h.rendered.current).toMatchObject({ ready: true, session, adding: true, url: 'https://saved.example/article' });
     expect(document.cookie).toContain('crate-reading-install=install-token');
     expect(network).toHaveBeenCalledOnce();
-    h.cleanup();
+    await act(async () => h.rendered.current.setUrl('https://edited.example/article'));
+    expect(writeValue).toHaveBeenLastCalledWith(`draft:${session.id}`, { url: 'https://edited.example/article' }, session);
   });
 
   it.each(['peer logout', 'local logout', 'replacement reading session', 'replacement reminders session', 'reset', 'unmount'] as const)(
     'discards a delayed grant after %s', async change => {
       const h = start();
-      if (change === 'peer logout') localStorage.setItem(PWA_LOGOUT_KEY, 'logout');
-      if (change === 'local logout') invalidatePwaSession();
-      if (change === 'replacement reading session') localStorage.setItem(READING_SESSION_KEY, JSON.stringify(replacement));
-      if (change === 'replacement reminders session') localStorage.setItem(AUTH_TOKEN_KEY, 'replacement-reminders');
-      if (change === 'reset') h.hook.resetSession();
-      if (change === 'unmount') h.cleanup();
-      h.release(new Response(JSON.stringify({ ...session, installToken: 'obsolete-install-token' })));
-      await vi.waitFor(() => expect(network.mock.calls.some(([path]) => path === '/auth/session')).toBe(true));
+      await act(async () => {
+        if (change === 'peer logout') localStorage.setItem(PWA_LOGOUT_KEY, 'logout');
+        if (change === 'local logout') invalidatePwaSession();
+        if (change === 'replacement reading session') localStorage.setItem(READING_SESSION_KEY, JSON.stringify(replacement));
+        if (change === 'replacement reminders session') localStorage.setItem(AUTH_TOKEN_KEY, 'replacement-reminders');
+        if (change === 'reset') h.rendered.current.resetSession();
+      });
+      if (change === 'unmount') h.rendered.unmount();
+      await act(async () => { h.release(new Response(JSON.stringify({ ...session, installToken: 'obsolete-install-token' }))); });
       const revocation = network.mock.calls.find(([path]) => path === '/auth/session')![1]!;
       expect(revocation.method).toBe('DELETE');
       expect(new Headers(revocation.headers).get('Authorization')).toBe(`Bearer ${session.token}`);
-      if (change !== 'unmount') await vi.waitFor(h.ready);
+      if (change !== 'unmount') expect(h.rendered.current.ready).toBe(true);
       expect(localStorage.getItem(READING_SESSION_KEY)).toBe(change === 'replacement reading session' ? JSON.stringify(replacement) : null);
       expect(readReadingCache).not.toHaveBeenCalled();
-      expect(hooks.setters[0]).not.toHaveBeenCalledWith(session);
+      expect(h.rendered.current.session).toBeNull();
       expect(document.cookie).not.toContain('obsolete-install-token');
-      h.cleanup();
     },
   );
 
   it('ignores a late enrollment failure after logout', async () => {
     const h = start();
     localStorage.setItem(PWA_LOGOUT_KEY, 'logout');
-    h.release(new Response(JSON.stringify({ error: 'Expired grant' }), { status: 401 }));
-    await vi.waitFor(h.ready);
-    expect(hooks.setters[5]).not.toHaveBeenCalled();
+    await act(async () => { h.release(new Response(JSON.stringify({ error: 'Expired grant' }), { status: 401 })); });
+    expect(h.rendered.current).toMatchObject({ ready: true, session: null, error: null });
     expect(localStorage.getItem(READING_SESSION_KEY)).toBeNull();
-    h.cleanup();
+  });
+
+  it('fences delayed hydration after reset and preserves an unreadable draft', async () => {
+    const cache = deferred<undefined>();
+    vi.mocked(readReadingCache).mockReturnValueOnce(cache.promise);
+    const h = start();
+    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    await act(async () => h.rendered.current.resetSession());
+    await act(async () => { cache.resolve(undefined); });
+    expect(h.rendered.current.session).toBeNull();
+    expect(writeValue).not.toHaveBeenCalled();
+    h.rendered.unmount();
+
+    vi.mocked(readReadingDraft).mockRejectedValueOnce(new Error('Saved draft needs recovery'));
+    const damaged = start();
+    await act(async () => { damaged.release(new Response(JSON.stringify(session))); });
+    expect(damaged.rendered.current).toMatchObject({ session, recovery: true, error: 'Saved draft needs recovery' });
+    expect(writeValue).not.toHaveBeenCalled();
+  });
+
+  it('removes connection listeners after enrollment and on unmount', async () => {
+    vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading' });
+    localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
+    const rendered = renderSession();
+    await act(async () => {});
+    expect(connectReadingFromReminders).toHaveBeenCalledOnce();
+    vi.mocked(connectReadingFromReminders).mockImplementationOnce(async () => {
+      localStorage.setItem(READING_SESSION_KEY, JSON.stringify(session)); return session;
+    });
+    await act(async () => window.dispatchEvent(new window.Event('online')));
+    expect(rendered.current.session).toEqual(session);
+    vi.mocked(connectReadingFromReminders).mockClear();
+    await act(async () => window.dispatchEvent(new window.Event('online')));
+    expect(connectReadingFromReminders).not.toHaveBeenCalled();
+    rendered.unmount();
+    window.dispatchEvent(new window.Event('online'));
+    expect(connectReadingFromReminders).not.toHaveBeenCalled();
   });
 });
