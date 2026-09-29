@@ -58,6 +58,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(enrollment.url);
     const open = async () => {
       await page.getByRole('button', { name: /example.invalid Highlight article/ }).click();
+      await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
+      await expect(page).toHaveURL(new RegExp(`item=${saved.id}`));
       await expect(page.locator('.crate-reading-reader__body')).toContainText('A useful article excerpt.');
       await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     };
@@ -247,7 +249,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(marks).toHaveCount(0);
     await select();
     await expect(marks).toHaveCount(3);
+    // Hold the history traversal after the close animation. The revealed library
+    // must not accept an article tap that the delayed popstate would then close.
+    await page.evaluate(() => {
+      const back = history.back.bind(history);
+      history.back = () => { window.__finishReadingBack = () => { history.back = back; back(); }; };
+    });
     await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => Boolean(window.__finishReadingBack));
+    await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert');
+    await page.evaluate(() => window.__finishReadingBack());
+    await expect(page.locator('.crate-reading__library')).not.toHaveAttribute('inert');
     await open();
     await expect(marks).toHaveCount(3);
     if (name === 'chromium') { await page.reload(); await expect(marks).toHaveCount(3); }
