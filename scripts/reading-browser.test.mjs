@@ -608,9 +608,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal(new URL(page.url()).searchParams.has('item'), false);
     await assertArticleStaysDismissed(page, articleHistoryLength);
     // Direct links and reloads still open an article; closing them removes Forward too.
+    await page.waitForLoadState('networkidle');
     await page.goto(articleUrl);
     await page.getByText('Available offline',{exact:true}).waitFor();
     await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-motion','none');
+    await page.waitForLoadState('networkidle');
     await page.reload();
     await page.getByText('Available offline',{exact:true}).waitFor();
     const deepLinkHistoryLength = await page.evaluate(() => history.length);
@@ -733,8 +735,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // An enrolled Reminders PWA opens Reading even when article fetching is off.
     await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
     const remindersEnrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+    const remindersLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/reminders/list');
     await page.goto(`${origin}/notifications?browserToken=${remindersEnrollment.browserToken}`);
     await page.waitForFunction(() => !!localStorage.getItem('crate-reminders-auth-token'));
+    // Token persistence precedes bootstrap. This transition tests Reading access,
+    // not cancellation of the new document's initial Reminders request.
+    await (await remindersLoaded).finished();
+    await page.waitForLoadState('networkidle');
     await page.goto(`${origin}/notifications?section=reading`);
     await page.getByRole('searchbox', { name: 'Search reading' }).waitFor();
     await runtime.db.prepare('UPDATE reading_policy SET enabled=1').run();
@@ -758,7 +765,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')), null);
     assert.equal((await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status, 401);
     assert.deepEqual(errors,[]);
-  } catch (error) { await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
+  } catch (error) { console.error('Reading failure assertion:', error); await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
 });
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: single-screen layout at every width`, { timeout: 60000 }, async () => {

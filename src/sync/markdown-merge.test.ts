@@ -11,6 +11,55 @@ function fromArrayBuffer(buffer: ArrayBuffer): string {
 
 describe('mergeMarkdownContent', () => {
 	it.each([
+		['title: Note', 'title: Note\ntags: [alpha]', 'title: Note\ntags: [beta]'],
+		['title: Note', 'title: Note\nowner: Alice', 'title: Note\nstatus: done'],
+		['nested:\n  first: 1\n  second: 2', 'nested:\n  first: 3\n  second: 2', 'nested:\n  first: 1\n  second: 4'],
+		['default: &default old\nvalue: *default', 'default: &default local\nvalue: *default', 'default: &default old\nvalue: remote'],
+	])('preserves competing frontmatter as a conflict: %s', (base, local, remote) => {
+		for (const bom of ['', '\uFEFF']) for (const ending of ['\n', '\r\n']) {
+			const document = (header: string) => toArrayBuffer((`${bom}---\n${header}\n---\nBody\n`).replaceAll('\n', ending));
+			for (const [left, right] of [[local, remote], [remote, local]]) {
+				expect(mergeMarkdownContent(document(base), document(left!), document(right!))).toEqual({ success: false, reason: 'overlap' });
+			}
+		}
+	});
+
+	it('preserves an authored header and BOM when merging an independent body change', () => {
+		const base = '\uFEFF---\r\ntitle: Note\r\n---\r\nBody\r\n';
+		const local = base.replace('title: Note', 'title: Changed');
+		const remote = base.replace('Body', 'Edited body');
+		for (const [left, right] of [[local, remote], [remote, local]]) {
+			const result = mergeMarkdownContent(toArrayBuffer(base), toArrayBuffer(left!), toArrayBuffer(right!));
+			expect(result.success).toBe(true);
+			if (result.success) expect(result.text).toBe(local.replace('Body', 'Edited body'));
+		}
+	});
+
+	it.each([
+		['---\ntitle: Note\n---\nBody', 'Body', '---\ntitle: Changed\n---\nBody'],
+		['Body', '---\ntags: [alpha]\n---\nBody', '---\ntags: [beta]\n---\nBody'],
+		['---\ntitle: Note', '---\ntitle: Note\nowner: Alice', '---\ntitle: Note\nowner: Bob'],
+		['```json\n{\n}\n```', '```json\n{\n"key": 1\n}\n```', '```json\n{\n"key": 2\n}\n```'],
+		['~~~yaml\na: 1\nb: 2\n~~~', '~~~yaml\na: 3\nb: 2\n~~~', '~~~yaml\na: 1\nb: 4\n~~~'],
+	])('does not invent combined structured content: %s', (base, local, remote) => {
+		for (const [left, right] of [[local, remote], [remote, local]]) expect(mergeMarkdownContent(toArrayBuffer(base), toArrayBuffer(left!), toArrayBuffer(right!)))
+			.toEqual({ success: false, reason: 'overlap' });
+	});
+
+	it('applies identical frontmatter insertions once', () => {
+		const base = '---\ntitle: Note\n---\nBody\n';
+		const edited = base.replace('title: Note', 'title: Note\ntags: [alpha]');
+		const result = mergeMarkdownContent(toArrayBuffer(base), toArrayBuffer(edited), toArrayBuffer(edited));
+		expect(result.success).toBe(true);
+		if (result.success) expect(result.text).toBe(edited);
+	});
+
+	it.each(['---  ', '  ---', '\t---\t'])('protects frontmatter delimiters accepted by the reminder parser: %s', delimiter => {
+		const base = `${delimiter}\ntitle: Note\n${delimiter}\nBody`;
+		expect(mergeMarkdownContent(toArrayBuffer(base), toArrayBuffer(base.replace('title: Note', 'title: Note\ntags: [a]')),
+			toArrayBuffer(base.replace('title: Note', 'title: Note\ntags: [b]')))).toEqual({ success: false, reason: 'overlap' });
+	});
+	it.each([
 		['I like red apples and green pears.', 'I like ripe apples and green pears.', 'I like red apples and fresh pears.', 'I like ripe apples and fresh pears.'],
 		['Meet Alice on Monday.', 'Meet Bob on Monday.', 'Meet Alice on Tuesday.', 'Meet Bob on Tuesday.'],
 		['Café ☕ opens today.', 'Bistro ☕ opens today.', 'Café ☕ opens tomorrow.', 'Bistro ☕ opens tomorrow.'],

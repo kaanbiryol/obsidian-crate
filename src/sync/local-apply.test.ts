@@ -7,6 +7,7 @@ const decode = (content: ArrayBuffer): string => new TextDecoder('utf-8', { igno
 
 function harness(path: string, initial: ArrayBuffer) {
 	const files = new Map([[path, initial]]);
+	const identities = new Map<string, { path: string; extension: string }>();
 	let beforeProcess = () => {};
 	const process = vi.fn(async (target: string, update: (text: string) => string) => {
 		beforeProcess();
@@ -24,8 +25,11 @@ function harness(path: string, initial: ArrayBuffer) {
 	};
 	const vault = {
 		adapter,
-		getAbstractFileByPath: vi.fn((target: string) => files.has(target) && !target.startsWith('.')
-			? { path: target, extension: target.split('.').pop() } : null),
+		getAbstractFileByPath: vi.fn((target: string) => {
+			if (!files.has(target) || target.startsWith('.')) return null;
+			if (!identities.has(target)) identities.set(target, { path: target, extension: target.split('.').pop() ?? '' });
+			return identities.get(target)!;
+		}),
 		createFolder: vi.fn(async () => {}),
 		createBinary: vi.fn(async (target: string, content: ArrayBuffer) => {
 			if (files.has(target)) throw new Error('File exists');
@@ -38,6 +42,38 @@ function harness(path: string, initial: ArrayBuffer) {
 }
 
 describe('safe local application', () => {
+	it('does not overwrite a hidden incoming copy created at the final write', async () => {
+		const path = '.hidden/image.bin', original = new Uint8Array([255, 1]).buffer;
+		const h = harness(path, original), late = new Uint8Array([255, 3]).buffer;
+		h.vault.createBinary.mockImplementation(async target => {
+			h.files.set(target, late);
+			throw new Error('File exists');
+		});
+		await expect(applyRemoteContentIfUnchanged(h.context, path, new Uint8Array([255, 2]).buffer, await computeHash(original)))
+			.rejects.toThrow('File exists');
+		expect(h.files.get(path)).toEqual(original);
+		expect([...h.files.entries()].filter(([name]) => name !== path).map(([, bytes]) => bytes)).toEqual([late]);
+		expect(h.vault.adapter.writeBinary).not.toHaveBeenCalled();
+	});
+	it.each(['read', 'process'] as const)('does not follow a rename during %s', async stage => {
+		const original = encode('original');
+		const h = harness('note.md', original);
+		const file = h.vault.getAbstractFileByPath('note.md')!;
+		const rename = () => { h.files.delete('note.md'); h.files.set('excluded/note.md', original); file.path = 'excluded/note.md'; };
+		if (stage === 'read') h.vault.adapter.readBinary.mockImplementationOnce(async () => { rename(); return original; });
+		else h.beforeProcess(rename);
+		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await computeHash(original))).status).toBe('deferred');
+		expect(h.files.get('excluded/note.md')).toEqual(original);
+		expect(h.files.has('note.md')).toBe(false);
+	});
+
+	it('rejects a replacement TFile even if its text is identical', async () => {
+		const original = encode('original'), h = harness('note.md', original);
+		h.beforeProcess(() => h.vault.getAbstractFileByPath.mockReturnValue({ path: 'note.md', extension: 'md' }));
+		expect((await applyRemoteContentIfUnchanged(h.context, 'note.md', encode('remote'), await computeHash(original))).status).toBe('deferred');
+		expect(h.files.get('note.md')).toEqual(original);
+	});
+
 	it.each(['notes/note.md', '.hidden/note.md', 'drawing.canvas', 'settings.json', '.hidden/settings.json', '.obsidian/plugins/omnisearch/data.json'])('retains an edit arriving after the hash check: %s', async (path) => {
 		const original = encode('original');
 		const h = harness(path, original);

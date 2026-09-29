@@ -16,6 +16,7 @@ export default defineConfig({
 		},
 	},
 	test: {
+		setupFiles: ['./src/test/setup-byte-equality.ts'],
 		include: ['src/cloudflare/worker/**/*.integration.ts'],
 	},
 });

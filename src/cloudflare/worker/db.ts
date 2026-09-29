@@ -13,13 +13,11 @@ export function changedRows(result: unknown): number {
 }
 
 export async function pruneChangelog(db: D1Database): Promise<void> {
-	try {
-		await db.prepare(
+	await db.prepare(
 			`DELETE FROM changelog
 			WHERE created_at < datetime('now', '-' || ? || ' days')
 			AND seq < (SELECT MAX(seq) FROM changelog)`,
-		).bind(CHANGELOG_RETENTION_DAYS).run();
-	} catch { /* non-fatal */ }
+	).bind(CHANGELOG_RETENTION_DAYS).run();
 }
 
 export async function queryRows<T = Record<string, unknown>>(statement: D1PreparedStatement): Promise<T[]> {

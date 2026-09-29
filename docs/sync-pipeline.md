@@ -90,8 +90,11 @@ same-point insertions merge deterministically, so devices that see the two sides
 in opposite order still produce identical bytes. When both sides replace the
 same aligned prose lines, a bounded word-level merge also combines edits to
 different words within a paragraph. Competing changes to the same word or
-different insertions at the same word boundary remain conflicts. Frontmatter,
-fenced code, and indented code retain the line-level policy. Inline refinement
+different insertions at the same word boundary remain conflicts. Frontmatter is
+atomic: competing header edits preserve a conflict, even when they touch different
+keys. The merged header must match one authored input. Competing edits inside
+one fenced block also remain conflicts. Indented code retains the line-level
+policy. Inline refinement
 is limited to 16,000 combined characters per line and 128,000 per merge.
 
 Line and word changes are computed with jsdiff. Each comparison permits at most
@@ -158,13 +161,15 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 
 ## Constants
 
+Release and transfer values are also checked against source in [current contract](current-contract.md).
+
 | Constant | Value | Location |
 |---|---|---|
 | `debounceDelay` default | 5 seconds | `types.ts` |
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
-| `BATCH_UPLOAD_MAX_FILES` | 6 | `protocol/sync-limits.ts` |
-| `BATCH_DELETE_MAX_FILES` | 6 | `protocol/sync-limits.ts` |
+| `BATCH_UPLOAD_MAX_FILES` | 3 | `protocol/sync-limits.ts` |
+| `BATCH_DELETE_MAX_FILES` | 4 | `protocol/sync-limits.ts` |
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
@@ -173,7 +178,7 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 | `FORCE_SYNC_CONCURRENCY` | 2 | `engine.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `engine-constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer-budget.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 1 | `engine-constants.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine-constants.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 

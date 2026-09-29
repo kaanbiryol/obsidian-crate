@@ -255,7 +255,7 @@ describe('createConflictCopy', () => {
 		vi.useRealTimers();
 	});
 
-	it('writes hidden conflict copies through adapter', async () => {
+	it('creates hidden conflict copies without an overwriting adapter write', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
@@ -277,8 +277,8 @@ describe('createConflictCopy', () => {
 
 		expect(path).toMatch(/^[.]vault-config\/config \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.json$/);
 		expect(mkdir).toHaveBeenCalledWith(CONFIG_DIR);
-		expect(writeBinary).toHaveBeenCalledWith(path, content);
-		expect(createBinary).not.toHaveBeenCalled();
+		expect(createBinary).toHaveBeenCalledWith(path, content);
+		expect(writeBinary).not.toHaveBeenCalled();
 	});
 
 	it('writes regular conflict copies through vault API', async () => {

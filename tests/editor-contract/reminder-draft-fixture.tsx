@@ -1,3 +1,5 @@
+import { ReminderEditorScreen } from '@/pwa/components/ReminderEditorScreen';
+import type { ModalState } from '@/pwa/types';
 import React, { useRef, useState } from 'react';
 import type { Reminder } from '@/reminders/types';
 import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
@@ -60,5 +62,27 @@ export function ReminderDraftFixture() {
     }}>Save</button>
     <output data-testid="draft">{JSON.stringify({ content: draft.content, dueDate: draft.dueDate, hasTime: draft.hasTime, recurrence: draft.recurrence })}</output>
     <output data-testid="saved">{saved}</output>
+  </main>;
+}
+
+/** Keep presentation open after acceptance to exercise delayed submission callbacks. */
+export function PwaSaveFixture() {
+  const [modal, setModal] = useState<ModalState>(() => ({ mode: 'create', operationId: crypto.randomUUID(),
+    draft: { content: 'One logical save', description: '', project: 'Inbox', defaultProject: 'Inbox',
+      priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } }));
+  const attempts = useRef(0);
+  const [result, setResult] = useState({ attempts: 0, accepted: false });
+  return <main className="crate-reminders-ui reminders-shadow-root">
+    <ReminderEditorScreen modal={modal} colorScheme="light" projectOptions={['Inbox']} saving={false}
+      isClosing={false} isActive isReturningToEditor={false} canInteract keyboardInset={0}
+      onPatchDraft={patch => setModal(current => ({ ...current, draft: { ...current.draft, ...patch } }))}
+      onOpenPicker={() => {}} onDeleteConfirmationChange={() => {}} onClose={() => {}}
+      onSave={async () => {
+        attempts.current++;
+        const accepted = !(new URLSearchParams(location.search).has('failFirst') && attempts.current === 1);
+        setResult({ attempts: attempts.current, accepted });
+        return accepted;
+      }} />
+    <output data-testid="save-result">{JSON.stringify(result)}</output>
   </main>;
 }

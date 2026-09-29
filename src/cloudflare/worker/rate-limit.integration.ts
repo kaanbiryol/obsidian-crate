@@ -68,3 +68,61 @@ it('edge keys separate senders without placing raw addresses in the key', async 
 	expect(edge.limit.mock.calls[0]).not.toEqual(edge.limit.mock.calls[1]);
 	expect(JSON.stringify(edge.limit.mock.calls)).not.toContain('192.0.2.');
 });
+
+it.each(['/sync/manifest', '/sync/changes', '/reminders/list', '/reading/list', '/features', '/diagnostics', '/notifications/vapid-public-key'])('denies %s before D1 or Durable Objects', async path => {
+	const prepare = vi.spyOn(env.DB, 'prepare');
+	const get = vi.fn(() => { throw new Error('Coordinator must not be reached'); });
+	const response = await worker.fetch(new Request(`https://denied.test${path}`, { headers: { Authorization: 'Bearer invalid' } }), {
+		...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: false }) }, REMINDER_ALARMS: { ...env.REMINDER_ALARMS, get },
+	});
+	expect(response.status).toBe(429);
+	expect(response.headers.get('Retry-After')).toBe('60');
+	expect(prepare).not.toHaveBeenCalled();
+	expect(get).not.toHaveBeenCalled();
+});
+
+it('keeps fallback budgets across real request-local metering wrappers and rotating bearers', async () => {
+	const statuses = [];
+	for (let index = 0; index < 80; index++) statuses.push((await worker.fetch(new Request('https://fallback.test/sync/manifest', {
+		headers: { Authorization: `Bearer invalid-${index}` },
+	}), { ...env, NOTIFICATION_REQUEST_LIMITER: undefined })).status);
+	expect(statuses.slice(0, 60)).toEqual(Array(60).fill(401));
+	expect(statuses.slice(60)).toEqual(Array(20).fill(429));
+	const prepare = vi.spyOn(env.DB, 'prepare');
+	expect((await worker.fetch(new Request('https://fallback.test/features'), { ...env, NOTIFICATION_REQUEST_LIMITER: undefined })).status).toBe(429);
+	expect(prepare).not.toHaveBeenCalled();
+});
+
+it('authenticates ordinary Reading routes before invoking the coordinator', async () => {
+	const get = vi.fn(() => { throw new Error('Coordinator must not be reached'); });
+	for (const path of ['/features', '/reading/list', '/reading/item']) {
+		const response = await worker.fetch(new Request(`https://auth-first.test${path}`, { headers: { Authorization: 'Bearer invalid' } }), {
+			...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) }, REMINDER_ALARMS: { ...env.REMINDER_ALARMS, get },
+		});
+		expect(response.status).toBe(401);
+	}
+	expect(get).not.toHaveBeenCalled();
+});
+
+it('rejects unknown routes and methods before protocol checks, authentication, or admission', async () => {
+	const prepare = vi.spyOn(env.DB, 'prepare');
+	const limit = vi.fn(async () => ({ success: false }));
+	for (const [method, path] of [['GET', '/sync/invented'], ['POST', '/reading/invented'], ['PATCH', '/features'], ['POST', '/health']]) {
+		const response = await worker.fetch(new Request(`https://unknown.test${path}`, { method, headers: { Authorization: 'Bearer invalid' } }), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit } });
+		expect(response.status).toBe(404);
+	}
+	expect(prepare).not.toHaveBeenCalled();
+	expect(limit).not.toHaveBeenCalled();
+});
+
+it('separates authenticated sync traffic and still honors immediate token revocation', async () => {
+	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('bootstrap-owner',?,'vault')").bind(await sha256Hex('bootstrap-owner')).run();
+	const limit = vi.fn(async () => ({ success: true }));
+	const attempt = () => worker.fetch(new Request('https://bootstrap.test/health', { headers: { Authorization: 'Bearer bootstrap-owner' } }), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit } });
+	for (let index = 0; index < 100; index++) expect((await attempt()).status).toBe(200);
+	expect(limit).toHaveBeenCalledTimes(1);
+	await env.DB.prepare("DELETE FROM auth_tokens WHERE id='bootstrap-owner'").run();
+	expect((await attempt()).status).toBe(401);
+	expect((await attempt()).status).toBe(401);
+	expect(limit).toHaveBeenCalledTimes(2);
+});

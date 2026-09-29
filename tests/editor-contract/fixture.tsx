@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { replaceReminderProject, toReminderCursorOffset } from '@/reminders/utils/reminderEditorEdits';
 import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
-import { ReminderDraftFixture, ReminderModalFixture } from './reminder-draft-fixture';
+import { ReminderDraftFixture, ReminderModalFixture, PwaSaveFixture } from './reminder-draft-fixture';
 import css from '@/styles/main.scss?inline';
 
 const params = new URLSearchParams(location.search);
@@ -62,4 +62,5 @@ style.textContent = css + `
 const mount = document.createElement('div');
 root.append(style, mount);
 createRoot(mount).render(params.get('fixture') === 'modal' ? <ReminderModalFixture />
+  : params.get('fixture') === 'pwa-save' ? <PwaSaveFixture />
   : params.get('fixture') === 'draft' ? <ReminderDraftFixture /> : <Fixture />);

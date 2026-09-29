@@ -39,6 +39,20 @@ async function harness(initial: Record<string, ArrayBuffer>, server: Record<stri
 }
 
 describe('pending discard', () => {
+    it.each(['.hidden/image.bin', '.obsidian/app.json'])('keeps recreation at the final hidden-file create: %s', async path => {
+        const h = await harness({}, { [path]: bytes('server') });
+        const review = await createPendingDiscard(h.context, [path]);
+        const create = h.vault.createBinary.getMockImplementation()!;
+        h.vault.createBinary.mockImplementation(async (target, content) => {
+            h.files.set(target, bytes('concurrent recreation'));
+            return create(target, content);
+        });
+        await expect(review.discard()).rejects.toThrow('File exists');
+        expect(h.files.get(path)).toEqual(bytes('concurrent recreation'));
+        expect(h.applied).not.toHaveBeenCalled();
+        expect(h.adapter.writeBinary).not.toHaveBeenCalled();
+    });
+
     it('prepares actions without changing files and excludes unchanged content', async () => {
         const h = await harness({ 'new.md': bytes('new'), 'same.md': bytes('same'), 'edit.md': bytes('edit') }, { 'same.md': bytes('same'), 'edit.md': bytes('server'), 'deleted.md': bytes('restore') });
         const review = await createPendingDiscard(h.context, ['new.md', 'same.md', 'edit.md', 'delete:deleted.md']);

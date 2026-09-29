@@ -118,6 +118,7 @@ try {
 			await switchFeature(page, 'Reading');
 			await page.getByRole('searchbox', { name: 'Search reading' }).fill('retained query');
 			await checkCompoundFocus(page, page.getByRole('searchbox', { name: 'Search reading' }), page.locator('.crate-feature-panel[data-active="true"] .crate-field--search .crate-field__control'));
+			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');
 			await gear.click();
 			await checkSettingsFocus(page, sheet);
 			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveValue('17');
@@ -203,6 +204,7 @@ try {
 			await expectTheme(page, 'dark', 'dark');
 
 			// The saved opening preference must select Reading before its first mount.
+			await page.waitForLoadState('networkidle');
 			const readingLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/reading/list');
 			await page.goto(origin + '/notifications');
 			await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');

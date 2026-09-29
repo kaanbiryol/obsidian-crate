@@ -7,6 +7,8 @@ export interface RichTextInputHandle {
     blur: () => void;
     /** Get the underlying DOM element */
     getElement: () => HTMLDivElement | null;
+    /** Commit pending editor updates and read the current Markdown for saving. */
+    getValue: () => string;
     /** Select all editable content */
     selectAll: () => void;
     /** Set a pending cursor position to be applied on next content update */

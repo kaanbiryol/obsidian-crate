@@ -2,6 +2,10 @@ import { expect } from '@playwright/test';
 
 export async function checkCompoundFocus(page, control, wrapper) {
 	const textEntry = await control.evaluate(element => element.tagName === 'INPUT' || element.tagName === 'TEXTAREA');
+	// Callers may have just filled the field. Measure an unfocused baseline,
+	// otherwise a focused border can be compared with itself.
+	await control.evaluate(element => element.blur());
+	await expect.poll(() => wrapper.evaluate(element => element.matches(':focus-within'))).toBe(false);
 	const restingBorder = await wrapper.evaluate(element => getComputedStyle(element).borderColor);
 	await control.tap();
 	if (await control.evaluate(element => element.tagName === 'SELECT')) {

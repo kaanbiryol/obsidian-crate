@@ -10,8 +10,7 @@ import {
 const log = createLogger('AddReminderModal');
 
 interface UseReminderModalActionsOptions {
-	content: string;
-	description: string;
+	readEditor: () => { content: string; description: string };
 	projects: string[];
 	priority: Priority;
 	project: string;
@@ -27,8 +26,7 @@ interface UseReminderModalActionsOptions {
 }
 
 export function useReminderModalActions({
-	content,
-	description,
+	readEditor,
 	projects,
 	priority,
 	project,
@@ -53,8 +51,8 @@ export function useReminderModalActions({
 		let submission: ReturnType<typeof buildReminderSubmission>;
 		try {
 			submission = buildReminderSubmission({
-				content,
-				description,
+				// Lexical can commit before React publishes the latest draft render.
+				...readEditor(),
 				projects,
 				priority,
 				project,
@@ -95,8 +93,7 @@ export function useReminderModalActions({
 			},
 		});
 	}, [
-		content,
-		description,
+		readEditor,
 		dueDate,
 		hasTime,
 		isEditing,

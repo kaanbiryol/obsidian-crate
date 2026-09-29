@@ -34,7 +34,7 @@ type ReminderSheetProps = {
 	isClosing: boolean;
 	onClose: () => void;
 	onClosed: () => void;
-	onSave: (modal: ModalState) => void;
+	onSave: (modal: ModalState) => Promise<boolean>;
 	onDelete: (id: string, expectedRevision?: string, filePath?: string) => void;
 };
 

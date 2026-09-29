@@ -16,8 +16,43 @@ async function verify(browser) {
 	await fetch(`${origin}/preview/reset`, { method: 'POST' });
 	const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: true, reducedMotion: 'reduce', viewport: { width: 390, height: 844 } });
 	const page = await context.newPage(); const other = await context.newPage();
-	const errors = []; const attempted = [];
+	const errors = []; const attempted = []; const deliveries = [];
+	const requestDetails = new Map();
+	context.on('request', request => {
+		if (!request.url().endsWith('/reminders/create')) return;
+		const body = request.postDataJSON();
+		const detail = { tab: request.frame().page() === page ? 'main' : 'other',
+			operationId: body.operationId, recordId: body.id,
+			bodyHash: createHash('sha256').update(request.postData() ?? '').digest('hex') };
+		requestDetails.set(request, detail); deliveries.push(detail);
+	});
+	context.on('response', response => { const detail = requestDetails.get(response.request()); if (detail) detail.status = response.status(); });
+	context.on('requestfailed', request => { const detail = requestDetails.get(request); if (detail) detail.failure = request.failure()?.errorText; });
 	for (const tab of [page, other]) tab.on('pageerror', error => errors.push(error.message));
+	const storageTrace = [];
+	if (process.env.CRATE_EXPIRY_TRACE === '1') {
+		await context.exposeBinding('traceOutbox', ({ page: tab }, event) => storageTrace.push({ tab: tab === page ? 'main' : 'other', ...event }));
+		await context.addInitScript(() => {
+			const details = (key, raw) => {
+				if (!key?.startsWith('crate-reminder-outbox:')) return null;
+				const change = raw ? JSON.parse(raw).change : null;
+				return { operationId: key.slice(key.lastIndexOf(':') + 1), status: change?.status, attempts: change?.attempts, error: change?.error };
+			};
+			for (const method of ['setItem', 'removeItem']) {
+				const original = Storage.prototype[method];
+				Storage.prototype[method] = function (key, value) {
+					const result = original.apply(this, arguments);
+					const detail = details(key, value);
+					if (detail) void window.traceOutbox({ event: method, ...detail });
+					return result;
+				};
+			}
+			window.addEventListener('storage', event => {
+				const detail = details(event.key, event.newValue);
+				if (detail) void window.traceOutbox({ event: 'received-storage', ...detail });
+			});
+		});
+	}
 	await page.clock.install({ time: new Date('2099-01-01T12:00:00Z') });
 	await context.route('**/expiry-seed', route => route.fulfill({ body: '<!doctype html><title>Seed</title>', contentType: 'text/html' }));
 	await context.route('**/reminders/create', async route => {
@@ -67,18 +102,44 @@ async function verify(browser) {
 		await page.getByRole('textbox', { name: 'Reminder title', exact: true }).fill('New work after review');
 		await page.getByRole('button', { name: 'Add reminder', exact: true }).click();
 		await page.getByRole('group', { name: 'New work after review. Press Enter to edit reminder.', exact: true }).waitFor();
-		await expect.poll(() => attempted.length).toBe(2);
+		// Delivery is at least once across tabs/crashes. Check one immutable
+		// logical operation and one stored effect, not an exactly-once network count.
+		await expect.poll(() => attempted.length).toBeGreaterThanOrEqual(2);
 		const saved = attempted[1];
 		expect(saved.id).toBe(saved.operationId);
 		expect(saved.operationId).toMatch(new RegExp(`^e1_${String(Math.floor(Date.now() / 86_400_000)).padStart(8, '0')}_`));
+		const savedKey = key.slice(0, -expiredId.length) + saved.operationId;
+		for (const tab of [page, other]) {
+			await expect.poll(() => tab.evaluate(key => localStorage.getItem(key), savedKey)).toBeNull();
+			await expect(tab.getByRole('group', { name: 'New work after review. Press Enter to edit reminder.', exact: true })).toHaveCount(1);
+		}
+		expect(attempted.filter(change => change.operationId === expiredId)).toHaveLength(1);
+		for (const body of attempted.slice(1)) expect(body).toEqual(saved);
+		await page.evaluate(() => navigator.locks.request('crate-reminder-outbox', () => {}));
+		await expect.poll(() => deliveries.filter(item => item.operationId !== expiredId).every(item => item.status === 200)).toBe(true);
+		const newDeliveries = deliveries.filter(item => item.operationId !== expiredId);
+		expect(newDeliveries.length).toBeLessThanOrEqual(2);
+		expect(new Set(newDeliveries.map(item => item.bodyHash)).size).toBe(1);
+		expect(newDeliveries.every(item => item.status === 200 && !item.failure)).toBe(true);
+		const response = await fetch(`${origin}/reminders/list?folderPath=Reminders`, {
+			headers: { Authorization: `Bearer ${previewAuthToken}` },
+		});
+		expect(response.ok).toBe(true);
+		const { reminders } = await response.json();
+		expect(reminders.filter(item => item.id === saved.id || item.content === saved.content)).toHaveLength(1);
+		if (newDeliveries.length > 1) console.log('Idempotent cross-tab replay:', JSON.stringify({ deliveries, storageTrace }));
 		expect(await page.evaluate(() => window.injected)).toBeUndefined();
 		expect(errors).toEqual([]);
+	} catch (error) {
+		console.error('Expiry delivery trace:', JSON.stringify(deliveries));
+		console.error('Expiry storage trace:', JSON.stringify(storageTrace));
+		throw error;
 	} finally { await context.close(); }
 }
 try {
-	for (const browserType of [chromium, webkit]) {
+	for (const browserType of [chromium, webkit].filter(type => !process.env.CRATE_EXPIRY_BROWSER || type.name() === process.env.CRATE_EXPIRY_BROWSER)) {
 		const browser = await browserType.launch();
-		try { await verify(browser); console.log(`${browserType.name()}: expired changes stop across reload/tabs, export exact requests, require reviewed removal, and new commands use the server clock`); }
+		try { for (let iteration = 0; iteration < Number(process.env.CRATE_EXPIRY_REPEATS ?? 1); iteration++) await verify(browser); console.log(`${browserType.name()}: expired changes stop across reload/tabs, export exact requests, require reviewed removal, and new commands use the server clock`); }
 		finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }

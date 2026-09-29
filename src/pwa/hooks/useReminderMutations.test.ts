@@ -66,7 +66,7 @@ describe('PWA optimistic mutations', () => {
 		const { hook, render, outbox, changes, closeModal, setSaving, apiFetch, commitReminderState, memory } = harness();
 		const modal = draft();
 		saveReminderDraft(modal, 'Reminders');
-		await hook.saveReminder(modal);
+		expect(await hook.saveReminder(modal)).toBe(true);
 
 		expect(outbox.enqueue).toHaveBeenCalledOnce();
 		expect(outbox.drain).toHaveBeenCalledOnce();
@@ -88,7 +88,7 @@ describe('PWA optimistic mutations', () => {
 		const modal = draft();
 		saveReminderDraft(modal, 'Reminders');
 		outbox.enqueue.mockImplementationOnce(() => { throw new Error('Device storage is full'); });
-		await hook.saveReminder(modal);
+		expect(await hook.saveReminder(modal)).toBe(false);
 
 		expect(closeModal).not.toHaveBeenCalled();
 		expect(outbox.drain).not.toHaveBeenCalled();

@@ -44,7 +44,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	onOpenPicker: (picker: ModalPickerId) => void;
 	onDeleteConfirmationChange: (open: boolean) => void;
 	onClose: () => void;
-	onSave: (modal: ModalState) => void;
+	onSave: (modal: ModalState) => Promise<boolean>;
 }>(function ReminderEditorScreen({
 	modal,
 	colorScheme,
@@ -69,6 +69,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLDivElement | null>(null);
+	const descriptionInputRef = useRef<RichTextInputHandle | null>(null);
 	const { rememberFocus, restoreFocus } = useEditorFocus({
 		titleRef: contentRef, descriptionRef, editorRef, active: isActive, keyboardInset,
 	});
@@ -84,10 +85,25 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		&& !saving
 		&& !isClosing
 		&& Boolean(contentMetadata.cleanContent.trim());
+	const submissionStarted = useRef(false);
 	const performSave = useCallback(() => {
-		if (!canSubmit) return;
-		onSave(modal);
-	}, [canSubmit, modal, onSave]);
+		// Keyboard dismissal can leave a callback holding earlier props. Keep
+		// one accepted command for this editor until the sheet unmounts.
+		if (!canSubmit || submissionStarted.current) return;
+		submissionStarted.current = true;
+		const currentDraft = {
+			...modal.draft,
+			content: richTextInputRef.current?.getValue() ?? modal.draft.content,
+			description: descriptionInputRef.current?.getValue() ?? modal.draft.description,
+		};
+		// Preserve settled relative dates; only reconcile text not yet in React state.
+		if (currentDraft.content !== modal.draft.content) {
+			Object.assign(currentDraft, deriveDraftPatchFromContent(currentDraft, projectOptions));
+		}
+		void onSave({ ...modal, draft: currentDraft }).then(accepted => {
+			if (!accepted) submissionStarted.current = false;
+		});
+	}, [canSubmit, modal, onSave, projectOptions]);
 	const {
 		dismissEditorKeyboard,
 		handleDescriptionFocus,
@@ -192,6 +208,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						richTextInputRef={richTextInputRef}
 						textareaRef={contentRef}
 						descriptionRef={descriptionRef}
+						descriptionInputRef={descriptionInputRef}
 						disabled={saving || !editorInteractive}
 						allowAutoFocus={!saving && !isClosing}
 						titleInputProps={{

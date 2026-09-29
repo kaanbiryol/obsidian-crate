@@ -47,12 +47,12 @@ describe('authenticated page titles in the Worker runtime', () => {
 	});
 	it('does not authorize other methods for reminder sessions', async () => {
 		const outbound = mockPage();
-		expect((await worker.fetch(request('reminders-credential', 'GET'), env)).status).toBe(403);
+		expect((await worker.fetch(request('reminders-credential', 'GET'), env)).status).toBe(404);
 		expect(outbound).not.toHaveBeenCalled();
 	});
 	it('applies a separate authenticated rate limit before fetching', async () => {
 		const outbound = mockPage();
-		const limit = vi.fn().mockResolvedValue({ success: false });
+		const limit = vi.fn().mockImplementation(async ({ key }: { key: string }) => ({ success: !key.startsWith('link-titles:') }));
 		const response = await worker.fetch(request('reminders-credential'), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit } });
 		expect(response.status).toBe(429);
 		expect(response.headers.get('Retry-After')).toBe('60');

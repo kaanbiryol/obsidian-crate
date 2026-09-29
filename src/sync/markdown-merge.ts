@@ -1,6 +1,7 @@
 import { diffSequence } from './text-diff';
 import { mergeSequences } from './text-merge';
 import { createInlineMerger } from './markdown-inline-merge';
+import { frontmatter, hasCompetingFenceEdits } from './markdown-merge-structure';
 
 interface MarkdownMergeSuccess {
 	success: true;
@@ -17,7 +18,7 @@ type MarkdownMergeResult = MarkdownMergeSuccess | MarkdownMergeConflict;
 
 const MAX_MERGE_LINES = 20_000;
 
-const decoder = new TextDecoder('utf-8', { fatal: true });
+const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const encoder = new TextEncoder();
 
 export function mergeMarkdownContent(
@@ -50,10 +51,16 @@ export function mergeMarkdownContent(
 	const localHunks = diffSequence(baseLines, localLines);
 	const remoteHunks = diffSequence(baseLines, remoteLines);
 	if (!localHunks || !remoteHunks) return { success: false, reason: 'too-large' };
+	const baseHeader = frontmatter(baseLines), localHeader = frontmatter(localLines), remoteHeader = frontmatter(remoteLines);
+	if (localHeader !== remoteHeader && localHeader !== baseHeader && remoteHeader !== baseHeader
+		|| hasCompetingFenceEdits(baseLines, localHunks, remoteHunks)) {
+		return { success: false, reason: 'overlap' };
+	}
 	const mergedLines = mergeSequences(baseLines, localHunks, remoteHunks, {
 		mergeOverlap: createInlineMerger(baseLines),
 	});
-	if (!mergedLines) {
+	const expectedHeader = localHeader === baseHeader ? remoteHeader : localHeader;
+	if (!mergedLines || frontmatter(mergedLines) !== expectedHeader) {
 		return { success: false, reason: 'overlap' };
 	}
 

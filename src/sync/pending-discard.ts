@@ -6,6 +6,7 @@ import { assertLocalSyncPath } from './local-path-safety';
 import { isHiddenPath } from './file-discovery';
 import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
+import { replaceLocalFileWithRecovery } from './local-recovery-write';
 
 interface DiscardItem {
     path: string;
@@ -114,8 +115,6 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
             if (item.localHash !== null) {
                 await context.beforeBinaryReplace(item.path);
                 context.verify();
-                const outcome = await deletePathLocallyIfUnchanged({ vault }, item.path, item.localHash);
-                if (outcome.status !== 'deleted') throw new Error(`${item.path} changed. Reopen discard.`);
             }
             const parent = item.path.includes('/') ? item.path.slice(0, item.path.lastIndexOf('/')) : '';
             if (parent && !await vault.adapter.exists(parent)) {
@@ -123,9 +122,7 @@ async function discardOne(context: DiscardContext, item: DiscardSnapshot): Promi
                 else await vault.createFolder(parent);
             }
             context.verify();
-            if (await vault.adapter.stat(item.path)) throw new Error(`${item.path} was recreated. Its contents were kept.`);
-            if (isHiddenPath(item.path)) await vault.adapter.writeBinary(item.path, content);
-            else await vault.createBinary(item.path, content);
+            await replaceLocalFileWithRecovery(vault, item.path, content, item.localHash, () => context.verify());
         }
     }
     context.verify();

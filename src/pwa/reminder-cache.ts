@@ -1,3 +1,4 @@
+import { stringDigest } from './string-digest';
 import { capturePwaSession } from './session-generation';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from './types';
 import { AUTH_TOKEN_KEY } from './config';
@@ -16,8 +17,7 @@ interface CacheFreshness {
 // logout deletion. No credential is stored in the snapshot.
 async function cacheSessionScope(): Promise<string> {
 	const token = typeof localStorage === 'undefined' ? '' : localStorage.getItem(AUTH_TOKEN_KEY) ?? '';
-	const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-	return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+	return stringDigest(token);
 }
 
 async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminderSnapshot | null> {

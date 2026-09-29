@@ -14,6 +14,7 @@ export default defineConfig({
 		},
 	},
 	test: {
+		setupFiles: ['./src/test/setup-byte-equality.ts'],
 		include: ['src/**/*.test.ts'],
 	},
 });

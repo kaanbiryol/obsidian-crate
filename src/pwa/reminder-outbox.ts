@@ -2,6 +2,11 @@ import { ExpiredReminderChange, RejectedReminderChange, submitReminderChange } f
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ApiFetch } from './types';
+import { stringDigest } from './string-digest';
+
+function requestFingerprint(change: PendingReminderChange): Promise<string> {
+	return stringDigest(JSON.stringify([change.method, change.path, change.body]));
+}
 
 export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onError, onSettled, withLock = work => work(), canSend = () => true }: {
 	storage: ReminderOutboxStorage;
@@ -16,13 +21,17 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 	canSend?: () => boolean;
 }) {
 	let running = false;
+	// Web Locks do not flush another process's localStorage view. Remember only
+	// fully persisted settlements to stop stale entries bouncing between tabs.
+	// Eviction/restart may replay a receipt safely; no private bodies are retained.
+	const settledRequests = new Map<string, string>();
 	const refresh = () => {
 		const changes = storage.load();
 		if (isCurrent()) onChange(changes);
 		return changes;
 	};
 	const update = (change: PendingReminderChange) => { storage.put(change); refresh(); };
-	const hasCurrentAttempt = (change: PendingReminderChange) => isCurrent() && storage.load().some(item => item.operationId === change.operationId && item.body === change.body);
+	const hasCurrentAttempt = (change: PendingReminderChange) => isCurrent() && storage.load().some(item => item.operationId === change.operationId && item.body === change.body && item.path === change.path && item.method === change.method);
 
 	const enqueue = (change: PendingReminderChange) => {
 		if (!isCurrent()) throw new Error('Session changed. Reopen Crate before saving.');
@@ -65,6 +74,11 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 					const queued = storage.load().find(item => !item.reviewRequired && (item.status === 'pending'
 						|| (item.status === 'uncertain' && item.attempts < 3 && item.retryAt <= Date.now())));
 					if (!queued) break;
+					if (settledRequests.has(queued.operationId)
+						&& settledRequests.get(queued.operationId) === await requestFingerprint(queued)) {
+						if (hasCurrentAttempt(queued)) { storage.remove(queued.operationId); refresh(); }
+						continue;
+					}
 					const change = { ...queued, status: 'pending' as const, attempts: queued.attempts + 1,
 						ambiguous: queued.ambiguous || queued.status === 'uncertain' || (queued.status === 'pending' && queued.attempts > 0) };
 					update(change);
@@ -76,6 +90,10 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 						if (!hasCurrentAttempt(change)) continue;
 						// Keep the successor durable before removing the original receipt check.
 						if (followUp && !storage.load().some(item => item.operationId === followUp.operationId)) storage.put(followUp);
+						const fingerprint = await requestFingerprint(change);
+						settledRequests.set(change.operationId, fingerprint);
+						if (settledRequests.size > 64) settledRequests.delete(settledRequests.keys().next().value!);
+						if (!hasCurrentAttempt(change)) continue;
 						storage.remove(change.operationId);
 						refresh();
 					} catch (error) {
