@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 3 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain.
+The current candidate uses server revision 3 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 

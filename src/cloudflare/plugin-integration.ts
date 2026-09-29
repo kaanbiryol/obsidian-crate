@@ -208,7 +208,7 @@ async function executeCloudflareOperation(
                 [
                     'If another device is updating this server, let it finish.',
                     isDelete
-                        ? 'Once your connection is stable, open Crate settings → Advanced server actions and select Resume server deletion. Crate will check the interrupted step before continuing. If it still needs review, keep the technical details for support.'
+                        ? `Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'}. Crate will check the interrupted step before continuing. If it still needs review, keep the technical details for support.`
                         : 'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
                     'Closing this message does not clear the lock.',
                 ],
@@ -221,7 +221,7 @@ async function executeCloudflareOperation(
 		if (isDelete) {
 			plugin.refreshSettingsTab();
 			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
-				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'} to check and continue.`],
+				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'} to check and continue.`],
 				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } });
 			return;
 		}
@@ -300,6 +300,18 @@ async function executeCloudflareOperation(
 
 	plugin.refreshSettingsTab();
 	if (!connection.success) {
+		if (/^Incompatible Crate server protocol \d+$/.test(connection.error ?? '')) {
+			progress.fail(
+				'Crate server is incompatible',
+				`Sync is unavailable: ${connection.error}.`,
+				[
+					'Reconnecting keeps the existing server version. To keep its remote data, use a matching plugin build and its recovery instructions.',
+					'For a fresh start, open Crate settings → Advanced server actions → Delete server and all data. After deletion, select Connect with Cloudflare and create a new server. Your local vault files are kept.',
+				],
+				{ action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
+			);
+			return;
+		}
 		progress.fail(
 			'Crate is connected with a warning',
 			`The connection test failed: ${connection.error ?? 'Unknown error'}`,

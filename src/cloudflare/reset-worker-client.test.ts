@@ -20,6 +20,24 @@ it('sends a single bulk request with a cleanup credential and preserves exact ke
 	expect(JSON.stringify(transport.mock.calls)).not.toContain('account-management-secret');
 });
 
+it('passes opaque keys unchanged to the terminal deletion helper, including dot segments', async () => {
+	const target = `https://crate-delete-${resetId}.example.workers.dev`, keys = ['../opaque', '__crate__/future/data'];
+	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ ...metadata,
+		batchHash: await sha256Hex(JSON.stringify(keys)), deleted: keys.length }) }));
+	await new CloudflareApiClient('account-secret', transport).deleteR2Objects(target, resetId, token, keys);
+	expect(transport.mock.calls[0]![1].body).toBe(JSON.stringify(keys));
+});
+
+it('requires whole-bucket cleanup capability from the terminal helper', async () => {
+	vi.useFakeTimers();
+	const transport = vi.fn<HttpTransport>()
+		.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true }) })
+		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true }) });
+	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(`https://crate-delete-${resetId}.example.workers.dev`, resetId, true);
+	await vi.runAllTimersAsync(); await expect(operation).resolves.toBe(true);
+	expect(transport).toHaveBeenCalledTimes(2);
+});
+
 it.each([{ deleted: 1 }, { batchHash: 'wrong' }, { resetId: 'other' }, { protocol: 2 }, { service: 'other' }])('rejects mismatched bulk receipts: %j', async changed => {
 	const response = { ...metadata, batchHash: await sha256Hex(JSON.stringify(keys)), deleted: keys.length, ...changed };
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(response) }));
@@ -79,5 +97,16 @@ it('waits for upgraded cleanup capabilities after refreshing an old retirement W
 	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(origin, resetId, true);
 	await vi.runAllTimersAsync();
 	await expect(operation).resolves.toBe(true);
+	expect(transport).toHaveBeenCalledTimes(2);
+});
+
+it('waits for the exact helper publication after rotating its cleanup configuration', async () => {
+	vi.useFakeTimers();
+	const tag = `crate-${crypto.randomUUID()}`;
+	const transport = vi.fn<HttpTransport>()
+		.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true, uploadTag: 'previous-publication' }) })
+		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true, uploadTag: tag }) });
+	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(`https://crate-delete-${resetId}.example.workers.dev`, resetId, true, tag);
+	await vi.runAllTimersAsync(); await expect(operation).resolves.toBe(true);
 	expect(transport).toHaveBeenCalledTimes(2);
 });

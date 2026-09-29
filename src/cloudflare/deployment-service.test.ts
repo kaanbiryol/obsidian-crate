@@ -352,7 +352,7 @@ describe('Cloudflare deployment lifetime', () => {
 		expect(h.transportCalls[0]?.body).toContain('late-token');
 	});
 
-	it.each(['connect', 'reset', 'delete'] as const)('does not begin %s after artifacts finish loading on a destroyed service', async intent => {
+	it.each(['connect', 'reset'] as const)('does not begin %s after artifacts finish loading on a destroyed service', async intent => {
 		const h = intent === 'connect' ? createHarness() : resetHarness();
 		let release!: () => void;
 		const artifacts = await h.loadArtifacts();
@@ -461,6 +461,7 @@ describe('server reset authorization', () => {
 		const result = await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
 		expect(result.deleted).toBe(true);
 		expect(deleteCrateServer).toHaveBeenCalledOnce();
+		expect(h.loadArtifacts).not.toHaveBeenCalled();
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 		expect(apiMocks.queryD1).not.toHaveBeenCalled();
 		expect(h.settings.cloudflareDeployment).toBeNull();
@@ -702,4 +703,21 @@ it('keeps reconnect bound to its saved server across browser authorization', asy
 	await expect(h.service.handleCallback({ state, code: 'code' }, resetDevice)).rejects.toThrow('Server settings changed');
 	expect(apiMocks.queryD1).not.toHaveBeenCalled();
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+});
+
+it.each(['connect', 'reconnect', 'switch', 'create', 'update', 'reset'] as const)('blocks %s while terminal deletion is pending', async intent => {
+	const h = resetHarness();
+	h.settings.cloudflareDeployment!.deletion = { id: 'a'.repeat(32), phase: 'clearing-bucket', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!,
+		bucketCreatedAt: 'date', workerCreatedAt: 'date', helperName: `crate-delete-${'a'.repeat(32)}` };
+	await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume server deletion');
+});
+
+it('allows deletion to supersede an interrupted reset without loading artifacts', async () => {
+	const h = resetHarness();
+	h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
+	h.loadArtifacts.mockRejectedValue(new Error('obsolete server bundle'));
+	await h.service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }));
+	expect(deleteCrateServer).toHaveBeenCalledOnce();
+	expect(resetCrateServer).not.toHaveBeenCalled();
+	expect(h.loadArtifacts).not.toHaveBeenCalled();
 });

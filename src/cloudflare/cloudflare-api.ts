@@ -4,6 +4,7 @@ import { normalizeVaultName, VAULT_NAME_BINDING } from './vault-name';
 import { verifyWorkerDeployment } from './verify-worker-deployment';
 import cloudSafetyCompatSource from './worker/cloud-safety-compat.js?raw';
 import resetWorkerSource from './worker/reset-worker.js?raw';
+import serverDeleteWorkerSource from './worker/server-delete-worker.js?raw';
 import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
@@ -321,8 +322,8 @@ export class CloudflareApiClient {
 		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
 	}
 
-	async verifyResetWorker(origin: string, resetId: string, requireRecoveryObjects = false): Promise<boolean> {
-		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects);
+	async verifyResetWorker(origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string): Promise<boolean> {
+		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects, uploadTag);
 	}
 
 	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {
@@ -341,6 +342,21 @@ export class CloudflareApiClient {
 
 	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): Promise<void> {
 		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired);
+		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
+			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
+		});
+	}
+
+	async uploadServerDeletionWorker(accountId: string, workerName: string, deletionId: string, bucketName: string, tokenHash: string, uploadTag: string): Promise<void> {
+		const multipart = buildWorkerModule({
+			main_module: 'worker.mjs', compatibility_date: '2026-08-18',
+			compatibility_flags: ['global_fetch_strictly_public'],
+			annotations: { 'workers/message': `Crate deletion ${deletionId}`, 'workers/tag': uploadTag },
+			bindings: [{ type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
+				{ type: 'plain_text', name: 'CRATE_RESET_ID', text: deletionId },
+				{ type: 'plain_text', name: 'CRATE_DELETE_TOKEN_HASH', text: tokenHash },
+				{ type: 'plain_text', name: 'CRATE_DELETE_UPLOAD_TAG', text: uploadTag }],
+		}, serverDeleteWorkerSource);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
 		});

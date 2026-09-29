@@ -72,6 +72,21 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 	if (workersSubdomain !== null && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workersSubdomain)) {
 		return null;
 	}
+	let deletion: CloudflareDeploymentMetadata['deletion'];
+	if (value.deletion !== undefined) {
+		const job = value.deletion;
+		if (!isRecord(job) || typeof job.id !== 'string' || !/^[a-f0-9]{32}$/.test(job.id)
+			|| typeof job.databaseId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(job.databaseId)
+			|| job.databaseId !== d1DatabaseId || job.helperName !== `crate-delete-${job.id}`
+			|| !['removing-worker', 'clearing-bucket', 'removing-database', 'removing-helper', 'complete'].includes(String(job.phase))
+			|| (job.bucketCreatedAt !== null && (typeof job.bucketCreatedAt !== 'string' || !job.bucketCreatedAt))
+			|| (job.workerCreatedAt !== null && (typeof job.workerCreatedAt !== 'string' || !job.workerCreatedAt))
+			|| (job.helperUploadPending !== undefined && (typeof job.helperUploadPending !== 'string' || !/^crate-[a-f0-9-]{36}$/.test(job.helperUploadPending)))) return null;
+		deletion = { id: job.id, databaseId: job.databaseId, helperName: job.helperName,
+			phase: job.phase as NonNullable<CloudflareDeploymentMetadata['deletion']>['phase'],
+			bucketCreatedAt: job.bucketCreatedAt, workerCreatedAt: job.workerCreatedAt,
+			...(typeof job.helperUploadPending === 'string' ? { helperUploadPending: job.helperUploadPending } : {}) };
+	}
 	return {
 		deploymentId,
 		...(normalizeVaultName(value.vaultName) ? { vaultName: normalizeVaultName(value.vaultName) } : {}),
@@ -84,6 +99,7 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 		workersSubdomain,
 		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
 		lastDeployedFingerprint,
+		...(deletion ? { deletion } : {}),
 		...(typeof value.lastKnownRevision === 'number' && Number.isSafeInteger(value.lastKnownRevision) && value.lastKnownRevision > 0
 			? { lastKnownRevision: value.lastKnownRevision } : {}),
 		...(isRecord(value.reset) && typeof value.reset.id === 'string' && /^[a-f0-9]{32}$/.test(value.reset.id)

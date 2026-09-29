@@ -70,6 +70,27 @@ class FenceTests(unittest.TestCase):
             fence.release(self.remote, 'crate-' + 'b' * 16, self.owner, True)
         self.assertEqual(fence.inspect(self.remote, self.worker)[1], self.record)
 
+    def test_deletion_of_an_unverified_server_cannot_be_unlocked(self):
+        record = dict(self.record, kind='delete', deletionPending=True, step='acquire-deployment', stepState='confirmed')
+        self.remote.db.execute('UPDATE maintenance_state SET value = ?', (json.dumps(record),))
+        with self.assertRaisesRegex(ValueError, 'This deletion must finish'):
+            fence.release(self.remote, self.worker, self.owner, True)
+        self.assertFalse(any(sql.startswith('DELETE') for sql in self.remote.calls))
+        self.assertEqual(fence.inspect(self.remote, self.worker)[1], record)
+
+    def test_operator_can_settle_deletion_without_unlocking_or_requiring_a_release_version(self):
+        for kind in ('update', 'reset', 'delete', 'future-operation'):
+            with self.subTest(kind=kind):
+                record = dict(self.record, kind=kind, recoveryProtocol=999, step='unknown-step',
+                              stepState='started', deletionPending=kind == 'delete')
+                self.remote.db.execute('UPDATE maintenance_state SET value = ?', (json.dumps(record),))
+                with self.assertRaises(ValueError):
+                    fence.settle(self.remote, self.worker, self.owner)
+                self.assertTrue(fence.settle(self.remote, self.worker, self.owner, True))
+                expected = dict(record, stepState='settled')
+                self.assertEqual(fence.inspect(self.remote, self.worker)[1], expected)
+                self.assertFalse(any(sql.startswith('DELETE') for sql in self.remote.calls))
+
 
 if __name__ == '__main__':
     unittest.main()

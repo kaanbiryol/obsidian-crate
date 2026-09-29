@@ -35,6 +35,7 @@ function harness() {
 		],
 	};
 	const remote = { worker: true, bucket: true, database: true, retired: false };
+	const helpers = new Map<string, CloudflareWorkerSettings>();
 	const objects = new Set(['__crate__/settings.json', `__crate__/files/${'b'.repeat(64)}/01234567-89ab-cdef-0123-456789abcdef`]);
 	const mutations: string[] = [];
 	const writeSettings = vi.fn(async (update: Partial<CrateSettings>) => {
@@ -47,7 +48,7 @@ function harness() {
 		if (path === '/oauth2/revoke') return { status: 200, text: '{}' };
 		if (path === '/client/v4/memberships') return json([{ status: 'accepted', account: { id: accountId, name: 'Personal' } }]);
 		if (path.endsWith('/workers/subdomain')) return json({ subdomain: 'example' });
-		if (path.endsWith(`/workers/scripts/${name}/subdomain`)) return json({ enabled: true, previews_enabled: false });
+		if (path.endsWith('/subdomain')) return json({ enabled: true, previews_enabled: false });
 		if (path.endsWith('/schedules')) return json({});
 		if (path === '/.well-known/crate') return { status: 200, text: JSON.stringify({ service: 'crate', deploymentFingerprint: 'f'.repeat(64), serverRevision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion }) };
 		if (path.endsWith('/d1/database')) {
@@ -57,7 +58,10 @@ function harness() {
 		}
 		if (path.endsWith(`/d1/database/${replacementId}`)) return json(replacementCreated ? { uuid: replacementId, name } : null, replacementCreated ? 200 : 404);
 		if (path.endsWith('/r2/buckets') && request.method === 'POST') { remote.bucket = true; mutations.push('create-bucket'); return json({ name }); }
-		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id, recoveryObjects: true }) };
+		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1,
+			resetId: settings.cloudflareDeployment!.deletion?.id ?? settings.cloudflareDeployment!.reset!.id,
+			recoveryObjects: true, ...(settings.cloudflareDeployment!.deletion ? { deleteAll: true,
+				uploadTag: helpers.get(new URL(url).hostname.split('.')[0]!)?.annotations?.['workers/tag'] } : {}) }) };
 		if (path === '/__crate__/reset/objects' && request.method === 'POST' && typeof request.body === 'string') {
 			const [result] = fence.query('SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence'])!;
 			const record = JSON.parse(result!.results[0]!.value as string) as Record<string, unknown>;
@@ -67,17 +71,30 @@ function harness() {
 				|| record.stepState !== 'started') return { status: 403, text: 'Unauthorized batch' };
 			mutations.push(path);
 			keys.forEach(key => objects.delete(key));
-			return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id, batchHash: record.batchHash, deleted: keys.length }) };
+			return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1,
+				resetId: settings.cloudflareDeployment!.deletion?.id ?? settings.cloudflareDeployment!.reset!.id, batchHash: record.batchHash, deleted: keys.length }) };
 		}
-		if (path.endsWith('/workers/scripts')) return json(remote.worker ? [{ id: name }] : []);
-		if (path.endsWith('/settings')) return json(worker);
+		if (path.endsWith('/workers/scripts')) return json([...(remote.worker ? [{ id: name, created_on: '2026-01-01' }] : []),
+			...[...helpers.keys()].map(id => ({ id, created_on: '2026-09-29' }))]);
+		if (path.endsWith('/settings')) {
+			const target = path.split('/').at(-2)!;
+			return target === name ? json(worker, remote.worker ? 200 : 404) : json(helpers.get(target), helpers.has(target) ? 200 : 404);
+		}
 		if (path.endsWith('/durable_objects/namespaces')) return json(remote.retired ? [] : [{ id: 'c'.repeat(32), script: name, class: 'ReminderAlarm' }]);
 		if (request.method === 'DELETE') {
 			mutations.push(path);
 			if (path.endsWith(`/r2/buckets/${name}`)) remote.bucket = false;
 			else if (path.endsWith(`/d1/database/${databaseId}`)) remote.database = false;
-			else if (path.endsWith(`/workers/scripts/${name}`)) remote.worker = false;
+			else if (path.endsWith(`/workers/scripts/${name}`)) { remote.worker = false; remote.retired = true; }
+			else if (helpers.has(path.split('/').at(-1)!)) helpers.delete(path.split('/').at(-1)!);
 			else throw new Error(`Unexpected deletion: ${path}`);
+			return json({});
+		}
+		if (request.method === 'PUT' && path.includes('/workers/scripts/crate-delete-')) {
+			const body = new TextDecoder().decode(request.body as ArrayBuffer);
+			const metadata = JSON.parse(body.split('\r\n\r\n')[1]!.split('\r\n--')[0]!) as CloudflareWorkerSettings;
+			helpers.set(path.split('/').at(-1)!, metadata);
+			mutations.push(path);
 			return json({});
 		}
 		if (request.method === 'PUT' && path.endsWith(`/workers/scripts/${name}`)) {
@@ -111,7 +128,7 @@ function harness() {
 				return json([{ results: sql.includes('sqlite_master') ? initialized ? [{ name: 'crate_schema' }] : []
 					: sql.startsWith('SELECT version') ? [{ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion }] : [] }]);
 			}
-			return json([{ results: sql.startsWith('PRAGMA') ? [{ name: 'storage_key' }] : ['files', 'auth_tokens'].map(name => ({ name })) }]);
+			return json([{ results: sql.startsWith('PRAGMA') ? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'maintenance_state'].map(name => ({ name })) }]);
 		}
 		throw new Error(`Unexpected request: ${request.method} ${path}`);
 	});
@@ -137,6 +154,29 @@ function harness() {
 const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
 
 describe('Cloudflare deployment interruption and recovery', () => {
+	it('deletes an older server with a settled update and clears the saved connection', async () => {
+		const h = harness();
+		const metadata = h.settings.cloudflareDeployment!;
+		metadata.lastKnownRevision = 53;
+		await h.transport(`https://api.cloudflare.com/client/v4/accounts/${metadata.accountId}/d1/database/${h.databaseId}/query`, {
+			method: 'POST', body: JSON.stringify({
+				sql: 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;',
+				params: ['crate_deployment_fence', JSON.stringify({
+					owner: '01234567-89ab-cdef-0123-456789abcdef', worker: metadata.workerName,
+					kind: 'update', version: '0.1.0', fingerprint: 'a'.repeat(64), recoveryProtocol: 1,
+					step: 'record-release', stepState: 'confirmed', verificationPending: true,
+				})],
+			}),
+		});
+		const { service } = h.createService();
+		const result = await service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }));
+		expect(result.deleted).toBe(true);
+		expect(h.settings.cloudflareDeployment).toBeNull();
+		expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
+		expect(h.mutations).not.toContain('create-database');
+		expect(h.mutations).not.toContain('create-bucket');
+	});
+
 	it.each(['oauth', 'saved'] as const)('rebuilds after reset with %s authorization', async authorization => {
 		const h = harness();
 		const { service, authorize } = h.createService();
@@ -195,17 +235,17 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		const running = first.service.handleCallback(params, device);
 		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
 		await vi.waitFor(() => expect(dispatched).toBe(true));
-		const checkpoint = structuredClone(h.settings.cloudflareDeployment!.reset);
+		const checkpoint = structuredClone(intent === 'delete' ? h.settings.cloudflareDeployment!.deletion : h.settings.cloudflareDeployment!.reset);
 		const writes = h.writeSettings.mock.calls.length;
 		first.service.destroy();
 		release();
 		await rejected;
 		expect(h.objects.size).toBe(500);
-		expect(h.remote).toEqual({ worker: true, bucket: true, database: true, retired: true });
-		expect(h.mutations).toHaveLength(2); // The retired Worker and one bulk request; no second batch.
+		expect(h.remote).toEqual({ worker: intent === 'reset', bucket: true, database: true, retired: true });
+		expect(h.mutations).toHaveLength(intent === 'delete' ? 3 : 2); // Take the server offline, prepare cleanup, and dispatch one batch.
 		expect(h.writeSettings).toHaveBeenCalledTimes(writes);
-		expect(h.settings.cloudflareDeployment!.reset).toEqual(checkpoint);
-		expect(checkpoint?.phase).toBe('clearing');
+		expect(intent === 'delete' ? h.settings.cloudflareDeployment!.deletion : h.settings.cloudflareDeployment!.reset).toEqual(checkpoint);
+		expect(checkpoint?.phase).toBe(intent === 'delete' ? 'clearing-bucket' : 'clearing');
 		expect(vi.mocked(h.transport).mock.calls.at(-1)?.[0]).toContain('/oauth2/revoke');
 
 		if (intent === 'delete') {
@@ -216,7 +256,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
 			expect(h.objects.size).toBe(0);
 			// No repeated Worker retirement, object deletion or database deletion.
-			expect(h.mutations).toHaveLength(6);
+			expect(h.mutations).toHaveLength(8);
 		}
 	});
 
@@ -256,7 +296,7 @@ it('keeps cleanup capability rejection distinct from account OAuth and allows de
 	});
 	const authorize = <T>(operation: (tokens: { accessToken: string }) => Promise<T>) => operation({ accessToken: 'saved' });
 	await expect(service.deployWithSavedAuthorization('delete', authorize)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
-	expect(h.remote).toMatchObject({ worker: true, database: true, bucket: true });
+	expect(h.remote).toMatchObject({ worker: false, database: true, bucket: true });
 	rejectCleanup = false;
 	await expect(service.deployWithSavedAuthorization('delete', authorize)).resolves.toMatchObject({ deleted: true });
 });

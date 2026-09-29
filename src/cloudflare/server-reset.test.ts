@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import type { CloudflareWorkerSettings } from './cloudflare-api';
 import { createFenceQueryHarness } from './deployment-fence-test-harness';
+
+// Keep the retirement-stub recovery contract for saved resets from earlier releases.
+const deleteLegacyResetData = (input: Parameters<typeof resetCrateServer>[0]) => resetCrateServer({ ...input, deleteOnly: true });
 
 function harness() {
 	const fence = createFenceQueryHarness();
@@ -26,14 +28,13 @@ function harness() {
 	let database: { uuid: string; name: string } | null = { uuid: metadata.d1DatabaseId!, name: metadata.d1DatabaseName };
 	const objects = new Set(['__crate__/settings.json']);
 	const api = {
-		deleteWorker: vi.fn(async () => {}),
 		getWorkerSettings: vi.fn(async (_account: string, _name: string) => worker),
 		listWorkers: vi.fn(async () => [{ id: metadata.workerName }]),
 		getD1Database: vi.fn(async () => database),
 		getR2Bucket: vi.fn(async () => bucket),
 		listDurableObjectNamespaces: vi.fn(async () => worker.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
 		queryD1: vi.fn(async (_account: string, _db: string, sql: string, params?: string[]): Promise<Array<{ results: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? [{ results: sql.startsWith('PRAGMA')
-			? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'crate_migrations'].map(name => ({ name })) }]),
+			? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'crate_migrations', 'maintenance_state'].map(name => ({ name })) }]),
 		listR2Objects: vi.fn(async (_account: string, _bucket: string, cursor?: string): Promise<{ keys: string[]; cursor?: string }> => {
 			const offset = Number(cursor ?? 0);
 			return { keys: [...objects].slice(offset, offset + 1000), ...(offset + 1000 < objects.size ? { cursor: String(offset + 1000) } : {}) };
@@ -108,17 +109,16 @@ describe('Crate server reset boundaries', () => {
 		const h = harness();
 		h.worker.bindings!.push({ type: 'plain_text', name: 'CRATE_VAULT_NAME', text: 'Notes' }, { type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: 'f'.repeat(64) },
 			{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: `https://${h.metadata.workerName}.example.workers.dev` });
-		await deleteCrateServer(h.input);
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
+		await deleteLegacyResetData(h.input);
 	});
 
 	it('preserves files when the cleanup Worker is not ready and can retry without repeating retirement', async () => {
 		const h = harness();
 		h.api.verifyResetWorker.mockRejectedValueOnce(new Error('cleanup not ready'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('cleanup not ready');
+		await expect(deleteLegacyResetData(h.input)).rejects.toThrow('cleanup not ready');
 		expect(h.objects.size).toBe(1);
 		expect(h.api.deleteR2Objects).not.toHaveBeenCalled();
-		await deleteCrateServer(h.input);
+		await deleteLegacyResetData(h.input);
 		expect(h.api.retireCrateWorker).toHaveBeenCalledOnce();
 		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
 	});
@@ -126,7 +126,7 @@ describe('Crate server reset boundaries', () => {
 	it('upgrades an old retirement stub under the fence before continuing deletion', async () => {
 		const h = harness();
 		h.api.deleteR2Objects.mockRejectedValueOnce(new Error('offline'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+		await expect(deleteLegacyResetData(h.input)).rejects.toThrow('uncertain outcome');
 		h.worker.bindings = h.worker.bindings!.filter(binding => binding.name !== 'CRATE_RESET_ID');
 		const [row] = await h.api.queryD1(h.metadata.accountId!, h.metadata.d1DatabaseId!, 'SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence']);
 		const previous = row!.results[0]!.value as string;
@@ -135,7 +135,7 @@ describe('Crate server reset boundaries', () => {
 		delete legacy.cleanupTokenHash;
 		delete legacy.batchHash;
 		await h.api.queryD1(h.metadata.accountId!, h.metadata.d1DatabaseId!, 'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;', [JSON.stringify(legacy), 'crate_deployment_fence', previous]);
-		await deleteCrateServer(h.input);
+		await deleteLegacyResetData(h.input);
 		expect(h.api.retireCrateWorker).toHaveBeenCalledTimes(2);
 		expect(h.api.retireCrateWorker).toHaveBeenLastCalledWith(h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true);
 		expect(h.objects.size).toBe(0);
@@ -249,168 +249,6 @@ describe('Crate server reset boundaries', () => {
 });
 
 
-describe('delete-only server removal', () => {
-	it('deletes 7,992 files in eight bulk requests with one pair of checkpoints per batch', async () => {
-		const h = harness();
-		for (let i = 0; i < 7991; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
-		await deleteCrateServer(h.input);
-		expect(h.api.deleteR2Objects).toHaveBeenCalledTimes(8);
-		expect(h.api.deleteR2Objects.mock.calls.map(([, , , keys]) => keys.length)).toEqual([1000, 1000, 1000, 1000, 1000, 1000, 1000, 992]);
-		expect(h.objects.size).toBe(0);
-		const checkpoints = h.api.queryD1.mock.calls.filter(([, , sql, params]) =>
-			sql.startsWith('UPDATE maintenance_state') && params?.[0]?.includes('"step":"deleteR2Objects"'));
-		expect(checkpoints).toHaveLength(16);
-		for (const [, , , params] of checkpoints) expect(params![0]).not.toContain(h.api.deleteR2Objects.mock.calls[0]![2]);
-	});
-
-	it('waits for the active bulk request and leaves later batches untouched on failure', async () => {
-		const h = harness();
-		for (let i = 0; i < 1499; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
-		let release!: () => void, started!: () => void;
-		const pending = new Promise<void>(resolve => { release = resolve; });
-		const dispatched = new Promise<void>(resolve => { started = resolve; });
-		h.api.deleteR2Objects.mockImplementation(async (_origin, _reset, _token, keys) => {
-			started();
-			await pending;
-			keys.slice(0, 50).forEach(key => h.objects.delete(key));
-			throw new Error('network failed');
-		});
-		const deletion = deleteCrateServer(h.input);
-		const rejected = expect(deletion).rejects.toThrow('uncertain outcome');
-		await dispatched;
-		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
-		expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
-		release();
-		await rejected;
-		expect(h.objects.size).toBe(1450);
-		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
-		expect(h.api.deleteD1Database).not.toHaveBeenCalled();
-	});
-
-	it.each([false, true])('resumes an interrupted object deletion, including a lost response (applied=%s)', async applied => {
-		const h = harness();
-		h.api.deleteR2Objects.mockImplementationOnce(async (_origin, _reset, _token, keys) => {
-			if (applied) keys.forEach(key => h.objects.delete(key));
-			throw new Error('net::ERR_NETWORK_CHANGED');
-		});
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
-		await deleteCrateServer(h.input);
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
-		expect(h.api.retireCrateWorker).toHaveBeenCalledOnce();
-		expect(h.objects.size).toBe(0);
-	});
-
-	it('does not let an old deletion continue after another resume takes ownership', async () => {
-		const h = harness();
-		let release!: () => void;
-		let started!: () => void;
-		const pending = new Promise<void>(resolve => { release = resolve; });
-		const dispatched = new Promise<void>(resolve => { started = resolve; });
-		h.api.deleteR2Objects.mockImplementationOnce(async (_origin, _reset, _token, keys) => {
-			started();
-			await pending;
-			keys.forEach(key => h.objects.delete(key));
-		});
-		const original = deleteCrateServer(h.input);
-		const rejected = expect(original).rejects.toThrow('checkpoint');
-		await dispatched;
-		await deleteCrateServer(h.input);
-		release();
-		await rejected;
-		expect(h.api.deleteR2Bucket).toHaveBeenCalledOnce();
-		expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
-	});
-
-	it('keeps an uncertain Worker retirement locked', async () => {
-		const h = harness();
-		const retire = h.api.retireCrateWorker.getMockImplementation()!;
-		h.api.retireCrateWorker.mockImplementationOnce(async (...args) => {
-			await retire(...args);
-			throw new Error('net::ERR_NETWORK_CHANGED');
-		});
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('cannot be resumed automatically');
-		expect(h.api.deleteR2Objects).not.toHaveBeenCalled();
-	});
-
-	it('leaves reset recovery blocked after an uncertain file deletion', async () => {
-		const h = harness();
-		h.api.deleteR2Objects.mockRejectedValueOnce(new Error('offline'));
-		await expect(resetCrateServer(h.input)).rejects.toThrow('uncertain outcome');
-		await expect(resetCrateServer(h.input)).rejects.toThrow('Another deployment');
-		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
-	});
-
-	it('does not steal ownership when the inspected record changes', async () => {
-		const h = harness();
-		h.api.deleteR2Objects.mockRejectedValueOnce(new Error('offline'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
-		const query = h.api.queryD1.getMockImplementation()!;
-		h.api.queryD1.mockImplementation(async (account, database, sql, params) => {
-			if (sql.startsWith('UPDATE maintenance_state SET value = ?')) {
-				await query(account, database, sql, ['replacement-owner', params![1]!, params![2]!]);
-			}
-			return query(account, database, sql, params);
-		});
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('Another deployment');
-		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
-		expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
-	});
-
-	it('refuses recovery when the bucket was replaced', async () => {
-		const h = harness();
-		h.api.deleteR2Objects.mockRejectedValueOnce(new Error('offline'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow();
-		h.api.getR2Bucket.mockResolvedValue({ name: h.metadata.r2BucketName, creation_date: 'different' });
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('bucket identity changed');
-		expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
-	});
-	it('removes the retired Worker after storage and keeps a deletion checkpoint', async () => {
-		const h = harness();
-		await deleteCrateServer(h.input);
-		expect(h.api.deleteWorker).toHaveBeenCalledExactlyOnceWith(h.metadata.accountId, h.metadata.workerName);
-		expect(h.api.deleteD1Database.mock.invocationCallOrder[0]).toBeLessThan(h.api.deleteWorker.mock.invocationCallOrder[0]!);
-		expect(h.metadata.reset).toMatchObject({ deleteOnly: true, phase: 'rebuilding' });
-	});
-
-	it('resumes after the Worker DELETE response was lost without recreating anything', async () => {
-		const h = harness();
-		h.api.deleteWorker.mockRejectedValueOnce(new Error('Connection lost'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('Connection lost');
-		h.api.listWorkers.mockResolvedValue([]);
-		await deleteCrateServer(h.input);
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
-		expect(h.api.retireCrateWorker).toHaveBeenCalledOnce();
-		expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
-	});
-
-	it('refuses a replacement Worker when retrying deletion', async () => {
-		const h = harness();
-		h.api.deleteWorker.mockRejectedValueOnce(new Error('Connection lost'));
-		await expect(deleteCrateServer(h.input)).rejects.toThrow();
-		h.worker.annotations = { 'workers/message': 'Crate 0.1.0' };
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('Worker changed');
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
-	});
-
-	it('refuses replacement storage when retrying deletion', async () => {
-		const h = harness();
-		await deleteCrateServer(h.input);
-		h.api.getR2Bucket.mockResolvedValue({ name: h.metadata.r2BucketName, creation_date: 'new' });
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('recreated');
-		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
-	});
-
-	it('does not switch an interrupted reset into deletion', async () => {
-		const h = harness();
-		await resetCrateServer(h.input);
-		await expect(deleteCrateServer(h.input)).rejects.toThrow('Finish the server reset');
-		expect(h.api.deleteWorker).not.toHaveBeenCalled();
-	});
-});
-
-
 it('identifies the exact unknown and missing tables before any deletion', async () => {
 	const h = harness();
 	h.api.queryD1.mockResolvedValue([{ results: [{ name: 'files' }, { name: 'unexpected_table' }] }]);
@@ -422,7 +260,7 @@ it('identifies the exact unknown and missing tables before any deletion', async 
 });
 
 
-it.each([resetCrateServer, deleteCrateServer])('recognizes the baseline release tables during cleanup', async cleanup => {
+it.each([resetCrateServer, deleteLegacyResetData])('recognizes the baseline release tables during cleanup', async cleanup => {
 	const h = harness();
 	const query = h.api.queryD1.getMockImplementation()!;
 	h.api.queryD1.mockImplementation(async (account, database, sql, params) => sql.includes('sqlite_master')
@@ -465,12 +303,12 @@ it.each([false, true])('re-lists only remaining objects after a partially applie
 		}
 		keys.forEach(key => h.objects.delete(key));
 	});
-	await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+	await expect(deleteLegacyResetData(h.input)).rejects.toThrow('uncertain outcome');
 	const remaining = [...h.objects];
 	expect(remaining.length).toBe(applied ? 1010 : 1100);
 	const previousToken = h.api.deleteR2Objects.mock.calls[0]![2];
 	h.api.deleteR2Objects.mockClear();
-	await deleteCrateServer(h.input);
+	await deleteLegacyResetData(h.input);
 	expect(h.api.deleteR2Objects.mock.calls.flatMap(([, , , keys]) => keys)).toEqual(remaining);
 	expect(h.api.deleteR2Objects.mock.calls[0]![2]).not.toBe(previousToken);
 	expect(h.objects.size).toBe(0);
@@ -487,7 +325,7 @@ it('shows an estimated time remaining once enough deletions have completed', asy
 			now += 5000;
 			keys.forEach(key => h.objects.delete(key));
 		});
-		await deleteCrateServer({ ...h.input, onProgress });
+		await deleteLegacyResetData({ ...h.input, onProgress });
 		expect(onProgress).toHaveBeenCalledWith('Removing remote files: 1,000 / 2,000 deleted · about 5 seconds remaining…');
 		expect(onProgress).toHaveBeenCalledWith('Removing remote files: 2,000 / 2,000 deleted…');
 	} finally {
@@ -496,7 +334,7 @@ it('shows an estimated time remaining once enough deletions have completed', asy
 });
 
 
-it.each([resetCrateServer, deleteCrateServer])('cleans upgrade backups and shared history with the server', async cleanup => {
+it.each([resetCrateServer, deleteLegacyResetData])('cleans upgrade backups and shared history with the server', async cleanup => {
 	const h = harness();
 	const id = '288f7648-db97-4f53-a162-95c692b8572f';
 	const backup = `__crate__/backups/schema-upgrade-${id}`;
@@ -517,7 +355,7 @@ it.each([
 ])('preserves unknown objects inside Crate prefixes: %s', async key => {
 	const h = harness();
 	h.objects.add(key);
-	await expect(deleteCrateServer(h.input)).rejects.toThrow('Reset blocked');
+	await expect(deleteLegacyResetData(h.input)).rejects.toThrow('Reset blocked');
 	expect(h.api.deleteR2Objects).not.toHaveBeenCalled();
 	expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
 	expect(h.api.deleteD1Database).not.toHaveBeenCalled();
@@ -528,16 +366,15 @@ it('resumes the held deletion by refreshing an older cleanup Worker before remov
 	const h = harness();
 	h.objects.add('__crate__/backups/schema-upgrade-288f7648-db97-4f53-a162-95c692b8572f/archive.json');
 	h.api.deleteR2Objects.mockRejectedValueOnce(new Error('old cleanup response lost'));
-	await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+	await expect(deleteLegacyResetData(h.input)).rejects.toThrow('uncertain outcome');
 	h.api.verifyResetWorker.mockResolvedValueOnce(false).mockResolvedValue(true);
-	await deleteCrateServer(h.input);
+	await deleteLegacyResetData(h.input);
 	expect(h.api.retireCrateWorker).toHaveBeenCalledTimes(2);
 	expect(h.api.retireCrateWorker.mock.calls[1]).toEqual([
 		h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true,
 	]);
 	expect(h.api.verifyResetWorker).toHaveBeenLastCalledWith(`https://${h.metadata.workerName}.example.workers.dev`, h.metadata.reset!.id, true);
 	expect(h.objects.size).toBe(0);
-	expect(h.api.deleteWorker).toHaveBeenCalledOnce();
 });
 
 

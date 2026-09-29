@@ -611,3 +611,20 @@ it('retains a development identity when an interrupted publication is completed 
   expect(await held()).toBeNull();
   await h.deploy(artifact());
 });
+
+it('coordinates terminal deletion with only an old key/value administration table and arbitrary application tables', async () => {
+	await env.DB.prepare('CREATE TABLE maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)').run();
+	await env.DB.prepare('CREATE TABLE unknown_future_data (opaque BLOB)').run();
+	const worker = 'crate-0123456789abcdef';
+	const previous = JSON.stringify({ owner: crypto.randomUUID(), worker, kind: 'update', recoveryProtocol: 999,
+		step: 'unrecognized-step', stepState: 'confirmed', verificationPending: true });
+	await env.DB.prepare('INSERT INTO maintenance_state (key, value) VALUES (?, ?)').bind(DEPLOYMENT_FENCE_KEY, previous).run();
+	const api = { queryD1: async (_account: string, _database: string, sql: string, params?: string[]) => [await env.DB.prepare(sql).bind(...params ?? []).all()] };
+	const { withDeploymentFence } = await import('../deployment-fence');
+	await withDeploymentFence({ api, accountId: 'a'.repeat(32), databaseId: 'database', recoverDeletionValue: previous,
+		record: { worker, kind: 'delete', version: '', deletionPending: true } }, async fence => {
+		await fence.mutate(async () => {}, 'delete-worker');
+		expect(JSON.parse((await held())!.value)).toMatchObject({ kind: 'delete', deletionPending: true, step: 'delete-worker', stepState: 'confirmed' });
+		fence.removedDatabase();
+	});
+});

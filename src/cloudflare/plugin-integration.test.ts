@@ -363,8 +363,40 @@ it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an 
         expect.objectContaining({ technicalDetails: 'Network changed. The deployment fence remains held.' }),
     );
     expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', intent === 'update' ? 'Check and recover update' : 'Open settings');
-    if (intent === 'delete') expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
-    else expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('select Resume server deletion');
+    if (intent === 'delete') expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Delete server and all data');
+    expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('select Resume server deletion');
+});
+
+it('offers resume only when an interrupted deletion checkpoint is saved', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
+	const plugin = createPlugin(true);
+	Object.assign(plugin.settings.cloudflareDeployment, { reset: { deleteOnly: true } });
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new DeploymentRecoveryRequiredError('Needs review'));
+	await startCloudflareDeployment(plugin as never, 'delete');
+	expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
+});
+
+it('explains the fresh-server recovery for a protocol-10 development server', async () => {
+	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+	const plugin = createPlugin();
+	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: false, error: 'Incompatible Crate server protocol 10' });
+	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+	expect(progress.succeed).not.toHaveBeenCalled();
+	expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
+	expect(progress.fail).toHaveBeenCalledWith('Crate server is incompatible', expect.stringContaining('protocol 10'),
+		expect.arrayContaining([expect.stringContaining('create a new server')]),
+		expect.any(Object));
+	expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', 'Open settings');
+});
+
+it('keeps connection-test retry guidance for a temporary network failure', async () => {
+	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+	const plugin = createPlugin();
+	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: false, error: 'Network unavailable' });
+	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+	expect(progress.fail).toHaveBeenCalledWith('Crate is connected with a warning', expect.stringContaining('Network unavailable'),
+		['Your device credentials were saved. You can retry the connection test from Crate settings.']);
 });
 
 it('does not open another update dialog when the service is busy', async () => {

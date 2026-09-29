@@ -29,8 +29,8 @@ def inspect(remote, worker):
     record = json.loads(value)
     if (not isinstance(record, dict) or record.get('worker') != worker
             or not re.fullmatch(r'crate-[a-f0-9]{16}', worker)
-            or not re.fullmatch(r'[a-f0-9-]{36}', str(record.get('owner', '')))
-            or record.get('kind') not in ('update', 'reset', 'delete')):
+            or not isinstance(record.get('owner'), str) or not record['owner']
+            or not isinstance(record.get('kind'), str) or not record['kind']):
         raise ValueError('The deployment fence does not match the requested Worker')
     return value, record
 
@@ -46,6 +46,10 @@ def release(remote, worker, owner, confirm_quiescent=False):
         raise ValueError('The owner changed; inspect the fence again')
     if record.get('verificationPending') is True:
         raise ValueError('This update must be resumed and verified, not unlocked. Settle resolved requests and use Check and recover update.')
+    if record.get('deletionPending') is True:
+        raise ValueError('This deletion must finish, not be unlocked. Use Delete server and all data or Resume server deletion.')
+    if record['kind'] not in ('update', 'reset', 'delete'):
+        raise ValueError('An unknown operation must remain locked. Settle resolved requests before deleting the server.')
     removed = query(remote, 'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key', [KEY, value])
     if removed != [{'key': KEY}]:
         raise ValueError('The fence changed before release; no replacement owner was cleared')
@@ -55,14 +59,13 @@ def release(remote, worker, owner, confirm_quiescent=False):
 def settle(remote, worker, owner, confirm_quiescent=False):
     """Operator attests the request has stopped; keep all writers fenced."""
     if not confirm_quiescent:
-        raise ValueError('Resolve all in-flight provider requests before marking an update settled')
+        raise ValueError('Resolve all in-flight provider requests before marking an operation settled')
     current = inspect(remote, worker)
     if current is None:
         return False
     value, record = current
-    if (owner != record['owner'] or record.get('kind') != 'update'
-            or record.get('recoveryProtocol') != 1 or record.get('verificationPending') is not True):
-        raise ValueError('Only the exact inspected pending update can be settled')
+    if owner != record['owner']:
+        raise ValueError('Only the exact inspected operation can be settled')
     record['stepState'] = 'settled'
     updated = json.dumps(record)
     rows = query(remote, 'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value', [updated, KEY, value])
@@ -87,13 +90,13 @@ def main():
             print('No deployment fence is held.')
         else:
             record = current[1]
-            print(json.dumps({key: record.get(key) for key in ('owner', 'worker', 'kind', 'version', 'fingerprint', 'startedAt', 'step', 'stepState', 'verificationPending')}, indent=2))
+            print(json.dumps({key: record.get(key) for key in ('owner', 'worker', 'kind', 'version', 'fingerprint', 'startedAt', 'step', 'stepState', 'verificationPending', 'deletionPending')}, indent=2))
     else:
         if not args.owner:
             parser.error('--owner from the inspection is required')
         if args.action == 'settle':
             settle(remote, args.worker, args.owner, args.confirm_quiescent)
-            print('The update remains locked. Select Check and recover update in the matching plugin build.')
+            print('The operation remains locked. Resume server deletion to permanently remove this server, or use the matching plugin build to recover an update or reset.')
             return
         changed = release(remote, args.worker, args.owner, args.confirm_quiescent)
         print('Released the inspected owner. Resume the original operation in Obsidian.' if changed else 'No fence is held. Review the live deployment before resuming.')

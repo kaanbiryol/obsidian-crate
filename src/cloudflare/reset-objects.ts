@@ -50,14 +50,15 @@ export async function inspectBucketObjects(api: ResetApi, accountId: string, buc
 	return checked;
 }
 
-export async function clearBucketObjects(api: ResetApi, accountId: string, bucketName: string, check: (key: string) => Promise<void>, verifyTarget: () => Promise<void>, remove: (keys: string[]) => Promise<void>, total: number, onProgress?: (message: string) => void): Promise<void> {
+export async function clearBucketObjects(api: Pick<ResetApi, 'listR2Objects'>, accountId: string, bucketName: string, check: (key: string) => Promise<void>, verifyTarget: () => Promise<void>, remove: (keys: string[]) => Promise<void>, total: number, onProgress?: (message: string) => void): Promise<void> {
 	// Restart at the beginning after each deletion batch so changing pagination
 	// cannot skip objects. A failed request leaves the reset checkpoint resumable.
 	let deleted = 0;
+	const knownTotal = total > 0;
 	const startedAt = Date.now();
 	const report = () => {
 		const elapsed = Date.now() - startedAt;
-		const remainingSeconds = deleted >= 10 && elapsed >= 3000 && total > deleted
+		const remainingSeconds = knownTotal && deleted >= 10 && elapsed >= 3000 && total > deleted
 			? Math.ceil(elapsed / deleted * (total - deleted) / 1000) : 0;
 		const minutes = Math.ceil(remainingSeconds / 60);
 		const duration = remainingSeconds < 60
@@ -65,7 +66,7 @@ export async function clearBucketObjects(api: ResetApi, accountId: string, bucke
 			: `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 		const estimate = remainingSeconds > 0
 			? ` · about ${duration} remaining` : '';
-		onProgress?.(`Removing remote files: ${deleted.toLocaleString()} / ${total.toLocaleString()} deleted${estimate}…`);
+		onProgress?.(`Removing remote files: ${deleted.toLocaleString()}${knownTotal ? ` / ${total.toLocaleString()}` : ''} deleted${estimate}…`);
 	};
 	report();
 	let previousFirst: string | undefined;
@@ -81,8 +82,15 @@ export async function clearBucketObjects(api: ResetApi, accountId: string, bucke
 		for (const key of page.keys) await check(key);
 		// The preflight total can grow if uploads finished before retirement.
 		total = Math.max(total, deleted + page.keys.length);
-		for (let offset = 0; offset < page.keys.length; offset += 1000) {
-			const keys = page.keys.slice(offset, offset + 1000);
+		for (let offset = 0; offset < page.keys.length;) {
+			const keys: string[] = [];
+			let bytes = 2;
+			while (offset < page.keys.length && keys.length < 1000) {
+				const key = page.keys[offset]!;
+				const nextBytes = new TextEncoder().encode(JSON.stringify(key)).length + (keys.length ? 1 : 0);
+				if (keys.length && bytes + nextBytes > 1_100_000) break;
+				keys.push(key); bytes += nextBytes; offset++;
+			}
 			await remove(keys);
 			// Count only a verified bulk response; re-list after an uncertain result.
 			deleted += keys.length;

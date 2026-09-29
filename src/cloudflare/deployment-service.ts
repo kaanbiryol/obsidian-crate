@@ -127,8 +127,7 @@ export class CloudflareDeploymentService {
 		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (existingMetadata?.reset?.deleteOnly && intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
-		if (existingMetadata?.reset && !existingMetadata.reset.deleteOnly && intent === 'delete') throw new Error('Finish the server reset before deleting this server.');
+		if ((existingMetadata?.deletion || existingMetadata?.reset?.deleteOnly) && intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
 		if (existingMetadata?.reset && intent !== 'reset' && intent !== 'delete') throw new Error('Resume the server reset before connecting or updating.');
 		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
 			throw new Error('Connect to a Crate server before resetting its remote data.');
@@ -228,7 +227,9 @@ export class CloudflareDeploymentService {
 			this.lifetime.signal.throwIfAborted();
 			const api = this.createGuardedApi(tokens, savedLogin ? 'saved' : 'temporary',
 				savedLogin || pending.intent === 'reconnect' ? () => this.checkSavedTarget(pending.metadata, pending.intent) : undefined);
-			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');
+			const saved = this.options.settingsOwner.settings.cloudflareDeployment;
+			if (saved?.deletion && pending.intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
+			if (pending.intent !== 'reset' && pending.intent !== 'delete' && saved?.reset) throw new Error('Resume the server reset before connecting or updating.');
 			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
 			}
@@ -277,9 +278,8 @@ export class CloudflareDeploymentService {
 
 			if (pending.intent === 'delete') {
 				if (!this.options.beforeServerReset) throw new Error('Deletion requires sync shutdown.');
-				const artifacts = await this.whileActive(this.options.loadArtifacts);
 				await this.whileActive(() => deleteCrateServer({
-					api, accountId: account.id, metadata, version: artifacts.version,
+					api, accountId: account.id, metadata,
 					beforeDelete: () => this.whileActive(this.options.beforeServerReset!), onProgress,
 					persist: () => this.persistMetadata(metadata),
 				}));
@@ -385,7 +385,7 @@ export class CloudflareDeploymentService {
         this.lifetime.signal.throwIfAborted();
         if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
         const source = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-        if (!source?.accountId || !source.d1DatabaseId || source.reset) throw new Error('Select the source Cloudflare server and finish any deletion first.');
+        if (!source?.accountId || !source.d1DatabaseId || source.reset || source.deletion) throw new Error('Select the source Cloudflare server and finish any deletion first.');
         this.cancelPendingDeployment();
         this.handlingCallback = true;
         try {
@@ -477,9 +477,11 @@ export class CloudflareDeploymentService {
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: PendingOAuthSession['intent']): void {
 		const current = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (current?.reset && intent !== (current.reset.deleteOnly ? 'delete' : 'reset')) throw new Error('Resume the server reset or deletion before continuing.');
+		if (current?.deletion && intent !== 'delete') throw new Error('Resume server deletion before continuing.');
+		if (current?.reset && intent !== 'delete' && intent !== (current.reset.deleteOnly ? 'delete' : 'reset')) throw new Error('Resume the server reset or deletion before continuing.');
 		if (!current || current.accountId !== expected.accountId || current.workerName !== expected.workerName
-			|| current.d1DatabaseId !== expected.d1DatabaseId || current.r2BucketName !== expected.r2BucketName) {
+			|| current.d1DatabaseId !== expected.d1DatabaseId || current.r2BucketName !== expected.r2BucketName
+			|| expected.deletion && current.deletion?.id !== expected.deletion.id) {
 			throw new Error('Server settings changed. Start the update again.');
 		}
 	}

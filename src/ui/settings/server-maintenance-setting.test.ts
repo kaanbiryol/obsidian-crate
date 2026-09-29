@@ -84,3 +84,14 @@ it.each(['cancel', 'changed target'])('does not delete after %s', async reason =
 	await Promise.resolve();
 	expect(start).not.toHaveBeenCalled();
 });
+
+it('offers terminal deletion during a legacy unfinished rebuild', async () => {
+	const plugin = await render(false, true);
+	const { renderServerDeleteSetting } = await import('./server-delete-setting');
+	renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
+	confirm.mockResolvedValue(true);
+	const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server and all data')!;
+	setting.buttons[0]!.click();
+	await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(plugin, 'delete'));
+	expect(confirm.mock.calls[0]![1].details.join(' ')).toContain('entire selected database and file bucket');
+});

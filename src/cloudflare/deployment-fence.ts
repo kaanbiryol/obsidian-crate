@@ -23,6 +23,7 @@ export interface DeploymentFenceRecord {
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
   verificationPending?: boolean;
   completionOnly?: boolean;
+	deletionPending?: true;
 	uploadTag?: string;
 	resetId?: string;
 	cleanupTokenHash?: string;
@@ -52,8 +53,11 @@ export class DeploymentFence {
 	private uncertain = false;
   private verificationPending = false;
 	private databaseRemoved = false;
+	private readonly deletionPending: boolean;
 	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {
-    this.verificationPending = (JSON.parse(value) as DeploymentFenceRecord).verificationPending === true;
+		const record = JSON.parse(value) as DeploymentFenceRecord;
+		this.verificationPending = record.verificationPending === true;
+		this.deletionPending = record.kind === 'delete' && record.deletionPending === true;
   }
 
 	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string, uploadTag?: string): Promise<T> {
@@ -85,7 +89,7 @@ export class DeploymentFence {
         const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
         try {
             const rows = (await this.api.queryD1(this.account, this.database,
-                "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
+                `UPDATE maintenance_state SET value = ?${record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
                 [next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
             if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
             this.value = next;
@@ -116,6 +120,7 @@ export class DeploymentFence {
 		if (this.databaseRemoved) return;
 		if (this.verificationPending) throw new DeploymentRecoveryRequiredError('The update needs its matching Worker and database verified. The deployment fence remains held until recovery completes.');
 		if (this.uncertain) throw new DeploymentRecoveryRequiredError('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
+		if (this.deletionPending) throw new DeploymentRecoveryRequiredError('Server deletion is incomplete. The deployment fence remains held until the original server storage is removed. Retry server deletion.');
 		try {
 			await this.api.queryD1(this.account, this.database,
 				'DELETE FROM maintenance_state WHERE key = ? AND value = ?;', [DEPLOYMENT_FENCE_KEY, this.value]);
@@ -128,7 +133,7 @@ export class DeploymentFence {
 export async function withDeploymentFence<T>(input: {
 	api: FenceApi; accountId: string; databaseId: string;
 	record: Omit<DeploymentFenceRecord, 'owner' | 'startedAt'>;
-	/** Exact inspected deletion record; replacing it prevents the old client advancing. */
+	/** Exact inspected predecessor of a deletion; replacing it prevents the old client advancing. */
 	recoverDeletionValue?: string;
   resumeUpdateValue?: string;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
@@ -145,7 +150,7 @@ export async function withDeploymentFence<T>(input: {
 		acquired = (await input.api.queryD1(input.accountId, input.databaseId,
 			recoveredValue === undefined
 				? 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;'
-				: "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
+				: `UPDATE maintenance_state SET value = ?${input.record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
 			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]))
 			.flatMap(result => result.results ?? []);
 	} catch (error) {

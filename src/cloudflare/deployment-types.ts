@@ -13,6 +13,17 @@ export interface CloudflareDeploymentMetadata {
 	lastKnownRevision?: number;
 	lastDeployedVersion: string | null;
 	lastDeployedFingerprint: string | null;
+	/** Terminal resource deletion; independent of application schema and releases. */
+	deletion?: {
+		id: string;
+		phase: 'removing-worker' | 'clearing-bucket' | 'removing-database' | 'removing-helper' | 'complete';
+		databaseId: string;
+		bucketCreatedAt: string | null;
+		workerCreatedAt: string | null;
+		helperName: string;
+		/** Provider receipt for an uncertain helper upload when D1 is already absent. */
+		helperUploadPending?: string;
+	};
 	reset?: {
 		id: string;
 		phase: 'clearing' | 'rebuilding';

@@ -17,7 +17,7 @@ const confirmedSteps = new Set(['freeze-upgrade-data', 'verify-upgrade-checkpoin
  * it to "started" before dispatching its next mutation. Pending address activation
  * has a separate read-and-verify recovery path; other started steps stay blocked. */
 export async function recoverDeployment(api: RecoveryApi, target: CloudflareDeploymentMetadata, fingerprint?: string): Promise<DeploymentRecoveryResult> {
-    if (!target.accountId || !target.d1DatabaseId || target.reset) throw new Error('Select the original server and finish any pending reset or deletion first.');
+    if (!target.accountId || !target.d1DatabaseId || target.reset || target.deletion) throw new Error('Select the original server and finish any pending reset or deletion first.');
     const account = target.accountId;
     const database = target.d1DatabaseId;
     const report: Record<string, unknown> = { worker: target.workerName, database, checkedAt: new Date().toISOString(), currentFingerprint: fingerprint };

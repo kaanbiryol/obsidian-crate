@@ -71,6 +71,22 @@ describe('CloudflareApiClient', () => {
 		expect(transport).toHaveBeenCalledOnce();
 	});
 
+	it('publishes an isolated terminal cleanup helper with only the selected bucket and a hashed capability', async () => {
+		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: {} }) }));
+		const id = 'a'.repeat(32), hash = 'b'.repeat(64), tag = `crate-${crypto.randomUUID()}`;
+		await new CloudflareApiClient('account-secret', transport).uploadServerDeletionWorker('account', `crate-delete-${id}`, id, 'crate-0123456789abcdef', hash, tag);
+		const [url, request] = transport.mock.calls[0]!;
+		expect(url).toBe(`https://api.cloudflare.com/client/v4/accounts/account/workers/scripts/crate-delete-${id}`);
+		const body = new TextDecoder().decode(request.body as ArrayBuffer);
+		const metadata = JSON.parse(body.split('\r\n\r\n')[1]!.split('\r\n--')[0]!) as { bindings: unknown[]; annotations: Record<string, string> };
+		expect(metadata.bindings).toEqual([{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-0123456789abcdef' },
+			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: id }, { type: 'plain_text', name: 'CRATE_DELETE_TOKEN_HASH', text: hash },
+			{ type: 'plain_text', name: 'CRATE_DELETE_UPLOAD_TAG', text: tag }]);
+		expect(metadata.annotations).toEqual({ 'workers/message': `Crate deletion ${id}`, 'workers/tag': tag });
+		expect(body).not.toContain('account-secret');
+		expect(body).not.toContain('sqlite_master');
+	});
+
 	it('rejects an ambiguous truncated R2 listing', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: [], result_info: { is_truncated: true } }) }));
 		await expect(new CloudflareApiClient('token', transport).listR2Objects('account', 'bucket')).rejects.toThrow('complete R2');

@@ -136,7 +136,7 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 						details: [deployment
 							? 'Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'
 							: 'Your access token is revoked when the server is reachable. Local files and server data are kept. Other devices stay connected. Generate a new pairing code on your server to reconnect.'],
-						checkbox: deployment && !deployment.reset ? {
+						checkbox: deployment && !deployment.reset && !deployment.deletion ? {
 							label: 'Forget saved connection',
 							description: 'You’ll need to select a server to reconnect.',
 							onChange: checked => { forgetConnection = checked; },
@@ -167,7 +167,7 @@ export type { ConfigSectionContext } from './config-types';
 
 function renderServerBackupSetting({ containerEl, plugin }: ConfigSectionContext): void {
     const deployment = plugin.settings.cloudflareDeployment;
-    if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset) {
+    if (deployment?.accountId && deployment.d1DatabaseId && !deployment.reset && !deployment.deletion) {
         const restore = plugin.settings.cloudflareRestore;
         new Setting(containerEl).setName('Server backup recovery')
             .setDesc(restore ? 'Review or resume your saved restore. The original server and backup are retained.' : 'Restore an upgrade backup into a separate server, keeping your current files and connection.')

@@ -212,3 +212,15 @@ it('persists usage snapshots across settings reloads and rejects malformed cache
 	snapshot.groups[0]!.metrics[0]!.used = -1;
 	expect(normalizeCrateSettings({ usageSnapshot: snapshot }, '.obsidian').usageSnapshot).toBeNull();
 });
+
+it.each(['removing-worker', 'clearing-bucket', 'removing-database', 'removing-helper', 'complete'] as const)('retains terminal deletion progress after reload: %s', phase => {
+	const deletion = { id: 'a'.repeat(32), phase, databaseId: '01234567-89ab-cdef-0123-456789abcdef',
+		bucketCreatedAt: '2026-01-01', workerCreatedAt: null, helperName: `crate-delete-${'a'.repeat(32)}`,
+		helperUploadPending: 'crate-01234567-89ab-cdef-0123-456789abcdef' };
+	const deployment = { deploymentId: '0123456789abcdef', accountId: 'b'.repeat(32), accountName: 'Personal',
+		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef', d1DatabaseId: deletion.databaseId,
+		r2BucketName: 'crate-0123456789abcdef', workersSubdomain: 'example', lastDeployedVersion: 'old', lastDeployedFingerprint: null, deletion };
+	const settings = normalizeCrateSettings({ cloudflareDeployment: deployment }, '.obsidian');
+	expect(settings.cloudflareDeployment?.deletion).toEqual(deletion);
+	expect(buildPersistedCrateSettings(settings).cloudflareDeployment?.deletion).toEqual(deletion);
+});
