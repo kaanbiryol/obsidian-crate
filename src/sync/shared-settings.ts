@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { type CrateSettings, type SharedSettings } from '../plugin/settings-types';
 
 function normalizeStringArray(value: unknown): string[] | null {

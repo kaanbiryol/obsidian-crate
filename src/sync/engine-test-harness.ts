@@ -83,10 +83,7 @@ export type Harness = {
 	};
 };
 
-export function setEngineLocalManifest(
-	engine: SyncEngine,
-	localManifest: Harness['localManifest'],
-): void {
+function setEngineLocalManifest(engine: SyncEngine, localManifest: Harness['localManifest']): void {
 	(engine as unknown as { localManifest: Harness['localManifest'] }).localManifest = localManifest;
 }
 
@@ -110,10 +107,6 @@ export async function flushPendingChanges(engine: SyncEngine): Promise<void> {
 
 export function setSyncStatus(engine: SyncEngine, status: 'idle' | 'syncing' | 'error'): void {
 	(engine as unknown as { state: { status: 'idle' | 'syncing' | 'error' } }).state.status = status;
-}
-
-export function getConsecutiveCheckFailures(engine: SyncEngine): number {
-	return (engine as unknown as { lifecycle: { checkFailureCount: number } }).lifecycle.checkFailureCount;
 }
 
 export async function runPeriodicCheck(engine: SyncEngine): Promise<void> {

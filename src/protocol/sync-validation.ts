@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { assertPortablePaths, getSyncPathIssue } from './portable-path';
 import { createPathRecord } from './path-record';
 import type { FileEntry } from './sync-types';

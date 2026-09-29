@@ -1,5 +1,5 @@
 import type { DataAdapter } from 'obsidian';
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { parseSyncFiles } from '../protocol/sync-validation';
 import { assertPortablePaths } from '../protocol/portable-path';
 import type { FileEntry } from '../protocol/sync-types';

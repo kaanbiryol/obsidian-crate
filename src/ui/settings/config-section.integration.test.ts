@@ -358,7 +358,7 @@ it('keeps a matching live build visible and routes it to recovery when saved dep
     expect(update.buttons[0]?.buttonEl.textContent).toBe('Check and recover update');
     expect(update.settingEl.style.display).not.toBe('none');
     update.buttons[0]?.click();
-    expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin);
+    expect(checkAndRecoverUpdate).toHaveBeenCalledWith(plugin, expect.any(Function));
     expect(startCloudflareDeployment).not.toHaveBeenCalled();
 });
 

@@ -57,7 +57,7 @@ export interface ReminderIndex {
   getProjects(): string[];
 
   load(): Promise<ScanResult>;
-  rescanFile(file: TFile, force?: boolean): Promise<void>;
+  rescanFile(file: TFile): Promise<void>;
   flushDeferredScans(): Promise<void>;
   removeFile(filePath: string): void;
   renameFile(oldPath: string, newPath: string): void;
@@ -82,11 +82,15 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
   let sourceIssues = new Map<string, ReminderSourceIssue>();
 
   const listeners = new Set<IndexChangeListener>();
-  const fileRescanTimestamps = new Map<string, number>();
   const lookupStore = createReminderLookupStore();
   const optimisticState = createReminderOptimisticState();
-  const RESCAN_DEBOUNCE_MS = 1500;
   let scanQueue: Promise<unknown> = Promise.resolve();
+  let structureRevision = 0;
+  const pendingFileScans = new Set<{ path: string; current: boolean }>();
+  function invalidateScans(...paths: string[]): void {
+    structureRevision++;
+    for (const scan of pendingFileScans) if (paths.includes(scan.path)) scan.current = false;
+  }
   let deferredLoad = false;
   const deferredPaths = new Set<string>();
   const enqueueScan = <T>(scan: () => Promise<T>): Promise<T> => {
@@ -183,7 +187,16 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
         return { reminders, issues: [...sourceIssues.values()], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [...discoveredProjects], deferred: true };
       }
       log.info(` Starting scan of ${remindersFolderPath}/...`);
-      const result = await scanVault(app, remindersFolderPath, signal, shouldDeferScan, shouldDeferCollisionRepair, [...reminders, ...ambiguousOwners]);
+      let result: ScanResult;
+      let revision: number;
+      do {
+        revision = structureRevision;
+        result = await scanVault(app, remindersFolderPath, signal,
+          path => revision !== structureRevision || shouldDeferScan(path),
+          shouldDeferCollisionRepair, [...reminders, ...ambiguousOwners]);
+        // A rename or deletion updates the visible index immediately. Re-read
+        // the inventory before publishing a snapshot that crossed that event.
+      } while (!signal?.aborted && revision !== structureRevision);
       if (signal?.aborted) return result;
       if (result.deferred) {
         deferredLoad = true;
@@ -216,65 +229,63 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       return result;
     }),
 
-    rescanFile: (file: TFile, force = false) => enqueueScan(async () => {
-      if (signal?.aborted) return;
-      const filePath = file.path;
-      if (!isInRemindersFolder(filePath, remindersFolderPath)) {
-        return;
-      }
-      if (shouldDeferScan(filePath)) {
-        deferredPaths.add(filePath);
-        return;
-      }
+    rescanFile: (file: TFile) => {
+      // Capture the path when work is requested, including time spent queued.
+      // The watcher owns debounce; an accepted scan must not drop a newer edit.
+      const scan = { path: file.path, current: true };
+      pendingFileScans.add(scan);
+      return enqueueScan(async () => {
+        if (signal?.aborted || !scan.current || file.path !== scan.path) return;
+        const filePath = scan.path;
+        if (!isInRemindersFolder(filePath, remindersFolderPath)) {
+          return;
+        }
+        if (shouldDeferScan(filePath)) {
+          deferredPaths.add(filePath);
+          return;
+        }
 
-      const lastRescan = fileRescanTimestamps.get(filePath);
-      const now = Date.now();
-      if (!force && lastRescan && now - lastRescan < RESCAN_DEBOUNCE_MS) {
-        log.info(` Skipping rescan of ${filePath} - debounced (${now - lastRescan}ms since last scan)`);
-        return;
-      }
+        log.info(` Rescanning file: ${filePath}`);
 
-      log.info(` Rescanning file: ${filePath}`);
-      fileRescanTimestamps.set(filePath, now);
+        const identityOwners: ReminderIdentityOwners = new Map();
+        addReminderIdentityOwners(identityOwners, reminders);
+        addReminderIdentityOwners(identityOwners, ambiguousOwners);
+        const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners,
+          () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath), shouldDeferCollisionRepair);
+        if (signal?.aborted || !scan.current || file.path !== scan.path) return;
+        if (result.deferred) { deferredPaths.add(filePath); return; }
+        if (result.error) {
+          sourceIssues.set(filePath, { path: filePath, reason: result.error });
+          log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
+          notifyListeners();
+          return;
+        }
 
-      const identityOwners: ReminderIdentityOwners = new Map();
-      addReminderIdentityOwners(identityOwners, reminders);
-      addReminderIdentityOwners(identityOwners, ambiguousOwners);
-      const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferScan(filePath), shouldDeferCollisionRepair);
-      if (signal?.aborted) return;
-      if (result.deferred) { deferredPaths.add(filePath); return; }
-      if (result.error) {
-        sourceIssues.set(filePath, { path: filePath, reason: result.error });
-        fileRescanTimestamps.delete(filePath);
-        log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
+        sourceIssues.delete(filePath);
+
+        discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
+
+        const persistedReminders = lookupStore.getByFile(filePath);
+        optimisticState.clearFileState(filePath, [...persistedReminders, ...result.reminders]);
+
+        const released = new Set((result.releasedOwners ?? []).map(owner => `${owner.filePath}\0${owner.id}`));
+        ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath && !released.has(`${owner.filePath}\0${owner.id}`));
+        reminders = reminders.filter(reminder => reminder.filePath !== filePath && !released.has(`${reminder.filePath}\0${reminder.id}`));
+
+        reminders.push(...result.reminders);
+        // A move can release an indexed owner that has not received its own
+        // refresh yet. Publish the ownership transfer as one index transition.
+        if (released.size) lookupStore.rebuild(reminders);
+        else {
+          lookupStore.removeFile(filePath);
+          lookupStore.addReminders(result.reminders);
+        }
         notifyListeners();
-        return;
-      }
 
-      sourceIssues.delete(filePath);
-
-      discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
-
-      const persistedReminders = lookupStore.getByFile(filePath);
-      optimisticState.clearFileState(filePath, [...persistedReminders, ...result.reminders]);
-
-      const released = new Set((result.releasedOwners ?? []).map(owner => `${owner.filePath}\0${owner.id}`));
-      ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath && !released.has(`${owner.filePath}\0${owner.id}`));
-      reminders = reminders.filter(reminder => reminder.filePath !== filePath && !released.has(`${reminder.filePath}\0${reminder.id}`));
-
-      reminders.push(...result.reminders);
-      // A move can release an indexed owner that has not received its own
-      // refresh yet. Publish the ownership transfer as one index transition.
-      if (released.size) lookupStore.rebuild(reminders);
-      else {
-        lookupStore.removeFile(filePath);
-        lookupStore.addReminders(result.reminders);
-      }
-      notifyListeners();
-
-      log.info(` File rescanned, found ${result.reminders.length} reminders`);
-      if (deferredPaths.size) void index.flushDeferredScans().catch(error => log.error('Deferred reminder scan failed:', error));
-    }),
+        log.info(` File rescanned, found ${result.reminders.length} reminders`);
+        if (deferredPaths.size) void index.flushDeferredScans().catch(error => log.error('Deferred reminder scan failed:', error));
+      }).finally(() => pendingFileScans.delete(scan));
+    },
 
     async flushDeferredScans() {
       await scanQueue;
@@ -290,15 +301,15 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       for (const path of paths) {
         if (signal?.aborted) return;
         const file = app.vault.getAbstractFileByPath(path);
-        if (file instanceof TFile) await index.rescanFile(file, true);
+        if (file instanceof TFile) await index.rescanFile(file);
         else index.removeFile(path);
       }
     },
 
     removeFile(filePath: string) {
+      invalidateScans(filePath);
       deferredPaths.delete(filePath);
       sourceIssues.delete(filePath);
-      fileRescanTimestamps.delete(filePath);
       ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath);
       log.info(` Removing file from index: ${filePath}`);
       const before = reminders.length;
@@ -312,11 +323,10 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     },
 
     renameFile(oldPath: string, newPath: string) {
+      invalidateScans(oldPath, newPath);
       if (deferredPaths.delete(oldPath)) deferredPaths.add(newPath);
       const issue = sourceIssues.get(oldPath);
       if (issue) { sourceIssues.delete(oldPath); sourceIssues.set(newPath, { ...issue, path: newPath }); }
-      fileRescanTimestamps.delete(oldPath);
-      fileRescanTimestamps.delete(newPath);
       ambiguousOwners = ambiguousOwners.map(owner => owner.filePath === oldPath ? { ...owner, filePath: newPath } : owner);
       log.info(` Renaming file in index: ${oldPath} -> ${newPath}`);
 

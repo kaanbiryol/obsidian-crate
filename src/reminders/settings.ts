@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { normalizePath } from 'obsidian';
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import type { TabId } from './ui/layoutConstants';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';

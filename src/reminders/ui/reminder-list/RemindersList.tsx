@@ -16,7 +16,7 @@ import { ReorderableReminderList } from "@/reminders/components/ReorderableRemin
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { ThemeIconProvider } from "@/reminders/components/theme-icon";
-import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
+import { openReminderCreationModal } from "@/reminders/ui/adapters/reminderEditorModals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import {
   buildRemindersListPresentation,

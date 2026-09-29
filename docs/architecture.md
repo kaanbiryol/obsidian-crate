@@ -94,6 +94,33 @@ CratePlugin (src/plugin/CratePlugin.ts)
   └── MarkdownWriter (reminders/data/markdown-writer/) - markdown CRUD for reminder lines
 ```
 
+Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
+The engine retains cancellation, exclusive-operation checks and active-work tracking.
+`sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
+verification and resumption together; the runtime supplies connection identity checks
+and the ordinary sync-operation wrapper.
+
+Reading's PWA adapter composes three hooks: `useReadingSession` owns enrollment,
+session invalidation and durable hydration; `useReadingSync` owns refresh serialization,
+retries and foreground/cross-tab refresh; `useReadingArticle` owns article loading,
+browser history and stale navigation guards. The application component owns presentation
+and feature composition. Durable Reading records are validated at the storage boundary
+before the hooks publish them or the queue dispatches them.
+
+Reminder vault events are debounced by `reminders/services/vaultWatcher.ts`.
+The reminder index serializes accepted scans without a second time-based filter.
+Delete and rename events invalidate queued/in-flight scans for their paths; a full
+scan re-reads its inventory if one of those events occurs before publication.
+The same invalidation also stops the scanner's ID normalization, preventing a late
+read from rewriting a note after it moves out of the reminder folder. This keeps
+immediate index updates authoritative over older asynchronous reads.
+
+The sync HTTP client binds compatibility checks, dispatch and response publication
+to one connection generation. Replacing credentials or the lifecycle signal
+invalidates older work, including mutations waiting on cached compatibility data.
+Already dispatched Obsidian requests remain non-cancellable; ordinary durable
+operation reconciliation still handles uncertain remote writes.
+
 ## Authentication
 
 ### Cloudflare deployment

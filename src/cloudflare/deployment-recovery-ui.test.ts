@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('obsidian', () => ({ Notice: class {} }));
 vi.mock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
-vi.mock('./plugin-integration', () => ({ startCloudflareDeployment: mocks.start }));
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
 
@@ -25,7 +24,7 @@ function plugin(status: 'blocked' | 'recovered') {
 }
 it('offers a fresh check and cancel without asking users to attest upload safety', async () => {
     const instance = plugin('blocked');
-    await checkAndRecoverUpdate(instance as never);
+    await checkAndRecoverUpdate(instance as never, mocks.start);
     const options = mocks.modal.fail.mock.calls[0]?.[3] as { dismissLabel: string; technicalDetails: string; action: { label: string; onClick(): void } };
     expect(options.dismissLabel).toBe('Cancel');
     expect(options.technicalDetails).toBe('{"step":"upload-worker"}');
@@ -37,18 +36,18 @@ it('offers a fresh check and cancel without asking users to attest upload safety
 });
 it('offers an explicit update after successful recovery', async () => {
     const instance = plugin('recovered');
-    await checkAndRecoverUpdate(instance as never);
+    await checkAndRecoverUpdate(instance as never, mocks.start);
     const options = mocks.modal.succeed.mock.calls[0]?.[2] as { action: { label: string; onClick(): void } };
     expect(options.action.label).toBe('Update server');
     expect(mocks.start).not.toHaveBeenCalled();
     options.action.onClick();
-    expect(mocks.start).toHaveBeenCalledWith(instance, 'update');
+    expect(mocks.start).toHaveBeenCalledOnce();
 });
 
 it('explains a retained verification lock without misreporting it as a network failure', async () => {
     const instance = plugin('recovered');
     instance.cloudflareDeploymentService.recoverUpdate.mockRejectedValue(new DeploymentRecoveryRequiredError('Public fingerprint mismatch'));
-    await checkAndRecoverUpdate(instance as never);
+    await checkAndRecoverUpdate(instance as never, mocks.start);
     expect(mocks.modal.fail).toHaveBeenCalledWith('Could not check the server', expect.stringContaining('lock remains held'), undefined,
         { technicalDetails: 'Public fingerprint mismatch' });
 });
@@ -57,6 +56,6 @@ it('explains a retained verification lock without misreporting it as a network f
 it('reveals a running operation instead of starting recovery concurrently', async () => {
     const instance = plugin('recovered');
     mocks.reveal.mockReturnValueOnce(true);
-    await checkAndRecoverUpdate(instance as never);
+    await checkAndRecoverUpdate(instance as never, mocks.start);
     expect(instance.cloudflareDeploymentService.recoverUpdate).not.toHaveBeenCalled();
 });

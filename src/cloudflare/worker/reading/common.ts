@@ -18,7 +18,7 @@ export async function policy(db: D1Database): Promise<ReadingPolicy | null> {
 export async function authority(db: D1Database, principal: AuthPrincipal): Promise<ReadingPolicy> {
   if (!await featureEnabled(db, 'reading')) throw new ReadingError('Reading is paused. Enable it in Crate settings.', 423, 'feature_paused');
   const current = await policy(db);
-  if (!current) throw new ReadingError('Choose a Reading folder in Obsidian’s Crate settings first.', 403);
+  if (!current) throw new ReadingError('Choose a Reading folder in Obsidian’s Crate settings first.', 403, 'reading_not_configured');
   if (principal.scope !== 'vault' && principal.scope !== 'reminders' && (principal.folderPath !== current.folder_path || principal.readingGeneration !== current.generation)) {
     throw new ReadingError('Open a fresh Reading setup link from Crate settings.', 401);
   }

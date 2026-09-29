@@ -135,10 +135,17 @@ export class WorkerApiHttpClient {
 	getRequestTimings() { return { ...this.requestTimings, ...(this.requestTimings.d1 ? { d1: { ...this.requestTimings.d1 } } : {}) }; }
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
+	private requestGeneration = 0;
 
-	private clearServerInfo(): void {
+	private invalidateRequests(): void {
+		this.requestGeneration++;
 		this.serverInfo = undefined;
 		this.serverInfoRequest = undefined;
+	}
+
+	private assertRequestCurrent(generation: number): void {
+		if (this.externalSignal?.aborted) throw createAbortError('Sync request aborted');
+		if (generation !== this.requestGeneration) throw createAbortError('Sync connection changed');
 	}
 
 	/** Bound metadata reuse; the Worker still fences every mutation by protocol. */
@@ -169,12 +176,12 @@ export class WorkerApiHttpClient {
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
-		this.clearServerInfo();
+		this.invalidateRequests();
 		this.externalSignal = signal;
 	}
 
 	updateCredentials(workerUrl: string, authToken: string): void {
-		this.clearServerInfo();
+		this.invalidateRequests();
 		this.workerUrl = normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
 	}
@@ -196,14 +203,17 @@ export class WorkerApiHttpClient {
 		options: ApiRequestOptions,
 		timeout: number,
 	): Promise<ApiHttpResponse> {
+		// Bind compatibility, dispatch and completion to the same connection.
+		const generation = this.requestGeneration;
+		const { workerUrl, authToken, externalSignal } = this;
+		this.assertRequestCurrent(generation);
 		let protocol = CRATE_PLUGIN_PROTOCOL.current;
 		if (isCrateMutation(path, options.method)) {
 			const info = await this.getServerInfo(Math.min(timeout, 30_000));
+			this.assertRequestCurrent(generation);
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 		}
-		const externalSignal = this.externalSignal;
-		if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
 
 		const headersWithoutContentType = Object.fromEntries(
 			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),
@@ -246,6 +256,8 @@ export class WorkerApiHttpClient {
 			};
 			const resolveOnce = (response: ApiHttpResponse) => {
 				if (settled) return;
+				try { this.assertRequestCurrent(generation); }
+				catch (error) { rejectOnce(error); return; }
 				settled = true;
 				cleanup();
 				record('response', response);
@@ -253,6 +265,8 @@ export class WorkerApiHttpClient {
 			};
 			const rejectOnce = (error: unknown) => {
 				if (settled) return;
+				try { this.assertRequestCurrent(generation); }
+				catch (stale) { error = stale; }
 				settled = true;
 				cleanup();
 				record(isAbortError(error) ? 'aborted' : 'failed');
@@ -268,12 +282,12 @@ export class WorkerApiHttpClient {
 				timeout,
 			);
 			void this.transport({
-				url: `${this.workerUrl}${path}`,
+				url: `${workerUrl}${path}`,
 				method: options.method,
 				body: options.body,
 				contentType: resolvedContentType,
 				headers: {
-					Authorization: `Bearer ${this.authToken}`,
+					Authorization: `Bearer ${authToken}`,
 					'X-Crate-Client-Session': this.clientSession,
 					'X-Crate-Operation-Id': operationId,
 					[CRATE_PROTOCOL_HEADER]: String(protocol),
@@ -294,11 +308,13 @@ export class WorkerApiHttpClient {
 		options: ApiRequestOptions = {},
 		timeout: number = 30_000,
 	): Promise<T> {
+		const generation = this.requestGeneration;
 		logger.info(`${options.method ?? 'GET'} ${path}`);
 		const response = await this.runRequest(path, {
 			...options,
 			contentType: options.contentType ?? getHeader(options.headers ?? {}, 'Content-Type') ?? 'application/json',
 		}, timeout);
+		this.assertRequestCurrent(generation);
 
 		if (response.status >= 400) {
 			const details = parseErrorDetails(response.status, response.text);
@@ -322,8 +338,10 @@ export class WorkerApiHttpClient {
 		options: ApiRequestOptions = {},
 		timeout: number = 30_000,
 	): Promise<{ body: ArrayBuffer; headers: Record<string, string> }> {
+		const generation = this.requestGeneration;
 		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
 		const response = await this.runRequest(path, options, timeout);
+		this.assertRequestCurrent(generation);
 
 		if (response.status >= 400) {
 			const details = parseErrorDetails(response.status, response.text);

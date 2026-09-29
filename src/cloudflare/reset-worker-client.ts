@@ -1,4 +1,4 @@
-import { CloudflareApiError } from './cloudflare-api';
+import { CloudflareApiError } from './cloudflare-api-error';
 import { sha256Hex } from './deployment-artifacts';
 import type { HttpTransport } from './http';
 

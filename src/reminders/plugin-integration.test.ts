@@ -255,7 +255,7 @@ describe('initializeReminders', () => {
 		expect(plugin.activateRemindersView).toHaveBeenCalledTimes(1);
 
 		await latestWriter.onFileWritten?.({ path: 'Reminders/Work.md' });
-		expect(reminderIndexRescanFile).toHaveBeenCalledWith({ path: 'Reminders/Work.md' }, true);
+		expect(reminderIndexRescanFile).toHaveBeenCalledWith({ path: 'Reminders/Work.md' });
 	});
 
 	it('does not duplicate UI registration when reminders are initialized twice for the same plugin', async () => {

@@ -1,4 +1,4 @@
-import { isRecord } from '../plugin/settings';
+import { isRecord } from '../platform/validation';
 import { isSyncDate, isSyncSequence, parseSyncFiles } from './sync-validation';
 import type { FileEntry } from './sync-types';
 

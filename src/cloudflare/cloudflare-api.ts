@@ -1,3 +1,5 @@
+import { CloudflareApiError } from './cloudflare-api-error';
+export { CloudflareApiError } from './cloudflare-api-error';
 import { normalizeVaultName, VAULT_NAME_BINDING } from './vault-name';
 import { verifyWorkerDeployment } from './verify-worker-deployment';
 import cloudSafetyCompatSource from './worker/cloud-safety-compat.js?raw';
@@ -72,17 +74,6 @@ interface R2Bucket {
 interface D1QueryResult {
 	results?: Array<Record<string, unknown>>;
 	success?: boolean;
-}
-
-export class CloudflareApiError extends Error {
-	constructor(
-		message: string,
-		readonly status: number,
-		readonly code: number | null,
-	) {
-		super(message);
-		this.name = 'CloudflareApiError';
-	}
 }
 
 function parseJson(text: string): unknown {

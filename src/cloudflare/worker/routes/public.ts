@@ -3,7 +3,7 @@ import { readingSavePage, readingSaveScript } from '../reading/save-page';
 import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
-} from '../notifications';
+} from '../notification-enrollment-handlers';
 import {
 	handleAppleTouchIcon,
 	handleCrateIcon192,

@@ -1,3 +1,4 @@
+import { isPendingReading, isReadingArticleCache, isReadingCache, isReadingDraft, isReadingSession } from './storage-validation';
 import { downloadJson } from '../download';
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ReadingItem } from '@/reading/core/model';
@@ -24,9 +25,9 @@ export function readingDatabase(): Promise<IDBPDatabase<ReadingDatabase>> {
 export function readingSession(): ReadingSession | null {
   const raw = localStorage.getItem(READING_SESSION_KEY);
   if (!raw) return null;
-  const value = JSON.parse(raw) as ReadingSession;
-  if (!value.token || !value.id || !value.folderPath || !value.generation || !Number.isFinite(value.expiresAt)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
-  if (value.source && value.source !== 'reminders') throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.'); }
+  if (!isReadingSession(value)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
   if (value.source === 'reminders' && localStorage.getItem(AUTH_TOKEN_KEY) !== value.token) return null;
   return value;
 }
@@ -34,15 +35,51 @@ export function assertReadingSession(session: ReadingSession) {
   const current = readingSession();
   if (current?.id !== session.id || current.token !== session.token || current.generation !== session.generation) throw new Error('Reading sign-in changed. Reload this page.');
 }
-export async function readValue<T>(key: string): Promise<T | undefined> { return (await readingDatabase()).get('values', key) as Promise<T | undefined>; }
+async function readValue(key: string): Promise<unknown> { return (await readingDatabase()).get('values', key); }
+
+export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
+  const value = await readValue(`list:${session.id}`);
+  if (value === undefined) return undefined;
+  if (!isReadingCache(value, session.folderPath)) throw new Error('The saved Reading library could not be read. Refresh when connected.');
+  return value;
+}
+
+export async function readReadingDraft(key: string): Promise<{ url: string } | undefined> {
+  const value = await readValue(key);
+  if (value === undefined) return undefined;
+  if (!isReadingDraft(value)) throw new Error('The saved Reading draft could not be read. Export your Reading data before changing browser storage.');
+  return value;
+}
+
+export async function readReadingArticle(session: ReadingSession, id: string) {
+  const value = await readValue(`article:${session.id}:${id}`);
+  if (value === undefined) return undefined;
+  if (!isReadingArticleCache(value, session.folderPath) || value.item.crate_reading_id !== id) throw new Error('The saved article could not be read. Open it again when connected.');
+  return value;
+}
+
+export async function hasEarlierReadingChanges(sessionId?: string): Promise<boolean> {
+  const db = await readingDatabase();
+  for (const key of await db.getAllKeys('values')) {
+    if (!key.startsWith('pending:') || key === `pending:${sessionId}`) continue;
+    const value = await db.get('values', key);
+    if (!Array.isArray(value) || value.length) return true;
+  }
+  return false;
+}
 export async function writeValue(key: string, value: unknown, session?: ReadingSession): Promise<void> {
   const db = await readingDatabase();
   if (session) assertReadingSession(session);
   if (value === null) await db.delete('values', key); else await db.put('values', value, key);
 }
 export async function pendingReading(session: ReadingSession): Promise<PendingReading[]> {
-  const data = await readValue<PendingReading[]>(`pending:${session.id}`) ?? [];
-  if (!Array.isArray(data) || data.some(op => !op.id || op.sessionId !== session.id || !['capture','update','retry'].includes(op.action) || !op.intent || op.body !== undefined && typeof op.body !== 'string')) throw new Error('Pending Reading changes could not be read. Export your Reading data before changing browser storage.');
+  const stored = await readValue(`pending:${session.id}`);
+  const data = stored === undefined ? [] : stored;
+  const ids = new Set<string>();
+  if (!Array.isArray(data) || !data.every((op: unknown): op is PendingReading => {
+    if (!isPendingReading(op, session.id) || ids.has(op.id)) return false;
+    ids.add(op.id); return true;
+  })) throw new Error('Pending Reading changes could not be read. Export your Reading data before changing browser storage.');
   return data;
 }
 export async function readingLock<T>(action: () => Promise<T>): Promise<T> {
@@ -59,7 +96,9 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
   const key = `article:${session.id}:${item.crate_reading_id}`;
   await tx.store.put({ item, markdown, usedAt: Date.now() }, key);
   const keys = (await tx.store.getAllKeys()).filter(k => String(k).startsWith(`article:${session.id}:`));
-  const entries = await Promise.all(keys.map(async k => ({ key: k, value: await tx.store.get(k) as { markdown: string; usedAt: number } })));
+  const records = await Promise.all(keys.map(async key => ({ key, value: await tx.store.get(key) })));
+  // Preserve unreadable copies for recovery; they must not break a healthy write.
+  const entries = records.flatMap(entry => isReadingArticleCache(entry.value, session.folderPath) ? [{ key: entry.key, value: entry.value }] : []);
   entries.sort((a, b) => b.value.usedAt - a.value.usedAt);
   let bytes = 0;
   for (let i = 0; i < entries.length; i++) { const entry = entries[i]!; bytes += new TextEncoder().encode(entry.value.markdown).byteLength;

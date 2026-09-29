@@ -214,7 +214,7 @@ async function executeCloudflareOperation(
                 ],
                 { technicalDetails: deploymentErrorMessage(error), action: isReset || isDelete
                     ? { label: 'Open settings', onClick: () => plugin.openSettingsTab() }
-                    : { label: 'Check and recover update', onClick: () => { void checkAndRecoverUpdate(plugin); } } },
+                    : { label: 'Check and recover update', onClick: () => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); } } },
             );
             return;
         }

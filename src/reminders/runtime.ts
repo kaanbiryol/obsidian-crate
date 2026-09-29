@@ -93,7 +93,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	plugin.markdownWriter = createMarkdownWriter(plugin.app, index, journal);
 	plugin.reminderRepository = createReminderRepository(index, plugin.markdownWriter);
 	plugin.markdownWriter.setOnFileWritten(async (file) => {
-		await index.rescanFile(file, true);
+		await index.rescanFile(file);
 	});
 
 	plugin.remindersVaultWatcher = new VaultWatcher(

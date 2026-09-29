@@ -30,10 +30,10 @@ async function workspace() {
 		const index = createReminderIndex(app, folderPath, lifetime.signal, path => Boolean(path && journal.isPendingFile(path)), () => journal.hasPending());
 		for (const path of [sourcePath, destinationPath]) {
 			const file = app.vault.getAbstractFileByPath(path);
-			if (file instanceof TFile) await index.rescanFile(file, true);
+			if (file instanceof TFile) await index.rescanFile(file);
 		}
 		const writer = createMarkdownWriter(app, index, journal);
-		writer.setOnFileWritten(written => index.rescanFile(written, true));
+		writer.setOnFileWritten(written => index.rescanFile(written));
 		return { journal, index, writer, lifetime, issues };
 	}
 	return { files, vault, adapter, session, first: await session(), records: () => [...files.keys()].filter(path => path.startsWith(directory) && path.endsWith('.json')) };

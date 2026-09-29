@@ -1,7 +1,5 @@
+import { createEngineHistory } from './engine-history';
 import { loadPendingDiff } from './pending-diff';
-import { HistoryCheckpoints } from './history-checkpoint';
-import { createHistoryRestore } from './history-restore';
-import { findHistorySource } from './history-source';
 import type { HistorySnapshot } from './history-comparison';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
@@ -218,7 +216,7 @@ export class SyncEngine {
 
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
-		try { await this.historyCheckpoints().prune(this.settings.syncHistory.flatMap(entry => entry.historyCheckpoint ? [entry.historyCheckpoint] : [])); }
+		try { await this.history().prune(this.settings.syncHistory.flatMap(entry => entry.historyCheckpoint ? [entry.historyCheckpoint] : [])); }
 		catch (error) { logger.warn('Could not prune old history checkpoints:', errorMessage(error)); }
 		this.lifecycle.throwIfDestroyed();
 		await this.conflictStore.load();
@@ -280,64 +278,30 @@ export class SyncEngine {
 		return this.queueController.getPendingPaths();
 	}
 
-    private historyCheckpoints(): HistoryCheckpoints {
-        return new HistoryCheckpoints(this.vault.adapter, `${this.plugin.manifest.dir}/history-checkpoints`, normalizeWorkerUrl(this.settings.workerUrl));
+    private history() {
+        return createEngineHistory({
+            vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
+            getSettings: () => this.settings, getManifest: () => this.localManifest.getManifest(),
+            shouldIgnore: path => this.shouldIgnore(path),
+            assertActive: () => this.lifecycle.throwIfDestroyed(),
+            hasPendingMutations: () => Boolean(this.getActiveConflicts().length
+                || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length),
+            canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
+            runExclusive: operation => this.runHistoryOperation(operation),
+            applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
+        });
     }
 
-    async saveSharedHistoryCheckpoint() {
-        if (this.lifecycle.isDestroyed || this.state.status === 'syncing' || this.getActiveConflicts().length
-            || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) return undefined;
-        return this.api.sharedHistory.save();
-    }
+    async saveSharedHistoryCheckpoint() { return this.history().saveShared(); }
 
-    async saveHistoryCheckpoint(): Promise<string | undefined> {
-        if (this.lifecycle.isDestroyed || this.state.status === 'syncing' || this.getActiveConflicts().length
-            || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) return undefined;
-        // Clone synchronously, before another sync can advance the baseline.
-        const files = Object.fromEntries(Object.entries(this.localManifest.getManifest().files)
-            .filter(([path]) => !this.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }]));
-        return this.historyCheckpoints().save(files, [...this.settings.ignorePatterns]);
-    }
+    async saveHistoryCheckpoint(): Promise<string | undefined> { return this.history().saveLocal(); }
 
     async loadHistorySnapshot(checkpoint: string, shared = false): Promise<HistorySnapshot> {
-        this.lifecycle.throwIfDestroyed();
-        const snapshot = shared ? await this.api.sharedHistory.load(checkpoint) : await this.historyCheckpoints().load(checkpoint, this.settings.ignorePatterns);
-        this.lifecycle.throwIfDestroyed();
-        return { files: snapshot.files, read: async (path, file) => {
-            this.lifecycle.throwIfDestroyed();
-            if (snapshot.files[path] !== file) throw new Error('This file is not in the selected sync.');
-            const bytes = shared ? await this.api.sharedHistory.download(checkpoint, path, file)
-                : await (await findHistorySource(this.api, path, file, (await this.api.getManifest()).files[path]))();
-            this.lifecycle.throwIfDestroyed();
-            return bytes;
-        } };
+        return this.history().loadSnapshot(checkpoint, shared);
     }
 
     async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
-        return this.runHistoryOperation(async () => {
-            const scope = JSON.stringify(this.settings.ignorePatterns);
-            const verify = () => {
-                this.lifecycle.throwIfDestroyed();
-                if (scope !== JSON.stringify(this.settings.ignorePatterns)) throw new Error('Sync exclusions changed. Review the restore again.');
-                if (this.getActiveConflicts().length || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length) {
-                    throw new Error('Finish pending uploads, file restores, and conflict reviews before returning to this state.');
-                }
-            };
-            verify();
-            const snapshot = shared ? await this.api.sharedHistory.load(checkpoint) : await this.historyCheckpoints().load(checkpoint, this.settings.ignorePatterns);
-            const review = await createHistoryRestore({
-                vault: this.vault, api: this.api, target: snapshot.files,
-                baseline: this.localManifest.getManifest().files,
-                ...(shared ? { readTarget: (path: string, file: FileEntry) => this.api.sharedHistory.download(checkpoint, path, file) } : {}),
-                recoveryRoot: `${this.plugin.manifest.dir}/state-recovery`,
-                shouldIgnore: path => this.shouldIgnore(path), verify, beforeApply,
-                applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
-            });
-            return { ...review,
-                restore: () => this.runHistoryOperation(() => review.restore()),
-                verifySynced: () => this.runHistoryOperation(() => review.verifySynced()),
-            };
-        });
+        return this.history().prepareRestore(checkpoint, beforeApply, shared);
     }
 
     private async runHistoryOperation<T>(operation: () => Promise<T>): Promise<T> {
