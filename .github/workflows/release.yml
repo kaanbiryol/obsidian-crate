@@ -22,6 +22,9 @@ jobs:
   resolve:
     name: Resolve and verify release tag
     runs-on: macos-26
+    permissions:
+      # GitHub requires write access to include draft releases in API results.
+      contents: write
     outputs:
       commit: ${{ steps.commit.outputs.sha }}
     steps:
