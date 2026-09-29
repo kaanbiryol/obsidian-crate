@@ -259,7 +259,9 @@ try {
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
 			await checkRapidSwitches(page);
-			await page.emulateMedia({ reducedMotion: 'no-preference' });
+			// Higher contrast adds borders to the selection. Percentage transforms
+			// travel by its border box, which can differ from computed content width.
+			await page.emulateMedia({ reducedMotion: 'no-preference', contrast: 'more' });
 			const upcomingButton = await chip('Upcoming').elementHandle();
 			await chip('Today').tap();
 			await expect(row('today')).toBeVisible();
@@ -275,13 +277,19 @@ try {
 					await new Promise(requestAnimationFrame);
 					positions.push(new DOMMatrixReadOnly(getComputedStyle(control, '::after').transform).m41);
 				}
-				return { positions, destination: parseFloat(getComputedStyle(control, '::after').width) };
+				const style = getComputedStyle(control, '::after');
+				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+				return { positions, destination: parseFloat(style.width) + borders };
 			});
 			assert.ok(slide.positions.some(x => x > 0 && x < slide.destination), 'The shared selection must slide between segments');
 			await expect.poll(() => control.evaluate(element => {
 				const style = getComputedStyle(element, '::after');
-				return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width));
+				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+				return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width) - borders);
 			}), { message: 'The selection must settle under Upcoming' }).toBeLessThan(1);
+			await page.emulateMedia({ contrast: 'no-preference' });
 			await chip('Upcoming').focus();
 			await page.keyboard.press('Space');
 			await expect(chip('Upcoming')).toBeFocused();

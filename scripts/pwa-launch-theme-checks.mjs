@@ -4,7 +4,11 @@ import { expect } from '@playwright/test';
 import { previewEnrollmentToken } from './pwa-preview-fixtures.mjs';
 
 export async function dockAppearance(page) {
- return page.locator('.pwa-dock').evaluate(dock => {
+ return page.evaluate(() => {
+  // Hydration replaces the static dock. Resolve the painted dock and measure it
+  // in one task so a detached element cannot produce an empty appearance.
+  const dock = Array.from(document.querySelectorAll('.pwa-dock')).find(element => element.getClientRects().length > 0);
+  if (!dock) throw new Error('Expected a visible dock');
   const rect = element => {
    const box = element.getBoundingClientRect();
    return [box.x, box.y, box.width, box.height].map(value => Math.round(value * 100) / 100);
