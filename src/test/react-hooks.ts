@@ -10,11 +10,12 @@ afterEach(() => {
 });
 
 /** Real React effects and renders in a lightweight DOM; browser focus is tested separately. */
-export function renderHook<T>(useHook: () => T) {
+export function renderHook<T>(useHook: () => T, setup?: () => void) {
 	const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
 	vi.stubGlobal('window', window);
 	vi.stubGlobal('document', document);
 	vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+	setup?.();
 	const root = createRoot(document.getElementById('root')!);
 	let current: T;
 	let mounted = true;

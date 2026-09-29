@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
 import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-update';
-import type { PendingReading } from './storage';
+import type { PendingReading } from './outbox';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 import { presentReadingItems } from './pending-view';
 import type { ReadingItem } from '@/reading/core/model';
 const first = [{ start: 0, end: 3, text: 'One' }];
 const next = [...first, { start: 4, end: 7, text: 'Two' }];
-const pending = (): PendingReading => ({ id: 'op', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { highlights: first }, before: {} } });
+const pending = (): Extract<PendingReading, { action: 'update' }> => ({ id: 'op', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { highlights: first }, before: {} } });
 it('coalesces offline highlights while keeping the original absent-field precondition', () => {
 	const op = pending();
 	expect(coalesceReadingUpdate(op, { changes: { highlights: next }, before: { highlights: first } })).toBe(true);
@@ -15,7 +15,7 @@ it('coalesces offline highlights while keeping the original absent-field precond
 });
 it('preserves dispatched operations and rejects stale peer edits', () => {
 	const op = { ...pending(), body: 'exact saved bytes' };
-	expect(coalesceReadingUpdate(op, { changes: { highlights: next } })).toBe(false);
+	expect(coalesceReadingUpdate(op, { changes: { highlights: next }, before: { highlights: first } })).toBe(false);
 	expect(op.body).toBe('exact saved bytes');
 	expect(() => coalesceReadingUpdate(pending(), { changes: { highlights: next }, before: {} })).toThrow('another tab');
 });
@@ -29,8 +29,8 @@ it('combines repeated offline edits while retaining each original precondition',
 });
 it('checks follow-up edits against the last pending value, including dispatched changes', () => {
 	const operations: PendingReading[] = [
-		{ id: 'first', sessionId: 'session', action: 'update', body: 'immutable', intent: { changes: { favorite: true, tags: ['essays'] } } },
-		{ id: 'second', sessionId: 'session', action: 'update', intent: { changes: { favorite: false } } },
+		{ id: 'first', sessionId: 'session', action: 'update', body: 'immutable', intent: { id: 'article', changes: { favorite: true, tags: ['essays'] }, before: { favorite: false, tags: [] } } },
+		{ id: 'second', sessionId: 'session', action: 'update', intent: { id: 'article', changes: { favorite: false }, before: { favorite: true } } },
 	];
 	expect(() => assertReadingUpdateBase(operations, { changes: { favorite: true, tags: [] }, before: { favorite: false, tags: ['essays'] } })).not.toThrow();
 	expect(() => assertReadingUpdateBase(operations, { changes: { favorite: false }, before: { favorite: true } })).toThrow('another tab');

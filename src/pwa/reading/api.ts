@@ -1,13 +1,11 @@
-import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-update';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
-import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
+import { validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
-import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingDrainLock, readingLock, readingSession, pendingReading, writeValue, type PendingReading, type ReadingSession, type ReadingCache } from './storage';
+import { READING_SESSION_KEY, assertReadingSession, readingDatabase, readingSession, writeValue, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
-import { isReadingCache, isReadingIntent } from './storage-validation';
+import { isReadingCache } from './storage-validation';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -56,85 +54,4 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
   await tx.done;
   await writeValue(`list:${session.id}`, cache, session);
   return cache;
-}
-export async function queueReading(session: ReadingSession, action: PendingReading['action'], intent: Record<string, unknown>) {
-  if (action === 'capture') {
-    intent = { ...intent, url: readingUrl(intent.url) };
-    if (intent.title !== undefined && (typeof intent.title !== 'string' || intent.title.length > 1000)) throw new Error('Use a title shorter than 1,000 characters.');
-  }
-  if (!isReadingIntent(action, intent)) throw new Error('Invalid Reading change. Reopen this article before editing.');
-  return readingLock(async () => {
-    assertReadingSession(session); const queue = await pendingReading(session);
-    const previous = action === 'capture' ? [] : queue.filter(op => op.intent.id === intent.id);
-    if (previous.some(op => op.review)) throw new Error('Review this article’s unsynced changes in settings before editing again.');
-    if (previous.length && (action !== 'update' || previous.some(op => op.action !== 'update'))) throw new Error('Article text is being updated. Try again after it syncs.');
-    if (action === 'update') assertReadingUpdateBase(previous, intent);
-    const existing = previous.at(-1);
-    if (existing && coalesceReadingUpdate(existing, intent)) {
-      await writeValue(`pending:${session.id}`, queue, session); return queue;
-    }
-    if (queue.length >= 200) throw new Error('Send or review pending Reading changes before adding more.');
-    queue.push({ id: crypto.randomUUID(), sessionId: session.id, action, intent, queuedAt: new Date().toISOString() });
-    await writeValue(`pending:${session.id}`, queue, session);
-    return queue;
-  });
-}
-export async function drainReading(session: ReadingSession): Promise<ReadingCache | undefined> {
-  if (!navigator.onLine) return undefined;
-  return readingDrainLock(async () => {
-    assertReadingSession(session);
-    const queue = await pendingReading(session);
-    if (!queue.some(op => !op.review)) return undefined;
-    const info = await readingRequest<{ day: number; generation: string }>('/reading/session', session);
-    if (info.generation !== session.generation) throw new Error('Reading destination changed. Export and review pending work.');
-    const confirmed = new Set<string>();
-    for (const candidate of queue) {
-      if (candidate.review) continue;
-      const op = await readingLock(async () => {
-        const current = await pendingReading(session), next = current.find(entry => entry.id === candidate.id);
-        if (!next || next.review || current.some(entry => entry.review && entry.intent.id === next.intent.id && next.action !== 'capture')) return null;
-        if (!next.body) {
-          next.body = JSON.stringify({ ...next.intent, operationId: createReminderOperationId(info.day) });
-          // Store exact dispatch bytes and ID before making the request.
-          await writeValue(`pending:${session.id}`, current, session);
-        }
-        return next;
-      });
-      if (!op) continue;
-      try {
-        await readingRequest(`/reading/${op.action}`, session, op.body);
-        confirmed.add(op.id);
-      } catch (error) {
-        await readingLock(async () => {
-          const current = await pendingReading(session), failed = current.find(entry => entry.id === op.id);
-          if (!failed) return;
-          failed.error = error instanceof Error ? error.message : 'Save has not been confirmed. Retry when connected.';
-          failed.review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
-          failed.attempts = (failed.attempts ?? 0) + 1;
-          failed.retryAt = !failed.review && (!(error instanceof ReadingApiError) || error.status >= 500 || error.status === 429)
-            ? Date.now() + 2_000 * 2 ** Math.min(failed.attempts - 1, 5) : undefined;
-          // Later edits depend on the rejected value. Keep them for recovery,
-          // but never send them or present them as if that value had committed.
-          if (failed.review && failed.action !== 'capture') {
-            for (const followUp of current.slice(current.indexOf(failed) + 1)) {
-              if (followUp.intent.id !== failed.intent.id) continue;
-              followUp.review = true;
-              followUp.error = 'An earlier change to this article needs review. These edits are saved on this device.';
-            }
-          }
-          await writeValue(`pending:${session.id}`, current, session);
-        });
-        break;
-      }
-    }
-    if (!confirmed.size) return undefined;
-    // Confirm once for this batch before removing any durable command. Another
-    // tab may have queued more work while the network requests were in flight.
-    const cache = await loadReading(session);
-    await readingLock(async () => {
-      const current = await pendingReading(session);
-      await writeValue(`pending:${session.id}`, current.filter(op => !confirmed.has(op.id)), session);
-    });
-    return cache;
-  });
 }

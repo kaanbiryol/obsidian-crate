@@ -102,10 +102,15 @@ and the ordinary sync-operation wrapper.
 
 Reading's PWA adapter composes three hooks: `useReadingSession` owns enrollment,
 session invalidation and durable hydration; `useReadingSync` owns refresh serialization,
-retries and foreground/cross-tab refresh; `useReadingArticle` owns article loading,
+retry scheduling and foreground/cross-tab refresh; `useReadingArticle` owns article loading,
 browser history and stale navigation guards. The application component owns presentation
 and feature composition. Durable Reading records are validated at the storage boundary
-before the hooks publish them or the queue dispatches them.
+before the hooks publish them or the queue dispatches them. `reading/outbox.ts` owns
+typed commands, exact dispatch bytes, dependent-edit ordering and retry eligibility;
+automatic refreshes honor the persisted deadline and three-attempt budget, while an
+explicit refresh can retry uncertain commands. Rejected commands remain for review.
+The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
+invalidates late reads on Back, a newer open, library replacement or unmount.
 
 Reminder vault events are debounced by `reminders/services/vaultWatcher.ts`.
 The reminder index serializes accepted scans without a second time-based filter.
