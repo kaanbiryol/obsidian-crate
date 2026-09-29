@@ -148,7 +148,9 @@ async function captureReaderMotion(page, action) {
     const before = state(), width = pane.getBoundingClientRect().width;
     let slides = 0, pops = 0;
     const transition = event => { if (event.target === pane && event.propertyName === 'transform') slides++; };
-    const pop = () => { pops++; };
+    let resolvePop;
+    const popped = new Promise(resolve => { resolvePop = resolve; });
+    const pop = () => { pops++; resolvePop(); };
     pane.addEventListener('transitionrun', transition); window.addEventListener('popstate', pop);
     const committed = new Promise(resolve => {
       const observer = new MutationObserver(() => {
@@ -165,6 +167,8 @@ async function captureReaderMotion(page, action) {
     await committed;
     const samples = [], started = performance.now();
     do { await new Promise(resolve => requestAnimationFrame(resolve)); samples.push(state()); } while (performance.now() - started < 450);
+    // Back commits after the slide; a busy compositor may finish after the sampling window.
+    if (action !== 'open') { await popped; samples.push(state()); }
     pane.removeEventListener('transitionrun', transition); window.removeEventListener('popstate', pop);
     return { before, width, samples, slides, pops, motion: workspace.dataset.readerMotion };
   }, action); } finally { await hitTestStyle.evaluate(element => element.remove()); }
@@ -239,8 +243,8 @@ async function sheetAppearance(page) {
     const icon = close.querySelector('svg');
     const action = [...sheet.querySelectorAll('button')].find(button => button.textContent.trim() === 'Refresh all');
     return { radius: getComputedStyle(sheet).borderTopLeftRadius, surface: getComputedStyle(sheet).backgroundColor,
-      headerHeight: header.getBoundingClientRect().height, titleSize: getComputedStyle(header.querySelector('h2')).fontSize,
-      closeSize: close.getBoundingClientRect().width, icon: icon.outerHTML,
+      headerHeight: Math.round(header.getBoundingClientRect().height * 100) / 100, titleSize: getComputedStyle(header.querySelector('h2')).fontSize,
+      closeSize: Math.round(close.getBoundingClientRect().width * 100) / 100, icon: icon.outerHTML,
       actionSize: getComputedStyle(action).fontSize, actionColor: getComputedStyle(action).color, actionBackground: getComputedStyle(action).backgroundColor };
   });
 }

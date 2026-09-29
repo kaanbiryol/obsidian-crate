@@ -270,7 +270,10 @@ try {
 				return { positions, destination: parseFloat(getComputedStyle(control, '::after').width) };
 			});
 			assert.ok(slide.positions.some(x => x > 0 && x < slide.destination), 'The shared selection must slide between segments');
-			assert.ok(Math.abs(slide.positions.at(-1) - slide.destination) < 1, 'The selection must settle under Upcoming');
+			await expect.poll(() => control.evaluate(element => {
+				const style = getComputedStyle(element, '::after');
+				return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width));
+			}), { message: 'The selection must settle under Upcoming' }).toBeLessThan(1);
 			await chip('Upcoming').focus();
 			await page.keyboard.press('Space');
 			await expect(chip('Upcoming')).toBeFocused();

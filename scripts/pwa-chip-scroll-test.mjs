@@ -94,6 +94,7 @@ try {
           await page.touchscreen.tap(tap.x, tap.y);
           const dialog = page.getByRole('dialog', { name: picker === 'date' ? 'Schedule reminder' : 'Select project', exact: true });
           await expect(dialog).toBeVisible();
+          await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
           await dialog.getByRole('button', { name: picker === 'date' ? 'Close schedule' : 'Close project selection', exact: true }).tap();
           await expect(editor).toBeVisible();
           await expect(title).toBeFocused();

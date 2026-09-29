@@ -104,9 +104,16 @@ for (const browserType of [chromium, webkit]) {
     await expect(page.getByRole('button', { name: 'Add reminder', exact: true })).toBeDisabled();
     const draftTitle = 'Draft 👩🏽‍💻 [reference](https://example.com/draft)';
     const draftDescription = 'First line\n日本語 & <script>literal text</script>';
-    await title.fill(draftTitle);
+    // Use paste and explicit focus gestures. fill() selects DOM contents before focusing,
+    // which races the editor's focus/selection handling when moving between fields.
+    await title.press('ControlOrMeta+a');
+    await title.evaluate((element, text) => {
+      const data = new DataTransfer(); data.setData('text/plain', text);
+      element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    }, draftTitle);
     const description = page.getByRole('textbox', { name: 'Reminder description', exact: true });
-    await description.fill(draftDescription);
+    await description.focus();
+    await page.keyboard.insertText(draftDescription);
     await expect.poll(() => page.evaluate(() => {
       const saved = sessionStorage.getItem('crate-reminder-draft:Reminders:new');
       return saved ? JSON.parse(saved).draft : null;

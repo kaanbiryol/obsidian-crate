@@ -96,7 +96,7 @@ export function registerPluginNavigationTests() {
         const reopened = active.getByRole('dialog', { name: 'More views' });
         await expect(reopened.getByRole('button')).toHaveText(['Favorites', 'Archive', 'Highlights']);
         await reopened.getByRole('button', { name: 'Highlights', exact: true }).click();
-        await expect(active.getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
+        await expect(active.locator('.pwa-tab-panel:not([data-leaving])').getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
         await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
         await active.getByRole('button', { name: 'Inbox', exact: true }).click();
         await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -134,7 +134,7 @@ export function registerPluginNavigationTests() {
           const low = Math.min(frames.before, index), high = Math.max(frames.before, index);
           expect(frames.positions.every(pair => pair.every(position => position >= low - .01 && position <= high + .01))).toBe(true);
           expect(frames.positions.some(pair => pair.every(position => position > low + .05 && position < high - .05)), `${label} must visibly slide`).toBe(true);
-          for (const position of frames.positions.at(-1)!) expect(position).toBeCloseTo(index, 2);
+          await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll((indicators, index) => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width - index) < .005), index)).toBe(true);
         }
         const reversed = await workspace.evaluate(async root => {
           const positions: number[][] = [];
@@ -151,7 +151,7 @@ export function registerPluginNavigationTests() {
           return positions;
         });
         expect(reversed.every(pair => Math.abs(pair[0]! - pair[1]!) < .03), `Reversals must share one painted highlight: ${JSON.stringify(reversed)}`).toBe(true);
-        for (const position of reversed.at(-1)!) expect(position).toBeCloseTo(0, 2);
+        await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll(indicators => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width) < .005))).toBe(true);
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await active.getByRole('button', { name: 'Reading', exact: true }).click();
         await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll(indicators => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width - 3) < .01 && indicator.getAnimations().length === 0))).toBe(true);
@@ -191,7 +191,7 @@ export function registerPluginNavigationTests() {
                 await new Promise(resolve => setTimeout(resolve, delay));
                 select(target.label);
                 const frames: string[][] = [], start = performance.now();
-                while (performance.now() - start < 220) {
+                while (performance.now() - start < 220 || frames.length < 2) {
                   await new Promise(requestAnimationFrame);
                   frames.push(Array.from(root.querySelectorAll<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel')).map(panel => panel.dataset.tabView!));
                 }

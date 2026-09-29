@@ -18,7 +18,9 @@ export async function dockAppearance(page) {
 }
 
 async function loadingChrome(page, cardSelector = '.crate-content-loading') {
- return page.locator('.view-header').evaluate((header, cardSelector) => {
+ return page.evaluate(cardSelector => {
+  // Resolve and read in the same browser task; hydration can replace the splash.
+  const header = document.querySelector('.view-header');
   const rect = element => { const box = element.getBoundingClientRect(); return [box.x, box.y, box.width, box.height]; };
   const title = header.querySelector('.view-header-title'), settings = header.querySelector('[data-icon="settings"]');
   const font = getComputedStyle(title);
