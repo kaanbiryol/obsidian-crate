@@ -15,6 +15,11 @@
   --pwa-safe-area-bottom: 0px;
   --pwa-dock-bottom-inset: max(10px, var(--reminders-host-bottom-inset, 0px));
 
+  // Keep the article action above status bars that overlay the host pane.
+  .crate-reading-reader__floating {
+    top: calc(100% - 68px - var(--reminders-host-bottom-inset, 0px));
+  }
+
   // Floating controls need an opaque base beneath Obsidian's translucent tints.
   .crate-reading-reader__highlights-button:not(:disabled) {
     @media (hover: hover) and (pointer: fine) {
