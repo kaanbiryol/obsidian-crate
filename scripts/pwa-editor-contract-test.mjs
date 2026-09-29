@@ -393,15 +393,24 @@ async function verifyRepeatPicker(browser, server) {
       if (scenario === 'change') await page.getByLabel('Reminder time', { exact: true }).fill('10:30');
       await page.getByRole('button', { name: scenario === 'remove' ? 'Remove repeat' : 'Done', exact: true }).tap();
       await expect(title).toBeEditable();
+      const waitForEditorReturn = async () => {
+        await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeVisible();
+        await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
+        await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
+      };
+      await waitForEditorReturn();
       if (!['change', 'add', 'remove'].includes(scenario)) {
         await expect(title).toHaveText(initialTitle);
         // Reopening must not leave stale picker state that changes a later Done.
         await page.locator('.reminder-action-chips [data-picker="recurrence"]').tap();
         await page.getByRole('button', { name: 'Done', exact: true }).tap();
+        await waitForEditorReturn();
       }
-      const request = page.waitForRequest(request => request.url().endsWith('/reminders/update') && request.method() === 'POST');
-      await page.getByRole('button', { name: 'Save reminder', exact: true }).tap();
-      const body = (await request).postDataJSON();
+      const [request] = await Promise.all([
+        page.waitForRequest(request => request.url().endsWith('/reminders/update') && request.method() === 'POST'),
+        page.getByRole('button', { name: 'Save reminder', exact: true }).tap(),
+      ]);
+      const body = request.postDataJSON();
       if (scenario === 'remove') assert.equal(body.recurrence, null);
       else if (scenario === 'change' || scenario === 'add') {
         assert.equal(body.recurrence.frequency, scenario === 'add' ? 'daily' : 'weekly');

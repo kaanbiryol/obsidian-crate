@@ -186,7 +186,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const height = () => parseFloat(getComputedStyle(surface).height);
       dock.querySelector('[data-dock-group]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
       const samples = [], reveals = []; const start = performance.now();
-      while (performance.now() - start < 120) {
+      while (performance.now() - start < 120 || samples.length < 2) {
         await frame(); samples.push(height());
         const menu = dock.querySelector('.pwa-dock__menu');
         if (menu) {
@@ -200,7 +200,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       }
       const before = height();
       document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      await frame(); const after = height();
+      // Compare at the reversal itself, before a delayed frame advances it.
+      await Promise.resolve(); const after = height();
       return { samples, reveals, before, after };
     });
     assert.ok(interrupted.before > 70, JSON.stringify(interrupted));

@@ -85,7 +85,7 @@ export function registerPluginNavigationTests() {
           expect(frames.frames.every(frame => frame.docks.every(dock => Math.abs(dock.tabs - dock.indicator) < .01))).toBe(true);
           expect(frames.frames.every(frame => Math.abs(frame.docks[0]!.tabs - frame.docks[1]!.tabs) < .01), 'Both bars must reveal their icons and indicator together').toBe(true);
           expect(frames.frames.some(frame => frame.docks.every(dock => dock.height > 65))).toBe(true);
-          await expect(active.locator('.view-header-title')).toHaveText(label);
+          await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText(label);
           await expect(active.locator('[data-dock-group]')).toBeFocused();
           await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
         }
@@ -102,7 +102,7 @@ export function registerPluginNavigationTests() {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await active.locator('[data-dock-group]').press('ArrowDown');
         await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: 'Favorites', exact: true }).click();
-        await expect(active.locator('.view-header-title')).toHaveText('Favorites');
+        await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText('Favorites');
         await expect(page.getByRole('dialog', { name: 'More views' })).toHaveCount(0);
         for (const surface of await workspace.locator('.pwa-dock__surface').all()) await expect(surface).toHaveCSS('height', '60px');
       });
@@ -305,7 +305,7 @@ export function registerPluginNavigationTests() {
       await active.locator('[data-dock-group]').press('ArrowDown');
       await expect(page.getByRole('dialog', { name: 'More views' })).toBeVisible();
       await page.getByRole('button', { name: 'Favorites', exact: true }).click();
-      await expect(active.locator('.view-header-title')).toHaveText('Favorites');
+      await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText('Favorites');
       await active.locator('[data-dock-group]').press('ArrowDown');
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog', { name: 'More views' })).toBeHidden();
@@ -339,7 +339,7 @@ export function registerPluginNavigationTests() {
       const target = await favorite.boundingBox();
       await page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2, { steps: 4 });
       await page.mouse.up();
-      await expect(active.locator('.view-header-title')).toHaveText('Favorites');
+      await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText('Favorites');
       for (let index = 0; index < 3; index++) {
         await active.getByRole('button', { name: 'Reminders', exact: true }).click();
         await active.getByRole('button', { name: 'Upcoming', exact: true }).click();

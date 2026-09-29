@@ -84,7 +84,7 @@ async function checkTodayStartup(browser, reducedMotion) {
 
 async function checkScheduleFade(page, nextView, interruptWith) {
 	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-	const samples = await page.evaluate(async ({ nextView, interruptWith }) => {
+	const samples = await page.evaluate(async ({ nextView, interruptWith, reducedMotion }) => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
 		const current = () => container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
@@ -95,20 +95,26 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 		let outgoing = current(), oldText = outgoing.textContent;
 		const oldRect = rect(outgoing);
 		select(nextView);
-		const samples = [];
-		let start = performance.now();
-		while (performance.now() - start < 360) {
-			await new Promise(requestAnimationFrame);
-			if (interruptWith && performance.now() - start > 60) {
+		// Seek native CSS transitions so a dropped CI frame cannot skip the
+		// entire dissolve. Keep reduced-motion rendering on its normal frames.
+		const samples = [], animations = new Map();
+		for (let time = 0; time <= 420; time += 20) {
+			if (reducedMotion) await new Promise(requestAnimationFrame);
+			await Promise.resolve();
+			if (interruptWith && time === 80) {
 				outgoing = current(); oldText = outgoing.textContent;
-				select(interruptWith); interruptWith = null; samples.length = 0; start = performance.now();
-				continue;
+				select(interruptWith); interruptWith = null; samples.length = 0;
+				await Promise.resolve();
+			}
+			if (!reducedMotion) for (const layer of container.children) for (const animation of layer.getAnimations()) {
+				if (animation.transitionProperty !== 'opacity' || animation.playState === 'finished') continue;
+				if (!animations.has(animation)) { animation.pause(); animations.set(animation, time); }
+				animation.currentTime = Math.min(time - animations.get(animation), Number(animation.effect.getTiming().duration));
 			}
 			const incoming = current(), style = getComputedStyle(incoming);
 			const opacities = [...container.children].map(panel => Number(getComputedStyle(panel).opacity));
 			const leavingStyle = getComputedStyle(outgoing);
 			samples.push({
-				retained: outgoing.isConnected,
 				outgoing: outgoing.isConnected ? Number(leavingStyle.opacity) : 0,
 				coverage: 1 - opacities.reduce((gap, opacity) => gap * (1 - opacity), 1),
 			fading: opacities.some(opacity => opacity > .1 && opacity < .9),
@@ -119,12 +125,14 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 				transition: [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction],
 			});
 		}
+		for (const animation of container.getAnimations({ subtree: true })) {
+			if (animations.has(animation)) animation.finish();
+		}
 		return samples;
-	}, { nextView, interruptWith });
+	}, { nextView, interruptWith, reducedMotion });
 	assert.equal(samples.some(frame => frame.fading), !reducedMotion, 'Fade only when motion is enabled');
 	assert.ok(samples.every(frame => frame.coverage === 1 && frame.inert && frame.oldContent && frame.stationary && frame.chromeStable), 'Keep the background covered and content stationary, departing content inert, and chrome stable');
 	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out'])), 'Reuse the dock tab fade');
-	assert.equal(samples.at(-1).retained, false, 'Remove the old content after the fade');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 

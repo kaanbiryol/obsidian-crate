@@ -368,7 +368,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       for (const title of ['General', 'Tabs', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
       await page.screenshot({path:`test-results/reading/${name}-settings-${theme}.png`});
-      await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}));
+      // This checks dismissal and focus, independently of native flick velocity.
+      // The dedicated settings motion suite covers short, fast releases.
+      await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}), 540, 300, 36);
       await expect(sheet).toHaveCount(0);
       await expect(page.getByRole('button',{name:'Open settings',exact:true})).toBeFocused();
       await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);

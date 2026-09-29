@@ -83,23 +83,28 @@ export async function checkLaunchThemes(browser, origin) {
     if (document.querySelector('#app')) {
      const title = document.querySelector('.view-header-title');
      const liveTitle = document.querySelector('.pwa-reminders-view .view-header-title');
-     if (title) {
-      if (liveTitle) window.firstHeaderTitle ??= liveTitle;
-      const chain = [];
-      for (let node = title; node; node = node.parentElement) chain.push(getComputedStyle(node));
-      window.headerFrames.push({ sameNode: !liveTitle || liveTitle === window.firstHeaderTitle,
-       visible: chain.every(style => style.opacity === '1' && style.visibility === 'visible'),
-       settings: Boolean(document.querySelector('.pwa-header-settings-button svg')),
+     // A streamed document can yield while the parser is halfway through the
+     // static header. Start chrome assertions once that whole shell is parsed;
+     // theme surfaces below are still sampled from the first #app node onward.
+     if (document.querySelector('#pwa-opening-screen-init')) {
+      if (title) {
+       if (liveTitle) window.firstHeaderTitle ??= liveTitle;
+       const chain = [];
+       for (let node = title; node; node = node.parentElement) chain.push(getComputedStyle(node));
+       window.headerFrames.push({ sameNode: !liveTitle || liveTitle === window.firstHeaderTitle,
+        visible: chain.every(style => style.opacity === '1' && style.visibility === 'visible'),
+        settings: Boolean(document.querySelector('.pwa-header-settings-button svg')),
+       });
+      } else window.headerFrames.push({ visible: false });
+      const dock = document.querySelector('.pwa-dock');
+      const dockIcons = Array.from(dock?.querySelectorAll('svg') ?? []).filter(icon => icon.getClientRects().length > 0);
+      window.dockFrames.push({
+       visible: Boolean(dock && dock.getBoundingClientRect().height > 0),
+       icons: dockIcons.length,
+       placeholders: dock?.querySelectorAll('.pwa-mode-opening__shape').length ?? 0,
+       faded: dockIcons.some(icon => getComputedStyle(icon).opacity !== '1'),
       });
-     } else window.headerFrames.push({ visible: false });
-     const dock = document.querySelector('.pwa-dock');
-     const dockIcons = Array.from(dock?.querySelectorAll('svg') ?? []).filter(icon => icon.getClientRects().length > 0);
-     window.dockFrames.push({
-      visible: Boolean(dock && dock.getBoundingClientRect().height > 0),
-      icons: dockIcons.length,
-      placeholders: dock?.querySelectorAll('.pwa-mode-opening__shape').length ?? 0,
-      faded: dockIcons.some(icon => getComputedStyle(icon).opacity !== '1'),
-     });
+     }
      const selectors = ['html', 'body', '#app', '.pwa-launch-splash', '.crate-feature-shell', '.reminders-shadow-root'];
      window.launchFrames.push(selectors.flatMap(selector => {
       const element = document.querySelector(selector);

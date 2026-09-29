@@ -9,6 +9,8 @@ export async function checkPickerReturnTiming(page, reducedMotion, label) {
 		window.pickerReturnComplete = false;
 		window.pickerReturnFocusedAt = null;
 		let started;
+		let previousTime = 0;
+		let frameDelay = 0;
 		let keyboardInset = 0;
 		const viewport = window.visualViewport;
 		Object.defineProperty(viewport, 'height', { configurable: true, get: () => window.innerHeight - keyboardInset });
@@ -22,16 +24,19 @@ export async function checkPickerReturnTiming(page, reducedMotion, label) {
 		document.addEventListener('click', () => { started = performance.now(); }, { once: true, capture: true });
 		function sample() {
 			if (started !== undefined) {
+				const time = performance.now() - started;
+				frameDelay += Math.max(0, time - previousTime - 1000 / 60);
+				previousTime = time;
 				const stage = document.querySelector('.pwa-reminder-sheet-stage');
 				const transform = getComputedStyle(stage).transform;
 				window.pickerReturnFrames.push({
-					time: performance.now() - started,
+					time, frameDelay,
 					active: Boolean(stage.querySelector('.pwa-reminder-sheet-screen--editor.is-active')),
 					y: transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42,
 					top: stage.getBoundingClientRect().top,
 				});
 			}
-			if (started === undefined || performance.now() - started < 650) requestAnimationFrame(sample);
+			if (started === undefined || performance.now() - started - frameDelay < 650) requestAnimationFrame(sample);
 			else {
 				document.removeEventListener('focusin', focus, true);
 				delete viewport.height;
@@ -46,15 +51,14 @@ export async function checkPickerReturnTiming(page, reducedMotion, label) {
 	const { frames, focusedAt } = await page.evaluate(() => ({
 		frames: window.pickerReturnFrames, focusedAt: window.pickerReturnFocusedAt,
 	}));
-	// Frame-driven handoffs can only paint on the next available frame. Account
-	// for measured runner stalls, without changing the expected animation cadence.
-	const frameDelay = Math.max(0, ...frames.map((frame, index) => frame.time - (frames[index - 1]?.time ?? 0) - 1000 / 60));
+	// The handoff spans multiple frames. Subtract the accumulated missed-frame
+	// time up to each milestone; a timer pause with healthy frames still fails.
 	assert.ok(focusedAt !== null && focusedAt < 80, `${label}: restore focus inside the return gesture (${focusedAt} ms)`);
 	const editor = frames.filter(frame => frame.active);
-	assert.ok(editor[0]?.time < 160 + frameDelay, `${label}: editor must start returning promptly (${editor[0]?.time} ms)`);
+	assert.ok(editor[0]?.time - editor[0]?.frameDelay < 160, `${label}: editor must start returning promptly (${editor[0]?.time} ms)`);
 	const finalTop = editor.at(-1).top;
 	const settled = editor.find(frame => frame.y < 1 && Math.abs(frame.top - finalTop) < 1);
-	assert.ok(settled?.time < (reducedMotion === 'reduce' ? 160 : 590) + frameDelay,
+	assert.ok(settled?.time - settled?.frameDelay < (reducedMotion === 'reduce' ? 160 : 590),
 		`${label}: return must finish without an extra pause (${settled?.time} ms)`);
 	if (reducedMotion === 'no-preference') {
 		assert.ok(editor.filter(frame => frame.y > 10).length >= 3,
