@@ -10,6 +10,7 @@ vi.mock('../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }
 vi.mock('../plugin-integration', () => ({ startCloudflareDeployment: connect }));
 vi.mock('../../plugin/lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
 import { openServerRestore } from './ui';
+import { CloudflareReauthorizationRequired } from '../oauth-client';
 const backup = { prefix: 'backup', hash: 'hash', manifest: { createdAt: '2026-09-01T00:00:00Z', objects: [] } } as unknown as BackupChoice;
 function harness(saved?: unknown) {
   const plugin = { app: {}, settings: { cloudflareRestore: saved }, getSettingsDocument: vi.fn(), refreshSettingsTab: vi.fn(), cloudflareUsageConnection: { withAuthorization: vi.fn() }, cloudflareDeploymentService: { isBusy: false, listRestoreBackups: vi.fn(async () => [backup]), restoreBackup: vi.fn(async () => 'https://restored.test.workers.dev') } };
@@ -42,4 +43,12 @@ it('resumes the saved restore without selecting another backup', async () => {
   const f = harness({ phase: 'copying' }); await f.open();
   expect(f.plugin.cloudflareDeploymentService.listRestoreBackups).not.toHaveBeenCalled();
   expect(f.plugin.cloudflareDeploymentService.restoreBackup).toHaveBeenCalledWith(expect.any(Function), null, expect.any(Function));
+});
+
+it.each(['list', 'resume'])('explains a denied saved login during %s', async mode => {
+  const f = harness(mode === 'resume' ? { phase: 'copying' } : undefined);
+  f.plugin.cloudflareDeploymentService.listRestoreBackups.mockRejectedValue(new CloudflareReauthorizationRequired());
+  f.plugin.cloudflareDeploymentService.restoreBackup.mockRejectedValue(new CloudflareReauthorizationRequired());
+  await f.open();
+  expect(progress.fail).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('login needs renewing'), undefined, expect.any(Object));
 });

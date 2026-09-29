@@ -8,7 +8,7 @@ Open <http://127.0.0.1:8790/?scene=lexical&host=plugin&theme=dark> for plugin st
 and a real open Shadow DOM, or use `host=pwa` for the ordinary DOM. Both support
 `theme=light`.
 
-`npx playwright test tests/visual/lexical-trial.spec.ts --workers=2` checks editing,
+`node scripts/visual-test-run.mjs tests/visual/lexical-trial.spec.ts --workers=2` checks editing,
 Markdown links, chips, Unicode, paste and history in Chromium and WebKit.
 The built-PWA focus and selection scripts additionally exercise saving and
 picker restoration. Desktop browser tests do not establish physical iPhone

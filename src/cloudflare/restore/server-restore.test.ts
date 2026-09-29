@@ -1,3 +1,4 @@
+import { prepareRows } from './prepare-rows';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -10,9 +11,10 @@ import { provisionCloudflareDeployment } from '../provisioner';
 import { recoverDeployment } from '../deployment-recovery';
 import { completePublishedDeployment } from '../complete-published-deployment';
 import { listUpgradeBackups, restoreUpgradeBackup, rowSql } from './server-restore';
-import { hashBytes, parseBackupRows, prepareRows, readBackup } from './archive';
+import { hashBytes, parseBackupRows, readBackup } from './archive';
 import type { ServerRestoreState } from './state';
 import { normalizeCrateSettings } from '../../plugin/settings';
+import policyFixture from '../../../tests/fixtures/recovery/restore-policy.json';
 
 vi.mock('../provisioner', () => ({ provisionCloudflareDeployment: vi.fn(async () => undefined) }));
 vi.mock('../deployment-recovery', () => ({ recoverDeployment: vi.fn(async () => ({ status: 'ready' })) }));
@@ -50,7 +52,7 @@ async function fixture(extraRows = 0) {
       return [{ results: [] }];
     }),
     getRecoveryObject: vi.fn(async (_account: string, bucket: string, key: string) => {
-      const bytes = buckets.get(bucket)?.get(key); if (!bytes) throw new Error('Recovery object unavailable (404)'); return bytes;
+      const bytes = buckets.get(bucket)?.get(key); if (!bytes) throw new CloudflareApiError('Object not found', 404, null); return bytes;
     }),
     putRecoveryObject: vi.fn(async (_account: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
     putRestoredObject: vi.fn(async (_account: string, _sourceBucket: string, bucket: string, key: string, bytes: Uint8Array) => { buckets.get(bucket)!.set(key, bytes); }),
@@ -105,6 +107,33 @@ it('restores launch-baseline checkpoints, keeps history and receipts, and requir
   expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
   expect(f.snapshots.map(state => state.phase)).toEqual(['copying', 'publishing', 'complete']);
   expect(normalizeCrateSettings({ cloudflareRestore: f.state, cloudflareDeployment: f.state.target }, '.obsidian').cloudflareDeployment).toMatchObject({ workerName: f.state.target.workerName });
+});
+
+it('applies the shared CLI/in-app policy fixture without retaining source operation markers', async () => {
+  const f = await fixture();
+  await f.rewriteSQL(sql => sql + readFileSync('tests/fixtures/recovery/restore-policy.sql', 'utf8'));
+  await f.run();
+  const restored = f.databases.get(destination)!;
+  for (const key of policyFixture.discardedKeys) {
+    if (key === 'crate_restore_progress') {
+      expect(restored.prepare('SELECT value FROM maintenance_state WHERE key = ?').get(key)).not.toEqual({ value: 'old plan:3' });
+    } else expect(restored.prepare('SELECT value FROM maintenance_state WHERE key = ?').get(key)).toBeUndefined();
+  }
+  for (const [key, value] of Object.entries(policyFixture.retainedState)) expect(restored.prepare('SELECT value FROM maintenance_state WHERE key = ?').get(key)).toEqual({ value });
+  for (const table of policyFixture.emptyTables) expect(restored.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
+  for (const [table, row] of Object.entries(policyFixture.preservedRows)) expect(restored.prepare(`SELECT * FROM ${table}`).all()).toEqual([expect.objectContaining(row)]);
+});
+
+it.each([403, 503])('does not overwrite a destination object when its read fails with %s', async status => {
+  const f = await fixture();
+  const read = f.api.getRecoveryObject.getMockImplementation()!;
+  f.api.getRecoveryObject.mockImplementation(async (...args) => {
+    if (args[1] !== source.bucket) throw new CloudflareApiError('Unavailable', status, null);
+    return read(...args);
+  });
+  await expect(f.run()).rejects.toMatchObject({ status });
+  expect(f.api.putRestoredObject).not.toHaveBeenCalled();
+  expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 });
 
 it('resumes a committed batch whose acknowledgement was lost without duplicate rows or object uploads', async () => {

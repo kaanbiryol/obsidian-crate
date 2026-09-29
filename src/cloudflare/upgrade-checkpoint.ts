@@ -1,4 +1,4 @@
-import type { CloudflareApiClient } from './cloudflare-api';
+import { CloudflareApiError, type CloudflareApiClient } from './cloudflare-api';
 import { sha256Hex } from './deployment-artifacts';
 import type { DeploymentFence } from './deployment-fence';
 
@@ -81,7 +81,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
     await api.putRecoveryObject(accountId, bucketName, backupKey, bytes);
     if (await hash(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== sha) throw new Error('Settings checkpoint verification failed');
     objects.push({ key, sha256: sha, size: bytes.byteLength, contentType: 'application/json' });
-  } catch (error) { if (!(error instanceof Error && error.message === 'Recovery object unavailable (404)')) throw error; }
+  } catch (error) { if (!(error instanceof CloudflareApiError && error.status === 404)) throw error; }
   const manifest = JSON.stringify({ format: 1, complete: true, createdAt: new Date().toISOString(), source: { account: accountId, database: databaseId, bucket: bucketName }, bookmark: null, databaseSha256, objects });
   await api.putRecoveryObject(accountId, bucketName, `${prefix}/archive.json`, new TextEncoder().encode(manifest));
   if (await hash(await api.getRecoveryObject(accountId, bucketName, `${prefix}/archive.json`)) !== await sha256Hex(manifest)) throw new Error('Checkpoint manifest verification failed');

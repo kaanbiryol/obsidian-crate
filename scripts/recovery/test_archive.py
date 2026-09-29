@@ -84,6 +84,28 @@ class ArchiveTests(unittest.TestCase):
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertTrue({'reminder_operations_created_at_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
         self.assertEqual(len(manifest['objects']), 1)
+    def test_shared_cli_and_in_app_restore_policy(self):
+        fixture_dir = Path(__file__).parents[2] / 'tests/fixtures/recovery'
+        expected = json.loads((fixture_dir / 'restore-policy.json').read_text())
+        self.remote.sql += b"\nDELETE FROM maintenance_state WHERE key = 'crate_deployment_fence';\n"
+        self.remote.sql += (fixture_dir / 'restore-policy.sql').read_bytes()
+        recovery.backup(self.remote, self.directory)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        recovery.restore(target, self.directory)
+        restored = load_database(target.sql)
+        self.addCleanup(restored.close)
+        for key in expected['discardedKeys']:
+            self.assertIsNone(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone())
+        for key, value in expected['retainedState'].items():
+            self.assertEqual(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone()[0], value)
+        for table in expected['emptyTables']:
+            self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), [])
+        for table, expected_row in expected['preservedRows'].items():
+            rows = restored.execute(f'SELECT * FROM {table}').fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual({key: rows[0][key] for key in expected_row}, expected_row)
+
     def test_baseline_restore_preserves_its_source_archive(self):
         recovery.backup(self.remote, self.directory)
         source_sql = (self.directory / 'database.sql').read_bytes()

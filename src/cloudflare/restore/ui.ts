@@ -6,6 +6,9 @@ import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../../
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { startCloudflareDeployment } from '../plugin-integration';
 import type { BackupChoice } from './archive';
+import { CloudflareReauthorizationRequired } from '../oauth-client';
+
+const renewLoginMessage = 'Your Cloudflare login needs renewing. Select Reconnect under Account and devices, then resume the restore.';
 
 class BackupPicker extends SharedModal {
   constructor(plugin: CratePlugin, private readonly backups: BackupChoice[], private readonly select: (backup: BackupChoice) => void) { super(plugin.app); }
@@ -40,7 +43,8 @@ export async function openServerRestore(plugin: CratePlugin, chooseAnother = fal
     progress.dismiss();
     new BackupPicker(plugin, backups, backup => { void confirmRestore(plugin, backup); }).open();
   } catch (error) {
-    if (!signal.aborted) progress.fail('Could not list server backups', 'Check your connection and Cloudflare login, then try again.', undefined,
+    if (!signal.aborted) progress.fail('Could not list server backups', error instanceof CloudflareReauthorizationRequired
+      ? renewLoginMessage : 'Check your connection and Cloudflare login, then try again.', undefined,
       { technicalDetails: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
@@ -67,7 +71,8 @@ async function runRestore(plugin: CratePlugin, backup: BackupChoice | null): Pro
   } catch (error) {
     if (signal.aborted) return;
     plugin.refreshSettingsTab();
-    progress.fail('Restore needs attention', 'The original server and backup are kept. Resume to check the same restore destination; do not delete its resources.', undefined,
+    progress.fail('Restore needs attention', error instanceof CloudflareReauthorizationRequired
+      ? renewLoginMessage : 'The original server and backup are kept. Resume to check the same restore destination; do not delete its resources.', undefined,
       { technicalDetails: error instanceof Error ? error.message : 'Unknown error', action: { label: 'Resume restore', onClick: () => { void openServerRestore(plugin); } } });
   }
 }

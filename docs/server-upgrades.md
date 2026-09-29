@@ -127,6 +127,12 @@ indefinitely. Requests already sent to websites or push providers cannot be reca
 
 ## In-app checkpoint restore
 
+In-app and Python recovery share table-reset, maintenance-marker and history-retention
+rules in `src/cloudflare/restore/restore-policy.json`. Both run the fixture in
+`tests/fixtures/recovery/` to verify that credentials and source operation markers
+are discarded while queued captures and operation receipts survive. Each adapter
+keeps its own schema migration and destination publication workflow.
+
 The in-app restore adapter supports source schemas 1 and 2 into the current
 schema-2 database. Schema 2 adds only the durable Reading capture queue, so restore
 preserves queued captures (including their retry state and notes) alongside the

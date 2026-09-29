@@ -6,6 +6,8 @@ import sqlite3
 import time
 from pathlib import Path
 
+RESTORE_POLICY = json.loads((Path(__file__).parents[2] / 'src/cloudflare/restore/restore-policy.json').read_text())
+
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -87,16 +89,15 @@ def prepare_restore_sql(directory, restored_at=None):
     _manifest, db = verify(directory)
     try:
         upgrade_schema(db)
-        for table in ('auth_tokens', 'push_subscriptions', 'web_enrollment_tokens',
-                      'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache',
-                      'object_cleanup_queue', 'staged_uploads', 'staged_upload_batches',
-                      'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state',
-                      'reading_sources', 'reading_jobs', 'reading_enrollments', 'reading_handoffs'):
+        for table in RESTORE_POLICY['resetTables']:
             db.execute(f'DELETE FROM "{table}"')
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
-        db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + 2592000000,))
-        db.execute("DELETE FROM maintenance_state WHERE key = 'crate_deployment_fence' OR key GLOB 'reminder_source_scan*'")
+        db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + RESTORE_POLICY['fileVersionRetentionMs'],))
+        discarded_keys = [(key,) for key, in db.execute('SELECT key FROM maintenance_state')
+                          if key in RESTORE_POLICY['resetMaintenanceKeys']
+                          or any(key.startswith(prefix) for prefix in RESTORE_POLICY['resetMaintenancePrefixes'])]
+        db.executemany('DELETE FROM maintenance_state WHERE key = ?', discarded_keys)
         db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md' AND EXISTS (SELECT 1 FROM notification_policy WHERE id = 1 AND path >= folder_path || '/' AND path < folder_path || '0')", (restored_at,))
         db.commit()
         return '\n'.join(db.iterdump()).encode('utf-8')
