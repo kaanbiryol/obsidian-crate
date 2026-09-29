@@ -6,8 +6,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ModalLayout } from './shared/ModalLayout';
 import { StatusContent } from './shared/StatusContent';
 import { Button } from './shared/Button';
-import { ThemeIconProvider } from '../reminders/components/theme-icon';
-import { ObsidianIcon } from '../reminders/components/obsidian-icon';
+import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
+import { ObsidianIcon } from '@/ui/obsidian-icon';
 
 const activeOperations = new WeakMap<App, CloudflareDeploymentModal>();
 

@@ -25,7 +25,7 @@ import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 import type { ReadingItem, ReadingChanges } from '@/reading/core/model';
 import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
 import { Button } from '@/ui/shared/Button';
-import { ThemeIcon } from '@/reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { PwaReadingDialog } from './PwaReadingDialog';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { SettingsRow } from '../components/SettingsRow';

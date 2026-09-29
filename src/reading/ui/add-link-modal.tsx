@@ -6,8 +6,8 @@ import { BaseUiModal } from '../../ui/shared/BaseUiModal';
 import { hideNativeModalCloseButton } from '../../reminders/ui/adapters/modalShell';
 import { getReadingLibrary } from '../runtime';
 import { SaveLinkDialog } from './SaveLinkDialog';
-import { ThemeIconProvider } from '../../reminders/components/theme-icon';
-import { ObsidianIcon } from '../../reminders/components/obsidian-icon';
+import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
+import { ObsidianIcon } from '@/ui/obsidian-icon';
 
 /** Plugin capture uses Obsidian's modal shell with the same capture fields as the PWA. */
 export class AddReadingLinkModal extends BaseUiModal {

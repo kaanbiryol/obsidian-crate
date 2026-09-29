@@ -1,4 +1,4 @@
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { PWA_SURFACE_SPRING } from './motion';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useMotionValueEvent, useSpring } from 'motion/react';
@@ -6,7 +6,7 @@ import { useMotionValueEvent, useSpring } from 'motion/react';
 /** One damped spring preserves both shape and velocity when the target changes. */
 export function useDockMorph(open: boolean, menuHeight: number) {
   const surface = useRef<HTMLSpanElement>(null);
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const target = open ? menuHeight : 60;
   const height = useSpring(60, PWA_SURFACE_SPRING);
   const paint = useCallback((value: number) => {

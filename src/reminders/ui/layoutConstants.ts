@@ -18,11 +18,6 @@ const EASE_STANDARD: Easing = [0.4, 0, 0.2, 1];
 // Page-level transition duration (slightly faster)
 export const PAGE_TRANSITION_DURATION = 0.18;
 
-export const SPRING_CONFIG = {
-  stiffness: 500,
-  damping: 40,
-  mass: 0.8
-} as const;
 
 // Position belongs to the row; the separate drag surface owns the subtle lift.
 export const REMINDER_LIST_LAYOUT_TRANSITION = {

@@ -9,10 +9,10 @@ import { PwaScheduleSwitcher } from './PwaScheduleSwitcher';
 import { TABS } from '@/reminders/ui/layoutConstants';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
-import { ThemeIconProvider } from '@/reminders/components/theme-icon';
+import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
@@ -97,7 +97,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 }) => {
 	const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? 'browse' : initialTab);
 	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
-	const reduceMotion = useObsidianReducedMotion();
+	const reduceMotion = useReducedMotion();
 	const shell = useRef<HTMLDivElement>(null);
 	const contentRevealed = useRef(false);
 

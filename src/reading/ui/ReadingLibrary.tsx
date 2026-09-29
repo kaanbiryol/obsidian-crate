@@ -5,7 +5,7 @@ import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
 import type { NavigationItem } from '../../ui/shared/NavigationBar';
 import { NavigationBar } from '../../ui/shared/NavigationBar';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { FloatingActionButton } from '../../reminders/components/FloatingActionButton';
 import type { ReadingChanges, ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';

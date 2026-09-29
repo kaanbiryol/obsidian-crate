@@ -3,7 +3,7 @@ import { AppDock } from '../shared/navigation/AppDock';
 import { DOCK_TABS, type DockTab } from '../shared/navigation/dock-destinations';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 
 type RenderDock = (tab: TabId, onChange: (tab: TabId) => void, onAdd: (() => void) | undefined, inert: boolean) => React.ReactNode;
 type ReadingDockProps = { activeTab: ReadingSection; onTabChange: (tab: ReadingSection) => void; onAdd: () => void; inert?: boolean };
@@ -26,7 +26,7 @@ export function PluginWorkspaceNavigation({ initialSection = 'reminders', initia
   const [visited, setVisited] = useState({ reminders: initialSection === 'reminders', reading: initialSection === 'reading' });
   const root = useRef<HTMLDivElement>(null);
   const [front, setFront] = useState(initialSection);
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const activeSection = section === 'reading' && readingEnabled ? 'reading' : remindersEnabled ? 'reminders' : 'reading';
   useLayoutEffect(() => {
     if (front === activeSection) return;

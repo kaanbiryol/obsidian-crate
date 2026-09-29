@@ -1,8 +1,8 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from './ThemeIcon';
 import { Button } from './Button';
-import type { ThemeIconSize } from '../../reminders/components/theme-icon';
+import type { ThemeIconSize } from './ThemeIcon';
 
 type NativeButtonProps = Omit<
 	ButtonHTMLAttributes<HTMLButtonElement>,

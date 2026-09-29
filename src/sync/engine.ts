@@ -287,7 +287,7 @@ export class SyncEngine {
             hasPendingMutations: () => Boolean(this.getActiveConflicts().length
                 || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length),
             canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
-            runExclusive: operation => this.runHistoryOperation(operation),
+            runExclusive: operation => this.runExclusiveOperation(operation),
             applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
         });
     }
@@ -304,9 +304,9 @@ export class SyncEngine {
         return this.history().prepareRestore(checkpoint, beforeApply, shared);
     }
 
-    private async runHistoryOperation<T>(operation: () => Promise<T>): Promise<T> {
+    private async runExclusiveOperation<T>(operation: () => Promise<T>, busyMessage = 'Wait for sync to finish, then try again.'): Promise<T> {
         this.lifecycle.throwIfDestroyed();
-        if (this.state.status === 'syncing') throw new Error('Wait for sync to finish, then try again.');
+        if (this.state.status === 'syncing') throw new Error(busyMessage);
         this.updateState({ status: 'syncing' });
         return this.trackWork(async () => {
             try { return await operation(); }
@@ -362,22 +362,12 @@ export class SyncEngine {
         }, keys);
         return { ...review, discard: async () => {
             this.assertPendingSelection(keys);
-            this.updateState({ status: 'syncing' });
-            return this.trackWork(async () => {
-                try { return await review.discard(); }
-                finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
-            });
+            return this.runExclusiveOperation(() => review.discard());
         } };
     }
 
 	async runConflictResolution<T>(operation: () => Promise<T>): Promise<T> {
-		if (this.state.status === 'syncing') throw new Error('Wait for sync to finish before resolving this conflict.');
-		this.lifecycle.throwIfDestroyed();
-		this.updateState({ status: 'syncing' });
-		return this.trackWork(async () => {
-			try { return await operation(); }
-			finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
-		});
+		return this.runExclusiveOperation(operation, 'Wait for sync to finish before resolving this conflict.');
 	}
 
 	async markConflictResolved(path: string): Promise<void> {

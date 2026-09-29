@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { fetchReadyReminderList } from '../reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import { parseReminderSourceIssues } from '../reminder-source-issues';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
+
+export interface ConfirmedReminderSnapshot {
+	reminders: ReminderRecord[];
+	projects: string[];
+}
 
 export interface ReminderSyncState {
 	reminders: ReminderRecord[];
@@ -17,36 +22,31 @@ export interface ReminderSyncState {
 	dataMode: DataMode;
 	lastUpdatedAt: number | null;
 	isOffline: boolean;
-	remindersRef: MutableRefObject<ReminderRecord[]>;
-	projectsRef: MutableRefObject<string[]>;
-	hydratedCacheRef: MutableRefObject<boolean>;
+	getSnapshot: () => ConfirmedReminderSnapshot;
+	hasHydratedCache: () => boolean;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	loadReminders: LoadReminders;
 	rebuildOfflineCache: () => Promise<void>;
 	beginLocalMutation: () => () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => Promise<void>;
 	resetReminderState: () => void;
-	setReminders: Dispatch<SetStateAction<ReminderRecord[]>>;
-	setProjects: Dispatch<SetStateAction<string[]>>;
-	setLoading: Dispatch<SetStateAction<boolean>>;
-	setError: Dispatch<SetStateAction<string | null>>;
+	refreshPresentation: () => void;
+	reportError: (message: string | null) => void;
 }
 
 export function useReminderSync({
 	apiFetch,
 	authToken,
-	bootstrapped,
 	config,
 	setSelectedProject,
 }: {
 	apiFetch: ApiFetch;
 	authToken: string | null;
-	bootstrapped: boolean;
 	config: StoredConfig;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 }): ReminderSyncState {
-	const [reminders, setReminders] = useState<ReminderRecord[]>([]);
-	const [projects, setProjects] = useState<string[]>([]);
+	const [snapshot, setSnapshot] = useState<ConfirmedReminderSnapshot>({ reminders: [], projects: [] });
+	const { reminders, projects } = snapshot;
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -55,35 +55,54 @@ export function useReminderSync({
 	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
 	const [issues, setIssues] = useState<ReminderSourceIssue[]>([]);
 	const issuesRef = useRef<ReminderSourceIssue[]>([]);
-	const remindersRef = useRef(reminders);
-	const projectsRef = useRef(projects);
+	const snapshotRef = useRef(snapshot);
 	const hydratedCacheRef = useRef(false);
 	const requestCoordinatorRef = useRef(createReminderRequestCoordinator());
 	const etagRef = useRef<string | undefined>(undefined);
 	const lastCheckedAtRef = useRef<number | null>(null);
 	const activeReadRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
+	const lifetimeRef = useRef({ active: true });
 	useEffect(() => {
-		remindersRef.current = reminders;
-	}, [reminders]);
+		const lifetime = { active: true };
+		lifetimeRef.current = lifetime;
+		return () => {
+			lifetime.active = false;
+			activeReadRef.current = null;
+		};
+	}, [apiFetch, authToken, config.folderPath]);
 
-	useEffect(() => {
-		projectsRef.current = projects;
-	}, [projects]);
+	const getSnapshot = useCallback(() => snapshotRef.current, []);
+	const publishSnapshot = useCallback((reminders: ReminderRecord[], projects = snapshotRef.current.projects) => {
+		snapshotRef.current = { reminders, projects };
+		setSnapshot(snapshotRef.current);
+		setSelectedProject(current => current && !projects.includes(current) ? null : current);
+	}, [setSelectedProject]);
+	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
+	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
+
+	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string) => {
+		const savedAt = Date.now();
+		publishSnapshot(nextReminders, nextProjects);
+		etagRef.current = etag;
+		lastCheckedAtRef.current = savedAt;
+		setLastUpdatedAt(savedAt);
+		setDataMode('live');
+		setIsOffline(false);
+		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current);
+	}, [config.folderPath, publishSnapshot]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
-		remindersRef.current = snapshot.reminders;
-		projectsRef.current = snapshot.projects;
+		hydratedCacheRef.current = true;
+		setLoading(false);
+		publishSnapshot(snapshot.reminders, snapshot.projects);
 		issuesRef.current = snapshot.issues ?? [];
 		setIssues(issuesRef.current);
 		etagRef.current = snapshot.etag;
 		lastCheckedAtRef.current = snapshot.savedAt;
-		setReminders(snapshot.reminders);
-		setProjects(snapshot.projects);
 		setLastUpdatedAt(snapshot.savedAt);
 		setDataMode('cached');
-		setSelectedProject((current) => current && !snapshot.projects.includes(current) ? null : current);
-	}, [setSelectedProject]);
+	}, [publishSnapshot]);
 
 	const loadReminders = useCallback((options: { silent?: boolean; maxAgeMs?: number } = {}) => {
 		if (!authToken) return Promise.resolve();
@@ -99,7 +118,10 @@ export function useReminderSync({
 		if (activeReadRef.current?.key === requestKey) return activeReadRef.current.promise;
 
 		const promise = (async () => {
-			const sessionCurrent = capturePwaSession();
+			const session = capturePwaSession();
+			const lifetime = lifetimeRef.current;
+			const sessionCurrent = () => lifetime.active && session();
+			if (!sessionCurrent()) return;
 			const readToken = requestCoordinatorRef.current.beginRead();
 			if (options.silent) setRefreshing(true);
 			else setLoading(true);
@@ -137,19 +159,7 @@ export function useReminderSync({
 				setError(null);
 				issuesRef.current = nextIssues;
 				setIssues(nextIssues);
-				const savedAt = Date.now();
-				const etag = response.headers.get('ETag') ?? undefined;
-				remindersRef.current = nextReminders;
-				projectsRef.current = nextProjects;
-				etagRef.current = etag;
-				lastCheckedAtRef.current = savedAt;
-				setReminders(nextReminders);
-				setProjects(nextProjects);
-				setSelectedProject((current) => current && !nextProjects.includes(current) ? null : current);
-				setLastUpdatedAt(savedAt);
-				setDataMode('live');
-				setIsOffline(false);
-				void saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, nextIssues);
+				void commitConfirmedSnapshot(nextReminders, nextProjects, response.headers.get('ETag') ?? undefined);
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
@@ -176,7 +186,7 @@ export function useReminderSync({
 		};
 		void promise.then(clearActiveRead, clearActiveRead);
 		return promise;
-	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot, setSelectedProject]);
+	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot, commitConfirmedSnapshot]);
 
 	const rebuildOfflineCache = useCallback(async () => {
 		const sessionCurrent = capturePwaSession();
@@ -198,26 +208,9 @@ export function useReminderSync({
 		};
 	}, []);
 
-	const commitReminderState = useCallback(async (nextReminders: ReminderRecord[], nextProjects = projectsRef.current) => {
-		const savedAt = Date.now();
-		remindersRef.current = nextReminders;
-		projectsRef.current = nextProjects;
-		etagRef.current = undefined;
-		lastCheckedAtRef.current = savedAt;
-		setReminders(nextReminders);
-		setProjects(nextProjects);
-		setSelectedProject((current) => current && !nextProjects.includes(current) ? null : current);
-		setLastUpdatedAt(savedAt);
-		setDataMode('live');
-		setIsOffline(false);
-		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, undefined, issuesRef.current);
-	}, [config.folderPath, setSelectedProject]);
 
 	useEffect(() => {
-		const handleOnline = () => {
-			setIsOffline(false);
-			if (bootstrapped && authToken) void loadReminders({ silent: true });
-		};
+		const handleOnline = () => setIsOffline(false);
 		const handleOffline = () => setIsOffline(true);
 
 		window.addEventListener('online', handleOnline);
@@ -226,12 +219,11 @@ export function useReminderSync({
 			window.removeEventListener('online', handleOnline);
 			window.removeEventListener('offline', handleOffline);
 		};
-	}, [authToken, bootstrapped, loadReminders]);
+	}, []);
 
 	const resetReminderState = useCallback(() => {
 		requestCoordinatorRef.current = createReminderRequestCoordinator();
-		remindersRef.current = [];
-		projectsRef.current = [];
+		publishSnapshot([], []);
 		issuesRef.current = [];
 		setIssues([]);
 		hydratedCacheRef.current = false;
@@ -239,12 +231,9 @@ export function useReminderSync({
 		setLoading(false);
 		setRefreshing(false);
 		setLastUpdatedAt(null);
-		setReminders([]);
-		setProjects([]);
-		setSelectedProject(null);
 		etagRef.current = undefined;
 		lastCheckedAtRef.current = null;
-	}, [setSelectedProject]);
+	}, [publishSnapshot]);
 
 	return {
 		reminders,
@@ -256,18 +245,15 @@ export function useReminderSync({
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
-		remindersRef,
-		projectsRef,
-		hydratedCacheRef,
+		getSnapshot,
+		hasHydratedCache,
 		hydrateCachedSnapshot,
 		rebuildOfflineCache,
 		loadReminders,
 		beginLocalMutation,
-		commitReminderState,
+		commitReminderState: commitConfirmedSnapshot,
 		resetReminderState,
-		setReminders,
-		setProjects,
-		setLoading,
-		setError,
+		refreshPresentation,
+		reportError: setError,
 	};
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { RecurrencePickerContent } from '@/reminders/ui/reminder-modal/RecurrencePickerContent';
 import { buildRecurrencePickerDraft, buildRecurrencePickerState, isRecurrencePickerStateUnchanged, recurrenceRuleFromPickerDraft } from '@/reminders/ui/reminder-modal/recurrencePickerShared';
 import { applyReminderTextUpdate } from '../reminder-state';
@@ -12,7 +12,7 @@ export function ReminderRecurrencePicker({ draft, projectOptions, isDark, onSele
     onSelect: (patch?: Partial<ModalDraft>) => void;
     onClose: () => void;
 }) {
-    const reduceMotion = useObsidianReducedMotion();
+    const reduceMotion = useReducedMotion();
     const initialState = useMemo(() => buildRecurrencePickerState(draft.recurrence), [draft.recurrence]);
     const [recurrenceDraft, setRecurrenceDraft] = useState(() => buildRecurrencePickerDraft(draft.recurrence));
     useEffect(() => setRecurrenceDraft(buildRecurrencePickerDraft(draft.recurrence)), [draft.recurrence]);

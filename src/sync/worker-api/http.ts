@@ -34,7 +34,7 @@ export interface ApiHttpResponse {
 
 export type ApiHttpTransport = (request: ApiHttpRequest) => Promise<ApiHttpResponse>;
 
-const obsidianHttpTransport: ApiHttpTransport = async request => {
+export const obsidianHttpTransport: ApiHttpTransport = async request => {
 	const response = await requestUrl({
 		url: request.url,
 		method: request.method,

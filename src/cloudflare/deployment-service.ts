@@ -226,18 +226,9 @@ export class CloudflareDeploymentService {
 		let result: CloudflareDeploymentResult;
 		try {
 			this.lifetime.signal.throwIfAborted();
-			// Obsidian's transport cannot cancel a dispatched request. Guard both
-			// sides so its late response cannot start another request or save settings.
-			// OAuth stays outside this guard: even a late exchange must be revoked.
-			const api = new CloudflareApiClient(accessToken, (url, request) =>
-				this.whileActive(async () => {
-					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
-					const response = await this.options.transport(url, request);
-					if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
-					if (savedLogin && new URL(url).origin === 'https://api.cloudflare.com'
-						&& (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
-					return response;
-				}));
+			const api = this.createGuardedApi(accessToken,
+				savedLogin || pending.intent === 'reconnect' ? () => this.checkSavedTarget(pending.metadata, pending.intent) : undefined,
+				savedLogin);
 			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');
 			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
@@ -402,12 +393,7 @@ export class CloudflareDeploymentService {
         this.cancelPendingDeployment();
         this.handlingCallback = true;
         try {
-            return await withAuthorization(tokens => operation(new CloudflareApiClient(tokens.accessToken, async (url, request) => {
-                this.lifetime.signal.throwIfAborted(); this.checkSavedTarget(source, 'update');
-                const response = await this.options.transport(url, request);
-                this.lifetime.signal.throwIfAborted(); this.checkSavedTarget(source, 'update');
-                return response;
-            }), source));
+            return await withAuthorization(tokens => operation(this.createGuardedApi(tokens.accessToken, () => this.checkSavedTarget(source, 'update')), source));
         } finally { this.handlingCallback = false; }
     }
 
@@ -455,14 +441,7 @@ export class CloudflareDeploymentService {
         this.handlingCallback = true;
         try {
             return await withAuthorization(async tokens => {
-                const api = new CloudflareApiClient(tokens.accessToken, async (url, request) => {
-                    this.lifetime.signal.throwIfAborted();
-                    this.checkSavedTarget(metadata, 'update');
-                    const response = await this.options.transport(url, request);
-                    this.lifetime.signal.throwIfAborted();
-                    this.checkSavedTarget(metadata, 'update');
-                    return response;
-                });
+                const api = this.createGuardedApi(tokens.accessToken, () => this.checkSavedTarget(metadata, 'update'));
                 const artifacts = await this.whileActive(this.options.loadArtifacts);
                 const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
                 if (recovery.status === 'verify' && recovery.resumeValue) {
@@ -481,6 +460,20 @@ export class CloudflareDeploymentService {
             });
         } finally { this.handlingCallback = false; }
     }
+
+	private createGuardedApi(accessToken: string, checkTarget?: () => void, savedLogin = false): CloudflareApiClient {
+		// Obsidian cannot cancel dispatched requests. Guard both sides so a late
+		// response cannot start more work. OAuth is separate so it can be revoked.
+		return new CloudflareApiClient(accessToken, (url, request) => this.whileActive(async () => {
+			checkTarget?.();
+			const response = await this.options.transport(url, request);
+			this.lifetime.signal.throwIfAborted();
+			checkTarget?.();
+			if (savedLogin && new URL(url).origin === 'https://api.cloudflare.com'
+				&& (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
+			return response;
+		}));
+	}
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: PendingOAuthSession['intent']): void {
 		const current = this.options.settingsOwner.settings.cloudflareDeployment;

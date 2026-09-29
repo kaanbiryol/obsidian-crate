@@ -37,19 +37,17 @@ function harness() {
 	const closeModal = vi.fn(); const showToast = vi.fn(); const setSaving = vi.fn();
 	const ensureCanMutate = vi.fn(() => true);
 	const commitReminderState = vi.fn();
-	const setReminders = vi.fn<Parameters<typeof useReminderMutations>[0]['setReminders']>(value => {
-		remindersRef.current = typeof value === 'function' ? value(remindersRef.current) : value;
-	});
+	const refreshPresentation = vi.fn();
 	const options: Parameters<typeof useReminderMutations>[0] = {
 		apiFetch, authToken: 'token', bootstrapped: true, beginLocalMutation: () => () => {}, ensureCanMutate,
-		commitReminderState, setReminders, remindersRef, reminders: remindersRef.current, projectsRef: { current: ['Inbox'] },
+		commitReminderState, refreshPresentation, getSnapshot: () => ({ reminders: remindersRef.current, projects: ['Inbox'] }), reminders: remindersRef.current,
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
-		projects: ['Inbox'], selectedProject: null, closeModal, setProjects: vi.fn(), setSaving, showToast, loadReminders: vi.fn(),
+		projects: ['Inbox'], selectedProject: null, closeModal, setSaving, showToast, loadReminders: vi.fn(),
 	};
 	// eslint-disable-next-line react-hooks/rules-of-hooks -- React is mocked above; this harness exercises hook logic without a React render.
 	const render = () => useReminderMutations({ ...options, reminders: remindersRef.current });
 	return { hook: render(), render, state, outbox, changes, remindersRef, apiFetch, closeModal, showToast,
-		setSaving, ensureCanMutate, commitReminderState, setReminders, memory };
+		setSaving, ensureCanMutate, commitReminderState, refreshPresentation, memory };
 }
 
 function body(change: PendingReminderChange): Record<string, unknown> { return JSON.parse(change.body) as Record<string, unknown>; }
@@ -156,7 +154,7 @@ describe('PWA optimistic mutations', () => {
 	});
 
 	it('honors the mutation guard before saving, completing, deleting, or reordering', async () => {
-		const { hook, outbox, ensureCanMutate, closeModal, setSaving, setReminders } = harness();
+		const { hook, outbox, ensureCanMutate, closeModal, setSaving, refreshPresentation } = harness();
 		ensureCanMutate.mockReturnValue(false);
 		await hook.saveReminder(draft());
 		await hook.toggleReminderCompleted('one', false);
@@ -165,7 +163,7 @@ describe('PWA optimistic mutations', () => {
 		expect(outbox.enqueue).not.toHaveBeenCalled();
 		expect(closeModal).not.toHaveBeenCalled();
 		expect(setSaving).not.toHaveBeenCalled();
-		expect(setReminders).toHaveBeenCalledOnce();
+		expect(refreshPresentation).toHaveBeenCalledOnce();
 	});
 
 	it('preserves a failed edit draft while refreshing its revision and keeping its operation identity', async () => {

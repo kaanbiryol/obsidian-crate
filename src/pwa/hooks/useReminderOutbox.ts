@@ -8,7 +8,7 @@ import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
 import { applyReminderSettlement, createReminderSettlementChannel } from '../reminder-settlement';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
-import type { MutableRefObject } from 'react';
+import type { ConfirmedReminderSnapshot } from './useReminderSync';
 
 export function useReminderOutbox(options: {
 	authToken: string | null;
@@ -17,8 +17,7 @@ export function useReminderOutbox(options: {
 	apiFetch: ApiFetch;
 	beginLocalMutation: () => () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => void | Promise<void>;
-	remindersRef: MutableRefObject<ReminderRecord[]>;
-	projectsRef: MutableRefObject<string[]>;
+	getSnapshot: () => ConfirmedReminderSnapshot;
 	loadReminders: LoadReminders;
 	showToast: ShowToast;
 	hasSnapshot?: boolean;
@@ -67,8 +66,7 @@ export function useReminderOutbox(options: {
 				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
 				commit: async (change, result) => {
 					const current = optionsRef.current;
-					let reminders = current.remindersRef.current;
-					let projects = current.projectsRef.current;
+					let { reminders, projects } = current.getSnapshot();
 					if (result.reminder) {
 						reminders = mergeReminderRecord(reminders, result.reminder);
 						projects = mergeProject(projects, result.reminder.project);
@@ -133,7 +131,8 @@ export function useReminderOutbox(options: {
 					const finish = current.beginLocalMutation();
 					void (async () => {
 						try {
-							const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(current.remindersRef.current, current.projectsRef.current, confirmed) : null;
+							const snapshot = current.getSnapshot();
+							const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(snapshot.reminders, snapshot.projects, confirmed) : null;
 							if (next) await current.commitReminderState(next.reminders, next.projects);
 						} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
 						finally { finish(); if (isCurrent()) void optionsRef.current.loadReminders({ silent: true }); }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { TextField } from '../../ui/shared/TextField';
 import { Button } from '../../ui/shared/Button';
 

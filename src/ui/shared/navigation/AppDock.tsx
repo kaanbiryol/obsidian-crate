@@ -3,7 +3,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { DockViewButton } from './DockViewButton';
 import { useDockMorph } from './useDockMorph';
 import { Button } from '../Button';
-import { ThemeIcon } from '@/reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { DOCK_TABS, type DockTab } from './dock-destinations';
 
 /** Host-independent dock; the adapter owns destinations, preferences and routing. */

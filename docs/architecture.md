@@ -191,6 +191,27 @@ dock with direct section switching through a Reading navigation adapter and its 
 feature switching and per-section state retention stay in the PWA feature shell. Reading owns its
 article layout and typography, while common controls use the same host tokens.
 
+Shared icons and reduced-motion preferences live in `src/ui/shared/`; the Obsidian
+icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
+these implementations for existing feature consumers.
+
+`src/pwa/main.tsx` mounts the feature shell. `components/RemindersApp.tsx` composes
+reminder data, session, outbox, and presentation hooks. `useReminderSync` owns the
+confirmed snapshot and exposes reads and explicit commit/reset operations; outbox
+consumers cannot independently replace its refs or React state. `useReminderEditor`
+owns editor presentation, synchronous tap opening, close transitions, recovered
+drafts, and session reset.
+
+Plugin feature requests use `src/plugin/server-request.ts` for validated server
+metadata and lifecycle/connection guards before dispatch and after responses.
+Reading adds its own capability requirements; shared feature settings require
+only their own capability.
+
+`ReminderAlarm` retains the Durable Object class, storage identities, and mutation
+lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
+keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
+maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
+
 The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The first-release schema records version 1 in `crate_schema`. Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.

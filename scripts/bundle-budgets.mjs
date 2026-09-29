@@ -30,9 +30,10 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Includes React DOM and shared Base UI controls; measured 349 KB raw / 110 KB gzip.
+		// Includes React DOM, shared controls, and reminder snapshot/editor lifecycle guards.
+		// Measured 349.5 KB raw / 110.2 KB gzip; total startup and asset caps stay fixed.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '355000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '110000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '110250', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,

@@ -6,7 +6,7 @@ import { ReadingHighlightActions } from './ReadingHighlightActions';
 import { ReadingBody } from './ReadingBody';
 import { ReadingTagsForm } from './ReadingTagsForm';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { ThemeIcon } from '../../reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { readingMarkdown, readingDocument } from '../core/markdown';
 import { READING_DROP_CONTENTS, READING_HTML_TAGS } from '../core/html-policy';
 import { anchorHighlight, writeMarkdownHighlights } from '../core/markdown-highlights';

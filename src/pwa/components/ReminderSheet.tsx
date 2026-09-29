@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import {
@@ -93,7 +93,7 @@ function ReminderEditorSheet({
 	const pickerTransitionKeyboardInsetRef = useRef(0);
 	const reminderStageRef = useRef<HTMLDivElement | null>(null);
 	const keyboardInset = useKeyboardHeight();
-	const prefersReducedMotion = useObsidianReducedMotion();
+	const prefersReducedMotion = useReducedMotion();
 	const projectOptions = useMemo(
 		() => ['Inbox', ...projects.filter((project) => project !== 'Inbox')],
 		[projects],
