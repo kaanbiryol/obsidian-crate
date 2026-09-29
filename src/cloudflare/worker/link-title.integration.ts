@@ -20,6 +20,32 @@ function request(token?: string, method = 'POST', body = JSON.stringify({ url: '
 const mockPage = () => vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('<title>Public article</title>', { headers: { 'Content-Type': 'text/html' } }));
 
 describe('authenticated page titles in the Worker runtime', () => {
+	it.each([false, true])('uses the restricted binding for every hop without falling back to global fetch (rejected: %s)', async rejected => {
+		const global = mockPage();
+		const requests: Request[] = [];
+		const network = { async fetch(outbound: Request) {
+			requests.push(outbound);
+			if (requests.length === 1) return new Response(null, { status: 302, headers: { Location: 'https://other.example.com/final#private' } });
+			if (rejected) throw new TypeError('Native network boundary rejected the resolved address');
+			return new Response('<title>Restricted transport</title>', { headers: { 'Content-Type': 'text/html' } });
+		} };
+		const response = await worker.fetch(request('reminders-credential'), { ...env, READING_FETCH: network });
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ title: rejected ? null : 'Restricted transport' });
+		expect(global).not.toHaveBeenCalled();
+		expect(requests.map(value => value.url)).toEqual(['https://example.com/article', 'https://other.example.com/final']);
+		for (const outbound of requests) {
+			expect(outbound.redirect).toBe('manual');
+			expect([...outbound.headers]).toEqual([['accept', 'text/html']]);
+		}
+	});
+	it('does not bypass a binding failure on the initial request', async () => {
+		const global = mockPage();
+		const network = { fetch: vi.fn().mockRejectedValue(new TypeError('Address not allowed')) };
+		expect(await (await worker.fetch(request('vault-credential'), { ...env, READING_FETCH: network })).json()).toEqual({ title: null });
+		expect(network.fetch).toHaveBeenCalledOnce();
+		expect(global).not.toHaveBeenCalled();
+	});
 	it.each(['vault', 'reminders'])('serves %s credentials without a mutation protocol or folder body', async scope => {
 		const outbound = mockPage();
 		const response = await worker.fetch(request(`${scope}-credential`), env);

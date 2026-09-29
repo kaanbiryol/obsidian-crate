@@ -62,7 +62,7 @@ Parser 9 additionally recognizes task lines ending in CRLF. The plugin validates
 ## Launch protocol baseline
 
 Wire protocol 1 is the launch contract, with oldest compatible version 1.
-The current candidate uses server revision 2 and database schema 2. Earlier development
+The current candidate uses server revision 3 and database schema 2. Earlier development
 protocol numbers are unsupported; use matching plugin, Worker, PWA and shortcut
 builds when recreating a development deployment.
 

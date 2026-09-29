@@ -8,6 +8,10 @@ import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 
 export interface ReadingPolicy { enabled: number; folder_path: string; generation: string; revision: string }
+/** Preparation and capability redemption must recognize the same issuer scopes. */
+export function canPrepareReadingHandoff(scope: string): scope is AuthPrincipal['scope'] {
+  return ['vault', 'reminders', 'reading', 'reading_capture'].includes(scope);
+}
 export class ReadingError extends Error {
   constructor(message: string, readonly status = 400, readonly code = 'reading_error') { super(message); }
 }

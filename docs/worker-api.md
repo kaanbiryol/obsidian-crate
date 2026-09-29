@@ -82,6 +82,24 @@ tokens and scoped PWA enrollment keep their current behavior.
 
 `POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached. Older servers return an error and clients retain the URL label.
 
+Self-hosted title requests use the native public-network binding, including every
+redirect. A rejected connection returns `title: null` without retrying through
+another transport. The local server also forwards global Worker fetches through
+that binding; Miniflare's default outbound service is not the security boundary.
+Hosted Workers retain `global_fetch_strictly_public`. URL validation alone does
+not protect against a public-looking hostname resolving to a private address.
+
+### Reading capture handoffs
+
+`POST /reading/prepare` accepts vault, reminders, Reading, and capture credentials
+when the Reading library is configured and available. Its five-minute launch URL
+contains an opaque capability in the fragment. `POST /reading/handoff` redeems it
+through `X-Crate-Capture`, using the same issuer-scope policy. Redemption checks
+issuer revocation/expiry, capability expiry, the Reading folder generation, and
+feature availability. Repeating a live capability reuses its exact operation ID;
+it does not create another note. Revoking the issuer blocks even a committed
+capability's subsequent replay.
+
 ### PUT /sync/upload
 
 - Query: `?path=<url-encoded-path>`

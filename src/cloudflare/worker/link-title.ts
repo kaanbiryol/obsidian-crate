@@ -1,5 +1,6 @@
 import { corsResponse } from './cors';
 import { parseJsonObject } from './utils';
+import type { Env } from './types';
 
 const MAX_HTML_BYTES = 256 * 1024;
 
@@ -37,7 +38,7 @@ function extractTitle(html: string): string | null {
 	return null;
 }
 
-/** Only public DNS names on standard web ports; global Worker fetch has no private bindings. */
+/** URL screening supplements the transport's public-only DNS/network boundary. */
 function publicPageUrl(value: unknown): URL | null {
 	if (typeof value !== 'string' || value.length > 4096) return null;
 	try {
@@ -77,7 +78,7 @@ async function readTitle(response: Response): Promise<string | null> {
 	return extractTitle(html);
 }
 
-export async function handleLinkTitle(request: Request): Promise<Response> {
+export async function handleLinkTitle(request: Request, network?: Env['READING_FETCH']): Promise<Response> {
 	const parsed = await parseJsonObject(request, 8192);
 	if (!parsed.ok) return parsed.response;
 	let url = publicPageUrl(parsed.value.url);
@@ -86,7 +87,10 @@ export async function handleLinkTitle(request: Request): Promise<Response> {
 	try {
 		for (let redirects = 0; redirects <= 3; redirects++) {
 			// Fresh headers deliberately exclude the caller's authorization and cookies.
-			const response: Response = await fetch(url.href, { signal, redirect: 'manual', headers: { Accept: 'text/html' } });
+			const init: RequestInit = { signal, redirect: 'manual', headers: { Accept: 'text/html' } };
+			// Local Miniflare must use the native public-network binding, including
+			// redirects. A rejected binding request must never retry via global fetch.
+			const response: Response = await (network ? network.fetch(new Request(url.href, init)) : fetch(url.href, init));
 			if ([301, 302, 303, 307, 308].includes(response.status)) {
 				await response.body?.cancel();
 				const location: string | null = response.headers.get('Location');

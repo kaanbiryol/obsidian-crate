@@ -3,7 +3,7 @@ import { changedRows } from '../db';
 import { sha256Hex } from '../auth';
 import { validateReadingFolder } from '@/reading/settings';
 import type { AuthPrincipal } from '../authenticate';
-import { policy, authority, ReadingError, readingResponse, type ReadingPolicy } from './common';
+import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse, type ReadingPolicy } from './common';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);
@@ -60,6 +60,7 @@ export async function exchangeReadingAccess(db: D1Database, body: Record<string,
   return readingResponse({ token, id, expiresAt, ...(installToken ? { installToken } : {}), folderPath: current.folder_path, generation: current.generation });
 }
 export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, body: Record<string, unknown>, origin: string) {
+  if (!canPrepareReadingHandoff(principal.scope)) throw new ReadingError('Reading access is required.', 403);
   const current = await authority(db, principal);
   const { readingUrl } = await import('@/reading/core/model');
   const { createReminderOperationId } = await import('@/protocol/reminder-operation');
@@ -79,8 +80,8 @@ export async function handoffAuthority(db: D1Database, request: Request) {
   const row = await db.prepare(`SELECT h.body, h.generation, a.id, a.scope, a.folder_path, a.reading_generation FROM reading_handoffs h
     JOIN auth_tokens a ON a.id=h.principal_id WHERE h.token_hash=? AND h.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`)
     .bind(await sha256Hex(token), Date.now(), Date.now()).first<{ body: string; generation: string; id: string; scope: string; folder_path: string; reading_generation: string }>();
-  if (!row || !['reading_capture', 'reading', 'vault'].includes(row.scope)) throw new ReadingError('This save link expired or its access was revoked. Share the article again.', 410);
-  const principal: AuthPrincipal = { tokenId: row.id, scope: row.scope as AuthPrincipal['scope'], folderPath: row.folder_path, readingGeneration: row.reading_generation };
+  if (!row || !canPrepareReadingHandoff(row.scope)) throw new ReadingError('This save link expired or its access was revoked. Share the article again.', 410);
+  const principal: AuthPrincipal = { tokenId: row.id, scope: row.scope, folderPath: row.folder_path, readingGeneration: row.reading_generation };
   const current = await authority(db, principal);
   if (current.generation !== row.generation) throw new ReadingError('Reading settings changed. Share the article again.', 410);
   return { principal, current, body: JSON.parse(row.body) as Record<string, unknown> };

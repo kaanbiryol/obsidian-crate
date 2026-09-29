@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from './local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
 test('built server captures, replays, isolates scopes and confirms browser handoffs', { timeout: 60000 }, async () => {
@@ -97,4 +97,42 @@ test('local article network binding rejects private addresses after hostname res
     }
     assert.equal(requests,0);
   } finally { await runtime?.close();await new Promise(resolve=>privateServer.close(resolve)); await rm(dir,{recursive:true,force:true}); }
+});
+
+test('production local outbound policy blocks private connections through global and bound fetch', { timeout: 30000 }, async () => {
+  const { createServer } = await import('node:http');
+  const { Miniflare, convertV4MiniflareOptions } = await import('miniflare');
+  let hits = 0, runtime;
+  const server = createServer((_request, response) => { hits++; response.end('private fixture'); });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  try {
+    const options = {
+      name: 'crate-network-regression', modules: true, host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
+      compatibilityDate: '2026-08-18', compatibilityFlags: ['global_fetch_strictly_public'],
+      ...localNetworkOptions(),
+      script: `export default { async fetch(request, env) {
+        const { target, bound } = await request.json();
+        try {
+          const result = await (bound ? env.READING_FETCH.fetch(target) : fetch(target));
+          await result.body?.cancel();
+          return Response.json({ rejected: !result.ok });
+        } catch { return Response.json({ rejected: true }); }
+      } };`,
+    };
+    const probe = (host, bound) => runtime.dispatchFetch('http://localhost/probe', {
+      method: 'POST', body: JSON.stringify({ target: `http://${host}:${server.address().port}/`, bound }),
+    }).then(response => response.json());
+    // A reachable-fixture control catches false passes from a broken runtime or
+    // listener. Only this test instance permits the owned loopback destination.
+    runtime = new Miniflare(convertV4MiniflareOptions({ ...options, outboundService: undefined }));
+    assert.deepEqual(await probe('127.0.0.1', false), { rejected: false });
+    assert.equal(hits, 1);
+    await runtime.dispose();
+    hits = 0;
+    runtime = new Miniflare(convertV4MiniflareOptions(options));
+    for (const host of ['127.0.0.1', 'localhost']) for (const bound of [false, true]) {
+      assert.deepEqual(await probe(host, bound), { rejected: true }, `${bound ? 'Bound' : 'Global'} fetch must reject ${host}`);
+    }
+    assert.equal(hits, 0, 'No private fixture may receive a request');
+  } finally { await runtime?.dispose(); await new Promise(resolve => server.close(resolve)); }
 });

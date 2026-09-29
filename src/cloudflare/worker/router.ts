@@ -13,6 +13,7 @@ import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
 import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
+import { canPrepareReadingHandoff } from './reading/common';
 
 export { handlePublicRoute };
 
@@ -38,7 +39,6 @@ const READING_LIBRARY_ROUTES = new Set([
 	'GET /reading/list',
 	'GET /reading/item',
 	'POST /reading/capture',
-	'POST /reading/prepare',
 	'POST /reading/update',
 	'POST /reading/retry',
 ]);
@@ -48,10 +48,11 @@ export function isAuthenticatedRouteAllowed(
 	path: string,
 	method: RouteMethod,
 ): boolean {
+	if (path === '/reading/prepare' && method === 'POST') return canPrepareReadingHandoff(principal.scope);
 	if (principal.scope === 'vault') return true;
 	if (path === '/features' && method === 'GET' && ['reading', 'reminders'].includes(principal.scope)) return true;
  if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`) || READING_LIBRARY_ROUTES.has(`${method} ${path}`);
- if (principal.scope === 'reading_capture') return ['POST /reading/capture', 'POST /reading/prepare'].includes(`${method} ${path}`);
+ if (principal.scope === 'reading_capture') return path === '/reading/capture' && method === 'POST';
  if (principal.scope === 'reading') return READING_LIBRARY_ROUTES.has(`${method} ${path}`) || `${method} ${path}` === 'DELETE /auth/session';
  return false;
 }
@@ -90,7 +91,7 @@ export async function handleAuthenticatedRoute(
 		if (env.NOTIFICATION_REQUEST_LIMITER && !(await env.NOTIFICATION_REQUEST_LIMITER.limit({ key: `link-titles:${principal.tokenId}` })).success) {
 			return corsResponse({ title: null }, 429, { 'Retry-After': '60' });
 		}
-		return handleLinkTitle(request);
+		return handleLinkTitle(request, env.READING_FETCH);
 	}
 
 	return await handleSyncRoute(request, env, path, method, mutationAuditContext(request, principal, requestId))

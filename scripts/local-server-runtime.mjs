@@ -10,6 +10,19 @@ const { Miniflare, convertV4MiniflareOptions } = await import(packageInfo.crateS
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const digest = value => createHash('sha256').update(value).digest('hex');
 
+// Miniflare's default outbound service permits private networks even when the
+// Worker uses global_fetch_strictly_public. Enforce the boundary natively for
+// both explicit article/title fetches and any other Worker fetch (such as push).
+export function localNetworkOptions() {
+	const publicNetwork = { network: { allow: ['public'], deny: ['private', 'local', '100.64.0.0/10', '198.18.0.0/15', '192.0.0.0/24', '240.0.0.0/4'], tlsOptions: { trustBrowserCas: true } } };
+	return {
+		// The v5 adapter does not accept a network as outboundService. Forward
+		// through its supported hook to the same native network binding instead.
+		outboundService: async (request, runtime) => (await runtime.getBindings()).READING_FETCH.fetch(request),
+		serviceBindings: { READING_FETCH: publicNetwork },
+	};
+}
+
 export async function localBuildInfo() {
 	const packaged = packageInfo.crateServerAssets === true;
 	const [schema, release] = await Promise.all([
@@ -111,7 +124,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			name: 'crate-local', modules: true, script: worker,
 			compatibilityDate: '2026-08-18',
       compatibilityFlags: ['global_fetch_strictly_public'],
-      serviceBindings: { READING_FETCH: { network: { allow: ['public'], deny: ['private', 'local', '100.64.0.0/10', '198.18.0.0/15', '192.0.0.0/24', '240.0.0.0/4'], tlsOptions: { trustBrowserCas: true } } } },
+      ...localNetworkOptions(),
 			host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
 			resourcePersistencePath: join(dataDir, 'resources'),
 			isolatedResourcePersistencePath: join(dataDir, 'isolated'),

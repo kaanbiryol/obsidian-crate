@@ -93,7 +93,10 @@ different words within a paragraph. Competing changes to the same word or
 different insertions at the same word boundary remain conflicts. Frontmatter is
 atomic: competing header edits preserve a conflict, even when they touch different
 keys. The merged header must match one authored input. Competing edits inside
-one fenced block also remain conflicts. Indented code retains the line-level
+one fenced block also remain conflicts, including fences inside callouts,
+blockquotes, and lists. Literal quote/list markers within a fence do not end its
+protected region. Ambiguous or unterminated fences are treated conservatively
+through the end of the document. Indented code retains the line-level
 policy. Inline refinement
 is limited to 16,000 combined characters per line and 128,000 per merge.
 

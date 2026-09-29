@@ -8,6 +8,8 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const root = resolve(import.meta.dirname, '..');
 const exec = promisify(execFile);
@@ -102,4 +104,29 @@ setInterval(() => {}, 1000);
 	assert.equal(response.status, 200);
 	await response.text();
 	await stop();
+	// Exercise the installed runtime and vendored Miniflare, independent of the
+	// repository's dependencies. No private-network fixture may be contacted.
+	const { localNetworkOptions } = await import(pathToFileURL(join(install, 'scripts/local-server-runtime.mjs')).href);
+	const { Miniflare, convertV4MiniflareOptions } = miniflareRequire('./index.js');
+	let hits = 0;
+	const privateServer = createServer((_request, reply) => { hits++; reply.end('private fixture'); });
+	await new Promise((resolve, reject) => { privateServer.once('error', reject); privateServer.listen(0, '127.0.0.1', resolve); });
+	let network;
+	try {
+		const target = `http://localhost:${privateServer.address().port}/`;
+		assert.equal(await (await fetch(target)).text(), 'private fixture');
+		hits = 0;
+		network = new Miniflare(convertV4MiniflareOptions({
+			name: 'packed-network-regression', modules: true, host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
+			compatibilityDate: '2026-08-18', compatibilityFlags: ['global_fetch_strictly_public'],
+			...localNetworkOptions(), bindings: { TARGET: target },
+			script: `export default { async fetch(request, env) {
+				try { const response = await (new URL(request.url).pathname === '/bound' ? env.READING_FETCH.fetch(env.TARGET) : fetch(env.TARGET));
+					await response.body?.cancel(); return Response.json({ rejected: !response.ok });
+				} catch { return Response.json({ rejected: true }); }
+			} };`,
+		}));
+		for (const route of ['global', 'bound']) assert.deepEqual(await (await network.dispatchFetch(`http://localhost/${route}`)).json(), { rejected: true });
+		assert.equal(hits, 0);
+	} finally { await network?.dispose(); await new Promise(resolve => privateServer.close(resolve)); }
 });
