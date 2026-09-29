@@ -60,6 +60,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const focusDelayMs = 0;
     const textareaRef = useRef<HTMLDivElement>(null);
     const richTextInputRef = useRef<RichTextInputHandle>(null);
+    const descriptionInputRef = useRef<RichTextInputHandle>(null);
     const {
         content,
         setContent,
@@ -110,8 +111,10 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         handleDeleteConfirm,
         closeDeleteConfirm,
     } = useReminderModalActions({
-        content,
-        description,
+        readEditor: () => ({
+            content: richTextInputRef.current?.getValue() ?? content,
+            description: descriptionInputRef.current?.getValue() ?? description,
+        }),
         projects,
         priority,
         project,
@@ -228,6 +231,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                     projects={projects}
                     textareaRef={textareaRef}
                     richTextInputRef={richTextInputRef}
+                    descriptionInputRef={descriptionInputRef}
                     dueDate={dueDate}
                     hasTime={hasTime}
                     project={project}

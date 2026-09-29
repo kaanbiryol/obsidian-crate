@@ -167,7 +167,11 @@ export class SyncRuntime {
 	async createConflictReview(record: ConflictRecord) {
 		if (!this.syncEngine || !this.getActiveConflicts().some(item => item.conflictPath === record.conflictPath)) throw new Error('Conflict is no longer active');
 		const engine = this.syncEngine;
-		const review = await createConflictReview(this.plugin.app, this.plugin.manifest.dir!, record, () => this.syncEngine !== engine, () => engine.markConflictResolved(record.conflictPath));
+		const review = await createConflictReview(this.plugin.app, this.plugin.manifest.dir!, record, () => this.syncEngine !== engine,
+			() => engine.markConflictResolved(record.conflictPath), {
+				beforeBinaryReplace: path => engine.prepareRecoverableReplacement(path),
+				beforeKeepLocal: () => engine.acceptIncomingConflictBaseline(record),
+			});
 		return { ...review, resolve: (choice: import('./conflict-review').ConflictChoice, editedText?: string) => engine.runConflictResolution(() => review.resolve(choice, editedText)) };
 	}
 

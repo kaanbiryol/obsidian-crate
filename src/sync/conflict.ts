@@ -42,8 +42,8 @@ export function getConflictFileName(originalPath: string): string {
 
 /**
  * Create a conflict copy of a file.
- * Uses the low-level adapter for hidden paths (dot-prefixed) since
- * Obsidian's vault API doesn't handle them.
+ * The host create checks existence for hidden paths too; unlike adapter writes,
+ * it refuses to overwrite a colliding or concurrently created recovery copy.
  */
 export async function createConflictCopy(
 	vault: Vault,
@@ -70,11 +70,7 @@ export async function createConflictCopy(
 		}
 	}
 
-	if (isHiddenPath(conflictPath)) {
-		await vault.adapter.writeBinary(conflictPath, content);
-	} else {
-		await vault.createBinary(conflictPath, content);
-	}
+	await vault.createBinary(conflictPath, content);
 	logger.info('Created conflict copy:', conflictPath);
 	return conflictPath;
 }

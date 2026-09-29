@@ -447,3 +447,29 @@ Paused feature APIs return 423 with `code: feature_paused`; sync and feature-pol
 access remain available. Legacy Reading policy/capture operations cannot override
 the shared pause. Push opt-in remains unchanged by reminder pause/resume. Queued
 operations, saved content, library identity, and scoped credentials are retained.
+
+## Admission before database work
+
+Unknown routes and unsupported methods return 404 before authentication or
+coordinator work. Public static assets and OPTIONS remain available without an
+API budget. Other requests with unrecognized credentials, plus the sensitive
+Reading/notification actions, use the edge admission binding: 60 requests per
+minute per hashed source address and deployment host. Invalid rotating bearer
+tokens share that budget. The local server replaces client-supplied forwarding
+headers with the socket address.
+
+A successful D1 authentication records only a bounded, 60-second credential-hash
+hint in the isolate. Subsequent ordinary requests use a separate local budget
+of 6,000 per minute per credential so vault bootstrap can proceed. Every request
+still checks token validity, expiry and authorization against D1; an authentication
+failure removes the hint. This is not an authentication cache. Action/day limits
+remain enforced after authentication. Denial returns 429 with Retry-After: 60.
+
+Without the edge binding, the restrictive budget also runs in bounded isolate
+memory keyed by the original D1 binding, before request-local metering wrappers.
+The authenticated sync budget and fallback are per isolate, not global quotas;
+Cloudflare's [edge limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) are also location-scoped abuse protection, not exact
+account-wide billing caps. Keep Cloudflare account usage alerts enabled.
+Ordinary Reading requests authenticate and authorize before entering the shared
+coordinator. Public one-use Reading grants enter it after admission because
+redemption and capture must be serialized together.

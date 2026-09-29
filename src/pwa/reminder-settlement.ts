@@ -1,3 +1,4 @@
+import { stringDigest } from './string-digest';
 import { isConfirmedReminder } from './reminder-change-request';
 import { mergeReminderRecord } from './reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from './reminder-list-state';
@@ -20,8 +21,7 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 
 /** Uses the same storage-event ordering as removing an acknowledged command. */
 export async function createReminderSettlementChannel(authToken: string, folderPath: string) {
-	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(authToken));
-	const hash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+	const hash = await stringDigest(authToken);
 	// Old clients ignore this reserved namespace, while their logout still erases it.
 	const key = `crate-reminder-outbox:confirmed:${hash}:${encodeURIComponent(folderPath)}`;
 	return {

@@ -84,6 +84,37 @@ beforeEach(() => vi.stubGlobal('navigator', { onLine: true }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('optimistic reminder outbox', () => {
+	it('does not bounce settled requests between tabs with delayed storage removal visibility', async () => {
+		const tabs = [harness(), harness()];
+		const command = completion();
+		for (const tab of tabs) tab.apiFetch.mockImplementation(async () => confirmed());
+		// Both tabs receive the original pending entry; the second observes it
+		// before the first tab's removal reaches its localStorage view.
+		for (const tab of tabs) { tab.storage.put(command); await tab.drain(); }
+		for (let delivery = 0; delivery < 4; delivery++) {
+			const tab = tabs[delivery % 2]!;
+			tab.storage.put({ ...command, attempts: delivery + 1 });
+			await tab.drain();
+		}
+		for (const tab of tabs) {
+			expect(tab.apiFetch).toHaveBeenCalledOnce();
+			expect(tab.commit).toHaveBeenCalledOnce();
+			expect(tab.storage.load()).toEqual([]);
+		}
+	});
+
+	it('does not discard a changed payload merely because its operation ID previously settled', async () => {
+		const state = harness();
+		const command = completion();
+		state.apiFetch.mockImplementationOnce(async () => confirmed());
+		state.storage.put(command); await state.drain();
+		state.apiFetch.mockImplementationOnce(async () => new Response(JSON.stringify({ code: 'operation_mismatch', error: 'Operation changed' }), { status: 409 }));
+		const body = JSON.stringify({ ...JSON.parse(command.body) as Record<string, unknown>, completed: false });
+		state.storage.put({ ...command, body }); await state.drain();
+		expect(state.apiFetch).toHaveBeenCalledTimes(2);
+		expect(state.storage.load()).toMatchObject([{ body, status: 'uncertain', error: 'Operation changed' }]);
+	});
+
 	it('stops expired ambiguous commands for review while healthy work continues and requires the exact exported change to remove them', async () => {
 		const locks = vi.fn(async (work: () => Promise<void>) => work());
 		const state = harness(memoryStorage(), locks);

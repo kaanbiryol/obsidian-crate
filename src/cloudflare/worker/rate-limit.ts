@@ -1,5 +1,7 @@
 import { sha256Hex } from './auth';
 import { corsResponse } from './cors';
+import { requestAdmissionKind } from './routes/admission';
+import { admitLocally, authenticatedAdmissionKey } from './admission-state';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const actions = new Map([
@@ -14,29 +16,30 @@ const actions = new Map([
 	['POST /notifications/subscribe', 30],
 	['DELETE /notifications/subscribe', 30],
 	['POST /notifications/test', 3],
+	['POST /notifications/retry', 10],
 ]);
-// Bounded fallback for older/local deployments without the edge binding. It is
-// per isolate, not a global abuse limit; production deployments bind the API.
-const fallback = new WeakMap<D1Database, { expires: number; count: number }>();
-const denied = () => corsResponse({ error: 'Too many notification requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
+const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
 
 export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
 	const url = new URL(request.url);
-	if (!['/notifications/', '/reading/'].some(prefix => url.pathname.startsWith(prefix)) || ['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return null;
+	if (request.method === 'OPTIONS') return null;
+	const kind = requestAdmissionKind(request);
+	if (kind === 'asset') return null;
+	if (kind === 'unknown') return corsResponse({ error: 'Not found' }, 404);
 	const action = `${request.method} ${url.pathname}`;
-	const limit = actions.get(action);
-	// Reject invented routes before authentication or any D1 operation.
-	if (!limit) return corsResponse({ error: 'Not found' }, 404);
-	const now = Date.now();
+	const authenticated = actions.has(action) ? undefined : await authenticatedAdmissionKey(request, db);
+	// Sync bootstrap needs thousands of requests. A recently verified credential
+	// gets a separate, bounded local budget; it still undergoes D1 authentication.
+	// Unrecognized credentials cannot obtain this budget by rotating bearers.
+	if (authenticated) return admitLocally(db, `authenticated:${authenticated}`, 6_000) ? null : denied();
+	const address = await sha256Hex(request.headers.get('CF-Connecting-IP') ?? 'local');
+	const key = `api-admission:${url.host}:${address}`;
 	if (limiter) {
 		// One sender cannot consume every user's edge admission slot. Invalid
 		// credentials never reach the authenticated database-write budgets.
-		const address = await sha256Hex(request.headers.get('CF-Connecting-IP') ?? 'local');
-		if (!(await limiter.limit({ key: `notification-writes:${url.host}:${address}` })).success) return denied();
+		if (!(await limiter.limit({ key })).success) return denied();
 	} else {
-		let budget = fallback.get(db);
-		if (!budget || budget.expires <= now) { budget = { expires: now + 60_000, count: 0 }; fallback.set(db, budget); }
-		if (++budget.count > 60) return denied();
+		if (!admitLocally(db, key, 60)) return denied();
 	}
 	return null;
 }

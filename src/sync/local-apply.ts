@@ -7,6 +7,7 @@ import { IncomingFileReviewError, preserveIncomingForReview } from './incoming-f
 import type { RecordConflictInput } from './conflict-store';
 import { isVaultTFileLike } from './planner-helpers';
 import type { DiffApplyOutcome } from './transfer-types';
+import { isCurrentVaultFile } from '../platform/vault-file-identity';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
 const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -167,7 +168,7 @@ async function writeLocalContent(
 			return preserveIncomingForReview(context, path, content, snapshot.hash ?? '');
 		}
 		const update = (current: string): string => {
-			if (current !== expectedText) throw new LocalFileChangedError();
+			if (current !== expectedText || snapshot.visibleFile && !isCurrentVaultFile(vault, path, snapshot.visibleFile)) throw new LocalFileChangedError();
 			return replacement;
 		};
 		// Compare within the atomic callback, after all asynchronous hashing and

@@ -40,22 +40,23 @@ export function useReminderMutations(options: {
 		void outboxRef.current.drain();
 	};
 
-	const saveReminder = async (modal: ModalState) => {
-		if (!ensureCanMutate() || preparingRef.current) return;
+	const saveReminder = async (modal: ModalState): Promise<boolean> => {
+		if (!ensureCanMutate() || preparingRef.current) return false;
 		const sessionCurrent = capturePwaSession();
 		preparingRef.current = true;
 		setSaving(true);
 		try {
 			const { createSaveReminderChange } = await import('../save-reminder-command');
-			if (!sessionCurrent()) return;
+			if (!sessionCurrent()) return false;
 			const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
 			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
-			if (!sessionCurrent()) return;
+			if (!sessionCurrent()) return false;
 			enqueue(change);
 			discardReminderDraft(modal, config.folderPath);
 			closeModal();
 			showToast('success', modal.mode === 'create' ? 'Reminder created' : 'Reminder updated');
-		} catch (error) { if (sessionCurrent()) report(error); }
+			return true;
+		} catch (error) { if (sessionCurrent()) report(error); return false; }
 		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }
 	};
 

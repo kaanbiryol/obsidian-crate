@@ -23,9 +23,9 @@ const { outputFiles } = await build({
         Object.defineProperty(HTMLElement.prototype, 'win', { get: () => window });
         window.current = 'Title\\nCurrent change'; window.saved = 'Title\\nSaved change';
         window.writes = []; window.opened = []; window.revealed = [];
-        window.mount = () => {
-            window.modal = new ConflictReviewModal({}, { originalPath: 'Note.md', conflictPath: 'Note.conflict.md' }, async () => ({
-                currentText: window.current, savedText: window.saved, currentSize: 20, savedSize: 18,
+        window.mount = (incoming = false) => {
+            window.modal = new ConflictReviewModal({}, { originalPath: 'Note.md', conflictPath: 'Note.conflict.md', ...(incoming ? { cause: 'incoming-review', copySide: 'remote' } : {}) }, async () => ({
+                currentText: incoming ? undefined : window.current, savedText: incoming ? undefined : window.saved, currentSize: 20, savedSize: 18,
                 openVersion: async version => { window.opened.push(version); },
                 resolve: async (choice, text) => { window.writes.push({ choice, text }); },
             }), () => {});
@@ -110,6 +110,17 @@ for (const browserType of [chromium, webkit]) {
             await result.fill('Discard this draft');
             await page.evaluate(() => window.modal.close());
             assert.equal(await page.evaluate(() => window.writes.length), 1);
+            await page.evaluate(() => window.mount(true));
+            await expect(page.getByRole('radio', { name: 'Use incoming copy', exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: `${actionTitle}: Incoming server copy`, exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: `${actionTitle}: Local file`, exact: true })).toBeVisible();
+            await expect(page.getByRole('radio', { name: 'Custom result', exact: true })).toHaveCount(0);
+            const apply = page.getByRole('button', { name: 'Apply choice', exact: true });
+            await expect(apply).toBeDisabled();
+            await page.getByRole('radio', { name: 'Use incoming copy', exact: true }).check();
+            await expect(page.locator('.crate-conflict-resolution-help')).toContainText('local trash');
+            await apply.click();
+            assert.equal(await page.evaluate(() => window.writes.at(-1).choice), 'saved');
             assert.deepEqual(errors, []);
             await page.close();
         }

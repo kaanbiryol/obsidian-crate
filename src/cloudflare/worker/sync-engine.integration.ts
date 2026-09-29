@@ -4,6 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
+import { createConflictReview } from '../../sync/conflict-review';
 
 const devices: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -58,6 +59,98 @@ async function expectConvergence(replicas: readonly SyncTestDevice[], expected: 
 }
 
 describe('multiple real sync engines across Worker and storage boundaries', () => {
+	it.each(['current', 'both'] as const)('honors %s for an incoming binary review across the next sync', async choice => {
+		const original = new Uint8Array([255, 1]).buffer, incoming = new Uint8Array([255, 2]).buffer;
+		const [first, second] = await replicas('image.bin', original);
+		first.disk.write('image.bin', incoming);
+		await sync(first);
+		await second.engine.sync();
+		const record = second.engine.getActiveConflicts()[0]!;
+		const review = await createConflictReview({ vault: second.disk.vault } as never, '.obsidian/plugins/crate', record,
+			() => false, () => second.engine.markConflictResolved(record.conflictPath), {
+				beforeBinaryReplace: path => second.engine.prepareRecoverableReplacement(path), beforeKeepLocal: () => second.engine.acceptIncomingConflictBaseline(record),
+			});
+		await second.engine.runConflictResolution(() => review.resolve(choice));
+		expect(second.engine.getPendingPaths()).toContain('image.bin');
+		second.close();
+		await second.open();
+		await sync(second);
+		expect(second.disk.read('image.bin')).toEqual(original);
+		expect((await first.api.downloadFile('image.bin')).content).toEqual(original);
+		expect(second.engine.getActiveConflicts()).toEqual([]);
+		if (choice === 'both') {
+			const copy = second.disk.paths().find(path => path !== 'image.bin')!;
+			expect(second.disk.read(copy)).toEqual(incoming);
+			expect((await first.api.downloadFile(copy)).content).toEqual(incoming);
+		}
+	});
+	it.each(['before-choice', 'before-sync'] as const)('preserves a newer server edit arriving %s during incoming review', async when => {
+		const original = new Uint8Array([255, 1]).buffer, incoming = new Uint8Array([255, 2]).buffer, newer = new Uint8Array([255, 3]).buffer;
+		const [first, second] = await replicas('image.bin', original);
+		first.disk.write('image.bin', incoming);
+		await sync(first);
+		await second.engine.sync();
+		const record = second.engine.getActiveConflicts()[0]!;
+		const review = await createConflictReview({ vault: second.disk.vault } as never, '.obsidian/plugins/crate', record,
+			() => false, () => second.engine.markConflictResolved(record.conflictPath), {
+				beforeBinaryReplace: path => second.engine.prepareRecoverableReplacement(path), beforeKeepLocal: () => second.engine.acceptIncomingConflictBaseline(record),
+			});
+		if (when === 'before-sync') await second.engine.runConflictResolution(() => review.resolve('current'));
+		first.disk.write('image.bin', newer);
+		await sync(first);
+		if (when === 'before-choice') {
+			await expect(second.engine.runConflictResolution(() => review.resolve('current'))).rejects.toThrow('server file changed');
+			expect(second.disk.read(record.conflictPath)).toEqual(incoming);
+		} else expect((await second.engine.sync()).success).toBe(false);
+		expect(second.disk.read('image.bin')).toEqual(original);
+		expect((await first.api.downloadFile('image.bin')).content).toEqual(newer);
+		expect(second.engine.getActiveConflicts().length).toBeGreaterThan(0);
+	});
+	it('recovers after a crash between trash and binary replacement without publishing a delete', async () => {
+		const original = new Uint8Array([255, 1]).buffer, incoming = new Uint8Array([255, 2]).buffer;
+		const [first, second] = await replicas('image.bin', original);
+		first.disk.write('image.bin', incoming);
+		await sync(first);
+		await second.engine.sync();
+		const record = second.engine.getActiveConflicts()[0]!;
+		expect(record).toBeDefined();
+		const engine = second.engine;
+		const review = await createConflictReview({ vault: second.disk.vault } as never, '.obsidian/plugins/crate', record,
+			() => false, () => engine.markConflictResolved(record.conflictPath), {
+				beforeBinaryReplace: path => engine.prepareRecoverableReplacement(path), beforeKeepLocal: () => engine.acceptIncomingConflictBaseline(record),
+			});
+		const create = vi.spyOn(second.disk.vault, 'createBinary').mockRejectedValueOnce(new Error('Interrupted before creation'));
+		try {
+			await expect(engine.runConflictResolution(() => review.resolve('saved'))).rejects.toThrow('Interrupted before creation');
+			expect(second.disk.trash.get('image.bin')).toEqual(original);
+			expect(second.checkpoint().files['image.bin']).toBeUndefined();
+			expect(second.disk.has('image.bin')).toBe(false);
+		} finally { create.mockRestore(); }
+		second.close();
+		await second.open();
+		await sync(second);
+		expect(second.disk.read('image.bin')).toEqual(incoming);
+		expect((await first.api.downloadFile('image.bin')).content).toEqual(incoming);
+		expect(second.requests).not.toContain('POST /sync/delete');
+		expect(second.requests).not.toContain('POST /sync/batch-delete');
+	});
+	it.each(['alpha', 'beta'])('keeps competing frontmatter intact when %s arrives first', async firstTag => {
+		const base = '---\ntitle: Note\n---\n\nBody\n';
+		const clients = await replicas('note.md', base);
+		const first = base.replace('title: Note', `title: Note\ntags: [${firstTag}]`);
+		const second = base.replace('title: Note', `title: Note\ntags: [${firstTag === 'alpha' ? 'beta' : 'alpha'}]`);
+		clients[0].disk.write('note.md', first);
+		clients[1].disk.write('note.md', second);
+		await sync(clients[0]);
+		const result = await clients[1].engine.sync();
+		expect(result.merged).toBe(0);
+		expect(new TextDecoder().decode((await clients[0].api.downloadFile('note.md')).content)).toBe(first);
+		const contents = clients[1].disk.paths().map(path => clients[1].disk.text(path));
+		expect(contents).toContain(first);
+		expect(contents).toContain(second);
+		await clients[1].engine.sync();
+		expect(clients[1].disk.paths().map(path => clients[1].disk.text(path))).toEqual(contents);
+	});
 	it('retains literal prototype filenames across client synchronization and checkpoint restart', async () => {
 		const first = await device('first');
 		for (const path of ['__proto__', 'constructor', 'toString']) first.disk.write(path, `content:${path}`);

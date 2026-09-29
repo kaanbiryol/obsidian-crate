@@ -75,7 +75,7 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog, file manifest, authentication, subscriptions, and parsed reminder cache |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
-| `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Limits notification requests per source before D1; authenticated action/day budgets preserve management availability |
+| `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Limits unrecognized API credentials and sensitive actions per source before D1; verified sessions use a separate bounded sync budget |
 
 ## Component Ownership
 
@@ -219,7 +219,7 @@ lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
 
-The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The first-release schema records version 1 in `crate_schema`. Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
+The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 2 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. The registered schema-1 upgrade uses the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 

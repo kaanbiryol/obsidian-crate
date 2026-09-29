@@ -1,3 +1,4 @@
+import { stringDigest } from './string-digest';
 import * as v from 'valibot';
 import { isStoredReminderChange, OPERATION_ID, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
@@ -82,8 +83,7 @@ function quarantineStorage(storage: Storage, keys: () => string[], folderPath: s
 }
 
 async function outboxScope(authToken: string, folderPath: string): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(authToken));
-	const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+	const tokenHash = await stringDigest(authToken);
 	return `${PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
 }
 

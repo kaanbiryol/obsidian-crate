@@ -7,6 +7,7 @@ import { ReminderFileSizeError } from './reminders-web/limits';
 import { ReminderIdentityConflictError } from './reminder-source-identity';
 import { logMutation } from './request-diagnostics';
 import { limitNotificationRequest } from './rate-limit';
+import { rememberAuthenticatedRequest } from './admission-state';
 import { coordinatedUpload } from './staged-upload-dispatch';
 import { affectsNotifications } from './notification-mutations';
 import { armNotificationCoordinator } from './notification-lifecycle';
@@ -31,10 +32,10 @@ function withRequestId(response: Response, requestId: string, started: number): 
 }
 
 export function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
-  return withD1Usage(env, measured => handleWorkerRequest(request, measured, coordinatorState));
+  return withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, coordinatorState));
 }
 
-async function handleWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
+async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, coordinatorState?: DurableObjectState): Promise<Response> {
 	const requestId = crypto.randomUUID();
 	const started = performance.now();
 	if (request.method === 'OPTIONS') {
@@ -47,27 +48,30 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 	const db = env.DB;
 
 	try {
+		const rateLimited = coordinatorState ? null : await limitNotificationRequest(request, admissionDb, env.NOTIFICATION_REQUEST_LIMITER);
+		if (rateLimited) return withRequestId(rateLimited, requestId, started);
 		if (isCrateMutation(path, method) && path !== '/notifications/share/reading') {
 			const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
 			if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 				return withRequestId(corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428), requestId, started);
 			}
 		}
-		const rateLimited = coordinatorState ? null : await limitNotificationRequest(request, db, env.NOTIFICATION_REQUEST_LIMITER);
-		if (rateLimited) return withRequestId(rateLimited, requestId, started);
-		if ((path.startsWith('/reading/') || path === '/features') && !coordinatorState) {
+		// One-use public Reading grants must be redeemed under the coordinator.
+		// Their bounded pre-auth admission runs above; ordinary routes authenticate
+		// and authorize before entering the coordinator below.
+		const readingGrant = method === 'POST' && ['/reading/exchange', '/reading/handoff', '/reading/shortcut-exchange'].includes(path);
+		if (readingGrant && !coordinatorState) {
  const forwarded = new Request(request); forwarded.headers.set('X-Crate-Internal-Mutation', '1');
  return env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded);
  }
- if (coordinatorState && path.startsWith('/reading/')) {
- if (path === '/reading/exchange' || path === '/reading/handoff' || path === '/reading/shortcut-exchange') return handleReadingRoute(request, env, undefined, coordinatorState);
- }
+ if (coordinatorState && readingGrant) return handleReadingRoute(request, env, undefined, coordinatorState);
 		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {
 			return withRequestId(publicResponse, requestId, started);
 		}
 
 		const authResult = await authenticateWorkerRequest(request, db);
+		if (!coordinatorState) await rememberAuthenticatedRequest(request, admissionDb, !authResult.response);
 		if (authResult.response) {
 			return withRequestId(authResult.response, requestId, started);
 		}
@@ -76,7 +80,7 @@ async function handleWorkerRequest(request: Request, env: Env, coordinatorState?
 		const mutation = isCrateMutation(path, method);
     if (coordinatorState && (path.startsWith('/reading/') || path === '/features' && method === 'POST')) await armNotificationCoordinator(coordinatorState);
     const notificationMutation = await affectsNotifications(request);
-		if (notificationMutation && !coordinatorState) {
+		if ((notificationMutation || path.startsWith('/reading/') || path === '/features') && !coordinatorState) {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 			const forwarded = new Request(request);
 			forwarded.headers.set('X-Crate-Internal-Mutation', '1');

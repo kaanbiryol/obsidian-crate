@@ -50,6 +50,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     focus,
     blur: () => rootRef.current?.blur(),
     getElement: () => rootRef.current,
+    getValue: () => editorRef.current?.read($readReminder) ?? latest.current.value,
     selectAll: () => focus({ select: true }),
     setCursorPosition: (pos, options = {}) => { pendingRef.current = { pos, ...options }; },
   }), [focus]);

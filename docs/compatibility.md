@@ -4,6 +4,8 @@ Compatibility is a contract among plugin code, the Worker, the PWA asset build, 
 
 ## Current format matrix
 
+Server revision, schema, wire protocol and transfer limits are checked against source in [current contract](current-contract.md).
+
 | Boundary | Current format | Upgrade or recovery behavior |
 | --- | --- | --- |
 | API writes | `X-Crate-Protocol: 1`; oldest compatible is 1 | Clients negotiate the highest common version. The launch protocol supports ordinary writes; restores require a durable operation and the `restore-operation-receipts` capability. Missing, older or future protocols receive 428 before mutations. Authenticated read endpoints remain available at the HTTP layer; an older application's decoder may still require an update. |
@@ -17,13 +19,13 @@ Compatibility is a contract among plugin code, the Worker, the PWA asset build, 
 | Local sync checkpoints | Checkpoint envelope version 3 with generation, server authority, rename dependencies, settled upload IDs and restore intents | Read supported version-1/2/3 checkpoints and write version 3. Older plugins reject format 3 to avoid dropping pending restore authority. Select the newest valid main/tmp generation; authority mismatch or unsupported state stops sync. Reconfiguration verifies recovery copies before invalidating both files. The remote manifest is a separate version-1 format. |
 | Upload retry journal | Version 2, ordered per-operation files in `pending-uploads/`, bound to the server authority | Persist exact upload bytes, merge preimages and the operation ID before dispatch. Version-1 or unsupported journals stop for review; missing merge preimages are never invented. Recover receipts before planning; checkpoint settled IDs before pruning. Reconfiguration archives the journal with both checkpoint generations. |
 | Plugin reminder moves | Journal version 1 in the plugin's `reminder-moves/` directory | Recover before normalization. Ambiguous or unsupported records preserve files and block affected writes for review. |
-| Paired recovery archive | Archive format 1, schema 1 | Verify and restore the baseline while preserving source archive bytes, receipts and observations. Future upgrades use the shared release manifest. |
+| Paired recovery archive | Archive format 1, schemas 1–2 | Restore into the current schema while preserving source archive bytes, receipts and observations. Schema-1 recovery initializes the new capture queue empty; the shared release manifest defines the supported chain. |
 
 No unsupported database or checkpoint is silently interpreted as empty. Signing out is an explicit privacy operation and deletes the browser cache and all pending-command namespaces; a blocked deletion is reported. A cache-only rebuild never clears pending intent or unknown stores. See [browser recovery](pwa-storage-recovery.md) and [checkpoint recovery](sync-checkpoint-recovery.md).
 
 ## Upgrade order
 
-1. Preserve device vaults and pending browser text. Create and verify a paired D1/R2 archive with recovery tools that support the source schema. The current tools support the launch schema 1. Record the deployed artifact and resource identities.
+1. Preserve device vaults and pending browser text. Create and verify a paired D1/R2 archive with recovery tools that support the source schema. The current tools support schemas 1 and 2 in the current migration chain. Record the deployed artifact and resource identities.
 2. Pause sync on every device, close editing web tabs, and allow in-flight writes to finish before publishing the new Worker. Preserve and compare any unresolved older upload: the server cannot reconstruct an identity for a request made by an older client, and replacing the Worker does not cancel its already-running requests. Also stop deployment/reset activity on older devices and direct account administration. Current deployment ownership cannot fence an older client or dashboard action that ignores it. Resolve any uncertain accepted provider request before proceeding.
 3. Install the intended plugin and select **Authorize update**. The client verifies the live bindings, acquires the D1 deployment owner, and checks the current artifact again. It initializes empty databases or follows the explicit upgrade plan, publishes the Worker/PWA, and verifies the live release before unlocking writes. Interruption leaves owned recovery state; do not lower a marker or discard a deployment fence to force a retry.
 4. Let the new Worker verify sources and drain projection jobs. Existing first-observation timestamps survive. Check diagnostics for parser verification, ambiguous identities and unavailable sources; repair the source notes rather than bypassing validation.
@@ -38,7 +40,7 @@ Prefer a forward fix using the current schema and protocol. Replacing the Worker
 
 For a historical rollback, keep the current deployment offline or preserved for comparison. Use the historical build and matching recovery tools with its pre-update paired archive, restored into separate empty resources and a fresh Worker/DO namespace. That copy excludes subsequent writes. Review post-backup vault edits and pending browser commands before enrolling devices into the restored deployment. Credentials and local checkpoints from another deployment must not be copied across authorities.
 
-Current recovery tools restore baseline archives. Future registered migrations apply only to an isolated copy; they are not schema downgrade tools. They retain the original database export and object bytes. An unsupported future archive stops before uploading objects or importing SQL. Service-worker and browser-storage downgrades likewise require their matching application; current cache rebuilding refuses unknown formats.
+Current recovery tools restore supported schema-1 and schema-2 archives into isolated resources; they are not schema downgrade tools. They retain the original database export and object bytes. An unsupported future archive stops before uploading objects or importing SQL. Service-worker and browser-storage downgrades likewise require their matching application; current cache rebuilding refuses unknown formats.
 
 ## Rules for the next format change
 
@@ -59,8 +61,8 @@ Parser 9 additionally recognizes task lines ending in CRLF. The plugin validates
 
 ## Launch protocol baseline
 
-Server revision, database schema and wire protocol start at 1 for the first public
-installation. The oldest compatible protocol is also 1. Earlier development
+Wire protocol 1 is the launch contract, with oldest compatible version 1.
+The current candidate uses server revision 2 and database schema 2. Earlier development
 protocol numbers are unsupported; use matching plugin, Worker, PWA and shortcut
 builds when recreating a development deployment.
 
@@ -74,7 +76,7 @@ Server revisions and database versions advance independently of the wire protoco
 
 ## Local server storage
 
-Ordinary startup of self-hosted Miniflare storage requires the same runtime version and schema hash, and an equal or newer server revision. `check-upgrade` validates compatibility without changing stored data. Previous development databases have no upgrade path. Future registered migrations require a stopped server and the explicit `upgrade` command, which creates a verified backup. Unsupported runtime or schema changes remain blocked; editing metadata does not make them compatible. Keep the backup and its matching installation before updating. See [Reading upgrade instructions](read-it-later-testing.md#existing-server-upgrade) and [self-hosting backup and restore](self-hosting.md#verified-backups-restore-and-updates).
+Ordinary startup of self-hosted Miniflare storage requires the same runtime version and schema hash, and an equal or newer server revision. `check-upgrade` validates compatibility without changing stored data. Databases from the retired pre-reset development sequence have no upgrade path. Supported schema-1 databases upgrade through the registered migration. Migrations require a stopped server and the explicit `upgrade` command, which creates a verified backup. Unsupported runtime or schema changes remain blocked; editing metadata does not make them compatible. Keep the backup and its matching installation before updating. See [Reading upgrade instructions](read-it-later-testing.md#existing-server-upgrade) and [self-hosting backup and restore](self-hosting.md#verified-backups-restore-and-updates).
 
 Parser 10 keeps the last inline schedule active and preserves earlier date and repeat phrases as title text. When a standalone weekday precedes a complete calendar date, only the calendar date is consumed; this keeps a title such as `Notes from Monday` intact after saving and reopening. Canonical recurring reminders still combine their readable rule and next occurrence using the existing `crate-rule` metadata. Weekday, alternate-week, plural-weekday, weekday-range and weekend phrases remain recurring. Calendar phrases are passed intact to Chrono: an unmatched phrase such as `February 30 at 9 in the morning` remains title text without an error or a derived morning reminder. Recognized dates follow Chrono's date ordering and year inference. Cache and notification source verification are rebuilt under the new parser version; source Markdown is retained.
 
@@ -82,7 +84,7 @@ One-off and repeating editor schedules accept timezone suffixes, for example `to
 
 The launch baseline includes `reading-shortcut-pairing-v1` in protocol 1 and schema 1. Enrolled Reading sessions may mint one-use capture grants, but cannot renew or mint library sessions. Capture access is bounded by the issuer’s expiry. Existing manually configured shortcuts continue working. Deploy the signed v1 shortcut through the Pages workflow before distributing this server revision; downloaded templates contain no account data.
 
-Revision 69 lets an enrolled Reminders PWA use the same browser credential for Reading after server Reading is enabled. The Reading library stays gated by the active server policy; Reminders credentials still cannot create Reading setup links, change Reading policy, or access vault sync. The web app keeps Reading-only setup links for browsers without a Reminders connection. Protocol 11 and schema 2 do not change.
+The current server lets an enrolled Reminders PWA use the same browser credential for Reading after server Reading is enabled. The Reading library stays gated by the active server policy; Reminders credentials still cannot create Reading setup links, change Reading policy, or access vault sync. The web app keeps Reading-only setup links for browsers without a Reminders connection. This uses wire protocol 1 and schema 2.
 
 Reading-folder imports no longer require a Clipper marker. Existing marked templates
 remain supported. Imported notes without a web source use `source_url: ""` with

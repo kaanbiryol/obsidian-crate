@@ -18,6 +18,7 @@ interface ReminderEditorFieldsProps {
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
     containerRef?: React.RefObject<HTMLDivElement | null>;
     descriptionRef?: React.RefObject<HTMLDivElement | null>;
+    descriptionInputRef?: React.RefObject<RichTextInputHandle | null>;
     disabled?: boolean;
     titleInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
         'onFocus' | 'onBlur' | 'focusRequestKey' | 'preserveSelection' | 'externalChangeCursor'
@@ -38,6 +39,7 @@ export function ReminderEditorFields({
     richTextInputRef,
     containerRef: externalContainerRef,
     descriptionRef: externalDescriptionRef,
+    descriptionInputRef,
     disabled = false,
     titleInputProps,
     descriptionInputProps,
@@ -109,6 +111,7 @@ export function ReminderEditorFields({
                     resolvePageTitle={resolvePageTitle}
                     readOnly={disabled}
                     markers={false}
+                    ref={descriptionInputRef}
                     ariaLabel="Reminder description"
                     inputRef={descriptionRef}
                     value={description}

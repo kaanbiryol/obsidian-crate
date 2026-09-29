@@ -59,6 +59,8 @@ export async function checkTabSettings(page, name) {
 		await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText(label);
 		await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-dock [aria-current="page"]')).toHaveAttribute('aria-label', label);
 	}
+	// This checks persisted tabs; let unrelated Reading refreshes settle before replacing the document.
+	await page.waitForLoadState('networkidle');
 	await page.reload();
 	await expect.poll(() => dockTabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Archive', 'Favorites', 'Highlights', 'Reminders']);
 	await gear.click();
@@ -82,6 +84,7 @@ export async function checkTabSettings(page, name) {
 		await sheet.getByRole('combobox', { name: 'Default tab', exact: true }).selectOption({ label });
 		await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await expect(sheet).toHaveCount(0);
+		await page.waitForLoadState('networkidle');
 		await page.goto(new URL('/notifications', page.url()).href);
 		await expect(page.locator('.pwa-schedule-chip[aria-pressed="true"]')).toHaveText(label);
 		await expect(activeDock.locator('[aria-current="page"]')).toHaveAttribute('aria-label', 'Reminders');
@@ -138,6 +141,7 @@ export async function checkTabSettings(page, name) {
 	await assertSwitcher('Favorites');
 	await expect.poll(savedTabs).toEqual(['inbox', 'today', 'reading', 'favorites']);
 	await expect(page.getByRole('searchbox', { name: 'Search reading' })).toBeVisible();
+	await page.waitForLoadState('networkidle');
 	await page.reload();
 	await assertSwitcher('Favorites');
 	// Each new selection replaces slot four, across both features.
@@ -190,6 +194,7 @@ export async function checkTabSettings(page, name) {
 	await expect(views.getByRole('button')).toHaveText(['Inbox', 'Favorites', 'Archive']);
 	await views.getByRole('button', { name: 'Inbox', exact: true }).click();
 	await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title:not([inert] *)')).toHaveText('Inbox');
+	await page.waitForLoadState('networkidle');
 	await page.reload();
 	await expect(dockTabs.nth(3)).toHaveAccessibleName('Inbox');
 	await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);

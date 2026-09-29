@@ -34,10 +34,16 @@ export class PersistentTestVault {
 	remove(path: string): void { this.files.delete(path); this.fileObjects.delete(path); }
 
 	rename(from: string, to: string): void {
+		const identity = this.fileObjects.get(from);
 		const content = this.read(from);
 		if (this.files.has(to)) throw new Error(`Destination exists: ${to}`);
 		this.write(to, content);
 		this.remove(from);
+		if (identity) {
+			identity.path = to;
+			this.fileObjects.set(to, identity);
+			this.file(to);
+		}
 	}
 
 	paths(): string[] { return [...this.files.keys()].filter(path => !isHiddenPath(path)).sort(); }
@@ -90,6 +96,7 @@ export class PersistentTestVault {
 		configDir: '.obsidian',
 		getFiles: () => this.paths().map(path => this.file(path)!),
 		getAbstractFileByPath: (path: string) => this.file(path),
+		readBinary: async (file: TFile) => this.read(file.path),
 		createFolder: async (path: string) => { this.mkdir(path); },
 		createBinary: async (path: string, content: ArrayBuffer) => {
 			if (this.files.has(path)) throw new Error(`File already exists: ${path}`);

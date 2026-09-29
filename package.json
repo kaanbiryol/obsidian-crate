@@ -58,12 +58,13 @@
 		"benchmark:reminders": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/reminder-capacity.integration.ts --reporter=verbose",
 		"benchmark:pwa": "node scripts/pwa-capacity-test.mjs",
 		"check": "npm run check:source && npm run test:worker-runtime && npm run test:local-server",
-		"check:source": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:ci && npm run test:server-revision && npm run check:server-revision && npm run test:recovery && npm test",
+		"check:source": "npm run build:worker && npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run check:contracts && npm run test:ci && npm run test:server-revision && npm run check:server-revision && npm run test:recovery && npm test",
+		"check:contracts": "node scripts/check-contract-docs.mjs",
 		"preview:ui": "vite --config vite.visual.config.mts",
 		"test:visual": "node scripts/visual-test-run.mjs && playwright test --config tests/editor-contract/playwright.config.ts",
 		"typecheck:visual": "tsc -p tests/visual/tsconfig.json && npm run typecheck:editor-contract",
 		"security:secrets": "node scripts/check-secrets.mjs",
-		"security:audit": "npm audit --audit-level=low --include=dev",
+		"security:audit": "npm audit --audit-level=low --include=dev && npm --prefix packages/server audit --audit-level=low --include=dev",
 		"security:check": "npm run security:audit && npm run security:secrets",
 		"test:recovery": "python3 -m unittest discover -s scripts/recovery -p \"test_*.py\"",
 		"benchmark:sync": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync-capacity.integration.ts --reporter=verbose",
@@ -163,7 +164,8 @@
 	},
 	"overrides": {
 		"miniflare": {
-			"sharp": "0.35.5"
+			"sharp": "0.35.5",
+			"undici": "7.29.1"
 		}
 	}
 }

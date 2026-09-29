@@ -11,3 +11,15 @@ If startup reports that the checkpoint is not bound to this server, Crate leaves
 An interrupted reset can leave some active generations and all verified recovery copies. Retry the reset after correcting the filesystem problem. Do not manually copy a previous server's checkpoint into the active checkpoint path. A paired server backup restores remote data; a checkpoint alone contains no note bytes.
 
 Checkpoint format 3 validates every entry, generation, cursor, authority, receipt ID, pending restore intent and rename dependency before adopting any state. Valid format-1 and format-2 checkpoints migrate on the next write. Unknown versions and semantically damaged JSON stop synchronization; they never become an empty or partial manifest. Both main and temporary generations must have compatible authority, and equal generations cannot disagree about their authoritative state. An I/O failure also stops recovery. Only torn JSON can fall back to another complete generation; its original bytes are first preserved in a `.corrupt-<id>` file. Keep those files with the private vault backup. Do not downgrade a client after it writes format 3.
+
+Explicit binary recovery first saves a checkpoint without the original file's
+baseline, then moves the current bytes to local trash and creates the replacement
+without overwriting an existing file. If the app stops between trash and creation,
+the next sync retrieves the server copy instead of interpreting the gap as a local
+deletion. The displaced bytes and verified recovery copies remain available.
+
+For an incoming-file review, **Keep local** and **Keep both** verify that the server
+still has the reviewed hash before acknowledging that version in the checkpoint.
+The next ordinary, journaled sync publishes the retained local file conditionally.
+A newer server edit requires another review; an offline verification leaves the
+review unresolved and its saved copy intact.

@@ -22,6 +22,7 @@ const equal = (a: ArrayBuffer, b: ArrayBuffer) => {
 export async function createConflictReview(
     app: App, backupRoot: string, record: ConflictRecord,
     isSyncing: () => boolean, onResolved: () => Promise<void>,
+    recovery: { beforeBinaryReplace(path: string): Promise<void>; beforeKeepLocal(): Promise<void> },
 ): Promise<ConflictReview> {
     const original = await conflictReviewFile(app, record.originalPath);
     const saved = await conflictReviewFile(app, record.conflictPath);
@@ -77,6 +78,10 @@ export async function createConflictReview(
                 if (!equal(await app.vault.adapter.readBinary(`${folder}/current`), currentBytes)
                     || !equal(await app.vault.adapter.readBinary(`${folder}/saved`), savedBytes)) throw new Error('Could not verify recovery copies. No files were replaced.');
                 await verify();
+                // Incoming review leaves the old baseline untouched. Verify the
+                // reviewed remote version before creating a keep-both result, so
+                // an offline retry cannot create a duplicate copy each attempt.
+                if (choice === 'current' || choice === 'both') await recovery.beforeKeepLocal();
                 if (choice === 'both') {
                     const dot = original.path.lastIndexOf('.');
                     const stem = dot > original.path.lastIndexOf('/') ? original.path.slice(0, dot) : original.path;
@@ -90,12 +95,15 @@ export async function createConflictReview(
                             return choice === 'manual' ? editedText! : savedText!;
                         });
                     } else {
-                        await original.writeBinary(savedBytes);
+                        await recovery.beforeBinaryReplace(original.path);
+                        await original.writeBinary(savedBytes, currentBytes, () => {
+                            if (isSyncing()) throw new Error('Wait for sync to finish before resolving this conflict.');
+                        });
                     }
                 }
                 // Do not discard a saved copy edited during the operation.
                 if (!equal(await saved.read(), savedBytes)) throw new Error('The saved copy changed and was kept. Reopen the conflict to review it.');
-                await saved.trash();
+                await saved.trash(savedBytes);
                 await onResolved();
                 completed = true;
                 return folder;

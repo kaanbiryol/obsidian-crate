@@ -1,3 +1,4 @@
+import { checkReadingLogoutCorruption } from './pwa-reading-logout-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -10,6 +11,7 @@ try {
  for (const type of [chromium, webkit]) {
   const browser = await type.launch();
   try {
+   await checkReadingLogoutCorruption(browser, origin);
    for (const failure of ['token', 'drafts', 'outbox', 'cache']) {
     const page = await browser.newPage({ serviceWorkers: 'block' });
     const errors = []; page.on('pageerror', error => errors.push(error.message));

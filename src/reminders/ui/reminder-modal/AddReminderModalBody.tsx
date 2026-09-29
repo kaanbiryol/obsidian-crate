@@ -20,6 +20,7 @@ interface AddReminderModalBodyProps {
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
+    descriptionInputRef: React.RefObject<RichTextInputHandle | null>;
     dueDate: string | null;
     hasTime?: boolean;
     project: string;
@@ -43,6 +44,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     projects,
     textareaRef,
     richTextInputRef,
+    descriptionInputRef,
     dueDate,
     hasTime,
     project,
@@ -80,6 +82,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                         projects={projects}
                         textareaRef={textareaRef}
                         richTextInputRef={richTextInputRef}
+                        descriptionInputRef={descriptionInputRef}
                     />
                 </PageTitleContext.Provider>
 

@@ -880,3 +880,69 @@ for (const fractional of [false, true]) {
     expect((await saved()).recurrence?.millisecond).toBeUndefined();
   });
 }
+
+test('saving immediately after a paste includes the committed editor text', async ({ page }, info) => {
+  await page.goto(`/?fixture=modal&host=${String(info.project.metadata.host)}`);
+  const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+  await title.click();
+  await title.pressSequentially('Call Alex every Monday');
+  await title.evaluate(element => {
+    const data = new DataTransfer();
+    data.setData('text/plain', ' 09:00:30.123');
+    element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  });
+  await expect.poll(async () => JSON.parse((await page.getByTestId('saved').textContent()) || 'null') as Reminder)
+    .toMatchObject({ content: 'Call Alex', recurrence: { hour: 9, minute: 0, second: 30, millisecond: 123 } });
+});
+
+test('saving immediately after removing a repeat rule does not restore it', async ({ page }, info) => {
+  await page.goto(`/?fixture=modal&host=${String(info.project.metadata.host)}&reminder=${encodeURIComponent(JSON.stringify(recurringReminder))}`);
+  const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+  await title.click();
+  await title.press('ControlOrMeta+a');
+  await title.evaluate(element => {
+    const data = new DataTransfer(); data.setData('text/plain', 'Call Alex');
+    element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  });
+  const saved = async () => JSON.parse((await page.getByTestId('saved').textContent()) || 'null') as Reminder;
+  await expect.poll(saved).toMatchObject({ content: 'Call Alex' });
+  expect((await saved()).recurrence).toBeUndefined();
+  expect((await saved()).dueDate).toBeUndefined();
+  expect((await saved()).dueDatetime).toBeUndefined();
+});
+
+test('the save button reads a pending description paste as Markdown', async ({ page }, info) => {
+  await page.goto(`/?fixture=modal&host=${String(info.project.metadata.host)}&reminder=${encodeURIComponent(JSON.stringify(recurringReminder))}`);
+  const description = page.getByRole('textbox', { name: 'Reminder description', exact: true });
+  await description.click();
+  await description.evaluate(element => {
+    const data = new DataTransfer(); data.setData('text/plain', 'Read [docs](https://example.com)\nSecond line');
+    element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    (element.getRootNode() as Document | ShadowRoot).querySelector<HTMLButtonElement>('[aria-label="Save reminder"]')!.click();
+  });
+  await expect.poll(async () => JSON.parse((await page.getByTestId('saved').textContent()) || 'null') as Reminder)
+    .toMatchObject({ description: 'Read [docs](https://example.com)\nSecond line' });
+});
+
+for (const failFirst of [false, true]) {
+  test(`one accepted PWA save survives a delayed submission callback (initial failure: ${failFirst})`, async ({ page }, info) => {
+    test.skip(info.project.metadata.host !== 'pwa', 'PWA editor submission boundary');
+    await page.goto(`/?fixture=pwa-save${failFirst ? '&failFirst' : ''}`);
+    const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+    await expect(title).toBeVisible();
+    const submit = () => title.evaluate(element => element.closest('form')!.requestSubmit());
+    await submit();
+    await expect(page.getByTestId('save-result')).toHaveText(JSON.stringify({ attempts: 1, accepted: !failFirst }));
+    if (failFirst) {
+      await title.fill('Corrected after storage failure');
+      await submit();
+      await expect(page.getByTestId('save-result')).toHaveText(JSON.stringify({ attempts: 2, accepted: true }));
+    }
+    // A queued submit/keyboard callback arrives after preparation settled but
+    // before the sheet has unmounted. It must not create a second command.
+    await submit();
+    await expect(page.getByTestId('save-result')).toHaveText(JSON.stringify({ attempts: failFirst ? 2 : 1, accepted: true }));
+  });
+}

@@ -338,12 +338,7 @@ export class SyncEngine {
             verify: () => {
                 this.lifecycle.throwIfDestroyed();
             },
-            beforeBinaryReplace: async path => {
-                // A crash between trash and recreation must not become a remote
-                // deletion. With no baseline, the next sync retrieves the server copy.
-                this.localManifest.removeEntry(path);
-                await this.localManifest.save();
-            },
+            beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
             applied: async (path, remote, content) => {
                 if (remote && content) {
                     const local = await readLocalFileEntry(this.vault, path);
@@ -370,9 +365,34 @@ export class SyncEngine {
 		return this.runExclusiveOperation(operation, 'Wait for sync to finish before resolving this conflict.');
 	}
 
+	/** Called within an exclusive recovery operation, before removing local bytes.
+	 * A crash between trash and creation must not publish a remote deletion. */
+	async prepareRecoverableReplacement(path: string): Promise<void> {
+		this.lifecycle.throwIfDestroyed();
+		this.localManifest.removeEntry(path);
+		await this.localManifest.save();
+		this.lifecycle.throwIfDestroyed();
+	}
+
 	async markConflictResolved(path: string): Promise<void> {
 		await this.conflictStore.markResolved(path);
 		this.updateState({ conflictCount: this.conflictStore.getActiveConflicts().length });
+	}
+
+	/** Preserve the user's keep-local intent without accepting a newer server edit.
+	 * Publication remains in the ordinary durable upload/CAS pipeline. */
+	async acceptIncomingConflictBaseline(record: ConflictRecord): Promise<void> {
+		if (record.copySide !== 'remote') return;
+		this.lifecycle.throwIfDestroyed();
+		const remote = (await this.api.getFileMetadata([record.originalPath])).files[record.originalPath];
+		if (!record.remoteHash || !remote || remote.hash !== record.remoteHash) {
+			throw new Error('The server file changed. Sync again and review the latest incoming copy. Both versions were kept.');
+		}
+		this.lifecycle.throwIfDestroyed();
+		this.localManifest.setEntry(record.originalPath, { ...remote, modified: 'unverified' });
+		await this.localManifest.save();
+		this.lifecycle.throwIfDestroyed();
+		this.queueController.restorePendingPaths([record.originalPath]);
 	}
 
 	getActiveConflicts(): ConflictRecord[] {

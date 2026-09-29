@@ -1,4 +1,5 @@
 import { pwaStartSearchFromUrl } from '../cloudflare/worker/pwa/pwa-params';
+export { stringDigest as enrollmentFingerprint } from './string-digest';
 
 const INSTALL_COOKIE = 'crate-reminders-install';
 const REDEEMED_KEY = 'crate-reminders-redeemed-enrollment';
@@ -42,11 +43,6 @@ export function restoreInstallEnrollment(params: URLSearchParams): URLSearchPara
 	} catch {
 		return params;
 	}
-}
-
-export async function enrollmentFingerprint(token: string): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-	return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export function wasEnrollmentRedeemed(fingerprint: string): boolean {

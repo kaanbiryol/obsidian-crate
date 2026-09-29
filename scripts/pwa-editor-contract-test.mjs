@@ -178,6 +178,29 @@ for (const browserType of [chromium, webkit]) {
     assert.equal(projectBody.content, 'Task #Personal then new tail');
     assert.equal(projectBody.project, 'Work');
     await expect(title).toBeHidden();
+    // Save in the paste event's turn, before React can publish a new draft.
+    for (const field of ['title', 'description']) {
+      await page.locator('[data-action="open-create-modal"]').tap();
+      await replaceTitle('Call Alex every Monday');
+      const target = field === 'title' ? title : description;
+      await target.tap();
+      const request = page.waitForRequest(request => request.url().endsWith('/reminders/create') && request.method() === 'POST');
+      await target.evaluate((element, field) => {
+        const data = new DataTransfer();
+        data.setData('text/plain', field === 'title' ? ' 09:00:30.123' : 'Read [docs](https://example.com)\nSecond line');
+        element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+        element.closest('form').requestSubmit();
+      }, field);
+      const body = (await request).postDataJSON();
+      assert.equal(body.content, 'Call Alex');
+      if (field === 'title') {
+        assert.equal(body.recurrence.hour, 9);
+        assert.equal(body.recurrence.minute, 0);
+        assert.equal(body.recurrence.second, 30);
+        assert.equal(body.recurrence.millisecond, 123);
+      } else assert.equal(body.description, 'Read [docs](https://example.com)\nSecond line');
+      await expect(title).toBeHidden();
+    }
     for (const content of ['Email monday@example.com', 'Review Monday.md', 'Open /notes/Friday.md',
       'Task February 30 at 9 in the morning', 'Task 2027-02-29 at noon', 'Task 02/30/2027 09:00']) {
       await page.locator('[data-action="open-create-modal"]').tap();

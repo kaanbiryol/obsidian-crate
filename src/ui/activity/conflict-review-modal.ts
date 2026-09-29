@@ -12,6 +12,7 @@ export class ConflictReviewModal extends SharedModal {
     private draft: string | undefined;
     private selected: ConflictChoice | undefined;
     private awaitingExternal = false;
+    private get incoming(): boolean { return this.record.cause === 'incoming-review' && this.record.copySide === 'remote'; }
     private readonly returnToReview = () => {
         if (this.awaitingExternal && !this.busy) {
             this.awaitingExternal = false;
@@ -20,7 +21,7 @@ export class ConflictReviewModal extends SharedModal {
     };
     constructor(app: App, private record: ConflictRecord, private load: () => Promise<ConflictReview>, private resolved: () => void) { super(app); }
     onOpen(): void {
-        this.openLayout('Review conflict');
+        this.openLayout(this.incoming ? 'Review incoming file' : 'Review conflict');
         this.modalEl.addClass('crate-conflict-review-modal');
         this.modalEl.toggleClass('is-mobile', Platform.isMobile);
         this.contentEl.win.addEventListener('focus', this.returnToReview);
@@ -58,7 +59,9 @@ export class ConflictReviewModal extends SharedModal {
         const heading = fileInfo.createEl('h3', { cls: 'crate-conflict-review-path' });
         if (parts.length) heading.createSpan({ text: `${parts.join('/')}/`, cls: 'crate-conflict-review-folder' });
         heading.createSpan({ text: filename });
-        body.createEl('p', { text: 'Choose which version to keep, or edit a combined result.', cls: 'crate-conflict-review-help' });
+        body.createEl('p', { text: this.incoming
+            ? 'An incoming server version is ready. This file needs review before replacement. Choose which copy to keep; the displaced file is preserved in local trash.'
+            : 'Choose which version to keep, or edit a combined result.', cls: 'crate-conflict-review-help' });
         const status = body.createDiv({ cls: 'crate-conflict-review-help', attr: { role: 'status', 'aria-live': 'polite' } });
         if (returning) status.setText('Versions refreshed. Review the latest content and choose a result. Your result draft, if any, is preserved.');
         const controls: Array<HTMLButtonElement | HTMLInputElement> = [];
@@ -70,13 +73,14 @@ export class ConflictReviewModal extends SharedModal {
         const diff = textPreview ? buildConflictDiff(review.currentText!, review.savedText!) : undefined;
         if (textPreview) body.createEl('p', {
             cls: 'crate-conflict-review-help',
-            text: 'Comparing current file with saved copy. Red shows removed text · green shows added text.',
+            text: this.incoming ? 'Comparing local file with incoming server copy. Red shows removed text · green shows added text.'
+                : 'Comparing current file with saved copy. Red shows removed text · green shows added text.',
         });
         if (diff?.limited) body.createEl('p', { text: 'These versions are too different to highlight. Review the full text below.' });
         const compare = body.createDiv({ cls: 'crate-conflict-compare' });
         const previews: HTMLElement[] = [];
         for (const [version, title, size] of [
-            ['current', 'Current file', review.currentSize], ['saved', 'Saved copy', review.savedSize],
+            ['current', this.incoming ? 'Local file' : 'Current file', review.currentSize], ['saved', this.incoming ? 'Incoming server copy' : 'Saved copy', review.savedSize],
         ] as const) {
             const panel = compare.createDiv({ cls: 'crate-conflict-version' });
             const heading = panel.createEl('h3');
@@ -105,7 +109,7 @@ export class ConflictReviewModal extends SharedModal {
         const manual = body.createDiv({ cls: 'crate-conflict-manual' });
         manual.createEl('h3', { text: 'Custom result' });
         const draftHelp = manual.createEl('p', { text: 'This draft starts with the current file’s text. Edit it to combine both versions, then save with ', cls: 'crate-conflict-review-help' });
-        draftHelp.createEl('strong', { text: 'Resolve conflict' });
+        draftHelp.createEl('strong', { text: this.incoming ? 'Apply choice' : 'Resolve conflict' });
         draftHelp.append('.');
         const label = manual.createEl('label', { text: 'Result text' });
         const editor = label.createEl('textarea', { cls: 'crate-conflict-editor', attr: { 'aria-label': 'Result text', spellcheck: 'false' } });
@@ -118,14 +122,16 @@ export class ConflictReviewModal extends SharedModal {
         const showResult = () => manual.toggle(this.selected === 'manual');
         showResult();
         const explanations = {
-            current: 'Keep the current file. A recovery copy of the saved version is kept.',
-            saved: 'Replace the current file with the saved copy. Recovery copies of both versions are kept.',
+            current: this.incoming ? 'Keep the local file for the next sync. Requires a connection to verify the reviewed server version. A recovery copy of the incoming version is kept.'
+                : 'Keep the current file. A recovery copy of the saved version is kept.',
+            saved: this.incoming ? 'Use the incoming server copy. Recovery copies of both versions are kept; the displaced file is preserved in local trash.'
+                : 'Replace the current file with the saved copy. Recovery copies of both versions are kept.',
             both: 'Save both as separate files. The saved copy gets a new name.',
             manual: 'Save your edited result to the original file. Recovery copies of both versions are kept.',
         };
         const explanation = actions.createEl('p', { cls: 'crate-conflict-review-help crate-conflict-resolution-help' });
         const modes: Array<[ConflictChoice, string]> = [
-            ['current', 'Keep current'], ['saved', 'Use saved copy'], ['both', 'Keep both'],
+            ['current', this.incoming ? 'Keep local' : 'Keep current'], ['saved', this.incoming ? 'Use incoming copy' : 'Use saved copy'], ['both', 'Keep both'],
             ...(textPreview ? [['manual', 'Custom result'] as [ConflictChoice, string]] : []),
         ];
         explanation.setText(this.selected ? explanations[this.selected] : 'Select a resolution, then confirm. Recovery copies are kept on this device.');
@@ -145,7 +151,7 @@ export class ConflictReviewModal extends SharedModal {
                 if (value === 'manual') editor.focus();
             });
         }
-        const primary = button(actions, 'Resolve conflict', () => { if (this.selected) void resolve(this.selected); });
+        const primary = button(actions, this.incoming ? 'Apply choice' : 'Resolve conflict', () => { if (this.selected) void resolve(this.selected); });
         primary.addClass('crate-conflict-primary-action', 'crate-sync-primary-action'); primary.disabled = !this.selected;
         const resolve = async (choice: ConflictChoice) => {
             this.busy = true; controls.forEach(el => { el.disabled = true; }); editor.disabled = true;
@@ -154,7 +160,7 @@ export class ConflictReviewModal extends SharedModal {
                 await review.resolve(choice, editor.value);
                 this.resolved();
                 if (this.active) this.close();
-                new Notice('Conflict resolved. Recovery copies saved on this device.');
+                new Notice(this.incoming ? 'Incoming file review saved. Recovery copies kept on this device.' : 'Conflict resolved. Recovery copies saved on this device.');
             } catch (error) {
                 status.setText(error instanceof Error ? error.message : String(error));
                 const retry = status.createDiv({ cls: 'crate-conflict-retry' });

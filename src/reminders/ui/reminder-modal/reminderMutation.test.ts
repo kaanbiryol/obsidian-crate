@@ -18,6 +18,14 @@ function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
 }
 
 describe('buildReminderSubmission', () => {
+    it('does not restore a removed repeat rule from a draft awaiting its effect', () => {
+        const reminder = makeReminder({ dueDatetime: '2026-09-28T09:00:00.000Z',
+            recurrence: { frequency: 'weekly', daysOfWeek: [1], hour: 9, minute: 0 } });
+        const saved = buildReminderSubmission({ content: 'Call Alex', projects: [], priority: 4,
+            project: 'Inbox', dueDate: reminder.dueDatetime!, hasTime: true, recurrence: reminder.recurrence, reminder });
+        expect(saved?.updatedReminder).toMatchObject({ content: 'Call Alex', recurrence: undefined,
+            dueDate: undefined, dueDatetime: undefined });
+    });
     it.each(['', ' \u00a0 ', 'tomorrow', '09:00', 'every Monday', 'every week Monday 09:00', '#Work', '!',
         'every Monday 09:00 #Work !', '#Work\u00a0!\u00a0tomorrow'])('blocks titleless creation and editing: %j', content => {
         for (const reminder of [undefined, makeReminder({ dueDate: '2026-09-28' })]) {

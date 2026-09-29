@@ -69,13 +69,15 @@ export function buildReminderSubmission({
 
 	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
 	const finalProject = parsed.project || project;
-	const chosenRecurrence = preserveRecurrenceMetadata(parsed.recurrence, recurrence) || (parsed.dueDate ? undefined : recurrence);
+	// Pickers write their rule into the title. An absent marker is a removal,
+	// even if the draft effect has not cleared its previous recurrence yet.
+	const chosenRecurrence = preserveRecurrenceMetadata(parsed.recurrence, recurrence);
   const finalRecurrence = normalizeRecurrenceRule(chosenRecurrence);
 	// The draft clears its occurrence when a repeat rule changes. Do not restore
 	// the original reminder's occurrence after that edit.
 	const finalDueDate = finalRecurrence ? (reminder && chosenRecurrence === recurrence ? dueDate ?? undefined : undefined) : parsed.dueDate
 		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
-		: dueDate ?? undefined;
+		: recurrence ? undefined : dueDate ?? undefined;
 	const finalHasTime = finalRecurrence ? Boolean(finalDueDate && hasTime) : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
 	const storedDates = buildStoredReminderDates(
 		parseReminderDateValue(finalDueDate, finalHasTime),

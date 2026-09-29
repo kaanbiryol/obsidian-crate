@@ -435,7 +435,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 
     // Exercise the actual sanitized reader, offline queue, and source writer
     // together: parser-only tests cannot catch textContent offset differences.
-    for (const [markdown, excerpt, native = false] of [
+    let sourceRevision = 0;
+    for (const [sourceMarkdown, excerpt, native = false] of [
       ['Visit <https://example.com> today.', 'https://example.com', true],
       ['Visit https://example.org today.', 'example.org'],
       ['| Name | Value |\n| --- | --- |\n| a\\|b | `x` |\n', 'a|b'],
@@ -449,9 +450,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       ['A paragraph. ^block-id\n', 'block-id'],
       ['<audio>Hidden audio</audio><video>Hidden video</video><object>Hidden object</object>\n\nVisible text.', 'Visible text.', true],
     ]) {
+      // A cached article may briefly contain the next excerpt too (for example
+      // note inside footnote). Wait for this revision before measuring offsets.
+      const marker = `Selection fixture revision ${++sourceRevision}`;
+      const markdown = `${sourceMarkdown}\n\n${marker}\n`;
       await replaceArticle(markdown);
       await page.reload();
       const body = page.locator('.crate-reading-reader__body');
+      await expect(body).toContainText(marker);
       await expect(body).toContainText(excerpt);
       await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
       const beforeText = await body.textContent();
@@ -469,7 +475,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
           if (began && offset + node.length >= start + excerpt.length) { range.setEnd(node, start + excerpt.length - offset); break; }
           offset += node.length;
         }
-        if (range.toString() !== excerpt) throw new Error('Incorrect browser selection');
+        if (range.toString() !== excerpt) throw new Error(`Incorrect browser selection: ${JSON.stringify({ expected: excerpt, actual: range.toString(), start, text: element.textContent })}`);
         const selection = document.getSelection(); selection.removeAllRanges(); selection.addRange(range);
         document.dispatchEvent(new Event('selectionchange'));
       }, { start, excerpt });
