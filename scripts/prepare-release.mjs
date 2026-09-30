@@ -91,6 +91,7 @@ export async function prepareRelease({ target, dryRun = false, noWait = false, r
 		const env = { ...process.env, GH_REPO: repository };
 		const gh = args => execute('gh', args, { ...inCheckout, env });
 		const request = path => JSON.parse(gh(['api', path]));
+		execute('npm', ['ci', '--ignore-scripts'], { ...inCheckout, stdio: 'inherit' });
 		execute(process.execPath, ['--test', 'scripts/reading-shortcut.test.mjs'], { ...inCheckout, stdio: 'inherit' });
 		const sourceSha256 = await sourceHash(checkout);
 		if (!resign && existing?.assets?.some(asset => asset.name === assetName) && existing.assets.some(asset => asset.name === metadataName)) {
