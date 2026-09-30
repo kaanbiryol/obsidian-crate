@@ -15,7 +15,7 @@ export function registerPluginNavigationTests() {
             context.fillStyle = color; context.fillRect(0, 0, 1, 1);
             return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
           };
-          const frames: { position: number; emphasis: number[] }[][] = [];
+          const frames: { position: number; emphasis: number[]; colorStep: number }[][] = [];
           const selected: string[] = [];
           for (const [label, duration] of [['Projects', 480], ['Reading', 480], ['Inbox', 45], ['Projects', 45], ['Reminders', 480]] as const) {
             const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
@@ -29,6 +29,9 @@ export function registerPluginNavigationTests() {
                 const distance = normal.map((channel, index) => channel - muted[index]!);
                 const indicator = dock.querySelector('.pwa-dock__indicator')!;
                 return { position: new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width,
+                  // Canvas rounds to 8-bit channels. Brighter resting icons
+                  // have a smaller color range, so one step exceeds 4%.
+                  colorStep: distance.reduce((sum, channel) => sum + Math.abs(channel), 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0),
                   emphasis: Array.from(dock.querySelectorAll('.pwa-dock__bar > button')).map(tab => {
                     const color = rgb(getComputedStyle(tab).color);
                     return color.reduce((sum, channel, index) => sum + (channel - muted[index]!) * distance[index]!, 0) / distance.reduce((sum, channel) => sum + channel ** 2, 0);
@@ -42,7 +45,7 @@ export function registerPluginNavigationTests() {
         expect(result.selected).toEqual(['Projects', 'Reading', 'Inbox', 'Projects', 'Reminders']);
         expect(result.frames.flat().some(frame => frame.emphasis.some(value => value > .1 && value < .9)), 'Icon emphasis should visibly blend during travel').toBe(true);
         for (const frame of result.frames.flat()) for (const [index, emphasis] of frame.emphasis.entries()) {
-          expect(Math.abs(emphasis - Math.max(0, 1 - Math.abs(frame.position - index))), `Icon ${index} must follow the painted highlight at ${frame.position}`).toBeLessThan(.04);
+          expect(Math.abs(emphasis - Math.max(0, 1 - Math.abs(frame.position - index))), `Icon ${index} must follow the painted highlight at ${frame.position}`).toBeLessThanOrEqual(Math.max(.04, frame.colorStep));
         }
         await page.emulateMedia({ reducedMotion: 'reduce' });
         const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');

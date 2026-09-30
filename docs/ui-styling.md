@@ -588,9 +588,16 @@ and keyboard behavior. Browser Forward can reopen setup.
 The separate circular add action uses the existing editor/capture flow, including
 on Projects. Insets reserve the home indicator once. Loading shells use matching
 dock geometry.
-The dock overlaps the full-height list viewport so rows scroll behind its blurred
-surface. Scroll containers reserve dock height plus a small gap at the end, keeping
-the final item reachable above the controls. Space around the pill and add button
+The dock overlaps the full-height list viewport. Its pill and add button use a
+nearly opaque, raised theme surface with a fine highlight, bright icons, and a
+quiet selection fill. A shared backdrop layer gently dissolves rows into the host
+background from the pill's top edge through the bottom safe area, with only slight
+softening. Content above the pill remains clear; rows beneath it recede instead
+of remaining readable through the controls.
+It spans the PWA viewport or Obsidian pane, even when the pill reaches its maximum
+width. Reduced transparency and increased contrast remove this layer and keep
+the controls opaque. Scroll containers reserve dock height plus a small gap at
+the end, keeping the final item reachable above the controls. Space around the pill and add button
 passes gestures through to the list; the expanded picker still blocks the backdrop.
 The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
 its shared navigation. Obsidian wide layouts retain their sidebar; PWA connection

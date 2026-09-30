@@ -10,8 +10,10 @@
   }
   .pwa-dock {
     // Stay opaque when backdrop filtering is unavailable.
-    --dock-surface: var(--background-primary-alt);
-    --dock-surface-hover: var(--background-primary-alt);
+    --dock-material: color-mix(in srgb, var(--background-primary-alt) 94%, var(--text-normal));
+    --dock-surface: var(--dock-material);
+    --dock-surface-hover: var(--dock-material);
+    --text-muted: color-mix(in srgb, var(--text-normal) 90%, var(--dock-material));
     --dock-bottom-inset: var(--pwa-dock-bottom-inset);
     position: relative;
     width: 100%;
@@ -28,16 +30,34 @@
   }
   .pwa-dock__bar, .pwa-dock__add { pointer-events: auto; }
   .pwa-dock__surface, .pwa-dock__add {
-    background: linear-gradient(145deg, #ffffff0d, transparent 65%) var(--dock-surface);
+    background: linear-gradient(180deg, #ffffff08, transparent 55%, #ffffff03) var(--dock-surface);
     border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
-    box-shadow: 0 6px 20px #0000001a;
-    backdrop-filter: blur(24px) saturate(1.35);
-    -webkit-backdrop-filter: blur(24px) saturate(1.35);
+    box-shadow: inset 0 1px 0 #ffffff08;
+    // Standard declaration last: the plugin minifier retains the final variant.
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
+    backdrop-filter: blur(12px) saturate(1.1);
   }
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .pwa-dock {
-      --dock-surface: color-mix(in srgb, var(--background-primary-alt) 72%, transparent);
-      --dock-surface-hover: color-mix(in srgb, var(--background-primary-alt) 84%, transparent);
+      --dock-surface: color-mix(in srgb, var(--dock-material) 92%, transparent);
+      --dock-surface-hover: color-mix(in srgb, var(--dock-material) 96%, transparent);
+    }
+    // Let rows dissolve into the host background beneath the pill. A small
+    // amount of softening avoids sharp fragments without a broad blur halo.
+    .pwa-dock::before {
+      content: '';
+      position: absolute;
+      z-index: -1;
+      inset-block: 10px 0;
+      left: 50%;
+      width: var(--pwa-dock-underlay-width, 100vw);
+      transform: translateX(-50%);
+      pointer-events: none;
+      background: var(--background-primary);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #0006 28px, #000e 60px, #000);
+      mask-image: linear-gradient(to bottom, transparent, #0006 28px, #000e 60px, #000);
     }
   }
   .pwa-dock__bar { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; height: 60px; padding: 4px; border: 1px solid transparent; border-radius: 32px; }
@@ -53,7 +73,7 @@
     position: absolute; left: 4px; top: 4px; height: 50px; border-radius: 26px;
     // Keep fractional-pixel edges on the same layer when the slide settles.
     will-change: transform;
-    background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+    background: color-mix(in srgb, var(--text-normal) 8%, transparent);
     opacity: var(--dock-tabs-opacity, 1);
     // A full tab-width move needs visible travel before settling, unlike a
     // small control's quick feedback. CSS retargets from the painted position.
@@ -99,7 +119,8 @@
   }
   @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
     .pwa-dock { --dock-surface: var(--background-primary-alt); --dock-surface-hover: var(--background-primary-alt); }
-    .pwa-dock__surface, .pwa-dock__add { background: var(--dock-surface); border-color: var(--text-muted); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .pwa-dock::before { display: none; }
+    .pwa-dock__surface, .pwa-dock__add { background: var(--dock-surface); border-color: var(--text-muted); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .pwa-dock__indicator { background: color-mix(in srgb, var(--text-normal) 16%, var(--background-primary-alt)); box-shadow: none; }
   }
   @media (prefers-reduced-motion: reduce) { .pwa-dock__view-icon { animation: none; } .pwa-dock__surface, .pwa-dock__tab, .pwa-dock__indicator, .pwa-dock__menu { transition: none; } }
