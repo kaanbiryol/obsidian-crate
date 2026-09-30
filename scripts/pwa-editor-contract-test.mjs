@@ -392,7 +392,15 @@ async function verifyRepeatPicker(browser, server) {
       const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
       await expect(title).toBeEditable();
       const initialTitle = await title.textContent();
+      const waitForSheet = async name => {
+        await expect(page.getByRole('dialog', { name, exact: true })).toBeVisible();
+        await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
+        // A visible picker can still be entering and reject Done until the
+        // spring completion callback enables navigation.
+        await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
+      };
       await page.locator('.reminder-action-chips [data-picker="recurrence"]').tap();
+      await waitForSheet('Repeat reminder');
       if (scenario === 'reverted') {
         await page.getByRole('button', { name: 'Monday', exact: true }).tap();
         await page.getByRole('button', { name: 'Monday', exact: true }).tap();
@@ -403,18 +411,14 @@ async function verifyRepeatPicker(browser, server) {
       if (scenario === 'change') await page.getByLabel('Reminder time', { exact: true }).fill('10:30');
       await page.getByRole('button', { name: scenario === 'remove' ? 'Remove repeat' : 'Done', exact: true }).tap();
       await expect(title).toBeEditable();
-      const waitForEditorReturn = async () => {
-        await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeVisible();
-        await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
-        await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
-      };
-      await waitForEditorReturn();
+      await waitForSheet('Edit reminder');
       if (!['change', 'add', 'remove'].includes(scenario)) {
         await expect(title).toHaveText(initialTitle);
         // Reopening must not leave stale picker state that changes a later Done.
         await page.locator('.reminder-action-chips [data-picker="recurrence"]').tap();
+        await waitForSheet('Repeat reminder');
         await page.getByRole('button', { name: 'Done', exact: true }).tap();
-        await waitForEditorReturn();
+        await waitForSheet('Edit reminder');
       }
       const [request] = await Promise.all([
         page.waitForRequest(request => request.url().endsWith('/reminders/update') && request.method() === 'POST'),
