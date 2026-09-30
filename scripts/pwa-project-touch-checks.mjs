@@ -54,6 +54,10 @@ export async function checkProjectTouchFeedback(page) {
     // Force :hover to remain on a touch surface after release, including WebKit.
     await card.hover();
     assert.ok(await card.evaluate(element => element.matches(':hover')));
+    const pointer = await page.evaluate(() => ({
+      hover: matchMedia('(hover: hover)').matches, fine: matchMedia('(pointer: fine)').matches, touchPoints: navigator.maxTouchPoints,
+    }));
+    assert.equal(pointer.hover || pointer.fine, false, `${project}: touch emulation changed: ${JSON.stringify(pointer)}`);
     await expect.poll(() => appearance(card), { message: `${project}: touch hover must not highlight cards or icons` }).toEqual(resting);
     await page.mouse.move(-1, -1);
 

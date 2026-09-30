@@ -182,11 +182,22 @@ async function testUpdate(browser, launchMode) {
     await expect(page.locator('html')).toHaveAttribute('data-pwa-updating', 'restore');
     await page.evaluate(() => {
       window.__updateRevealSamples = [];
+      let revealStarted;
       const sample = () => {
         const phase = document.documentElement.dataset.pwaUpdating;
+        const overlay = document.getElementById('pwa-update-transition');
+        if (phase === 'revealing' && revealStarted === undefined) {
+          revealStarted = performance.now();
+          // Model delayed compositor progress. Content must remain inert until
+          // the actual fade finishes, even beyond the nominal 320ms duration.
+          for (const animation of overlay.getAnimations()) {
+            if (animation.transitionProperty === 'opacity') animation.updatePlaybackRate(.5);
+          }
+        }
         window.__updateRevealSamples.push({
           phase,
-          opacity: Number(getComputedStyle(document.getElementById('pwa-update-transition')).opacity),
+          elapsed: revealStarted === undefined ? 0 : performance.now() - revealStarted,
+          opacity: Number(getComputedStyle(overlay).opacity),
           inert: document.getElementById('app').hasAttribute('inert'),
           home: Boolean(document.querySelector('.pwa-reminders-view')),
           appOpacity: getComputedStyle(document.getElementById('app')).opacity,
@@ -209,6 +220,7 @@ async function testUpdate(browser, launchMode) {
     else {
       expect(intermediate.length).toBeGreaterThanOrEqual(3);
       expect(intermediate.every(sample => sample.phase === 'revealing' && sample.inert && sample.home)).toBe(true);
+      expect(intermediate.some(sample => sample.elapsed > 320)).toBe(true);
       for (let index = 1; index < intermediate.length; index++) expect(intermediate[index].opacity).toBeLessThanOrEqual(intermediate[index - 1].opacity);
     }
     expect(await activity.evaluate(element => new DOMMatrix(getComputedStyle(element).transform).a)).toBe(1);

@@ -2,9 +2,15 @@ export const PWA_UPDATE_TRANSITION_KEY = 'crate-pwa-update-transition';
 export const PWA_UPDATE_TRANSITION_POSITION_KEY = 'crate-pwa-update-position';
 export const PWA_UPDATE_TRANSITION_MAX_AGE_MS = 60_000;
 export const PWA_UPDATE_OPENING_PROGRESS = 0.9;
-// Keep in sync with the curtain's revealing transition in theme.css.
-const UPDATE_REVEAL_MS = 320;
+// Recover if the browser suspends or cancels transition completion.
+const UPDATE_REVEAL_FALLBACK_MS = 1000;
 let revealTimer: number | undefined;
+let revealGeneration = 0;
+
+function stopPendingReveal(): void {
+	window.clearTimeout(revealTimer);
+	revealGeneration++;
+}
 
 /** Stage milestones, not download percentages. Never advance on a timer. */
 export function advancePwaUpdateProgress(stage: 'checking' | 'downloading' | 'activating' | 'opening' | 'ready'): void {
@@ -16,7 +22,7 @@ export function advancePwaUpdateProgress(stage: 'checking' | 'downloading' | 'ac
 
 /** Show immediately for a requested update, without creating a reload marker. */
 export function showPwaUpdateTransition(): void {
-	window.clearTimeout(revealTimer);
+	stopPendingReveal();
 	if (document.documentElement.dataset.pwaUpdating === 'prepare') return;
 	// Mobile browser chrome can resize the viewport during reload. Keep the
 	// message at the same height while the curtain continues to cover the screen.
@@ -63,21 +69,30 @@ export async function preparePwaUpdateTransition(): Promise<void> {
 }
 
 export function finishPwaUpdateTransition({ fade = false }: { fade?: boolean } = {}): void {
-	window.clearTimeout(revealTimer);
+	stopPendingReveal();
+	const overlay = document.getElementById('pwa-update-transition');
 	if (fade && document.documentElement.dataset.pwaUpdating === 'restore'
-		&& document.getElementById('pwa-update-transition')
+		&& overlay
 		&& !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 		// The home screen is already rendered and settled beneath the curtain.
 		// Keep it inert until the reveal finishes so taps cannot pass through.
 		document.documentElement.dataset.pwaUpdating = 'revealing';
-		revealTimer = window.setTimeout(clearPwaUpdateTransition, UPDATE_REVEAL_MS);
+		// A timer started at the style change can expire before the browser's
+		// first painted transition frame. Wait for the actual opacity animation.
+		const animation = overlay.getAnimations().find(animation =>
+			(animation as CSSTransition).transitionProperty === 'opacity');
+		if (!animation) { clearPwaUpdateTransition(); return; }
+		const generation = revealGeneration;
+		const complete = () => { if (generation === revealGeneration) clearPwaUpdateTransition(); };
+		revealTimer = window.setTimeout(complete, UPDATE_REVEAL_FALLBACK_MS);
+		void animation.finished.then(complete, complete);
 		return;
 	}
 	clearPwaUpdateTransition();
 }
 
 function clearPwaUpdateTransition(): void {
-	revealTimer = undefined;
+	stopPendingReveal();
 	// Retain the label position through the CSS fade; the next update resets it.
 	delete document.documentElement.dataset.pwaUpdating;
 	document.getElementById('app')?.removeAttribute('inert');

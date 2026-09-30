@@ -12,7 +12,8 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await page.goto(`/?host=${host}&scene=reading&theme=${theme}`);
 		const surface = page.getByTestId('visual-surface');
 		await expect(page.getByRole('searchbox', { name: 'Search reading' })).toBeVisible();
-		await expect(surface).toHaveScreenshot(`reading-${host}-${theme}-${width}.png`, { animations: 'disabled' });
+		// Match the shared UI tolerance for subpixel font rasterization across macOS hosts.
+		await expect(surface).toHaveScreenshot(`reading-${host}-${theme}-${width}.png`, { animations: 'disabled', maxDiffPixelRatio: 0.001 });
 		expect(await surface.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
 		const article = page.locator('article.crate-reading-reader');
@@ -21,7 +22,7 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 			await expect(page.locator('.crate-reading__library')).toBeHidden();
 			await expect(page.locator('.crate-reading__sidebar')).toBeHidden();
 		}
-		await expect(surface).toHaveScreenshot(`reading-reader-${host}-${theme}-${width}.png`, { animations: 'disabled' });
+		await expect(surface).toHaveScreenshot(`reading-reader-${host}-${theme}-${width}.png`, { animations: 'disabled', maxDiffPixelRatio: 0.001 });
 		await expect(article.getByRole('group', { name: 'Article view' })).toHaveCount(0);
 		const highlights = article.getByRole('button', { name: 'Highlights (0)', exact: true });
 		await expect(highlights).toBeInViewport();
@@ -100,7 +101,7 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	await page.getByRole('button', { name: 'Reading appearance' }).click();
 	const sheet = page.getByRole('dialog', { name: 'Reading appearance' });
 	await expect.poll(async () => { const bounds = await sheet.boundingBox(); return bounds && Math.round(bounds.y + bounds.height); }).toBe(844);
-	await expect(page.getByTestId('visual-surface')).toHaveScreenshot(`reading-appearance-${host}.png`, { animations: 'disabled' });
+	await expect(page.getByTestId('visual-surface')).toHaveScreenshot(`reading-appearance-${host}.png`, { animations: 'disabled', maxDiffPixelRatio: 0.001 });
 	await page.getByRole('button', { name: 'Literary Serif' }).click();
 	await page.getByRole('button', { name: 'Increase text size' }).click();
 	await expect(page.getByRole('status', { name: 'Text size' })).toHaveText('20');

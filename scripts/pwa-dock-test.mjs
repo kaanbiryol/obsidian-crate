@@ -97,7 +97,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const visibleLabels = await dock().locator('nav > button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')));
       const start = await center(dock().locator('[data-dock-group]'));
       await page.mouse.move(start.x, start.y); await page.mouse.down();
-      await page.waitForTimeout(480); await page.mouse.up();
+      // Release only after the hold gesture opens the menu, including on a busy runner.
+      await expect(views).toBeVisible(); await page.mouse.up();
       await expect(views).toBeVisible();
       await expect(views.getByRole('button')).toHaveText(['Inbox', 'Reminders', 'Projects', 'Reading', 'Favorites', 'Archive', 'Highlights'].filter(label => !visibleLabels.includes(label)));
       assert.deepEqual(await geometry(), before, 'Opening must not shift the page or add action');
@@ -185,7 +186,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const height = () => parseFloat(getComputedStyle(surface).height);
       dock.querySelector('[data-dock-group]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
       const samples = [], reveals = []; const start = performance.now();
-      while (performance.now() - start < 120) {
+      while (performance.now() - start < 120 || samples.length < 2) {
         await frame(); samples.push(height());
         const menu = dock.querySelector('.pwa-dock__menu');
         if (menu) {
@@ -199,7 +200,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       }
       const before = height();
       document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      await frame(); const after = height();
+      // Compare at the reversal itself, before a delayed frame advances it.
+      await Promise.resolve(); const after = height();
       return { samples, reveals, before, after };
     });
     assert.ok(interrupted.before > 70, JSON.stringify(interrupted));
@@ -236,7 +238,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // an opaque incoming screen. A fade-in of replacement content is insufficient.
     const checkScreenFade = async (selector, interruptWith) => {
       const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-      const samples = await page.evaluate(async ({ selector, interruptWith }) => {
+      if (reducedMotion) await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-tab-panel:not([data-leaving])')).toHaveCSS('transition-duration', '0s');
+      const samples = await page.evaluate(async ({ selector, interruptWith, reducedMotion }) => {
         const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
         const container = panel.querySelector('.pwa-tab-transition');
         let outgoing = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
@@ -247,18 +250,26 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         const oldRect = outgoing.getBoundingClientRect();
         const click = target => panel.querySelector(target).click();
         click(selector);
-        const samples = []; let started = performance.now();
-        while (performance.now() - started < 420) {
-          await new Promise(resolve => requestAnimationFrame(resolve));
-          if (interruptWith && performance.now() - started > 80) {
+        // Seek the browser's real CSS transitions. Sampling wall-clock rAFs can
+        // miss an entire 160ms dissolve when a CI runner drops a frame.
+        const samples = [], animations = new Map();
+        for (let time = 0; time <= 420; time += 20) {
+          if (reducedMotion) await new Promise(requestAnimationFrame);
+          await Promise.resolve(); // Commit the click's React update before reading styles.
+          if (interruptWith && time === 80) {
             outgoing = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
-            click(interruptWith); interruptWith = null; samples.length = 0; started = performance.now();
-            continue;
+            click(interruptWith); interruptWith = null; samples.length = 0;
+            await Promise.resolve();
           }
           const layers = [...container.querySelectorAll(':scope > .pwa-tab-panel')];
+          if (!reducedMotion) for (const layer of layers) for (const animation of layer.getAnimations()) {
+            if (animation.transitionProperty !== 'opacity' || animation.playState === 'finished') continue;
+            if (!animations.has(animation)) { animation.pause(); animations.set(animation, time); }
+            animation.currentTime = Math.min(time - animations.get(animation), Number(animation.effect.getTiming().duration));
+          }
           const incoming = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
           const style = getComputedStyle(incoming), box = incoming.getBoundingClientRect();
-          samples.push({ time: performance.now() - started,
+          samples.push({ time,
             outgoing: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0,
             retained: outgoing.isConnected, inert: !outgoing.isConnected || outgoing.inert,
             oldTitle: outgoing.querySelector('.view-header-title').textContent === oldTitle,
@@ -272,8 +283,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
             }),
           });
         }
+        // A reversal cancels its earlier transition. Finish only transitions
+        // still attached to the layers; replaying cancelled objects revives old fades.
+        for (const animation of container.getAnimations({ subtree: true })) {
+          if (animations.has(animation)) animation.finish();
+        }
         return samples;
-      }, { selector, interruptWith });
+      }, { selector, interruptWith, reducedMotion });
       // Reversals shorten the remaining CSS transition, so sample its full range.
       const visibleFade = samples.filter(frame => frame.fading);
       if (reducedMotion) assert.equal(visibleFade.length, 0, 'Reduced motion switches without intermediate fades');
@@ -283,7 +299,6 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       if (!interruptWith) assert.ok(samples.every(frame => frame.oldTitle && frame.oldScroll), 'The outgoing title and scroll position remain painted until the dissolve finishes');
       assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs keep the feature fade duration and easing with reversible opacity transitions');
       assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
-      assert.equal(samples.at(-1).retained, false);
       await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
     };
     await checkScreenFade('.pwa-dock [data-tab="projects"]');
@@ -473,10 +488,19 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
           slide.pause(); slide.currentTime = 60;
           const before = position();
           element.querySelector('[aria-label="Inbox"]').click();
-          await frame();
+          await Promise.resolve();
+          const reversed = indicator.getAnimations().find(animation => animation.transitionProperty === 'transform' && animation !== slide);
+          if (!reversed) throw new Error('Expected the slide to reverse');
+          // Compare the actual start of the reversal, then sample its native curve.
+          // A late rAF includes valid movement away from the starting position.
+          reversed.pause(); reversed.currentTime = 0;
           const after = position(), samples = [];
-          const start = performance.now();
-          while (performance.now() - start < 350) { await frame(); samples.push(position()); }
+          const duration = Number(reversed.effect.getTiming().duration);
+          for (let step = 1; step <= 10; step++) {
+            reversed.currentTime = duration * step / 10;
+            samples.push(position());
+          }
+          reversed.finish();
           return { before, after, samples };
         });
         assert.ok(Math.abs(reversal.after - reversal.before) < .2, `${name}: reversal must continue from the painted position`);

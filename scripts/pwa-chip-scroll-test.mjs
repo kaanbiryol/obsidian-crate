@@ -90,10 +90,13 @@ try {
           else await page.mouse.wheel(-600, 0);
           await expect.poll(() => row.evaluate(element => element.scrollLeft)).toBeLessThan(5);
           // The same control must still open its picker after a pan.
-          const tap = await chipPoint(chip);
-          await page.touchscreen.tap(tap.x, tap.y);
+          // Scroll momentum can continue after crossing the starting position.
+          // Locator tap waits for stable geometry and targets the intended chip
+          // instead of reusing screen coordinates from an earlier scroll frame.
+          await chip.tap();
           const dialog = page.getByRole('dialog', { name: picker === 'date' ? 'Schedule reminder' : 'Select project', exact: true });
           await expect(dialog).toBeVisible();
+          await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
           await dialog.getByRole('button', { name: picker === 'date' ? 'Close schedule' : 'Close project selection', exact: true }).tap();
           await expect(editor).toBeVisible();
           await expect(title).toBeFocused();

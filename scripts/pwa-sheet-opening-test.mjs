@@ -11,14 +11,24 @@ async function trackOpening(page, content, animated) {
 		window.sheetOpeningSamples = [];
 		window.sheetOpeningStartedAt = null;
 		window.sheetOpeningDelay = null;
+		window.sheetOpeningFrameDelay = 0;
+		let previousTime = 0, frameDelay = 0;
 		document.addEventListener('click', () => { window.sheetOpeningStartedAt = performance.now(); }, { once: true, capture: true });
 		function sample() {
 			const surface = document.querySelector(content);
 			const element = document.querySelector(animated);
-			if (surface && element && window.sheetOpeningStartedAt !== null) {
-				window.sheetOpeningDelay ??= performance.now() - window.sheetOpeningStartedAt;
-				const transform = getComputedStyle(element).transform;
-				window.sheetOpeningSamples.push(transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42);
+			if (window.sheetOpeningStartedAt !== null) {
+				const time = performance.now() - window.sheetOpeningStartedAt;
+				frameDelay += Math.max(0, time - previousTime - 1000 / 60);
+				previousTime = time;
+				if (surface && element) {
+					if (window.sheetOpeningDelay === null) {
+						window.sheetOpeningDelay = time;
+						window.sheetOpeningFrameDelay = frameDelay;
+					}
+					const transform = getComputedStyle(element).transform;
+					window.sheetOpeningSamples.push(transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42);
+				}
 			}
 			window.sheetOpeningFrame = requestAnimationFrame(sample);
 		}
@@ -27,15 +37,17 @@ async function trackOpening(page, content, animated) {
 }
 
 async function expectAnimatedOpening(page, label, maxStartDelay) {
-	const { samples, delay } = await page.evaluate(() => {
+	const { samples, delay, frameDelay } = await page.evaluate(() => {
 		cancelAnimationFrame(window.sheetOpeningFrame);
-		return { samples: window.sheetOpeningSamples, delay: window.sheetOpeningDelay };
+		return { samples: window.sheetOpeningSamples, delay: window.sheetOpeningDelay, frameDelay: window.sheetOpeningFrameDelay };
 	});
 	assert.ok(samples.filter(y => y > 10).length >= 3,
 		`${label}: content must travel through intermediate frames instead of appearing at rest (${samples})`);
 	assert.ok(samples.at(-1) < 1, `${label}: the entrance must finish`);
-	if (maxStartDelay) assert.ok(delay < maxStartDelay,
-		`${label}: a prepared picker must start after the 180 ms editor exit without an extra loading pause (${delay} ms)`);
+	// Match return timing: discount frames the runner could not deliver. A
+	// loading/fallback pause while frames keep arriving still exceeds the bound.
+	if (maxStartDelay) assert.ok(delay - frameDelay < maxStartDelay,
+		`${label}: a prepared picker must start after the 180 ms editor exit without an extra loading pause (${delay} ms, ${frameDelay} ms missed frames)`);
 }
 
 const pickers = [

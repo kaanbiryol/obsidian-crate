@@ -35,6 +35,8 @@ export interface ReadingLibraryProps {
 	/** PWA phone navigation; browser history can settle without a second slide. */
 	readerMotion?: 'slide' | 'none';
 	onReaderClosed?: () => void;
+	/** Keep library input blocked until the host finishes its Back traversal. */
+	readerClosing?: boolean;
 	notice?: React.ReactNode;
 	beforeListContent?: React.ReactNode;
 	/** Host-owned unavailable state, keeping library navigation mounted. */
@@ -47,7 +49,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
-export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, notice, beforeListContent, listContent, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent, pendingItemIds }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
@@ -67,13 +69,13 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 	}, [section]);
 	const previousArticle = useRef(activeId);
 	useEffect(() => {
-		if (!activeId && previousArticle.current) {
+		if (!activeId && previousArticle.current && !readerClosing) {
 			const list = lists.current.get(section);
 			const button = list?.querySelector<HTMLButtonElement>(`[data-reading-id="${previousArticle.current}"]`);
 			(button ?? list)?.focus({ preventScroll: true });
 		}
-		previousArticle.current = activeId;
-	}, [activeId, section]);
+		if (!readerClosing) previousArticle.current = activeId;
+	}, [activeId, readerClosing, section]);
 	useEffect(() => {
 		if (reader) {
 			if (readerMotion !== undefined) setExitingReader(reader);
@@ -107,11 +109,11 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(section, content) : content;
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
-			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && !!reader}>
-				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, onAdd, inert: !!reader, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
+			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && (!!reader || readerClosing)}>
+				{renderNavigation ? renderNavigation({ items: navigationItems, activeTab: section, onTabChange: selectSection, onAdd, inert: !!reader || readerClosing, disabled: false }) : <NavigationBar className="crate-reading__mobile-nav" items={navigationItems} activeTab={section} onTabChange={selectSection} label="Reading filters" action="switch-reading-section" animateActiveIndicator={animateTabIndicator} />}
 
 			</aside>
-			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && !!reader}>
+			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && (!!reader || readerClosing)}>
 				{renderLibrary(<>
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count} countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{headerStatus}{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />{headerActions}</div>} />
 				<TextField fieldClassName="crate-reading__search crate-field--rounded" label="Search reading" hideLabel type="search" placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />} value={query} onChange={event => { setQuery(event.target.value); resetList(); }} trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />

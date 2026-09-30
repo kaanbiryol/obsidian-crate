@@ -18,13 +18,14 @@ interface ReadingArticleOptions {
 /** Article navigation and stale-request guards share one lifetime. */
 export function useReadingArticle({ session, cache, pending, alive, setError, run }: ReadingArticleOptions) {
   const [reader, setReader] = useState<OpenReadingArticle | null>(null);
+  const [readerClosing, setReaderClosing] = useState(false);
   const [readerMotion, setReaderMotion] = useState<'slide' | 'none'>('none');
   const [requestedItem, setRequestedItem] = useState(new URL(location.href).searchParams.get('item'));
   const navigation = useRef(0), appBack = useRef<'closing' | 'traversing' | null>(null), articleStack = useRef<string | null>(null);
   useEffect(() => {
     const requests = navigation;
     requests.current++;
-    setReader(null);
+    setReader(null); setReaderClosing(false);
     return () => { requests.current++; };
   }, [session]);
   useEffect(() => {
@@ -122,7 +123,7 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
       // Commit the library before changing history. WebKit can snapshot the current
       // document during pushState; retaining the article here records a stale reader.
       flushSync(() => {
-        setReaderMotion('none'); setReader(null); setRequestedItem(null);
+        setReaderMotion('none'); setReader(null); setReaderClosing(false); setRequestedItem(null);
       });
       const stack = articleStack.current; articleStack.current = null;
       cancelAnimationFrame(historyFrame);
@@ -137,11 +138,14 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
   const closeReader = () => {
     if (appBack.current || !hasReadingArticleHistory()) return;
     navigation.current++; appBack.current = 'closing';
-    setRequestedItem(null); setReaderMotion('slide'); setReader(null);
+    // Keep the revealed library inert until the history traversal commits.
+    // The outgoing article stays mounted during the slide; input can resume once
+    // the library URL commits and the old reader has been removed.
+    setReaderClosing(true); setRequestedItem(null); setReaderMotion('slide'); setReader(null);
   };
   const finishReaderClose = useCallback(() => {
     if (appBack.current !== 'closing') return;
     appBack.current = 'traversing'; history.back();
   }, []);
-  return { reader, readerMotion, open, closeReader, finishReaderClose };
+  return { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose };
 }

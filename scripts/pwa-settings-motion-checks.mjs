@@ -86,31 +86,18 @@ export async function checkSettingsMotion(browser, origin) {
 		for (let offset = 30; offset <= 540; offset += 30) await touch('touchmove', offset);
 		// Compare painted positions: computed CSS durations can agree even when
 		// a transition has already started with a different duration.
-		const motionFrames = await sheet.evaluateHandle(el => {
-			const canvas = document.querySelector('.crate-modal-canvas');
-			const frames = [];
-			const sample = () => {
-				if (!el.isConnected) return;
-				frames.push({ progress: new DOMMatrix(getComputedStyle(el).transform).f / el.offsetHeight, scale: new DOMMatrix(getComputedStyle(canvas).transform).a });
-				requestAnimationFrame(() => setTimeout(sample, 0));
-			};
-			requestAnimationFrame(() => setTimeout(sample, 0));
-			return frames;
-		});
+		const checkCommittedDrag = await trackSheetDismissal(sheet);
 		const release = await touch('touchend', 540);
 		expect(release.strength).toBeGreaterThan(0);
 		expect(release.strength).toBeLessThanOrEqual(1);
 		const duration = Math.max(.24, Math.min(.32, .32 * release.strength));
 		expect(release.duration).toBeCloseTo(duration, 4);
-		await expect.poll(() => canvas.evaluate(el => el.getAnimations().some(animation => animation.playState === 'running'))).toBe(true);
-		await expect(sheet).toHaveCount(0);
+		// Record the complete exit before releasing. Polling for a transient
+		// running state can begin after the compositor already finished it.
+		const frames = await checkCommittedDrag();
+		expect(frames.some(frame => frame.alive && frame.sheet > .7 && frame.sheet < .95), JSON.stringify(frames)).toBe(true);
+		for (const frame of frames) expect(Math.abs(frame.canvas - frame.sheet) * .06 * 390).toBeLessThan(1.5);
 		await expect.poll(scale).toBe(1);
-		const frames = await motionFrames.jsonValue();
-		await motionFrames.dispose();
-		expect(frames.some(frame => frame.progress > .7 && frame.progress < .95)).toBe(true);
-		// WebKit can advance its compositor between sampling the sheet and canvas.
-		// Bound that discrepancy in visible pixels, rather than exact matrix equality.
-		for (const frame of frames) expect(Math.abs(frame.scale - (.94 + .06 * frame.progress)) * 390).toBeLessThan(1.5);
 		expect(await canvas.evaluate(el => el.style.getPropertyValue('--pwa-sheet-position'))).toBe('');
 		await expect(gear).toBeFocused();
 		await gear.click();

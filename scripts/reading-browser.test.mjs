@@ -148,7 +148,9 @@ async function captureReaderMotion(page, action) {
     const before = state(), width = pane.getBoundingClientRect().width;
     let slides = 0, pops = 0;
     const transition = event => { if (event.target === pane && event.propertyName === 'transform') slides++; };
-    const pop = () => { pops++; };
+    let resolvePop;
+    const popped = new Promise(resolve => { resolvePop = resolve; });
+    const pop = () => { pops++; resolvePop(); };
     pane.addEventListener('transitionrun', transition); window.addEventListener('popstate', pop);
     const committed = new Promise(resolve => {
       const observer = new MutationObserver(() => {
@@ -163,10 +165,32 @@ async function captureReaderMotion(page, action) {
       back.click(); back.click(); // Repeated taps must still request one history traversal.
     } else history.back();
     await committed;
-    const samples = [], started = performance.now();
-    do { await new Promise(resolve => requestAnimationFrame(resolve)); samples.push(state()); } while (performance.now() - started < 450);
+    const samples = [];
+    let slideDuration = 0;
+    if (action === 'history-back') {
+      const started = performance.now();
+      do { await new Promise(resolve => requestAnimationFrame(resolve)); samples.push(state()); } while (performance.now() - started < 450);
+    } else {
+      // Inspect the actual CSS transition at known progress. A loaded runner can
+      // deliver its next rAF after the whole slide and miss every interior frame.
+      const animation = pane.getAnimations().find(animation => animation.transitionProperty === 'transform');
+      if (!animation) throw new Error(`Missing reader ${action} transition`);
+      slideDuration = Number(animation.effect.getComputedTiming().duration);
+      animation.pause();
+      await animation.ready;
+      for (const progress of [0, .25, .5, .75, .99]) {
+        animation.currentTime = slideDuration * progress;
+        samples.push(state());
+      }
+      animation.finish();
+      await animation.finished;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      samples.push(state());
+    }
+    // Back commits after the slide; a busy compositor may finish after the sampling window.
+    if (action !== 'open') { await popped; samples.push(state()); }
     pane.removeEventListener('transitionrun', transition); window.removeEventListener('popstate', pop);
-    return { before, width, samples, slides, pops, motion: workspace.dataset.readerMotion };
+    return { before, width, samples, slides, pops, slideDuration, motion: workspace.dataset.readerMotion };
   }, action); } finally { await hitTestStyle.evaluate(element => element.remove()); }
 }
 
@@ -175,6 +199,7 @@ function assertReaderSlide(result, action) {
   assertSteadyReadingTab(result);
   assert.equal(samples.at(-1).dockInert, opening, 'Reader must block the dock until returning to the library');
   assert.equal(slides, 1, JSON.stringify(result));
+  assert.ok(result.slideDuration > 0 && result.slideDuration <= 450, JSON.stringify(result));
   assert.equal(pops, opening ? 0 : 1, 'Repeated toolbar taps must only go back once');
   assert.ok(Math.abs(before.reader - (opening ? width : 0)) < 1, JSON.stringify(result));
   assert.ok(samples.some(sample => sample.reader > 1 && sample.reader < width - 1), 'Expected intermediate slide frames');
@@ -239,8 +264,8 @@ async function sheetAppearance(page) {
     const icon = close.querySelector('svg');
     const action = [...sheet.querySelectorAll('button')].find(button => button.textContent.trim() === 'Refresh all');
     return { radius: getComputedStyle(sheet).borderTopLeftRadius, surface: getComputedStyle(sheet).backgroundColor,
-      headerHeight: header.getBoundingClientRect().height, titleSize: getComputedStyle(header.querySelector('h2')).fontSize,
-      closeSize: close.getBoundingClientRect().width, icon: icon.outerHTML,
+      headerHeight: Math.round(header.getBoundingClientRect().height * 100) / 100, titleSize: getComputedStyle(header.querySelector('h2')).fontSize,
+      closeSize: Math.round(close.getBoundingClientRect().width * 100) / 100, icon: icon.outerHTML,
       actionSize: getComputedStyle(action).fontSize, actionColor: getComputedStyle(action).color, actionBackground: getComputedStyle(action).backgroundColor };
   });
 }
@@ -361,11 +386,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.getByRole('button',{name:'Open settings',exact:true}).click();
       const sheet = page.getByRole('dialog',{name:'Settings',exact:true});
       await expect(sheet).toHaveClass(/pwa-modal-sheet__container--settings/);
+      // The portal exists before Base UI starts its entrance transition.
+      // An empty animation list in that frame does not mean it is on screen.
+      await expect(sheet).toHaveCSS('transform', 'none');
       await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
       for (const title of ['General', 'Tabs', 'Reminders', 'Reading']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(sheet.getByRole('button',{name:'Close settings'}).locator('svg[data-icon="x"]')).toHaveCount(1);
       await page.screenshot({path:`test-results/reading/${name}-settings-${theme}.png`});
-      await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}));
+      // This checks dismissal and focus, independently of native flick velocity.
+      // The dedicated settings motion suite covers short, fast releases.
+      await swipe(page, sheet.getByRole('heading',{name:'Settings',exact:true}), 540, 300, 36);
       await expect(sheet).toHaveCount(0);
       await expect(page.getByRole('button',{name:'Open settings',exact:true})).toBeFocused();
       await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
