@@ -15,7 +15,9 @@ export function matchIgnorePattern(
 	patternCache: Map<string, RegExp>
 ): boolean {
 	if (pattern.endsWith('/')) {
-		return path.startsWith(pattern) || path === pattern.slice(0, -1);
+		// Git internals also occur in nested repositories and worktree pointer files.
+		return path.startsWith(pattern) || path === pattern.slice(0, -1)
+			|| (pattern === '.git/' && (path.includes('/.git/') || path.endsWith('/.git')));
 	}
 
 	let regex = patternCache.get(pattern);
@@ -60,7 +62,7 @@ export function shouldIgnoreConfiguredPath(
 	// Recovery copies created by local trash must never re-enter sync.
 	if (path === '.trash' || path.startsWith('.trash/')) return true;
 	for (const prefix of context.ignoredDirPrefixes) {
-		if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {
+		if (matchIgnorePattern(path, prefix, context.patternCache)) {
 			return true;
 		}
 	}

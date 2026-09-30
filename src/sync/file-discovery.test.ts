@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TFile, Vault } from 'obsidian';
+import { shouldIgnoreSyncPath } from './engine-ignore';
 import {
 	getAllVaultFiles,
 	getExtensionFromPath,
@@ -21,6 +22,30 @@ describe('file-discovery helpers', () => {
 });
 
 describe('getAllVaultFiles', () => {
+	it('skips root and nested Git repositories before listing their contents', async () => {
+		const listings: Record<string, { files: string[]; folders: string[] }> = {
+			'': { files: ['.gitignore'], folders: ['.git', 'Projects'] },
+			'Projects': { files: [], folders: ['Projects/example'] },
+			'Projects/example': { files: [], folders: ['Projects/example/.git', 'Projects/example/.github'] },
+			'Projects/example/.github': { files: ['Projects/example/.github/config.yml'], folders: [] },
+		};
+		const list = vi.fn(async (path: string) => {
+			if (!listings[path]) throw new Error(`Unexpected directory scan: ${path}`);
+			return listings[path];
+		});
+		const vault = {
+			getFiles: vi.fn(() => []),
+			adapter: { list, stat: vi.fn(async () => ({ type: 'file', size: 10, mtime: 1 })) },
+		} as unknown as Vault;
+		const context = { ignoredDirPrefixes: ['.git/'], ignorePatterns: ['.git/'], patternCache: new Map<string, RegExp>() };
+
+		const files = await getAllVaultFiles(vault, path => shouldIgnoreSyncPath(path, context));
+
+		expect(files.map(file => file.path)).toEqual(['Projects/example/.github/config.yml', '.gitignore']);
+		expect(list).not.toHaveBeenCalledWith('.git');
+		expect(list).not.toHaveBeenCalledWith('Projects/example/.git');
+	});
+
 	it('merges indexed files with hidden files and avoids duplicates', async () => {
 		const indexedFiles = [
 			{

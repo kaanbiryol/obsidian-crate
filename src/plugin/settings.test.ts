@@ -3,6 +3,33 @@ import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings }
 import { MAX_SYNC_HISTORY_PATHS } from './settings-types';
 
 describe('normalizeCrateSettings', () => {
+	it.each(['.obsidian', '/custom-config/'])(
+		'upgrades the original default exclusions for %s', configDir => {
+			const workspacePattern = `${configDir.replace(/^\/+|\/+$/g, '')}/workspace*`;
+			const expected = ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini',
+				'*.swp', '*.swo', workspacePattern];
+			expect(normalizeCrateSettings(undefined, configDir).ignorePatterns).toEqual(expected);
+			for (const ignorePatterns of [
+				['.git/', '.trash/', '*.tmp', '.DS_Store'],
+				[workspacePattern, '.DS_Store', '*.tmp', '.trash/', ' .git/ ', '.git/'],
+			]) {
+				const settings = normalizeCrateSettings({ ignorePatterns }, configDir);
+				expect(settings.ignorePatterns).toEqual(expected);
+				expect(normalizeCrateSettings(buildPersistedCrateSettings(settings), configDir).ignorePatterns).toEqual(expected);
+			}
+		},
+	);
+
+	it.each([
+		{ ignorePatterns: [] },
+		{ ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', 'Archive/'] },
+		{ ignorePatterns: ['.git/', '.trash/', '*.tmp'] },
+		{ ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*'] },
+	])('preserves customized exclusion lists: $ignorePatterns', ({ ignorePatterns }) => {
+		expect(normalizeCrateSettings({ ignorePatterns }, '.obsidian').ignorePatterns)
+			.toEqual([...ignorePatterns, '.obsidian/workspace*']);
+	});
+
 	it('enables reading by default for new installs and missing preferences', () => {
 		expect(normalizeCrateSettings(undefined, '.obsidian').reading.enabled).toBe(true);
 		expect(normalizeCrateSettings({ reading: { folderPath: 'Articles' } as never }, '.obsidian').reading)

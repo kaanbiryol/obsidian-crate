@@ -45,7 +45,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	lastSync: null,
 	lastSeq: 0,
 	deviceId: '',
-	ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store'],
+	ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini', '*.swp', '*.swo'],
 	syncOnStartup: true,
 	syncOnResume: true,
 	syncInterval: 300,

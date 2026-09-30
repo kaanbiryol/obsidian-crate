@@ -212,16 +212,20 @@ function normalizeSyncHistory(value: unknown): SyncHistoryEntry[] {
 		.slice(0, MAX_SYNC_HISTORY);
 }
 
-function ensureConfigDirWorkspaceIgnorePattern(ignorePatterns: string[], configDir: string): string[] {
+function normalizeIgnorePatterns(ignorePatterns: string[], configDir: string): string[] {
 	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
-	if (!normalizedConfigDir) {
-		return ignorePatterns;
-	}
+	const workspacePattern = normalizedConfigDir ? `${normalizedConfigDir}/workspace*` : null;
+	const originalDefaults = ['.git/', '.trash/', '*.tmp', '.DS_Store'];
+	const configuredPatterns = ignorePatterns.filter(pattern => pattern !== workspacePattern);
+	// Upgrade unchanged defaults while preserving customized exclusion lists.
+	const patterns = configuredPatterns.length === originalDefaults.length
+		&& originalDefaults.every(pattern => configuredPatterns.includes(pattern))
+		? [...DEFAULT_SETTINGS.ignorePatterns]
+		: ignorePatterns;
 
-	const workspacePattern = `${normalizedConfigDir}/workspace*`;
-	return ignorePatterns.includes(workspacePattern)
-		? ignorePatterns
-		: [...ignorePatterns, workspacePattern];
+	return !workspacePattern || patterns.includes(workspacePattern)
+		? patterns
+		: [...patterns, workspacePattern];
 }
 
 export function normalizeCrateSettings(
@@ -238,7 +242,7 @@ export function normalizeCrateSettings(
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
 		deviceId: DEFAULT_SETTINGS.deviceId,
-		ignorePatterns: ensureConfigDirWorkspaceIgnorePattern(
+		ignorePatterns: normalizeIgnorePatterns(
 			normalizeStringArray(value?.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
 			configDir,
 		),
