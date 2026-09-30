@@ -124,6 +124,10 @@ jobs:
     name: Worker integration tests
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      # Match package-lock.json; browsers and OS dependencies are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,8 +140,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:worker-runtime
-      - name: Install browser runtimes for desktop extraction checks
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Verify Reading extraction, server and shortcut contracts
         run: npm run test:reading-server
       - name: Verify persistent local hosting
@@ -205,6 +207,9 @@ jobs:
     name: Editor and activity browser tests (${{ matrix.shard }}/4)
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -220,8 +225,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
       - name: Check editor contracts
         run: npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/4
@@ -248,6 +251,9 @@ jobs:
     name: PWA browser tests (${{ matrix.shard }}/4)
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -263,8 +269,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Run browser group
         run: npm run test:pwa-browser -- --shard=${{ matrix.shard }}/4
       - name: Upload browser failure diagnostics
@@ -282,6 +286,9 @@ jobs:
     name: Reading browser tests
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -293,8 +300,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build:worker
       - run: npm run test:reading-browser
       - name: Upload Reading browser diagnostics
