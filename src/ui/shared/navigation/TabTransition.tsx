@@ -38,10 +38,14 @@ export function TabTransition({ viewKey, children }: TabContent) {
 
 	useLayoutEffect(() => {
 		// The feature shell already owns the dissolve when returning from Reading.
+		// Returning to the same tab must also discard an interrupted local fade;
+		// its view key and cleanup callbacks have not changed in that case.
 		if (container.current?.closest('.crate-feature-panel, .plugin-workspace-panel')?.getAttribute('data-entering') === 'true') {
 			discardDepartedLayers();
-			return;
 		}
+	});
+
+	useLayoutEffect(() => {
 		// Covers a reversal before the browser starts a transition. transitionend
 		// owns normal cleanup; the timeout recovers if the browser cancels it.
 		const owner = container.current?.ownerDocument.defaultView ?? window;

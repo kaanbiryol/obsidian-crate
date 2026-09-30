@@ -178,6 +178,31 @@ export function registerPluginNavigationTests() {
         await active.getByRole('button', { name: 'Reading', exact: true }).click();
         await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll(indicators => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width - 3) < .01 && indicator.getAnimations().length === 0))).toBe(true);
       });
+      test(`plugin discards an unfinished tab fade when returning to the same destination at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto('/?host=plugin&scene=navigation&theme=light');
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const frames = await workspace.evaluate(async root => {
+          const select = (label: string) => {
+            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+            button.click();
+          };
+          const views = () => Array.from(root.querySelectorAll<HTMLElement>('.plugin-workspace-panel[data-active="true"] .pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel')).map(panel => panel.dataset.tabView!);
+          select('Reminders');
+          await new Promise(requestAnimationFrame);
+          const departing = views();
+          select('Reading');
+          await new Promise(requestAnimationFrame);
+          select('Reminders');
+          await new Promise(requestAnimationFrame);
+          return { departing, returned: views() };
+        });
+        expect(frames.departing).toContain('inbox');
+        expect(frames.departing).toContain('today');
+        expect(frames.returned).toEqual(['today']);
+      });
       test(`plugin prepares every dock destination during feature switches at ${width}px`, async ({ page }) => {
         test.setTimeout(60_000);
         await page.setViewportSize({ width, height: 800 });
