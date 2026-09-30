@@ -107,7 +107,9 @@ it.each([false, true])('resumes reminder setup and syncs a local repair before w
   const put = vi.spyOn(env.BUCKET, 'put');
   const upload = vi.spyOn(device.api.initialImport, 'upload');
   const resumed = device.engine.sync();
-  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+  // Recovery crosses real D1/R2 requests. The default one-second polling budget
+  // can expire under CI load even though the enclosing journey allows 15 seconds.
+  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 5_000 });
   expect(device.engine.getState().status).toBe('syncing');
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   for (let i = 0; i < 5; i++) await runDurableObjectAlarm(coordinator);
@@ -123,7 +125,7 @@ it('keeps first-time sync active until the reminder schedule is ready', async ()
   await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
   device.disk.write('Reminders/task.md', note('2099-01-01T12:00:00.000Z'));
   const syncing = device.engine.initialSync();
-  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 5_000 });
   expect(device.engine.getState().status).toBe('syncing');
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   await runDurableObjectAlarm(coordinator);
@@ -151,7 +153,7 @@ it('preserves initial uploads when reminder settings fail and resumes without up
   const upload = vi.spyOn(device.api.initialImport, 'upload');
   const wait = vi.spyOn(device.api.initialImport, 'waitUntilReady');
   const resumed = device.engine.sync();
-  await vi.waitFor(() => expect(wait).toHaveBeenCalled());
+  await vi.waitFor(() => expect(wait).toHaveBeenCalled(), { timeout: 5_000 });
   const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
   await runDurableObjectAlarm(coordinator);
   expect(await resumed).toMatchObject({ success: true, uploaded: 0 });

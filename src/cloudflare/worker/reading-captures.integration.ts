@@ -90,4 +90,4 @@ it('leases failed fetches durably and falls back after three attempts', async ()
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
 	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/example.com - ${row.id.slice(0, 8)}.md`))!;
 	expect(parseReadingNote(file.content)?.extraction_status).toBe('unavailable');
-});
+}, 15_000); // Three complete D1/R2 attempts need room for slower CI I/O.
