@@ -122,13 +122,29 @@ describe('settings controls', () => {
 
 	it('shows sync preferences without manual sync actions or progress subscriptions', async () => {
 		const { renderSyncSection } = await import('./sync-section');
-		const plugin = { settings: { ...DEFAULT_SETTINGS } };
+		const plugin = { settings: { ...DEFAULT_SETTINGS, automaticSync: true } };
 		renderSyncSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
 		const names = MockSetting.instances.map(setting => setting.nameEl.textContent);
 		expect(names).not.toContain('Sync now');
 		expect(names).not.toContain('Sync activity');
 		const delay = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Sync delay after editing (seconds)')!;
 		expect(delay.texts[0]!.inputEl.value).toBe('5');
+	});
+
+	it('shows automatic sync off for a fresh install without starting or saving sync', async () => {
+		const { renderSyncSection } = await import('./sync-section');
+		const plugin = {
+			settings: { ...DEFAULT_SETTINGS },
+			writeSettings: vi.fn(),
+			syncRuntime: { sync: vi.fn(), updateSyncSettings: vi.fn() },
+		};
+		renderSyncSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		const automatic = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Automatic sync')!;
+		expect(automatic.toggles[0]!.value).toBe(false);
+		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Sync delay after editing (seconds)')).toBe(false);
+		expect(plugin.writeSettings).not.toHaveBeenCalled();
+		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
+		expect(plugin.syncRuntime.updateSyncSettings).not.toHaveBeenCalled();
 	});
 
 	it('uses a startup toggle and preserves the saved reminder defaults', async () => {

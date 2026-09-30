@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import { createHarness, createSyncResult, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
+import { createHarness, createSyncResult, flushPendingChanges, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
+import { normalizeCrateSettings } from '../plugin/settings';
 
 async function setup() {
 	const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
@@ -36,6 +37,32 @@ async function restore(h: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('pending changes after restart with automatic sync off', () => {
+	it('keeps fresh-install files pending without transfers after discovery, edits, and periodic checks', async () => {
+		vi.useFakeTimers();
+		const h = createHarness(normalizeCrateSettings(undefined, '.vault-config'));
+		h.vault.getFiles.mockReturnValue([{ path: 'existing.md', extension: 'md', stat: { size: 8, mtime: 1000 } }]);
+		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		const recovery = spyOnConflictRecovery(h.engine).mockResolvedValue();
+		try {
+			expect(h.settings.automaticSync).toBe(false);
+			await restore(h);
+			h.engine.onFileChange({ path: 'edited.md' } as never);
+			await vi.advanceTimersByTimeAsync(h.settings.syncInterval * 2 * 1000);
+			await flushPendingChanges(h.engine);
+			await runPeriodicCheck(h.engine);
+
+			expect(h.engine.getPendingPaths().sort()).toEqual(['edited.md', 'existing.md']);
+			expect(h.engine.getState()).toMatchObject({ status: 'idle', lastSync: null, pendingChanges: 2 });
+			for (const call of [h.api.checkForChanges, h.api.getChanges, h.api.getManifest, h.api.uploadFile, h.api.batchUpload, h.api.batchDownload, h.api.batchDelete, h.api.recoverUploads]) {
+				expect(call).not.toHaveBeenCalled();
+			}
+		} finally {
+			h.engine.destroy();
+			recovery.mockRestore();
+			vi.useRealTimers();
+		}
+	});
+
 	it('rediscovers edits, additions, hidden files, deletes and renames without syncing', async () => {
 		const h = await setup();
 		try {

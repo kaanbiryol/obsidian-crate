@@ -208,6 +208,8 @@ npm run deploy:plugin
 
 `npm run deploy:plugin` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
 
+Automatic sync is off by default on each new installation. After connecting a server, select **Crate: Sync - sync now** to start your first sync, or enable **Automatic sync** in Crate settings. Opening **Sync activity** or **History** does not start a sync. Manual syncing leaves automatic sync off.
+
 To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Sync - stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.
 
 ## Cloudflare Setup
@@ -240,7 +242,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Sync Scope and Limits
 
-- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not scan or transfer vault files. A running sync finishes; use **Crate: Sync - sync now** in the command palette to sync manually.
+- Automatic sync is off by default on this device. When enabled under **Settings → Crate → Sync → Automatic sync**, Crate syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. While automatic sync is off, Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not transfer vault files. A running sync finishes; use **Crate: Sync - sync now** in the command palette to sync manually.
 - Crate syncs files inside the vault, including attachments. New attachments download automatically; updates to existing binary files are saved as incoming copies for review in **Activity → Conflicts**. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, `.DS_Store`, `._*`, `Thumbs.db`, `desktop.ini`, `*.swp`, and `*.swo`. Saved lists that still match the original defaults receive these additions; customized lists are kept. The `.git/` rule also excludes nested Git repositories' internals and `.git` pointer files. Git configuration files such as `.gitignore`, `.gitattributes`, and `.gitmodules` remain eligible for sync. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.

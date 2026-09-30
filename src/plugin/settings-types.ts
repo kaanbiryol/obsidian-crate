@@ -39,7 +39,7 @@ export interface SharedSettings {
 export const DEFAULT_SETTINGS: CrateSettings = {
 	reading: { ...DEFAULT_READING_SETTINGS },
 	usageSnapshot: null,
-	automaticSync: true,
+	automaticSync: false,
 	workerUrl: '',
 	cloudflareDeployment: null,
 	lastSync: null,

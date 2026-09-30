@@ -40,10 +40,23 @@ describe('normalizeCrateSettings', () => {
 		expect(normalizeCrateSettings({ reading: { enabled: false, folderPath: 'Reading' } }, '.obsidian').reading.enabled).toBe(false);
 	});
 
-	it('migrates disabled startup and resume switches to manual-only sync', () => {
-		expect(normalizeCrateSettings({ syncOnStartup: false, syncOnResume: false }, '.obsidian').automaticSync).toBe(false);
-		expect(normalizeCrateSettings({}, '.obsidian').automaticSync).toBe(true);
-		expect(normalizeCrateSettings({ automaticSync: true, syncOnStartup: false, syncOnResume: false }, '.obsidian').automaticSync).toBe(true);
+	it.each([undefined, null, {}])('defaults to manual sync when settings are %s', saved => {
+		expect(normalizeCrateSettings(saved, '.obsidian').automaticSync).toBe(false);
+	});
+
+	it.each([true, false])('does not enable automatic sync from legacy switches (%s)', enabled => {
+		expect(normalizeCrateSettings({ syncOnStartup: enabled, syncOnResume: enabled }, '.obsidian').automaticSync).toBe(false);
+	});
+
+	it.each([true, false])('preserves an explicit automatic sync preference across reloads (%s)', automaticSync => {
+		const settings = normalizeCrateSettings({ automaticSync, syncOnStartup: false, syncOnResume: false }, '.obsidian');
+		const persisted = buildPersistedCrateSettings(settings);
+		expect(settings.automaticSync).toBe(automaticSync);
+		expect(normalizeCrateSettings(JSON.parse(JSON.stringify(persisted)) as typeof persisted, '.obsidian').automaticSync).toBe(automaticSync);
+	});
+
+	it('keeps automatic sync off when its persisted preference is invalid', () => {
+		expect(normalizeCrateSettings({ automaticSync: 'true' as never }, '.obsidian').automaticSync).toBe(false);
 	});
 
 	it('keeps valid non-secret Cloudflare deployment metadata', () => {

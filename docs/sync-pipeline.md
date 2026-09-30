@@ -1,16 +1,22 @@
 # Sync Pipeline
 
+Automatic sync is off by default on new installs. Connecting a server, restarting
+Obsidian, editing files, and opening Sync activity or History do not start file
+transfers while it is off. Start a manual sync with **Crate: Sync - sync now** or
+enable **Automatic sync** in Crate settings. A manual sync leaves automatic sync
+off. Explicitly saved preferences are preserved when upgrading or restarting.
+
 ## Sync Modes
 
 ### 1. Periodic Check
 
-Every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
+When `automaticSync` is enabled, every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
 
 Entry point: `engine.ts:periodicCheck()`
 
 ### 2. Foreground Sync
 
-When `syncOnResume` is enabled, the plugin schedules a sync when Obsidian comes back into focus, becomes visible, or the device reconnects to the network. Foreground triggers are debounced for 1 second and throttled by a 30-second cooldown.
+When `automaticSync` is enabled, the plugin schedules a sync when Obsidian comes back into focus, becomes visible, or the device reconnects to the network. Foreground triggers are debounced for 1 second and throttled by a 30-second cooldown.
 
 Entry point: `runtime.ts:triggerForegroundSync()`
 

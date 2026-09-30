@@ -7,7 +7,7 @@ vi.mock('react-dom/client', () => ({
 }));
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
-import { SyncRuntime } from './runtime';
+import { FOREGROUND_SYNC_DEBOUNCE_MS, SyncRuntime } from './runtime';
 import type { SyncResult } from './types';
 import {
 	createDeferred,
@@ -45,6 +45,32 @@ describe('SyncRuntime startup event handling', () => {
 			runtime.destroy();
 		}
 		vi.restoreAllMocks();
+	});
+
+	it('keeps a fresh install idle after connecting, restarting, and resuming until a manual sync', async () => {
+		vi.useFakeTimers();
+		const { runtime, settings } = createRuntimeHarness(normalizeCrateSettings(undefined, '.vault-config'));
+		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
+		try {
+			expect(settings.automaticSync).toBe(false);
+			await runtime.applyInfrastructureConfig({ workerUrl: 'https://worker.example', authToken: 'auth-token' });
+			expect(await runtime.waitForStartupSync()).toBe(false);
+
+			await runtime.initialize();
+			expect(await runtime.waitForStartupSync()).toBe(false);
+			for (const reason of ['focus', 'visible', 'online'] as const) runtime.triggerForegroundSync(reason);
+			await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
+			expect(sync).not.toHaveBeenCalled();
+			expect(runtime.getState().status).toBe('idle');
+
+			startupSync.resolve(createEmptySyncResult());
+			await runtime.sync();
+			expect(sync).toHaveBeenCalledOnce();
+			expect(settings.automaticSync).toBe(false);
+		} finally {
+			runtime.destroy();
+			vi.useRealTimers();
+		}
 	});
 
 	it('keeps automatic sync off after saving settings and restarting', async () => {
