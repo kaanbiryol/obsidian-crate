@@ -163,7 +163,6 @@
 		"zustand": "^5.0.15"
 	},
 	"overrides": {
-		"moment": "2.31.0",
 		"miniflare": {
 			"sharp": "0.35.5",
 			"undici": "7.29.1"

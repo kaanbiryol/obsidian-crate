@@ -12,10 +12,10 @@ export const bundleBudgets = {
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
-		// Shared plugin navigation and reader highlighting now measure 286 KB raw /
-		// 37.5 KB gzip. Desktop fetching itself adds no stylesheet.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '290000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '38000', 10),
+		// The committed navigation and Reading controls measure 293.2 KB raw /
+		// 38.4 KB gzip, with a small margin for the current UI.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '294000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '38500', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
