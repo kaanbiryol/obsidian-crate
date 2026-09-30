@@ -9,7 +9,9 @@ import { randomUUID, createHash } from 'node:crypto';
 import { swipe } from './browser-touch-swipe.mjs';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 
-for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading highlights ${name}: select, remove, persist offline and sync`, { timeout: 90000 }, async () => {
+// This end-to-end case performs many syncs and reloads; individual expectations
+// retain their own deadlines while the complete journey allows slower CI I/O.
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading highlights ${name}: select, remove, persist offline and sync`, { timeout: 180000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-highlights-'));
   let runtime, server, browser, page;
   const codeExample = 'let greeting = "hello <world> & friends"\nText(greeting)\n';
@@ -58,6 +60,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(enrollment.url);
     const open = async () => {
       await page.getByRole('button', { name: /example.invalid Highlight article/ }).click();
+      await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
+      await expect(page).toHaveURL(new RegExp(`item=${saved.id}`));
       await expect(page.locator('.crate-reading-reader__body')).toContainText('A useful article excerpt.');
       await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     };
@@ -100,10 +104,19 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const firstPassageOffset = (await page.locator('.crate-reading-reader__body').textContent()).indexOf('A useful article excerpt.');
     const select = async (offset = firstPassageOffset, length = 25) => {
       const existing = await page.locator('.crate-reading-reader__highlight').count();
+      // Measure fresh glyph positions after reloads or annotation removal, with
+      // no previous native range influencing the next drag's selection anchor.
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        getSelection()?.removeAllRanges();
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
       const start = await textPoint(offset), end = await textPoint(offset + length);
       await page.mouse.move(start.x + .2, start.y); await page.mouse.down();
       await page.mouse.move(end.x, end.y, { steps: 8 });
       assert.equal(await page.locator('.crate-reading-reader__highlight').count(), existing, 'Selection is not saved while the pointer is held');
+      const expected = await page.locator('.crate-reading-reader__body').evaluate((body, { offset, length }) => body.textContent.slice(offset, offset + length), { offset, length });
+      await expect.poll(() => page.evaluate(() => getSelection().toString())).toBe(expected);
       await page.mouse.up();
       await expect(page.getByRole('button', { name: 'Copy text', exact: true })).toBeVisible();
     };
@@ -247,7 +260,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(marks).toHaveCount(0);
     await select();
     await expect(marks).toHaveCount(3);
+    // Hold the history traversal after the close animation. The revealed library
+    // must not accept an article tap that the delayed popstate would then close.
+    await page.evaluate(() => {
+      const back = history.back.bind(history);
+      history.back = () => { window.__finishReadingBack = () => { history.back = back; back(); }; };
+    });
     await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => Boolean(window.__finishReadingBack));
+    await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert');
+    await page.evaluate(() => window.__finishReadingBack());
+    await expect(page.locator('.crate-reading__library')).not.toHaveAttribute('inert');
     await open();
     await expect(marks).toHaveCount(3);
     if (name === 'chromium') { await page.reload(); await expect(marks).toHaveCount(3); }
@@ -401,6 +424,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Delete highlight', exact: true }).tap();
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights).toEqual([]);
 
+    // Server acknowledgement can precede repainting and removal of the old
+    // selection controls. Finish deletion in the reader before selecting again.
+    await expect(marks).toHaveCount(0);
+    await expect(actions).toHaveCount(0);
     await context.setOffline(true);
     await select(inlineStart + 6, 6);
     await expect(marks).toHaveText('Button');

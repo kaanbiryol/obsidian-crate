@@ -104,9 +104,16 @@ for (const browserType of [chromium, webkit]) {
     await expect(page.getByRole('button', { name: 'Add reminder', exact: true })).toBeDisabled();
     const draftTitle = 'Draft 👩🏽‍💻 [reference](https://example.com/draft)';
     const draftDescription = 'First line\n日本語 & <script>literal text</script>';
-    await title.fill(draftTitle);
+    // Use paste and explicit focus gestures. fill() selects DOM contents before focusing,
+    // which races the editor's focus/selection handling when moving between fields.
+    await title.press('ControlOrMeta+a');
+    await title.evaluate((element, text) => {
+      const data = new DataTransfer(); data.setData('text/plain', text);
+      element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    }, draftTitle);
     const description = page.getByRole('textbox', { name: 'Reminder description', exact: true });
-    await description.fill(draftDescription);
+    await description.focus();
+    await page.keyboard.insertText(draftDescription);
     await expect.poll(() => page.evaluate(() => {
       const saved = sessionStorage.getItem('crate-reminder-draft:Reminders:new');
       return saved ? JSON.parse(saved).draft : null;
@@ -183,7 +190,17 @@ for (const browserType of [chromium, webkit]) {
       await page.locator('[data-action="open-create-modal"]').tap();
       await replaceTitle('Call Alex every Monday');
       const target = field === 'title' ? title : description;
-      await target.tap();
+      // Append at the end. A coordinate tap can put the caret inside the date
+      // chip, changing the input instead of exercising same-turn persistence.
+      await target.focus();
+      await target.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element); range.collapse(false);
+        document.getSelection().removeAllRanges();
+        document.getSelection().addRange(range);
+        document.dispatchEvent(new Event('selectionchange'));
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const request = page.waitForRequest(request => request.url().endsWith('/reminders/create') && request.method() === 'POST');
       await target.evaluate((element, field) => {
         const data = new DataTransfer();
@@ -375,7 +392,15 @@ async function verifyRepeatPicker(browser, server) {
       const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
       await expect(title).toBeEditable();
       const initialTitle = await title.textContent();
+      const waitForSheet = async name => {
+        await expect(page.getByRole('dialog', { name, exact: true })).toBeVisible();
+        await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
+        // A visible picker can still be entering and reject Done until the
+        // spring completion callback enables navigation.
+        await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
+      };
       await page.locator('.reminder-action-chips [data-picker="recurrence"]').tap();
+      await waitForSheet('Repeat reminder');
       if (scenario === 'reverted') {
         await page.getByRole('button', { name: 'Monday', exact: true }).tap();
         await page.getByRole('button', { name: 'Monday', exact: true }).tap();
@@ -386,15 +411,20 @@ async function verifyRepeatPicker(browser, server) {
       if (scenario === 'change') await page.getByLabel('Reminder time', { exact: true }).fill('10:30');
       await page.getByRole('button', { name: scenario === 'remove' ? 'Remove repeat' : 'Done', exact: true }).tap();
       await expect(title).toBeEditable();
+      await waitForSheet('Edit reminder');
       if (!['change', 'add', 'remove'].includes(scenario)) {
         await expect(title).toHaveText(initialTitle);
         // Reopening must not leave stale picker state that changes a later Done.
         await page.locator('.reminder-action-chips [data-picker="recurrence"]').tap();
+        await waitForSheet('Repeat reminder');
         await page.getByRole('button', { name: 'Done', exact: true }).tap();
+        await waitForSheet('Edit reminder');
       }
-      const request = page.waitForRequest(request => request.url().endsWith('/reminders/update') && request.method() === 'POST');
-      await page.getByRole('button', { name: 'Save reminder', exact: true }).tap();
-      const body = (await request).postDataJSON();
+      const [request] = await Promise.all([
+        page.waitForRequest(request => request.url().endsWith('/reminders/update') && request.method() === 'POST'),
+        page.getByRole('button', { name: 'Save reminder', exact: true }).tap(),
+      ]);
+      const body = request.postDataJSON();
       if (scenario === 'remove') assert.equal(body.recurrence, null);
       else if (scenario === 'change' || scenario === 'add') {
         assert.equal(body.recurrence.frequency, scenario === 'add' ? 'daily' : 'weekly');

@@ -133,9 +133,10 @@ export async function checkTabSettings(page, name) {
 	const last = await dockTabs.nth(3).boundingBox();
 	await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2);
 	await page.mouse.down();
-	await page.waitForTimeout(480);
-	await page.mouse.up();
+	// Keep holding until the menu opens; a busy browser may deliver the hold
+	// timer after a fixed automation sleep has already released the pointer.
 	await expect(views).toBeVisible();
+	await page.mouse.up();
 	await views.getByRole('button', { name: 'Favorites', exact: true }).click();
 	await expect(views).toHaveCount(0);
 	await assertSwitcher('Favorites');

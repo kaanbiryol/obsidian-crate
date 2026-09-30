@@ -24,8 +24,9 @@ export const bundleBudgets = {
 		// about 3.30 MB raw / 1.19 MB gzip, including the numbered shortcut setup and expanding navigation dock.
 		// Source-preserving highlights and the deferred review UI: about 3.57 MB / 1.30 MB.
 		// Updated dependencies and PWA controls measure 3.85 MB raw / 1.375 MB gzip.
+		// Update-curtain completion and stale-reveal guards measure 1.3801 MB gzip.
 		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3900000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1380000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1381000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',

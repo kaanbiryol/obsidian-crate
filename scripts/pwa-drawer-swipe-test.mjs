@@ -34,7 +34,8 @@ try {
 				const y = () => new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42;
 				const before = y(), height = sheet.getBoundingClientRect().height;
 				sheet.querySelector('[aria-label="Close settings"]').click();
-				await new Promise(resolve => requestAnimationFrame(resolve));
+				// Dismissal commits synchronously. Measure its starting position in the
+				// same frame; a delayed next frame includes legitimate exit travel.
 				const after = y();
 				return { before, after, height };
 			});

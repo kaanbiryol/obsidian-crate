@@ -194,10 +194,18 @@ for (const browserType of [chromium, webkit]) {
 				return stage && !document.querySelector('.reminder-action-chips')?.inert
 					&& Math.abs(new DOMMatrixReadOnly(getComputedStyle(stage).transform).m42) < 0.1;
 			});
-			await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
-			await expect(confirmation).toBeVisible();
-			await confirmation.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
-			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeHidden();
+				await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
+				await expect(confirmation).toBeVisible();
+				// The confirmation mounts below the viewport before its entrance.
+				// Its handler intentionally ignores taps until the stage can interact.
+				await page.waitForFunction(() => {
+					const stage = document.querySelector('.pwa-reminder-sheet-stage');
+					return stage && !document.querySelector('.reminder-action-chips')?.inert
+						&& Math.abs(new DOMMatrixReadOnly(getComputedStyle(stage).transform).m42) < 0.1;
+				});
+				await confirmation.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
+				await expect(confirmation).toHaveCount(0);
+				await expect(page.locator('.pwa-navigation-viewport')).not.toHaveAttribute('inert');
 			await expect(updatedCard).toBeHidden();
 			await expect(page.getByRole('group', { name: 'Unsaved deletion draft. Press Enter to edit reminder.', exact: true })).toBeHidden();
 			await page.getByRole('button', { name: 'Add reminder', exact: true }).tap();

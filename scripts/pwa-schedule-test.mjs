@@ -15,12 +15,26 @@ const reminders = [
 	{ id: 'completed', content: 'Finished task', dueDate: '2026-09-27', completed: true },
 ].map(reminder => ({ revision: 'fixture', description: '', priority: 4, completed: false, project: 'Work', filePath: 'Reminders/Work.md', ...reminder }));
 
+// Freeze calendar calculations without replacing performance, rAF, or timers.
+// Playwright's clock also virtualizes those APIs, which can drive JS frames out
+// of sync with native CSS transitions under load.
+async function fixCalendarDate(page) {
+	await page.addInitScript(time => {
+		const NativeDate = Date;
+		globalThis.Date = new Proxy(NativeDate, {
+			construct: (target, args, newTarget) => Reflect.construct(target, args.length ? args : [time], newTarget),
+			apply: () => new NativeDate(time).toString(),
+			get: (target, property) => property === 'now' ? () => time : Reflect.get(target, property),
+		});
+	}, Date.parse('2026-09-26T12:00:00Z'));
+}
+
 async function checkTodayStartup(browser, reducedMotion) {
 	const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
 		timezoneId: 'UTC', serviceWorkers: 'block', reducedMotion });
 	let response = Promise.withResolvers();
 	const list = Array.from({ length: 21 }, (_, index) => ({ ...reminders[0], id: `overdue-${index}`, dueDate: '2026-09-25' }));
-	await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+	await fixCalendarDate(page);
 	await page.route('**/reminders/list?*', async route => {
 		await response.promise;
 		await route.fulfill({ json: { reminders: list, projects: ['Work'], issues: [] } });
@@ -84,7 +98,7 @@ async function checkTodayStartup(browser, reducedMotion) {
 
 async function checkScheduleFade(page, nextView, interruptWith) {
 	const reducedMotion = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-	const samples = await page.evaluate(async ({ nextView, interruptWith }) => {
+	const samples = await page.evaluate(async ({ nextView, interruptWith, reducedMotion }) => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
 		const current = () => container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
@@ -95,20 +109,26 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 		let outgoing = current(), oldText = outgoing.textContent;
 		const oldRect = rect(outgoing);
 		select(nextView);
-		const samples = [];
-		let start = performance.now();
-		while (performance.now() - start < 360) {
-			await new Promise(requestAnimationFrame);
-			if (interruptWith && performance.now() - start > 60) {
+		// Seek native CSS transitions so a dropped CI frame cannot skip the
+		// entire dissolve. Keep reduced-motion rendering on its normal frames.
+		const samples = [], animations = new Map();
+		for (let time = 0; time <= 420; time += 20) {
+			if (reducedMotion) await new Promise(requestAnimationFrame);
+			await Promise.resolve();
+			if (interruptWith && time === 80) {
 				outgoing = current(); oldText = outgoing.textContent;
-				select(interruptWith); interruptWith = null; samples.length = 0; start = performance.now();
-				continue;
+				select(interruptWith); interruptWith = null; samples.length = 0;
+				await Promise.resolve();
+			}
+			if (!reducedMotion) for (const layer of container.children) for (const animation of layer.getAnimations()) {
+				if (animation.transitionProperty !== 'opacity' || animation.playState === 'finished') continue;
+				if (!animations.has(animation)) { animation.pause(); animations.set(animation, time); }
+				animation.currentTime = Math.min(time - animations.get(animation), Number(animation.effect.getTiming().duration));
 			}
 			const incoming = current(), style = getComputedStyle(incoming);
 			const opacities = [...container.children].map(panel => Number(getComputedStyle(panel).opacity));
 			const leavingStyle = getComputedStyle(outgoing);
 			samples.push({
-				retained: outgoing.isConnected,
 				outgoing: outgoing.isConnected ? Number(leavingStyle.opacity) : 0,
 				coverage: 1 - opacities.reduce((gap, opacity) => gap * (1 - opacity), 1),
 			fading: opacities.some(opacity => opacity > .1 && opacity < .9),
@@ -119,12 +139,56 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 				transition: [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction],
 			});
 		}
+		for (const animation of container.getAnimations({ subtree: true })) {
+			if (animations.has(animation)) animation.finish();
+		}
 		return samples;
-	}, { nextView, interruptWith });
+	}, { nextView, interruptWith, reducedMotion });
 	assert.equal(samples.some(frame => frame.fading), !reducedMotion, 'Fade only when motion is enabled');
 	assert.ok(samples.every(frame => frame.coverage === 1 && frame.inert && frame.oldContent && frame.stationary && frame.chromeStable), 'Keep the background covered and content stationary, departing content inert, and chrome stable');
 	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out'])), 'Reuse the dock tab fade');
-	assert.equal(samples.at(-1).retained, false, 'Remove the old content after the fade');
+	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+}
+
+// A transition-end cleanup and a new selection can be batched into one React
+// commit. Reopening the departed view must start with a fresh opaque layer.
+async function checkCleanupReversal(page) {
+	const result = await page.evaluate(async () => {
+		const shell = document.querySelector('.pwa-reminders-view');
+		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
+		const button = name => [...shell.querySelectorAll('.pwa-schedule-chip')].find(button => button.textContent === name);
+		const layers = () => [...container.children].map(panel => ({
+			view: panel.dataset.tabView, opacity: Number(getComputedStyle(panel).opacity),
+		}));
+		const holdCleanup = event => {
+			if (event.propertyName === 'opacity' && event.target.parentElement === container) event.stopImmediatePropagation();
+		};
+		container.addEventListener('transitionend', holdCleanup, true);
+		button('Today').click();
+		await Promise.resolve();
+		// Finish only the setup fade while retaining its layers. Natural rapid
+		// reversals are exercised separately below; this case targets batching.
+		for (const animation of container.getAnimations({ subtree: true })) {
+			if (animation.transitionProperty === 'opacity' && animation.effect?.target?.parentElement === container) animation.finish();
+		}
+		const before = layers();
+		const departed = container.querySelector('[data-tab-view="upcoming"]');
+		container.removeEventListener('transitionend', holdCleanup, true);
+		departed.dispatchEvent(new TransitionEvent('transitionend', { bubbles: true, propertyName: 'opacity' }));
+		button('Upcoming').click();
+		await Promise.resolve();
+		const frames = [layers()], reopenedAt = performance.now();
+		while (performance.now() - reopenedAt < 250) {
+			await new Promise(requestAnimationFrame);
+			frames.push(layers());
+		}
+		return { before, frames };
+	});
+	assert.deepEqual(result.before, [{ view: 'today', opacity: 1 }, { view: 'upcoming', opacity: 0 }]);
+	assert.ok(result.frames.every(frame => frame.some(layer => layer.opacity === 1)),
+		`Cleanup and immediate reopening must keep an opaque tab: ${JSON.stringify(result.frames)}`);
+	assert.ok(result.frames.some(frame => frame.some(layer => layer.opacity > 0 && layer.opacity < 1)),
+		'Reopening after cleanup must preserve the outgoing fade');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 
@@ -140,7 +204,31 @@ async function checkRapidSwitches(page, dock = false) {
 		const sequence = dock
 			? ['projects', 'inbox', 'today', 'inbox', 'projects', 'today']
 			: ['today', 'upcoming', 'today', 'upcoming', 'today', 'upcoming'];
+		// A removed and recreated view is a new layer, even with the same view key.
+		const layerIds = new WeakMap(), animationIds = new WeakMap();
+		let nextLayerId = 0, nextAnimationId = 0;
+		const layerId = panel => {
+			if (!layerIds.has(panel)) layerIds.set(panel, ++nextLayerId);
+			return `${panel.dataset.tabView}:${layerIds.get(panel)}`;
+		};
 		const sample = () => {
+			// Reading geometry for a long scrolled list can take several frames.
+			// Keep the full sampling interval; a timestamp taken only afterwards
+			// understates how much native animation time elapsed between reads.
+			const started = performance.now();
+			const animations = [...container.children].flatMap(panel => panel.getAnimations());
+			const nativeTimes = animations.filter(animation => animation.transitionProperty === 'opacity').map(animation => {
+				if (!animationIds.has(animation)) animationIds.set(animation, ++nextAnimationId);
+				return { id: animationIds.get(animation), time: Number(animation.currentTime) };
+			});
+			const motionRate = animations.reduce((rate, animation) => {
+				if (animation.transitionProperty !== 'opacity') return rate;
+				const keys = animation.effect.getKeyframes(), duration = Number(animation.effect.getTiming().duration);
+				const distance = Math.abs(Number(keys.at(-1).opacity) - Number(keys[0].opacity));
+				// Native CSS reversals shorten both the span and duration. Ease-out's
+				// maximum slope is below 2; composite weights can include every layer.
+				return rate + (duration > 0 ? 2 * distance / duration : 0);
+			}, 0);
 			const panels = [...container.children].sort((a, b) => Number(getComputedStyle(b).zIndex) - Number(getComputedStyle(a).zIndex));
 			let uncovered = 1;
 			const weights = {}, cards = {};
@@ -153,16 +241,21 @@ async function checkRapidSwitches(page, dock = false) {
 					if (rect.top >= 0 && rect.bottom <= innerHeight) cards[`${panel.dataset.tabView}:${row.dataset.reminderId}`] = [rect.y, rect.height];
 				}
 			}
-			return { time: performance.now(), weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
+			return { started, time: performance.now(), connected: container.isConnected, active: container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView, motionRate, nativeTimes, weights, uncovered, cards, order: panels.map(layerId) };
 		};
 		const frames = [sample()], start = performance.now();
-		let step = 0;
-		while (performance.now() - start < 750) {
+		let step = 0, lastSwitch = start;
+		while (step < sequence.length || performance.now() - lastSwitch < 400) {
 			if (step < sequence.length && performance.now() - start >= step * 60) {
 				const view = sequence[step++];
 				const button = dock ? shell.querySelector(`.pwa-dock [data-tab="${view}"]`)
 					: [...shell.querySelectorAll('.pwa-schedule-chip')].find(button => button.textContent.toLowerCase() === view);
+				const before = sample();
+				frames.push(before);
 				button.click();
+				await Promise.resolve();
+				frames.push(sample());
+				lastSwitch = performance.now();
 			}
 			await new Promise(requestAnimationFrame);
 			frames.push(sample());
@@ -172,17 +265,24 @@ async function checkRapidSwitches(page, dock = false) {
 	const geometry = new Map();
 	for (let index = 0; index < frames.length; index++) {
 		const frame = frames[index], previous = frames[index - 1];
-		assert.equal(frame.uncovered, 0, 'Rapid switching must never expose the background');
+		assert.equal(frame.uncovered, 0, `Rapid switching must never expose the background: ${JSON.stringify(frame)}`);
 		if (reducedMotion) assert.ok(Object.values(frame.weights).every(weight => weight === 0 || weight === 1), 'Reduced motion switches without intermediate fades');
 		if (previous) {
 			assert.deepEqual(frame.order.filter(view => previous.order.includes(view)), previous.order.filter(view => frame.order.includes(view)), 'Retained screens must not swap paint order on reversal');
 		}
 		if (previous && !reducedMotion) for (const view of new Set([...Object.keys(frame.weights), ...Object.keys(previous.weights)])) {
 			const change = Math.abs((frame.weights[view] ?? 0) - (previous.weights[view] ?? 0));
-			// Allow one compositor frame of sampling skew. A third dock screen
-			// can also contribute two overlapping fades at once.
-			assert.ok(change <= .04 + (frame.time - previous.time + 17) / (dock ? 40 : 80),
-				`${view} flashed by ${change.toFixed(3)} in ${(frame.time - previous.time).toFixed(1)}ms`);
+			// Bound travel by the actual native transitions, including shortened
+			// reversals. Include measurement work and one compositor frame of skew.
+			// Without a native transition, a switch still permits no visible jump.
+			const rate = Math.max(previous.motionRate, frame.motionRate);
+			// WebKit can resolve a pending native start retrospectively: its
+			// animation clock advances farther than performance.now between reads.
+			const nativeElapsed = Math.max(0, ...frame.nativeTimes.map(({ id, time }) =>
+				time - (previous.nativeTimes.find(animation => animation.id === id)?.time ?? 0)));
+			const elapsed = Math.max(frame.time - previous.started, nativeElapsed) + 17;
+			assert.ok(change <= .04 + elapsed * rate,
+				`${view} flashed by ${change.toFixed(3)} in ${(frame.time - previous.time).toFixed(1)}ms: ${JSON.stringify({ previous, frame })}`);
 		}
 		for (const [id, rect] of Object.entries(frame.cards)) {
 			const before = geometry.get(id);
@@ -190,6 +290,8 @@ async function checkRapidSwitches(page, dock = false) {
 			geometry.set(id, rect);
 		}
 	}
+	assert.equal(frames.some(frame => Object.values(frame.weights).some(weight => weight > 0 && weight < 1)), !reducedMotion,
+		`Rapid switches must exercise the dissolve only when motion is enabled: ${JSON.stringify(frames)}`);
 	assert.equal(frames.at(-1).weights[dock ? 'today' : 'upcoming'], 1, 'Settle on the latest requested screen');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
@@ -204,7 +306,7 @@ try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, timezoneId: 'UTC', serviceWorkers: 'block' });
 			const errors = [];
 			page.on('pageerror', error => errors.push(error.message));
-			await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+			await fixCalendarDate(page);
 			let empty = false, list = reminders;
 			await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders: empty ? [] : list, projects: ['Work'], issues: [] } }));
 			const live = page.locator('.pwa-reminders-view:not([data-pwa-opening])');
@@ -243,15 +345,20 @@ try {
 			await expect(row('completed')).toHaveCount(0);
 			await expect(live.locator('.upcoming-date-header')).toHaveCount(2);
 			await expect(live.locator('.view-header-count')).toHaveText('2 reminders');
+			// Observe unmodified native reversals before the separate fade checks
+			// seek CSS animations; finished seeked effects can affect later reversals.
+			await checkRapidSwitches(page);
+			await checkCleanupReversal(page);
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
 			await checkScheduleFade(page, 'Today', 'Upcoming');
-			await checkRapidSwitches(page);
 			await page.emulateMedia({ reducedMotion: 'reduce' });
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
 			await checkRapidSwitches(page);
-			await page.emulateMedia({ reducedMotion: 'no-preference' });
+			// Higher contrast adds borders to the selection. Percentage transforms
+			// travel by its border box, which can differ from computed content width.
+			await page.emulateMedia({ reducedMotion: 'no-preference', contrast: 'more' });
 			const upcomingButton = await chip('Upcoming').elementHandle();
 			await chip('Today').tap();
 			await expect(row('today')).toBeVisible();
@@ -267,10 +374,19 @@ try {
 					await new Promise(requestAnimationFrame);
 					positions.push(new DOMMatrixReadOnly(getComputedStyle(control, '::after').transform).m41);
 				}
-				return { positions, destination: parseFloat(getComputedStyle(control, '::after').width) };
+				const style = getComputedStyle(control, '::after');
+				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+				return { positions, destination: parseFloat(style.width) + borders };
 			});
 			assert.ok(slide.positions.some(x => x > 0 && x < slide.destination), 'The shared selection must slide between segments');
-			assert.ok(Math.abs(slide.positions.at(-1) - slide.destination) < 1, 'The selection must settle under Upcoming');
+			await expect.poll(() => control.evaluate(element => {
+				const style = getComputedStyle(element, '::after');
+				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+				return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width) - borders);
+			}), { message: 'The selection must settle under Upcoming' }).toBeLessThan(1);
+			await page.emulateMedia({ contrast: 'no-preference' });
 			await chip('Upcoming').focus();
 			await page.keyboard.press('Space');
 			await expect(chip('Upcoming')).toBeFocused();

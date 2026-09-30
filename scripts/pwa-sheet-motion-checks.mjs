@@ -13,6 +13,17 @@ export async function trackSheetDismissal(sheet, { minimumSettleMs = 0, recedeCa
 		const done = new Promise(resolve => { finish = resolve; });
 		const sample = () => {
 			const alive = popup.isConnected;
+			// WebKit can advance the compositor between consecutive style reads.
+			// Freeze each layer at the same timeline instant using its own start
+			// time, so a genuinely late mirror still differs from the sheet.
+			const timelineTime = document.timeline.currentTime;
+			const running = [popup, canvas, backdrop].flatMap(el => el.getAnimations())
+				.filter(animation => animation.playState === 'running' && animation.startTime !== null)
+				.map(animation => ({ animation, startTime: animation.startTime, playbackRate: animation.playbackRate }));
+			for (const { animation, startTime, playbackRate } of running) {
+				animation.pause();
+				animation.currentTime = (timelineTime - startTime) * playbackRate;
+			}
 			if (popup.hasAttribute('data-ending-style') || !alive) frames.push({
 				time: performance.now(), alive,
 				sheet: alive ? Math.max(0, Math.min(1, new DOMMatrix(getComputedStyle(popup).transform).f / (Number.parseFloat(getComputedStyle(popup).getPropertyValue('--pwa-sheet-travel')) || popup.offsetHeight))) : 1,
@@ -20,6 +31,10 @@ export async function trackSheetDismissal(sheet, { minimumSettleMs = 0, recedeCa
 				canvasBounds: canvas.getBoundingClientRect().toJSON(), baselineBounds: canvasBounds,
 				backdrop: alive ? 1 - Number(getComputedStyle(backdrop).opacity) : 1,
 			});
+			for (const { animation, startTime } of running) {
+				animation.play();
+				animation.startTime = startTime;
+			}
 			if (!alive && ++afterRemoval === 3) { finish(); return; }
 			requestAnimationFrame(() => setTimeout(sample, 0));
 		};
@@ -49,5 +64,6 @@ export async function trackSheetDismissal(sheet, { minimumSettleMs = 0, recedeCa
 			const settled = visible.find(frame => frame.sheet >= start.sheet + (1 - start.sheet) * .9);
 			expect(settled.time - start.time).toBeGreaterThanOrEqual(minimumSettleMs);
 		}
+		return frames;
 	};
 }

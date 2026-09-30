@@ -101,8 +101,14 @@ try {
       assert.ok(before.scrollTop > 0, 'Exercise a scrolled Projects list');
       const opening = await page.evaluate(async () => {
         document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        // Reopening refreshes the history entry before mounting the screen.
+        // That traversal is asynchronous and can take more than one frame.
+        const deadline = performance.now() + 5000;
+        while (!document.querySelector('.pwa-navigation-screen--project') && performance.now() < deadline) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+        }
         const screen = document.querySelector('.pwa-navigation-screen--project');
+        if (!screen) throw new Error('Project did not mount after its history traversal');
         const samples = [];
         const x = () => { const transform = getComputedStyle(screen).transform; return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m41; };
         const started = performance.now();
@@ -169,12 +175,15 @@ try {
         document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
         // Reopening first refreshes browser history; measure from the actual entrance.
         while (!document.querySelector('.pwa-navigation-screen--project')) await new Promise(resolve => requestAnimationFrame(resolve));
-        await new Promise(resolve => setTimeout(resolve, 80));
         const screen = document.querySelector('.pwa-navigation-screen--project');
         const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;
-        const before = x(), width = screen.getBoundingClientRect().width;
+        const width = screen.getBoundingClientRect().width, entranceStarted = performance.now();
+        // The mounted surface can wait for its first animation frame on CI.
+        // Interrupt actual travel rather than assuming 80 ms delivered a frame.
+        while ((x() <= 1 || x() >= width - 1) && performance.now() - entranceStarted < 1000) await new Promise(requestAnimationFrame);
+        const before = x();
         screen.querySelector('.crate-back-button').click();
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        await Promise.resolve();
         const after = x(), samples = [after], started = performance.now();
         while (screen.isConnected && performance.now() - started < 900) {
           await new Promise(resolve => requestAnimationFrame(resolve));
