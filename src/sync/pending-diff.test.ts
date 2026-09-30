@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadPendingDiff } from './pending-diff';
+import { loadRemotePendingBase } from './pending-baseline';
 import type { FileEntry } from '../protocol/sync-types';
 import { computeHash } from './hasher';
 
@@ -101,5 +102,63 @@ describe('pending file previews', () => {
         await expect(h.load(false, '../outside')).rejects.toThrow('Invalid sync path');
         expect(h.adapter.stat).not.toHaveBeenCalled();
         expect(h.readBase).not.toHaveBeenCalled();
+    });
+});
+
+describe('remote pending comparison baselines', () => {
+    async function remoteSetup() {
+        const content = new TextEncoder().encode('{"theme":"old"}').buffer;
+        const baseline = { hash: await computeHash(content), size: content.byteLength, modified: '' };
+        const path = '.obsidian/plugins/obsidian-minimal-settings/data.json';
+        const version = { ...baseline, path, storage_key: 'retained', created_at: '2026-09-30T10:00:00Z', expires_at: 1, reason: 'replaced' as const };
+        const api = {
+            getFileMetadata: vi.fn(async (): Promise<{ files: Record<string, FileEntry> }> => ({ files: { [path]: baseline } })),
+            downloadFile: vi.fn(async () => ({ content, contentType: 'application/json', size: content.byteLength, hash: baseline.hash })),
+            listFileVersions: vi.fn(async () => ({ versions: [version], hasMore: false, nextCursor: undefined as string | undefined })),
+            previewFileVersion: vi.fn(async () => content),
+        };
+        return { api, content, baseline, path, version, load: () => loadRemotePendingBase(api, path, baseline, 256_000) };
+    }
+
+    it('uses the current server copy when its contents still match the last sync', async () => {
+        const h = await remoteSetup();
+        expect(await h.load()).toEqual(h.content);
+        expect(h.api.downloadFile).toHaveBeenCalledWith(h.path);
+        expect(h.api.listFileVersions).not.toHaveBeenCalled();
+    });
+
+    it.each(['changed', 'deleted'])('finds the exact retained contents after the server file was %s', async state => {
+        const h = await remoteSetup();
+        h.api.getFileMetadata.mockResolvedValue({ files: state === 'deleted' ? {} : { [h.path]: { ...h.baseline, hash: 'new hash' } } });
+        h.api.listFileVersions.mockResolvedValueOnce({ versions: [{ ...h.version, hash: 'different' }], hasMore: true, nextCursor: 'older' });
+        expect(await h.load()).toEqual(h.content);
+        expect(h.api.listFileVersions).toHaveBeenNthCalledWith(2, { path: h.path, cursor: 'older' });
+        expect(h.api.previewFileVersion).toHaveBeenCalledWith(h.version);
+        expect(h.api.downloadFile).not.toHaveBeenCalled();
+    });
+
+    it('does not compare a newer server file when the last-synced version has expired', async () => {
+        const h = await remoteSetup();
+        h.api.getFileMetadata.mockResolvedValue({ files: {} });
+        h.api.listFileVersions.mockResolvedValue({ versions: [], hasMore: false, nextCursor: undefined });
+        await expect(h.load()).rejects.toThrow('no longer available');
+        expect(h.api.downloadFile).not.toHaveBeenCalled();
+        expect(h.api.previewFileVersion).not.toHaveBeenCalled();
+    });
+
+    it.each(['current', 'retained'])('verifies actual %s bytes instead of trusting metadata', async source => {
+        const h = await remoteSetup();
+        const corrupt = new TextEncoder().encode('{"theme":"new"}').buffer;
+        if (source === 'retained') h.api.getFileMetadata.mockResolvedValue({ files: {} });
+        h.api.downloadFile.mockResolvedValue({ content: corrupt, contentType: 'application/json', size: h.baseline.size, hash: h.baseline.hash });
+        h.api.previewFileVersion.mockResolvedValue(corrupt);
+        await expect(h.load()).rejects.toThrow('could not be verified');
+    });
+
+    it('rejects oversized current metadata before downloading contents', async () => {
+        const h = await remoteSetup();
+        h.api.getFileMetadata.mockResolvedValue({ files: { [h.path]: { ...h.baseline, size: 256_001 } } });
+        await expect(h.load()).rejects.toThrow('could not be verified');
+        expect(h.api.downloadFile).not.toHaveBeenCalled();
     });
 });

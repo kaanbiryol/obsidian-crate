@@ -1,6 +1,8 @@
 import { createEngineHistory } from './engine-history';
 import { getSyncIssues, recordSyncError, syncErrorIssues } from './issues';
 import { loadPendingDiff } from './pending-diff';
+import { loadRemotePendingBase } from './pending-baseline';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import type { HistorySnapshot } from './history-comparison';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
@@ -265,11 +267,18 @@ export class SyncEngine {
 	async loadPendingDiff(path: string, deleted: boolean) {
 		assertLocalSyncPath(path);
 		const baseline = this.localManifest.getEntry(path);
+		const verifyBaseline = () => {
+			if (this.localManifest.getEntry(path)?.hash !== baseline?.hash) {
+				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
+			}
+		};
 		const preview = await loadPendingDiff(this.vault.adapter, baseline,
-			(filePath, hash) => this.markdownBaseCache.readBase(filePath, hash), path, deleted);
-		if (this.localManifest.getEntry(path)?.hash !== baseline?.hash) {
-			throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
-		}
+			async (filePath, hash) => {
+				const cached = await this.markdownBaseCache.readBase(filePath, hash);
+				verifyBaseline();
+				return cached ?? (baseline ? await loadRemotePendingBase(this.api, filePath, baseline, 256_000) : null);
+			}, path, deleted);
+		verifyBaseline();
 		return preview;
 	}
 
@@ -332,7 +341,8 @@ export class SyncEngine {
         const review = await createPendingDiscard({
             vault: this.vault,
             getBaseline: path => this.localManifest.getEntry(path),
-            readBase: (path, hash) => this.markdownBaseCache.readBase(path, hash),
+            readBase: async (path, baseline) => await this.markdownBaseCache.readBase(path, baseline.hash)
+                ?? loadRemotePendingBase(this.api, path, baseline, MAX_FILE_SIZE_BYTES),
             backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
             verify: () => {
                 this.lifecycle.throwIfDestroyed();

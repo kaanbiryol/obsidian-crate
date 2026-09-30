@@ -12,7 +12,7 @@ export class PendingDiscardModal extends SharedModal {
     }
     private async render(): Promise<void> {
         this.bodyEl.empty();
-        this.bodyEl.createEl('p', { text: 'Restore the last-synced copies stored on this device. New local files move to trash.' });
+        this.bodyEl.createEl('p', { text: 'Restore the last-synced versions. New local files move to trash.' });
         const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list', attr: { 'aria-busy': 'true' } });
         for (const path of this.paths) {
             const row = list.createDiv({ cls: 'crate-discard-file' });
@@ -30,7 +30,7 @@ export class PendingDiscardModal extends SharedModal {
             const review = await this.load();
             if (!this.active) return;
             this.bodyEl.empty();
-            this.bodyEl.createEl('p', { text: 'Restore the last-synced copies stored on this device. New local files move to trash.' });
+            this.bodyEl.createEl('p', { text: 'Restore the last-synced versions. New local files move to trash.' });
             const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list' });
             for (const item of review.items) {
                 const row = list.createDiv({ cls: 'crate-discard-file' });

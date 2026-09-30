@@ -20,7 +20,7 @@ export interface PendingDiscardReview {
 interface DiscardContext {
     vault: Vault;
     getBaseline(path: string): FileEntry | undefined;
-    readBase(path: string, hash: string): Promise<ArrayBuffer | null>;
+    readBase(path: string, baseline: FileEntry): Promise<ArrayBuffer | null>;
     backupRoot: string;
     verify(): void;
     beforeBinaryReplace(path: string): Promise<void>;
@@ -135,9 +135,9 @@ function isUtf8(bytes: ArrayBuffer): boolean {
 }
 
 async function readBaseline(context: DiscardContext, path: string, baseline: FileEntry): Promise<ArrayBuffer> {
-    const content = await context.readBase(path, baseline.hash);
-    if (!content || content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== baseline.hash) {
-        throw new Error(`${path}: the last-synced copy is not available on this device. Local changes were kept.`);
+    const content = await context.readBase(path, baseline);
+    if (!content || content.byteLength > MAX_FILE_SIZE_BYTES || content.byteLength !== baseline.size || await computeHash(content) !== baseline.hash) {
+        throw new Error(`${path}: the last-synced copy is unavailable or could not be verified. Local changes were kept.`);
     }
     return content;
 }

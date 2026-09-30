@@ -268,15 +268,29 @@ Implementation: `manifest.ts:LocalManifest`
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
 
+## Pending change previews
+
+Sync Activity compares the current local file with its last-synced contents.
+Matching hashes need no baseline read. Changed text files use the on-device
+Markdown cache first, then fetch the matching server copy or retained version
+when the cache is unavailable (including JSON configuration files). Fetched
+bytes must match the last-synced hash and size; a newer server version is never
+substituted. Previews remain limited to 256 KB and do not modify files, the
+manifest, or the sync queue. Uncached comparisons require a connection and a
+server copy still within retention; failed loads can be retried.
+
 ## Discarding local changes
 
 Sync Activity discard compares selected files with the local manifest and restores
-last-synced bytes from the on-device Markdown base cache. It does not fetch server
-metadata or contents, upload changes, or advance the remote sync cursor. Files
-absent from the local manifest move to local trash; unchanged files are kept.
-Missing or corrupt cached copies block review without changing the selection.
-Existing non-Markdown files currently have no cached baseline and cannot be
-restored through local discard.
+their last-synced contents. It uses the on-device Markdown base cache first, then
+fetches the matching server copy or retained version when needed, including for
+JSON configuration files. Both preview and discard verify the same last-synced
+hash and size. Cached copies remain usable offline; uncached copies require a
+connection. Missing or unverified versions block review without changing files.
+Discard does not upload changes or advance the remote sync cursor. Files absent
+from the local manifest move to local trash; unchanged files are kept. Current
+server copies can be restored up to the 25 MiB sync limit; uncached retained
+versions use the server's 256 KB version-preview limit.
 
 Confirmation rechecks local contents and manifest versions before applying changes.
 Recovery copies are verified before replacing files, and edits arriving during

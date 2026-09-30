@@ -141,7 +141,7 @@ describe('pending discard', () => {
         const h = await harness({ 'new.md': bytes('new'), 'note.md': bytes('local') }, { 'note.md': bytes('baseline') });
         if (state === 'missing') h.remote.delete('note.md');
         else h.remote.set('note.md', bytes('broken'));
-        await expect(createPendingDiscard(h.context, ['new.md', 'note.md'])).rejects.toThrow('not available on this device');
+        await expect(createPendingDiscard(h.context, ['new.md', 'note.md'])).rejects.toThrow('unavailable or could not be verified');
         expect(h.files.get('note.md')).toEqual(bytes('local'));
         expect(h.files.get('new.md')).toEqual(bytes('new'));
         expect(h.trash).not.toHaveBeenCalled();
