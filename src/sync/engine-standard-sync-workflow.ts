@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -115,6 +116,7 @@ export async function runSyncWorkflow(
 			errors,
 		} = plan;
 		result.errors.push(...errors);
+		if (plan.issues?.length) (result.issues ??= []).push(...plan.issues);
 		for (const [path, entry] of Object.entries(localFiles)) {
 			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(path);
 		}
@@ -143,7 +145,7 @@ export async function runSyncWorkflow(
 			const downloadRequests: DownloadRequest[] = [];
 			for (const diff of downloadDiffs) {
 				if (!diff.remoteHash) {
-					result.errors.push(`${diff.path}: remote hash missing from download plan`);
+					recordSyncError(result, `remote hash missing from download plan`, diff.path);
 					continue;
 				}
 				downloadRequests.push({
@@ -191,10 +193,10 @@ export async function runSyncWorkflow(
 				if (diff.action === 'delete' && result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
 				const outcome = await context.processDiff(diff, localFiles, result);
 				if (outcome.status === 'deferred') {
-					result.errors.push(`${diff.path}: ${outcome.reason}`);
+					recordSyncError(result, `${outcome.reason}`, diff.path);
 				}
 			} catch (error) {
-				result.errors.push(`${diff.path}: ${errorMessage(error)}`);
+				recordSyncError(result, `${errorMessage(error)}`, diff.path);
 			}
 			current++;
 			progressCallback?.(current, total);

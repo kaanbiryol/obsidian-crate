@@ -25,7 +25,7 @@ import type { SyncHistoryEntry } from '../sync/types';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 import { renderLoadingState } from './activity/rendering';
 import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
-import { syncConnectionFailureMessage } from './settings/self-hosted-errors';
+import { renderSyncIssues } from './activity/sync-issues';
 
 export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
     loadHistoryComparison?(entry: SyncHistoryEntry, previous?: SyncHistoryEntry): Promise<HistoryComparison>;
@@ -63,7 +63,8 @@ export class ActivityModal extends BaseUiModal {
 	private subtitleLabelEl!: HTMLSpanElement;
 	private subtitleIndicatorRoot: Root | undefined;
 	private errorNoticeEl!: HTMLDivElement;
-	private errorMessageEl!: HTMLSpanElement;
+	private errorIssuesEl!: HTMLDivElement;
+	private errorSignature = '';
 	private errorTitleEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
 	private syncBtnLabel!: HTMLSpanElement;
@@ -181,7 +182,7 @@ export class ActivityModal extends BaseUiModal {
 		setIcon(errorIconEl, 'alert-triangle');
 		const errorCopyEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-copy' });
 		this.errorTitleEl = errorCopyEl.createSpan({ text: 'Sync error', cls: 'crate-sync-error-title' });
-		this.errorMessageEl = errorCopyEl.createSpan({ cls: 'crate-sync-error-message' });
+		this.errorIssuesEl = errorCopyEl.createDiv({ cls: 'crate-sync-error-message' });
 		this.updateSyncErrorNotice();
 
 
@@ -277,10 +278,18 @@ export class ActivityModal extends BaseUiModal {
 			return;
 		}
 
-		this.errorTitleEl.setText(state.status === 'offline' ? 'Server unavailable' : 'Sync error');
-		this.errorMessageEl.setText(state.status === 'error' && state.lastError
-			? syncConnectionFailureMessage(state.lastError, this.settings.workerUrl) ?? state.lastError
-			: state.lastError || 'Cannot reach the sync server.');
+		const issues = state.lastIssues?.length ? state.lastIssues : [{ message: state.lastError || 'Cannot reach the sync server.' }];
+		const signature = JSON.stringify([state.status, issues, this.settings.workerUrl]);
+		if (signature !== this.errorSignature) {
+			this.errorSignature = signature;
+			this.errorTitleEl.setText(state.status === 'offline' ? 'Server unavailable'
+				: issues.every(issue => issue.scope === 'reminders') ? 'Files synced; reminders need attention' : 'Sync needs attention');
+			this.errorIssuesEl.empty();
+			renderSyncIssues(this.errorIssuesEl, issues, {
+				serverUrl: this.settings.workerUrl,
+				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
+			});
+		}
 		this.errorNoticeEl.show();
 	}
 
@@ -318,7 +327,7 @@ export class ActivityModal extends BaseUiModal {
                 restore: deps.createHistoryRestore ? entry => {
                     new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
                 } : undefined,
-            });
+            }, () => this.close());
         }
         this.activityHistory.update(this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? []);
     }

@@ -173,9 +173,9 @@ describe('SyncEngine slice 5 safeguards', () => {
 		const state = harness.engine.getState();
 
 		expect(result.success).toBe(false);
-		expect(result.errors).toContain('delete notes/remote-only.md: remote locked');
+		expect(result.errors).toContain('notes/remote-only.md: remote locked');
 		expect(state.status).toBe('error');
-		expect(state.lastError).toBe('delete notes/remote-only.md: remote locked');
+		expect(state.lastError).toBe('notes/remote-only.md: remote locked');
 		expect(harness.settings.lastSync).toBeNull();
 	});
 

@@ -1,3 +1,4 @@
+import { withSyncFileContext } from './issues';
 import { computeHash } from "./hasher";
 import { getAllVaultFiles } from "./file-discovery";
 import type { LocalDiffPlannerContext } from "./planner-types";
@@ -13,7 +14,7 @@ export async function getLocalDeletes(
 
   const tasks = knownPaths.map((path) => async () => {
     context.throwIfDestroyed?.();
-    const exists = await context.vault.adapter.exists(path);
+    const exists = await withSyncFileContext(path, () => context.vault.adapter.exists(path));
     context.throwIfDestroyed?.();
     return exists ? null : path;
   });
@@ -51,7 +52,7 @@ export async function getLocalChanges(
 
   const tasks = candidates.map((file) => async () => {
     context.throwIfDestroyed?.();
-    const content = await context.vault.adapter.readBinary(file.path);
+    const content = await withSyncFileContext(file.path, () => context.vault.adapter.readBinary(file.path));
     context.throwIfDestroyed?.();
     const hash = await computeHash(content);
     context.throwIfDestroyed?.();

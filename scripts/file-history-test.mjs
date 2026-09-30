@@ -4,6 +4,7 @@ import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
 
 const { outputFiles } = await build({
+ external: ['electron'],
  stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
  import { openRemoteRecoveryModal } from './src/ui/remote-recovery-modal';
  import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
@@ -88,6 +89,11 @@ const { outputFiles } = await build({
      }};
    }
   });
+  window.showHistoryErrors = () => {
+   const issues = Array.from({length:4}, (_,i) => ({path:'Notes/error-'+i+'.md', message:'EACCES'}));
+   history[0]={...history[0],success:false,errorCount:4,issues,errors:issues.map(issue=>issue.path+': '+issue.message)};
+   window.updateHistory();
+  };
   window.updateHistory = () => window.activityHistory.update(history);
   window.refreshHistoryDetails = () => {history[0]={...history[0],errors:[]};window.updateHistory();};
   window.updateHistory();
@@ -97,6 +103,8 @@ const { outputFiles } = await build({
  plugins: [{name:'obsidian',setup(builder) {
   builder.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'fixture'}));
   builder.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`
+   export class TFile {}
+   export class FileSystemAdapter {}
    export const Platform = { get isMobile() { return innerWidth < 700; } };
    export class Modal {
     constructor(app) {this.app=app;this.modalEl=document.createElement('div');this.modalEl.className='modal';this.contentEl=this.modalEl.createDiv({cls:'modal-content'});}
@@ -389,6 +397,13 @@ for(const browserType of [chromium,webkit]) {
    await expect(historyRoot).toHaveCount(0);
    await expect(activityRoot).toBeVisible();
    await expect(browseVault).toBeFocused();
+   await page.evaluate(() => { window.mountStateHistory(); window.showHistoryErrors(); });
+   const errorHistory = page.locator('#history-fixture details[data-history-key]').first();
+   await errorHistory.locator(':scope > summary').click();
+   await errorHistory.locator('.crate-sync-issue-details > summary').first().click();
+   await page.evaluate(() => window.refreshHistoryDetails());
+   await expect(errorHistory.locator('.crate-sync-issue-details[open]')).toHaveCount(1);
+   await expect(errorHistory.locator('.crate-sync-issues-more')).not.toHaveAttribute('open');
    assert.deepEqual(errors,[]);await page.close();
   }
  } finally {await browser.close();}

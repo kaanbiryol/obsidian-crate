@@ -1,5 +1,6 @@
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type CrateSettings } from '../plugin/settings-types';
 import type { SyncHistoryEntry, SyncResult } from './types';
+import { getSyncIssues } from './issues';
 
 export function recordSyncHistory(
   settings: CrateSettings,
@@ -16,6 +17,7 @@ export function recordSyncHistory(
     deleted: result.deleted,
     errorCount: result.errors.length,
     errors: limitHistoryPaths(result.errors),
+    ...(result.errors.length ? { issues: getSyncIssues(result).slice(0, MAX_SYNC_HISTORY_PATHS) } : {}),
     conflictCount: result.conflicts.length,
     resolvedRaceCount: result.resolvedRaces.length,
     conflictPaths: limitHistoryPaths(result.conflicts),

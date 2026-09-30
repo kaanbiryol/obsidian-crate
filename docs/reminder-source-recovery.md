@@ -4,6 +4,21 @@ The plugin shows **Some reminders could not be refreshed** when a reminder note 
 
 For a temporary storage error, wait until the vault is available and select **Refresh reminders**. A successful refresh clears the warning and reads the current task text. Renaming a note moves its warning to the new path; confirmed deletion removes its saved entries.
 
+Older Crate builds wrote plain-text `<!-- crate-desc:details -->` comments, sometimes spanning multiple lines. Parser 11 reads these without changing the note. If initial sync reports **Unsupported reminder description encoding** for one of these older descriptions, update both the plugin and server, then select **Sync vault** to resume setup; uploaded files do not need to be sent again. An unsupported version such as `v2:` or a damaged comment still needs source repair. In **Sync activity**, each source error identifies the note path and malformed
+description errors include a line number. Select **Open file** to open an available
+local note, or **Reveal in Finder** / **Reveal in File Explorer** on desktop to locate
+it. Back up the note before removing only a broken `crate-desc` comment in Source
+mode; keep the task and its `crate-id`, then re-add the description in Crate.
+Select **Sync vault** after saving to resume setup. Uploaded file contents remain synced.
+
+Sync errors show recovery guidance for common failures, including file sizes,
+permissions, storage, network connections and interrupted transfers. **Technical
+details** preserves the original diagnostic; **Copy details** includes the path and
+recovery guidance for troubleshooting. Additional errors can be expanded, and the
+first 50 are saved in **History**, including their file actions. Older history may
+contain text without a reliable file link. For notes that are not present locally,
+use the displayed path to repair them on the device where they exist.
+
 For an encoding error, preserve a separate copy of the original note before using an editor that understands its encoding to save it as UTF-8 without null characters. Crate does not guess the encoding or convert it automatically. Valid Unicode, a UTF-8 BOM and literal replacement characters are supported. Generic sync continues to preserve the original file bytes, even while reminder editing is unavailable.
 
 An interrupted reminder move retains its journal while either source is unreadable. Restore readable source files, then use the existing interrupted-move recovery flow. Do not delete the journal to dismiss an error: it records the intent needed to distinguish an incomplete move from a duplicate task.

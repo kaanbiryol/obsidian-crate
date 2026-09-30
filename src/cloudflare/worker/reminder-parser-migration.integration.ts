@@ -12,6 +12,7 @@ import { ReminderAlarm } from './notifications/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 import { runNotificationCoordinator } from './notification-coordinator';
+import { handleListReminders } from './reminders-web/routes/list';
 
 vi.mock('./notifications/push', () => ({ listPushSubscriptionIds: vi.fn(async () => ['sub']), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
@@ -98,6 +99,28 @@ it('rediscovers CRLF tasks omitted by the previous parser without rewriting thei
     .toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
   expect(await (await env.BUCKET.get(h.file.storageKey))?.text()).toBe(`${h.valid}\r\n`);
   expect(await command()).toMatchObject({ operation: 'schedule' });
+});
+
+it('revalidates previously quarantined legacy descriptions without reuploading or changing file bytes', async () => {
+  const description = '100% complete\nkeep %20 literally';
+  const h = await legacy(text => `${text}\n<!-- crate-desc:${description} -->\n`);
+  await env.DB.batch([
+    env.DB.prepare('UPDATE reminder_source_state SET verified = 0'),
+    env.DB.prepare("UPDATE notification_projection_jobs SET last_error = 'Unsupported reminder description encoding'"),
+    env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES (?, 1, -1, 'Unsupported reminder description encoding')").bind(path),
+  ]);
+  await revalidateReminderSources(env, 3);
+  await drainNotificationProjections(env);
+  expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first())
+    .toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
+  expect(await env.DB.prepare('SELECT 1 FROM notification_file_retries').first()).toBeNull();
+  expect(await command()).toMatchObject({ operation: 'schedule' });
+  const list = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
+  expect(list.status).toBe(200);
+  expect(await list.json()).toMatchObject({ reminders: [{ description }], issues: [] });
+  expect(await (await env.BUCKET.get(h.file.storageKey))!.text()).toBe(`${h.valid}\n<!-- crate-desc:${description} -->\n`);
+  expect(await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first()).toEqual({ storage_key: h.file.storageKey });
+  expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(1);
 });
 
 it('quarantines uncertain legacy metadata and permits repair without deriving cancellations', async () => {

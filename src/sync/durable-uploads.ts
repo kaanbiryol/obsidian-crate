@@ -1,4 +1,5 @@
 import { recoveryChunks } from './recovery-chunks';
+import { SyncIssueError, withSyncFileContext } from './issues';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from './manifest';
@@ -66,19 +67,21 @@ export class DurableUploads {
 			};
 			try {
 				for (const chunk of recoveryChunks(pending)) {
-					for (const file of chunk) {
-						if (!this.manifest.getUploadDiagnostics().some(row => row.operationId === file.operationId && row.phase === 'prepared')) await this.trace(file, 'prepared');
-						await this.trace(file, 'replaying');
-					}
-					if (chunk.length === 1) {
-						const result = await this.sendSingle(chunk[0]!);
-						if (!result.success && !this.definitive(result)) throw new Error(result.error ?? 'An upload receipt is unresolved');
-						await settled();
-					} else {
-						const response = await this.sendBatch(chunk, settled);
-						const unresolved = response.results.find(result => !result.success && !this.definitive(result));
-						if (unresolved) throw new Error(unresolved.error ?? 'An upload receipt is unresolved');
-					}
+					await withSyncFileContext(chunk.map(file => file.path), async () => {
+						for (const file of chunk) {
+							if (!this.manifest.getUploadDiagnostics().some(row => row.operationId === file.operationId && row.phase === 'prepared')) await this.trace(file, 'prepared');
+							await this.trace(file, 'replaying');
+						}
+						if (chunk.length === 1) {
+							const result = await this.sendSingle(chunk[0]!);
+							if (!result.success && !this.definitive(result)) throw new Error(result.error ?? 'An upload receipt is unresolved');
+							await settled();
+						} else {
+							const response = await this.sendBatch(chunk, settled);
+							const unresolved = response.results.find(result => !result.success && !this.definitive(result));
+							if (unresolved) throw new SyncIssueError(unresolved.error ?? 'An upload receipt is unresolved', [{ path: unresolved.path, message: unresolved.error ?? 'An upload receipt is unresolved' }]);
+						}
+					});
 				}
 			} finally {
 				if (uncheckpointed > 0) await this.manifest.save();

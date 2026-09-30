@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { InitialImportApi } from './initial-import';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
+import { syncErrorIssues } from '../issues';
 
 afterEach(() => vi.useRealTimers());
 function harness() {
@@ -29,6 +30,30 @@ it('preserves a completed-upload session for retry after a reminder error', asyn
     .mockResolvedValueOnce({ import: { token: 'token', state: 'complete' } });
   await expect(api.waitUntilReady('token', () => {})).rejects.toThrow('Files uploaded. Reminder setup needs attention');
   expect(await api.begin()).toEqual({ token: 'token', state: 'complete' });
+});
+
+it('preserves every reported note and reminder scope, and filters unsafe remote paths', async () => {
+  const { api, requestJson } = harness();
+  requestJson.mockResolvedValue({ ready: false, error: 'Reminder setup failed', moreIssues: true, issues: [
+    { path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4' },
+    { path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
+    { path: '../outside.md', message: 'Bad path' },
+    { path: 'invalid.md', message: 42 },
+  ] });
+  const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+  expect(syncErrorIssues(error)).toEqual([
+    { scope: 'reminders', path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4' },
+    { scope: 'reminders', path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
+    { scope: 'reminders', message: 'Bad path' },
+    { scope: 'reminders', message: expect.stringContaining('More reminder notes') as string },
+  ]);
+});
+
+it('retains older server errors without guessing which part of their text is a filename', async () => {
+  const { api, requestJson } = harness();
+  requestJson.mockResolvedValue({ ready: false, error: 'note.md: bad description' });
+  const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+  expect(syncErrorIssues(error)).toEqual([{ scope: 'reminders', message: 'Files uploaded. Reminder setup needs attention: note.md: bad description' }]);
 });
 
 it('stops polling when the sync is cancelled', async () => {

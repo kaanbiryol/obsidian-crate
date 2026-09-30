@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	appendReminderBlockToContent,
+	buildDescriptionBlock,
 	decodeDescriptionFromMarkdown,
 	deleteReminderBlockFromContent,
 	encodeDescriptionForMarkdown,
@@ -50,7 +51,45 @@ describe('markdownReminderFile', () => {
 		expect(encoded).not.toContain('\n');
 		expect(encoded).not.toContain('>');
 		expect(decodeDescriptionFromMarkdown(encoded)).toBe(description);
-		expect(() => decodeDescriptionFromMarkdown('plain text')).toThrow('Unsupported reminder description encoding');
+		expect(decodeDescriptionFromMarkdown(' legacy 100% %20 café 😀 ')).toBe('legacy 100% %20 café 😀');
+		expect(() => decodeDescriptionFromMarkdown('v2:plain text')).toThrow('Unsupported reminder description encoding');
+		expect(() => decodeDescriptionFromMarkdown('v1:%invalid')).toThrow();
+	});
+
+	it('edits and deletes multiline legacy descriptions without consuming the next reminder', () => {
+		const rawLine = '- [ ] Task <!-- crate-id:r1 -->';
+		const description = 'collect 100% of receipts\nand confirm %20 deductions';
+		const next = '- [ ] Keep <!-- crate-id:r2 -->\n';
+		const initial = `${rawLine}\n<!-- crate-desc:${description} -->\n${next}`;
+		const reminder = makeRecord({ rawLine, description });
+		const updated = replaceReminderBlockInContent(initial, reminder, [rawLine, ...buildDescriptionBlock(description)]);
+		expect(updated.content).toBe(`${rawLine}\n<!-- crate-desc:v1:collect%20100%25%20of%20receipts%0Aand%20confirm%20%2520%20deductions -->\n${next}`);
+		expect(deleteReminderBlockFromContent(initial, reminder).content).toBe(next);
+		expect(() => replaceReminderBlockInContent(initial.replace('100%', '90%'), reminder, [rawLine]))
+			.toThrow('Reminder changed while it was being edited');
+	});
+
+	it('reorders multiline legacy descriptions together with their task without rewriting metadata', () => {
+		const first = '- [ ] First <!-- crate-id:r1 -->\n<!-- crate-desc:line one\nline two -->';
+		const second = '- [ ] Second <!-- crate-id:r2 -->';
+		expect(reorderReminderBlocksInContent(`${first}\n${second}\n`, ['r2', 'r1']))
+			.toBe(`${second}\n${first}\n`);
+	});
+
+	it.each([
+		'<!-- crate-desc:v2:unsupported -->',
+		'<!-- crate-desc:v1:%invalid -->',
+		'<!-- crate-desc:v1:line%20one\nline%20two -->',
+		'<!-- crate-desc:unfinished',
+		'<!-- crate-desc:details --> trailing text',
+		'<!-- crate-desc:details --> extra -->',
+		'<!-- crate-desc:details\n<!-- unrelated -->',
+	])('rejects unsafe description edits and deletions: %s', block => {
+		const reminder = makeRecord({ description: 'details' });
+		const content = `${reminder.rawLine}\n${block}\n`;
+		expect(() => replaceReminderBlockInContent(content, reminder, [reminder.rawLine])).toThrow();
+		expect(() => deleteReminderBlockFromContent(content, reminder)).toThrow();
+		expect(() => reorderReminderBlocksInContent(content, ['r1'])).toThrow();
 	});
 
 	it('replaces and deletes reminder blocks together with description lines', () => {

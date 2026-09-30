@@ -64,7 +64,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 9, IndexedDB version 2, generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered upload journals, and URI-encoded `crate-desc:v1:` description comments. Provisioning applies the registered schema-1 → schema-2 migration; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 11, IndexedDB version 2, generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered upload journals, and URI-encoded `crate-desc:v1:` description comments. The reminder parser also reads older unversioned plain-text description comments, including multiline descriptions; unknown version prefixes and malformed blocks remain errors. Provisioning applies the registered schema-1 → schema-2 migration; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -91,8 +91,14 @@ file inventory and, when a reminder policy exists, records pending reminder setu
 `POST /sync/import/readiness` checks the selected-folder scan and durable source,
 projection and schedule queues, then atomically acknowledges readiness. Probes
 return `{ ready: false }` while work remains, optionally with an error requiring
-attention. `/sync/import` returns the completed-upload session while its reminder
-setup is pending, allowing a restarted client to resume without retransfers.
+attention. Source errors include the affected note path. An additive `issues` array
+contains up to 20 `{ path, message }` entries in path order; `moreIssues: true` means
+more notes need repair. The legacy `error` string remains available to older clients.
+Plugin sync results and saved history keep explicit file context alongside their
+text errors, enabling safe file-opening actions without parsing filenames from messages.
+`/sync/import` returns
+the completed-upload session while its reminder setup is pending, allowing a
+restarted client to resume without retransfers.
 Local corrections sync before this acknowledgement so a failed reminder source
 can be repaired. The client shows completion only after readiness is acknowledged. A cancelled
 wait or the three-hour foreground wait bound leaves all progress intact.

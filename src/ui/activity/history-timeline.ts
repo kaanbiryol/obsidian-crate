@@ -4,8 +4,10 @@ import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 import { historyEntryKey } from './history-point';
 import { historyTime } from './history';
+import { getSyncIssues } from '../../sync/issues';
+import { renderSyncIssues, type SyncIssueRenderOptions } from './sync-issues';
 
-export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void): void {
+export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[], openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
     // Server-only restore points have no local sync activity to display.
     const activity = history.filter(entry => entry.checkpointFileCount === undefined);
 	if (activity.length === 0) {
@@ -25,7 +27,7 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 				const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': historyEntryKey(entry) } });
 				const summary = details.createEl('summary', { cls: 'crate-history-card' });
 				renderHistoryHeader(summary, entry, true, count);
-				renderHistoryFiles(details, entry, openFileHistory);
+				renderHistoryFiles(details, entry, openFileHistory, issueOptions);
 
 			} else {
 				const card = entryEl.createDiv({ cls: 'crate-history-card' });
@@ -52,11 +54,10 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
     }).format(new Date(entry.timestamp)));
 }
 
-function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, openFileHistory?: (path: string) => void): void {
+function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry, openFileHistory?: (path: string) => void, issueOptions: SyncIssueRenderOptions = {}): void {
 	const filesEl = container.createDiv({ cls: 'crate-history-files' });
-	for (const error of entry.errors ?? []) {
-		filesEl.createDiv({ text: error, cls: 'crate-history-error' });
-	}
+	const issues = getSyncIssues(entry);
+	if (issues.length) renderSyncIssues(filesEl, issues, issueOptions);
 	if (entry.errorCount > (entry.errors?.length ?? 0)) {
 		filesEl.createDiv({ text: entry.errors?.length
 			? `Showing ${entry.errors.length} of ${entry.errorCount} errors.`

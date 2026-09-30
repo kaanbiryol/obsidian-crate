@@ -82,6 +82,7 @@ export interface FullSyncPlannerContext {
 }
 
 export interface FullSyncPlan {
+	issues?: import('./types').SyncIssue[];
   localFiles: Record<string, FileEntry>;
   diffs: FileDiff[];
   uploadDiffs: UploadDiff[];

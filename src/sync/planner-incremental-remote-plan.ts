@@ -3,7 +3,7 @@ import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 import type { DownloadRequest } from './transfer-download';
-import { errorMessage } from '../plugin/logger';
+import { recordSyncError } from './issues';
 import type { ChangelogEntry } from '../protocol/sync-types';
 import type { FileDiff, SyncResult } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -74,7 +74,7 @@ export async function planIncrementalRemoteChanges(
 			}
 
 			if (entry.size > MAX_FILE_SIZE_BYTES) {
-				result.errors.push(`${path}: Skipped remote file larger than 25MB`);
+				recordSyncError(result, 'Skipped remote file larger than 25MB', path);
 				continue;
 			}
 
@@ -141,7 +141,7 @@ export async function planIncrementalRemoteChanges(
 				});
 			}
 		} catch (error) {
-			result.errors.push(`${path}: ${errorMessage(error)}`);
+			recordSyncError(result, error, path);
 		}
 	}
 

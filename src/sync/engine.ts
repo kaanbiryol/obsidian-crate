@@ -1,4 +1,5 @@
 import { createEngineHistory } from './engine-history';
+import { getSyncIssues, recordSyncError, syncErrorIssues } from './issues';
 import { loadPendingDiff } from './pending-diff';
 import type { HistorySnapshot } from './history-comparison';
 import { findStartupPendingPaths } from './startup-pending';
@@ -115,6 +116,7 @@ export class SyncEngine {
 			status: lastError ? 'error' : 'idle',
 			lastSync: settings.lastSync,
 			lastError,
+			...(lastError && latestAttempt ? { lastIssues: getSyncIssues(latestAttempt) } : {}),
 			pendingChanges: 0,
 			conflictCount: 0,
 		};
@@ -144,7 +146,9 @@ export class SyncEngine {
 			},
 			onCheckFailure: error => {
 				if (this.lifecycle.isDestroyed || this.state.status === 'syncing') return;
-				this.updateState({ status: 'error', lastError: isAuthError(error) ? AUTH_ERROR_MESSAGE : `Sync check failed: ${errorMessage(error)}` });
+				this.updateState({ status: 'error', lastError: isAuthError(error) ? AUTH_ERROR_MESSAGE : `Sync check failed: ${errorMessage(error)}`,
+					...(!isAuthError(error) ? { lastIssues: syncErrorIssues(error) } : {}),
+				});
 				this.periodicCheckFailed = true;
 			},
 		});
@@ -437,6 +441,7 @@ export class SyncEngine {
 		if (updates.status && updates.status !== 'syncing') this.timingRecorder.stop();
 		if ('status' in updates || 'lastError' in updates) this.periodicCheckFailed = false;
 		this.state = { ...this.state, ...updates };
+		if ('lastError' in updates && !updates.lastIssues) this.state.lastIssues = undefined;
 		if (updates.status) this.state.work = updates.status === 'syncing' ? updates.work : undefined;
 		this.onStateChange?.(this.state);
 	}
@@ -479,7 +484,7 @@ export class SyncEngine {
 				}
 			} catch (error) {
 				if (!this.isAbortError(error) && revision === this.syncActivityRevision) {
-					this.updateState({ status: 'error', lastError: `Could not check local changes: ${errorMessage(error)}` });
+					this.updateState({ status: 'error', lastError: `Could not check local changes: ${errorMessage(error)}`, lastIssues: syncErrorIssues(error) });
 				}
 			}
 		});
@@ -698,13 +703,15 @@ export class SyncEngine {
 					});
 					this.pruneMarkdownBaseCacheInBackground();
 				} else {
-					this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed' });
+					this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed', lastIssues: getSyncIssues(result) });
 				}
 				return result;
 			} catch (error) {
-				const message = errorMessage(error);
-				this.updateState({ status: 'error', lastError: message });
-				return createSyncFailureResult(message);
+				const result = createEmptySyncResult();
+				recordSyncError(result, error);
+				result.success = false;
+				this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed', lastIssues: getSyncIssues(result) });
+				return result;
 			}
 		});
 	}

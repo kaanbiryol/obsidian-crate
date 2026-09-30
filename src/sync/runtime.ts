@@ -107,7 +107,7 @@ export class SyncRuntime {
 		if (this.syncEngine) {
 			const state = this.syncEngine.getState();
 			return this.connectionIssue && state.status === 'idle'
-				? { ...state, status: 'offline', lastError: this.connectionIssue }
+				? { ...state, status: 'offline', lastError: this.connectionIssue, lastIssues: undefined }
 				: state;
 		}
 		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0 };

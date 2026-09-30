@@ -1,5 +1,11 @@
 type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
+export interface SyncIssue {
+	message: string;
+	path?: string;
+	scope?: 'reminders';
+}
+
 export interface SyncWork {
 	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving' | 'reminders';
 	reminderSetup?: import('../protocol/initial-import').ReminderSetupProgress;
@@ -12,6 +18,7 @@ export interface SyncState {
 	status: SyncStatus;
 	lastSync: string | null;
 	lastError: string | null;
+	lastIssues?: SyncIssue[];
 	pendingChanges: number;
 	conflictCount: number;
 }
@@ -27,6 +34,7 @@ export interface SyncResult {
 	resolvedRaces: ResolvedSyncRace[];
 	settledPaths: string[];
 	errors: string[];
+	issues?: SyncIssue[];
 	uploadedPaths: string[];
 	downloadedPaths: string[];
 	mergedPaths: string[];
@@ -70,6 +78,7 @@ export interface SyncHistoryEntry {
 	deleted: number;
 	errorCount: number;
 	errors?: string[];
+	issues?: SyncIssue[];
 	conflictCount: number;
 	resolvedRaceCount?: number;
 	conflictPaths?: string[];

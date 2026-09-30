@@ -32,7 +32,11 @@ export function encodeDescriptionForMarkdown(description: string): string {
 
 export function decodeDescriptionFromMarkdown(description: string): string {
 	const trimmed = description.trim();
-	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) throw new Error('Unsupported reminder description encoding');
+	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) {
+		if (/^v\d+:/.test(trimmed)) throw new Error('Unsupported reminder description encoding');
+		// Older Crate builds wrote unversioned plain text, including literal percent signs.
+		return trimmed;
+	}
 	return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
 }
 
@@ -104,27 +108,46 @@ export function buildDescriptionBlock(description: string | undefined): string[]
 	return [`<!-- crate-desc:${encodeDescriptionForMarkdown(description)} -->`];
 }
 
-function countDescriptionBlockLines(
-	lines: string[],
+export function readDescriptionBlock(
+	lines: readonly string[],
 	checkboxLineNumber: number,
-): number {
+): { description?: string; lineCount: number } {
 	const nextIndex = checkboxLineNumber + 1;
 	const nextLine = lines[nextIndex];
-	if (!nextLine?.startsWith("<!-- crate-desc:")) return 0;
+	const prefix = '<!-- crate-desc:';
+	if (!nextLine?.startsWith(prefix)) return { lineCount: 0 };
 
-	if (!nextLine.endsWith(' -->')) throw new Error('Invalid reminder description block');
-	decodeDescriptionFromMarkdown(nextLine.slice('<!-- crate-desc:'.length, -4));
-	return 1;
+	const payload = nextLine.slice(prefix.length);
+	const versioned = /^v\d+:/.test(payload.trimStart());
+	const descriptionLines: string[] = [];
+	for (let index = nextIndex; index < lines.length; index++) {
+		const line = (index === nextIndex ? payload : lines[index]!).replace(/\r$/, '');
+		if (line.includes('<!--')) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
+		const end = line.indexOf('-->');
+		if (end !== -1) {
+			if (!line.endsWith(' -->') || end !== line.length - 3) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
+			descriptionLines.push(line.slice(0, end));
+			try {
+				return {
+					description: decodeDescriptionFromMarkdown(descriptionLines.join('\n')) || undefined,
+					lineCount: index - nextIndex + 1,
+				};
+			} catch (error) {
+				const reason = error instanceof URIError ? 'Invalid reminder description encoding' : error instanceof Error ? error.message : 'Invalid reminder description block';
+				throw new Error(`${reason} on line ${nextIndex + 1}`, { cause: error });
+			}
+		}
+		// Encoded descriptions are always one line; only the old plain-text format spans lines.
+		if (versioned) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
+		descriptionLines.push(line);
+	}
+	throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
 }
 
 export function assertReminderBlockUnchanged(lines: string[], reminder: ReminderLineRecord, lineNumber: number): void {
 	const line = lines[lineNumber];
-	const count = countDescriptionBlockLines(lines, lineNumber);
-	const block = lines.slice(lineNumber + 1, lineNumber + 1 + count).join('\n');
-	const description = block
-		? decodeDescriptionFromMarkdown(block.slice('<!-- crate-desc:'.length, block.indexOf('-->')))
-		: '';
-	if (!line || (line !== reminder.rawLine && !lineMatchesReminder(line, reminder)) || description !== (reminder.description?.trim() ?? '')) {
+	const { description } = readDescriptionBlock(lines, lineNumber);
+	if (!line || (line !== reminder.rawLine && !lineMatchesReminder(line, reminder)) || (description ?? '') !== (reminder.description?.trim() ?? '')) {
 		throw new Error('Reminder changed while it was being edited. Reload it before saving; your changes were not applied');
 	}
 }
@@ -160,7 +183,7 @@ export function replaceReminderBlockInContent(
 	}
 	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
-	const oldDescCount = countDescriptionBlockLines(lines, lineNumber);
+	const oldDescCount = readDescriptionBlock(lines, lineNumber).lineCount;
 	lines.splice(lineNumber, 1 + oldDescCount, ...replacementLines);
 	return {
 		content: lines.join("\n"),
@@ -180,7 +203,7 @@ export function deleteReminderBlockFromContent(
 	}
 	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
-	const descCount = countDescriptionBlockLines(lines, lineNumber);
+	const descCount = readDescriptionBlock(lines, lineNumber).lineCount;
 	if (hasAttachedMarkdownContent(lines, lineNumber, lineNumber + 1 + descCount)) {
 		throw new ReminderMarkdownContextError('This reminder has nested tasks or supporting text. Move or remove it in Markdown to preserve that content; nothing was changed.');
 	}
@@ -225,7 +248,7 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 			}
 
 			const blockLines = [line];
-			const descCount = countDescriptionBlockLines(lines, index);
+			const descCount = readDescriptionBlock(lines, index).lineCount;
 			for (let descIndex = 1; descIndex <= descCount; descIndex++) {
 				const descriptionLine = lines[index + descIndex];
 				if (descriptionLine !== undefined) blockLines.push(descriptionLine);

@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import { isAbortError } from './abort';
 import { arrayBufferToBase64 } from "./encoding";
 import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./transfer-prepare";
@@ -83,9 +84,7 @@ export async function uploadPreparedFiles(
 
           if (fileResult.success) {
             if (fileResult.hash && fileResult.hash !== upload.hash) {
-              result.errors.push(
-                `${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`,
-              );
+              recordSyncError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`, upload.path);
               continue;
             }
 
@@ -103,14 +102,14 @@ export async function uploadPreparedFiles(
           } else if (fileResult.code === 'version_conflict' || isQueueVersionConflict(fileResult.status, fileResult.code)) {
             versionConflictPaths.add(upload.path);
           } else {
-            result.errors.push(`${upload.path}: ${fileResult.error || "Upload failed"}`);
+            recordSyncError(result, `${fileResult.error || "Upload failed"}`, upload.path);
           }
         }
       } catch (error) {
         if (isAbortError(error)) throw error;
         const uploadError = error instanceof Error ? error.message : "Batch upload failed";
         for (const upload of chunk) {
-          result.errors.push(`${upload.path}: ${uploadError}`);
+          recordSyncError(result, `${uploadError}`, upload.path);
         }
       }
       options.onProcessed?.(chunk.length);
@@ -132,11 +131,11 @@ export async function uploadPreparedFiles(
       } catch (error) {
         if (isAbortError(error)) throw error;
         const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
-        for (const path of paths) result.errors.push(`${path}: ${message}`);
+        for (const path of paths) recordSyncError(result, `${message}`, path);
       }
     } else {
       for (const path of paths) {
-        result.errors.push(`${path}: Remote file changed since it was read`);
+        recordSyncError(result, `Remote file changed since it was read`, path);
       }
     }
   }
@@ -172,9 +171,7 @@ async function uploadPreparedFilesIndividually(
 
       if (uploadResult.success) {
         if (uploadResult.hash && uploadResult.hash !== upload.hash) {
-          result.errors.push(
-            `${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`,
-          );
+          recordSyncError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`, upload.path);
           return null;
         }
 
@@ -195,14 +192,14 @@ async function uploadPreparedFilesIndividually(
       if (uploadResult.code === 'version_conflict' || isQueueVersionConflict(uploadResult.status, uploadResult.code)) {
         return upload.path;
       }
-      result.errors.push(`${upload.path}: ${uploadResult.error || "Upload failed"}`);
+      recordSyncError(result, `${uploadResult.error || "Upload failed"}`, upload.path);
     } catch (error) {
       if (isAbortError(error)) throw error;
       if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
         return upload.path;
       }
       const uploadError = error instanceof Error ? error.message : "Upload failed";
-      result.errors.push(`${upload.path}: ${uploadError}`);
+      recordSyncError(result, `${uploadError}`, upload.path);
     } finally {
       options.onProcessed?.(1);
     }

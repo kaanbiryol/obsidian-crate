@@ -65,6 +65,7 @@ export function mergeSyncResults(target: SyncResult, source: SyncResult): void {
 	for (const race of source.resolvedRaces) recordResolvedRace(target, race.path, race.resolution);
 	appendUnique(target.settledPaths, source.settledPaths);
 	target.errors.push(...source.errors);
+	if (source.issues?.length) (target.issues ??= []).push(...source.issues);
 	appendUnique(target.uploadedPaths, source.uploadedPaths);
 	appendUnique(target.downloadedPaths, source.downloadedPaths);
 	appendUnique(target.mergedPaths, source.mergedPaths);

@@ -27,11 +27,15 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
     db.prepare(`DELETE FROM maintenance_state WHERE key = ? AND value = ? AND (${READY_SQL})`)
       .bind(INITIAL_REMINDERS_PENDING, current.token),
     db.prepare(`SELECT NOT EXISTS(SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?) AS ready,
-      COALESCE((SELECT error FROM notification_file_retries LIMIT 1),
+      COALESCE((SELECT path || ': ' || error FROM notification_file_retries ORDER BY path LIMIT 1),
         (SELECT last_error FROM notification_jobs ORDER BY available_at LIMIT 1)) AS error`)
       .bind(INITIAL_REMINDERS_PENDING, current.token),
   ]);
   const status = result[1]!.results[0]!;
+  // Return enough context to repair several notes without an unbounded error payload.
+  const sourceIssues = status.ready ? [] : (await db.prepare(
+    'SELECT path, error AS message FROM notification_file_retries ORDER BY path LIMIT 21',
+  ).all<{ path: string; message: string }>()).results;
   const progress = status.ready ? undefined : await db.prepare(`SELECT
     NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
       ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,
@@ -46,5 +50,6 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
   return corsResponse({ ready: Boolean(status.ready),
     ...(progress ? { progress: { ...progress, scanning: Boolean(progress.scanning) } } : {}),
     ...(!status.ready && status.error ? { error: status.error } : {}),
+    ...(sourceIssues.length ? { issues: sourceIssues.slice(0, 20), moreIssues: sourceIssues.length > 20 } : {}),
   });
 }

@@ -3,6 +3,7 @@ import { validRestoreState } from '../cloudflare/restore/state';
 import { normalizeVaultName } from '../cloudflare/vault-name';
 import { normalizeReadingSettings } from '../reading/settings';
 import { normalizeSyncTimings } from '../sync/timings';
+import { normalizeSyncIssues } from '../sync/issues';
 /**
  * Settings helpers for Crate.
  */
@@ -159,6 +160,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		merged: normalizeNonNegativeInteger(value.merged, 0),
 		deleted: normalizeNonNegativeInteger(value.deleted, 0),
 		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
+		...(Array.isArray(value.issues) ? { issues: normalizeSyncIssues(value.issues, MAX_SYNC_HISTORY_PATHS) } : {}),
 		...(Array.isArray(value.errors) ? {
 			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
 		} : {}),

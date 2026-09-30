@@ -10,6 +10,8 @@ import { handleNotificationPolicy } from './notification-policy';
 import { meterD1Writes } from './d1-write-meter-test-harness';
 import { SyncTestDevice } from './sync-engine-test-harness';
 import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
+import { handleListReminders } from './reminders-web/routes/list';
+import type { ReminderSetupStatus } from '../../protocol/initial-import';
 
 const clients: SyncTestDevice[] = [];
 const json = (body: unknown) => new Request('https://test', { method: 'POST', body: JSON.stringify(body) });
@@ -25,7 +27,7 @@ async function pendingImport() {
   await env.DB.prepare("INSERT INTO initial_import(id, token, state, snapshot_seq) VALUES (1, 'import', 'complete', 1)").run();
   await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(INITIAL_REMINDERS_PENDING, 'import').run();
 }
-const readiness = async (db = env.DB) => (await finishInitialReminderSetup(json({ token: 'import' }), db)).json() as Promise<{ ready: boolean; error?: string }>;
+const readiness = async (db = env.DB) => (await finishInitialReminderSetup(json({ token: 'import' }), db)).json() as Promise<ReminderSetupStatus>;
 const pass = () => runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, env);
 
 it('keeps readiness pending until every schedule is installed and writes nothing on pending probes', async () => {
@@ -54,10 +56,82 @@ it('reports a reminder failure without acknowledging setup or deleting uploaded 
     [note('2099-01-01T12:00:00.000Z', id), note('2099-01-01T12:00:00.000Z', id)].join('\n'), null);
   await pass();
   const status = await readiness();
-  expect(status.ready).toBe(false); expect(status.error).toMatch(/duplicate/i);
+  expect(status.ready).toBe(false); expect(status.error).toMatch(/^Reminders\/duplicate\.md: .*duplicate/i);
   expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(INITIAL_REMINDERS_PENDING).first()).not.toBeNull();
   expect(await env.DB.prepare("SELECT 1 FROM files WHERE portable_path = 'reminders/duplicate.md'").first()).not.toBeNull();
 });
+
+it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes initial sync with legacy description metadata: %s', async description => {
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  const device = new SyncTestDevice('legacy-description-import', env); clients.push(device);
+  await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
+  const path = 'Reminders/legacy.md';
+  const content = `${note('2099-01-01T12:00:00.000Z')}\n<!-- crate-desc:${description} -->\n`;
+  device.disk.write(path, content);
+  device.disk.write('note.md', 'ordinary note');
+  const syncing = device.engine.initialSync();
+  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+  const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+  await runDurableObjectAlarm(coordinator);
+  expect(await syncing).toMatchObject({ success: true, uploaded: 2, errors: [] });
+  expect(device.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
+  expect((await device.api.downloadFile(path)).content).toEqual(new TextEncoder().encode(content).buffer);
+  expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 1 });
+  const list = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
+  expect(list.status).toBe(200);
+  expect(await list.json()).toMatchObject({ reminders: [{ description }], issues: [] });
+}, 15_000);
+
+it('names the uploaded note when unsupported description metadata blocks setup', async () => {
+  await pendingImport();
+  const path = 'Reminders/unsupported.md';
+  const content = `${note('2099-01-01T12:00:00.000Z')}\n<!-- crate-desc:v2:unsupported -->\n`;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  await pass();
+  expect(await readiness()).toMatchObject({ ready: false, error: expect.stringContaining(`${path}: `) as string });
+  expect((await readiness()).error).toContain('Unsupported reminder description encoding');
+  expect((await readiness()).issues).toEqual([{ path, message: expect.stringContaining('Unsupported reminder description encoding on line 2') as string }]);
+  const uploaded = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
+  expect(await (await env.BUCKET.get(uploaded!.storage_key))!.text()).toBe(content);
+});
+
+it('returns a bounded, stable list of affected notes and signals additional failures', async () => {
+  await pendingImport();
+  const paths = Array.from({ length: 21 }, (_, index) => `Reminders/${String(index).padStart(2, '0')} café: task.md`);
+  for (const path of paths) {
+    await env.DB.prepare('INSERT INTO notification_file_retries(path, available_at, error) VALUES (?, 0, ?)')
+      .bind(path, 'Invalid reminder description encoding on line 2').run();
+  }
+  const status = await readiness();
+  expect(status.ready).toBe(false);
+  expect(status.issues?.map(issue => issue.path)).toEqual(paths.slice(0, 20));
+  expect(status.moreIssues).toBe(true);
+  expect(status.error).toContain(paths[0]);
+});
+
+it('carries a source failure into sync activity and clears it after the note is repaired', async () => {
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  const device = new SyncTestDevice('actionable-reminder-error', env); clients.push(device);
+  await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
+  const path = 'Reminders/broken.md';
+  const task = note('2099-01-01T12:00:00.000Z');
+  device.disk.write(path, `${task}\n<!-- crate-desc:v2:unsupported -->\n`);
+  const syncing = device.engine.initialSync();
+  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+  const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+  await runDurableObjectAlarm(coordinator);
+  const result = await syncing;
+  expect(result).toMatchObject({ success: false, uploaded: 1, issues: [{
+    path, scope: 'reminders', message: expect.stringContaining('on line 2') as string,
+  }] });
+  expect(device.engine.getState().lastIssues).toEqual(result.issues);
+  device.disk.write(path, `${task}\n<!-- crate-desc:v1:repaired -->\n`);
+  const retry = device.engine.sync();
+  await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+  await runDurableObjectAlarm(coordinator);
+  expect((await retry).success).toBe(true);
+  expect(device.engine.getState()).toMatchObject({ status: 'idle', lastError: null, lastIssues: undefined });
+}, 15_000);
 
 it('does not create catch-up schedules for reminders already overdue when indexed', async () => {
   await pendingImport();

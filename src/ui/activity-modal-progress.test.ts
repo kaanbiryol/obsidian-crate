@@ -110,15 +110,15 @@ it('shows the reachability warning without treating it as a failed sync', () => 
         sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
     });
     const internal = modal as unknown as {
-        errorNoticeEl: HTMLElement; errorTitleEl: HTMLElement; errorMessageEl: HTMLElement;
+        errorNoticeEl: HTMLElement; errorTitleEl: HTMLElement; errorIssuesEl: HTMLElement;
         updateSyncErrorNotice(): void;
     };
     internal.errorNoticeEl = new FakeElement('div') as unknown as HTMLElement;
     internal.errorTitleEl = new FakeElement('span') as unknown as HTMLElement;
-    internal.errorMessageEl = new FakeElement('span') as unknown as HTMLElement;
+    internal.errorIssuesEl = new FakeElement('span') as unknown as HTMLElement;
     internal.updateSyncErrorNotice();
     expect(internal.errorTitleEl.textContent).toBe('Server unavailable');
-    expect(internal.errorMessageEl.textContent).toContain('temporary tunnel address');
+    expect((internal.errorIssuesEl as unknown as FakeElement).collectText()).toContain('temporary tunnel address');
 });
 
 it('keeps the header stable while detailed sync phases change', () => {

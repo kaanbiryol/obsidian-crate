@@ -59,4 +59,32 @@ describe('markdownScan', () => {
 		expect(result.reminders).toHaveLength(1);
 		expect(result.reminders[0]?.description).toBe('line one\nline two --> safe');
 	});
+
+	it.each(['\n', '\r\n'])('reads legacy descriptions literally and ignores tasks inside their comment: %j', newline => {
+		const result = scanReminderMarkdownContent('Reminders/Work.md', [
+			'- [ ] First <!-- crate-id:r1 -->',
+			'<!-- crate-desc:100% complete %20 café 😀 -->',
+			'- [ ] Second <!-- crate-id:r2 -->',
+			'<!-- crate-desc:line one',
+			'- [ ] description example',
+			'line three -->',
+			'- [ ] Third <!-- crate-id:r3 -->',
+			'<!-- crate-desc:v1:current%20description -->',
+		].join(newline), 'Reminders');
+		expect(result.reminders.map(({ id, description }) => ({ id, description }))).toEqual([
+			{ id: 'r1', description: '100% complete %20 café 😀' },
+			{ id: 'r2', description: 'line one\n- [ ] description example\nline three' },
+			{ id: 'r3', description: 'current description' },
+		]);
+	});
+
+	it.each([
+		'<!-- crate-desc:v2:unsupported -->',
+		'<!-- crate-desc:v1:%invalid -->',
+		'<!-- crate-desc:v1:unfinished',
+		'<!-- crate-desc:unfinished',
+		'<!-- crate-desc:details --> trailing text',
+	])('does not turn unreadable metadata into an empty reminder list: %s', block => {
+		expect(() => scanReminderMarkdownContent('Reminders/Work.md', `- [ ] Task <!-- crate-id:r1 -->\n${block}`, 'Reminders')).toThrow();
+	});
 });

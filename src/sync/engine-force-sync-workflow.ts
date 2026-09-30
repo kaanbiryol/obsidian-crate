@@ -1,4 +1,5 @@
 import type { Vault } from 'obsidian';
+import { recordSyncError } from './issues';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import { assertLocalFileAbsent } from './local-absence';
 import {
@@ -126,7 +127,7 @@ export async function runForceFullSyncWorkflow(
 				result.deleted++;
 				result.deletedPaths.push(path);
 			} catch (error) {
-				result.errors.push(`delete ${path}: ${errorMessage(error)}`);
+				recordSyncError(result, errorMessage(error), path);
 			}
 			current++;
 			progressCallback?.(current, total);

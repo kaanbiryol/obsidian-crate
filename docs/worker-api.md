@@ -135,6 +135,17 @@ single-use pairing semantics. Other scopes and routes still enforce the app
 protocol. Legacy and versioned paths share the same action rate limits.
 See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
 
+### POST /sync/import/readiness
+
+Request: `{ token }`, using the completed initial-import token. Returns `{ ready }`,
+optional `{ progress: { scanning, remainingFiles, remainingSchedules } }`, and an
+`error` string when reminder setup needs attention. Source failures additionally
+return `issues: [{ path, message }]` (up to 20 notes) and `moreIssues`. These fields
+are additive; clients must accept older responses containing only `error`.
+Paths identify vault notes; malformed description messages include a one-based
+source line. Repairing a note and syncing again resumes setup without repeating
+completed file uploads. See [initial import readiness](protocol.md#initial-import-readiness).
+
 ### PUT /sync/upload
 
 - Query: `?path=<url-encoded-path>`

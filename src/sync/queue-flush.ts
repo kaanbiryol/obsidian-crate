@@ -1,6 +1,6 @@
 import { prepareUploadChunks } from './transfer-budget';
 import { createAbortError } from './abort';
-import { createLogger, errorMessage } from '../plugin/logger';
+import { createLogger } from '../plugin/logger';
 import { isAbortError } from './abort';
 import { isRetryableSyncError } from './engine-utils';
 import { deletePendingFiles } from './queue-delete';
@@ -10,6 +10,7 @@ import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure'
 import { HttpError } from './api';
 import { createEmptySyncResult } from './sync-result';
 import type { SyncResult } from './types';
+import { recordSyncError, syncErrorIssues, formatSyncIssue, withSyncFileContext } from './issues';
 
 export type { QueueFlushContext } from './queue-flush-types';
 
@@ -105,7 +106,7 @@ export async function processPendingChanges(
 		});
 		const chunks = prepareUploadChunks(paths.filter(path => !path.startsWith('delete:')), async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
-			return context.prepareUploadFromPath(path);
+			return withSyncFileContext(path, () => context.prepareUploadFromPath(path));
 		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		for await (const chunk of chunks) {
@@ -136,14 +137,16 @@ export async function processPendingChanges(
 		clearCompletedRevisions(context, completedQueueKeys, revisionSnapshot);
 		if (failures.length > 0) {
 			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
+			const issues = failures.map(failure => ({ path: failure.path, message: failure.error }));
 			context.updateState({
 				status: 'error',
 				lastError: errors.join('; '),
+				lastIssues: issues,
 				pendingChanges: context.pendingPaths.size,
 			});
 			await reportFlushResult(
 				context,
-				buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors),
+				{ ...buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors), issues },
 			);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 			return;
@@ -186,9 +189,18 @@ export async function processPendingChanges(
 			}
 			context.updateState({
 				status: 'error',
-				lastError: errorMessage(error),
+				lastError: syncErrorIssues(error).map(formatSyncIssue).join('; '),
+				lastIssues: syncErrorIssues(error),
 				pendingChanges: context.pendingPaths.size,
 			});
+			const failed = buildQueueSyncResult(
+				paths.filter(path => !path.startsWith('delete:')).map(path => ({ path })),
+				paths.filter(path => path.startsWith('delete:')).map(path => ({ path: path.substring(7) })),
+				completedQueueKeys,
+			);
+			recordSyncError(failed, error);
+			failed.success = false;
+			await reportFlushResult(context, failed);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 		}
 	} finally {

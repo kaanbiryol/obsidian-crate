@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import { BATCH_UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
@@ -120,11 +121,11 @@ export async function runIncrementalSync(
         context.reportWork?.('applying');
         const outcome = await context.processDiff(diff, localFiles, result);
         if (outcome.status === "deferred") {
-          result.errors.push(`${diff.path}: ${outcome.reason}`);
+          recordSyncError(result, `${outcome.reason}`, diff.path);
         }
       } catch (error) {
         if (isAbortError(error)) throw error;
-        result.errors.push(`${diff.path}: ${errorMessage(error)}`);
+        recordSyncError(result, `${errorMessage(error)}`, diff.path);
       }
     }
 
@@ -144,7 +145,7 @@ export async function runIncrementalSync(
         }
       } catch (error) {
         if (isAbortError(error)) throw error;
-        result.errors.push(`${file.path}: ${errorMessage(error)}`);
+        recordSyncError(result, `${errorMessage(error)}`, file.path);
       }
       current++;
       options.progressCallback?.(current, total);
@@ -195,7 +196,7 @@ export async function runIncrementalSync(
           (path) => !context.localManifest.getEntry(path)?.hash,
         );
         for (const path of missingExpectedPaths) {
-          result.errors.push(`${path}: Missing remote version for delete`);
+          recordSyncError(result, `Missing remote version for delete`, path);
         }
         const deleteResult = deleteFiles.length > 0
           ? await deleteFilesInBatches(context.api, deleteFiles, path => assertLocalFileAbsent(context.vault, path))
@@ -219,7 +220,7 @@ export async function runIncrementalSync(
           );
           const otherFailures = failures.filter((failure) => !versionConflicts.includes(failure));
           for (const failure of otherFailures) {
-            result.errors.push(`${failure.path}: ${failure.error}`);
+            recordSyncError(result, `${failure.error}`, failure.path);
           }
           if (versionConflicts.length > 0) {
             if (context.reconcileVersionConflicts) {
@@ -229,7 +230,7 @@ export async function runIncrementalSync(
               );
             } else {
               for (const failure of versionConflicts) {
-                result.errors.push(`${failure.path}: ${failure.error}`);
+                recordSyncError(result, `${failure.error}`, failure.path);
               }
             }
           }
@@ -237,7 +238,7 @@ export async function runIncrementalSync(
       } catch (error) {
         const errMsg = errorMessage(error);
         for (const path of localOnlyDeletes) {
-          result.errors.push(`${path}: ${errMsg}`);
+          recordSyncError(result, `${errMsg}`, path);
         }
       }
 

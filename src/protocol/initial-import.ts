@@ -16,3 +16,11 @@ export interface ReminderSetupProgress {
   remainingFiles: number;
   remainingSchedules: number;
 }
+
+export interface ReminderSetupStatus {
+  ready: boolean;
+  error?: string;
+  progress?: ReminderSetupProgress;
+  issues?: Array<{ path: string; message: string }>;
+  moreIssues?: boolean;
+}

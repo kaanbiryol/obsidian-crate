@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import { errorMessage } from '../plugin/logger';
 import type { FileEntry } from '../protocol/sync-types';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
@@ -23,10 +24,10 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 		try {
 			const prepared = await context.prepareFullSyncUpload(diff);
 			if (prepared) return prepared;
-			result.errors.push(`${diff.path}: Local file changed or disappeared while preparing the upload`);
+			recordSyncError(result, `Local file changed or disappeared while preparing the upload`, diff.path);
 		} catch (error) {
 			if (context.isAbortError(error)) throw error;
-			result.errors.push(`${diff.path}: ${errorMessage(error)}`);
+			recordSyncError(result, `${errorMessage(error)}`, diff.path);
 		}
 		processed++;
 		onCompleted();

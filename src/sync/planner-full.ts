@@ -1,4 +1,5 @@
 import { computeHash } from "./hasher";
+import { withSyncFileContext } from './issues';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "./file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
@@ -19,7 +20,7 @@ export async function createFullSyncPlan(
   const eligible = files.filter((file) => file.size <= MAX_FILE_SIZE_BYTES);
 
   const hashTasks = eligible
-    .map((file) => async () => {
+    .map((file) => () => withSyncFileContext(file.path, async () => {
       context.throwIfDestroyed?.();
       const content = await context.vault.adapter.readBinary(file.path);
       context.throwIfDestroyed?.();
@@ -27,7 +28,7 @@ export async function createFullSyncPlan(
       context.throwIfDestroyed?.();
       context.plannedContent?.remember(file.path, content, hash);
       return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
-    });
+    }));
   const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);
   context.throwIfDestroyed?.();
   for (const entry of hashed) {
@@ -55,7 +56,8 @@ export async function createFullSyncPlan(
     if (local.hash === remoteEntry?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteEntry.revision });
   }
 
-  const errors: string[] = [...largeLocalPaths].map(path => `${path}: Skipped local file larger than 25MB`);
+  const issues = [...largeLocalPaths].map(path => ({ path, message: 'Skipped local file larger than 25MB' }));
+  const errors: string[] = issues.map(issue => `${issue.path}: ${issue.message}`);
   for (const [path, diff] of [...diffMap.entries()]) {
     const remoteEntry = getPathEntry(remoteFiles, path);
     if (context.shouldIgnore(path)) {
@@ -68,6 +70,7 @@ export async function createFullSyncPlan(
     }
     if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
       errors.push(`${path}: Skipped remote file larger than 25MB`);
+      issues.push({ path, message: 'Skipped remote file larger than 25MB' });
       diffMap.delete(path);
       continue;
     }
@@ -86,5 +89,6 @@ export async function createFullSyncPlan(
       diff.action === "conflict" || diff.action === "delete" || diff.action === "delete-local"
     ),
     errors,
+    ...(issues.length ? { issues } : {}),
   };
 }

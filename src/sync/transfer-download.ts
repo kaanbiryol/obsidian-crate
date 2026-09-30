@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import { isAbortError } from "./abort";
 import { base64ToArrayBuffer } from "./encoding";
 import { computeHash } from "./hasher";
@@ -117,7 +118,7 @@ export async function parallelDownloadAndSaveFiles(
             if (!downloadRequest) throw new Error("Unexpected path in batch response");
             seenPaths.add(file.path);
             if (file.error) {
-              result.errors.push(`${file.path}: ${file.error}`);
+              recordSyncError(result, `${file.error}`, file.path);
               continue;
             }
 
@@ -136,7 +137,7 @@ export async function parallelDownloadAndSaveFiles(
               downloadRequest.expectedLocalHash,
             );
             if (outcome.status === "deferred") {
-              result.errors.push(`${file.path}: ${outcome.reason}`);
+              recordSyncError(result, `${outcome.reason}`, file.path);
               continue;
             }
             await recordAppliedContent(context, file.path, content, file.revision);
@@ -144,14 +145,14 @@ export async function parallelDownloadAndSaveFiles(
             result.downloadedPaths.push(file.path);
           } catch (error) {
             const downloadError = error instanceof Error ? error.message : "Download failed";
-            result.errors.push(`${file.path}: ${downloadError}`);
+            recordSyncError(result, `${downloadError}`, file.path);
           } finally {
             onProcessed?.();
           }
         }
         for (const request of chunk) {
           if (!seenPaths.has(request.path)) {
-            result.errors.push(`${request.path}: Missing from batch download response`);
+            recordSyncError(result, `Missing from batch download response`, request.path);
           }
         }
       } catch (error) {
@@ -181,11 +182,11 @@ async function downloadFilesIndividually(
     try {
       const outcome = await downloadAndSaveFile(context, request, result);
       if (outcome.status === "deferred") {
-        result.errors.push(`${request.path}: ${outcome.reason}`);
+        recordSyncError(result, `${outcome.reason}`, request.path);
       }
     } catch (error) {
       const downloadError = error instanceof Error ? error.message : "Download failed";
-      result.errors.push(`${request.path}: ${downloadError}`);
+      recordSyncError(result, `${downloadError}`, request.path);
     } finally {
       onProcessed?.();
     }

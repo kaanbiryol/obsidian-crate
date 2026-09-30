@@ -1,3 +1,4 @@
+import { withSyncFileContext } from './issues';
 import type { DataAdapter, Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -62,7 +63,7 @@ export class LocalContentVerifier {
 				bytes += file.size;
 				const entry = manifest.getEntry(file.path);
 				if (!entry || Date.parse(entry.modified) !== file.mtime || entry.size !== file.size) continue;
-				const content = await vault.adapter.readBinary(file.path);
+				const content = await withSyncFileContext(file.path, () => vault.adapter.readBinary(file.path));
 				const hash = await computeHash(content);
 				signal.throwIfAborted();
 				if (manifest.getEntry(file.path) !== entry) continue;

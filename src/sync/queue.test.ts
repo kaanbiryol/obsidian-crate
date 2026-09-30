@@ -166,6 +166,24 @@ function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
 	};
 }
 
+it('records the affected file and preserves earlier uploads if queue preparation fails', async () => {
+  const h = createFlushHarness({
+    prepareUploadFromPath: async path => {
+      if (path === 'broken.md') throw new Error('EACCES');
+      return { path, hash: 'a'.repeat(64), content: new ArrayBuffer(1), size: 1, contentType: 'text/plain' };
+    },
+    uploadFile: async ({ path, hash }) => ({ success: true, path, hash }),
+  });
+  for (let index = 0; index < 128; index++) h.pendingPaths.add(`sent-${index}.md`);
+  h.pendingPaths.add('broken.md');
+  await processPendingChanges(h.context, 1);
+  expect(h.state.lastIssues).toEqual([{ path: 'broken.md', message: 'EACCES' }]);
+  expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+    success: false, uploaded: 128, issues: [{ path: 'broken.md', message: 'EACCES' }], errors: ['broken.md: EACCES'],
+  }));
+  expect(h.pendingPaths.has('broken.md')).toBe(true);
+});
+
 function createNamedAbortError(message = 'Sync request aborted'): Error {
 	const error = new Error(message);
 	error.name = 'AbortError';

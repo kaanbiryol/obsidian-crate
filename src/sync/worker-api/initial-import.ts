@@ -1,4 +1,5 @@
-import { INITIAL_IMPORT_CAPABILITY, type InitialImport, type ReminderSetupProgress } from '@/protocol/initial-import';
+import { INITIAL_IMPORT_CAPABILITY, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
+import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import { arrayBufferToBase64 } from '../encoding';
@@ -60,7 +61,7 @@ export class InitialImportApi {
     while (Date.now() < deadline) {
       throwIfDestroyed();
       if (this.http.getWorkerUrl() !== workerUrl) throw new Error('Sync connection changed during reminder setup');
-      const status = await this.http.requestJson<{ ready: boolean; error?: string; progress?: ReminderSetupProgress }>('/sync/import/readiness', {
+      const status = await this.http.requestJson<ReminderSetupStatus>('/sync/import/readiness', {
         method: 'POST', body: JSON.stringify({ token }),
       });
       throwIfDestroyed();
@@ -76,7 +77,12 @@ export class InitialImportApi {
         && Number.isSafeInteger(status.progress.remainingSchedules) && status.progress.remainingSchedules >= 0) {
         onProgress?.(status.progress);
       }
-      if (status.error) throw new Error(`Files uploaded. Reminder setup needs attention: ${status.error}`);
+      if (status.error) {
+        const summary = `Files uploaded. Reminder setup needs attention: ${status.error}`;
+        const issues = normalizeSyncIssues(status.issues, 20).map(issue => ({ ...issue, scope: 'reminders' as const }));
+        if (status.moreIssues === true) issues.push({ scope: 'reminders', message: 'More reminder notes need attention. Repair the listed notes, then sync again to review the remaining files.' });
+        throw new SyncIssueError(summary, issues.length ? issues : [{ message: summary, scope: 'reminders' }]);
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     throw new Error('Files uploaded. Reminder setup is still running; sync again to check completion.');

@@ -152,6 +152,8 @@
 .crate-sync-error-notice {
 	display: flex;
 	align-items: flex-start;
+	max-height: min(45vh, 420px);
+	overflow-y: auto;
 	gap: 10px;
 	margin: 8px var(--crate-activity-space-inline) 16px;
 	padding: 14px 16px;
@@ -176,6 +178,7 @@
 .crate-sync-error-copy {
 	display: flex;
 	min-width: 0;
+	width: 100%;
 	flex-direction: column;
 	gap: 6px;
 }
@@ -193,6 +196,29 @@
 	overflow-wrap: anywhere;
 	user-select: text;
 }
+
+.crate-sync-issues {
+	display: grid;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+.crate-sync-issue { min-width: 0; }
+.crate-sync-issue + .crate-sync-issue { border-top: 1px solid var(--background-modifier-border); padding-top: 12px; }
+.crate-sync-issue-path { display: block; color: var(--text-normal); margin-bottom: 4px; }
+.crate-sync-issue-summary { color: var(--text-normal); }
+.crate-sync-issue-recovery { color: var(--text-muted); margin-top: 4px; }
+.crate-sync-issue-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.crate-sync-issue-actions button { min-height: 44px; white-space: normal; }
+.crate-sync-issue-details, .crate-sync-issues-more { margin-top: 8px; color: var(--text-muted); }
+.crate-sync-issue-details summary, .crate-sync-issues-more > summary { cursor: pointer; min-height: 32px; }
+.crate-sync-issue-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--font-ui-smaller); margin: 4px 0; }
+.crate-sync-issue-feedback { color: var(--text-muted); }
 
 /* Underline tabs */
 .crate-activity-tab-bar {

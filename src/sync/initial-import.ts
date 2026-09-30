@@ -1,3 +1,4 @@
+import { recordSyncError, SyncIssueError, withSyncFileContext } from './issues';
 import { importInventoryHash, INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from './api';
@@ -69,7 +70,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
       }
       if (batch.length) batches.push(batch);
       batches.push(...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]));
-      await transfer.runConcurrent(batches.map(batch => async () => {
+      await transfer.runConcurrent(batches.map(batch => () => withSyncFileContext(batch.map(file => file.path), async () => {
         context.throwIfDestroyed();
         if (result.errors.length) return;
         context.report({ phase: 'uploading', current: completed, total: local.length });
@@ -77,8 +78,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
         if (response.results.length !== batch.length || new Set(response.results.map(file => file.path)).size !== batch.length) throw new Error('Invalid initial upload results');
         for (const upload of batch) {
           const receipt = response.results.find(file => file.path === upload.path);
-          if (!receipt?.success) { result.errors.push(`${upload.path}: ${receipt?.error ?? 'Upload interrupted'}`); continue; }
-          if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new Error('Invalid initial upload metadata');
+          if (!receipt?.success) { recordSyncError(result, `${receipt?.error ?? 'Upload interrupted'}`, upload.path); continue; }
+          if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata' }]);
           const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: UNVERIFIED_MODIFIED };
           transfer.localManifest.setEntry(upload.path, entry);
           inventory[upload.path] = entry;
@@ -87,7 +88,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
           result.uploadedPaths.push(upload.path);
           completed++;
         }
-      }), 3);
+      })), 3);
       if (result.errors.length) return result;
       await context.save();
       progress?.(completed, local.length);

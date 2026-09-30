@@ -2,7 +2,7 @@ import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkb
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
-import { decodeDescriptionFromMarkdown } from "./markdownReminderFile";
+import { readDescriptionBlock } from "./markdownReminderFile";
 import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
 import { extractReminderId } from './reminderIdentity';
 import { markdownTaskContexts } from './markdownTaskContext';
@@ -67,13 +67,7 @@ export function scanReminderMarkdownContent(
     }
 
     const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
-    let description: string | undefined;
-    const nextIndex = lineNumber + 1;
-    const nextLine = lines[nextIndex];
-    if (nextLine?.startsWith("<!-- crate-desc:")) {
-      if (!nextLine.endsWith(' -->')) throw new Error('Invalid reminder description block');
-      description = decodeDescriptionFromMarkdown(nextLine.slice('<!-- crate-desc:'.length, -4)) || undefined;
-    }
+    const { description } = readDescriptionBlock(lines, lineNumber);
 
     reminders.push({
       id: parsed.reminderId,

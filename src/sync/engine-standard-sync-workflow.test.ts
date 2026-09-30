@@ -101,6 +101,7 @@ describe('runSyncWorkflow', () => {
 		expect(spies.updateState).toHaveBeenLastCalledWith({
 			status: 'error',
 			lastError: 'notes/a.md: quota exceeded',
+			lastIssues: [{ path: 'notes/a.md', message: 'quota exceeded' }],
 		});
 	});
 

@@ -1,4 +1,5 @@
 import { Notice } from 'obsidian';
+import { getSyncIssues, recordSyncError } from './issues';
 import { errorMessage, type Logger } from '../plugin/logger';
 import type { DownloadDiff, FileDiff, SyncResult, SyncState, UploadDiff } from './types';
 import type { FileEntry } from '../protocol/sync-types';
@@ -18,6 +19,7 @@ export interface RemoteManifest {
 }
 
 export interface FullSyncPlan {
+	issues?: import('./types').SyncIssue[];
 	localFiles: Record<string, FileEntry>;
 	diffs: FileDiff[];
 	uploadDiffs: UploadDiff[];
@@ -68,6 +70,7 @@ export function completeWorkflowResult(
 	context.updateState({
 		status: 'error',
 		lastError: getSyncResultError(result, options.errorFallback),
+		lastIssues: getSyncIssues(result),
 	});
 }
 
@@ -101,9 +104,9 @@ export function handleWorkflowError(
 	}
 
 	const errMsg = errorMessage(error);
-	result.errors.push(errMsg);
+	recordSyncError(result, error);
 	if (options.logGenericError) {
 		options.logger.error(`${options.failureLogPrefix}:`, errMsg);
 	}
-	context.updateState({ status: 'error', lastError: errMsg });
+	context.updateState({ status: 'error', lastError: getSyncResultError(result, errMsg), lastIssues: getSyncIssues(result) });
 }

@@ -1,3 +1,4 @@
+import { recordSyncError } from './issues';
 import type { Vault } from 'obsidian';
 import { HttpError } from './api';
 import { readLocalFileEntry } from './local-file-entry';
@@ -100,13 +101,13 @@ export async function reconcileQueuePaths(
 					await refreshRemoteEntry(context, remoteEntries, path);
 					continue;
 				}
-				result.errors.push(`${path}: ${errorMessage(error)}`);
+				recordSyncError(result, `${errorMessage(error)}`, path);
 				break;
 			}
 		}
 
 		if (!settled && !deletionDeferred && !result.errors.some((error) => error.startsWith(`${path}:`))) {
-			result.errors.push(`${path}: Reconciliation did not converge`);
+			recordSyncError(result, `Reconciliation did not converge`, path);
 		}
 	}
 
