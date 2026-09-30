@@ -37,7 +37,7 @@ async function fixture(t, controls = {}) {
 		'package.json': JSON.stringify({ name: 'release-fixture', version: '0.4.1' }),
 		'package-lock.json': JSON.stringify({ name: 'release-fixture', version: '0.4.1', lockfileVersion: 3, packages: { '': { name: 'release-fixture', version: '0.4.1' } } }),
 		'manifest.json': JSON.stringify({ version: '0.4.1', minAppVersion: '1.13.0', id: 'crate' }),
-		'versions.json': JSON.stringify({ '0.4.1': '1.13.0' }), '.gitignore': 'dist/\n', 'unrelated.txt': 'committed source',
+		'versions.json': JSON.stringify({ '0.4.1': '1.13.0' }), '.gitignore': 'dist/\nnode_modules/\n', 'unrelated.txt': 'committed source',
 		'docs/shortcuts/save-to-crate.plist': 'template', 'src/reading/shortcut-contract.json': '{}',
 		'scripts/reading-shortcut-template.mjs': '', 'scripts/reading-shortcut-first-run.mjs': '', 'scripts/sign-reading-shortcut.mjs': '',
 	};
