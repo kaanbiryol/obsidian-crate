@@ -119,26 +119,40 @@ export function registerPluginNavigationTests() {
       test(`plugin dock highlight takes one continuous path at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.clock.install({ time: new Date('2026-09-26T12:00:00Z') });
         await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
         const workspace = page.locator('.plugin-workspace-navigation');
         const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
         await active.getByRole('button', { name: 'Projects', exact: true }).click();
         await expect.poll(() => active.locator('.pwa-dock__indicator').evaluate(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width)).toBeCloseTo(2, 2);
+        // Motion springs run on rAF. Advance their real frame loop explicitly so
+        // a busy CI runner cannot skip the entire movement between observations.
+        await page.clock.pauseAt(new Date('2026-09-26T12:01:00Z'));
+        const sampler = await workspace.evaluateHandle(root => {
+          const position = (indicator: Element) => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width;
+          return {
+            select: (label: string) => {
+              const before = position(root.querySelector('.plugin-workspace-panel[data-active="true"] .pwa-dock__indicator')!);
+              const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+              button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+              button.click();
+              return before;
+            },
+            sample: () => Array.from(root.querySelectorAll('.plugin-workspace-panel .pwa-dock__indicator')).map(position),
+          };
+        });
+        const advance = async (duration: number) => {
+          const positions: number[][] = [];
+          for (let time = 0; time < duration; time += 16) {
+            await page.clock.runFor(Math.min(16, duration - time));
+            positions.push(await sampler.evaluate(sampler => sampler.sample()));
+          }
+          return positions;
+        };
         // Include Reading's first mount, switches to remembered tabs, and local changes.
         for (const [label, index] of [['Reading', 3], ['Inbox', 0], ['Projects', 2], ['Reminders', 1], ['Reading', 3], ['Projects', 2], ['Reading', 3]] as const) {
-          const frames = await workspace.evaluate(async (root, label) => {
-            const position = (indicator: Element) => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width;
-            const before = position(root.querySelector('.plugin-workspace-panel[data-active="true"] .pwa-dock__indicator')!);
-            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
-            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
-            button.click();
-            const positions: number[][] = [], start = performance.now();
-            while (performance.now() - start < 480) {
-              await new Promise(requestAnimationFrame);
-              positions.push(Array.from(root.querySelectorAll('.plugin-workspace-panel .pwa-dock__indicator')).map(position));
-            }
-            return { before, positions };
-          }, label);
+          const before = await sampler.evaluate((sampler, label) => sampler.select(label), label);
+          const frames = { before, positions: await advance(480) };
           expect(frames.positions.length).toBeGreaterThan(1);
           expect(frames.positions.every(pair => pair.length === 2 && Math.abs(pair[0]! - pair[1]!) < .03), `${label} must share one painted highlight: ${JSON.stringify(frames.positions)}`).toBe(true);
           const low = Math.min(frames.before, index), high = Math.max(frames.before, index);
@@ -146,20 +160,14 @@ export function registerPluginNavigationTests() {
           expect(frames.positions.some(pair => pair.every(position => position > low + .05 && position < high - .05)), `${label} must visibly slide`).toBe(true);
           await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll((indicators, index) => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width - index) < .005), index)).toBe(true);
         }
-        const reversed = await workspace.evaluate(async root => {
-          const positions: number[][] = [];
-          const sample = () => positions.push(Array.from(root.querySelectorAll('.plugin-workspace-panel .pwa-dock__indicator')).map(indicator => new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width));
-          for (const label of ['Inbox', 'Projects', 'Reminders', 'Reading', 'Inbox']) {
-            const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
-            button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
-            button.click();
-            const start = performance.now();
-            do { await new Promise(requestAnimationFrame); sample(); } while (performance.now() - start < 45);
-          }
-          const start = performance.now();
-          while (performance.now() - start < 480) { await new Promise(requestAnimationFrame); sample(); }
-          return positions;
-        });
+        const reversed: number[][] = [];
+        for (const label of ['Inbox', 'Projects', 'Reminders', 'Reading', 'Inbox']) {
+          await sampler.evaluate((sampler, label) => sampler.select(label), label);
+          reversed.push(...await advance(45));
+        }
+        reversed.push(...await advance(480));
+        await sampler.dispose();
+        await page.clock.resume();
         expect(reversed.every(pair => Math.abs(pair[0]! - pair[1]!) < .03), `Reversals must share one painted highlight: ${JSON.stringify(reversed)}`).toBe(true);
         await expect.poll(() => workspace.locator('.pwa-dock__indicator').evaluateAll(indicators => indicators.every(indicator => Math.abs(new DOMMatrixReadOnly(getComputedStyle(indicator).transform).m41 / indicator.getBoundingClientRect().width) < .005))).toBe(true);
         await page.emulateMedia({ reducedMotion: 'reduce' });

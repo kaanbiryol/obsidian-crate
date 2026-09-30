@@ -15,12 +15,26 @@ const reminders = [
 	{ id: 'completed', content: 'Finished task', dueDate: '2026-09-27', completed: true },
 ].map(reminder => ({ revision: 'fixture', description: '', priority: 4, completed: false, project: 'Work', filePath: 'Reminders/Work.md', ...reminder }));
 
+// Freeze calendar calculations without replacing performance, rAF, or timers.
+// Playwright's clock also virtualizes those APIs, which can drive JS frames out
+// of sync with native CSS transitions under load.
+async function fixCalendarDate(page) {
+	await page.addInitScript(time => {
+		const NativeDate = Date;
+		globalThis.Date = new Proxy(NativeDate, {
+			construct: (target, args, newTarget) => Reflect.construct(target, args.length ? args : [time], newTarget),
+			apply: () => new NativeDate(time).toString(),
+			get: (target, property) => property === 'now' ? () => time : Reflect.get(target, property),
+		});
+	}, Date.parse('2026-09-26T12:00:00Z'));
+}
+
 async function checkTodayStartup(browser, reducedMotion) {
 	const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
 		timezoneId: 'UTC', serviceWorkers: 'block', reducedMotion });
 	let response = Promise.withResolvers();
 	const list = Array.from({ length: 21 }, (_, index) => ({ ...reminders[0], id: `overdue-${index}`, dueDate: '2026-09-25' }));
-	await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+	await fixCalendarDate(page);
 	await page.route('**/reminders/list?*', async route => {
 		await response.promise;
 		await route.fulfill({ json: { reminders: list, projects: ['Work'], issues: [] } });
@@ -149,16 +163,19 @@ async function checkRapidSwitches(page, dock = false) {
 			? ['projects', 'inbox', 'today', 'inbox', 'projects', 'today']
 			: ['today', 'upcoming', 'today', 'upcoming', 'today', 'upcoming'];
 		const sample = () => {
-			// Use the compositor's timeline, not the wall time after style reads.
-			// Freeze only while reading so all layers describe the same instant,
-			// then preserve their start times and normal native reversal behavior.
-			const time = document.timeline.currentTime;
-			const running = [...container.children].flatMap(panel => panel.getAnimations())
-				.filter(animation => animation.playState === 'running' && animation.startTime !== null)
-				.map(animation => ({ animation, startTime: animation.startTime, playbackRate: animation.playbackRate }));
-			for (const { animation, startTime, playbackRate } of running) {
-				animation.pause(); animation.currentTime = (time - startTime) * playbackRate;
-			}
+			// Reading geometry for a long scrolled list can take several frames.
+			// Keep the full sampling interval; a timestamp taken only afterwards
+			// understates how much native animation time elapsed between reads.
+			const started = performance.now();
+			const animations = [...container.children].flatMap(panel => panel.getAnimations());
+			const motionRate = animations.reduce((rate, animation) => {
+				if (animation.transitionProperty !== 'opacity') return rate;
+				const keys = animation.effect.getKeyframes(), duration = Number(animation.effect.getTiming().duration);
+				const distance = Math.abs(Number(keys.at(-1).opacity) - Number(keys[0].opacity));
+				// Native CSS reversals shorten both the span and duration. Ease-out's
+				// maximum slope is below 2; composite weights can include every layer.
+				return rate + (duration > 0 ? 2 * distance / duration : 0);
+			}, 0);
 			const panels = [...container.children].sort((a, b) => Number(getComputedStyle(b).zIndex) - Number(getComputedStyle(a).zIndex));
 			let uncovered = 1;
 			const weights = {}, cards = {};
@@ -171,10 +188,7 @@ async function checkRapidSwitches(page, dock = false) {
 					if (rect.top >= 0 && rect.bottom <= innerHeight) cards[`${panel.dataset.tabView}:${row.dataset.reminderId}`] = [rect.y, rect.height];
 				}
 			}
-			for (const { animation, startTime } of running) {
-				animation.play(); animation.startTime = startTime;
-			}
-			return { time, performanceTime: performance.now(), weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
+			return { started, time: performance.now(), connected: container.isConnected, active: container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView, motionRate, weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
 		};
 		const frames = [sample()], start = performance.now();
 		let step = 0, lastSwitch = start;
@@ -183,7 +197,11 @@ async function checkRapidSwitches(page, dock = false) {
 				const view = sequence[step++];
 				const button = dock ? shell.querySelector(`.pwa-dock [data-tab="${view}"]`)
 					: [...shell.querySelectorAll('.pwa-schedule-chip')].find(button => button.textContent.toLowerCase() === view);
+				const before = sample();
+				frames.push(before);
 				button.click();
+				await Promise.resolve();
+				frames.push(sample());
 				lastSwitch = performance.now();
 			}
 			await new Promise(requestAnimationFrame);
@@ -194,16 +212,19 @@ async function checkRapidSwitches(page, dock = false) {
 	const geometry = new Map();
 	for (let index = 0; index < frames.length; index++) {
 		const frame = frames[index], previous = frames[index - 1];
-		assert.equal(frame.uncovered, 0, 'Rapid switching must never expose the background');
+		assert.equal(frame.uncovered, 0, `Rapid switching must never expose the background: ${JSON.stringify(frame)}`);
 		if (reducedMotion) assert.ok(Object.values(frame.weights).every(weight => weight === 0 || weight === 1), 'Reduced motion switches without intermediate fades');
 		if (previous) {
 			assert.deepEqual(frame.order.filter(view => previous.order.includes(view)), previous.order.filter(view => frame.order.includes(view)), 'Retained screens must not swap paint order on reversal');
 		}
 		if (previous && !reducedMotion) for (const view of new Set([...Object.keys(frame.weights), ...Object.keys(previous.weights)])) {
 			const change = Math.abs((frame.weights[view] ?? 0) - (previous.weights[view] ?? 0));
-			// Allow one compositor frame of sampling skew. A third dock screen
-			// can also contribute two overlapping fades at once.
-			assert.ok(change <= .04 + (frame.time - previous.time + 17) / (dock ? 40 : 80),
+			// Bound travel by the actual native transitions, including shortened
+			// reversals. Include measurement work and one compositor frame of skew.
+			// Without a native transition, a switch still permits no visible jump.
+			const rate = Math.max(previous.motionRate, frame.motionRate);
+			const elapsed = frame.time - previous.started + 17;
+			assert.ok(change <= .04 + elapsed * rate,
 				`${view} flashed by ${change.toFixed(3)} in ${(frame.time - previous.time).toFixed(1)}ms: ${JSON.stringify({ previous, frame })}`);
 		}
 		for (const [id, rect] of Object.entries(frame.cards)) {
@@ -228,7 +249,7 @@ try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, timezoneId: 'UTC', serviceWorkers: 'block' });
 			const errors = [];
 			page.on('pageerror', error => errors.push(error.message));
-			await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+			await fixCalendarDate(page);
 			let empty = false, list = reminders;
 			await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders: empty ? [] : list, projects: ['Work'], issues: [] } }));
 			const live = page.locator('.pwa-reminders-view:not([data-pwa-opening])');

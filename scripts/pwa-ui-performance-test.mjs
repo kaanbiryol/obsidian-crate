@@ -170,6 +170,9 @@ for (const browserType of [chromium, webkit]) {
 		await page.evaluate(() => { window.keyboardViewportHeight = 500; });
 		await page.getByRole('textbox', { name: 'Keyboard input' }).focus();
 		await expect(page.locator('#inset')).toHaveText('344');
+		// Focus updates the inset synchronously, but a preceding viewport event
+		// may still own a native frame. Drain it before replacing the scheduler.
+		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 		const batching = await page.evaluate(() => {
 			const raf = window.requestAnimationFrame;
 			const cancel = window.cancelAnimationFrame;

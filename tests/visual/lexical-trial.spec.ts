@@ -173,8 +173,15 @@ for (const browserName of ['chromium', 'webkit'] as const) {
             element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
           });
           await requested;
+          await expect(output).toHaveText('[https://example.com](https://example.com)');
+          // Synthetic paste has no native input boundary. Let its selection and
+          // decoration settle before sending the next native editing command.
+          await settleEditor(page);
           if (action === 'type') await page.keyboard.type(' more');
           else await editor.press('ControlOrMeta+z');
+          // This case is a late response: the user's edit must have committed
+          // before releasing it, otherwise the test races both operations.
+          await expect(output).toHaveText(action === 'type' ? '[https://example.com](https://example.com) more' : '');
           const response = page.waitForResponse('**/__test/page-title');
           release();
           await (await response).finished();
