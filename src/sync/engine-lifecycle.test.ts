@@ -7,6 +7,8 @@ import {
 	spyOnPrepareUploadsFromVaultFiles,
 	toArrayBuffer,
 } from './engine-test-harness';
+import { createDeferred } from './runtime-test-harness';
+import { computeHash } from './hasher';
 
 describe('SyncEngine initialization', () => {
 	it('defers conflict recovery until the workspace layout is ready', async () => {
@@ -49,6 +51,62 @@ describe('SyncEngine initialization', () => {
 });
 
 describe('SyncEngine abort-on-destroy', () => {
+	it.each(['incremental', 'full'] as const)('preserves the baseline when %s hashing finishes after cancellation', async mode => {
+		const harness = createHarness({ automaticSync: false, lastSeq: 42 });
+		const content = toArrayBuffer('unchanged');
+		const baseline = { hash: await computeHash(content), size: content.byteLength, modified: new Date(1000).toISOString() };
+		harness.localManifest.setEntry('note.md', baseline);
+		harness.localManifest.setEntry.mockClear();
+		harness.vault.getFiles.mockReturnValue([{ path: 'note.md', extension: 'md', stat: { size: content.byteLength, mtime: 2000 } }]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 43, hasMore: false });
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: { 'note.md': baseline } });
+		if (mode === 'full') spyOnIncrementalSync(harness.engine, null);
+		const read = createDeferred<ArrayBuffer>();
+		harness.vault.adapter.readBinary.mockReturnValue(read.promise);
+		const syncing = harness.engine.sync();
+		await vi.waitFor(() => expect(harness.vault.adapter.readBinary).toHaveBeenCalled());
+		harness.engine.destroy();
+		const stopped = harness.engine.waitForIdle();
+		read.resolve(content);
+		await syncing;
+		await stopped;
+
+		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).not.toHaveBeenCalled();
+		expect(harness.localManifest.getEntry('note.md')).toEqual(baseline);
+		expect(harness.api.batchUpload).not.toHaveBeenCalled();
+		expect(harness.settings.lastSeq).toBe(42);
+	});
+
+	it.each(['sync', 'initialSync', 'forceFullSync'] as const)('drains %s without continuing a cancelled vault scan or advancing the cursor', async operation => {
+		const harness = createHarness({ automaticSync: false, lastSeq: 42 });
+		const listed = createDeferred<void>();
+		const listing = createDeferred<{ files: string[]; folders: string[] }>();
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 43, hasMore: false });
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: {} });
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockImplementation(async path => {
+			if (path === '') { listed.resolve(); return listing.promise; }
+			return { files: [], folders: [] };
+		});
+		const syncing = harness.engine[operation]();
+		await listed.promise;
+		harness.engine.destroy();
+		const stopped = harness.engine.waitForIdle();
+		listing.resolve({ files: [], folders: ['.config', 'notes'] });
+		const result = await syncing;
+		await stopped;
+
+		expect(harness.vault.adapter.list).toHaveBeenCalledExactlyOnceWith('');
+		expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
+		expect(harness.api.batchUpload).not.toHaveBeenCalled();
+		expect(harness.api.batchDelete).not.toHaveBeenCalled();
+		expect(harness.settings.lastSeq).toBe(42);
+		expect(harness.settings.lastSync).toBeNull();
+		expect(result.errors).toEqual([]);
+	});
+
 	it('does not advance lastSeq when incremental sync is aborted', async () => {
 		const harness = createHarness({ lastSeq: 5 });
 		harness.api.getChanges.mockResolvedValue({

@@ -162,7 +162,8 @@ it('waits for a started progress write before replacing a destroyed engine', asy
  const checking = h.engine.hasUnsyncedLocalChanges();
  await vi.waitFor(() => expect(h.vault.adapter.write.mock.calls.some((args: unknown[]) => typeof args[0] === 'string' && args[0].endsWith('/content-verification.json'))).toBe(true));
  h.engine.destroy(); let settled = false;
+ const cancelled = expect(checking).rejects.toMatchObject({ name: 'AbortError' });
  const closing = h.engine.waitForIdle().then(() => { settled = true; });
  await Promise.resolve(); expect(settled).toBe(false);
- gate.resolve(); await checking; await closing; expect(settled).toBe(true);
+ gate.resolve(); await cancelled; await closing; expect(settled).toBe(true);
 });

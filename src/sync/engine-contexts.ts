@@ -76,6 +76,7 @@ export class SyncEngineContexts {
 	localDiffPlanner() {
 		const dependencies = this.dependencies;
 		return {
+			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
 			localManifest: dependencies.getLocalManifest(),
@@ -109,6 +110,7 @@ export class SyncEngineContexts {
 	fullSyncPlanner() {
 		const dependencies = this.dependencies;
 		return {
+			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
 			localManifest: dependencies.getLocalManifest(),

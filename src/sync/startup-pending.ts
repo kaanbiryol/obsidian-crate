@@ -13,7 +13,7 @@ export async function findStartupPendingPaths(context: {
 	throwIfDestroyed(): void;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }, concurrency: number): Promise<string[]> {
-	const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
+	const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 	const changes = await context.runConcurrent(files.map(file => async () => {
 		context.throwIfDestroyed();
 		const entry = getPathEntry(context.baseline, file.path);

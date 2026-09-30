@@ -63,11 +63,14 @@ export function tfileToVaultFile(file: TFile): VaultFile {
  *
  * @param shouldIgnore  Predicate used to skip ignored paths early (avoids
  *                      stat-ing thousands of files in e.g. `.git/`).
+ * @param assertActive  Cancellation check before and after each filesystem read.
  */
 export async function getAllVaultFiles(
 	vault: Vault,
 	shouldIgnore: (path: string) => boolean,
+	assertActive?: () => void,
 ): Promise<VaultFile[]> {
+	assertActive?.();
 	// Start with all indexed files
 	const indexedFiles = vault.getFiles();
 	const result: VaultFile[] = indexedFiles
@@ -78,7 +81,7 @@ export async function getAllVaultFiles(
 	const seen = new Set(result.map(f => f.path));
 
 	// Discover hidden files by walking dot-prefixed entries at root
-	const root = await safeList(vault, '');
+	const root = await safeList(vault, '', assertActive);
 
 	// Recurse into hidden folders
 	const hiddenFolders = root.folders.filter(f => {
@@ -88,7 +91,7 @@ export async function getAllVaultFiles(
 
 	for (const folder of hiddenFolders) {
 		if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
-		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result);
+		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result, assertActive);
 	}
 
 	// Discover hidden subfolders nested under non-hidden roots (e.g. notes/.config/)
@@ -98,7 +101,7 @@ export async function getAllVaultFiles(
 	});
 	for (const folder of visibleRootFolders) {
 		if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
-		await walkForNestedHiddenFolders(vault, folder, shouldIgnore, seen, result);
+		await walkForNestedHiddenFolders(vault, folder, shouldIgnore, seen, result, assertActive);
 	}
 
 	// Include hidden files at the root level (e.g. `.gitignore`)
@@ -107,7 +110,7 @@ export async function getAllVaultFiles(
 		if (!name.startsWith('.')) continue;
 		if (seen.has(filePath) || shouldIgnore(filePath)) continue;
 
-		const stat = await safeStat(vault, filePath);
+		const stat = await safeStat(vault, filePath, assertActive);
 		if (!stat || stat.type !== 'file') continue;
 
 		seen.add(filePath);
@@ -119,6 +122,7 @@ export async function getAllVaultFiles(
 		});
 	}
 
+	assertActive?.();
 	assertPortablePaths(result.map(file => file.path));
 	return result;
 }
@@ -132,6 +136,7 @@ async function walkHiddenFolder(
 	shouldIgnore: (path: string) => boolean,
 	seen: Set<string>,
 	result: VaultFile[],
+	assertActive?: () => void,
 ): Promise<void> {
 	const pendingFolders = [folderPath];
 	const visitedFolders = new Set<string>();
@@ -139,12 +144,12 @@ async function walkHiddenFolder(
 		const currentFolder = pendingFolders.pop();
 		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
 		visitedFolders.add(currentFolder);
-		const listing = await safeList(vault, currentFolder);
+		const listing = await safeList(vault, currentFolder, assertActive);
 
 		for (const filePath of listing.files) {
 			if (seen.has(filePath) || shouldIgnore(filePath)) continue;
 
-			const stat = await safeStat(vault, filePath);
+			const stat = await safeStat(vault, filePath, assertActive);
 			if (!stat || stat.type !== 'file') continue;
 
 			seen.add(filePath);
@@ -172,6 +177,7 @@ async function walkForNestedHiddenFolders(
 	shouldIgnore: (path: string) => boolean,
 	seen: Set<string>,
 	result: VaultFile[],
+	assertActive?: () => void,
 ): Promise<void> {
 	const pendingFolders = [folderPath];
 	const visitedFolders = new Set<string>();
@@ -179,13 +185,13 @@ async function walkForNestedHiddenFolders(
 		const currentFolder = pendingFolders.pop();
 		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
 		visitedFolders.add(currentFolder);
-		const listing = await safeList(vault, currentFolder);
+		const listing = await safeList(vault, currentFolder, assertActive);
 
 		for (const subfolder of listing.folders) {
 			if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
 			const name = subfolder.split('/').pop() ?? '';
 			if (name.startsWith('.')) {
-				await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
+				await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result, assertActive);
 			} else {
 				pendingFolders.push(subfolder);
 			}
@@ -193,18 +199,28 @@ async function walkForNestedHiddenFolders(
 	}
 }
 
-async function safeList(vault: Vault, folderPath: string): Promise<AdapterListing> {
+async function safeList(vault: Vault, folderPath: string, assertActive?: () => void): Promise<AdapterListing> {
+	assertActive?.();
+	let listing: AdapterListing;
 	try {
-		return await vault.adapter.list(folderPath);
+		listing = await vault.adapter.list(folderPath);
 	} catch (error) {
+		assertActive?.();
 		throw new Error(`Vault scan incomplete: cannot list ${folderPath || '/'}: ${errorMessage(error)}`);
 	}
+	assertActive?.();
+	return listing;
 }
 
-async function safeStat(vault: Vault, filePath: string): Promise<{ type: string; size: number; mtime: number } | null> {
+async function safeStat(vault: Vault, filePath: string, assertActive?: () => void): Promise<{ type: string; size: number; mtime: number } | null> {
+	assertActive?.();
+	let stat: { type: string; size: number; mtime: number } | null;
 	try {
-		return await vault.adapter.stat(filePath);
+		stat = await vault.adapter.stat(filePath);
 	} catch (error) {
+		assertActive?.();
 		throw new Error(`Vault scan incomplete: cannot stat ${filePath}: ${errorMessage(error)}`);
 	}
+	assertActive?.();
+	return stat;
 }

@@ -129,12 +129,7 @@ export class SyncEngine {
 			getSyncIntervalSeconds: () => this.settings.automaticSync ? this.settings.syncInterval : 0,
 			getLastSeq: () => this.settings.lastSeq,
 			getPendingPathCount: () => this.queueController.getPendingPathCount(),
-			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await hasLocalFileChanges(
-				this.vault,
-				this.localManifest,
-				this.shouldIgnore.bind(this),
-				files => this.verifyContent(files),
-			),
+			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
 			checkForChanges: async (lastSeq: number) => {
 				void this.retryReminderScope();
 				return this.api.checkForChanges(lastSeq);
@@ -400,12 +395,13 @@ export class SyncEngine {
 	}
 
 	async hasUnsyncedLocalChanges(): Promise<boolean> {
-		return hasLocalFileChanges(
+		return this.trackWork(() => hasLocalFileChanges(
 			this.vault,
 			this.localManifest,
 			this.shouldIgnore.bind(this),
 			files => this.verifyContent(files),
-		);
+			() => this.lifecycle.throwIfDestroyed(),
+		));
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
@@ -518,6 +514,7 @@ export class SyncEngine {
 	}
 
 	private pruneMarkdownBaseCacheInBackground(): void {
+		if (this.lifecycle.isDestroyed) return;
 		void this.markdownBaseCache.pruneUnreferenced(this.localManifest).catch((error) => {
 			logger.warn('Markdown base cache prune failed:', errorMessage(error));
 		});
@@ -656,6 +653,7 @@ export class SyncEngine {
 	}
 
 	private async clearSyncedPendingPaths(result: SyncResult, revisions: ReadonlyMap<string, number>): Promise<void> {
+		if (this.lifecycle.isDestroyed) return;
 		this.queueController.clearSyncedPendingPaths(result, revisions);
 		if (!result.success) return;
 		// Applying remote bytes emits vault events too. Verify those events against
@@ -664,11 +662,13 @@ export class SyncEngine {
 		const snapshot = this.queueController.snapshotPendingRevisions();
 		const settled = createEmptySyncResult();
 		for (const key of this.queueController.getPendingPaths()) {
+			if (this.lifecycle.isDestroyed) return;
 			const path = key.startsWith('delete:') ? key.substring(7) : key;
 			if (!applied.has(path)) continue;
 			const baseline = this.localManifest.getEntry(path);
 			try {
 				const local = await readLocalFileEntry(this.vault, path);
+				if (this.lifecycle.isDestroyed) return;
 				if (this.localManifest.getEntry(path) !== baseline) continue;
 				if (local?.hash === baseline?.hash) settled.settledPaths.push(key);
 			} catch {

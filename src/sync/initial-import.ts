@@ -31,7 +31,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
   }
   const transfer = context.transfer;
   context.report({ phase: 'scanning' });
-  const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path));
+  const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
   const remote = await context.api.getManifest();
   const localPaths = new Set(local.map(file => file.path));
   const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path));

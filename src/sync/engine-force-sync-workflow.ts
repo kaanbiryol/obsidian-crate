@@ -73,7 +73,7 @@ export async function runForceFullSyncWorkflow(
 		const remotePaths = new Set(Object.keys(remoteManifest.files));
 
 		context.updateState({ work: { phase: 'scanning' } });
-		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
+		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 		const localPaths = new Set(files.map(file => file.path));
 
 		const remoteOnlyPaths = [...remotePaths].filter(

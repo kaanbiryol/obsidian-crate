@@ -65,7 +65,7 @@ export async function runInitialSyncWorkflow(
       return imported;
     }
 		context.updateState({ work: { phase: 'scanning' } });
-		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
+		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 		logger.info(`Initial sync started with ${files.length} files`);
 		let uploadsProcessed = 0;
 		const total = files.length;

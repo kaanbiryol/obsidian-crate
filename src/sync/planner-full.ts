@@ -12,7 +12,7 @@ export async function createFullSyncPlan(
   prepareConcurrency: number,
 ): Promise<FullSyncPlan> {
   const localFiles = createPathRecord<FileEntry>();
-  const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
+  const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed?.());
   const largeLocalPaths = new Set(
     files.filter((file) => file.size > MAX_FILE_SIZE_BYTES).map((file) => file.path),
   );
@@ -20,12 +20,16 @@ export async function createFullSyncPlan(
 
   const hashTasks = eligible
     .map((file) => async () => {
+      context.throwIfDestroyed?.();
       const content = await context.vault.adapter.readBinary(file.path);
+      context.throwIfDestroyed?.();
       const hash = await computeHash(content);
+      context.throwIfDestroyed?.();
       context.plannedContent?.remember(file.path, content, hash);
       return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
     });
   const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);
+  context.throwIfDestroyed?.();
   for (const entry of hashed) {
     localFiles[entry.path] = {
       hash: entry.hash,

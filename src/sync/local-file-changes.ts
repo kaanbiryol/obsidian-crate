@@ -15,9 +15,11 @@ export async function hasLocalFileChanges(
 	manifest: LocalFileManifest,
 	shouldIgnore: (path: string) => boolean,
 	verifyContent?: (files: VaultFile[]) => Promise<boolean>,
+	assertActive?: () => void,
 ): Promise<boolean> {
-	const currentFiles = await getAllVaultFiles(vault, shouldIgnore);
+	const currentFiles = await getAllVaultFiles(vault, shouldIgnore, assertActive);
 	const contentChanged = await verifyContent?.(currentFiles);
+	assertActive?.();
 	if (contentChanged) return true;
 	const currentPaths = new Set(currentFiles.map((file) => file.path));
 
@@ -29,10 +31,14 @@ export async function hasLocalFileChanges(
 	}
 
 	for (const path of manifest.getAllPaths()) {
+		assertActive?.();
 		if (shouldIgnore(path) || currentPaths.has(path)) continue;
 		try {
-			if (!await vault.adapter.exists(path)) return true;
+			const exists = await vault.adapter.exists(path);
+			assertActive?.();
+			if (!exists) return true;
 		} catch {
+			assertActive?.();
 			// Treat an uncertain adapter result as unchanged until the next check.
 		}
 	}

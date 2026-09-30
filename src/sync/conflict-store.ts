@@ -5,6 +5,7 @@ import { createLogger, errorMessage } from '../plugin/logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
 import { getAllVaultFiles } from './file-discovery';
 import { computeHash } from './hasher';
+import { createAbortError } from './abort';
 
 const logger = createLogger('ConflictStore');
 const STORE_FILENAME = 'conflicts.json';
@@ -88,9 +89,11 @@ export class ConflictStore {
 			const files = await getAllVaultFiles(
 				this.app.vault,
 				(path) => this.isStorePath(path) || shouldIgnore(path),
+				() => { if (isCancelled()) throw createAbortError('Conflict discovery cancelled'); },
 			);
 			discoveredPaths = new Set(files.map((file) => file.path).filter(isConflictFile));
 		} catch (error) {
+			if (isCancelled()) return;
 			logger.warn('Failed to discover conflict copies:', errorMessage(error));
 			return;
 		}

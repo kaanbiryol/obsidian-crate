@@ -154,7 +154,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 
 async function scanLocal(context: Context): Promise<Files> {
     const files: Files = Object.create(null) as Files;
-    for (const file of await getAllVaultFiles(context.vault, path => context.shouldIgnore(path))) {
+    for (const file of await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.verify())) {
         context.verify();
         const entry = await readLocalFileEntry(context.vault, file.path);
         if (!entry) throw new Error(`${file.path} changed while checking the vault. Review again.`);

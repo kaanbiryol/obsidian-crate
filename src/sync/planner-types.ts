@@ -34,6 +34,7 @@ interface PlannerApi {
 }
 
 export interface LocalDiffPlannerContext {
+  throwIfDestroyed?(): void;
   pendingPaths?: ReadonlySet<string>;
   plannedContent?: PlannedContent;
   vault: Vault;
@@ -72,6 +73,7 @@ export interface IncrementalSyncPlannerContext {
 }
 
 export interface FullSyncPlannerContext {
+  throwIfDestroyed?(): void;
   plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;
