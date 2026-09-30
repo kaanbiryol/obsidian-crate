@@ -11,7 +11,7 @@ for (const path of paths) {
 	catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
 const artifacts = {};
-for (const path of ['dist/main.js', 'manifest.json', 'dist/styles.css', '.generated/cloudflare/worker.mjs', '.generated/cloudflare/pwa-client.json', 'src/cloudflare/schema.sql']) {
+for (const path of ['dist/main.js', 'manifest.json', 'dist/styles.css', 'THIRD_PARTY_NOTICES.md', '.generated/cloudflare/worker.mjs', '.generated/cloudflare/pwa-client.json', 'src/cloudflare/schema.sql']) {
 	const bytes = await readFile(path);
 	artifacts[path] = { sha256: digest(bytes), bytes: bytes.byteLength };
 }
@@ -25,6 +25,12 @@ const record = {
 	sourceSha256: digest(JSON.stringify(inputs)),
 	node: process.version,
 	npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(),
+	verification: process.env.GITHUB_ACTIONS === 'true' ? {
+		format: 1,
+		repository: process.env.GITHUB_REPOSITORY,
+		runId: Number(process.env.GITHUB_RUN_ID),
+		runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+	} : undefined,
 	artifacts,
 	inputs,
 	acceptance: { minimumObsidian: 'unverified', hostedLimits: 'unverified', hostedOAuth: 'unverified', hostedPush: 'unverified', independentAccountRestore: 'unverified', physicalIOS: 'unverified', physicalAndroid: 'unverified' },
