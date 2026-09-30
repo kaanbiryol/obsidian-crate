@@ -23,6 +23,8 @@ interface ImportContext {
 
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {
+  context.throwIfDestroyed();
+  context.report({ phase: 'server' });
   const session = await context.api.initialImport?.begin();
   if (!session) return null;
   if (session.state === 'complete') {

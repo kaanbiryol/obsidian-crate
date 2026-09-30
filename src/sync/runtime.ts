@@ -328,6 +328,8 @@ export class SyncRuntime {
 			this.stopSyncTask = null;
 			this.emitCurrentState();
 		});
+		this.emitCurrentState();
+		emitSyncProgress(this.progressListeners, 0, 0);
 		return this.stopSyncTask;
 	}
 
@@ -551,7 +553,6 @@ export class SyncRuntime {
 	}
 
 	private emitCurrentState(): void {
-		if (!this.syncEngine) return;
 		emitStateChange(this.stateChangeListeners, this.getState(), (nextState) => {
 			this.statusBar?.update(nextState);
 		});

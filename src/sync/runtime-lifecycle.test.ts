@@ -132,6 +132,31 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		runtime.destroy();
 	});
 
+	it('clears progress and tells listeners immediately while cancelled work is still draining', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		const drained = createDeferred<void>();
+		vi.spyOn(SyncEngine.prototype, 'waitForIdle').mockReturnValueOnce(drained.promise);
+		await runtime.initialize();
+		const syncing = runtime.sync();
+		expect(runtime.getActivityProgress()).not.toBeNull();
+		const stateChanged = vi.fn();
+		const progressChanged = vi.fn();
+		runtime.addStateChangeListener(stateChanged);
+		runtime.addProgressListener(progressChanged);
+		const stopping = runtime.stopSync();
+		try {
+			expect(runtime.getActivityProgress()).toBeNull();
+			expect(stateChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'idle' }));
+			expect(progressChanged).toHaveBeenCalledWith(0, 0);
+		} finally {
+			startupSyncs[0]!.resolve(createEmptySyncResult());
+			drained.resolve();
+			await syncing;
+			await stopping;
+			runtime.destroy();
+		}
+	});
+
 	it('does not restart after unloading while stop sync is saving settings', async () => {
 		const { runtime, persistSettings } = createRuntimeHarness({ automaticSync: false });
 		await runtime.initialize();
