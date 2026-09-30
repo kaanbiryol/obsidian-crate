@@ -53,7 +53,7 @@
 		"lint": "eslint .",
 		"deadcode": "knip && knip --production --include files,dependencies",
 		"test": "vitest run",
-		"test:ci": "node --test scripts/shortcut-release.test.mjs scripts/pwa-browser-tests.test.mjs scripts/pwa-asset-version.test.mjs scripts/pwa-preview-assets.test.mjs scripts/visual-preview.test.mjs scripts/visual-test-run.test.mjs",
+		"test:ci": "node --test scripts/release-verification.test.mjs scripts/prepare-release.test.mjs scripts/shortcut-release.test.mjs scripts/pwa-browser-tests.test.mjs scripts/pwa-asset-version.test.mjs scripts/pwa-preview-assets.test.mjs scripts/visual-preview.test.mjs scripts/visual-test-run.test.mjs",
 		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts",
 		"benchmark:reminders": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/reminder-capacity.integration.ts --reporter=verbose",
 		"benchmark:pwa": "node scripts/pwa-capacity-test.mjs",

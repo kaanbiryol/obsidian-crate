@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 export const shortcutName = 'Save to Crate (iOS 27).shortcut';
 export const assetName = 'save-to-crate-ios-27.shortcut';
@@ -9,9 +10,9 @@ const sources = ['docs/shortcuts/save-to-crate.plist', 'src/reading/shortcut-con
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const gh = args => execFileSync('gh', args, { encoding: 'utf8' }).trim();
 export const releases = () => JSON.parse(gh(['api', '--paginate', '--slurp', 'repos/{owner}/{repo}/releases?per_page=100'])).flat();
-export async function sourceHash() {
+export async function sourceHash(root = '.') {
   const inputs = [];
-  for (const path of sources) inputs.push([path, sha256(await readFile(path))]);
+  for (const path of sources) inputs.push([path, sha256(await readFile(resolve(root, path)))]);
   return sha256(JSON.stringify(inputs));
 }
 export function validateTag(tag) {

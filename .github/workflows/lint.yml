@@ -5,9 +5,20 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Optional release baseline for a verification-only reproducibility check
+        type: string
+        default: ""
+      reuse-run-id:
+        description: Optional successful exact-commit push run to verify artifact reuse
+        type: string
+        default: ""
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: build-${{ github.event_name }}-${{ github.ref }}
@@ -16,6 +27,9 @@ concurrency:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+    with:
+      release-tag: ${{ inputs.release-tag || '' }}
+      reuse-run-id: ${{ inputs.reuse-run-id || '' }}
   # Keep the existing aggregate check name for branch protection.
   build:
     needs: verify
