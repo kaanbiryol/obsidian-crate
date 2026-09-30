@@ -3,6 +3,7 @@ import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.mjs';
+import { readingShortcutTemplate } from './reading-shortcut-template.mjs';
 
 if (process.platform !== 'darwin') throw new Error('Sign this release asset on macOS with Apple Shortcuts installed.');
 const manualSetup = process.argv.includes('--manual-setup');
@@ -17,14 +18,12 @@ try {
   await mkdir('dist', { recursive: true });
   // Provide an editor-configured fallback when import questions stall, keeping
   // the same actions and placeholders.
-  if (manualSetup) execFileSync('plutil', ['-remove', 'WFWorkflowImportQuestions', input], { stdio: 'inherit' });
-  if (firstRunSetup) {
-    const template = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', input], { encoding: 'utf8' }));
-    const workflow = readingShortcutWithFirstRunSetup(template, { pairing });
-    await writeFile(input, JSON.stringify(workflow));
-    // Retain the exact readable source alongside the signed test artifact.
-    execFileSync('plutil', ['-convert', 'xml1', '-o', resolve(`dist/${name}.plist`), input], { stdio: 'inherit' });
-  }
+  const template = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', input], { encoding: 'utf8' }));
+  const workflow = firstRunSetup ? readingShortcutWithFirstRunSetup(template, { pairing }) : readingShortcutTemplate(template);
+  if (manualSetup) workflow.WFWorkflowImportQuestions = [];
+  await writeFile(input, JSON.stringify(workflow));
+  // Retain the exact readable source alongside every signed artifact.
+  execFileSync('plutil', ['-convert', 'xml1', '-o', resolve(`dist/${name}.plist`), input], { stdio: 'inherit' });
   execFileSync('plutil', ['-convert', 'binary1', input], { stdio: 'inherit' });
   // Only the public template, containing placeholders, is sent to Apple's signing service.
   execFileSync('shortcuts', ['sign', '--mode', 'anyone', '--input', input, '--output', resolve(`dist/${name}.shortcut`)], { stdio: 'inherit' });

@@ -1,4 +1,5 @@
 import { handleReadingRoute } from './reading/routes';
+import { shortcutCompatibility, shortcutLaunchResponse, shortcutMayBypassWireProtocol, shortcutTransport } from './reading/shortcut-transport';
 import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
@@ -31,8 +32,9 @@ function withRequestId(response: Response, requestId: string, started: number): 
 	});
 }
 
-export function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
-  return withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, coordinatorState));
+export async function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
+  const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, coordinatorState));
+  return shortcutLaunchResponse(request, response, env.CRATE_DEPLOYMENT_FINGERPRINT);
 }
 
 async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, coordinatorState?: DurableObjectState): Promise<Response> {
@@ -46,11 +48,14 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 	const path = url.pathname;
 	const method = request.method;
 	const db = env.DB;
+  const shortcut = shortcutTransport(request);
 
 	try {
 		const rateLimited = coordinatorState ? null : await limitNotificationRequest(request, admissionDb, env.NOTIFICATION_REQUEST_LIMITER);
 		if (rateLimited) return withRequestId(rateLimited, requestId, started);
-		if (isCrateMutation(path, method) && path !== '/notifications/share/reading') {
+    const compatibility = shortcut && shortcutCompatibility(shortcut);
+    if (compatibility) return withRequestId(corsResponse({ error: compatibility.message, code: compatibility.code }, compatibility.status), requestId, started);
+		if (isCrateMutation(path, method) && path !== '/notifications/share/reading' && !shortcut) {
 			const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
 			if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 				return withRequestId(corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428), requestId, started);
@@ -59,12 +64,12 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		// One-use public Reading grants must be redeemed under the coordinator.
 		// Their bounded pre-auth admission runs above; ordinary routes authenticate
 		// and authorize before entering the coordinator below.
-		const readingGrant = method === 'POST' && ['/reading/exchange', '/reading/handoff', '/reading/shortcut-exchange'].includes(path);
+		const readingGrant = method === 'POST' && (['/reading/exchange', '/reading/handoff', '/reading/shortcut-exchange'].includes(path) || shortcut?.kind === 'exchange');
 		if (readingGrant && !coordinatorState) {
  const forwarded = new Request(request); forwarded.headers.set('X-Crate-Internal-Mutation', '1');
- return env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded);
+ return withRequestId(await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded), requestId, started);
  }
- if (coordinatorState && readingGrant) return handleReadingRoute(request, env, undefined, coordinatorState);
+ if (coordinatorState && readingGrant) return withRequestId(await handleReadingRoute(request, env, undefined, coordinatorState), requestId, started);
 		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {
 			return withRequestId(publicResponse, requestId, started);
@@ -75,6 +80,9 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		if (authResult.response) {
 			return withRequestId(authResult.response, requestId, started);
 		}
+    if (shortcut?.kind === 'prepare' && !shortcutMayBypassWireProtocol(shortcut, authResult.principal.scope, request.headers.get(CRATE_PROTOCOL_HEADER))) {
+      return withRequestId(corsResponse({ error: 'This endpoint requires shortcut capture access.', code: 'shortcut_access_required' }, shortcut.legacy ? 428 : 403), requestId, started);
+    }
 
     if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);
 		const mutation = isCrateMutation(path, method);

@@ -14,6 +14,7 @@ import { corsResponse } from './cors';
 import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
 import { canPrepareReadingHandoff } from './reading/common';
+import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 
 export { handlePublicRoute };
 
@@ -48,6 +49,7 @@ export function isAuthenticatedRouteAllowed(
 	path: string,
 	method: RouteMethod,
 ): boolean {
+  if (path === shortcut.preparePath && method === 'POST') return principal.scope === 'reading_capture';
 	if (path === '/reading/prepare' && method === 'POST') return canPrepareReadingHandoff(principal.scope);
 	if (principal.scope === 'vault') return true;
 	if (path === '/features' && method === 'GET' && ['reading', 'reminders'].includes(principal.scope)) return true;

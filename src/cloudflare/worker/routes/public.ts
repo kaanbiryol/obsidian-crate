@@ -34,7 +34,7 @@ export async function handlePublicRoute(
 	const db = env.DB;
  if (path === '/notifications/share/reading' && method === 'POST') return readingShareFallback(request);
  if (path === '/notifications/save-reading' && method === 'GET') return readingSavePage();
- if (path === '/notifications/save-reading.js' && method === 'GET') return readingSaveScript();
+ if (path === '/notifications/save-reading.js' && method === 'GET') return readingSaveScript({ serverFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT });
 	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo(env);
 	if (path === '/' && method === 'GET') return handleServerInfo(env);
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);

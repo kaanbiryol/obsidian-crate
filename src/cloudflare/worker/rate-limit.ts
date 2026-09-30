@@ -19,6 +19,7 @@ const actions = new Map([
 	['POST /notifications/retry', 10],
 ]);
 const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
+const shortcutActionPath = (path: string) => path === '/reading/shortcut/v1/prepare' ? '/reading/prepare' : path === '/reading/shortcut/v1/exchange' ? '/reading/shortcut-exchange' : path;
 
 export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
 	const url = new URL(request.url);
@@ -26,7 +27,7 @@ export async function limitNotificationRequest(request: Request, db: D1Database,
 	const kind = requestAdmissionKind(request);
 	if (kind === 'asset') return null;
 	if (kind === 'unknown') return corsResponse({ error: 'Not found' }, 404);
-	const action = `${request.method} ${url.pathname}`;
+	const action = `${request.method} ${shortcutActionPath(url.pathname)}`;
 	const authenticated = actions.has(action) ? undefined : await authenticatedAdmissionKey(request, db);
 	// Sync bootstrap needs thousands of requests. A recently verified credential
 	// gets a separate, bounded local budget; it still undergoes D1 authentication.
@@ -48,7 +49,7 @@ export async function limitNotificationRequest(request: Request, db: D1Database,
  * counters are conditional in one transaction; denied actions spend neither. */
 export async function limitNotificationAction(request: Request, db: D1Database, actor: string): Promise<Response | null> {
 	const url = new URL(request.url);
-	const action = `${request.method} ${url.pathname}`;
+	const action = `${request.method} ${shortcutActionPath(url.pathname)}`;
 	const limit = actions.get(action);
 	if (!limit) return null;
 	const now = Date.now();

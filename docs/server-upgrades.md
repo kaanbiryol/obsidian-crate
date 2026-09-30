@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 3 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 4 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -124,6 +124,20 @@ while paused. Resume queues existing schedules with the same identity, preserves
 completed deliveries, and wakes pending projections and extraction. Notification
 retry-age limits remain in effect; a pause does not make old notifications valid
 indefinitely. Requests already sent to websites or push providers cannot be recalled.
+
+## Revision 4: stable shortcut capture and diagnostics
+
+`reading-shortcut-transport-v1` separates native capture requests from the app
+wire protocol. The Worker retains narrow adapters for the released preparation
+headers 1 and 11, so existing paired shortcuts resume saving after the server
+update. No schema migration or new library credential is required.
+
+Template revision 2 uses the versioned capture API and presents a public fallback
+when no usable launch URL is returned. The live save page provides update,
+reconnect, and retry guidance, copyable private-data-free diagnostics, and a
+GitHub issue draft. It reports success only after the durable handoff receipt.
+Publish the fallback page before distributing the new template and update the
+Worker before encouraging its installation. See [shortcut maintenance](reading-shortcuts.md).
 
 ## In-app checkpoint restore
 

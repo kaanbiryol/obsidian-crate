@@ -11,6 +11,7 @@ import {
 } from '../../protocol';
 import { corsResponse } from './cors';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
+import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 
@@ -40,10 +41,11 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 		'reminders-v1',
  'reading-v1', 'reading-deferred-captures-v1', 'reading-fetching-consent-v1', 'shared-features-v1',
  'reading-shortcut-pairing-v1',
+ 'reading-shortcut-transport-v1',
 		'notifications-v1',
 	]),
 });
 
 export function handleServerInfo(env: Env): Response {
-	return corsResponse({ ...CRATE_SERVER_INFO, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
+	return corsResponse({ ...CRATE_SERVER_INFO, shortcut: { version: READING_SHORTCUT_CONTRACT.version, revision: READING_SHORTCUT_CONTRACT.revision, minimumRevision: READING_SHORTCUT_CONTRACT.minimumRevision }, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

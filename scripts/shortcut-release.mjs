@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 export const shortcutName = 'Save to Crate (iOS 27).shortcut';
 export const assetName = 'save-to-crate-ios-27.shortcut';
 export const metadataName = 'reading-shortcut.json';
-const sources = ['docs/shortcuts/save-to-crate.plist', 'scripts/reading-shortcut-first-run.mjs', 'scripts/sign-reading-shortcut.mjs'];
+const sources = ['docs/shortcuts/save-to-crate.plist', 'src/reading/shortcut-contract.json', 'scripts/reading-shortcut-template.mjs', 'scripts/reading-shortcut-first-run.mjs', 'scripts/sign-reading-shortcut.mjs'];
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const gh = args => execFileSync('gh', args, { encoding: 'utf8' }).trim();
 export const releases = () => JSON.parse(gh(['api', '--paginate', '--slurp', 'repos/{owner}/{repo}/releases?per_page=100'])).flat();

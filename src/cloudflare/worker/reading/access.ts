@@ -4,6 +4,7 @@ import { sha256Hex } from '../auth';
 import { validateReadingFolder } from '@/reading/settings';
 import type { AuthPrincipal } from '../authenticate';
 import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse, type ReadingPolicy } from './common';
+import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
   const existing = await policy(db);
@@ -31,7 +32,7 @@ export async function issueReadingAccess(db: D1Database, current: ReadingPolicy,
     await db.prepare(`INSERT INTO auth_tokens(id, token_hash, device_name, platform, scope, folder_path, reading_generation, expires_at)
       VALUES (?, ?, 'Save to Crate shortcut', 'shortcut', 'reading_capture', ?, ?, ?)`)
       .bind(id, await sha256Hex(token), current.folder_path, current.generation, expiresAt).run();
-    return readingResponse({ token, id, expiresAt, endpoint: `${origin}/reading/prepare` });
+    return readingResponse({ token, id, expiresAt, endpoint: `${origin}${shortcut.preparePath}` });
   }
   if (body.kind !== 'reading') throw new ReadingError('Choose Reading or capture access.');
   await db.prepare(`INSERT INTO reading_enrollments(token_hash, generation, scope, expires_at) VALUES (?, ?, 'reading', ?)`)

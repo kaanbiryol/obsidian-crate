@@ -1,4 +1,5 @@
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
+import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
 import { armNotificationCoordinator } from '../notification-lifecycle';
 import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
@@ -18,6 +19,9 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;
     const body = parsed.value;
+    const shortcut = shortcutTransport(request);
+    if (shortcut && (!shortcut.legacy || shortcut.kind === 'exchange' || principal?.scope === 'reading_capture')) validateShortcutBody(body, shortcut.kind);
+    if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
     if (path === '/reading/shortcut-exchange' && request.method === 'POST') return await exchangeShortcutPairing(env.DB, body, request);
     if (path === '/reading/exchange' && request.method === 'POST') return await exchangeReadingAccess(env.DB, body, request);
     if (path === '/reading/handoff' && request.method === 'POST') {
@@ -45,7 +49,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     }
     if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
     if (path === '/reading/access' && request.method === 'POST' && principal.scope === 'vault') return await issueReadingAccess(env.DB, current, body, url.origin);
-    if (path === '/reading/prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
+    if ((path === '/reading/prepare' || shortcut?.kind === 'prepare') && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
     if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
     if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);
     if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });

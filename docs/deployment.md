@@ -144,7 +144,7 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 ## Supported protocol and schema
 
-Protocol 7 is required for writes. Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Only the current prerelease formats are supported.
+App writes use the current protocol range in [the release contract](current-contract.md). Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Native capture uses the separate [Shortcut contract](reading-shortcuts.md), including narrow adapters for released templates.
 
 Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 3. Schema 1 is the first supported baseline; schemas 1 and 2 upgrade through the registered migrations after a verified recovery checkpoint. Existing schema-3 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
 

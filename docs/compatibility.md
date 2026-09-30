@@ -8,7 +8,8 @@ Server revision, schema, wire protocol and transfer limits are checked against s
 
 | Boundary | Current format | Upgrade or recovery behavior |
 | --- | --- | --- |
-| API writes | `X-Crate-Protocol: 1`; oldest compatible is 1 | Clients negotiate the highest common version. The launch protocol supports ordinary writes; restores require a durable operation and the `restore-operation-receipts` capability. Missing, older or future protocols receive 428 before mutations. Authenticated read endpoints remain available at the HTTP layer; an older application's decoder may still require an update. |
+| App API writes | `X-Crate-Protocol: 1`; oldest compatible is 1 | Clients negotiate the highest common version. The launch protocol supports ordinary writes; restores require a durable operation and the `restore-operation-receipts` capability. Missing, older or future protocols receive 428 before mutations. Authenticated read endpoints remain available at the HTTP layer; an older application's decoder may still require an update. |
+| Native Shortcut capture | Contract 1; template revision 2; oldest revision 1 | Versioned capture routes evolve independently of the app wire protocol. Released capture requests with headers 1 and 11 retain narrow adapters. The save page offers optional updates and copyable diagnostics; incompatible contracts show explicit server/shortcut update guidance. See [shortcut maintenance](reading-shortcuts.md). |
 | Initial import | `resumable-initial-import-v2` | Protocol 1 includes a resumable reminder-readiness acknowledgement after upload completion. Older servers without this capability use ordinary sync. |
 | D1 | `crate_schema = 2` | Fresh databases initialize at schema 2. `002-reading-captures` upgrades schema 1 by adding a durable capture queue without rewriting files. |
 | Reminder parsing | Parser version 10 | List caches are disposable. Version 10 delegates calendar recognition to Chrono, combines local dates with times, and preserves inactive schedule, project and priority mentions, plus literal addresses and file references. Date/time recognition, including seconds and timestamps, follows Chrono. Unsupported repeat qualifiers remain errors. Durable source verification is rebuilt from current R2 revisions before queued or installed notifications can deliver. |
@@ -68,9 +69,11 @@ Parser 9 additionally recognizes task lines ending in CRLF. The plugin validates
 ## Launch protocol baseline
 
 Wire protocol 1 is the launch contract, with oldest compatible version 1.
-The current candidate uses server revision 3 and database schema 2. Earlier development
-protocol numbers are unsupported; use matching plugin, Worker, PWA and shortcut
-builds when recreating a development deployment.
+The current candidate uses server revision 4 and database schema 2. Earlier development
+protocol numbers are unsupported for general app writes. The released native
+capture requests have explicit adapters; new Shortcuts use an independent
+capture contract. Use matching plugin, Worker and PWA builds when recreating a
+development deployment.
 
 `protocol-rolling-upgrade.test.ts` exercises plugin and PWA writes against frozen
 protocol-1 metadata and preserves saved operation bodies. The Worker compatibility

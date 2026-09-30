@@ -4,13 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 const { outputFiles } = await build({
 	stdin: { contents: `export { CRATE_PLUGIN_PROTOCOL as protocol } from './src/protocol';
 		export { default as release } from './src/cloudflare/server-release.json';
+		export { READING_SHORTCUT_CONTRACT as shortcut } from './src/reading/shortcut';
 		export * as limits from './src/protocol/sync-limits';`, resolveDir: process.cwd() },
 	bundle: true, platform: 'node', format: 'esm', write: false,
 });
-const { protocol, release, limits } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
+const { protocol, release, shortcut, limits } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
 const text = `# Current release contract
 
-Generated from the release manifest, wire protocol and shared transfer limits.
+Generated from the release manifest, wire and shortcut protocols, and shared transfer limits.
 Run \`node scripts/check-contract-docs.mjs --write\` after changing those contracts;
 \`npm run check:contracts\` rejects stale values.
 
@@ -21,6 +22,9 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Oldest supported database schema | ${release.minimumSchemaVersion} |
 | Wire protocol | ${protocol.current} |
 | Oldest compatible wire protocol | ${protocol.oldestCompatible} |
+| Shortcut capture contract | ${shortcut.version} |
+| Shortcut template revision | ${shortcut.revision} |
+| Oldest compatible shortcut revision | ${shortcut.minimumRevision} |
 | Registered migrations | ${release.migrations.map(item => `\`${item.id}\` (${item.from} → ${item.to})`).join(', ') || 'None'} |
 | Markdown upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files |
 | Asset upload batch | ${limits.BATCH_ASSET_UPLOAD_MAX_FILES} files |

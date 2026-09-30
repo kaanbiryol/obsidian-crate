@@ -13,6 +13,12 @@ on:
       - "scripts/sign-reading-shortcut.mjs"
       - "scripts/reading-shortcut-first-run.mjs"
       - "scripts/reading-shortcut.test.mjs"
+      - "scripts/reading-shortcut-template.mjs"
+      - "scripts/reading-shortcut-fixture.mjs"
+      - "scripts/build-shortcut-support.mjs"
+      - "src/reading/shortcut-contract.json"
+      - "src/cloudflare/worker/reading/save-page.ts"
+      - "src/cloudflare/worker/reading/save-client.ts"
       - "docs/shortcuts/save-to-crate.plist"
   release:
     types: [published]
@@ -49,6 +55,8 @@ jobs:
         run: npm run build:site
       - name: Verify shortcut template
         run: node --test scripts/reading-shortcut.test.mjs
+      - name: Build shortcut support page
+        run: node scripts/build-shortcut-support.mjs
       - name: Download the latest published shortcut
         env:
           GH_TOKEN: ${{ github.token }}

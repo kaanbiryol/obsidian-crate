@@ -2,7 +2,7 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
-Every mutation requires `X-Crate-Protocol: 7`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
 
 ## Authentication
 
@@ -108,6 +108,32 @@ issuer revocation/expiry, capability expiry, the Reading folder generation, and
 feature availability. Repeating a live capability reuses its exact operation ID;
 it does not create another note. Revoking the issuer blocks even a committed
 capability's subsequent replay.
+
+### Native Shortcut compatibility
+
+`POST /reading/shortcut/v1/prepare` accepts only capture credentials and
+`{ url, title? }`. `POST /reading/shortcut/v1/exchange` redeems the same one-use
+pairing code with `{ token }`. These routes do not require the app wire header.
+`X-Crate-Shortcut-Revision` identifies the installed template; it defaults to 1.
+The capture contract version is in the path. Metadata at `/.well-known/crate`
+exposes `shortcut: { version, revision, minimumRevision }` and the
+`reading-shortcut-transport-v1` capability.
+
+Recognized native requests return `shortcut: { version, revision,
+updateAvailable, downloadUrl }`. Preparation successes return the opaque launch
+URL; failures return an error launch URL even for authentication, admission, or
+compatibility rejection. Its fragment contains only allowlisted diagnostic
+fields. A newer unsupported capture contract receives 426
+`server_update_required`; a retired contract/template receives 426
+`shortcut_update_required`. The live, uncached save page performs the handoff
+with the server's current app wire protocol.
+
+Released shortcuts remain supported through narrow legacy adapters:
+`/reading/prepare` with header 1 or 11 can bypass app protocol retirement only
+with capture access; `/reading/shortcut-exchange` with header 1 retains its
+single-use pairing semantics. Other scopes and routes still enforce the app
+protocol. Legacy and versioned paths share the same action rate limits.
+See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
 
 ### PUT /sync/upload
 

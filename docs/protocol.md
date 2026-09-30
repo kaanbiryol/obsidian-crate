@@ -1,6 +1,14 @@
 # Protocol contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The launch protocol is 1, with oldest compatible protocol 1. Earlier development protocols are unsupported. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The launch protocol is 1, with oldest compatible protocol 1. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+
+Native Shortcuts use a separate stable capture contract at
+`/reading/shortcut/v1/{exchange,prepare}`. App protocol bumps do not change it.
+The server also adapts the exact released capture requests using app headers 1
+and 11; this does not enable retired protocols for vault writes or unrelated
+routes. The browser confirmation uses the live server's app protocol.
+See [shortcut maintenance](reading-shortcuts.md) for the supported payloads,
+template revisions, update guidance, and failure diagnostics.
 
 ## Files
 

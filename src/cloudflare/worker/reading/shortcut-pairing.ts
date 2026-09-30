@@ -3,6 +3,7 @@ import { sha256Hex } from '../auth';
 import { changedRows } from '../db';
 import { limitNotificationAction } from '../rate-limit';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
+import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 
 const secret = () => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
 const invalidPairing = () => new ReadingError('This pairing code expired or was already used. Create a new code in Reading settings.', 410);
@@ -48,5 +49,6 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
     db.prepare('DELETE FROM reading_enrollments WHERE token_hash=?').bind(hash),
   ]);
   if (changedRows(results[0]) !== 1) throw invalidPairing();
-  return readingResponse({ endpoint: `${new URL(request.url).origin}/reading/prepare`, authorization: `Bearer ${token}` });
+  const endpoint = new URL(request.url).pathname === contract.exchangePath ? contract.preparePath : '/reading/prepare';
+  return readingResponse({ endpoint: `${new URL(request.url).origin}${endpoint}`, authorization: `Bearer ${token}` });
 }

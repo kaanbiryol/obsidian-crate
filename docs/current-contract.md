@@ -1,16 +1,19 @@
 # Current release contract
 
-Generated from the release manifest, wire protocol and shared transfer limits.
+Generated from the release manifest, wire and shortcut protocols, and shared transfer limits.
 Run `node scripts/check-contract-docs.mjs --write` after changing those contracts;
 `npm run check:contracts` rejects stale values.
 
 | Contract | Current value |
 | --- | --- |
-| Server candidate revision | 3 |
+| Server candidate revision | 4 |
 | Fresh database schema | 2 |
 | Oldest supported database schema | 1 |
 | Wire protocol | 1 |
 | Oldest compatible wire protocol | 1 |
+| Shortcut capture contract | 1 |
+| Shortcut template revision | 2 |
+| Oldest compatible shortcut revision | 1 |
 | Registered migrations | `002-reading-captures` (1 → 2) |
 | Markdown upload batch | 3 files |
 | Asset upload batch | 4 files |

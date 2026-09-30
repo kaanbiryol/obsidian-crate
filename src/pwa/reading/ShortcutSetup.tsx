@@ -58,5 +58,6 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
       <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong> before closing the share sheet.</p></SettingsSection></li>
     </ol>
     <SettingsSection title="Privacy and access"><p>The shortcut can save links but cannot read your library. Access lasts up to 90 days. Revoke it in Obsidian’s connected devices, or run setup again to reconnect.</p></SettingsSection>
+    <SettingsSection title="Updates and troubleshooting"><p>Server updates keep compatible shortcuts working. When a newer shortcut is available, the save page offers a download. Install it in Shortcuts, then return here to create a pairing code.</p><p>If a save fails, use <strong>Copy diagnostics</strong> or <strong>Report on GitHub</strong> on the error page. Wait for <strong>Saved to Crate</strong>; the shortcut completion checkmark alone does not confirm a save.</p></SettingsSection>
   </div>;
 }

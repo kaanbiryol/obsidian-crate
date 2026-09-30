@@ -104,6 +104,30 @@ it('authenticates ordinary Reading routes before invoking the coordinator', asyn
 	expect(get).not.toHaveBeenCalled();
 });
 
+it.each([
+	['/reading/prepare', '/reading/shortcut/v1/prepare', 30],
+	['/reading/shortcut-exchange', '/reading/shortcut/v1/exchange', 10],
+] as const)('shares the action budget between %s and %s', async (legacy, current, limit) => {
+	const attempt = (path: string) => new Request(`https://test${path}`, { method: 'POST' });
+	for (let index = 0; index < limit; index++) expect(await limitNotificationAction(attempt(index % 2 ? current : legacy), env.DB, 'shortcut-actor')).toBeNull();
+	const before = (await env.DB.prepare('SELECT * FROM request_rate_limits ORDER BY key').all()).results;
+	for (const path of [legacy, current]) expect((await limitNotificationAction(attempt(path), env.DB, 'shortcut-actor'))?.status).toBe(429);
+	expect((await env.DB.prepare('SELECT * FROM request_rate_limits ORDER BY key').all()).results).toEqual(before);
+});
+
+it.each(['/reading/shortcut/v1/prepare', '/reading/shortcut/v1/exchange'])('returns a safe launch page when %s is denied at the edge', async path => {
+	const prepare = vi.spyOn(env.DB, 'prepare');
+	const response = await worker.fetch(new Request(`https://denied.test${path}`, { method: 'POST',
+		headers: { Authorization: 'Bearer private-credential', 'X-Crate-Shortcut-Revision': '2' },
+		body: JSON.stringify({ url: 'https://example.com/private-article', token: 'private-pairing-code' }),
+	}), { ...env, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: false }) } });
+	expect(response.status).toBe(429); expect(response.headers.get('Retry-After')).toBe('60');
+	const result = await response.json() as { launchUrl: string };
+	expect(result.launchUrl).toMatch(/^https:\/\/denied\.test\/notifications\/save-reading#error=/);
+	expect(decodeURIComponent(result.launchUrl)).not.toContain('private');
+	expect(prepare).not.toHaveBeenCalled();
+});
+
 it('rejects unknown routes and methods before protocol checks, authentication, or admission', async () => {
 	const prepare = vi.spyOn(env.DB, 'prepare');
 	const limit = vi.fn(async () => ({ success: false }));

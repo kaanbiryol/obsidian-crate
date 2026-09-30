@@ -24,6 +24,7 @@ const api = new Set([
 
 export function requestAdmissionKind(request: Request): 'asset' | 'api' | 'unknown' {
 	const path = new URL(request.url).pathname;
+  if (request.method === 'POST' && /^\/reading\/shortcut\/v(?:0|[1-9]\d{0,2})\/(prepare|exchange)$/.test(path)) return 'api';
 	if (request.method === 'GET' && (assets.has(path) || path.startsWith('/notifications/assets/'))) return 'asset';
 	return api.has(`${request.method} ${path}`) ? 'api' : 'unknown';
 }
