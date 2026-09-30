@@ -18,7 +18,12 @@ export async function checkCompoundFocus(page, control, wrapper) {
 	await expect(control).toHaveCSS('outline-style', 'none');
 	await page.keyboard.press('Tab');
 	await page.keyboard.press('Shift+Tab');
-	await expect(control).toBeFocused();
+	await expect(control).toBeFocused().catch(async error => {
+		console.error('Keyboard focus return:', await page.evaluate(() => ({
+			active: document.activeElement?.outerHTML,
+		})), await control.evaluate(element => ({ control: element.outerHTML })));
+		throw error;
+	});
 	if (textEntry) {
 		await expect(wrapper).toHaveCSS('outline-style', 'none');
 		await expect(wrapper).not.toHaveCSS('border-color', restingBorder);

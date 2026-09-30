@@ -65,8 +65,10 @@ for (const type of [chromium, webkit]) {
        separated: text.right <= button.left && text.left >= closeBounds.right,
        touchTargets: [button, closeBounds].every(rect => rect.width >= 44 && rect.height >= 44),
        dangerColor: getComputedStyle(action).color === dangerColor,
+       bounds: { text: text.toJSON(), title: title.toJSON(), button: button.toJSON(), close: closeBounds.toJSON() },
+       font: getComputedStyle(heading).font,
       };
-     })).toEqual({ lines: 1, fits: true, centered: true, separated: true, touchTargets: true, dangerColor: true });
+     }), { message: `${type.name()} ${colorScheme}, ${width}px header geometry` }).toMatchObject({ lines: 1, fits: true, centered: true, separated: true, touchTargets: true, dangerColor: true });
     }
    }
    await page.setViewportSize({ width: 390, height: 844 });
