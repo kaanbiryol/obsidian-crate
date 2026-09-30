@@ -1,10 +1,6 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/36695803953",
-  "additionalSources": {
-    "scripts/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds"
-  },
   "seconds": {
-    "scripts/pwa-sync-coordinator-test.mjs": 12.4,
     "scripts/pwa-sheet-field-test.mjs": 18.9,
     "scripts/pwa-ios27-header-test.mjs": 8.8,
     "scripts/pwa-dock-test.mjs": 139.3,
