@@ -190,6 +190,7 @@ class RemoteRecoveryModal extends SharedModal {
 		if (this.busy) return;
 		this.selectedVersion = version; const revision = ++this.previewRevision; this.renderVersions();
 		const header = this.previewHeader(this.formatHistoryDate(versionDate(version.created_at)), `${version.reason === 'deleted' ? 'Before deletion' : 'Before update'} · ${formatSize(version.size)}`);
+		header.addClass('crate-history-version-header');
 		header.setAttribute('title', versionDate(version.created_at).toLocaleString());
 		const actions = header.createDiv({ cls: 'crate-history-version-actions' });
 		const restore = action(actions, this.isPending(version) ? 'Resume restore' : 'Restore this version', () => { void this.restore(version, restore, restoreLabel); }, 'crate-history-restore reminder-modal-header-action is-enabled');

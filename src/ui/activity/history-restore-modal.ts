@@ -50,12 +50,13 @@ export class HistoryRestoreModal extends SharedModal {
     private async prepare(): Promise<void> {
         this.review = undefined;
         this.confirm.disabled = true;
-        this.confirm.setText('Restore');
+        this.confirm.setText('Checking files…');
         this.status.setText('Checking files and available versions…');
         try {
             const review = await this.load();
             if (!this.active) return;
             this.review = review;
+            this.confirm.setText('Restore');
             this.status.setText(review.items.length
                 ? `${review.items.length} ${review.items.length === 1 ? 'file' : 'files'} will change · ${review.unchangedCount} unchanged`
                 : 'Your synced files already match this state.');

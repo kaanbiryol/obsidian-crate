@@ -26,11 +26,19 @@
     .crate-history-content-disclosure { margin-top: 8px; summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); padding: 8px 0; } }
     button[aria-pressed="true"] { background: var(--background-modifier-hover); color: var(--text-accent); }
     button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
-    .crate-history-workspace { display: grid; grid-template-columns: sync-review.$sidebar-columns; flex: 1; min-height: 0; border: 0; }
-    .crate-history-list-pane, .crate-history-preview-pane { min-width: 0; overflow: auto; padding: 0 sync-review.$panel-inset; overscroll-behavior: contain; }
+    .crate-history-workspace { display: grid; grid-template-columns: sync-review.$sidebar-columns; grid-template-rows: minmax(0, 1fr); flex: 1; min-height: 0; border: 0; }
+    .crate-history-list-pane, .crate-history-preview-pane { min-width: 0; min-height: 0; overflow: auto; padding: 0 sync-review.$panel-inset; overscroll-behavior: contain; }
     // Let row backgrounds extend into the inset while text aligns with the file heading.
     .crate-history-list-pane { margin-left: -12px; padding-inline: 0 sync-review.$list-inset; border-right: 1px solid sync-review.$pane-divider; }
     .crate-history-preview-pane { padding-right: 0; }
+    .crate-history-workspace > .crate-history-preview-pane {
+      display: flex; flex-direction: column; overflow: hidden;
+      > .crate-history-preview-header, > .crate-history-back { flex-shrink: 0; }
+      > .crate-history-back { align-self: flex-start; }
+      > .crate-history-preview-content, > .crate-history-preview-output {
+        flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+      }
+    }
     .crate-history-restore.reminder-modal-header-action { @include sync-review.action; }
     .crate-file-history-count { color: var(--text-muted); font-size: var(--font-ui-smaller); margin: 0 0 12px; line-height: 1.5; }
     h3:not(.crate-history-day-label) { font-size: var(--font-ui-small); font-weight: 500; margin: 0 0 8px; overflow-wrap: anywhere; }
@@ -45,21 +53,30 @@
     .crate-history-file-name { @include sync-review.title; overflow-wrap: anywhere; line-height: 1.4; }
     .crate-history-file-folder, .crate-history-file-count { @include sync-review.metadata; overflow-wrap: anywhere; }
     .crate-history-preview-header { padding-bottom: 0; border: 0; margin-bottom: 22px; display: flex; flex-direction: column; gap: 4px; h3 { margin-bottom: 4px; } .crate-file-history-count { margin: 0; } }
+    .crate-history-version-header {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: start;
+      .crate-history-version-actions { grid-column: 2; grid-row: 1 / span 2; justify-self: end; margin-top: 0; }
+    }
     .crate-history-preview-output pre { white-space: pre; overflow-wrap: normal; overflow-x: auto; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.6; user-select: text; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; }
     .crate-history-internal-marker { opacity: 0.25; overflow-wrap: anywhere; }
     .crate-history-current-label { color: var(--text-normal); font-weight: 500; }
-    .crate-history-diff .crate-diff-code { flex: none; max-width: 100%; }
+    .crate-history-diff .crate-diff-code { flex: none; max-width: 100%; overscroll-behavior-y: auto; }
     .crate-history-diff .crate-diff-line { width: max-content; min-width: 100%; grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); box-sizing: border-box; }
     .crate-history-diff .crate-diff-text { white-space: pre; overflow-wrap: normal; }
     .crate-history-back { display: none; margin-bottom: 16px; }
 
     @media (max-width: sync-review.$compact-width) {
       .crate-history-workspace { display: block; position: relative; }
-      .crate-history-list-pane, .crate-history-preview-pane { height: 100%; box-sizing: border-box; padding: 0; border: 0; display: none; }
+      .crate-history-list-pane, .crate-history-preview-pane { position: absolute; inset: 0; box-sizing: border-box; padding: 0; border: 0; display: none; }
+      .crate-history-workspace > .crate-history-preview-pane { display: none; }
       .crate-history-list-pane { padding-inline: 0 sync-review.$list-inset; }
-      .crate-history-workspace[data-pane="list"] .crate-history-list-pane,
-      .crate-history-workspace[data-pane="preview"] .crate-history-preview-pane { display: block; }
+      .crate-history-workspace[data-pane="list"] .crate-history-list-pane { display: block; }
+      .crate-history-workspace[data-pane="preview"] .crate-history-preview-pane { display: flex; }
       .crate-history-back { display: inline-flex; }
+      .crate-history-version-header {
+        grid-template-columns: minmax(0, 1fr);
+        .crate-history-version-actions { grid-column: 1; grid-row: auto; margin-top: 8px; }
+      }
       button { min-height: 44px; }
     }
   }

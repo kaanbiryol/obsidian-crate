@@ -38,6 +38,7 @@ const { outputFiles } = await build({
    window.previewCalls.push(version.storage_key);
    if(window.delay) { window.delay=false; await new Promise(resolve => window.release=resolve); }
    if(window.fail) throw new Error('Offline');
+   if(window.longDiff) return {current:'{}',saved:Array.from({length:100},(_,i)=>'Saved setting '+i).join('\\n')};
    if(window.timestampDiff) return {current:'Buy flowers 2026-09-19T14:23:00.000Z <!-- crate-id:long-internal-marker-123456789012345678901234567890 -->',saved:'Buy flowers 2026-09-19T14:21:00.000Z <!-- crate-id:long-internal-marker-123456789012345678901234567890 -->'};
    return {saved:'# Inbox\\n- [ ] Read the saved note <!-- crate-id:preview-123 -->\\n<script>not executed</script>',current:window.same ? '# Inbox\\n- [ ] Read the saved note <!-- crate-id:preview-123 -->\\n<script>not executed</script>' : '# Inbox\\n- [x] Read the current note'};
   },
@@ -165,6 +166,10 @@ for(const browserType of [chromium,webkit]) {
    await expect(page.getByLabel('Changes from current local file to saved version')).toContainText('Read the saved note <!-- crate-id:preview-123 -->');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'.png'});
+   const restoreBounds=await page.getByRole('button',{name:'Restore this version',exact:true}).boundingBox();
+   const versionHeaderBounds=await page.locator('.crate-history-version-header').boundingBox();
+   assert.ok(Math.abs(restoreBounds.x+restoreBounds.width-versionHeaderBounds.x-versionHeaderBounds.width)<2,'Restore aligns with the right edge of the version header');
+   if(width>=700) assert.ok(Math.abs(restoreBounds.y-versionHeaderBounds.y)<2,'Restore sits beside the version metadata');
    await page.getByRole('button',{name:'Restore this version',exact:true}).click();
    assert.deepEqual(await page.evaluate(()=>window.restores),[]);
    await page.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -172,6 +177,26 @@ for(const browserType of [chromium,webkit]) {
    await page.getByRole('button',{name:'Restore this version',exact:true}).click();
    await page.getByRole('button',{name:'Restore',exact:true}).click();
    await expect.poll(()=>page.evaluate(()=>window.restores)).toEqual(['first']);
+   await page.evaluate(()=>window.longDiff=true);
+   await openInbox();
+   await page.locator('[data-version-key=first]').click();
+   const previewPane=page.getByRole('region',{name:'File preview',exact:true});
+   const previewContent=previewPane.locator('.crate-history-preview-content');
+   const fixedHeader=previewPane.locator('.crate-history-version-header');
+   const longDiff=page.getByLabel('Changes from current local file to saved version');
+   await expect(longDiff).toContainText('Saved setting 99');
+   const headerBeforeScroll=await fixedHeader.boundingBox();
+   const paneBounds=await previewPane.boundingBox();
+   await page.mouse.move(paneBounds.x+paneBounds.width/2,paneBounds.y+paneBounds.height-30);
+   await page.mouse.wheel(0,5000);
+   await expect.poll(()=>previewContent.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+   await expect(longDiff.locator('.crate-diff-line').last()).toBeInViewport();
+   assert.equal(await previewPane.evaluate(el=>el.scrollTop),0,'The version pane itself does not scroll');
+   assert.deepEqual(await fixedHeader.boundingBox(),headerBeforeScroll,'Version metadata stays fixed while the changes scroll');
+   await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toBeInViewport();
+   if(width<700) await expect(page.getByRole('button',{name:'← Versions',exact:true})).toBeInViewport();
+   await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-scrolled.png'});
+   await page.evaluate(()=>window.longDiff=false);
    await openFile('Notes/New.md');
    await page.getByRole('button',{name:'Current local file',exact:true}).click();
    await expect(page.getByLabel('Current local file contents')).toContainText('Local contents');
@@ -362,7 +387,7 @@ for(const browserType of [chromium,webkit]) {
    await page.evaluate(()=>{window.stateCheckDelay=true;});
    await openPoint('12345678');
    await expect(stateModal).toContainText('Checking files and available versions');
-   await expect(stateModal.getByRole('button',{name:'Restore',exact:true})).toBeDisabled();
+   await expect(stateModal.getByRole('button',{name:'Checking files…',exact:true})).toBeDisabled();
    await stateModal.getByRole('button',{name:'Cancel',exact:true}).click();
    await page.evaluate(()=>window.releaseStateCheck());
    await expect(stateModal).toHaveCount(0);
