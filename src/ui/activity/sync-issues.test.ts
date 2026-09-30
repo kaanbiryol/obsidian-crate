@@ -36,7 +36,7 @@ it('opens the explicit file and keeps technical details copyable as text', async
   const actions = container.querySelector('.crate-sync-issue-actions')!;
   actions.children[0]!.dispatchEvent(new Event('click'));
   await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
-  actions.children[1]!.dispatchEvent(new Event('click'));
+  actions.children[2]!.dispatchEvent(new Event('click'));
   await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining(`${path}: EACCES`)));
 });
 
@@ -49,7 +49,7 @@ it('keeps moved files and clipboard failures actionable without replacing the er
   const actions = container.querySelector('.crate-sync-issue-actions')!;
   actions.children[0]!.dispatchEvent(new Event('click'));
   await vi.waitFor(() => expect(container.collectText()).toContain('It may have moved'));
-  actions.children[1]!.dispatchEvent(new Event('click'));
+  actions.children[2]!.dispatchEvent(new Event('click'));
   await vi.waitFor(() => expect(container.collectText()).toContain('copy them manually'));
   expect(container.querySelector('pre')!.textContent).toBe('EACCES');
 });

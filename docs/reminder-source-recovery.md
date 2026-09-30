@@ -12,9 +12,9 @@ mode; keep the task and its `crate-id`, then re-add the description in Crate.
 Select **Sync vault** after saving to resume setup. Uploaded file contents remain synced.
 
 Sync errors show recovery guidance for common failures, including file sizes,
-permissions, storage, network connections and interrupted transfers. **Technical
-details** preserves the original diagnostic; **Copy details** includes the path and
-recovery guidance for troubleshooting. Additional errors can be expanded, and the
+permissions, storage, network connections and interrupted transfers. The alert shows
+the first recovery step; select **Details** for the full repair guidance and original
+diagnostic. **Copy details** includes the path and recovery guidance for troubleshooting. Additional errors can be expanded, and the
 first 50 are saved in **History**, including their file actions. Older history may
 contain text without a reliable file link. For notes that are not present locally,
 use the displayed path to repair them on the device where they exist.

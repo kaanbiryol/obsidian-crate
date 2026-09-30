@@ -4,6 +4,7 @@ import { VaultHistoryModal } from './vault-history-modal';
 import type { HistoryBrowserDeps } from './history-browser';
 import { renderHistoryPanel } from './history-timeline';
 import { getPendingFileActions } from './file-actions';
+import { setSyncIssueDetailsExpanded } from './sync-issues';
 
 function detailKey(row: Element): string | undefined {
     const history = row.closest('[data-history-key]')?.getAttribute('data-history-key');
@@ -34,7 +35,7 @@ export class ActivityHistory {
         if (this.signature !== signature) {
             this.signature = signature;
             const scrollTop = this.panel.scrollTop;
-            const expanded = new Set(Array.from(this.timeline.querySelectorAll('details[open]')).map(detailKey).filter(Boolean));
+            const expanded = new Set(Array.from(this.timeline.querySelectorAll('details[open], .crate-sync-issue-details:not([hidden])')).map(detailKey).filter(Boolean));
             const focused = this.panel.ownerDocument.activeElement as HTMLElement | null;
             const focusedDetails = this.timeline.contains(focused) ? focused?.closest('details') : undefined;
             const focusedKey = focusedDetails ? detailKey(focusedDetails) : undefined;
@@ -52,6 +53,9 @@ export class ActivityHistory {
                     const target = focusedAction ? Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(button => button.getAttribute('aria-label') === focusedAction) : row.querySelector('summary');
                     target?.focus({ preventScroll: true });
                 }
+            }
+            for (const panel of Array.from(this.timeline.querySelectorAll<HTMLElement>('.crate-sync-issue-details'))) {
+                setSyncIssueDetailsExpanded(panel, expanded.has(detailKey(panel)));
             }
             this.panel.scrollTop = scrollTop;
         }

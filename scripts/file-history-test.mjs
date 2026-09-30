@@ -400,9 +400,9 @@ for(const browserType of [chromium,webkit]) {
    await page.evaluate(() => { window.mountStateHistory(); window.showHistoryErrors(); });
    const errorHistory = page.locator('#history-fixture details[data-history-key]').first();
    await errorHistory.locator(':scope > summary').click();
-   await errorHistory.locator('.crate-sync-issue-details > summary').first().click();
+   await errorHistory.locator('.crate-sync-issue-toggle').first().click();
    await page.evaluate(() => window.refreshHistoryDetails());
-   await expect(errorHistory.locator('.crate-sync-issue-details[open]')).toHaveCount(1);
+   await expect(errorHistory.locator('.crate-sync-issue-details:not([hidden])')).toHaveCount(1);
    await expect(errorHistory.locator('.crate-sync-issues-more')).not.toHaveAttribute('open');
    assert.deepEqual(errors,[]);await page.close();
   }
