@@ -9,7 +9,9 @@ import { randomUUID, createHash } from 'node:crypto';
 import { swipe } from './browser-touch-swipe.mjs';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 
-for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading highlights ${name}: select, remove, persist offline and sync`, { timeout: 90000 }, async () => {
+// This end-to-end case performs many syncs and reloads; individual expectations
+// retain their own deadlines while the complete journey allows slower CI I/O.
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading highlights ${name}: select, remove, persist offline and sync`, { timeout: 180000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-highlights-'));
   let runtime, server, browser, page;
   const codeExample = 'let greeting = "hello <world> & friends"\nText(greeting)\n';
@@ -102,6 +104,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const firstPassageOffset = (await page.locator('.crate-reading-reader__body').textContent()).indexOf('A useful article excerpt.');
     const select = async (offset = firstPassageOffset, length = 25) => {
       const existing = await page.locator('.crate-reading-reader__highlight').count();
+      // Measure fresh glyph positions after reloads or annotation removal, with
+      // no previous native range influencing the next drag's selection anchor.
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        getSelection()?.removeAllRanges();
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
       const start = await textPoint(offset), end = await textPoint(offset + length);
       await page.mouse.move(start.x + .2, start.y); await page.mouse.down();
       await page.mouse.move(end.x, end.y, { steps: 8 });

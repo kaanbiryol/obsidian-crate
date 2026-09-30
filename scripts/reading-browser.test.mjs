@@ -165,12 +165,32 @@ async function captureReaderMotion(page, action) {
       back.click(); back.click(); // Repeated taps must still request one history traversal.
     } else history.back();
     await committed;
-    const samples = [], started = performance.now();
-    do { await new Promise(resolve => requestAnimationFrame(resolve)); samples.push(state()); } while (performance.now() - started < 450);
+    const samples = [];
+    let slideDuration = 0;
+    if (action === 'history-back') {
+      const started = performance.now();
+      do { await new Promise(resolve => requestAnimationFrame(resolve)); samples.push(state()); } while (performance.now() - started < 450);
+    } else {
+      // Inspect the actual CSS transition at known progress. A loaded runner can
+      // deliver its next rAF after the whole slide and miss every interior frame.
+      const animation = pane.getAnimations().find(animation => animation.transitionProperty === 'transform');
+      if (!animation) throw new Error(`Missing reader ${action} transition`);
+      slideDuration = Number(animation.effect.getComputedTiming().duration);
+      animation.pause();
+      await animation.ready;
+      for (const progress of [0, .25, .5, .75, .99]) {
+        animation.currentTime = slideDuration * progress;
+        samples.push(state());
+      }
+      animation.finish();
+      await animation.finished;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      samples.push(state());
+    }
     // Back commits after the slide; a busy compositor may finish after the sampling window.
     if (action !== 'open') { await popped; samples.push(state()); }
     pane.removeEventListener('transitionrun', transition); window.removeEventListener('popstate', pop);
-    return { before, width, samples, slides, pops, motion: workspace.dataset.readerMotion };
+    return { before, width, samples, slides, pops, slideDuration, motion: workspace.dataset.readerMotion };
   }, action); } finally { await hitTestStyle.evaluate(element => element.remove()); }
 }
 
@@ -179,6 +199,7 @@ function assertReaderSlide(result, action) {
   assertSteadyReadingTab(result);
   assert.equal(samples.at(-1).dockInert, opening, 'Reader must block the dock until returning to the library');
   assert.equal(slides, 1, JSON.stringify(result));
+  assert.ok(result.slideDuration > 0 && result.slideDuration <= 450, JSON.stringify(result));
   assert.equal(pops, opening ? 0 : 1, 'Repeated toolbar taps must only go back once');
   assert.ok(Math.abs(before.reader - (opening ? width : 0)) < 1, JSON.stringify(result));
   assert.ok(samples.some(sample => sample.reader > 1 && sample.reader < width - 1), 'Expected intermediate slide frames');
