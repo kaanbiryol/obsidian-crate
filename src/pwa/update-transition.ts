@@ -4,11 +4,12 @@ export const PWA_UPDATE_TRANSITION_MAX_AGE_MS = 60_000;
 export const PWA_UPDATE_OPENING_PROGRESS = 0.9;
 // Recover if the browser suspends or cancels transition completion.
 const UPDATE_REVEAL_FALLBACK_MS = 1000;
-let cancelReveal: (() => void) | undefined;
+let revealTimer: number | undefined;
+let revealGeneration = 0;
 
 function stopPendingReveal(): void {
-	cancelReveal?.();
-	cancelReveal = undefined;
+	window.clearTimeout(revealTimer);
+	revealGeneration++;
 }
 
 /** Stage milestones, not download percentages. Never advance on a timer. */
@@ -78,15 +79,13 @@ export function finishPwaUpdateTransition({ fade = false }: { fade?: boolean } =
 		document.documentElement.dataset.pwaUpdating = 'revealing';
 		// A timer started at the style change can expire before the browser's
 		// first painted transition frame. Wait for the actual opacity animation.
-		const animations = overlay.getAnimations().filter(animation =>
-			'transitionProperty' in animation && animation.transitionProperty === 'opacity');
-		if (animations.length === 0) { clearPwaUpdateTransition(); return; }
-		let active = true;
-		const timer = window.setTimeout(clearPwaUpdateTransition, UPDATE_REVEAL_FALLBACK_MS);
-		cancelReveal = () => { active = false; window.clearTimeout(timer); };
-		void Promise.all(animations.map(animation => animation.finished.catch(() => undefined))).then(() => {
-			if (active) clearPwaUpdateTransition();
-		});
+		const animation = overlay.getAnimations().find(animation =>
+			(animation as CSSTransition).transitionProperty === 'opacity');
+		if (!animation) { clearPwaUpdateTransition(); return; }
+		const generation = revealGeneration;
+		const complete = () => { if (generation === revealGeneration) clearPwaUpdateTransition(); };
+		revealTimer = window.setTimeout(complete, UPDATE_REVEAL_FALLBACK_MS);
+		void animation.finished.then(complete, complete);
 		return;
 	}
 	clearPwaUpdateTransition();
