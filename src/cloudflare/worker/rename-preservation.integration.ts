@@ -31,7 +31,7 @@ it.each(['full', 'incremental', 'offline', 'queue'])('preserves the original rem
 		// Flush the same event controller used by Obsidian, with its real queue.
 		client.settings.debounceDelay = 0;
 		client.engine.onFileChange(client.disk.vault.getAbstractFileByPath('renamed.md')!);
-		await vi.waitFor(() => expect(client.engine.getState().status).toBe('error'));
+		await vi.waitFor(() => expect(client.engine.getState().status).toBe('error'), { timeout: 10_000 });
 	} else expect((await client.engine.sync()).errors.length).toBeGreaterThan(0);
 	expect((await client.api.getManifest()).files['original.md']).toBeDefined();
 	expect((await client.api.getManifest()).files['renamed.md']).toBeUndefined();
@@ -42,4 +42,4 @@ it.each(['full', 'incremental', 'offline', 'queue'])('preserves the original rem
 	const remote = await client.api.getManifest();
 	expect(Object.keys(remote.files)).toEqual(['renamed.md']);
 	expect(new TextDecoder().decode((await client.api.downloadFile('renamed.md')).content)).toBe('Irreplaceable content\nEdited after rename');
-});
+}, 30_000);

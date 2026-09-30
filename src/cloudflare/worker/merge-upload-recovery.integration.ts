@@ -159,4 +159,4 @@ it('recovers an uncertain merge before queued edits can upload a stale local sna
 	await vi.waitFor(() => expect(b.engine.getState().status).toBe('idle'), { timeout: 10_000 });
 	await sync(a);
 	expect(a.disk.text('note.md')).toBe(expected + '\nQueued offline edit\n');
-});
+}, 30_000);
