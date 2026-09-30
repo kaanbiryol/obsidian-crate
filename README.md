@@ -373,13 +373,25 @@ Run a production build:
 npm run build
 ```
 
-Run the complete first-release gate, including lint, types, dead-code analysis, unit and Worker-runtime tests, the PWA smoke test, size budgets, and release-artifact checks:
+Prepare a draft release from committed source on a Mac signed into iCloud:
+
+```bash
+npm run release:prepare -- patch
+```
+
+The command prepares the version in an isolated checkout, signs the public shortcut,
+pushes the release commit and tag, and waits for CI. A successful exact-commit push
+build can supply verified artifacts; security, server-revision and clean-build
+reproducibility checks still run. Complete device and hosted acceptance before
+publishing the draft. See [release preparation](docs/releases.md).
+
+To reproduce the complete automated release gate locally:
 
 ```bash
 npm run release:check
 ```
 
-Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. Pushing a tag that exactly matches the `x.y.z` version in `manifest.json` runs the release gate and creates a GitHub release with `main.js`, `manifest.json`, and `styles.css` as individual assets.
+Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. **Release plugin** attaches `main.js`, `manifest.json`, and `styles.css` as individual assets to the prepared draft only after all gates pass. Tag pushes alone do not dispatch that workflow.
 
 ## Documentation
 

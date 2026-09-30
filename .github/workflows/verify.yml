@@ -11,18 +11,24 @@ on:
         description: Release tag, also used to select the server revision baseline
         type: string
         default: ""
+      reuse-run-id:
+        description: Successful exact-commit push build whose artifacts passed all checks
+        type: string
+        default: ""
 
 permissions:
   contents: read
+  actions: read
 
 env:
   # Caller workflow env is not inherited by reusable workflows.
   RELEASE_TAG: ${{ inputs.release-tag }}
+  VERIFIED_RUN_ID: ${{ inputs.reuse-run-id || github.run_id }}
 
 jobs:
   checks:
     name: Source checks and release artifacts
-    runs-on: macos-26
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,28 +44,50 @@ jobs:
       - name: Check dependencies and source security
         run: npm run security:check
       - name: Check source, server revision and unit tests
+        if: inputs.reuse-run-id == ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run check:source
+      - name: Recheck the completed push verification
+        if: inputs.reuse-run-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REUSE_RUN_ID: ${{ inputs.reuse-run-id }}
+        run: node scripts/release-verification.mjs check "$REUSE_RUN_ID"
+      - name: Download exact-commit release assets
+        if: inputs.reuse-run-id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: release
+          run-id: ${{ inputs.reuse-run-id }}
+          github-token: ${{ github.token }}
+      - name: Refresh the release baseline and verify artifact identity
+        if: inputs.reuse-run-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run check:server-revision && node scripts/release-artifacts.mjs restore
       - name: Check visual and editor types
+        if: inputs.reuse-run-id == ''
         run: npm run typecheck:visual
       - name: Build plugin
+        if: inputs.reuse-run-id == ''
         run: npm run build:plugin
       - name: Smoke test built PWA
+        if: inputs.reuse-run-id == ''
         env:
           CRATE_PWA_PREBUILT: '1'
         run: npm run test:pwa-preview
       - name: Verify release artifacts
         run: npm run check:css-scope && npm run size-check && npm run verify:release-artifacts
       - name: Record candidate
+        if: inputs.reuse-run-id == ''
         run: npm run release:candidate
       - name: Prepare release assets
-        if: inputs.release-tag != ''
-        run: |
-          mkdir release
-          cp dist/main.js dist/styles.css manifest.json THIRD_PARTY_NOTICES.md release/
+        if: inputs.reuse-run-id == ''
+        run: node scripts/release-artifacts.mjs stage
       - name: Upload release assets for gated publishing
-        if: inputs.release-tag != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-assets
@@ -67,9 +95,35 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  reproducible:
+    name: Verify reproducible release
+    needs: checks
+    if: inputs.release-tag != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Download checked release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: release
+      - name: Rebuild from a clean install
+        run: npm ci && npm run build
+      - name: Compare original and reproduced artifacts
+        run: node scripts/release-artifacts.mjs reproduce
+
   worker:
     name: Worker integration tests
-    runs-on: macos-26
+    if: inputs.reuse-run-id == ''
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,6 +147,7 @@ jobs:
 
   docker:
     name: Docker server (${{ matrix.runner }})
+    if: inputs.reuse-run-id == ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
@@ -112,6 +167,7 @@ jobs:
 
   visual:
     name: Visual tests (${{ matrix.shard }}/2)
+    if: inputs.reuse-run-id == ''
     # Keep the reviewed snapshot platform; system fonts differ on Linux.
     runs-on: macos-26
     timeout-minutes: 15
@@ -146,13 +202,14 @@ jobs:
           retention-days: 7
 
   editor:
-    name: Editor and activity browser tests (${{ matrix.shard }}/2)
-    runs-on: macos-26
+    name: Editor and activity browser tests (${{ matrix.shard }}/4)
+    if: inputs.reuse-run-id == ''
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -167,7 +224,7 @@ jobs:
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
       - name: Check editor contracts
-        run: npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/2
+        run: npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/4
       - name: Check activity browser behavior
         if: matrix.shard == 1
         run: npm run test:activity-browser
@@ -189,7 +246,8 @@ jobs:
 
   pwa:
     name: PWA browser tests (${{ matrix.shard }}/4)
-    runs-on: macos-26
+    if: inputs.reuse-run-id == ''
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -222,7 +280,8 @@ jobs:
 
   reading:
     name: Reading browser tests
-    runs-on: macos-26
+    if: inputs.reuse-run-id == ''
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -245,3 +304,18 @@ jobs:
           name: reading-browser
           path: test-results/
           retention-days: 7
+
+  shortcut:
+    name: Native shortcut parser checks
+    if: inputs.reuse-run-id == ''
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - run: node --test scripts/reading-shortcut.test.mjs

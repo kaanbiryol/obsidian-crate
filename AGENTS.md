@@ -29,7 +29,7 @@ Use npm and the Node.js range declared in `package.json` (currently `^26.8.2`). 
 - Unit tests: `npm test`, or `npx vitest run <test-file>` for a focused regression.
 - Worker integration: `npm run test:worker-runtime` builds the Worker and tests local D1/R2/Durable Object bindings.
 - Browser coverage: select relevant tests from `npm run test:pwa-browser` or `npm run test:visual`; see the testing guide for harness requirements.
-- Broad validation: `npm run check`. Before publishing a plugin or server release, run `npm run release:check` and complete the applicable acceptance checks in the testing guide.
+- Broad validation: `npm run check`. Before publishing a plugin or server release, require the full release gate and applicable acceptance checks in the testing guide. A successful **Release plugin** run for the exact release commit satisfies the automated gate; it may reuse a successful exact-commit push build while refreshing security, server-revision and reproducibility checks. `npm run release:check` remains the full local alternative; do not repeat it solely to duplicate successful CI.
 
 Match verification to the behavior changed. Add regression coverage for meaningful behavior or failure modes; documentation-only edits need a diff/link review, not the application test suites. After relevant checks pass, repeat or broaden them only for new edits, failures, or unresolved risks.
 

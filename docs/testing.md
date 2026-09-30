@@ -171,7 +171,12 @@ These are unthrottled local samples from September 7, 2026, with service workers
 
 ## Release verification
 
-Run the release gate before publishing either deliverable:
+Require the full release gate before publishing either deliverable. A successful
+**Release plugin** run for the exact release commit satisfies the automated gate;
+complete the applicable [device and hosted acceptance](#public-release-acceptance)
+against its exact draft assets. Use focused checks during development rather than
+repeating the full suite locally after successful CI. To reproduce the complete
+gate locally:
 
 ```bash
 npm run release:check
@@ -181,7 +186,14 @@ It first runs the npm advisory audit (including development dependencies, failin
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, two visual shards, two editor shards (activity on the first, file/vault history on the second), a Reading browser job, and four PWA browser shards run as separate jobs. Capacity benchmarks remain in the release gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second), a Reading browser job, and four PWA browser shards run on Linux. Two visual shards retain the reviewed macOS snapshot platform, and a short macOS job checks the native shortcut parser. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+
+Successful push builds upload candidate records and release assets for seven days.
+Release preparation can reuse only a successful repository push run for the exact
+tag commit. It rechecks that run, rejects missing or expired artifacts, refreshes
+security and the published server-revision baseline, and verifies the candidate's
+workflow identity, Node.js toolchain, version and artifact hashes. PR and fork runs
+are excluded. If no eligible run exists, the complete matrix runs normally.
 
 Reading checks use the same named groups locally and in CI: `test:reading-server`
 covers extraction, server behavior, and shortcut contracts; `test:reading-browser`
@@ -196,7 +208,7 @@ with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifeti
 Browser focus and persistent storage behavior remain covered by Chromium/WebKit
 checks against the built PWA.
 
-Release runs resolve the tag to one commit before starting verification. Every job checks out that commit, and publishing waits for all verification jobs plus a separate clean-install rebuild that must reproduce the original plugin and CSS hashes. Assets uploaded by the source-check job cannot be published when any other check fails.
+Release runs resolve the tag to one commit before starting verification. Every job checks out that commit. A separate clean-install rebuild starts after the source artifacts are ready and must reproduce their plugin, CSS, Worker/PWA and source metadata hashes. Draft asset attachment waits for all required verification jobs and that rebuild. Source artifacts alone cannot authorize a release, and the original push run is rechecked before reused assets are attached.
 
 `npm run check:source` runs everything in `npm run check` except the Worker runtime tests. To inspect or reproduce a PWA browser shard:
 
@@ -205,7 +217,7 @@ npm run test:pwa-browser -- --shard=1/4 --list
 npm run test:pwa-browser -- --shard=1/4
 ```
 
-Omitting `--shard` runs the complete browser suite. Groups are balanced by the measured script durations in `scripts/pwa-browser-durations.json`, which records the source run. Update those estimates from later CI logs when workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
+Omitting `--shard` runs the complete browser suite. Groups are balanced by the measured script durations in `scripts/pwa-browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
 
 The runner builds the Worker/PWA once, then sets `CRATE_PWA_PREBUILT=1` for its child scripts to reuse those fresh assets. Standalone scripts build by default; tests requesting explicit asset versions (including service-worker updates) always build those versions separately. Missing prebuilt assets fail the test. `npm run test:ci` checks shard coverage and balance, runner failure handling, and metadata-independent asset versions.
 
