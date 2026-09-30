@@ -113,7 +113,10 @@ export async function checkTabSettings(page, name) {
 	// The switcher belongs to the last slot, even when Reading moves to the third slot.
 	await sheet.getByRole('button', { name: 'Reset tabs', exact: true }).click();
 	await expect(sheet.getByRole('button', { name: 'Reset tabs', exact: true })).toHaveCount(0);
-	await sheet.getByRole('button', { name: 'Reorder Reading', exact: true }).press('ArrowUp');
+	const resetReadingHandle = sheet.getByRole('button', { name: 'Reorder Reading', exact: true });
+	await resetReadingHandle.focus();
+	await expect(resetReadingHandle).toBeFocused();
+	await resetReadingHandle.press('ArrowUp');
 	await expect.poll(savedTabs).toEqual(['inbox', 'today', 'reading', 'browse']);
 	await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await expect(sheet).toHaveCount(0);

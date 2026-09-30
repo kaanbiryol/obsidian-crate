@@ -317,12 +317,9 @@ jobs:
           retention-days: 7
 
   reading:
-    name: Reading browser tests
+    name: Reading browser and native shortcut tests
     if: inputs.reuse-run-id == ''
-    runs-on: ubuntu-24.04
-    container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-      options: --init --ipc=host
+    runs-on: macos-26
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -334,6 +331,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Check the native shortcut parser
+        run: node --test scripts/reading-shortcut.test.mjs
+      - name: Install native browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build:worker
       - run: npm run test:reading-browser
       - name: Upload Reading browser diagnostics
@@ -343,20 +344,3 @@ jobs:
           name: reading-browser
           path: test-results/
           retention-days: 7
-
-  shortcut:
-    name: Native shortcut parser checks
-    if: inputs.reuse-run-id == ''
-    runs-on: macos-26
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: node --test scripts/reading-shortcut.test.mjs
