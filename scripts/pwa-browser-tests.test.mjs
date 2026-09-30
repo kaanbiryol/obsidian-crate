@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { test } from 'node:test';
-import { browserDurations, browserScripts, runBrowserTests, selectScripts } from './pwa-browser-tests.mjs';
+import { browserDurations, browserScripts, macosBrowserScripts, runBrowserTests, selectScripts } from './pwa-browser-tests.mjs';
 
 test('shards cover every existing browser script exactly once', () => {
 	assert.equal(new Set(browserScripts).size, browserScripts.length);
@@ -21,6 +21,23 @@ test('balances the four CI groups using measured durations', () => {
 		.reduce((total, script) => total + browserDurations[script], 0));
 	const average = totals.reduce((a, b) => a + b) / 4;
 	assert.ok(Math.max(...totals) < average * 1.1, `Expected each group within 10% of the ideal duration: ${totals}`);
+});
+
+test('Linux and native macOS groups retain every browser check exactly once', () => {
+	assert.equal(new Set(macosBrowserScripts).size, macosBrowserScripts.length);
+	assert.ok(macosBrowserScripts.every(script => browserScripts.includes(script)));
+	const linux = Array.from({ length: 4 }, (_, i) => selectScripts(`${i + 1}/4`, 'linux')).flat();
+	const macos = Array.from({ length: 2 }, (_, i) => selectScripts(`${i + 1}/2`, 'macos')).flat();
+	assert.deepEqual([...linux, ...macos].sort(), [...browserScripts].sort());
+	assert.deepEqual(macos.sort(), [...macosBrowserScripts].sort());
+	for (const [platform, count] of [['linux', 4], ['macos', 2]]) {
+		const totals = Array.from({ length: count }, (_, i) => selectScripts(`${i + 1}/${count}`, platform)
+			.reduce((total, script) => total + browserDurations[script], 0));
+		const average = totals.reduce((a, b) => a + b) / count;
+		assert.ok(Math.max(...totals) < average * 1.1, `${platform} groups must remain balanced: ${totals}`);
+	}
+	assert.throws(() => selectScripts(undefined, 'unknown'), /Invalid browser platform/);
+	assert.throws(() => selectScripts(`1/${macosBrowserScripts.length + 1}`, 'macos'), /Invalid shard/);
 });
 
 test('invalid shards fail instead of silently passing with no tests', () => {

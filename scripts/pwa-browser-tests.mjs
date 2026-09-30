@@ -53,22 +53,43 @@ export const browserScripts = [
 	'scripts/shared-press-feedback-test.mjs',
 ];
 
-export function selectScripts(shard) {
-	if (shard === undefined) return browserScripts;
+// These checks exercise native menus, system-font geometry, or WebKit
+// rendering/focus across page and viewport changes. Retain the release platform.
+export const macosBrowserScripts = [
+	'scripts/pwa-settings-test.mjs',
+	'scripts/pwa-safe-area-test.mjs',
+	'scripts/pwa-ios27-header-test.mjs',
+	'scripts/pwa-editor-contract-test.mjs',
+	'scripts/pwa-editor-selection-test.mjs',
+	'scripts/pwa-sheet-interaction-test.mjs',
+	'scripts/pwa-chip-scroll-test.mjs',
+	'scripts/pwa-inline-delete-test.mjs',
+	'scripts/pwa-sheet-opening-test.mjs',
+	'scripts/pwa-safety-test.mjs',
+	'scripts/pwa-update-test.mjs',
+];
+
+export function selectScripts(shard, platform) {
+	if (platform !== undefined && !['linux', 'macos'].includes(platform)) {
+		throw new Error('Invalid browser platform; expected linux or macos.');
+	}
+	const scripts = browserScripts.filter(script => platform === undefined
+		|| macosBrowserScripts.includes(script) === (platform === 'macos'));
+	if (shard === undefined) return scripts;
 	const match = /^([1-9]\d*)\/([1-9]\d*)$/.exec(shard);
 	const [index, total] = match ? match.slice(1).map(Number) : [];
-	if (!index || index > total || total > browserScripts.length) {
-		throw new Error(`Invalid shard ${shard}; expected index/total with 1 <= index <= total <= ${browserScripts.length}`);
+	if (!index || index > total || total > scripts.length) {
+		throw new Error(`Invalid shard ${shard}; expected index/total with 1 <= index <= total <= ${scripts.length}`);
 	}
 	const groups = Array.from({ length: total }, () => ({ seconds: 0, scripts: new Set() }));
 	const duration = script => browserDurations[script] ?? 30;
-	for (const script of [...browserScripts].sort((a, b) => duration(b) - duration(a))) {
+	for (const script of [...scripts].sort((a, b) => duration(b) - duration(a))) {
 		const group = groups.reduce((smallest, candidate) => candidate.seconds < smallest.seconds ? candidate : smallest);
 		group.scripts.add(script);
 		group.seconds += duration(script);
 	}
 	// Preserve suite order within each group; timing estimates only decide placement.
-	return browserScripts.filter(script => groups[index - 1].scripts.has(script));
+	return scripts.filter(script => groups[index - 1].scripts.has(script));
 }
 
 export function runBrowserTests(scripts, { run = spawnSync, env = process.env, logger = console } = {}) {
@@ -102,8 +123,8 @@ export function runBrowserTests(scripts, { run = spawnSync, env = process.env, l
 }
 
 if (import.meta.main) {
-	const { values } = parseArgs({ options: { shard: { type: 'string' }, list: { type: 'boolean' } } });
-	const scripts = selectScripts(values.shard);
+	const { values } = parseArgs({ options: { shard: { type: 'string' }, platform: { type: 'string' }, list: { type: 'boolean' } } });
+	const scripts = selectScripts(values.shard, values.platform);
 	if (values.list) console.log(scripts.join('\n'));
 	else process.exitCode = runBrowserTests(scripts);
 }
