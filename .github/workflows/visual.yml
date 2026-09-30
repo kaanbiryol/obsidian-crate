@@ -1,50 +1,43 @@
-name: Shared UI visual checks
+name: Release runner diagnostics
 
 on:
-  # Automatic comparisons are part of verify.yml; keep manual baseline review.
   workflow_dispatch:
-    inputs:
-      update_baselines:
-        description: Generate candidate baselines for review
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 jobs:
-  visual:
-    # Match the reviewed snapshot platform; system fonts differ on Linux.
-    runs-on: macos-26
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
-      - run: npm run build
-      - run: npm run typecheck:visual
-      - name: Compare shared UI screenshots
-        if: inputs.update_baselines != true
-        run: npm run test:visual
-      - name: Generate candidate baselines
-        if: inputs.update_baselines == true
-        run: node scripts/visual-test-run.mjs --update-snapshots
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: shared-ui-visual-review
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: inputs.update_baselines == true
-        with:
-          name: shared-ui-candidate-baselines
-          path: tests/visual/baselines/
-          retention-days: 7
+      - run: npm run build:worker
+      - name: Native keyboard focus with a display
+        continue-on-error: true
+        env:
+          CRATE_PWA_PREBUILT: '1'
+        run: xvfb-run --auto-servernum timeout 180s node scripts/pwa-settings-test.mjs
+      - name: Delete header geometry
+        continue-on-error: true
+        env:
+          CRATE_PWA_PREBUILT: '1'
+        run: xvfb-run --auto-servernum timeout 180s node scripts/pwa-inline-delete-test.mjs
+      - name: Safe area and clipboard with a display
+        continue-on-error: true
+        env:
+          CRATE_PWA_PREBUILT: '1'
+        run: xvfb-run --auto-servernum timeout 180s node scripts/pwa-safe-area-test.mjs
+      - name: Sheet opening with a display
+        continue-on-error: true
+        env:
+          CRATE_PWA_PREBUILT: '1'
+        run: xvfb-run --auto-servernum timeout 180s node scripts/pwa-sheet-opening-test.mjs
