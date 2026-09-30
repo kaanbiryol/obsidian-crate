@@ -14,7 +14,7 @@ import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const generatedDir = resolve(root, '.generated/cloudflare');
-const development = process.argv.includes('--development') ? createDevelopmentBuild(root, process.env.CRATE_DEV_WORKER) : undefined;
+const development = process.argv.includes('--development') ? createDevelopmentBuild(root) : undefined;
 // This identifies the Cloudflare service, not the Obsidian plugin release.
 // Keeping it stable prevents an otherwise unrelated plugin version bump from
 // changing the Worker bundle and prompting users to redeploy their server.

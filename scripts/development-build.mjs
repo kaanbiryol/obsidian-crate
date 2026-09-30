@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { loadEnv } from 'vite';
 
-export function createDevelopmentBuild(root, worker) {
-  if (!/^crate-[a-f0-9]{16}$/.test(worker ?? '')) throw new Error('Set CRATE_DEV_WORKER to the exact Worker name of your development server (crate- followed by 16 hex characters).');
+export function createDevelopmentBuild(root, worker = loadEnv('development', root, 'CRATE_DEV_WORKER').CRATE_DEV_WORKER) {
+  if (!/^crate-[a-f0-9]{16}$/.test(worker ?? '')) throw new Error('Set CRATE_DEV_WORKER in .env.development.local or your shell to the exact Worker name of your development server (crate- followed by 16 hex characters).');
   const { revision } = JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8'));
   if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('Invalid public server revision');
   const path = resolve(root, 'server-development.local.json');

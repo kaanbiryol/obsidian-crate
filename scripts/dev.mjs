@@ -9,6 +9,10 @@ const watchedPaths = [
 	path.join(rootDir, 'src'),
 	path.join(rootDir, 'scripts'),
 	...[
+		'.env',
+		'.env.local',
+		'.env.development',
+		'.env.development.local',
 		'manifest.json',
 		'package.json',
 		'postcss.config.js',

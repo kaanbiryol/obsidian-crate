@@ -309,6 +309,17 @@ Crate supports the current prerelease formats. Provisioning accepts an empty dat
 
 ## Development
 
+Set `CRATE_DEV_WORKER` in the ignored `.env.development.local` file to the exact
+Worker name of your development server (replace the example):
+
+```dotenv
+CRATE_DEV_WORKER=crate-0123456789abcdef
+```
+
+Development builds are restricted to that Worker. See
+[development deployments](docs/server-upgrades.md#testing-development-deployments)
+for server revision requirements. Shell values override the saved setting.
+
 Create the local test vault from the versioned sample notes, then run the dev watcher:
 
 ```bash
