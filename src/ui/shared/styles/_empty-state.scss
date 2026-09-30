@@ -1,0 +1,117 @@
+// Empty messages grow into the available space and scroll from the top when
+// their contents no longer fit. Hosts supply their own navigation clearance.
+@mixin body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    > * { flex-shrink: 0; }
+}
+
+@mixin styles {
+.reminders-empty-state {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+    align-items: center;
+    justify-content: center;
+    height: auto;
+    width: 100%;
+    text-align: center;
+    gap: 4px;
+    padding-right: 28px;
+    padding-left: 28px;
+
+    &.is-compact {
+        padding-right: 20px;
+        padding-left: 20px;
+    }
+}
+
+.reminders-empty-state-icon {
+    --empty-state-color: var(--interactive-accent);
+
+    flex-shrink: 0;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 10px;
+    background: color-mix(in srgb, var(--empty-state-color) 10%, transparent);
+    color: var(--empty-state-color);
+
+    &.tone-secondary {
+        --empty-state-color: var(--color-cyan);
+    }
+
+    &.tone-warning {
+        --empty-state-color: var(--text-warning);
+    }
+}
+
+.reminders-empty-state.is-compact .reminders-empty-state-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+}
+
+.reminders-empty-state-title,
+.reminders-empty-state-description {
+    max-width: 320px;
+    margin: 0;
+}
+
+.reminders-empty-state-title {
+    margin-bottom: 4px;
+    color: var(--text-normal);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    font-weight: var(--reminder-font-weight-semibold, 600);
+    line-height: 1.3;
+}
+
+.reminders-empty-state-description {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    line-height: 1.5;
+}
+
+.reminders-empty-state.is-compact {
+    .reminders-empty-state-title,
+    .reminders-empty-state-description {
+        max-width: 240px;
+    }
+
+    .reminders-empty-state-description {
+        font-size: var(--reminder-font-sm, var(--font-ui-small, 13px));
+    }
+}
+
+.reminders-empty-state-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    max-width: 320px;
+    p { margin: 0; color: var(--text-muted); }
+}
+}
+
+@mixin primary {
+    .reminders-empty-state-icon {
+        width: 52px;
+        height: 52px;
+        margin-bottom: 8px;
+        background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+    }
+
+    .reminders-empty-state-title {
+        margin-bottom: 2px;
+        font-size: var(--reminder-font-base);
+        font-weight: var(--reminder-font-weight-semibold);
+    }
+
+    .reminders-empty-state-description {
+        color: var(--text-faint);
+        font-size: var(--reminder-font-sm);
+        line-height: 1.4;
+    }
+}

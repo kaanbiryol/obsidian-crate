@@ -1,5 +1,6 @@
 @use "../../../ui/shared/styles/list-item";
 @use "../../../ui/shared/styles/loading-indicator";
+@use "../../../ui/shared/styles/empty-state";
 .crate-reminders-ui .crate-reading-workspace { height: 100%; min-height: 0; container: reading / inline-size; }
 .crate-reminders-ui .crate-reading {
 	&__layout { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
@@ -33,11 +34,11 @@
 	button.crate-reading__favorite { align-self: center; margin: 0 2px; color: var(--text-faint, var(--text-muted)); }
 	button.crate-reading__favorite[aria-pressed="true"] { color: var(--text-normal); }
 	@media (hover: hover) and (pointer: fine) { &__item:not(:hover):not(:focus-within) button.crate-reading__favorite[aria-pressed="false"] { opacity: 0; } }
-	&__empty { text-align: center; padding: 64px 20px; color: var(--text-muted); }
-	&__empty > svg { display: block; margin: 0 auto 24px; color: var(--text-faint, var(--text-muted)); }
-	&__empty h2 { font-size: 18px; color: var(--text-normal); font-weight: 500; line-height: 1.4; letter-spacing: -.025em; margin: 0 0 12px; }
-	&__empty p { max-width: 260px; font-size: 14px; margin: 0 auto; line-height: 1.75; }
-	&__empty button { margin-top: 24px; }
+	&__list-scroll:has(> .crate-reading__empty) {
+		@include empty-state.body;
+		padding-block: 16px;
+	}
+	&__empty { @include empty-state.primary; }
 	&__reader-pane { min-width: 0; min-height: 0; overflow: hidden; }
 	&__more { display: flex; margin: 16px auto; }
 	&__tag-filter { margin: 0 12px 14px; }

@@ -197,6 +197,10 @@ both hosts together.
   flow in its current position, keeping the incoming scroller’s parent and geometry
   intact. Incoming reminders accept input immediately; departing content is inert.
   Empty-state copy and icons fade as one unit without a separate icon delay.
+  Reading library, filter results, and setup guidance reuse the reminders
+  `EmptyState` component and shared `empty-state` Sass. Center these messages in
+  the space below the search and filters, clear of navigation; short screens
+  scroll from the top so their text and actions remain reachable.
   `PwaSheetSurface` owns keyboard padding and motion for reminder stages,
   Reading dialogs, and Settings. `PwaModalSheet` measures the keyboard by default;
   reminder navigation can override the inset while handing off to a picker.

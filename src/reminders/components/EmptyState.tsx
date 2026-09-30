@@ -8,7 +8,9 @@ import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 interface EmptyStateProps {
     icon: string;
     title: string;
-    description: string;
+    description: React.ReactNode;
+    className?: string;
+    children?: React.ReactNode;
     iconColor?: 'primary' | 'secondary' | 'warning';
     animationConfig?: AnimationConfig;
     /** Use tighter spacing for compact views like sidebars */
@@ -27,7 +29,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     description,
     iconColor = 'primary',
     animationConfig = { enabled: true },
-    compact = false
+    compact = false,
+    className = '',
+    children,
 }) => {
 	const currentMessage = useContext(EmptyStateMessageContext);
 	const isPresent = useIsPresent();
@@ -63,7 +67,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     return (
         <Wrapper
             {...wrapperProps}
-            className={`reminders-empty-state flex flex-col flex-1 items-center justify-center text-center w-full h-full${compact ? ' is-compact' : ''}`}
+            className={`reminders-empty-state${compact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`}
         >
             <div
                 className={`reminders-empty-state-icon tone-${iconColor} flex items-center justify-center rounded-full`}
@@ -76,6 +80,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             <p className="reminders-empty-state-description">
                 {message?.description ?? description}
             </p>
+            {children && <div className="reminders-empty-state-actions">{children}</div>}
         </Wrapper>
     );
 };

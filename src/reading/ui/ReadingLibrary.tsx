@@ -7,6 +7,7 @@ import type { NavigationItem } from '../../ui/shared/NavigationBar';
 import { NavigationBar } from '../../ui/shared/NavigationBar';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { FloatingActionButton } from '../../reminders/components/FloatingActionButton';
+import { EmptyState } from '../../reminders/components/EmptyState';
 import type { ReadingChanges, ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
 import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, type ReadingSection } from './reading-presentation';
@@ -123,8 +124,16 @@ export function ReadingLibraryPanel({ renderNavigation, renderLibraryContent, sn
 					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}
 					{listContent ?? (snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
-						{section === 'highlights' && <><HighlightList entries={excerpts.slice(0, visible)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />{!count && <div className="crate-reading__empty"><ThemeIcon id="highlighter" size="xl" aria-hidden="true" /><h2>{query || articleFilter || tag ? 'No matching highlights' : 'Keep the passages that stay with you'}</h2><p>{query || articleFilter || tag ? 'Try another passage, note, or article.' : 'Select text while reading. Your highlights appear here and in your Obsidian notes.'}</p></div>}</>}
-						{section !== 'highlights' && items.length === 0 && <div className="crate-reading__empty"><ThemeIcon id="book-open" size="xl" aria-hidden="true" /><h2>{query || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}</h2><p>{query || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}</p>{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}</div>}
+						{section === 'highlights' && (count > 0
+							? <HighlightList entries={excerpts.slice(0, visible)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
+							: <EmptyState className="crate-reading__empty" icon="highlighter"
+								title={query || articleFilter || tag ? 'No matching highlights' : 'Keep the passages that stay with you'}
+								description={query || articleFilter || tag ? 'Try another passage, note, or article.' : 'Select text while reading. Your highlights appear here and in your Obsidian notes.'} />)}
+						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open"
+							title={query || tag ? 'No matching links' : section === 'inbox' ? 'Save something worth your time' : section === 'favorites' ? 'Keep your favorites close' : 'A home for what you’ve read'}
+							description={query || tag ? 'Try another title, source, or tag.' : section === 'inbox' ? 'An essay, an idea, a little inspiration. Keep it here for a quieter moment.' : section === 'favorites' ? 'Star an article to find it here.' : 'Finished reading? Archive it. You can always come back.'}>
+							{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}
+						</EmptyState>}
 						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
 							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${item.title}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
 								<ReadingSourceIcon item={item} /><span className="crate-reading__item-copy"><strong>{item.title}</strong><span className="crate-reading__meta">{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Text pending' : item.source_url ? 'Link only' : 'Empty note'}</>}</span></span>

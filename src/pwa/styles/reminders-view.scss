@@ -1,4 +1,5 @@
 @use "../../reminders/ui/shared/styles/editor-fields";
+@use "../../ui/shared/styles/empty-state";
 @use "../../reminders/ui/shared/styles/editor-actions";
 @use "./editor-layout";
 @use "./picker-layout";
@@ -38,17 +39,12 @@
 	// Empty screens use the visible space above the overlapping dock. Keep
 	// short viewports scrollable instead of clipping the message at the top.
 	.pwa-reminders-view .reminders-empty-body {
-		display: grid;
-		grid-template-rows: minmax(min-content, 1fr);
-		min-height: 0;
-		overflow-y: auto;
+		@include empty-state.body;
 		padding-block: 16px calc(var(--pwa-dock-height) + 16px);
-	}
-	.pwa-reminders-view .reminders-empty-state {
-		height: auto;
 	}
 
 	.reminders-empty-state-icon,
+	.crate-reading__empty .reminders-empty-state-icon,
 	.reminders-view.is-primary .reminders-empty-state-icon {
 		background: transparent;
 	}

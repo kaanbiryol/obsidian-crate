@@ -1,22 +1,4 @@
 @use '../../ui/shared/styles/reading-navigation';
-// Fill the space below search and filters; dock.scss reserves the dock overlap.
-.crate-reminders-ui.pwa-reading-root {
-  .crate-reading__list-scroll:has(> .crate-reading__empty) {
-    display: flex;
-    flex-direction: column;
-    padding-top: 16px;
-    padding-bottom: 16px;
-    > * { flex-shrink: 0; }
-  }
-  .crate-reading__empty {
-    flex: 1 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-}
 // The reader supplies selection actions; keep saved passages selectable for resizing.
 #app .crate-reading-reader__body, #app .crate-reading-reader__highlight { user-select: text; -webkit-user-select: text; -webkit-touch-callout: none; }
 .crate-reminders-ui.pwa-reading-root { --pwa-tabbar-content-height: 64px; --pwa-tabbar-safe-area: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)); --reminders-tabbar-height: calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area)); }

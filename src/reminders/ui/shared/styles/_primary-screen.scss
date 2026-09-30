@@ -1,3 +1,4 @@
+@use "../../../../ui/shared/styles/empty-state";
 @use "../../../../ui/shared/styles/list-item";
 @use "../../../../ui/shared/styles/view-header";
 
@@ -114,24 +115,7 @@
         );
     }
 
-    .reminders-empty-state-icon {
-        width: 52px;
-        height: 52px;
-        margin-bottom: 8px;
-        background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
-    }
-
-    .reminders-empty-state-title {
-        margin-bottom: 2px;
-        font-size: var(--reminder-font-base);
-        font-weight: var(--reminder-font-weight-semibold);
-    }
-
-    .reminders-empty-state-description {
-        color: var(--text-faint);
-        font-size: var(--reminder-font-sm);
-        line-height: 1.4;
-    }
+    @include empty-state.primary;
 }
 
 .reminders-view .reminders-upcoming-view {
