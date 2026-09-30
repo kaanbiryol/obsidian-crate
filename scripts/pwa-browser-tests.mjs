@@ -59,6 +59,7 @@ export const macosBrowserScripts = [
 	'scripts/pwa-settings-test.mjs',
 	'scripts/pwa-safe-area-test.mjs',
 	'scripts/pwa-ios27-header-test.mjs',
+	'scripts/pwa-focus-test.mjs',
 	'scripts/pwa-feature-switcher-test.mjs',
 	'scripts/pwa-dock-test.mjs',
 	'scripts/pwa-editor-contract-test.mjs',

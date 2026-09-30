@@ -28,9 +28,24 @@ export async function checkSettingsMotion(browser, origin) {
 		await slow.evaluate(el => el.remove());
 		await checkShortcutSheet(page);
 		for (let cycle = 0; cycle < 2; cycle++) {
-			await sheet.getByRole('button', { name: 'Close settings', exact: true }).evaluate(el => el.click());
-			await expect(sheet).toHaveAttribute('data-ending-style', '');
-			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
+			// Record the exit inside the page so protocol delays cannot observe only
+			// the restored background after the sheet's transition has finished.
+			const closingInert = await sheet.getByRole('button', { name: 'Close settings', exact: true }).evaluate(button => {
+				const popup = button.closest('[role="dialog"]');
+				const background = document.querySelector('[data-crate-section="reminders"]');
+				return new Promise(resolve => {
+					const frames = [];
+					const sample = () => {
+						if (!popup.isConnected) { resolve(frames); return; }
+						if (popup.hasAttribute('data-ending-style')) frames.push(background.hasAttribute('inert'));
+						requestAnimationFrame(() => setTimeout(sample, 0));
+					};
+					button.click();
+					requestAnimationFrame(() => setTimeout(sample, 0));
+				});
+			});
+			expect(closingInert.length, 'Settings must retain a visible closing state').toBeGreaterThan(0);
+			expect(closingInert.every(Boolean), JSON.stringify(closingInert)).toBe(true);
 			await expect(sheet).toHaveCount(0);
 			await expect(gear).toBeFocused();
 			await gear.click();
