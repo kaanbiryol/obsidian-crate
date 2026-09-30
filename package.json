@@ -166,6 +166,9 @@
 		"miniflare": {
 			"sharp": "0.35.5",
 			"undici": "7.29.1"
+		},
+		"obsidian": {
+			"moment": "2.31.0"
 		}
 	}
 }
