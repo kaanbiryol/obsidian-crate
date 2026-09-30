@@ -110,6 +110,10 @@ export function registerPluginNavigationTests() {
         await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
         await active.getByRole('button', { name: 'Inbox', exact: true }).click();
         await page.emulateMedia({ reducedMotion: 'reduce' });
+        // Applying reduced motion can complete the feature switch and restore
+        // focus to Inbox. Wait for that handoff before focusing the menu trigger.
+        await expect(workspace).toHaveAttribute('data-reduced-motion', 'true');
+        await expect(active).toHaveAttribute('data-entering', 'false');
         await active.locator('[data-dock-group]').press('ArrowDown');
         await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: 'Favorites', exact: true }).click();
         await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText('Favorites');
