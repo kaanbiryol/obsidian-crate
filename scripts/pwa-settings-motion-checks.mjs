@@ -94,7 +94,7 @@ export async function checkSettingsMotion(browser, origin) {
 		// Record the complete exit before releasing. Polling for a transient
 		// running state can begin after the compositor already finished it.
 		const frames = await checkCommittedDrag();
-		expect(frames.some(frame => frame.alive && frame.sheet > .7 && frame.sheet < .95)).toBe(true);
+		expect(frames.some(frame => frame.alive && frame.sheet > .7 && frame.sheet < .95), JSON.stringify(frames)).toBe(true);
 		for (const frame of frames) expect(Math.abs(frame.canvas - frame.sheet) * .06 * 390).toBeLessThan(1.5);
 		await expect.poll(scale).toBe(1);
 		expect(await canvas.evaluate(el => el.style.getPropertyValue('--pwa-sheet-position'))).toBe('');

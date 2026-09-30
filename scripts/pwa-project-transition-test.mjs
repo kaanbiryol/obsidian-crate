@@ -175,10 +175,13 @@ try {
         document.querySelector('[data-action="open-project"][data-project="Errands"]').click();
         // Reopening first refreshes browser history; measure from the actual entrance.
         while (!document.querySelector('.pwa-navigation-screen--project')) await new Promise(resolve => requestAnimationFrame(resolve));
-        await new Promise(resolve => setTimeout(resolve, 80));
         const screen = document.querySelector('.pwa-navigation-screen--project');
         const x = () => new DOMMatrixReadOnly(getComputedStyle(screen).transform).m41;
-        const before = x(), width = screen.getBoundingClientRect().width;
+        const width = screen.getBoundingClientRect().width, entranceStarted = performance.now();
+        // The mounted surface can wait for its first animation frame on CI.
+        // Interrupt actual travel rather than assuming 80 ms delivered a frame.
+        while ((x() <= 1 || x() >= width - 1) && performance.now() - entranceStarted < 1000) await new Promise(requestAnimationFrame);
+        const before = x();
         screen.querySelector('.crate-back-button').click();
         await Promise.resolve();
         const after = x(), samples = [after], started = performance.now();
