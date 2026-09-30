@@ -190,7 +190,17 @@ for (const browserType of [chromium, webkit]) {
       await page.locator('[data-action="open-create-modal"]').tap();
       await replaceTitle('Call Alex every Monday');
       const target = field === 'title' ? title : description;
-      await target.tap();
+      // Append at the end. A coordinate tap can put the caret inside the date
+      // chip, changing the input instead of exercising same-turn persistence.
+      await target.focus();
+      await target.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element); range.collapse(false);
+        document.getSelection().removeAllRanges();
+        document.getSelection().addRange(range);
+        document.dispatchEvent(new Event('selectionchange'));
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const request = page.waitForRequest(request => request.url().endsWith('/reminders/create') && request.method() === 'POST');
       await target.evaluate((element, field) => {
         const data = new DataTransfer();

@@ -234,7 +234,7 @@ async function checkRapidSwitches(page, dock = false) {
 		}
 	}
 	assert.equal(frames.some(frame => Object.values(frame.weights).some(weight => weight > 0 && weight < 1)), !reducedMotion,
-		'Rapid switches must exercise the dissolve only when motion is enabled');
+		`Rapid switches must exercise the dissolve only when motion is enabled: ${JSON.stringify(frames)}`);
 	assert.equal(frames.at(-1).weights[dock ? 'today' : 'upcoming'], 1, 'Settle on the latest requested screen');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
@@ -288,10 +288,12 @@ try {
 			await expect(row('completed')).toHaveCount(0);
 			await expect(live.locator('.upcoming-date-header')).toHaveCount(2);
 			await expect(live.locator('.view-header-count')).toHaveText('2 reminders');
+			// Observe unmodified native reversals before the separate fade checks
+			// seek CSS animations; finished seeked effects can affect later reversals.
+			await checkRapidSwitches(page);
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
 			await checkScheduleFade(page, 'Today', 'Upcoming');
-			await checkRapidSwitches(page);
 			await page.emulateMedia({ reducedMotion: 'reduce' });
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
