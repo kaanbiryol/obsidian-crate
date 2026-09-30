@@ -150,6 +150,48 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 
+// A transition-end cleanup and a new selection can be batched into one React
+// commit. Reopening the departed view must start with a fresh opaque layer.
+async function checkCleanupReversal(page) {
+	const result = await page.evaluate(async () => {
+		const shell = document.querySelector('.pwa-reminders-view');
+		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
+		const button = name => [...shell.querySelectorAll('.pwa-schedule-chip')].find(button => button.textContent === name);
+		const layers = () => [...container.children].map(panel => ({
+			view: panel.dataset.tabView, opacity: Number(getComputedStyle(panel).opacity),
+		}));
+		const holdCleanup = event => {
+			if (event.propertyName === 'opacity' && event.target.parentElement === container) event.stopImmediatePropagation();
+		};
+		container.addEventListener('transitionend', holdCleanup, true);
+		button('Today').click();
+		await Promise.resolve();
+		// Finish only the setup fade while retaining its layers. Natural rapid
+		// reversals are exercised separately below; this case targets batching.
+		for (const animation of container.getAnimations({ subtree: true })) {
+			if (animation.transitionProperty === 'opacity' && animation.effect?.target?.parentElement === container) animation.finish();
+		}
+		const before = layers();
+		const departed = container.querySelector('[data-tab-view="upcoming"]');
+		container.removeEventListener('transitionend', holdCleanup, true);
+		departed.dispatchEvent(new TransitionEvent('transitionend', { bubbles: true, propertyName: 'opacity' }));
+		button('Upcoming').click();
+		await Promise.resolve();
+		const frames = [layers()], reopenedAt = performance.now();
+		while (performance.now() - reopenedAt < 250) {
+			await new Promise(requestAnimationFrame);
+			frames.push(layers());
+		}
+		return { before, frames };
+	});
+	assert.deepEqual(result.before, [{ view: 'today', opacity: 1 }, { view: 'upcoming', opacity: 0 }]);
+	assert.ok(result.frames.every(frame => frame.some(layer => layer.opacity === 1)),
+		`Cleanup and immediate reopening must keep an opaque tab: ${JSON.stringify(result.frames)}`);
+	assert.ok(result.frames.some(frame => frame.some(layer => layer.opacity > 0 && layer.opacity < 1)),
+		'Reopening after cleanup must preserve the outgoing fade');
+	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+}
+
 // Compare each screen's actual contribution to the composite, not just its own
 // opacity: swapping two partly faded layers can flash while both look animated.
 async function checkRapidSwitches(page, dock = false) {
@@ -162,12 +204,23 @@ async function checkRapidSwitches(page, dock = false) {
 		const sequence = dock
 			? ['projects', 'inbox', 'today', 'inbox', 'projects', 'today']
 			: ['today', 'upcoming', 'today', 'upcoming', 'today', 'upcoming'];
+		// A removed and recreated view is a new layer, even with the same view key.
+		const layerIds = new WeakMap(), animationIds = new WeakMap();
+		let nextLayerId = 0, nextAnimationId = 0;
+		const layerId = panel => {
+			if (!layerIds.has(panel)) layerIds.set(panel, ++nextLayerId);
+			return `${panel.dataset.tabView}:${layerIds.get(panel)}`;
+		};
 		const sample = () => {
 			// Reading geometry for a long scrolled list can take several frames.
 			// Keep the full sampling interval; a timestamp taken only afterwards
 			// understates how much native animation time elapsed between reads.
 			const started = performance.now();
 			const animations = [...container.children].flatMap(panel => panel.getAnimations());
+			const nativeTimes = animations.filter(animation => animation.transitionProperty === 'opacity').map(animation => {
+				if (!animationIds.has(animation)) animationIds.set(animation, ++nextAnimationId);
+				return { id: animationIds.get(animation), time: Number(animation.currentTime) };
+			});
 			const motionRate = animations.reduce((rate, animation) => {
 				if (animation.transitionProperty !== 'opacity') return rate;
 				const keys = animation.effect.getKeyframes(), duration = Number(animation.effect.getTiming().duration);
@@ -188,7 +241,7 @@ async function checkRapidSwitches(page, dock = false) {
 					if (rect.top >= 0 && rect.bottom <= innerHeight) cards[`${panel.dataset.tabView}:${row.dataset.reminderId}`] = [rect.y, rect.height];
 				}
 			}
-			return { started, time: performance.now(), connected: container.isConnected, active: container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView, motionRate, weights, uncovered, cards, order: panels.map(panel => panel.dataset.tabView) };
+			return { started, time: performance.now(), connected: container.isConnected, active: container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView, motionRate, nativeTimes, weights, uncovered, cards, order: panels.map(layerId) };
 		};
 		const frames = [sample()], start = performance.now();
 		let step = 0, lastSwitch = start;
@@ -223,7 +276,11 @@ async function checkRapidSwitches(page, dock = false) {
 			// reversals. Include measurement work and one compositor frame of skew.
 			// Without a native transition, a switch still permits no visible jump.
 			const rate = Math.max(previous.motionRate, frame.motionRate);
-			const elapsed = frame.time - previous.started + 17;
+			// WebKit can resolve a pending native start retrospectively: its
+			// animation clock advances farther than performance.now between reads.
+			const nativeElapsed = Math.max(0, ...frame.nativeTimes.map(({ id, time }) =>
+				time - (previous.nativeTimes.find(animation => animation.id === id)?.time ?? 0)));
+			const elapsed = Math.max(frame.time - previous.started, nativeElapsed) + 17;
 			assert.ok(change <= .04 + elapsed * rate,
 				`${view} flashed by ${change.toFixed(3)} in ${(frame.time - previous.time).toFixed(1)}ms: ${JSON.stringify({ previous, frame })}`);
 		}
@@ -291,6 +348,7 @@ try {
 			// Observe unmodified native reversals before the separate fade checks
 			// seek CSS animations; finished seeked effects can affect later reversals.
 			await checkRapidSwitches(page);
+			await checkCleanupReversal(page);
 			await checkScheduleFade(page, 'Today');
 			await checkScheduleFade(page, 'Upcoming');
 			await checkScheduleFade(page, 'Today', 'Upcoming');
