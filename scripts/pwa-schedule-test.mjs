@@ -41,6 +41,18 @@ async function checkTodayStartup(browser, reducedMotion) {
 	});
 	await page.addInitScript(() => {
 		window.startupFrames = [];
+		// Slow only the native startup fade so a dropped CI frame cannot skip
+		// its entire painted interval. Keyframes and reduced-motion behavior
+		// still come from the application, for both cold and cached launches.
+		const animate = Element.prototype.animate;
+		Element.prototype.animate = function(keyframes, options) {
+			const animation = animate.call(this, keyframes, options);
+			if (this.matches('.pwa-reminders-view .view-header-meta, .pwa-reminders-view .pwa-schedule-switcher, .pwa-reminders-view .reminders-content')
+				&& Array.isArray(keyframes) && keyframes[0]?.opacity === 0 && keyframes.at(-1)?.opacity === 1) {
+				animation.playbackRate = .16;
+			}
+			return animation;
+		};
 		const sample = () => {
 			const shell = document.querySelector('.pwa-reminders-view');
 			if (shell) {
