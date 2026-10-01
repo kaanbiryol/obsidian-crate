@@ -250,7 +250,7 @@ try {
 			await sheet.getByRole('button', { name: 'Log out', exact: true }).click();
 			const logout = page.getByRole('dialog', { name: 'Log out of Crate?', exact: true });
 			await expect(logout.getByText(/unsynced or unverified changes/)).toBeVisible();
-			await expect(logout.getByRole('button', { name: 'Export Reading data', exact: true })).toHaveCount(0);
+			await expect(logout.getByRole('button', { name: 'Export Reading data', exact: true })).toBeEnabled();
 			await logout.getByRole('button', { name: 'Cancel', exact: true }).click();
 			await expect(sheet.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 			await page.setViewportSize({ width: 320, height: 568 });

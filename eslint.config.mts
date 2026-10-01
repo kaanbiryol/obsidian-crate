@@ -203,6 +203,7 @@ export default tseslint.config(
 		".generated",
 		".generated/**",
 		"site/assets/*.generated.js",
+		"site/shortcuts/help/**",
 		"test-vault",
 		"test-vault/**",
 		"test-results/**",
