@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-crate",
-	"version": "0.4.1",
+	"version": "0.5.0",
 	"description": "Sync vault files and reminders with Cloudflare R2.",
 	"main": "main.js",
 	"type": "module",
