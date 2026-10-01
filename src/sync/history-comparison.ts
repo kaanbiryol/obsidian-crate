@@ -14,8 +14,8 @@ export interface HistoryComparison {
     preview(path: string): Promise<HistoryRestorePreview>;
 }
 
-/** Compare two immutable inventories. Current local files never participate. */
-export function compareHistorySnapshots(after: HistorySnapshot, before?: HistorySnapshot, notice?: string): HistoryComparison {
+/** Compare complete inventories; verify the corresponding bytes on preview. */
+export function compareHistorySnapshots(after: HistorySnapshot, before?: HistorySnapshot, { cachePreviews = true } = {}): HistoryComparison {
     const saved: Record<string, FileEntry> = Object.assign(Object.create(null) as Record<string, FileEntry>, after.files);
     const earlier: Record<string, FileEntry> = Object.assign(Object.create(null) as Record<string, FileEntry>, before?.files);
     const paths = [...new Set([...Object.keys(saved), ...Object.keys(earlier)])].sort();
@@ -26,7 +26,7 @@ export function compareHistorySnapshots(after: HistorySnapshot, before?: History
     // an entire vault's contents in memory on mobile.
     const previews = new Map<string, Promise<HistoryRestorePreview>>();
     return {
-        items, compared: !!before, notice,
+        items, compared: !!before,
         preview: async path => {
             if (!items.some(item => item.path === path)) throw new Error('This file is not in the selected sync.');
             const cached = previews.get(path);
@@ -37,6 +37,9 @@ export function compareHistorySnapshots(after: HistorySnapshot, before?: History
             }
             const preview = loadHistoryRestorePreview(path, earlier[path], saved[path],
                 () => before!.read(path, earlier[path]!), () => after.read(path, saved[path]!));
+            // A current-vault comparison must re-read local bytes when revisiting
+            // a file, so an edit cannot be hidden by an immutable-preview cache.
+            if (!cachePreviews) return preview;
             previews.set(path, preview);
             if (previews.size > 16) previews.delete(previews.keys().next().value!);
             try {

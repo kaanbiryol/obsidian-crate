@@ -1,4 +1,3 @@
-import { compareHistorySnapshots, type HistorySnapshot } from './history-comparison';
 import type { SyncEngine } from './engine';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { SyncHistoryEntry, SyncResult } from './types';
@@ -14,25 +13,14 @@ interface HistoryRestoreContext {
   runSyncOperation: (operation: (engine: HistoryEngine, progress: (current: number, total: number) => void) => Promise<SyncResult>) => Promise<SyncResult>;
 }
 
-export async function loadRuntimeHistoryComparison(engine: Pick<SyncEngine, 'loadHistorySnapshot'>, verify: () => void,
-    entry: SyncHistoryEntry, previous?: SyncHistoryEntry) {
-    const load = async (point: SyncHistoryEntry) => {
-        const id = point.sharedCheckpoint ?? point.historyCheckpoint;
-        if (!id) throw new Error('This sync has no saved state to preview.');
-        const snapshot = await engine.loadHistorySnapshot(id, !!point.sharedCheckpoint);
-        verify();
-        return snapshot;
-    };
-    const after = await load(entry);
-    let before: HistorySnapshot | undefined;
-    let notice = 'No earlier state to compare.';
-    let retryable = false;
-    if (previous) {
-        try { before = await load(previous); }
-        catch { verify(); retryable = true; notice = 'The earlier saved state could not be loaded. Showing saved contents.'; }
-    }
-    const comparison = compareHistorySnapshots(after, before, before ? undefined : notice);
-    return { ...comparison, retryable, preview: async (path: string) => {
+export async function loadRuntimeHistoryComparison(engine: Pick<SyncEngine, 'loadHistoryComparison'>, verify: () => void,
+    entry: SyncHistoryEntry) {
+    const id = entry.sharedCheckpoint ?? entry.historyCheckpoint;
+    if (!id) throw new Error('This sync has no saved state to preview.');
+    verify();
+    const comparison = await engine.loadHistoryComparison(id, !!entry.sharedCheckpoint);
+    verify();
+    return { ...comparison, preview: async (path: string) => {
         verify();
         const preview = await comparison.preview(path);
         verify();

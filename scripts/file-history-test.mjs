@@ -77,16 +77,16 @@ const { outputFiles } = await build({
   window.activityHistory = new ActivityHistory({}, panel, {
    restore,
    openFile: path => window.openedHistoryFiles.push(path),
-   load: async (selected, previous) => {
-    window.historyLoads.push([selected.sharedCheckpoint,previous?.sharedCheckpoint]);
+   load: async selected => {
+    window.historyLoads.push([selected.sharedCheckpoint]);
+    const earliest=selected.sharedCheckpoint.startsWith('abcdef12');
     if(window.historyDelay) {window.historyDelay=false;await new Promise(resolve=>window.releaseHistory=resolve);}
     if(window.historyError) throw new Error('History is offline');
-    return {compared:!!previous,items:[{path:'Today.md',action:previous?'modified':'saved'},{path:'Upcoming.md',action:previous?'added':'saved'}],
-     notice:previous?undefined:'No earlier state to compare.',
+    return {compared:true,items:window.historyMatches?[]:[{path:'Today.md',action:'modified'},{path:'Upcoming.md',action:'added'}],
      preview:async path => {
       if(window.historyPreviewDelay) {window.historyPreviewDelay=false;await new Promise(resolve=>window.releaseHistoryPreview=resolve);}
       if(window.historyPreviewError) throw new Error('Historical preview is offline');
-      return {current:'# Before '+path,saved:'# '+(previous?'After ':'Earliest ')+path};
+      return {current:'# Current vault '+path,saved:'# '+(earliest?'Earliest ':'Selected ')+path};
      }};
    }
   });
@@ -96,6 +96,10 @@ const { outputFiles } = await build({
    window.updateHistory();
   };
   window.updateHistory = () => window.activityHistory.update(history);
+  window.completeHistorySync = () => {
+   history.unshift({...entry,timestamp:'2026-09-20T10:19:00Z',sharedCheckpoint:'fedcba98-1234-1234-1234-123456789012'});
+   window.updateHistory();
+  };
   window.refreshHistoryDetails = () => {history[0]={...history[0],errors:[]};window.updateHistory();};
   window.updateHistory();
  };
@@ -307,8 +311,10 @@ for(const browserType of [chromium,webkit]) {
    if(width<700) await selectPoint('12345678');
    await expect(historyRoot.getByRole('button',{name:'View Today.md',exact:true})).toBeVisible();
    await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
-   await expect(historyRoot.getByRole('region')).toContainText('# Before Today.md');
-   await expect(historyRoot.getByRole('region')).toContainText('# After Today.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Current vault Today.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Today.md');
+   await expect(historyRoot.locator('.crate-history-comparison')).toContainText('Current vault → Selected saved state');
+   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Differences · 2');
    if(width>=700) {
     const columns=await Promise.all(['.crate-history-syncs','.crate-history-event-files','.crate-history-preview-pane'].map(selector=>historyRoot.locator(selector).boundingBox()));
     assert.ok(columns[0].x+columns[0].width<=columns[1].x);
@@ -318,22 +324,33 @@ for(const browserType of [chromium,webkit]) {
    await selectPoint('abcdef12');
    await expect(historyRoot.locator('.crate-history-syncs [aria-current="true"]')).toContainText(':18:07');
    await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
-   await expect(historyRoot.getByLabel('Saved file contents')).toContainText('# Earliest Today.md');
-   await expect(historyRoot.getByRole('region')).toHaveCount(0);
+   await expect(historyRoot.getByRole('region')).toContainText('# Earliest Today.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Current vault Today.md');
    await expect(historyRoot.getByRole('button',{name:'Retry loading',exact:true})).toHaveCount(0);
+   await page.evaluate(()=>{window.historyMatches=true;});
+   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Differences · 0');
+   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Your current vault matches this saved state.');
+   await expect(historyRoot.locator('.crate-history-preview-pane')).toContainText('Your current vault matches this saved state.');
+   await expect(historyRoot.locator('.crate-history-syncs [aria-current="true"]')).toContainText(':18:07');
+   await page.evaluate(()=>{window.historyMatches=false;});
+   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await expect(historyRoot.getByRole('region')).toContainText('# Earliest Today.md');
    await page.evaluate(()=>{window.historyDelay=true;});
    await selectPoint('12345678');
    await selectPoint('abcdef12');
-   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Saved files');
+   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Differences · 2');
    await page.evaluate(()=>window.releaseHistory());
-   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Saved files');
+   await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Differences · 2');
+   await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
+   await expect(historyRoot.getByRole('region')).toContainText('# Earliest Today.md');
    await page.evaluate(()=>{window.historyError=true;});
    await selectPoint('12345678');
    await expect(historyRoot.locator('.crate-history-event-files')).toContainText('History is offline');
    await page.evaluate(()=>{window.historyError=false;});
    await historyRoot.getByRole('button',{name:'Retry loading',exact:true}).click();
    await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
-   await expect(historyRoot.getByRole('region')).toContainText('# After Today.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Today.md');
    const selectHistoryFile = async path => {
     const back=historyRoot.getByRole('button',{name:'Back to files',exact:true});
     if(await back.isVisible()) await back.click();
@@ -343,14 +360,21 @@ for(const browserType of [chromium,webkit]) {
    await selectHistoryFile('Upcoming.md');
    await selectHistoryFile('Today.md');
    await page.evaluate(()=>window.releaseHistoryPreview());
-   await expect(historyRoot.getByRole('region')).toContainText('# After Today.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Today.md');
    await expect(historyRoot.getByRole('region')).not.toContainText('Upcoming.md');
    await page.evaluate(()=>{window.historyPreviewError=true;});
    await selectHistoryFile('Upcoming.md');
    await expect(historyRoot.locator('.crate-history-preview-output')).toContainText('Historical preview is offline');
    await page.evaluate(()=>{window.historyPreviewError=false;});
    await historyRoot.getByRole('button',{name:'Retry preview',exact:true}).click();
-   await expect(historyRoot.getByRole('region')).toContainText('# After Upcoming.md');
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Upcoming.md');
+   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Upcoming.md');
+   const loadsBeforeSync=await page.evaluate(()=>window.historyLoads.length);
+   await page.evaluate(()=>window.completeHistorySync());
+   await expect.poll(()=>page.evaluate(()=>window.historyLoads.length)).toBe(loadsBeforeSync+1);
+   await expect(historyRoot.locator('.crate-history-syncs [aria-current="true"]')).toContainText(':18:42');
+   await expect(historyRoot.getByRole('region')).toContainText('# Selected Upcoming.md');
    await page.mouse.move(0,0);
    for(const name of ['File history','Restore to this point']) {
     const action=historyRoot.getByRole('button',{name,exact:true});

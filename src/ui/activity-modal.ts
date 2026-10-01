@@ -28,7 +28,7 @@ import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-
 import { renderSyncIssues } from './activity/sync-issues';
 
 export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
-    loadHistoryComparison?(entry: SyncHistoryEntry, previous?: SyncHistoryEntry): Promise<HistoryComparison>;
+    loadHistoryComparison?(entry: SyncHistoryEntry): Promise<HistoryComparison>;
     listSharedCheckpoints?(): Promise<SharedCheckpoint[]>;
     createHistoryRestore?(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
 	loadPendingDiff?: PendingDiffLoader;

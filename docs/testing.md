@@ -491,10 +491,13 @@ The History tab retains expandable sync entries and per-file history actions. On
 checks file actions, expanded rows and focus across refresh, lazy loading,
 stacked dialog dismissal and focus return to the preserved activity list, desktop
 columns, mobile pane navigation, selected restore targets,
-saved-only previews without a predecessor, load retry, stale sync requests, and
-selection stability during refresh. `history-comparison.test.ts` and
-`runtime-history-comparison.test.ts` cover complete-inventory comparisons, missing
-saved states, byte verification, preview limits, and connection changes.
+current-vault comparisons even for the oldest checkpoint, matching-state messages,
+explicit comparison refresh, load retry, stale sync requests, and selection
+stability during refresh. `engine-history.test.ts`,
+`history-comparison.test.ts`, and `runtime-history-comparison.test.ts` cover
+complete-inventory comparisons, unsynced edits, hidden configuration, exclusions,
+incomplete reads, missing saved states, byte verification, preview limits, and
+connection changes.
 Restore opens a compact confirmation directly from Vault history. Browser checks
 cover transparent footer actions, current-file counts, cancellation during preflight,
 unavailable versions, unchanged states, busy dismissal guards, and failed-restore

@@ -648,10 +648,10 @@ export class SyncRuntime {
         return checkpoints;
     }
 
-    async loadHistoryComparison(entry: SyncHistoryEntry, previous?: SyncHistoryEntry) {
+    async loadHistoryComparison(entry: SyncHistoryEntry) {
         const engine = this.syncEngine;
         if (!engine) throw new Error('Sync is not configured.');
-        return loadRuntimeHistoryComparison(engine, () => this.verifyHistoryEngine(engine), entry, previous);
+        return loadRuntimeHistoryComparison(engine, () => this.verifyHistoryEngine(engine), entry);
     }
 
     async createHistoryRestore(entry: SyncHistoryEntry) {

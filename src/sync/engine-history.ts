@@ -1,9 +1,11 @@
 import type { Vault } from 'obsidian';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { FileManifest } from '../protocol/sync-types';
+import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import type { SyncApiClient } from './api';
 import { HistoryCheckpoints } from './history-checkpoint';
-import type { HistorySnapshot } from './history-comparison';
+import { compareHistorySnapshots, type HistoryComparison, type HistorySnapshot } from './history-comparison';
+import { getAllVaultFiles } from './file-discovery';
+import { readLocalFileEntry } from './local-file-entry';
 import { createHistoryRestore } from './history-restore';
 import { findHistorySource } from './history-source';
 import { normalizeWorkerUrl } from './worker-url';
@@ -40,18 +42,42 @@ export function createEngineHistory(context: EngineHistoryContext) {
         .filter(([path]) => !context.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }]));
       return checkpoints().save(files, [...context.getSettings().ignorePatterns]);
     },
-    async loadSnapshot(checkpoint: string, shared: boolean): Promise<HistorySnapshot> {
-      context.assertActive();
-      const snapshot = await load(checkpoint, shared);
-      context.assertActive();
-      return { files: snapshot.files, read: async (path, file) => {
+    async compare(checkpoint: string, shared: boolean): Promise<HistoryComparison> {
+      const scope = JSON.stringify(context.getSettings().ignorePatterns);
+      const verify = () => {
         context.assertActive();
-        if (snapshot.files[path] !== file) throw new Error('This file is not in the selected sync.');
+        if (scope !== JSON.stringify(context.getSettings().ignorePatterns)) throw new Error('Sync exclusions changed. Refresh the comparison.');
+      };
+      verify();
+      const snapshot = await load(checkpoint, shared);
+      verify();
+      const saved: HistorySnapshot = { files: Object.fromEntries(Object.entries(snapshot.files).filter(([path]) => !context.shouldIgnore(path))), read: async (path, file) => {
+        verify();
+        if (saved.files[path] !== file) throw new Error('This file is not in the selected saved state.');
         const bytes = shared ? await context.api.sharedHistory.download(checkpoint, path, file)
           : await (await findHistorySource(context.api, path, file, (await context.api.getManifest()).files[path]))();
-        context.assertActive();
+        verify();
         return bytes;
       } };
+      // Read actual vault contents, including hidden configuration and unsynced
+      // edits. The sync manifest only describes the last acknowledged state.
+      const files: Record<string, FileEntry> = Object.create(null) as Record<string, FileEntry>;
+      for (const file of await getAllVaultFiles(context.vault, context.shouldIgnore, verify)) {
+        verify();
+        const entry = await readLocalFileEntry(context.vault, file.path);
+        verify();
+        if (!entry) throw new Error(`${file.path} changed while checking the vault. Refresh the comparison.`);
+        files[file.path] = entry;
+      }
+      const current: HistorySnapshot = { files, read: async (path, file) => {
+        verify();
+        if (files[path] !== file) throw new Error('This file is not in the current vault comparison.');
+        const bytes = await context.vault.adapter.readBinary(path);
+        verify();
+        return bytes;
+      } };
+      verify();
+      return compareHistorySnapshots(saved, current, { cachePreviews: false });
     },
     prepareRestore(checkpoint: string, beforeApply: () => Promise<void>, shared: boolean) {
       return context.runExclusive(async () => {

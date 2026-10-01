@@ -7,7 +7,7 @@ import { describeHistory, historyTime, recordedHistoryFiles } from './history';
 import { renderHistoryPreview } from './history-preview';
 
 export interface HistoryBrowserDeps {
-    load?(entry: SyncHistoryEntry, previous?: SyncHistoryEntry): Promise<HistoryComparison>;
+    load?(entry: SyncHistoryEntry): Promise<HistoryComparison>;
     restore?(entry: SyncHistoryEntry): void;
     openFile?(path: string): void;
 }
@@ -21,7 +21,6 @@ export class HistoryBrowser {
     private revision = 0;
     private previewRevision = 0;
     private signature = '';
-    private selectionSignature = '';
     private disposed = false;
     private syncs: HTMLElement;
     private files: HTMLElement;
@@ -35,11 +34,11 @@ export class HistoryBrowser {
         container.empty();
         const workspace = container.createDiv({ cls: 'crate-history-browser-workspace' });
         this.syncs = workspace.createEl('nav', { cls: 'crate-history-syncs', attr: { 'aria-label': 'Sync history' } });
-        this.files = workspace.createEl('nav', { cls: 'crate-history-event-files', attr: { 'aria-label': 'Files in selected sync' } });
+        this.files = workspace.createEl('nav', { cls: 'crate-history-event-files', attr: { 'aria-label': 'Files different from current vault' } });
         this.preview = workspace.createDiv({ cls: 'crate-history-preview-pane' });
         this.footer = container.createDiv({ cls: 'crate-history-browser-footer' });
         this.showPane('history');
-        this.preview.createEl('p', { text: 'Select a sync to see its files and changes.', cls: 'crate-history-description' });
+        this.preview.createEl('p', { text: 'Select a saved state to compare with your current vault.', cls: 'crate-history-description' });
     }
 
     update(history: SyncHistoryEntry[]): void {
@@ -55,19 +54,11 @@ export class HistoryBrowser {
             this.revision++; this.previewRevision++;
             this.files.empty(); this.preview.empty(); this.footer.empty();
             this.preview.createEl('p', { text: 'Sync history will appear here.', cls: 'crate-history-description' });
-            this.selectionSignature = '';
             return;
         }
-        const selection = JSON.stringify([this.selected, this.previous()]);
-        if (selection !== this.selectionSignature) {
-            this.selectionSignature = selection;
-            void this.select(this.selected, false);
-        }
-    }
-
-    private previous(): SyncHistoryEntry | undefined {
-        const index = this.entries.indexOf(this.selected!);
-        return this.entries.slice(index + 1).find(entry => entry.sharedCheckpoint || entry.historyCheckpoint);
+        // A completed sync can change the current vault even if the selected
+        // historical entry is unchanged. Keep the selection and refresh its diff.
+        void this.select(this.selected, false, historyEntryKey(this.selected) === key ? this.selectedPath : undefined);
     }
 
     private showPane(pane: 'history' | 'files' | 'diff'): void { this.container.setAttribute('data-pane', pane); }
@@ -103,32 +94,33 @@ export class HistoryBrowser {
         }
     }
 
-    private async select(entry: SyncHistoryEntry, navigate: boolean): Promise<void> {
+    private async select(entry: SyncHistoryEntry, navigate: boolean, preferredPath?: string): Promise<void> {
         const revision = ++this.revision;
         this.previewRevision++;
         this.selected = entry;
-        this.selectionSignature = JSON.stringify([entry, this.previous()]);
         this.selectedPath = undefined; this.comparison = undefined; this.fileLimit = 200;
         this.items = recordedHistoryFiles(entry);
         if (navigate) this.showPane('files');
-        this.renderFiles('Loading saved state…', false);
+        this.renderFiles('Comparing with current vault…', false);
         this.preview.empty();
-        this.preview.createEl('p', { text: 'Loading saved state…', cls: 'crate-history-description', attr: { role: 'status' } });
+        this.preview.createEl('p', { text: 'Comparing with current vault…', cls: 'crate-history-description', attr: { role: 'status' } });
         this.renderFooter();
         if (navigate) this.files.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true });
         try {
             if (!entry.sharedCheckpoint && !entry.historyCheckpoint) throw new Error('No saved state for this sync. Recorded files may be incomplete.');
             if (!this.deps.load) throw new Error('Saved-state previews are unavailable.');
-            const comparison = await this.deps.load(entry, this.previous());
+            const comparison = await this.deps.load(entry);
             if (this.disposed || revision !== this.revision) return;
             this.comparison = comparison;
             this.items = comparison.items.map(item => ({ ...item, action: { added: 'Added', modified: 'Modified', deleted: 'Deleted', saved: 'Saved' }[item.action] }));
             this.renderFiles(comparison.notice, comparison.retryable);
-            if (this.items[0]) void this.selectFile(this.items[0].path, false);
+            const first = this.items.find(item => item.path === preferredPath) ?? this.items[0];
+            if (first) void this.selectFile(first.path, false);
             else {
                 this.preview.empty();
                 this.back(this.preview, 'Files', 'files');
-                this.preview.createEl('p', { text: comparison.compared ? 'No file changes between these saved states.' : 'This saved state has no files.', cls: 'crate-history-description' });
+                this.preview.createEl('p', { text: comparison.compared ? 'Your current vault matches this saved state.' : 'This saved state has no files.', cls: 'crate-history-description' });
+                this.renderFooter();
             }
         } catch (error) {
             if (this.disposed || revision !== this.revision) return;
@@ -145,8 +137,12 @@ export class HistoryBrowser {
         const focusHeader = this.files.querySelector('h3') === this.files.ownerDocument.activeElement;
         this.files.empty();
         this.back(this.files, 'History', 'history');
-        const heading = this.files.createEl('h3', { text: `${this.comparison && !this.comparison.compared ? 'Saved files' : 'Files'} · ${this.items.length}`, cls: 'crate-history-group', attr: { tabindex: '-1' } });
+        const heading = this.files.createEl('h3', { text: `${this.comparison?.compared ? 'Differences' : 'Files'} · ${this.items.length}`, cls: 'crate-history-group', attr: { tabindex: '-1' } });
         if (focusHeader) heading.focus({ preventScroll: true });
+        if (this.comparison?.compared) this.files.createEl('p', {
+            text: this.items.length ? 'Changes from your current vault to this saved state.' : 'Your current vault matches this saved state.',
+            cls: 'crate-history-description',
+        });
         if (notice) {
             const status = this.files.createDiv({ cls: 'crate-history-state-notice' });
             status.createEl('p', { text: notice, cls: 'crate-history-description', attr: { role: 'status' } });
@@ -183,7 +179,7 @@ export class HistoryBrowser {
         const title = header.createEl('h3', { text: path, attr: { tabindex: '-1' } });
         if (navigate) title.focus({ preventScroll: true });
         const caption = header.createDiv({ cls: 'crate-history-comparison' });
-        caption.createSpan({ text: this.comparison?.compared ? 'Previous saved state → Selected sync' : 'Saved contents' });
+        caption.createSpan({ text: this.comparison?.compared ? 'Current vault → Selected saved state' : 'Saved contents' });
         const counts = caption.createSpan({ cls: 'crate-history-diff-summary' });
         const output = this.preview.createDiv({ cls: 'crate-history-preview-output crate-history-diff crate-file-diff' });
         const status = output.createEl('p', { text: 'Loading file…', cls: 'crate-history-description', attr: { role: 'status' } });
@@ -192,7 +188,7 @@ export class HistoryBrowser {
             if (!this.comparison) throw new Error('The saved contents for this sync are unavailable.');
             const snapshot = await this.comparison.preview(path);
             if (this.disposed || revision !== this.previewRevision) return;
-            renderHistoryPreview(output, snapshot, counts, `Changes in selected sync: ${path}`, this.comparison.compared);
+            renderHistoryPreview(output, snapshot, counts, `Current vault to selected saved state: ${path}`, this.comparison.compared);
         } catch (error) {
             if (this.disposed || revision !== this.previewRevision) return;
             status.setText(error instanceof Error ? error.message : 'Could not load this file.');
@@ -208,12 +204,17 @@ export class HistoryBrowser {
         if (!this.selected) return;
         this.footer.createSpan({ text: `${describeHistory(this.selected)} · ${historyTime(this.selected)}`, cls: 'crate-history-hint' });
         const actions = this.footer.createDiv({ cls: 'crate-history-browser-actions' });
+        const entry = this.selected;
+        if ((entry.sharedCheckpoint || entry.historyCheckpoint) && this.deps.load) {
+            const refresh = actions.createEl('button', { text: 'Refresh comparison', cls: 'crate-activity-action', attr: { type: 'button' } });
+            refresh.disabled = !this.comparison;
+            refresh.addEventListener('click', () => { void this.select(entry, false, this.selectedPath); });
+        }
         const path = this.selectedPath;
         if (path && this.deps.openFile) {
             const file = actions.createEl('button', { text: 'File history', cls: 'crate-activity-action', attr: { type: 'button' } });
             file.addEventListener('click', () => this.deps.openFile!(path));
         }
-        const entry = this.selected;
         if ((entry.sharedCheckpoint || entry.historyCheckpoint) && this.deps.restore) {
             const restore = actions.createEl('button', { text: 'Restore to this point', cls: 'crate-activity-action', attr: { type: 'button' } });
             restore.addEventListener('click', () => this.deps.restore!(entry));

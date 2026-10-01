@@ -3,7 +3,6 @@ import { getSyncIssues, recordSyncError, syncErrorIssues } from './issues';
 import { loadPendingDiff } from './pending-diff';
 import { loadRemotePendingBase } from './pending-baseline';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import type { HistorySnapshot } from './history-comparison';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
@@ -304,8 +303,8 @@ export class SyncEngine {
 
     async saveHistoryCheckpoint(): Promise<string | undefined> { return this.history().saveLocal(); }
 
-    async loadHistorySnapshot(checkpoint: string, shared = false): Promise<HistorySnapshot> {
-        return this.history().loadSnapshot(checkpoint, shared);
+    async loadHistoryComparison(checkpoint: string, shared = false) {
+        return this.history().compare(checkpoint, shared);
     }
 
     async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {

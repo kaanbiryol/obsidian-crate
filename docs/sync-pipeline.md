@@ -337,10 +337,17 @@ activity. Closing it returns to the unchanged activity list and its previous scr
 position. The wider
 screen combines sync selection, files, and saved-state previews in three panes
 (History → Files → Diff on narrow screens). Saved contents load only when this
-screen opens. A selected checkpoint is compared
-with the preceding available checkpoint, using complete inventories and verified
-saved bytes, never current local contents. Without an available predecessor, the
-browser shows saved contents instead of presenting every file as an addition.
+screen opens. A selected checkpoint is compared with the current vault on this
+device, including unsynced edits and hidden configuration files, using complete
+inventories and verified bytes. Both sides honor the current sync exclusions.
+The diff reads **Current vault → Selected saved state**: red is current content
+and green is the selected saved content. **Differences** counts files that differ
+from the current vault, independently of the selected sync's transfer counts.
+Matching inventories show an explicit matching-state message, including for the
+newest checkpoint. The oldest checkpoint can be compared without a predecessor.
+Selecting a point, completing a sync, or selecting **Refresh comparison** reads
+the vault again. Browsing never initiates sync or writes files; incomplete reads
+fail visibly instead of displaying a partial comparison.
 Entries without checkpoints retain recorded paths and errors; they cannot provide
 an exact saved-state preview. File previews retain the 256 KB text limit.
 
