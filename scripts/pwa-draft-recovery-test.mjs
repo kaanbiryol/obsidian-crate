@@ -23,6 +23,8 @@ async function verify(browser) {
 	const retained = () => page.evaluate(key => sessionStorage.getItem(key), key);
 	try {
 		await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+		// Finish loading the reminder screen before failing the deferred recovery chunk.
+		await expect(page.locator('[data-action="open-create-modal"]')).toBeVisible();
 		await page.evaluate(({ key, bad }) => {
 			sessionStorage.setItem(key, bad);
 			sessionStorage.setItem('crate-reminder-draft:Private:new', 'Another folder stays private');

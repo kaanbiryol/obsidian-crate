@@ -29,6 +29,7 @@ it.each(['full', 'incremental', 'offline', 'queue'])('preserves the original rem
 	const fail = vi.spyOn(client.api, 'batchUpload').mockImplementation(async files => ({ success: false, results: files.map(file => ({ path: file.path, success: false, error: 'Storage unavailable', code: 'storage', status: 503 })) }));
 	if (mode === 'queue') {
 		// Flush the same event controller used by Obsidian, with its real queue.
+		client.settings.automaticSync = true;
 		client.settings.debounceDelay = 0;
 		client.engine.onFileChange(client.disk.vault.getAbstractFileByPath('renamed.md')!);
 		await vi.waitFor(() => expect(client.engine.getState().status).toBe('error'));

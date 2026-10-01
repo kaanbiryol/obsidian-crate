@@ -82,7 +82,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(enrollment.url);
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
-    const toast = page.locator('.pwa-reading-root .toast');
+    const toast = page.locator('.toast');
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
     const saveLink = async (url, offline = false) => {
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
@@ -238,9 +238,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     loseCaptureReply = true;
     await saveLink('https://lost-toast-reply.example.invalid/lost-toast-reply');
     await expect.poll(async () => (await pending(page)).some(op => op.error)).toBe(true);
-    await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
+    await expect(page.locator('.toast.is-error')).toHaveCount(0);
     await expect(sync).toHaveAttribute('data-sync-state', 'synced', { timeout: 10000 });
-    await expect(page.locator('.pwa-reading-root .toast.is-error')).toHaveCount(0);
+    await expect(page.locator('.toast.is-error')).toHaveCount(0);
 
     // Persisted retry limits survive background events and reload. A manual
     // refresh resends the exact receipt bytes after the automatic budget stops.

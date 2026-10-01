@@ -173,7 +173,11 @@ async function verifyProjectSyncIndicator(page) {
 	await expect(page.locator('.project-detail-header').getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
 	await expectSynced(page, indicator);
 	await indicator.getByRole('button').click();
-	await expect(page.locator('.toast')).toContainText('All changes synced');
+	const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+	await expect(settings).toBeVisible();
+	await expect(settings.getByRole('region', { name: 'Sync and device', exact: true })).toContainText('All changes synced');
+	await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
+	await expect(settings).toHaveCount(0);
 	const originalTop = (await scroll.boundingBox()).y;
 	const mutation = await holdNextMutation(page, '/reminders/update');
 	try {

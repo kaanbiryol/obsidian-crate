@@ -15,27 +15,29 @@ try {
       for (const theme of ['light','dark']) {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce', hasTouch:true });
         const page = await context.newPage(); await installFeatureNavigation(page); const errors=[]; page.on('pageerror',error=>errors.push(error.message));
-        await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+        await page.goto(`${origin}/notifications?folder=Reminders&tab=today`);
         await page.getByRole('button',{name:'Open settings',exact:true}).waitFor();
         await expect(page.locator('.crate-feature-nav')).toHaveCount(0);
         await expect(page.locator('.crate-feature-panel[data-crate-section="reading"]')).toHaveCSS('transition-duration', '0s');
-        const visibleTitle = await page.locator('.view-header-title').innerText();
+        const title = page.locator('.crate-feature-panel[data-active="true"] .view-header-title');
+        const visibleTitle = await title.innerText();
         await mkdir('test-results/feature-switcher',{recursive:true});
         const historyLength = await page.evaluate(() => history.length);
         await checkBackGesture(page, '[data-crate-section="reminders"]');
         await switchFeature(page, 'Reading');
-        await page.getByRole('heading',{name:'Your reading, everywhere',exact:true}).waitFor();
+        await page.getByRole('heading',{name:'Connect your Reading folder',exact:true}).waitFor();
         await checkBackGesture(page, '[data-crate-section="reading"]');
         assert.equal(await page.evaluate(() => history.length), historyLength);
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await expect(featureNavigationTarget(page)).toBeFocused();
-        await featureNavigationTarget(page).press('Enter');
-        await expect(page.locator('.view-header-title')).toHaveText(visibleTitle);
+        const headerSwitch = page.getByRole('button', { name: 'Switch to Reminders', exact: true });
+        await (await headerSwitch.isVisible() ? headerSwitch : page.locator('.crate-feature-panel[data-active="true"] .pwa-dock [data-tab="today"]')).press('Enter');
+        await expect(title).toHaveText(visibleTitle);
         await expect(featureNavigationTarget(page)).toBeFocused();
         await page.screenshot({path:`test-results/feature-switcher/${name}-${theme}-reminders.png`});
         await page.getByRole('button',{name:'Open settings',exact:true}).tap();
         await page.getByRole('dialog',{name:'Settings',exact:true}).waitFor();
-        const settingsTrigger = page.locator('.pwa-header-settings-button');
+        const settingsTrigger = page.locator('[data-crate-section="reminders"] .pwa-header-settings-button');
         await expect(settingsTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await expect(settingsTrigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
         await expect(settingsTrigger).toHaveCSS('opacity', '1');
@@ -44,12 +46,12 @@ try {
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await page.setViewportSize({width:844,height:320});
         await switchFeature(page, 'Reading'); await switchFeature(page, 'Reminders');
-        await expect(page.locator('.view-header-title')).toHaveText(visibleTitle);
+        await expect(title).toHaveText(visibleTitle);
         await page.setViewportSize({width:1280,height:900});
         await switchFeature(page, 'Reading');
         await expect(featureNavigationTarget(page)).toBeFocused();
         await switchFeature(page, 'Reminders');
-        await expect(page.locator('.view-header-title')).toHaveText(visibleTitle);
+        await expect(title).toHaveText(visibleTitle);
         if(errors.length) throw new Error(errors.join('\n'));
         await context.close();
       }
@@ -90,7 +92,7 @@ try {
           assert.ok(frames.every(frame => frame.coverage === 1 && frame.stationary && frame.inert));
           await expect(page.getByRole('status', { name: 'Loading Reading' })).toBeVisible();
         } finally { releaseReading(); }
-        await page.getByRole('heading', { name: 'Your reading, everywhere', exact: true }).waitFor();
+        await page.getByRole('heading', { name: 'Connect your Reading folder', exact: true }).waitFor();
         await settled('reading');
         await expect(featureNavigationTarget(page)).toBeFocused();
         const reverseFrames = await sampleSwitch('Reminders');

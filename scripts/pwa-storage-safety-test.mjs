@@ -39,8 +39,9 @@ try {
     await expect(page.getByRole('button', { name: 'Open Obsidian', exact: true })).toBeVisible();
     await expect(page.getByText('Logged out locally. Remote cleanup could not finish.', { exact: false }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Cleanup needs attention', exact: true })).toBeVisible();
-    await expect(page.getByRole('alert'), `${type.name()}: ${failure} cleanup instructions`).toContainText(/clear this site’s data in browser settings/i);
-    await expect(page.getByRole('alert')).toContainText('Remove this browser session from Crate’s connected devices in Obsidian.');
+    const cleanup = page.getByRole('region', { name: 'Cleanup needs attention', exact: true }).getByRole('alert');
+    await expect(cleanup, `${type.name()}: ${failure} cleanup instructions`).toContainText(/clear this site’s data in browser settings/i);
+    await expect(cleanup).toContainText('Remove this browser session from Crate’s connected devices in Obsidian.');
     await expect(page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
     if (failure === 'token') expect(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBeTruthy();
