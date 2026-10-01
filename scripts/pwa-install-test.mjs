@@ -164,6 +164,8 @@ async function testInstall(browser, launchMode) {
   await home.getByRole('button', { name: 'Log out', exact: true }).click();
     await home.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => home.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
+  // Clearing the auth token starts logout; the toast confirms async cleanup finished.
+  await expect(home.getByText('Logged out', { exact: true })).toBeVisible();
   await home.goto(launchUrl);
   await home.getByRole('button', { name: 'Open Obsidian', exact: true }).waitFor();
   expect(exchanges).toHaveLength(afterRenewal);
@@ -178,6 +180,7 @@ async function testInstall(browser, launchMode) {
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
     await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), authKey)).toBeNull();
+  await expect(page.getByText('Logged out', { exact: true })).toBeVisible();
   expect(await safari.cookies()).toEqual([]);
   await expect.poll(() => new URL(page.url()).searchParams.has('token')).toBe(false);
   await installed.close();

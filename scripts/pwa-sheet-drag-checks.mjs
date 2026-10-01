@@ -11,11 +11,24 @@ export async function checkSheetDragPosition(page, sheet, { recedeCanvas = true 
 		const samples = [];
 		let time = performance.now();
 		const frame = () => new Promise(requestAnimationFrame);
-		const sample = () => samples.push({
-			position: Math.max(0, Math.min(1, new DOMMatrix(getComputedStyle(popup).transform).f / travel())),
-			scale: new DOMMatrix(getComputedStyle(canvas).transform).a,
-			bounds: canvas.getBoundingClientRect().toJSON(),
-		});
+		const sample = () => {
+			// The compositor can advance between separate style reads. Compare the
+			// sheet and canvas at one native timeline instant, preserving each
+			// animation's own start time so a late mirror still fails.
+			const now = document.timeline.currentTime;
+			const running = [popup, canvas].flatMap(element => element.getAnimations())
+				.filter(animation => animation.playState === 'running' && animation.startTime !== null)
+				.map(animation => ({ animation, startTime: animation.startTime, playbackRate: animation.playbackRate }));
+			for (const { animation, startTime, playbackRate } of running) {
+				animation.pause(); animation.currentTime = (now - startTime) * playbackRate;
+			}
+			samples.push({
+				position: Math.max(0, Math.min(1, new DOMMatrix(getComputedStyle(popup).transform).f / travel())),
+				scale: new DOMMatrix(getComputedStyle(canvas).transform).a,
+				bounds: canvas.getBoundingClientRect().toJSON(),
+			});
+			for (const { animation, startTime } of running) { animation.play(); animation.startTime = startTime; }
+		};
 		sample();
 		const dispatch = async (type, y) => {
 			const touch = { identifier: 1, target, clientX: 180, clientY: y };

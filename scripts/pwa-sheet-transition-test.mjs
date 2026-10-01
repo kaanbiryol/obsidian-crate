@@ -25,14 +25,18 @@ for (const browserType of [chromium, webkit]) {
  const browser = await browserType.launch();
  try {
   const page = await browser.newPage();
+  // This harness tests a recovery timer, not native CSS motion.
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 60_000));
   async function mount() {
    await page.goto('about:blank');
    await page.setContent('<div id="root"></div>');
    await page.addScriptTag({ content: outputFiles[0].text });
-   await page.waitForFunction(() => Boolean(window.controls));
+   await expect.poll(() => page.evaluate(() => Boolean(window.controls))).toBe(true);
   }
   await mount();
   await page.evaluate(() => window.controls.requestClose());
+  await page.clock.runFor(1100);
   await expect(page.locator('#background')).not.toHaveAttribute('inert', '', { timeout: 2000 });
   assert.equal(await page.evaluate(() => window.controls.closed()), 1);
   await page.evaluate(() => window.controls.finishClose());
@@ -40,22 +44,22 @@ for (const browserType of [chromium, webkit]) {
 
   await mount();
   await page.evaluate(() => window.controls.requestClose());
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   await page.evaluate(() => window.controls.cancelClose());
-  await page.waitForTimeout(1100);
+  await page.clock.runFor(1100);
   assert.equal(await page.evaluate(() => window.controls.closed()), 0, 'Cancelled close must not dismiss a reopened sheet');
   await page.evaluate(() => window.controls.requestClose());
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   await page.evaluate(() => window.controls.finishClose());
   await expect(page.locator('#background')).not.toHaveAttribute('inert', '');
-  await page.waitForTimeout(1100);
+  await page.clock.runFor(1100);
   assert.equal(await page.evaluate(() => window.controls.closed()), 1);
 
   await mount();
   await page.evaluate(() => window.controls.requestClose());
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   await page.evaluate(() => window.root.unmount());
-  await page.waitForTimeout(1100);
+  await page.clock.runFor(1100);
   assert.equal(await page.evaluate(() => window.controls.closed()), 0, 'Unmount must cancel recovery');
   console.log(browserType.name() + ': sheet close recovery passed');
  } finally { await browser.close(); }

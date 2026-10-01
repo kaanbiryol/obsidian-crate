@@ -189,18 +189,25 @@ async function checkCleanupReversal(page) {
 		departed.dispatchEvent(new TransitionEvent('transitionend', { bubbles: true, propertyName: 'opacity' }));
 		button('Upcoming').click();
 		await Promise.resolve();
-		const frames = [layers()], reopenedAt = performance.now();
-		while (performance.now() - reopenedAt < 250) {
-			await new Promise(requestAnimationFrame);
+		// Inspect the native transition itself. A delayed compositor frame can
+		// otherwise consume the entire fade before the first rAF sample.
+		const frames = [], animations = new Set();
+		for (let time = 0; time <= 160; time += 20) {
+			for (const animation of container.getAnimations({ subtree: true })) {
+				if (animation.transitionProperty !== 'opacity') continue;
+				if (!animations.has(animation)) { animation.pause(); animations.add(animation); }
+				animation.currentTime = Math.min(time, Number(animation.effect.getTiming().duration));
+			}
 			frames.push(layers());
 		}
+		for (const animation of animations) animation.finish();
 		return { before, frames };
 	});
 	assert.deepEqual(result.before, [{ view: 'today', opacity: 1 }, { view: 'upcoming', opacity: 0 }]);
 	assert.ok(result.frames.every(frame => frame.some(layer => layer.opacity === 1)),
 		`Cleanup and immediate reopening must keep an opaque tab: ${JSON.stringify(result.frames)}`);
 	assert.ok(result.frames.some(frame => frame.some(layer => layer.opacity > 0 && layer.opacity < 1)),
-		'Reopening after cleanup must preserve the outgoing fade');
+		`Reopening after cleanup must preserve the outgoing fade: ${JSON.stringify(result.frames)}`);
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 
@@ -439,7 +446,7 @@ try {
 			await chip('Today').tap();
 			await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 			await live.locator('.reminders-view-scroll').evaluate(element => { element.scrollTop = 2000; });
-			await page.waitForTimeout(200);
+			await expect.poll(() => live.locator('.reminders-view-scroll').evaluate(element => element.scrollTop)).toBe(2000);
 			await checkRapidSwitches(page);
 			empty = true;
 			await page.reload();

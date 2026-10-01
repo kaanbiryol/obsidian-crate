@@ -1,7 +1,7 @@
 import serverRelease from '../server-release.json';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker, { ReminderAlarm } from './index';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { CRATE_SERVER_INFO } from './server-info';
@@ -144,6 +144,7 @@ function createSubscriptionRequest(): Request {
 }
 
 describe('worker entrypoint', () => {
+	afterEach(() => vi.restoreAllMocks());
 	it.each([false, true])('rejects an initial upload before forwarding it without vault authority (signed in: %s)', async signedIn => {
 		const runtime = createEnv({ DB: createDb({ authenticatedScope: 'reminders' }).db as never });
 		const forward = vi.spyOn(runtime.REMINDER_ALARMS, 'get');
@@ -165,6 +166,8 @@ describe('worker entrypoint', () => {
 	});
 
 	it('serves server metadata at the root without a public claim page', async () => {
+		// Keep the request and its assertion on the same UTC operation day.
+		vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 1, 23, 59, 59, 999));
 		const response = await worker.fetch(
 			new Request('https://worker.test/'),
 			createEnv(),
@@ -258,6 +261,8 @@ describe('worker entrypoint', () => {
 	});
 
 	it('publishes unauthenticated server compatibility metadata', async () => {
+		// Keep the request and its assertion on the same UTC operation day.
+		vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 1, 23, 59, 59, 999));
 		const response = await worker.fetch(
 			new Request('https://worker.test/.well-known/crate'),
 			createEnv(),

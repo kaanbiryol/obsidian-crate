@@ -8,6 +8,7 @@ import { createServer } from 'node:http';
 import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { captureDockSpring } from './pwa-dock-motion-checks.mjs';
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`PWA dock ${name}: direct switching, motion, capture and compact layouts`, { timeout: 90000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-dock-'));
@@ -41,6 +42,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     page = await context.newPage(); page.setDefaultTimeout(7000); const errors = []; page.on('pageerror', error => errors.push(error.message));
+    await page.clock.install();
     const dock = () => page.locator('.crate-feature-panel[data-active="true"] .pwa-dock');
     const views = page.getByRole('dialog', { name: 'More views', exact: true });
     const geometry = () => dock().locator('.pwa-dock__bar, .pwa-dock__add').evaluateAll(elements => elements.map(el => {
@@ -179,31 +181,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await dock().locator('[data-dock-group]').press('ArrowDown');
     await expect(views).toBeVisible(); await page.keyboard.press('Escape'); await closed();
     // A spring grows continuously and keeps its current shape when reversed.
-    const interrupted = await page.evaluate(async () => {
-      const dock = document.querySelector('.crate-feature-panel[data-active="true"] .pwa-dock');
-      const surface = dock.querySelector('.pwa-dock__surface');
-      const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
-      const height = () => parseFloat(getComputedStyle(surface).height);
-      dock.querySelector('[data-dock-group]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-      const samples = [], reveals = []; const start = performance.now();
-      while (performance.now() - start < 120 || samples.length < 2) {
-        await frame(); samples.push(height());
-        const menu = dock.querySelector('.pwa-dock__menu');
-        if (menu) {
-          const box = menu.getBoundingClientRect();
-          const inset = parseFloat(getComputedStyle(dock).getPropertyValue('--dock-menu-inset'));
-          reveals.push({ edge: box.top + inset, surface: surface.getBoundingClientRect().top,
-            top: box.top, height: box.height, opacity: Number(getComputedStyle(menu.querySelector('.pwa-dock__choices')).opacity),
-            tabOpacity: Number(getComputedStyle(dock.querySelector('.pwa-dock__tab')).opacity),
-            indicatorOpacity: Number(getComputedStyle(dock.querySelector('.pwa-dock__indicator')).opacity) });
-        }
-      }
-      const before = height();
-      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      // Compare at the reversal itself, before a delayed frame advances it.
-      await Promise.resolve(); const after = height();
-      return { samples, reveals, before, after };
-    });
+    const interrupted = await captureDockSpring(page);
     assert.ok(interrupted.before > 70, JSON.stringify(interrupted));
     assert.ok(interrupted.reveals.length > 1);
     assert.ok(interrupted.reveals.every(frame => frame.tabOpacity === frame.indicatorOpacity), 'The selected highlight and tab icons must disappear together');
@@ -217,13 +195,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // accept a choice immediately, including before its entrance has finished.
     for (let attempt = 0; attempt < 3; attempt++) {
       const nextView = attempt % 2 === 0 ? 'Reading' : 'Favorites';
-      await dock().locator('[data-dock-group]').press('ArrowDown');
-      await page.waitForTimeout(50);
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(35);
-      await dock().locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
-      await expect(views).toBeVisible();
-      await views.getByRole('button', { name: nextView, exact: true }).evaluate(button => button.click());
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 60_000));
+      try {
+        await dock().locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
+        await page.clock.runFor(50);
+        await page.keyboard.press('Escape');
+        await page.clock.runFor(35);
+        await dock().locator('[data-dock-group]').dispatchEvent('keydown', { key: 'ArrowDown', bubbles: true });
+        await page.clock.runFor(16);
+        await expect(views).toBeVisible();
+        await views.getByRole('button', { name: nextView, exact: true }).evaluate(button => button.click());
+      } finally { await page.clock.resume(); }
       await closed(); await active(nextView);
     }
     await direct('Reminders');
@@ -273,6 +255,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
             outgoing: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0,
             retained: outgoing.isConnected, inert: !outgoing.isConnected || outgoing.inert,
             oldTitle: outgoing.querySelector('.view-header-title').textContent === oldTitle,
+            title: outgoing.querySelector('.view-header-title').textContent, expectedTitle: oldTitle,
+            scroll: oldScroll?.scrollTop, expectedScroll: oldScrollTop,
             oldScroll: !outgoing.isConnected || !oldScroll || oldScroll.scrollTop === oldScrollTop,
             coverage: 1 - layers.reduce((unpainted, el) => unpainted * (1 - Number(getComputedStyle(el).opacity)), 1),
             fading: layers.some(el => { const opacity = Number(getComputedStyle(el).opacity); return opacity > .01 && opacity < .99; }), dock: Number(getComputedStyle(panel.querySelector('.pwa-dock')).opacity),
@@ -296,7 +280,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       else assert.ok(visibleFade.length >= (interruptWith ? 1 : 2), JSON.stringify(samples));
       assert.ok(samples.every(frame => frame.coverage === 1 && frame.dock === 1), 'The dock stays opaque and the screen stack never exposes the backdrop');
       assert.ok(samples.every(frame => frame.inert), 'Outgoing views cannot receive input');
-      if (!interruptWith) assert.ok(samples.every(frame => frame.oldTitle && frame.oldScroll), 'The outgoing title and scroll position remain painted until the dissolve finishes');
+      // After opacity reaches zero, browser layout may discard the departed
+      // scroller before React removes its node (especially with reduced motion).
+      if (!interruptWith) assert.ok(samples.filter(frame => frame.outgoing > 0).every(frame => frame.oldTitle && frame.oldScroll),
+        'The visible outgoing title and scroll position must remain intact: ' + JSON.stringify({ selector, samples }));
       assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs keep the feature fade duration and easing with reversible opacity transitions');
       assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
       await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
@@ -327,7 +314,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const start = await center(dock().locator('[data-dock-group]'));
       await input.down(start);
       if (immediate) await input.move({ x: start.x, y: start.y - 18 });
-      else await page.waitForTimeout(480);
+      // Hold until the timer opens the menu, including on a busy host.
       await expect(views).toBeVisible();
       const labels = await views.getByRole('button').allTextContents();
       for (const label of [...labels.filter(label => label !== 'Favorites').slice(0, 2), 'Favorites']) {
@@ -466,13 +453,15 @@ test('PWA dock indicator has visible travel and settles without repainting', { t
             slide.currentTime = duration - .001;
             return slide;
           }, label);
-          // Let the independent screen fade finish while the slide stays paused.
-          await page.waitForTimeout(350);
+          // The departing icon's color lasts longer than the screen fade. Wait
+          // for both before comparing pixels, keeping only the slide paused.
+          await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+          await expect.poll(() => dock().evaluate(element => element.getAnimations({ subtree: true })
+            .some(animation => animation.playState === 'running' || animation.pending))).toBe(false);
           const bar = await dock().locator('.pwa-dock__bar').boundingBox();
           const clip = { x: Math.floor(bar.x), y: Math.floor(bar.y), width: Math.ceil(bar.width), height: Math.ceil(bar.height) };
           const moving = await page.screenshot({ clip, path: `test-results/dock/${name}-${label}-moving.png` });
-          await animation.evaluate(slide => slide.finish());
-          await page.waitForTimeout(100);
+          await animation.evaluate(async slide => { slide.finish(); await slide.finished; });
           const settled = await page.screenshot({ clip, path: `test-results/dock/${name}-${label}-settled.png` });
           assert.ok(moving.equals(settled), `${name}: ${label} highlight must not snap when the slide finishes`);
           await animation.dispose();

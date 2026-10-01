@@ -71,6 +71,8 @@ it('keeps dispatched bytes immutable and sends subsequent edits in order', async
 });
 
 it('retries uncertain bytes before dispatching dependent edits', async () => {
+	vi.useFakeTimers({ toFake: ['Date'] });
+	vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
 	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
 	network.mockImplementationOnce(async () => response({ day: 20_000, generation: session.generation }))
 		.mockImplementationOnce(async () => response({ error: 'Reply lost' }, 503));

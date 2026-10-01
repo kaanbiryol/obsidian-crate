@@ -100,9 +100,13 @@ async function measureCapacity(browser, count) {
     for (const index of [Math.floor(count / 2), count - 1]) {
       await pageSelect.focus();
       await pageSelect.selectOption(String(Math.floor(index / pageSize)));
+      await expect(pageSelect).toHaveValue(String(Math.floor(index / pageSize)));
       await expect(pageSelect).toBeFocused();
-      await expect(page.locator(`[data-reminder-id="${reminders[index].id}"]`)).toBeAttached();
-      const card = cards.nth(index % pageSize);
+      // Exiting rows remain mounted during pagination. A positional locator can
+      // select an old row that detaches while Playwright is scrolling it.
+      const card = page.locator(`[data-reminder-id="${reminders[index].id}"] ${cardSelector}`);
+      await expect(card).toBeAttached();
+      await expect(cards).toHaveCount(Math.min(pageSize, count - Math.floor(index / pageSize) * pageSize));
       await card.scrollIntoViewIfNeeded();
       await expect(card).toBeInViewport();
       await expect(card).toHaveAttribute('aria-label', `${reminders[index].content}. Press Enter to edit reminder.`);

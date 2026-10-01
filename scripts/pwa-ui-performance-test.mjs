@@ -6,7 +6,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 const { outputFiles } = await build({
 	stdin: {
 		resolveDir: process.cwd(), loader: 'tsx', contents: `
-			import React, { useState } from 'react';
+			import React, { useEffect, useState } from 'react';
 			import { createRoot } from 'react-dom/client';
 			import { flushSync } from 'react-dom';
 			import { RichTextInput } from './src/reminders/components/RichTextInput';
@@ -25,11 +25,17 @@ const { outputFiles } = await build({
 				const [refreshes, setRefreshes] = useState(0);
 				return <div className={reading ? "crate-reading-web" : "pwa-reminders-view"}><div className="pwa-below-header-content"><PwaPullRefreshIndicator enabled scrollSelector={reading ? ".crate-reading-web .crate-reading__list-scroll" : undefined} onRefresh={async () => { setRefreshes(value => value + 1); }} /></div><div id="scroll" className={reading ? "crate-reading__list-scroll" : "ios-scroll"} style={{height: 250, overflow: 'auto'}}><div style={{height: 600}}>Reminders</div></div><output id="refreshes">{refreshes}</output></div>;
 			}
+			function Ready({ children }) {
+				// Child passive effects attach the gesture and viewport listeners first.
+				useEffect(() => { document.getElementById('app').dataset.ready = 'true'; }, []);
+				return children;
+			}
 			let root;
 			export function mount(kind) {
 				unmount();
+				document.getElementById('app').removeAttribute('data-ready');
 				root = createRoot(document.getElementById('app'));
-				flushSync(() => root.render(kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull reading={kind === "reading-pull"} />));
+				flushSync(() => root.render(<Ready>{kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull reading={kind === "reading-pull"} />}</Ready>));
 			}
 			export function unmount() { root?.unmount(); root = undefined; }
 		`,
@@ -91,8 +97,7 @@ for (const browserType of [chromium, webkit]) {
 
 		for (const kind of ['pull', 'reading-pull']) {
 			await page.evaluate(kind => window.uiTest.mount(kind), kind);
-			// Allow passive effects to attach gesture listeners before sending touches.
-			await page.waitForTimeout(150);
+			await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
 			const before = await page.locator('#scroll').boundingBox();
 			await page.evaluate(() => {
 				const target = document.getElementById('scroll');
@@ -147,11 +152,12 @@ for (const browserType of [chromium, webkit]) {
 			Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
 			window.uiTest.mount('keyboard');
 		});
-		await page.waitForTimeout(150);
+		await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
 		await page.getByRole('textbox', { name: 'Keyboard input' }).focus();
 		await expect(page.locator('#inset')).toHaveText('344');
 		await page.getByRole('textbox', { name: 'Keyboard input' }).evaluate(element => element.blur());
-		await page.waitForTimeout(50);
+		// Drain the frame scheduled by blur/resize before asserting no change.
+		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 		await expect(page.locator('#inset')).toHaveText('344');
 		for (const height of [620, 740, 844]) {
 			await page.evaluate(height => {
@@ -165,7 +171,8 @@ for (const browserType of [chromium, webkit]) {
 			window.keyboardViewportHeight = 800;
 			window.visualViewport.dispatchEvent(new Event('resize'));
 		});
-		await page.waitForTimeout(50);
+		// Drain the frame scheduled by blur/resize before asserting no change.
+		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 		await expect(page.locator('#inset')).toHaveText('0');
 		await page.evaluate(() => { window.keyboardViewportHeight = 500; });
 		await page.getByRole('textbox', { name: 'Keyboard input' }).focus();

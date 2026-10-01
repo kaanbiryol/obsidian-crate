@@ -83,10 +83,15 @@ async function checkReaderNavigation(page) {
     await expect(highlights).toBeFocused();
     await highlights.evaluate(element => element.blur());
     // Opening a sheet from a scrolled article must restore the document offset.
-    await reader.getByRole('button', { name: 'Reading appearance', exact: true }).evaluate(element => element.click());
+    // Give this sheet an explicit focus-return target. A programmatic click
+    // alone can leave the preceding Highlights trigger as the remembered target.
+    await appearance.evaluate(element => { element.focus({ preventScroll: true }); element.click(); });
     await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toHaveCount(0);
+    await expect(appearance).toBeFocused();
+    await appearance.evaluate(element => element.blur());
+    await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(360);
     await scrollTo(700);
     await expect(nav).toHaveAttribute('data-scroll-hidden', 'true');

@@ -3,6 +3,7 @@ import { trackSheetDismissal } from './pwa-sheet-motion-checks.mjs';
 import { swipe } from './browser-touch-swipe.mjs';
 import { switchFeature } from './pwa-feature-navigation.mjs';
 import { expect } from '@playwright/test';
+import { checkSettingsClose } from './pwa-settings-close-checks.mjs';
 
 export async function checkSettingsMotion(browser, origin) {
 	const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'no-preference', serviceWorkers: 'block' });
@@ -29,24 +30,7 @@ export async function checkSettingsMotion(browser, origin) {
 		await slow.evaluate(el => el.remove());
 		await checkShortcutSheet(page);
 		for (let cycle = 0; cycle < 2; cycle++) {
-			// Record the exit inside the page so protocol delays cannot observe only
-			// the restored background after the sheet's transition has finished.
-			const closingInert = await sheet.getByRole('button', { name: 'Close settings', exact: true }).evaluate(button => {
-				const popup = button.closest('[role="dialog"]');
-				const background = document.querySelector('[data-crate-section="reminders"]');
-				return new Promise(resolve => {
-					const frames = [];
-					const sample = () => {
-						if (!popup.isConnected) { resolve(frames); return; }
-						if (popup.hasAttribute('data-ending-style')) frames.push(background.hasAttribute('inert'));
-						requestAnimationFrame(() => setTimeout(sample, 0));
-					};
-					button.click();
-					requestAnimationFrame(() => setTimeout(sample, 0));
-				});
-			});
-			expect(closingInert.length, 'Settings must retain a visible closing state').toBeGreaterThan(0);
-			expect(closingInert.every(Boolean), JSON.stringify(closingInert)).toBe(true);
+			await checkSettingsClose(sheet);
 			await expect(sheet).toHaveCount(0);
 			await expect(gear).toBeFocused();
 			await gear.click();

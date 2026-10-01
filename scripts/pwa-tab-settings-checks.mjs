@@ -151,8 +151,13 @@ export async function checkTabSettings(page, name) {
 	// Each new selection replaces slot four, across both features.
 	for (const [id, label] of [['archive', 'Archive'], ['browse', 'Projects'], ['highlights', 'Highlights']]) {
 		await expect.poll(() => dockTabs.nth(3).evaluate(el => !el.closest('[inert]'))).toBe(true);
-	await dockTabs.nth(3).press('ArrowDown');
+		await dockTabs.nth(3).press('ArrowDown');
+		await expect(views).toBeVisible();
 		await views.getByRole('button', { name: label, exact: true }).click();
+		// Finish this selection and its focus return before starting the next one.
+		// Rapid reopen during dismissal has separate coverage in pwa-dock-test.
+		await expect(views).toHaveCount(0);
+		await expect(dockTabs.nth(3)).toBeFocused();
 		await assertSwitcher(label);
 		await expect(dockTabs.nth(3)).toHaveAttribute('aria-current', 'page');
 		await expect.poll(savedTabs).toEqual(['inbox', 'today', 'reading', id]);

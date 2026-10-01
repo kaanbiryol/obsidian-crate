@@ -254,6 +254,32 @@ The individual size gates are also available as `npm run size-check:plugin` and 
 npx --yes wrangler@4.123.0 deploy --dry-run
 ```
 
+## Avoiding timing-dependent assertions
+
+Freeze `Date` in unit tests that compare retry deadlines or UTC operation days,
+and restore it after each test. Keep unrelated asynchronous work on real timers.
+
+Wait for the state an action needs: mounted effects, a closed dialog and restored
+focus, completed logout cleanup, or the disappearance of an outgoing screen.
+A fixed sleep does not establish any of those conditions on a busy runner. Keep
+elapsed-time checks when the duration itself is the contract, such as verifying
+that a cancelled hold does not open a menu.
+
+For intermediate motion, control the timeline that actually drives the effect.
+Use Playwright's clock (installed before loading the app) for JavaScript springs
+and fallback timers, and advance through frames with `clock.runFor`. Native CSS
+transitions use a separate timeline: capture them when the state changes, pause
+and seek `Animation.currentTime`, then finish them and check normal cleanup.
+When comparing two animated layers, sample them at one document-timeline instant
+while retaining their individual start times so a delayed layer still fails.
+Check departing content while it is still painted; a fully invisible reduced-motion
+layer can lose its scroll geometry before React removes it.
+
+Exercise the modified script repeatedly in both Chromium and WebKit, without
+retries, after its first passing run. Run browser suites sequentially in each
+checkout so builds, focus, and output artifacts cannot interfere. A passing
+repeat establishes evidence for the fix, not a guarantee that every flake is gone.
+
 ## Test vault setup
 
 Run `npm run vault:setup` to copy the Markdown baseline from `fixtures/test-vault/`
