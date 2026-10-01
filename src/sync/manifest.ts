@@ -1,6 +1,7 @@
 import { CHECKPOINT_VERSION, parseCheckpoint, parseLocalManifest } from './manifest-checkpoint';
 import { UploadJournal } from './upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from './restore-intent';
+import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
 import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
 /**
  * Local manifest management for tracking file state.
@@ -33,6 +34,7 @@ export class LocalManifest {
 	private closed = false;
 	private uploadDiagnostics: UploadDiagnostic[] = [];
 	private restoreIntents: RestoreIntent[] = [];
+	private initialConfigPull?: InitialConfigPull;
 
 	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
 		this.app = app;
@@ -79,6 +81,7 @@ export class LocalManifest {
 			&& (JSON.stringify(main.manifest) !== JSON.stringify(tmp.manifest)
 				|| JSON.stringify(main.settledUploads) !== JSON.stringify(tmp.settledUploads)
 				|| JSON.stringify(main.restoreIntents) !== JSON.stringify(tmp.restoreIntents)
+				|| JSON.stringify(main.initialConfigPull) !== JSON.stringify(tmp.initialConfigPull)
 				|| JSON.stringify([...main.renames]) !== JSON.stringify([...tmp.renames])))) {
 			throw new Error('Conflicting manifest checkpoints. Preserve both generations before recovering sync.');
 		}
@@ -95,6 +98,7 @@ export class LocalManifest {
 			this.manifest = selected.manifest;
 			this.uploadDiagnostics = selected.uploadDiagnostics;
 			this.restoreIntents = selected.restoreIntents;
+			this.initialConfigPull = selected.initialConfigPull;
 			this.renameDependencies = selected.renames;
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
@@ -137,7 +141,7 @@ export class LocalManifest {
 	}
 
 	private serialize(): string {
-		return JSON.stringify({ ...this.manifest, version: CHECKPOINT_VERSION, ...(this.restoreIntents.length ? { restoreIntents: this.restoreIntents } : {}), ...(this.uploadDiagnostics.length ? { uploadDiagnostics: this.uploadDiagnostics } : {}), ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
+		return JSON.stringify({ ...this.manifest, version: CHECKPOINT_VERSION, ...(this.initialConfigPull ? { initialConfigPull: this.initialConfigPull } : {}), ...(this.restoreIntents.length ? { restoreIntents: this.restoreIntents } : {}), ...(this.uploadDiagnostics.length ? { uploadDiagnostics: this.uploadDiagnostics } : {}), ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
 	}
 
 	private async persist(): Promise<void> {
@@ -189,6 +193,13 @@ export class LocalManifest {
 	}
 
 	getRestoreIntents(): RestoreIntent[] { return structuredClone(this.restoreIntents); }
+
+	getInitialConfigPull(): InitialConfigPull | undefined { return structuredClone(this.initialConfigPull); }
+
+	setInitialConfigPull(state: InitialConfigPull | undefined): void {
+		this.initialConfigPull = parseInitialConfigPull(state);
+		this.revision++; this.dirty = true;
+	}
 
 	setRestoreIntent(intent: RestoreIntent): void {
 		this.restoreIntents = parseRestoreIntents([...this.restoreIntents.filter(item => item.request.storageKey !== intent.request.storageKey), intent]);

@@ -5,6 +5,7 @@ import type { FileManifest } from '../protocol/sync-types';
 import { parseRenameDependencies } from './rename-dependencies';
 import { normalizeUploadDiagnostics } from './upload-diagnostics';
 import { parseRestoreIntents } from './restore-intent';
+import { parseInitialConfigPull } from './initial-config-pull';
 
 export const CHECKPOINT_VERSION = 3;
 
@@ -24,6 +25,7 @@ export function parseCheckpoint(value: unknown) {
 		settledUploads: settled, renames: parseRenameDependencies(value.renameDependencies),
 		uploadDiagnostics: normalizeUploadDiagnostics(value.uploadDiagnostics),
 		restoreIntents: parseRestoreIntents(value.restoreIntents),
+		initialConfigPull: parseInitialConfigPull(value.initialConfigPull),
 	};
 }
 

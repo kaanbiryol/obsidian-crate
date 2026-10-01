@@ -140,6 +140,14 @@ after a host restart.
 
 `sync-engine.integration.ts` runs separate real sync engines through the authenticated Worker API. Each simulated device retains its own files, settings and disk checkpoints across restarts. It checks three-device offline merging, edit/delete ordering, rename/edit races, interrupted uploads after the server commits, binary conflict preservation, and filenames such as `__proto__`. Only the Obsidian filesystem/UI surface is simulated; planning, transfer, HTTP serialization, authentication, D1 and R2 use production code.
 
+`sync-initial-config.integration.ts` covers an empty device adopting server settings
+without conflicts, subsequent concurrent settings edits, edits during download,
+and interrupted first pulls across restart. `initial-config-pull.test.ts` covers
+the eligibility boundary, custom configuration folders, checkpoint persistence
+and validation. Physical Obsidian acceptance should start with an empty vault,
+install BRAT and Crate, connect to an existing server, and verify the resulting
+theme and settings after the first sync and an Obsidian reload.
+
 ## Reminder capacity measurements
 
 ```bash

@@ -6,6 +6,7 @@ import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import type { FileEntry } from '../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
+import { prepareInitialConfigPull } from './initial-config-pull';
 
 export async function createFullSyncPlan(
   context: FullSyncPlannerContext,
@@ -40,9 +41,13 @@ export async function createFullSyncPlan(
   }
 
   const manifestEntries = context.localManifest.getManifest().files;
+  const initialConfig = await prepareInitialConfigPull(context, localFiles, files.map(file => file.path), remoteFiles);
   const diffMap = new Map<string, import("./types").FileDiff>();
   for (const diff of classifyPaths(localFiles, remoteFiles, manifestEntries)) {
-    diffMap.set(diff.path, diff);
+    const setupHash = initialConfig && getPathEntry(initialConfig.files, diff.path);
+    diffMap.set(diff.path, diff.action === 'conflict' && diff.cause === 'concurrent-create' && setupHash === diff.localHash
+      ? { path: diff.path, action: 'download', localHash: diff.localHash, remoteHash: diff.remoteHash, cause: 'remote-created' }
+      : diff);
   }
 
   for (const path of Object.keys(manifestEntries)) {

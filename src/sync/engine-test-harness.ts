@@ -6,6 +6,7 @@ import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from './types';
+import type { InitialConfigPull } from './initial-config-pull';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -69,6 +70,8 @@ export type Harness = {
 		getFiles: ReturnType<typeof vi.fn>;
 	};
 	localManifest: {
+		getInitialConfigPull(): InitialConfigPull | undefined;
+		setInitialConfigPull(state: InitialConfigPull | undefined): void;
 		uploadJournal: { pending: () => unknown[] };
 		load: ReturnType<typeof vi.fn>;
 		save: ReturnType<typeof vi.fn>;
@@ -250,7 +253,10 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const engine = new SyncEngine(plugin as never, api as never, settings);
 
 	const manifestFiles: Record<string, ManifestEntry> = {};
+	let initialConfigPull: InitialConfigPull | undefined;
 	const localManifest = {
+		getInitialConfigPull: () => structuredClone(initialConfigPull),
+		setInitialConfigPull: (state: InitialConfigPull | undefined) => { initialConfigPull = structuredClone(state); },
 		uploadJournal: { pending: () => [] },
 		load: vi.fn(),
 		close: vi.fn(async () => {}),

@@ -47,6 +47,21 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 
 Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
 
+On a device with no successful sync, no existing file checkpoint, and no eligible
+local files outside the active Obsidian configuration folder, the first sync
+adopts existing server settings. Differing setup files are downloaded without
+creating conflict copies; this includes settings created while installing BRAT
+and Crate in an otherwise empty vault. Local-only files retain ordinary upload
+behavior, and ignore patterns still apply.
+
+Before transfer, the planner checkpoints the hashes of the local setup files
+eligible for replacement, separately from the last-synced file baseline. An
+interrupted pull can resume across restarts even after notes have downloaded.
+Only unchanged setup bytes qualify: a new edit during download defers the write,
+and an edit before retry receives normal conflict handling. A populated local
+vault and subsequent syncs always use normal reconciliation. The setup intent is
+removed after successful reconciliation.
+
 ### 5. Initial Sync
 
 First-time upload of all vault files. Files are prepared and uploaded in sequential byte-budgeted chunks so binary contents cannot accumulate without bound in memory.

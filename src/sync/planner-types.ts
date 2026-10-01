@@ -7,6 +7,7 @@ import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import type { VaultFile } from './file-discovery';
+import type { InitialConfigPull } from './initial-config-pull';
 
 interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
@@ -73,6 +74,11 @@ export interface IncrementalSyncPlannerContext {
 }
 
 export interface FullSyncPlannerContext {
+  initialConfigPull?: {
+    firstSync: boolean;
+    get(): InitialConfigPull | undefined;
+    save(state: InitialConfigPull): Promise<void>;
+  };
   throwIfDestroyed?(): void;
   plannedContent?: PlannedContent;
   vault: Vault;

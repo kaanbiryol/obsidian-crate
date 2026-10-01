@@ -672,7 +672,13 @@ export class SyncEngine {
 		if (!result.success) return;
 		// Applying remote bytes emits vault events too. Verify those events against
 		// the committed baseline instead of requiring another sync to clear them.
-		const applied = new Set([...result.downloadedPaths, ...result.mergedPaths, ...result.deletedPaths, ...result.conflicts]);
+		const applied = new Set([
+			...result.downloadedPaths,
+			...result.mergedPaths,
+			...result.deletedPaths,
+			// Conflict copies stay local; remote content was applied to the originals.
+			...result.unresolvedConflicts.map(conflict => conflict.path),
+		]);
 		const snapshot = this.queueController.snapshotPendingRevisions();
 		const settled = createEmptySyncResult();
 		for (const key of this.queueController.getPendingPaths()) {

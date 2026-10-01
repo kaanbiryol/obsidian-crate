@@ -14,6 +14,7 @@ import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { prepareUploadFromPath } from './transfer-prepare';
 import { runInitialImport } from './initial-import';
+import type { InitialConfigPull } from './initial-config-pull';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
@@ -110,6 +111,15 @@ export class SyncEngineContexts {
 	fullSyncPlanner() {
 		const dependencies = this.dependencies;
 		return {
+			initialConfigPull: {
+				firstSync: dependencies.getSettings().lastSync === null && dependencies.getSettings().lastSeq === 0,
+				get: () => dependencies.getLocalManifest().getInitialConfigPull(),
+				save: async (state: InitialConfigPull) => {
+					const manifest = dependencies.getLocalManifest();
+					manifest.setInitialConfigPull(state);
+					await manifest.save();
+				},
+			},
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
@@ -179,6 +189,13 @@ export class SyncEngineContexts {
 
   async finishInitialSetup(): Promise<void> {
     const { api, updateState, throwIfDestroyed, prepareReminderScope } = this.dependencies;
+    const manifest = this.dependencies.getLocalManifest();
+    const initialConfig = manifest.getInitialConfigPull();
+    if (initialConfig && (this.dependencies.getSettings().lastSeq > 0 || Object.keys(initialConfig.files).every(path => manifest.hasFile(path)))) {
+      manifest.setInitialConfigPull(undefined);
+      await manifest.save();
+      throwIfDestroyed();
+    }
     if (!api.initialImport?.isPreparingReminders()) return;
     updateState({ work: { phase: 'reminders' } });
     await prepareReminderScope?.();
