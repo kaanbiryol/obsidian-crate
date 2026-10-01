@@ -153,7 +153,7 @@ describe('settings controls', () => {
 		const { renderRemindersSection } = await import('./reminders-section');
 		const plugin = {
 			app: {},
-			remindersSettings: { enabled: true, autoOpenView: 'sidebar', sidebarDefaultTab: 'today', upcomingDaysDefault: 7, remindersFolderPath: 'Reminders', taskCreationDefaultDueDate: 'none' },
+			remindersSettings: { enabled: true, listStyle: 'flat', autoOpenView: 'sidebar', sidebarDefaultTab: 'today', upcomingDaysDefault: 7, remindersFolderPath: 'Reminders', taskCreationDefaultDueDate: 'none' },
 			writeRemindersSettings: vi.fn(async () => {}),
 		};
 		renderRemindersSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
@@ -165,6 +165,12 @@ describe('settings controls', () => {
 		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ autoOpenView: 'none' });
 		const tab = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Default reminders tab')!;
 		expect(tab.dropdowns[0]!.value).toBe('today');
+		const style = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Reminder list style')!.dropdowns[0]!;
+		expect(style.value).toBe('flat');
+		await style.change('cards');
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ listStyle: 'cards' });
+		await style.change('flat');
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ listStyle: 'flat' });
 		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders debug logging')).toBe(false);
 	});
 });

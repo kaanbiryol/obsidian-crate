@@ -25,6 +25,7 @@ describe('normalizeRemindersSettings', () => {
 
 		expect(settings).toEqual({
 			enabled: true,
+			listStyle: 'flat',
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: 'Reminders/Work',
 			queryViewPreferences: {
@@ -61,6 +62,14 @@ describe('normalizeRemindersSettings', () => {
 
 	it('preserves explicitly disabled Reminders', () => {
 		expect(normalizeRemindersSettings({ enabled: false }).enabled).toBe(false);
+	});
+
+	it.each(['flat', 'cards'] as const)('preserves the %s list style', listStyle => {
+		expect(normalizeRemindersSettings({ listStyle }).listStyle).toBe(listStyle);
+	});
+
+	it.each([undefined, null, 'compact', 1])('defaults missing or invalid list styles to flat: %s', listStyle => {
+		expect(normalizeRemindersSettings({ listStyle } as never).listStyle).toBe('flat');
 	});
 
 	it('normalizes allDayNotificationTime values', () => {

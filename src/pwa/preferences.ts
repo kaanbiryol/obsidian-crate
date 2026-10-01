@@ -1,5 +1,6 @@
 import { normalizeDockTabs, type DockTab } from './dock-preferences';
 import type { StartTab } from './types';
+import { DEFAULT_REMINDER_LIST_STYLE, normalizeReminderListStyle, type ReminderListStyle } from '../reminders/types/reminder-list-style';
 
 type PwaStartScreen = StartTab | 'reading' | 'favorites' | 'archive';
 
@@ -9,12 +10,14 @@ export interface PwaPreferences {
 	defaultScreen: PwaStartScreen;
 	dockTabs: DockTab[];
 	upcomingDays: number | null;
+	reminderListStyle: ReminderListStyle;
 }
 
 export function loadPwaPreferences(): PwaPreferences {
 	try {
 		const value = JSON.parse(localStorage.getItem(PWA_PREFERENCES_KEY) ?? '{}') as Partial<PwaPreferences> | null;
 		return {
+			reminderListStyle: normalizeReminderListStyle(value?.reminderListStyle),
 			dockTabs: normalizeDockTabs(value?.dockTabs),
 			defaultScreen: value?.defaultScreen === 'inbox' || value?.defaultScreen === 'upcoming' || value?.defaultScreen === 'browse'
 				|| value?.defaultScreen === 'reading' || value?.defaultScreen === 'favorites' || value?.defaultScreen === 'archive'
@@ -23,7 +26,7 @@ export function loadPwaPreferences(): PwaPreferences {
 				? value.upcomingDays : null,
 		};
 	} catch {
-		return { defaultScreen: 'today', upcomingDays: null, dockTabs: normalizeDockTabs(null) };
+		return { defaultScreen: 'today', upcomingDays: null, dockTabs: normalizeDockTabs(null), reminderListStyle: DEFAULT_REMINDER_LIST_STYLE };
 	}
 }
 

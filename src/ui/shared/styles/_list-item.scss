@@ -1,5 +1,24 @@
 // Shared item presentation; feature markup retains its own semantics and actions.
-// Future density modes belong here, independently of reminder/reading content.
+// Presentation modes belong here, independently of reminder/reading content.
+
+@mixin flat-surface {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+@mixin inset-divider($start, $end) {
+    &::after {
+        content: '';
+        position: absolute;
+        inset-inline: $start $end;
+        bottom: 0;
+        height: 1px;
+        background: var(--crate-divider);
+        pointer-events: none;
+    }
+}
 @mixin surface {
     border-radius: var(--crate-radius-card);
     background: var(--crate-reminder-card-bg);

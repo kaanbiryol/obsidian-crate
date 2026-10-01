@@ -1,3 +1,4 @@
+import { ReminderListStyleFixture } from './ReminderListStyleFixture';
 import { NavigationFixture } from './NavigationFixture';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { AppDock } from '@/ui/shared/navigation/AppDock';
@@ -80,6 +81,7 @@ function Gallery() {
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><AppDock section="reminders" tabs={['inbox', 'today', 'browse']} activeTab={activeTab === 'upcoming' ? 'today' : activeTab} onSelect={tab => setActiveTab(tab as TabId)} onPin={tab => setActiveTab(tab as TabId)} /></div>;
+  else if (scene === 'list-style') content = <ReminderListStyleFixture host={host} />;
   else if (scene === 'navigation') content = <NavigationFixture isDark={isDark} onAdd={setResult} />;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture />;
@@ -97,14 +99,14 @@ function Gallery() {
     <ReminderActionChips dueDate={null} dueDateLabel={date} project={project} defaultProject="Inbox" priority={4} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={noop} />
   </>;
   else if (scene === 'editor') content = <><ModalHeader title="New reminder" closeLabel="Close reminder editor" onClose={noop} action={{ label: 'Add', onClick: () => setResult('Saved') }} /><div className="reminder-modal-body"><ReminderEditorFields content={title} onContentChange={setTitle} description={description} onDescriptionChange={setDescription} allowAutoFocus={false} projects={projects} textareaRef={titleRef} richTextInputRef={richRef} /><ReminderActionChips dueDate={null} project={project} defaultProject="Inbox" priority={1} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={noop} /></div></>;
-  else if (scene === 'cards') content = <div className="reminders-view is-primary"><ReminderCard reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
+  else if (scene === 'cards') content = <div className="reminders-view is-primary"><ReminderCard listStyle="cards" reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard listStyle="cards" reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
   else content = <DatePickerContent currentDate={date ? new Date(`${date}T09:30:00`) : null} hasTime isDark={isDark} commitDateOnChange={host === 'pwa'} onClose={noop} onSelectPreset={preset => setResult(preset)} onDateChange={value => { setDate(value); setResult(value); }} onTimeChange={(hour, minute) => setResult(`${hour}:${minute}`)} onTimeClear={() => setResult('Cleared time')} onRemove={() => setResult('Removed')} />;
   if (scene === 'loading' || scene === 'loading-block') content = <RemindersLoading compact={scene === 'loading-block'} />;
   return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${['reading', 'navigation'].includes(scene) ? `reading-gallery${host === 'pwa' ? ' pwa-reading-root' : ''}` : ''} ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? ['editor', 'metadata'].includes(scene) ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
+const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

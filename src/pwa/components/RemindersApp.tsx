@@ -27,8 +27,10 @@ const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
 
 import { AppSyncIndicator } from '../sync/AppSyncIndicator';
 import { useRemindersRuntime } from './RemindersRuntime';
+import { usePwaPreferences } from '../hooks/usePwaPreferences';
 
 export function RemindersApp() {
+	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const {
 		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
@@ -67,6 +69,7 @@ export function RemindersApp() {
 
 	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
+			listStyle={preferences.reminderListStyle}
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
 			index={index}
@@ -74,7 +77,7 @@ export function RemindersApp() {
 			onEdit={editReminder}
 			onToggleComplete={toggleReminderCompleted}
 		/>
-	), [editReminder, toggleReminderCompleted]);
+	), [editReminder, toggleReminderCompleted, preferences.reminderListStyle]);
 
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.

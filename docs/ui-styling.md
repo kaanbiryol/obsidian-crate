@@ -32,13 +32,20 @@ both hosts together.
   Reading uses bottom navigation, floating Highlights, and sheets; do not introduce
   desktop sidebars, split panes, or centered dialogs. Desktop support is separate
   future work. Covered library cards keep their resting surface on return. Shared Sass mixins preserve each
-  feature's existing DOM and interaction semantics. Future compact/non-card
-  presentation should be implemented here for both features; no density setting
-  is exposed yet. Existing reminder surface tokens remain host-theme inputs.
+  feature's existing DOM and interaction semantics. Flat surfaces and inset
+  dividers are reusable mixins here; reminders opt into them through
+  `_reminder-cards.scss`. Reading retains its card presentation.
+  Existing reminder surface tokens remain host-theme inputs.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
+  **Reminders → Reminder list style** selects **Flat** (the default) or **Cards**
+  locally in each host. The plugin setting applies immediately to open views,
+  project lists, and embedded notes; the PWA stores its own preference and updates
+  open tabs. Flat rows retain completion targets, priority, keyboard focus,
+  press/drag feedback, and theme colors while removing card surfaces and metadata
+  pill outlines. Their dividers align with the reminder title.
 - Reading search and PWA Save a link fields opt into `crate-field--rounded`: 16px
   corners, 48px minimum height, and 16px horizontal padding. Their filled
   surfaces, borders, and focus rings retain shared theme colors. Reminder

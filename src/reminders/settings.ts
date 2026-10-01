@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { normalizePath } from 'obsidian';
 import { isRecord } from '../platform/validation';
 import type { TabId } from './ui/layoutConstants';
+import { DEFAULT_REMINDER_LIST_STYLE, normalizeReminderListStyle, type ReminderListStyle } from './types/reminder-list-style';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';
 
@@ -22,6 +23,7 @@ export type RemindersSettings = {
 	/** Explicit local edit waiting for this server, never copied to another connection. */
 	pendingServerFolder?: { id: string; workerUrl: string; folderPath: string };
 	enabled: boolean;
+	listStyle: ReminderListStyle;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;
 	queryViewPreferences: Record<string, QueryViewPreference>;
@@ -33,6 +35,7 @@ export type RemindersSettings = {
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	enabled: true,
+	listStyle: DEFAULT_REMINDER_LIST_STYLE,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
 	queryViewPreferences: {},
@@ -147,6 +150,7 @@ export function normalizeRemindersSettings(
 			? { pendingServerFolder: { id: value.pendingServerFolder.id, workerUrl: value.pendingServerFolder.workerUrl,
 				folderPath: normalizeRemindersFolderPath(value.pendingServerFolder.folderPath) } } : {}),
 		enabled: typeof value?.enabled === 'boolean' ? value.enabled : true,
+		listStyle: normalizeReminderListStyle(value?.listStyle),
 
 		taskCreationDefaultDueDate: isDueDateDefaultSetting(value?.taskCreationDefaultDueDate)
 			? value.taskCreationDefaultDueDate

@@ -2,15 +2,18 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
+import type { ReminderListStyle } from '@/reminders/types/reminder-list-style';
 
 export const WebReminderCard = memo(function WebReminderCard({
 	reminder,
+	listStyle,
 	index,
 	hideProject,
 	onEdit,
 	onToggleComplete,
 }: {
 	reminder: SharedReminder;
+	listStyle?: ReminderListStyle;
 	index: number;
 	hideProject: boolean;
 	onEdit: (id: string) => void;
@@ -60,6 +63,7 @@ export const WebReminderCard = memo(function WebReminderCard({
 			aria-label={`${reminder.content}. Press Enter to edit reminder.`}
 		>
 			<SharedReminderCard
+				listStyle={listStyle}
 				reminder={reminder}
 				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}

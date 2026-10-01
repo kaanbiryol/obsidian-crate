@@ -16,6 +16,7 @@ import type { Reminder } from '@/reminders/types/plugin-reminder';
 import { PluginContext } from '@/reminders/ui/reminders-context';
 import { openReminderEditModal } from '@/reminders/ui/adapters/reminderEditorModals';
 import type { ProjectColorScheme } from '@/reminders/utils/projectColors';
+import { useRemindersSettingsStore } from '@/reminders/settings';
 
 interface ReminderCardWrapperProps {
   reminder: Reminder;
@@ -43,6 +44,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   colorScheme = 'dark',
 }) => {
   const plugin = PluginContext.use();
+  const listStyle = useRemindersSettingsStore(state => state.listStyle);
   const isTogglingRef = useRef(false);
   const [completionPreview, setCompletionPreview] = useState<{ source: Reminder; completed: boolean }>();
 
@@ -111,6 +113,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       aria-label={`${reminder.content}. Press Enter to edit reminder.`}
     >
       <SharedReminderCard
+        listStyle={listStyle}
         reminder={{
           id: reminder.id,
           content: reminder.content,

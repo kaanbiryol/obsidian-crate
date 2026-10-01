@@ -8,6 +8,7 @@ import {
 	type RemindersSettings,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
+import { normalizeReminderListStyle } from '../../reminders/types/reminder-list-style';
 import { errorMessage } from '../../plugin/logger';
 import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
@@ -81,6 +82,15 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 		});
 
 	const viewPreferences = preferences.createDiv();
+
+	new Setting(viewPreferences)
+		.setName('Reminder list style')
+		.setDesc('This device · use flat rows with subtle dividers or individual cards, including in notes.')
+		.addDropdown(dropdown => dropdown
+			.addOption('flat', 'Flat')
+			.addOption('cards', 'Cards')
+			.setValue(settings.listStyle)
+			.onChange(value => persistSettings({ listStyle: normalizeReminderListStyle(value) })));
 
 	new Setting(viewPreferences)
 		.setName('Default due date')

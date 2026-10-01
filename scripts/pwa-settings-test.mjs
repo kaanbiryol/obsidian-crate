@@ -52,6 +52,19 @@ try {
 				await page.screenshot({ path: 'test-results/settings/' + name + '-maintenance-' + colorScheme + '.png' });
 			}
 			await checkSettingsFocus(page, sheet);
+			const listStyle = sheet.getByRole('combobox', { name: 'Reminder list style', exact: true });
+			const reminderRow = page.locator('.premium-reminder-card').first();
+			await expect(listStyle).toHaveValue('flat');
+			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'flat');
+			await listStyle.selectOption('cards');
+			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');
+			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
+			await page.reload();
+			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');
+			await gear.click();
+			await expect(listStyle).toHaveValue('cards');
+			await listStyle.selectOption('flat');
+			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'flat');
 			await checkTabSettings(page, name);
 			// Page presentation fills tall and short phones, rather than stopping
 			// at the desktop height cap. Resizing also exercises the layout lock.
@@ -108,7 +121,7 @@ try {
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
 			await sheet.getByRole('combobox', { name: 'Default tab' }).selectOption('favorites');
 			await checkSettingsFocus(page, sheet);
-			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'] });
+			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'], reminderListStyle: 'flat' });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 			await expect(sheet).toHaveCount(0);

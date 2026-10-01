@@ -208,13 +208,15 @@ describe('CratePlugin settings persistence', () => {
 			settings: normalizeCrateSettings({}, 'vault-config'),
 		});
 
-		await plugin.writeRemindersSettings({ upcomingDaysDefault: 14 });
+		await plugin.writeRemindersSettings({ upcomingDaysDefault: 14, listStyle: 'cards' });
 
 		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(14);
+		expect(plugin.remindersSettings.listStyle).toBe('cards');
 		const persisted = saveData.mock.calls[0]?.[0] as {
-			reminders?: { upcomingDaysDefault?: number };
+			reminders?: { upcomingDaysDefault?: number; listStyle?: string };
 		};
 		expect(persisted.reminders?.upcomingDaysDefault).toBe(14);
+		expect(persisted.reminders?.listStyle).toBe('cards');
 	});
 
 	it('keeps reminder settings unchanged when their combined data write fails', async () => {
@@ -225,12 +227,13 @@ describe('CratePlugin settings persistence', () => {
 			settings: normalizeCrateSettings({}, 'vault-config'),
 		});
 
-		await expect(plugin.writeRemindersSettings({ upcomingDaysDefault: 14 }))
+		await expect(plugin.writeRemindersSettings({ upcomingDaysDefault: 14, listStyle: 'cards' }))
 			.rejects.toThrow('disk full');
 
 		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
 		);
+		expect(plugin.remindersSettings.listStyle).toBe('flat');
 	});
 
 	it('serializes combined writes so concurrent core and reminder updates are not lost', async () => {
