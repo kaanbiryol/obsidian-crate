@@ -124,6 +124,10 @@ jobs:
     name: Worker integration tests
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      # Match package-lock.json; browsers and OS dependencies are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,8 +140,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:worker-runtime
-      - name: Install browser runtimes for desktop extraction checks
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Verify Reading extraction, server and shortcut contracts
         run: npm run test:reading-server
       - name: Verify persistent local hosting
@@ -205,6 +207,9 @@ jobs:
     name: Editor and activity browser tests (${{ matrix.shard }}/4)
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -220,8 +225,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build
       - name: Check editor contracts
         run: npx playwright test --config tests/editor-contract/playwright.config.ts --shard=${{ matrix.shard }}/4
@@ -248,6 +251,9 @@ jobs:
     name: PWA browser tests (${{ matrix.shard }}/4)
     if: inputs.reuse-run-id == ''
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --ipc=host
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -263,10 +269,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
-        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - name: Run browser group
-        run: npm run test:pwa-browser -- --shard=${{ matrix.shard }}/4
+        run: npm run test:pwa-browser -- --platform=linux --shard=${{ matrix.shard }}/4
       - name: Upload browser failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -278,10 +282,44 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  reading:
-    name: Reading browser tests
+  pwa-native:
+    name: Native PWA browser tests (${{ matrix.shard }}/2)
     if: inputs.reuse-run-id == ''
-    runs-on: ubuntu-24.04
+    runs-on: macos-26
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install native browser test runtimes
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
+      - name: Check native browser behavior
+        run: npm run test:pwa-browser -- --platform=macos --shard=${{ matrix.shard }}/2
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pwa-native-failures-${{ matrix.shard }}
+          path: |
+            .generated/browser-failures/
+            test-results/reading/
+          include-hidden-files: true
+          retention-days: 7
+
+  reading:
+    name: Reading browser and native shortcut tests
+    if: inputs.reuse-run-id == ''
+    runs-on: macos-26
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -293,7 +331,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install browser test runtimes
+      - name: Check the native shortcut parser
+        run: node --test scripts/reading-shortcut.test.mjs
+      - name: Install native browser test runtimes
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
       - run: npm run build:worker
       - run: npm run test:reading-browser
@@ -304,20 +344,3 @@ jobs:
           name: reading-browser
           path: test-results/
           retention-days: 7
-
-  shortcut:
-    name: Native shortcut parser checks
-    if: inputs.reuse-run-id == ''
-    runs-on: macos-26
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: node --test scripts/reading-shortcut.test.mjs

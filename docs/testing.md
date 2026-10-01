@@ -200,7 +200,7 @@ It first runs the npm advisory audit (including development dependencies, failin
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second), a Reading browser job, and four PWA browser shards run on Linux. Two visual shards retain the reviewed macOS snapshot platform, and a short macOS job checks the native shortcut parser. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
+GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second), and four PWA browser shards run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Two balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks. Two visual shards retain the reviewed macOS snapshot platform. The Reading browser job runs on macOS and checks the native shortcut parser before its browser suite. These five macOS jobs fit the hosted macOS concurrency limit. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
 
 Successful push builds upload candidate records and release assets for seven days.
 Release preparation can reuse only a successful repository push run for the exact
@@ -227,11 +227,12 @@ Release runs resolve the tag to one commit before starting verification. Every j
 `npm run check:source` runs everything in `npm run check` except the Worker runtime tests. To inspect or reproduce a PWA browser shard:
 
 ```bash
-npm run test:pwa-browser -- --shard=1/4 --list
-npm run test:pwa-browser -- --shard=1/4
+npm run test:pwa-browser -- --platform=linux --shard=1/4 --list
+npm run test:pwa-browser -- --platform=linux --shard=1/4
+npm run test:pwa-browser -- --platform=macos --shard=1/2
 ```
 
-Omitting `--shard` runs the complete browser suite. Groups are balanced by the measured script durations in `scripts/pwa-browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
+Omitting both `--platform` and `--shard` runs the complete browser suite. The Linux and native macOS groups cover every script exactly once; `test:ci` checks their combined coverage and balance. Groups are balanced by the measured script durations in `scripts/pwa-browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
 
 The runner builds the Worker/PWA once, then sets `CRATE_PWA_PREBUILT=1` for its child scripts to reuse those fresh assets. Standalone scripts build by default; tests requesting explicit asset versions (including service-worker updates) always build those versions separately. Missing prebuilt assets fail the test. `npm run test:ci` checks shard coverage and balance, runner failure handling, and metadata-independent asset versions.
 
