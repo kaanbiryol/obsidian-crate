@@ -241,6 +241,13 @@ If a local Markdown file changes after an automatic merge has already been accep
 
 Implementation: `queue.ts`
 
+File events also schedule a local content check after a 250 ms coalescing window,
+including while automatic sync is off. Files matching their last-synced SHA-256
+hash leave the pending list without a server request. The check refreshes their
+verified modification times in one checkpoint write. New edits, changed baselines,
+in-flight syncs, unreadable files, and outstanding durable mutations prevent stale
+checks from clearing pending work. Previews remain read-only.
+
 ## Local Manifest
 
 Stored as `file-manifest.json` in the plugin directory, separate from settings to avoid write amplification.

@@ -15,7 +15,7 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
         return;
     }
     if (diff.added === 0 && diff.removed === 0) {
-        const message = container.createDiv({ cls: 'crate-diff-message', attr: snapshot.kind === 'modified' ? { title: 'Touched files stay listed until sync, even when their contents match the last-synced copy.' } : {} });
+        const message = container.createDiv({ cls: 'crate-diff-message' });
         message.createDiv({ cls: 'crate-browser-empty-title', text: snapshot.kind === 'modified' ? 'Unchanged' : snapshot.kind === 'added' ? 'New empty file' : 'Empty file deleted' });
         message.createDiv({ text: snapshot.kind === 'modified' ? 'Matches the last-synced copy.'
                 : snapshot.kind === 'added' ? 'This empty file was added on this device since the last sync.' : 'This empty file was deleted on this device.' });

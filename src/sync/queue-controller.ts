@@ -1,5 +1,6 @@
 import type { TAbstractFile } from 'obsidian';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
+import { createEmptySyncResult } from './sync-result';
 import {
 	clearSyncedPendingPaths as clearSyncedQueuePaths,
 	debouncedSync as runDebouncedQueueSync,
@@ -26,6 +27,7 @@ export interface SyncQueueControllerContext {
 	updateState(updates: Partial<SyncState>): void;
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
+	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	assertLocalFileAbsent(path: string): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
@@ -47,6 +49,9 @@ export class SyncQueueController {
 	private flushTasks = new Set<Promise<void>>();
 	private reconciliationScheduled = false;
 	private reconciliationPaths = new Set<string>();
+	private verificationKeys = new Set<string>();
+	private verificationTimer: ReturnType<typeof setTimeout> | null = null;
+	private verificationTask: Promise<void> | null = null;
 
 	constructor(private readonly context: SyncQueueControllerContext) {}
 
@@ -94,6 +99,9 @@ export class SyncQueueController {
 
 	destroy(): void {
 		this.clearDebounceTimer();
+		if (this.verificationTimer !== null) clearTimeout(this.verificationTimer);
+		this.verificationTimer = null;
+		this.verificationKeys.clear();
 		this.pendingPaths.clear();
 		this.inFlightPaths.clear();
 		this.pendingRevisions.clear();
@@ -108,9 +116,11 @@ export class SyncQueueController {
 			markPending: (path: string) => {
 				this.nextRevision += 1;
 				this.pendingRevisions.set(path, this.nextRevision);
+				this.verificationKeys.add(path);
 			},
 			clearPending: (path: string) => {
 				this.pendingRevisions.delete(path);
+				this.verificationKeys.delete(path);
 			},
 			triggerDebouncedSync: () => this.debouncedSync(),
 		};
@@ -174,6 +184,7 @@ export class SyncQueueController {
 
 	private debouncedSync(): void {
 		this.context.updateState({ pendingChanges: this.pendingPaths.size });
+		this.schedulePendingVerification();
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		runDebouncedQueueSync(
 			this.getQueueDebounceContext(),
@@ -190,7 +201,43 @@ export class SyncQueueController {
 	}
 
 	async waitForIdle(): Promise<void> {
-		await Promise.allSettled([...this.flushTasks]);
+		await Promise.allSettled([...this.flushTasks, this.verificationTask]);
+	}
+
+	/** Resume checks deferred by a sync, including events emitted by downloads. */
+	recheckPendingPaths(): void {
+		for (const key of this.pendingPaths) this.verificationKeys.add(key);
+		this.schedulePendingVerification();
+	}
+
+	private schedulePendingVerification(): void {
+		if (!this.verificationKeys.size || this.verificationTimer !== null || this.verificationTask
+			|| this.context.isDestroyed() || this.context.currentStatus() === 'syncing') return;
+		// Coalesce bursts independently of the automatic network-sync preference.
+		this.verificationTimer = setTimeout(() => {
+			this.verificationTimer = null;
+			const task = this.verifyPendingChanges();
+			this.verificationTask = task;
+			void task.catch(() => {
+				// Failed checkpoint writes leave the queue intact for the next sync.
+			}).finally(() => {
+				this.verificationTask = null;
+				this.schedulePendingVerification();
+			});
+		}, 250);
+	}
+
+	private async verifyPendingChanges(): Promise<void> {
+		if (this.context.isDestroyed() || this.context.currentStatus() === 'syncing') return;
+		const keys = [...this.verificationKeys];
+		this.verificationKeys.clear();
+		const revisions = this.snapshotPendingRevisions();
+		const isCurrent = (key: string) => !this.context.isDestroyed()
+			&& this.context.currentStatus() !== 'syncing' && this.pendingPaths.has(key)
+			&& !this.inFlightPaths.has(key) && this.pendingRevisions.get(key) === revisions.get(key);
+		const result = createEmptySyncResult();
+		result.settledPaths = await this.context.verifyPendingPaths(keys, isCurrent);
+		this.clearSyncedPendingPaths(result, revisions);
 	}
 
 	private requestReconciliation(queueKeys: string[]): void {

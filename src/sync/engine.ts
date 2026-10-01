@@ -63,6 +63,7 @@ import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { normalizeWorkerUrl } from './worker-url';
 import { LocalContentVerifier } from './content-verifier';
+import { verifyUnchangedPendingPaths } from './pending-verification';
 
 const logger = createLogger('SyncEngine');
 
@@ -169,6 +170,16 @@ export class SyncEngine {
 			updateState: this.updateState.bind(this),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
+			verifyPendingPaths: (keys, isCurrent) => {
+				const revision = this.syncActivityRevision;
+				return verifyUnchangedPendingPaths({
+					adapter: this.vault.adapter,
+					manifest: this.localManifest,
+					isCurrent: key => isCurrent(key) && revision === this.syncActivityRevision
+						&& this.localManifest.uploadJournal.pending().length === 0
+						&& this.api.getPendingRestores().length === 0,
+				}, keys);
+			},
 			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
 			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
 			runConcurrent: this.runConcurrent.bind(this),
@@ -450,6 +461,7 @@ export class SyncEngine {
 		if (updates.status && updates.status !== 'syncing') this.timingRecorder.stop();
 		if ('status' in updates || 'lastError' in updates) this.periodicCheckFailed = false;
 		this.state = { ...this.state, ...updates };
+		if (updates.status && updates.status !== 'syncing') this.queueController.recheckPendingPaths();
 		if ('lastError' in updates && !updates.lastIssues) this.state.lastIssues = undefined;
 		if (updates.status) this.state.work = updates.status === 'syncing' ? updates.work : undefined;
 		this.onStateChange?.(this.state);

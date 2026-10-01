@@ -71,13 +71,20 @@ it('does not queue an inspection that completes after unload', async () => {
 	expect(harness.engine.getPendingPaths()).toEqual([]);
 });
 
-it('keeps touched configuration files visible even when their contents match the last sync', async () => {
-	const bytes = toArrayBuffer('same bytes');
-	harness.localManifest.getEntry.mockReturnValue({ hash: await computeHash(bytes), size: bytes.byteLength, modified: new Date(0).toISOString() });
-	harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 50 });
-	harness.vault.adapter.readBinary.mockResolvedValue(bytes);
-	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([path]);
-	expect(harness.engine.getState().pendingChanges).toBe(1);
-	expect(harness.api.uploadFile).not.toHaveBeenCalled();
+it('clears touched configuration files locally when their contents match the last sync', async () => {
+	vi.useFakeTimers();
+	try {
+		const bytes = toArrayBuffer('same bytes');
+		harness.localManifest.getEntry.mockReturnValue({ hash: await computeHash(bytes), size: bytes.byteLength, modified: new Date(0).toISOString() });
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 50 });
+		harness.vault.adapter.readBinary.mockResolvedValue(bytes);
+		await harness.engine.onRawFileChange(path);
+		expect(harness.engine.getPendingPaths()).toEqual([path]);
+		expect(harness.engine.getState().pendingChanges).toBe(1);
+		await vi.advanceTimersByTimeAsync(250);
+		await harness.engine.waitForIdle();
+		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getState().pendingChanges).toBe(0);
+		expect(harness.api.uploadFile).not.toHaveBeenCalled();
+	} finally { vi.useRealTimers(); }
 });

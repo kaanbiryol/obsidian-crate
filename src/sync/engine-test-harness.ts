@@ -15,6 +15,7 @@ type ManifestEntry = {
 	hash: string;
 	size: number;
 	modified: string;
+	revision?: string;
 };
 
 type MockAdapter = {
@@ -55,6 +56,7 @@ export type Harness = {
 		deleteFile: ReturnType<typeof vi.fn>;
 		downloadFile: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn<() => Promise<FileManifest>>>;
+		getPendingRestores: ReturnType<typeof vi.fn>;
 		checkForChanges: ReturnType<typeof vi.fn>;
 		batchUpload: ReturnType<typeof vi.fn>;
 		batchDownload: ReturnType<typeof vi.fn>;
@@ -83,6 +85,7 @@ export type Harness = {
 		setEntry: ReturnType<typeof vi.fn<(path: string, entry: ManifestEntry) => void>>;
 		removeEntry: ReturnType<typeof vi.fn>;
 		clear: ReturnType<typeof vi.fn>;
+		recordRename: ReturnType<typeof vi.fn>;
 	};
 };
 
@@ -222,6 +225,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
 		getManifest: vi.fn<() => Promise<FileManifest>>(),
+		getPendingRestores: vi.fn(() => []),
 		checkForChanges: vi.fn(),
 		batchUpload: vi.fn().mockImplementation(async (files: Array<{ path: string; hash: string; size: number }>) => ({
 			success: true,
@@ -272,6 +276,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		removeEntry: vi.fn((path: string) => {
 			delete manifestFiles[path];
 		}),
+		recordRename: vi.fn(),
 		clear: vi.fn(() => {
 			for (const path of Object.keys(manifestFiles)) {
 				delete manifestFiles[path];
