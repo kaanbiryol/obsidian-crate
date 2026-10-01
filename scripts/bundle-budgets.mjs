@@ -25,8 +25,10 @@ export const bundleBudgets = {
 		// Source-preserving highlights and the deferred review UI: about 3.57 MB / 1.30 MB.
 		// Updated dependencies and PWA controls measure 3.85 MB raw / 1.375 MB gzip.
 		// Update-curtain completion and stale-reveal guards measure 1.3801 MB gzip.
+		// Shared sync coordination, flat reminder styles and current dependencies
+		// measure 1.3875 MB gzip; retain a 12.5 KB margin for this release.
 		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '3900000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1381000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1400000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
