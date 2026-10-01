@@ -81,12 +81,21 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
       }
       await refresh(session);
     }); };
-    const changed = () => { const current = readingSession(); if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) { resetSession(); } else reload(); };
+    const changed = () => {
+      let current: ReadingSession | null;
+      try { current = readingSession(); } catch (cause) {
+        resetSession();
+        setError(cause instanceof Error ? cause.message : 'Reading sign-in could not be read. Reconnect from Obsidian settings.');
+        return;
+      }
+      if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) resetSession();
+      else reload();
+    };
     reload();
     const timer = window.setInterval(reload, 30_000);
     window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
     return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
-  }, [enabled, session, ready, refresh, run, resetSession]);
+  }, [enabled, session, ready, refresh, run, resetSession, setError]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };
 }

@@ -86,6 +86,19 @@ export function PwaModalSheet({
 	useLayoutEffect(() => {
 		if (role === 'alertdialog') popupRef.current?.focus({ preventScroll: true });
 	}, [role, hasMounted]);
+	const finalFocus = () => {
+		const host = focusHostRef.current;
+		const target = () => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
+			: host?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]');
+		// Closing can remove the selected row and clamp its page after Base UI
+		// resolves the return target. Recover on the next frame only if focus was lost.
+		requestAnimationFrame(() => {
+			if (host?.isConnected && !popupRef.current?.isConnected && document.activeElement === document.body) {
+				target()?.focus({ preventScroll: true });
+			}
+		});
+		return target();
+	};
 	return <><span ref={anchorRef} hidden />{mountPoint && (
 		<Drawer.Root open={isOpen && hasMounted} modal="trap-focus" swipeDirection="down"
 			disablePointerDismissal={!dismissible}
@@ -127,8 +140,7 @@ export function PwaModalSheet({
 										if (field && field !== field.ownerDocument.activeElement) field.focus({ preventScroll: true });
 									}}
 									initialFocus={variant === 'reminder' ? false : () => popupRef.current?.querySelector<HTMLElement>('[data-initial-focus]:not(:disabled)') ?? popupRef.current}
-									finalFocus={() => previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
-										: focusHostRef.current?.querySelector<HTMLElement>('.reminder-pagination select:not(:disabled), .sidebar-reminder-card-wrapper, [aria-current="page"]')}
+									finalFocus={finalFocus}
 								>
 									<Drawer.Content className="pwa-modal-sheet__content">
 										<div className="pwa-modal-sheet__scroller">{variant === 'settings'
