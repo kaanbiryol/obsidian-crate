@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHarness, getPendingPaths, setSyncStatus, toArrayBuffer } from './engine-test-harness';
 import { computeHash } from './hasher';
+import { formatSyncProgress } from '../ui/activity/progress-label';
 
 async function harness() {
     const h = createHarness({ automaticSync: false, lastSeq: 42 });
@@ -14,6 +15,30 @@ async function harness() {
 }
 
 describe('selected sync', () => {
+    it('shows checking, per-file progress, and saving during selected uploads', async () => {
+        const h = await harness();
+        const labels: string[] = [];
+        h.engine.setStateChangeCallback(state => labels.push(formatSyncProgress(null, state.work)));
+        h.api.getFileMetadata.mockImplementation(async () => {
+            expect(labels.at(-1)).toBe('Checking for changes…');
+            return { files: {} };
+        });
+        h.api.uploadFile.mockImplementation(async path => {
+            expect(labels.at(-1)).toBe(`Applying changes: ${path === 'a.md' ? 0 : 1}/2`);
+            return { path, success: true };
+        });
+        h.localManifest.save.mockImplementation(() => {
+            expect(labels.at(-1)).toBe('Saving sync progress…');
+        });
+
+        const result = await h.engine.syncSelected(['a.md', 'b.md']);
+
+        expect(result.success).toBe(true);
+        expect(result.uploadedPaths).toEqual(['a.md', 'b.md']);
+        expect(labels).toContain('Applying changes: 2/2');
+        expect(h.engine.getState()).toMatchObject({ status: 'idle', work: undefined });
+        h.engine.destroy();
+    });
     it('settles only selected touched files and preserves the global server cursor', async () => {
         const h = await harness();
         const result = await h.engine.syncSelected(['a.md']);

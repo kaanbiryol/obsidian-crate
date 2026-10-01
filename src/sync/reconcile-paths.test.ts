@@ -63,6 +63,34 @@ async function createHarness(options: {
 }
 
 describe('reconcileQueuePaths', () => {
+	it('counts each queued change once across ignored files, retries, and failures', async () => {
+		const harness = await createHarness({
+			baseHash: 'base', localText: 'local edit',
+			remoteManifests: [{ version: 1, files: {} }],
+		});
+		const reportWork = vi.fn<NonNullable<TargetedReconcileContext['reportWork']>>();
+		harness.context.reportWork = reportWork;
+		harness.context.shouldIgnore = path => path === 'ignored.md';
+		harness.processDiff
+			.mockRejectedValueOnce(new HttpError('remote changed', 409))
+			.mockResolvedValueOnce({ status: 'applied' })
+			.mockRejectedValueOnce(new Error('Upload failed'));
+
+		const result = await reconcileQueuePaths(harness.context, ['ignored.md', 'a.md', 'a.md', 'b.md']);
+
+		expect(result.success).toBe(false);
+		expect(result.settledPaths).toEqual(['ignored.md', 'a.md']);
+		expect(harness.processDiff).toHaveBeenCalledTimes(3);
+		expect(reportWork.mock.calls.map(([work]) => work)).toEqual([
+			{ phase: 'server' },
+			{ phase: 'applying', current: 0, total: 3 },
+			{ phase: 'applying', current: 1, total: 3 },
+			{ phase: 'applying', current: 2, total: 3 },
+			{ phase: 'applying', current: 3, total: 3 },
+			{ phase: 'saving' },
+		]);
+	});
+
 	it('classifies and reconciles only the queue path that lost the version race', async () => {
 		const localText = 'local edit';
 		const localHash = await computeHash(bytes(localText));

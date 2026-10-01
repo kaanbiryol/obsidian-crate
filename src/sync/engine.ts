@@ -734,6 +734,7 @@ export class SyncEngine {
 		if (recover) await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
+			reportWork: work => this.updateState({ work }),
 			vault: this.vault,
 			localManifest: this.localManifest,
 			getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,

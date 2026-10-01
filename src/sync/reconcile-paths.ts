@@ -6,7 +6,7 @@ import { classifyPath } from './reconciliation';
 import { isQueueVersionConflict } from './queue-failure';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import { RemoteVersionChangedError } from './transfer-download';
-import type { FileDiff, SyncResult } from './types';
+import type { FileDiff, SyncResult, SyncWork } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
@@ -22,6 +22,7 @@ interface TargetedManifest {
 }
 
 export interface TargetedReconcileContext {
+	reportWork?(work: SyncWork): void;
 	vault: Vault;
 	localManifest: TargetedManifest;
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
@@ -42,7 +43,11 @@ export async function reconcileQueuePaths(
 	const uniqueQueueKeys = [...new Set(queueKeys)];
 	const targetPaths = [...new Set(uniqueQueueKeys.map(queueKey =>
 		queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey))];
+	context.reportWork?.({ phase: 'server' });
 	const remoteEntries = createPathRecord(await context.getRemoteEntries(targetPaths));
+	let processed = 0;
+	const reportProgress = () => context.reportWork?.({ phase: 'applying', current: processed, total: uniqueQueueKeys.length });
+	reportProgress();
 
 	// Settle uploads and acknowledge matching server copies before deleting old
 	// rename sources. Queue insertion order puts the old name first.
@@ -51,6 +56,8 @@ export async function reconcileQueuePaths(
 		const path = queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey;
 		if (context.shouldIgnore(path)) {
 			result.settledPaths.push(queueKey);
+			processed++;
+			reportProgress();
 			continue;
 		}
 
@@ -109,8 +116,14 @@ export async function reconcileQueuePaths(
 		if (!settled && !deletionDeferred && !result.errors.some((error) => error.startsWith(`${path}:`))) {
 			recordSyncError(result, `Reconciliation did not converge`, path);
 		}
+		// Retries and deferred deletions belong to the same queued change.
+		if (!deletionDeferred) {
+			processed++;
+			reportProgress();
+		}
 	}
 
+	context.reportWork?.({ phase: 'saving' });
 	await context.localManifest.save();
 	finalizeSyncResult(result);
 	return result;

@@ -58,11 +58,20 @@ async function harness(destinationUploaded: boolean) {
 describe('targeted rename reconciliation', () => {
 	it.each([true, false])('preserves the destination before deleting the source (already uploaded: %s)', async uploaded => {
 		const h = await harness(uploaded);
+		const reportWork = vi.fn<NonNullable<TargetedReconcileContext['reportWork']>>();
+		h.context.reportWork = reportWork;
 		const result = await reconcileQueuePaths(h.context, [`delete:${h.source}`, h.destination]);
 		expect(result.success).toBe(true);
 		expect(result.settledPaths).toEqual([h.destination, `delete:${h.source}`]);
 		expect(h.deleted).toHaveBeenCalledWith(h.source);
 		expect(h.remote[h.destination]?.revision).toBe('v2');
+		expect(reportWork.mock.calls.map(([work]) => work)).toEqual([
+			{ phase: 'server' },
+			{ phase: 'applying', current: 0, total: 2 },
+			{ phase: 'applying', current: 1, total: 2 },
+			{ phase: 'applying', current: 2, total: 2 },
+			{ phase: 'saving' },
+		]);
 	});
 
 	it('also defers deletions discovered from ordinary queue keys', async () => {
