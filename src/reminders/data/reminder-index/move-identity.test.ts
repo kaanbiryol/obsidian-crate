@@ -36,7 +36,7 @@ describe('reminder identity ownership during moves', () => {
 		await writer.updateReminder(reminder, { project: destination });
 
 		expect(files.get(sourcePath)).toBe(unrelated);
-		expect(files.get(destinationPath)).toContain(task);
+		expect(files.get(destinationPath)).toContain('<!-- crate-desc:Important details -->');
 		expect(index.getAll().map(item => item.id).sort()).toEqual(['stable-id', 'unrelated']);
 		expect(index.getById('stable-id')).toMatchObject({ filePath: destinationPath, project: destination, description: 'Important details' });
 		expect(index.getByFile(sourcePath).map(item => item.id)).toEqual(['unrelated']);

@@ -6,6 +6,7 @@ import {
 	deleteReminderBlockFromContent,
 	encodeDescriptionForMarkdown,
 	findReminderLineNumber,
+	readDescriptionBlock,
 	replaceReminderBlockInContent,
 	reorderReminderBlocksInContent,
 	type ReminderLineRecord,
@@ -38,10 +39,27 @@ describe('markdownReminderFile', () => {
 			'# Work',
 			'',
 			'- [ ] Task <!-- crate-id:r1 -->',
-			'<!-- crate-desc:v1:extra%20details -->',
+			'<!-- crate-desc:extra details -->',
 			'',
 		].join('\n'));
 	});
+
+	it.each(['kaan', 'hello world', 'hello%20world', '100% complete %invalid café 😀', 'line one\n- [ ] example\nline three', 'text\twith\ttabs'])(
+		'writes descriptions as literal Markdown text: %j', description => {
+			const block = buildDescriptionBlock(description);
+			expect(block.join('\n')).toBe(`<!-- crate-desc:${description} -->`);
+			expect(readDescriptionBlock(['- [ ] Task', ...block, '- [ ] Next'], 0)).toEqual({ description, lineCount: block.length });
+		},
+	);
+
+	it.each(['text --> still text', '<!-- nested comment', 'text -- comment syntax', 'v1:hello%20world', 'v2:plain text', 'line one\r\nline two'])(
+		'preserves text that cannot be written as a literal description comment: %j', description => {
+			const block = buildDescriptionBlock(description);
+			expect(block).toHaveLength(1);
+			expect(block[0]).toMatch(/^<!-- crate-desc:v1:/);
+			expect(readDescriptionBlock(['- [ ] Task', ...block], 0).description).toBe(description);
+		},
+	);
 
 	it('encodes description payloads so comment syntax and newlines round-trip safely', () => {
 		const description = 'line one\nline two --> still text -- ok';
@@ -63,10 +81,17 @@ describe('markdownReminderFile', () => {
 		const initial = `${rawLine}\n<!-- crate-desc:${description} -->\n${next}`;
 		const reminder = makeRecord({ rawLine, description });
 		const updated = replaceReminderBlockInContent(initial, reminder, [rawLine, ...buildDescriptionBlock(description)]);
-		expect(updated.content).toBe(`${rawLine}\n<!-- crate-desc:v1:collect%20100%25%20of%20receipts%0Aand%20confirm%20%2520%20deductions -->\n${next}`);
+		expect(updated.content).toBe(initial);
 		expect(deleteReminderBlockFromContent(initial, reminder).content).toBe(next);
 		expect(() => replaceReminderBlockInContent(initial.replace('100%', '90%'), reminder, [rawLine]))
 			.toThrow('Reminder changed while it was being edited');
+	});
+
+	it('rewrites an encoded description as readable text when edited', () => {
+		const reminder = makeRecord({ description: 'hello%20world\nnext line' });
+		const content = `${reminder.rawLine}\n<!-- crate-desc:v1:hello%2520world%0Anext%20line -->\n`;
+		const updated = replaceReminderBlockInContent(content, reminder, [reminder.rawLine, ...buildDescriptionBlock(reminder.description)]);
+		expect(updated.content).toBe(`${reminder.rawLine}\n<!-- crate-desc:hello%20world\nnext line -->\n`);
 	});
 
 	it('reorders multiline legacy descriptions together with their task without rewriting metadata', () => {

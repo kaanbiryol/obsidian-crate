@@ -40,7 +40,15 @@ it.each([{ priority: 1 }, { content: 'Updated' }, { project: 'Other' }, { dueDat
 		if (field in patch || (field === 'dueDate' || field === 'dueDatetime') && ('dueDate' in patch || 'dueDatetime' in patch)) continue;
 		expect(after[field], field).toEqual(before[field]);
 	}
-	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, after.filePath))?.content).toContain('crate-desc:v1:Important%20details');
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, after.filePath))?.content).toContain('<!-- crate-desc:Important details -->');
+});
+
+it('stores description edits literally and returns the same text through the API', async () => {
+	const before = await setup();
+	const description = 'hello%20world\n100% complete café 😀';
+	expect((await update({ description }, before.revision!)).status).toBe(200);
+	expect((await reminder()).description).toBe(description);
+	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).toContain(`<!-- crate-desc:${description} -->`);
 });
 
 it.each(['', null])('honors an explicit description clear through the API: %j', async description => {

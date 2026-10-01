@@ -10,10 +10,11 @@ const reminderFolder = 'Notes/Reminders';
 const sourcePath = `${reminderFolder}/A.md`;
 const destinationPath = `${reminderFolder}/Z.md`;
 const task = '- [ ] Task <!-- crate-id:one -->\n<!-- crate-desc:v1:Important%20details -->';
+const plainTask = '- [ ] Task <!-- crate-id:one -->\n<!-- crate-desc:Important details -->';
 const other = '- [ ] Other <!-- crate-id:other -->\n';
 
-async function workspace() {
-	const { app, files, folders, vault } = createMockAppWithVault({ [sourcePath]: `${task}\n${other}`, [destinationPath]: '# Z\n' });
+async function workspace(sourceTask = task) {
+	const { app, files, folders, vault } = createMockAppWithVault({ [sourcePath]: `${sourceTask}\n${other}`, [destinationPath]: '# Z\n' });
 	const adapter = Object.assign(app.vault.adapter, {
 		exists: vi.fn(async (path: string) => files.has(path) || folders.has(path) || [...files.keys()].some(file => file.startsWith(`${path}/`))),
 		list: vi.fn(async (path: string) => ({ files: [...files.keys()].filter(file => file.startsWith(`${path}/`)), folders: [] })),
@@ -40,8 +41,10 @@ async function workspace() {
 }
 
 describe('durable plugin move recovery', () => {
-	it.each(['destination', 'source'])('recovers with the same ID after process loss at the %s write boundary', async boundary => {
-		const { files, vault, first, session, records } = await workspace();
+	it.each([task, plainTask, plainTask.replace('Important details', 'hello%20world\n- [ ] example\nnext line')].flatMap(sourceTask =>
+		['destination', 'source'].map(boundary => ({ sourceTask, boundary })),
+	))('recovers the complete description after process loss: $boundary, $sourceTask', async ({ sourceTask, boundary }) => {
+		const { files, vault, first, session, records } = await workspace(sourceTask);
 		const normalProcess = vault.process.getMockImplementation()!;
 		vault.process.mockImplementation(async (file, update) => {
 			const content = await normalProcess(file, update);
@@ -58,7 +61,8 @@ describe('durable plugin move recovery', () => {
 		expect(resumed.issues).toEqual([]);
 		expect(records()).toEqual([]);
 		expect(files.get(sourcePath)).toBe(other);
-		expect(files.get(destinationPath)).toContain(task);
+		expect(files.get(destinationPath)).toContain(sourceTask === task ? plainTask : sourceTask);
+		expect(resumed.index.getById('one')?.description).toBe(first.index.getById('one')?.description);
 		expect(resumed.index.getById('one')?.filePath).toBe(destinationPath);
 		expect(resumed.index.getAll().map(reminder => reminder.id).sort()).toEqual(['one', 'other']);
 	});
@@ -99,13 +103,13 @@ describe('durable plugin move recovery', () => {
 		});
 		await expect(first.writer.updateReminder(first.index.getById('one')!, { project: 'Z' }))
 			.rejects.toThrow('Durable write acknowledgement lost');
-		expect(files.get(destinationPath)).toContain(task);
+		expect(files.get(destinationPath)).toContain(plainTask);
 		expect(records()).toHaveLength(boundary === 'destination' ? 1 : 0);
 		vault.process.mockImplementation(normalProcess);
 		const recovered = await session();
 		expect(recovered.issues).toEqual([]);
 		expect(files.get(sourcePath)).toBe(other);
-		expect(files.get(destinationPath)).toContain(task);
+		expect(files.get(destinationPath)).toContain(plainTask);
 		expect(recovered.index.getById('one')?.filePath).toBe(destinationPath);
 		expect(records()).toEqual([]);
 	});
@@ -174,6 +178,37 @@ describe('durable plugin move recovery', () => {
 		await expect(resumed.writer.updateReminder(first.index.getById('one')!, { project: 'Z' })).rejects.toThrow('recovery records');
 		expect(files.get(sourcePath)).toBe(`${task}\n${other}`);
 		expect(files.get(`${directory}/broken.json`)).toBe('{partial');
+	});
+
+	it.each([task, `${task}\n- [ ] unrelated task`, `${plainTask.slice(0, -4)}\nunclosed`])(
+		'preserves or recovers a saved version-1 journal using its original description bytes: %j', async block => {
+			const { files, session, records } = await workspace();
+			const operationId = crypto.randomUUID();
+			files.set(`${directory}/${operationId}.json`, JSON.stringify({
+				version: 1, operationId, folderPath: reminderFolder, id: 'one',
+				source: { filePath: sourcePath, block }, destination: { filePath: destinationPath, block },
+			}));
+			files.set(destinationPath, `${task}\n`);
+			const resumed = await session();
+			if (block === task) {
+				expect(resumed.issues).toEqual([]);
+				expect(files.get(sourcePath)).toBe(other);
+				expect(records()).toEqual([]);
+			} else {
+				expect(resumed.issues.join()).toContain('could not be read');
+				expect(files.get(sourcePath)).toBe(`${task}\n${other}`);
+				expect(records()).toHaveLength(1);
+			}
+			expect(files.get(destinationPath)).toBe(`${task}\n`);
+		},
+	);
+
+	it('rejects a description changed in the note before a move starts', async () => {
+		const { files, first, vault, records } = await workspace();
+		files.set(sourcePath, `${task.replace('Important%20details', 'Edited%20details')}\n${other}`);
+		await expect(first.writer.updateReminder(first.index.getById('one')!, { project: 'Z' })).rejects.toThrow('source or destination changed');
+		expect(vault.process).not.toHaveBeenCalled();
+		expect(records()).toEqual([]);
 	});
 
 	it('keeps the source and recovery record if the destination disappears during recovery', async () => {

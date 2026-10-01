@@ -1,13 +1,13 @@
 import { TFile, type App } from 'obsidian';
 import { extractReminderId } from '../core/reminderIdentity';
-import { buildDescriptionBlock } from '../core/markdownReminderFile';
+import { buildDescriptionBlock, readDescriptionBlock } from '../core/markdownReminderFile';
 import { hasAttachedMarkdownContent, markdownTaskContexts } from '../core/markdownTaskContext';
 import { createReminderMoveStorage, type ReminderMoveRecord } from './reminder-move-storage';
 import { portablePathKey } from '@/protocol/portable-path';
 import { readVaultMarkdown, processVaultMarkdown } from './vault-markdown';
 
 type MoveSide = ReminderMoveRecord['source'];
-type ObservedBlock = { state: 'absent' | 'changed' | 'exact' | 'ambiguous'; lineNumber?: number; file: TFile | null; version: string | null };
+type ObservedBlock = { state: 'absent' | 'changed' | 'exact' | 'ambiguous'; lineNumber?: number; block?: string; file: TFile | null; version: string | null };
 const fileVersion = (file: TFile | null) => file ? `${file.stat.ctime}:${file.stat.mtime}:${file.stat.size}` : null;
 
 function observeContent(content: string, side: MoveSide, id: string): Omit<ObservedBlock, 'file' | 'version'> {
@@ -16,8 +16,9 @@ function observeContent(content: string, side: MoveSide, id: string): Omit<Obser
 	if (!owners.length) return { state: lines.some(line => extractReminderId(line) === id) ? 'ambiguous' : 'absent' };
 	if (owners.length !== 1) return { state: 'ambiguous' };
 	const lineNumber = owners[0]!;
-	const count = lines[lineNumber + 1]?.startsWith('<!-- crate-desc:') ? 2 : 1;
-	return { state: lines.slice(lineNumber, lineNumber + count).join('\n') === side.block ? 'exact' : 'changed', lineNumber };
+	const count = 1 + readDescriptionBlock(lines, lineNumber).lineCount;
+	const block = lines.slice(lineNumber, lineNumber + count).join('\n');
+	return { state: block === side.block ? 'exact' : 'changed', lineNumber, block };
 }
 
 export interface ReminderMoveJournal {
@@ -128,9 +129,16 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 				source: { filePath: source.filePath, block: [source.rawLine, ...buildDescriptionBlock(source.description)].join('\n') },
 				destination: { filePath: destination.filePath, block: [destination.rawLine, ...buildDescriptionBlock(destination.description)].join('\n') },
 			};
-			if ((await observe(record.source, record.id)).state !== 'exact' || (await observe(record.destination, record.id)).state !== 'absent') {
+			const observedSource = await observe(record.source, record.id);
+			const sourceLines = observedSource.block?.split('\n');
+			if (!sourceLines || sourceLines[0] !== source.rawLine
+				|| (readDescriptionBlock(sourceLines, 0).description ?? '') !== (source.description?.trim() ?? '')
+				|| (await observe(record.destination, record.id)).state !== 'absent') {
 				throw new Error('The reminder source or destination changed. Refresh before moving; nothing was changed.');
 			}
+			// Recovery compares exact bytes. The source may still use an older
+			// description representation even though new writes use plain text.
+			record.source.block = observedSource.block!;
 			// Track before awaiting publication: an uncertain storage response must
 			// block subsequent edits until the durable journal can be reconciled.
 			pending.push(record);

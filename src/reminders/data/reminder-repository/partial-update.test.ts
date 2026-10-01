@@ -45,7 +45,7 @@ describe('partial reminder updates', () => {
 			if (field in patch || (field === 'dueDate' || field === 'dueDatetime') && ('dueDate' in patch || 'dueDatetime' in patch)) continue;
 			expect(after[field], field).toEqual(before[field]);
 		}
-		expect(files.get(after.filePath)).toContain('<!-- crate-desc:v1:Important%20details%0AKeep%20both%20lines -->');
+		expect(files.get(after.filePath)).toContain('<!-- crate-desc:Important details\nKeep both lines -->');
 	});
 
 	it.each(['', undefined])('clears a description only when explicitly supplied as %j', async description => {

@@ -27,14 +27,18 @@ export interface FileContentMutationResult {
 const DESCRIPTION_ENCODING_PREFIX = "v1:";
 
 export function encodeDescriptionForMarkdown(description: string): string {
-	return `${DESCRIPTION_ENCODING_PREFIX}${encodeURIComponent(description.trim()).replace(/-/g, "%2D")}`;
+	const text = description.trim();
+	// Keep note text readable. Escape only HTML comment syntax, literal carriage
+	// returns and prefixes that the existing reader interprets as an encoding.
+	if (!/--|\r|^v\d+:/.test(text)) return text;
+	return `${DESCRIPTION_ENCODING_PREFIX}${encodeURIComponent(text).replace(/-/g, "%2D")}`;
 }
 
 export function decodeDescriptionFromMarkdown(description: string): string {
 	const trimmed = description.trim();
 	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) {
 		if (/^v\d+:/.test(trimmed)) throw new Error('Unsupported reminder description encoding');
-		// Older Crate builds wrote unversioned plain text, including literal percent signs.
+		// Unversioned descriptions are literal text, including percent signs.
 		return trimmed;
 	}
 	return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
@@ -105,7 +109,7 @@ export function getInitialProjectFileContent(project: string): string {
 
 export function buildDescriptionBlock(description: string | undefined): string[] {
 	if (!description?.trim()) return [];
-	return [`<!-- crate-desc:${encodeDescriptionForMarkdown(description)} -->`];
+	return `<!-- crate-desc:${encodeDescriptionForMarkdown(description)} -->`.split('\n');
 }
 
 export function readDescriptionBlock(
@@ -137,7 +141,7 @@ export function readDescriptionBlock(
 				throw new Error(`${reason} on line ${nextIndex + 1}`, { cause: error });
 			}
 		}
-		// Encoded descriptions are always one line; only the old plain-text format spans lines.
+		// Encoded descriptions are always one line; plain text may span lines.
 		if (versioned) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
 		descriptionLines.push(line);
 	}
