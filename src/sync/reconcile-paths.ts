@@ -6,7 +6,7 @@ import { classifyPath } from './reconciliation';
 import { isQueueVersionConflict } from './queue-failure';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import { RemoteVersionChangedError } from './transfer-download';
-import type { FileDiff, SyncResult, SyncWork } from './types';
+import type { FileDiff, SyncResult, SyncWork, UploadDiff } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
@@ -27,6 +27,8 @@ export interface TargetedReconcileContext {
 	localManifest: TargetedManifest;
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
 	shouldIgnore(path: string): boolean;
+	/** Upload ordinary edits together; return paths that need fresh reconciliation. */
+	uploadDiffs?(diffs: UploadDiff[], result: SyncResult): Promise<string[]>;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -34,7 +36,7 @@ export interface TargetedReconcileContext {
 	): Promise<DiffApplyOutcome>;
 }
 
-/** Reconcile only queue paths that lost a compare-and-swap race. */
+/** Reconcile selected files or queue paths that lost a compare-and-swap race. */
 export async function reconcileQueuePaths(
 	context: TargetedReconcileContext,
 	queueKeys: string[],
@@ -51,26 +53,33 @@ export async function reconcileQueuePaths(
 
 	// Settle uploads and acknowledge matching server copies before deleting old
 	// rename sources. Queue insertion order puts the old name first.
-	const work = uniqueQueueKeys.map(queueKey => ({ queueKey, allowDelete: false }));
-	for (const { queueKey, allowDelete } of work) {
+	const deletions: string[] = [];
+	const uploads = new Map<string, { diff: UploadDiff; keys: string[] }>();
+	async function reconcile(queueKey: string, allowDelete: boolean, firstAttempt = 1, collectUploads = false) {
 		const path = queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey;
 		if (context.shouldIgnore(path)) {
 			result.settledPaths.push(queueKey);
 			processed++;
 			reportProgress();
-			continue;
+			return;
 		}
 
 		let settled = false;
 		let deletionDeferred = false;
-		for (let attempt = 1; attempt <= MAX_RECONCILE_ATTEMPTS; attempt++) {
+		for (let attempt = firstAttempt; attempt <= MAX_RECONCILE_ATTEMPTS; attempt++) {
 			try {
 				const localEntry = await readLocalFileEntry(context.vault, path);
 				const remoteEntry = getPathEntry(remoteEntries, path);
 				const baseEntry = context.localManifest.getEntry(path);
 				const decision = classifyPath(path, localEntry, remoteEntry, baseEntry);
+				if (decision?.action === 'upload' && collectUploads && context.uploadDiffs) {
+					const upload = uploads.get(path) ?? { diff: decision, keys: [] };
+					upload.keys.push(queueKey);
+					uploads.set(path, upload);
+					return;
+				}
 				if (decision?.action === 'delete' && !allowDelete) {
-					work.push({ queueKey, allowDelete: true });
+					deletions.push(queueKey);
 					deletionDeferred = true;
 					break;
 				}
@@ -122,6 +131,29 @@ export async function reconcileQueuePaths(
 			reportProgress();
 		}
 	}
+	for (const queueKey of uniqueQueueKeys) await reconcile(queueKey, false, 1, true);
+	if (uploads.size && context.uploadDiffs) {
+		const retryPaths = new Set(await context.uploadDiffs([...uploads.values()].map(upload => upload.diff), result));
+		const uploadedPaths = new Set(result.uploadedPaths);
+		for (const [path, upload] of uploads) {
+			if (retryPaths.has(path)) {
+				try {
+					await refreshRemoteEntry(context, remoteEntries, path);
+				} catch (error) {
+					recordSyncError(result, errorMessage(error), path);
+					processed += upload.keys.length;
+					reportProgress();
+					continue;
+				}
+				for (const key of upload.keys) await reconcile(key, false, 2);
+			} else {
+				if (uploadedPaths.has(path)) result.settledPaths.push(...upload.keys);
+				processed += upload.keys.length;
+				reportProgress();
+			}
+		}
+	}
+	for (const queueKey of deletions) await reconcile(queueKey, true);
 
 	context.reportWork?.({ phase: 'saving' });
 	await context.localManifest.save();

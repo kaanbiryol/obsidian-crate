@@ -241,6 +241,13 @@ If a local Markdown file changes after an automatic merge has already been accep
 
 Implementation: `queue.ts`
 
+Selected-file sync classifies only the selected paths against current server
+metadata. Ordinary uploads use the same byte-bounded chunks, small-file batches,
+and bounded concurrency as full sync, with upload progress reported per batch.
+Only files that lose a conditional-write race fall back to individual
+reconciliation. Remote deletions still wait for successful uploads and rename
+preservation; unselected files and the global changelog cursor stay untouched.
+
 File events also schedule a local content check after a 250 ms coalescing window,
 including while automatic sync is off. Files matching their last-synced SHA-256
 hash leave the pending list without a server request. The check refreshes their

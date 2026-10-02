@@ -63,6 +63,48 @@ async function createHarness(options: {
 }
 
 describe('reconcileQueuePaths', () => {
+	it('includes the batch attempt in the bounded version-race retries', async () => {
+		const h = await createHarness({
+			baseHash: 'base', localText: 'local edit',
+			remoteManifests: [
+				{ version: 1, files: { 'a.md': { hash: 'base', size: 4, modified: 'now' } } },
+				{ version: 1, files: { 'a.md': { hash: 'remote-edit', size: 11, modified: 'now' } } },
+			],
+		});
+		const uploadDiffs = vi.fn<NonNullable<TargetedReconcileContext['uploadDiffs']>>(async () => ['a.md']);
+		h.context.uploadDiffs = uploadDiffs;
+		h.processDiff.mockRejectedValue(new HttpError('remote changed again', 409));
+		const reportWork = vi.fn<NonNullable<TargetedReconcileContext['reportWork']>>();
+		h.context.reportWork = reportWork;
+
+		const result = await reconcileQueuePaths(h.context, ['a.md']);
+
+		expect(uploadDiffs).toHaveBeenCalledOnce();
+		expect(uploadDiffs.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ action: 'upload', remoteHash: 'base' })]);
+		expect(h.processDiff).toHaveBeenCalledTimes(2);
+		expect(h.processDiff.mock.calls[0]?.[0]).toMatchObject({ action: 'conflict', remoteHash: 'remote-edit' });
+		expect(h.getRemoteEntries).toHaveBeenCalledTimes(3);
+		expect(result.success).toBe(false);
+		expect(result.settledPaths).toEqual([]);
+		expect(reportWork.mock.calls.map(([work]) => work).filter(work => work.current === 1)).toEqual([
+			{ phase: 'applying', current: 1, total: 1 },
+		]);
+	});
+
+	it('settles only acknowledged members of a partial batch', async () => {
+		const h = await createHarness({ baseHash: 'base', localText: 'local edit', remoteManifests: [{ version: 1, files: {} }] });
+		h.context.uploadDiffs = async (_diffs, result) => {
+			result.uploaded++;
+			result.uploadedPaths.push('a.md');
+			result.errors.push('b.md: Upload failed');
+			return [];
+		};
+		const result = await reconcileQueuePaths(h.context, ['a.md', 'b.md']);
+		expect(result.success).toBe(false);
+		expect(result.settledPaths).toEqual(['a.md']);
+		expect(h.processDiff).not.toHaveBeenCalled();
+	});
+
 	it('counts each queued change once across ignored files, retries, and failures', async () => {
 		const harness = await createHarness({
 			baseHash: 'base', localText: 'local edit',

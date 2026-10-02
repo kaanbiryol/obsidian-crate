@@ -23,10 +23,11 @@ describe('selected sync', () => {
             expect(labels.at(-1)).toBe('Checking for changes…');
             return { files: {} };
         });
-        h.api.uploadFile.mockImplementation(async path => {
-            expect(labels.at(-1)).toBe(`Applying changes: ${path === 'a.md' ? 0 : 1}/2`);
-            return { path, success: true };
+        const batchUpload = vi.fn(async (files: Array<{ path: string; hash: string }>) => {
+            expect(labels.at(-1)).toBe('Uploading 0 of 2 files');
+            return { success: true, results: files.map(file => ({ ...file, success: true })) };
         });
+        Object.assign(h.api, { batchUpload });
         h.localManifest.save.mockImplementation(() => {
             expect(labels.at(-1)).toBe('Saving sync progress…');
         });
@@ -35,6 +36,9 @@ describe('selected sync', () => {
 
         expect(result.success).toBe(true);
         expect(result.uploadedPaths).toEqual(['a.md', 'b.md']);
+        expect(h.api.batchUpload).toHaveBeenCalledTimes(1);
+        expect(h.api.uploadFile).not.toHaveBeenCalled();
+        expect(labels).toContain('Uploading 2 of 2 files');
         expect(labels).toContain('Applying changes: 2/2');
         expect(h.engine.getState()).toMatchObject({ status: 'idle', work: undefined });
         h.engine.destroy();

@@ -36,6 +36,7 @@ import { createByteBudgetedVaultFileChunks } from './transfer-budget';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { SyncState, SyncResult, FileDiff, PreparedUpload, ConflictRecord } from './types';
 import type { FileEntry } from '../protocol/sync-types';
+import { createPathRecord } from '../protocol/path-record';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
 import { AUTH_ERROR_MESSAGE, isAuthError, DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
@@ -54,6 +55,7 @@ import {
 import { SyncEngineContexts } from './engine-contexts';
 import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
+import { uploadFullSyncPlan } from './engine-full-sync-upload';
 import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
 import { createPendingDiscard } from './pending-discard';
 import { readLocalFileEntry } from './local-file-entry';
@@ -757,6 +759,17 @@ export class SyncEngine {
 			localManifest: this.localManifest,
 			getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,
 			shouldIgnore: this.shouldIgnore.bind(this),
+			uploadDiffs: async (diffs, result) => {
+				const retryPaths: string[] = [];
+				await uploadFullSyncPlan({
+					...this.contexts.syncWorkflow(),
+					uploadPreparedFiles: (prepared, syncResult, options) => this.uploadPreparedFiles(prepared, syncResult, {
+						...options,
+						onVersionConflicts: async paths => { retryPaths.push(...paths); },
+					}),
+				}, diffs, createPathRecord<FileEntry>(), result, () => {});
+				return retryPaths;
+			},
 			processDiff: (diff, localFiles, syncResult) =>
 				this.processDiff(diff, localFiles, syncResult),
 		}, queueKeys);
