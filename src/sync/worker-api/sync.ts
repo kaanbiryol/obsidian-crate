@@ -1,6 +1,11 @@
 import { computeHash } from '../hasher';
+import type { EncryptedFiles } from '../encrypted-files';
+import type { JournalUpload } from '../upload-intent';
+import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
+import type { RestoreIntent } from '../restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -39,6 +44,29 @@ import {
 
 export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
+	private encryption?: EncryptedFiles;
+	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
+	prepareUploadWire(file: JournalUpload) { return this.encryption?.prepare(file) ?? Promise.resolve(undefined); }
+	prepareRestoreWire(intent: RestoreIntent) { return this.encryption?.prepareRestore(intent) ?? Promise.resolve(undefined); }
+	assertPreparedRestore(intent: RestoreIntent): void {
+		if (!!this.encryption !== !!intent.encryptedWire || (this.encryption && (intent.encryptedWire!.vaultId !== this.encryption.keys.vaultId
+			|| intent.encryptedWire!.generation !== this.encryption.generation))) throw new Error('Unlock the original vault keys before resuming this restore');
+	}
+	async assertPreparedUpload(file: JournalUpload): Promise<void> {
+		if (this.encryption) await this.encryption.verifyPrepared(file);
+		else if (file.encryptedWire) throw new Error('Unlock the vault before retrying encrypted uploads');
+	}
+	private assertWireContentType(contentType: string): void {
+		if (!!this.encryption !== (contentType === ENCRYPTED_FILE_CONTENT_TYPE)) {
+			throw new Error('Encrypted uploads must be prepared in the durable upload journal');
+		}
+	}
+	private async decryptEntries(files: Record<string, FileEntry>): Promise<Record<string, FileEntry>> {
+		if (!this.encryption) return files;
+		const paths = Object.keys(files);
+		const entries = await this.encryption.metadata(paths.map(path => ({ path, entry: files[path]! })));
+		return Object.fromEntries(paths.map((path, index) => [path, entries[index]!]));
+	}
 
 	async health(): Promise<HealthResponse> {
 		return this.http.requestJson<HealthResponse>('/health');
@@ -97,7 +125,7 @@ export class SyncWorkerApi {
 
 		let changeCursor = snapshotSeq ?? lastSeq;
 		while (true) {
-			const changes = await this.getChanges(changeCursor);
+			const changes = await this.getRawChanges(changeCursor);
 			if (changes.cursorExpired) throw new Error('Remote manifest changed too quickly to load safely');
 			for (const change of changes.changes) {
 				if (change.action === 'delete') {
@@ -117,7 +145,7 @@ export class SyncWorkerApi {
 		}
 
 		assertPortablePaths(Object.keys(files));
-		return { version: 1, files, lastSeq };
+		return { version: 1, files: await this.decryptEntries(files), lastSeq };
 	}
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
@@ -147,7 +175,7 @@ export class SyncWorkerApi {
 			}
 		}
 
-		return { files };
+		return { files: await this.decryptEntries(files) };
 	}
 
 	async uploadFile(
@@ -159,6 +187,7 @@ export class SyncWorkerApi {
 		expectedHash: string | null,
 		operationId?: string,
 	): Promise<UploadResult> {
+		this.assertWireContentType(contentType);
 		operationId ??= await this.newUploadOperationId();
 		const encodedPath = encodeURIComponent(path);
 		return this.http.requestJson<UploadResult>(`/sync/upload?path=${encodedPath}`, {
@@ -187,21 +216,54 @@ export class SyncWorkerApi {
 		const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
 			? Number(contentLengthHeader)
 			: body.byteLength;
-		return {
+		const result = {
 			content: body,
 			contentType: getHeader(headers, 'Content-Type') || 'application/octet-stream',
 			size: Number.isSafeInteger(contentLength) ? contentLength : body.byteLength,
 			hash: getHeader(headers, 'X-File-Hash') || '',
 			revision: getHeader(headers, 'X-Crate-Revision') || undefined,
 		};
+		if (!this.encryption) return result;
+		const opened = await this.encryption.download(path, body, result);
+		return { ...result, content: opened.content, ...opened.metadata };
 	}
 
 	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
 		if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
+		if (this.encryption) expectedHash = (await this.encryption.expectedHash(path, expectedHash, expectedRevision))!;
 		return this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
 			body: JSON.stringify({ path, expectedHash, expectedRevision }),
 		});
+	}
+	requiresLegacyUploadRecovery(file: JournalUpload): boolean { return !!this.encryption && file.encryptedWire?.generation !== this.encryption.generation; }
+	async resolveLegacyUpload(file: JournalUpload): Promise<UploadResult | null> {
+		if (!this.encryption || file.encryptedWire?.generation === this.encryption.generation) return null;
+		const wire = file.encryptedWire;
+		if (!wire) return this.encryption.resolveLegacyOperation(file.operationId,
+			{ path: file.path, hash: file.hash, size: file.size, contentType: file.contentType, expectedHash: file.expectedHash });
+		if (wire.generation !== undefined && wire.generation > this.encryption.generation) throw new Error('Unlock the original vault keys before resuming this upload');
+		const descriptor = parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content))).descriptor;
+		if (descriptor.vaultId !== this.encryption.keys.vaultId) throw new Error('Unlock the original vault keys before resuming this upload');
+		const current = this.encryption.keys.forPath(file.path);
+		const payload = { path: file.path, hash: wire.hash, size: wire.size, contentType: wire.contentType, expectedHash: wire.expectedHash };
+		// A generation fence proves that an older in-flight write can no longer
+		// commit. Recover its exact receipt, or reconcile without replaying it.
+		if (wire.generation !== undefined || descriptor.scopeId !== current.scopeId || descriptor.keyId !== current.key.id) {
+			return this.encryption.resolveLegacyOperation(file.operationId, payload);
+		}
+		// Older journal formats do not record generation. Only a converted receipt
+		// proves settlement; otherwise retain their normal exact-body retry.
+		return this.encryption.resolveLegacyOperation(file.operationId, payload, true);
+	}
+	async resolveLegacyRestore(intent: RestoreIntent): Promise<UploadResult | null> {
+		if (!this.encryption || intent.encryptedWire?.generation === this.encryption.generation) return null;
+		if (intent.encryptedWire && (intent.encryptedWire.vaultId !== this.encryption.keys.vaultId || intent.encryptedWire.generation > this.encryption.generation)) throw new Error('Unlock the original vault keys before resuming this restore');
+		const request = intent.request;
+		const result = await this.encryption.resolveLegacyOperation(request.operationId, { kind: 'restore', path: request.path,
+			storageKey: request.storageKey, expectedHash: intent.encryptedWire ? intent.encryptedWire.expectedHash : request.expectedHash, expectedRevision: request.expectedRevision });
+		if (!result.success) throw new HttpError(result.error ?? 'Restore precondition changed', result.status ?? 409, null, result.code);
+		return result;
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -209,19 +271,35 @@ export class SyncWorkerApi {
 	}
 
 	async getChanges(since: number): Promise<ChangesResponse> {
+		const response = await this.getRawChanges(since);
+		if (!this.encryption) return response;
+		const puts = response.changes.filter(change => change.action === 'put');
+		const opened = await this.encryption.metadata(puts.map(entry => ({ path: entry.path, entry })));
+		let index = 0;
+		return { ...response, changes: response.changes.map(change => change.action === 'put' ? opened[index++]! : change) };
+	}
+
+	private async getRawChanges(since: number): Promise<ChangesResponse> {
 		const response = parseChanges(await this.http.requestJson<unknown>(`/sync/changes?since=${since}`), since);
 		assertPortablePathNames(response.changes.map(change => change.path));
 		return response;
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
+		for (const file of files) this.assertWireContentType(file.contentType);
+		if (this.encryption && (files.some(file => file.size > BATCH_FILE_SIZE_LIMIT) || files.reduce((bytes, file) => bytes + file.size, 0) > 8 * 1024 * 1024)) {
+			const results: UploadResult[] = [];
+			for (const file of files) results.push(await this.uploadFile(file.path, base64ToArrayBuffer(file.content), file.hash,
+				file.size, file.contentType, file.expectedHash, file.operationId));
+			return { success: results.every(result => result.success), results };
+		}
 		if (files.some(file => !file.operationId)) {
 			const day = (await this.getServerInfo()).reminderOperationDay;
 			if (day === undefined) throw new Error('Update the Crate server before uploading');
 			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
 		}
 		const info = await this.getServerInfo();
-		const bulkNew = files.every(file => file.expectedHash === null) && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
+		const bulkNew = !this.encryption && files.every(file => file.expectedHash === null) && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
 		const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES
 			: files.every(file => !file.path.toLowerCase().endsWith('.md')) && info.capabilities.includes(BATCH_ASSET_UPLOAD_CAPABILITY)
 				? BATCH_ASSET_UPLOAD_MAX_FILES : BATCH_UPLOAD_MAX_FILES;
@@ -241,10 +319,28 @@ export class SyncWorkerApi {
 	}
 
 	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
-		return this.http.requestJson<BatchDownloadResponse>('/sync/batch-download', {
+		let response: BatchDownloadResponse;
+		try { response = await this.http.requestJson<BatchDownloadResponse>('/sync/batch-download', {
 			method: 'POST',
 			body: JSON.stringify({ paths }),
-		}, TRANSFER_TIMEOUT_MS);
+		}, TRANSFER_TIMEOUT_MS); }
+		catch (error) {
+			if (!this.encryption || !(error instanceof HttpError) || error.status !== 413) throw error;
+			const files: BatchDownloadResponse['files'] = [];
+			for (const path of paths) {
+				const file = await this.downloadFile(path);
+				files.push({ ...file, path, content: arrayBufferToBase64(file.content) });
+			}
+			return { files };
+		}
+		if (!this.encryption) return response;
+		const files: BatchDownloadResponse['files'] = [];
+		for (const file of response.files) {
+			if (file.error) { files.push(file); continue; }
+			const opened = await this.encryption.download(file.path, base64ToArrayBuffer(file.content), file);
+			files.push({ ...file, ...opened.metadata, content: arrayBufferToBase64(opened.content) });
+		}
+		return { files };
 	}
 
 	async batchDelete(
@@ -261,6 +357,9 @@ export class SyncWorkerApi {
 			if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 			return { path, expectedHash, expectedRevision };
 		});
+		if (this.encryption) {
+			for (const file of files) file.expectedHash = (await this.encryption.expectedHash(file.path, file.expectedHash, file.expectedRevision))!;
+		}
 		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
 			body: JSON.stringify({ files }),
@@ -269,7 +368,8 @@ export class SyncWorkerApi {
 
 	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
 		const params = new URLSearchParams({ path: version.path, storageKey: version.storage_key });
-		const { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
+		let { body } = await this.http.requestBinary(`/sync/version-preview?${params}`, {}, TRANSFER_TIMEOUT_MS);
+		if (this.encryption) body = (await this.encryption.download(version.path, body)).content;
 		if (body.byteLength > 256_000 || body.byteLength !== version.size || await computeHash(body) !== version.hash) {
 			throw new Error('Saved version failed integrity validation.');
 		}
@@ -281,7 +381,10 @@ export class SyncWorkerApi {
 		if (query.path) params.set('path', query.path);
 		if (query.search) params.set('search', query.search);
 		if (query.cursor) params.set('cursor', query.cursor);
-		return parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
+		const result = parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
+		if (!this.encryption) return result;
+		return { ...result, versions: await this.encryption.metadata(result.versions.map(version => ({ path: version.path,
+			entry: { ...version, revision: version.storage_key } }))) };
 	}
 
 	async restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult> {

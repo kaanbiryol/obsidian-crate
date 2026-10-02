@@ -5,8 +5,12 @@ import { AUTH_TOKEN_KEY } from '../config';
 import { clearReminderDrafts } from '../reminder-drafts';
 import { clearReminderOutbox } from '../reminder-outbox-storage';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
+import { clearPersistedEncryption, clearEncryptionSessionMarkers } from '../encryption-cleanup';
+import { resetPwaEncryption } from '../encryption-session';
 import { capturePwaSession } from '../session-generation';
 
+vi.mock('../encryption-cleanup', async importOriginal => ({ ...await importOriginal<typeof import('../encryption-cleanup')>(), clearPersistedEncryption: vi.fn(async () => {}), clearEncryptionSessionMarkers: vi.fn() }));
+vi.mock('../encryption-session', () => ({ resetPwaEncryption: vi.fn() }));
 vi.mock('./storage', async importOriginal => ({ ...await importOriginal<typeof import('./storage')>(), clearReadingData: vi.fn(async () => {}) }));
 vi.mock('../config', async importOriginal => ({ ...await importOriginal<typeof import('../config')>(), finishEnrollment: vi.fn() }));
 vi.mock('../reminder-drafts', () => ({ clearReminderDrafts: vi.fn(() => true) }));
@@ -30,9 +34,12 @@ afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); vi.unstubAllGlobals(
 it.each(['malformed credentials', 'unavailable credential reads'])('clears device data and fences in-flight work despite %s', async failure => {
   if (failure === 'unavailable credential reads') vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new Error('Storage blocked'); });
   const current = capturePwaSession();
-  await expect(logoutReadingApp()).resolves.toContain('Revoke this browser');
+  await expect(logoutReadingApp()).resolves.toContain(failure === 'unavailable credential reads' ? 'Some browser data could not be cleared' : 'Revoke this browser');
   expect(current()).toBe(false);
   expect(clearReadingData).toHaveBeenCalledOnce();
+  expect(resetPwaEncryption).toHaveBeenCalledWith(true);
+  expect(clearEncryptionSessionMarkers).toHaveBeenCalledOnce();
+  expect(clearPersistedEncryption).toHaveBeenCalledOnce();
   expect(clearReminderDrafts).toHaveBeenCalledOnce();
   expect(clearReminderOutbox).toHaveBeenCalledOnce();
   expect(clearCachedReminderSnapshots).toHaveBeenCalledOnce();
@@ -42,4 +49,10 @@ it.each(['malformed credentials', 'unavailable credential reads'])('clears devic
     expect(call?.[0]).toBe('/auth/session');
     expect(new Headers(call?.[1]?.headers).get('Authorization')).toBe('Bearer valid-reminders-token');
   }
+});
+
+it('reports incomplete erasure when removing encryption keys fails', async () => {
+  vi.mocked(clearPersistedEncryption).mockRejectedValueOnce(new Error('Blocked database'));
+  await expect(logoutReadingApp()).resolves.toContain('Some browser data could not be cleared');
+  expect(clearReminderOutbox).toHaveBeenCalledOnce();
 });

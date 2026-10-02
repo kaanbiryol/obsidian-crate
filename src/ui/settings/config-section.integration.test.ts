@@ -1,3 +1,5 @@
+import release from '../../cloudflare/server-release.json';
+import type { DevelopmentBuild } from '../../cloudflare/server-build';
 import type { ConfirmationModalOptions } from '../confirmation-modal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -15,6 +17,7 @@ const openExternalBrowserModal = vi.fn();
 const embeddedArtifact = {
 	version: '0.1.0',
 	fingerprint: 'f'.repeat(64),
+	development: undefined as DevelopmentBuild | undefined,
 };
 
 async function flushMicrotasks(): Promise<void> {
@@ -44,6 +47,7 @@ function getSettingByName(name: string): MockSetting {
 }
 
 beforeEach(() => {
+	embeddedArtifact.development = undefined;
 	resetObsidianUiMocks();
 	openConfirmationModal.mockReset();
 	startCloudflareDeployment.mockReset();
@@ -85,7 +89,7 @@ describe('renderConfigSection integration', () => {
 		const { renderServerSection, renderServerUpdateNotice } = await loadConfigSectionModule();
 		const context = {
 			containerEl: new FakeElement('div') as never,
-			plugin: { manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: null, workerUrl: 'http://localhost:8787' },
+			plugin: { secretStorage: { get: () => null }, manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: null, workerUrl: 'http://localhost:8787' },
 				syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn(async () => ({ serverRevision: 56 })) },
 			} as never,
 			rerender: vi.fn(),
@@ -104,7 +108,7 @@ describe('renderConfigSection integration', () => {
 
 		renderConfigSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: { manifest: { version: '0.2.0' },
+			plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 				settings: { cloudflareDeployment: null },
 				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => false) },
 			} as never,
@@ -124,7 +128,7 @@ describe('renderConfigSection integration', () => {
 
 	it('offers reconnect for a remembered server on a disconnected device', async () => {
 		const { renderConfigSection } = await loadConfigSectionModule();
-		const plugin = { manifest: { version: '0.2.0' },
+		const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 			settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
 			syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false },
 		};
@@ -140,7 +144,7 @@ describe('renderConfigSection integration', () => {
 		await loadConfigSectionModule();
 		const { renderForgetServerSetting } = await import('./server-selection-setting');
 		const saved = { accountId: 'account', d1DatabaseId: 'database' };
-		const plugin = { manifest: { version: '0.2.0' },
+		const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 			app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
 			cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
 			clearSettingsUiState: vi.fn(),
@@ -169,7 +173,7 @@ describe('renderConfigSection integration', () => {
 		const clearSyncConfiguration = vi.fn(async () => {});
 		const rerender = vi.fn();
 		openConfirmationModal.mockResolvedValue(true);
-		const plugin = { manifest: { version: '0.2.0' },
+		const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 			app: {},
 			settings: { cloudflareDeployment: null },
 			clearSettingsUiState: vi.fn(),
@@ -200,7 +204,7 @@ describe('renderConfigSection integration', () => {
 		const getVersionInfo = vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint }));
 		renderServerUpdateNotice({
 			containerEl: new FakeElement('div') as never,
-			plugin: { manifest: { version: '0.2.0' },
+			plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 				settings: {
 					cloudflareDeployment: {
 						deploymentId: '0123456789abcdef',
@@ -214,7 +218,10 @@ describe('renderConfigSection integration', () => {
 		});
 
 		expect(getVersionInfo).not.toHaveBeenCalled();
-		getSettingByName('Check server version').buttons[0]?.click();
+		const row = getSettingByName('Check server version');
+		expect(row.buttons[0]!.buttonEl.style.display).toBe('none');
+		expect(row.buttons[1]!.buttonEl.textContent).toBe('Check for updates');
+		expect(row.buttons[1]!.buttonEl.style.display).not.toBe('none');
 		expect(startCloudflareDeployment).not.toHaveBeenCalled();
 	});
 
@@ -223,7 +230,7 @@ describe('renderConfigSection integration', () => {
 		const getVersionInfo = vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint }));
 		renderServerSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: { manifest: { version: '0.2.0' },
+			plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 				settings: {
 					cloudflareDeployment: {
 						deploymentId: '0123456789abcdef',
@@ -252,7 +259,7 @@ it.each([true, false])('hides the top notice when no update is actionable (conne
     const { renderServerUpdateNotice } = await loadConfigSectionModule();
     renderServerUpdateNotice({
         containerEl: new FakeElement('div') as never,
-        plugin: { manifest: { version: '0.2.0' },
+        plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
             settings: { cloudflareDeployment: {
                 lastDeployedVersion: embeddedArtifact.version,
                 lastDeployedFingerprint: embeddedArtifact.fingerprint,
@@ -268,7 +275,7 @@ it('keeps the installed version in the server section without duplicating the up
     const { renderServerSection } = await loadConfigSectionModule();
     renderServerSection({
         containerEl: new FakeElement('div') as never,
-        plugin: { manifest: { version: '0.2.0' },
+        plugin: { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
             settings: { cloudflareDeployment: {
                 lastDeployedVersion: '0.0.9',
                 lastDeployedFingerprint: 'old',
@@ -289,7 +296,7 @@ it('keeps the installed version in the server section without duplicating the up
 
 it('lets an older server save its vault name through an explicit update', async () => {
 	const { renderServerSection } = await loadConfigSectionModule();
-	const plugin = { manifest: { version: '0.2.0' },
+	const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
 		syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
 	};
@@ -304,7 +311,7 @@ it('lets an older server save its vault name through an explicit update', async 
 it.each([false, true])('disconnects with optional forgetting (%s)', async forget => {
 	const { renderAccountSection } = await loadConfigSectionModule();
 	const saved = { accountId: 'account', d1DatabaseId: 'database' };
-	const plugin = {
+	const plugin = { secretStorage: { get: () => null },
 		app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
 		cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
 		clearSettingsUiState: vi.fn(),
@@ -329,7 +336,7 @@ it.each([false, true])('disconnects with optional forgetting (%s)', async forget
 
 it('does not forget or disconnect when the dialog is cancelled after choosing forget', async () => {
 	const { renderAccountSection } = await loadConfigSectionModule();
-	const plugin = {
+	const plugin = { secretStorage: { get: () => null },
 		app: {}, settings: { cloudflareDeployment: { accountId: 'account' } },
 		clearSettingsUiState: vi.fn(), writeSettings: vi.fn(),
 		syncRuntime: { isConfigured: () => true, clearSyncConfiguration: vi.fn() },
@@ -347,7 +354,7 @@ it('does not forget or disconnect when the dialog is cancelled after choosing fo
 
 it('keeps a matching live build visible and routes it to recovery when saved deployment metadata is stale', async () => {
     const { renderServerUpdateNotice } = await loadConfigSectionModule();
-    const plugin = {
+    const plugin = { secretStorage: { get: () => null },
         settings: { cloudflareDeployment: { lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) } },
         syncRuntime: { isConfigured: () => true, getVersionInfo: async () => ({ deploymentFingerprint: embeddedArtifact.fingerprint }) },
     };
@@ -405,4 +412,43 @@ it('allows an installed revision 1 server to update to the current bundle', asyn
   row.buttons[0]!.click();
   expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin);
   expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+});
+
+
+it.each(['older development', 'stable', 'newer development', 'missing fingerprint', 'offline'])('offers a usable check action and preserves upgrade guards: %s', async live => {
+  const worker = 'crate-0123456789abcdef';
+  embeddedArtifact.development = { number: 3, worker };
+  const { renderServerUpdateNotice } = await loadConfigSectionModule();
+  const getVersionInfo = vi.fn(async () => {
+    if (live === 'offline') throw new Error('Offline');
+    return { serverRevision: release.revision, deploymentFingerprint: live === 'missing fingerprint' ? undefined : 'a'.repeat(64),
+      developmentBuild: live === 'stable' ? undefined : { worker, number: live === 'newer development' ? 4 : 2 } };
+  });
+  const plugin = { settings: {
+    workerUrl: `https://${worker}.example.workers.dev`,
+    cloudflareDeployment: { workerName: worker, workersSubdomain: 'example', lastKnownRevision: release.revision,
+      lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
+  }, syncRuntime: { isConfigured: () => true, getVersionInfo } };
+  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+  const row = getSettingByName('Check server version');
+  const visibleButtons = () => row.buttons.filter(button => button.buttonEl.style.display !== 'none');
+  expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Check for updates']);
+  expect(getVersionInfo).not.toHaveBeenCalled();
+  const check = visibleButtons()[0]!;
+  check.click();
+  expect(check.buttonEl.textContent).toBe('Checking…');
+  expect(check.buttonEl.classNames.has('is-disabled')).toBe(true);
+  await vi.waitFor(() => expect(check.buttonEl.classNames.has('is-disabled')).toBe(false));
+  expect(getVersionInfo).toHaveBeenCalledOnce();
+  expect(startCloudflareDeployment).not.toHaveBeenCalled();
+  if (live === 'older development') {
+    expect(row.descEl.textContent).toContain(`${release.revision}-dev.2`);
+    expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Update server']);
+    visibleButtons()[0]!.click();
+    expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
+  } else {
+    expect(visibleButtons().map(button => button.buttonEl.textContent)).toEqual(['Check for updates']);
+    expect(row.buttons[0]!.buttonEl.classNames.has('is-disabled')).toBe(true);
+    expect(row.descEl.textContent).toContain(`${release.revision}-dev.3`);
+  }
 });

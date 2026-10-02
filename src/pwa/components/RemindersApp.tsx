@@ -1,3 +1,4 @@
+import { EncryptionUnlock } from './EncryptionUnlock';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { lazy, useCallback, useContext } from 'react';
 import { useLaunchReminderModal } from '../hooks/useLaunchReminderModal';
@@ -33,7 +34,7 @@ export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const {
-		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
+		encryption, logOut, loggingOut, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
 		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
 		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
 		showToast, homeScreenInstall, loading, refreshing, error,
@@ -81,16 +82,24 @@ export function RemindersApp() {
 
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.
+	if (authToken && encryption.status === 'locked') {
+		return <div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root ${colorScheme}`} data-ui-host="pwa">
+			<EncryptionUnlock message={encryption.message} converting={encryption.converting} onLogout={() => { void logOut(); }} />
+		</div>;
+	}
+
 	if (!bootstrapped || launchPending) {
 		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
 	}
 
 	if (bootstrapped && !authToken) {
+		const savedEncryption = Object.keys(localStorage).some(key => key.startsWith('crate-encryption-session:'));
+		const resetSession = savedEncryption ? { onLogout: () => { void logOut(); }, loggingOut } : {};
 		return (
 			<div>
 				{error
-					? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
-					: <EmptyAuthState config={config} />}
+					? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} {...resetSession} />
+					: <EmptyAuthState config={config} {...resetSession} />}
 			</div>
 		);
 	}

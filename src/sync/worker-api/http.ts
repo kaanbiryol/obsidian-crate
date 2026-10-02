@@ -9,6 +9,7 @@ import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
 import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../request-diagnostics';
 import { isAbortError } from '../abort';
+import { ENCRYPTION_CAPABILITY } from '../../encryption/server-state';
 
 const logger = createLogger('ApiClient');
 
@@ -129,6 +130,10 @@ export class WorkerApiHttpClient {
 	private requestDiagnostics: RequestDiagnostic[] = [];
 	private workerUrl: string;
 	private authToken: string;
+	private encryptionHeaders: Record<string, string> = {};
+	setEncryptionAuthority(vaultId: string, generation: number): void {
+		this.encryptionHeaders = { 'X-Crate-Encryption-Vault': vaultId, 'X-Crate-Encryption-Generation': String(generation) };
+	}
 	private externalSignal: AbortSignal | undefined;
 	private requestTimings = emptyRequestTimings();
 	resetRequestTimings(): void { this.requestTimings = emptyRequestTimings(); }
@@ -182,6 +187,7 @@ export class WorkerApiHttpClient {
 
 	updateCredentials(workerUrl: string, authToken: string): void {
 		this.invalidateRequests();
+		this.encryptionHeaders = {};
 		this.workerUrl = normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
 	}
@@ -213,6 +219,14 @@ export class WorkerApiHttpClient {
 			this.assertRequestCurrent(generation);
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
+			const route = path.split('?')[0]!;
+			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders['X-Crate-Encryption-Vault']
+				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix)) || route === '/settings')) {
+				// Another device may have enabled encryption since this client last
+				// synced. Probe without a private body before dispatching plaintext.
+				const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
+				if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
+			}
 		}
 
 		const headersWithoutContentType = Object.fromEntries(
@@ -291,6 +305,7 @@ export class WorkerApiHttpClient {
 					'X-Crate-Client-Session': this.clientSession,
 					'X-Crate-Operation-Id': operationId,
 					[CRATE_PROTOCOL_HEADER]: String(protocol),
+					...this.encryptionHeaders,
 					...headersWithoutContentType,
 				},
 			}).then(resolveOnce, error => {

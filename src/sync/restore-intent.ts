@@ -8,6 +8,7 @@ export interface RestoreIntent {
 	request: RestoreFileRequest;
 	version: RemoteFileVersion;
 	phase: 'pending' | 'committed';
+	encryptedWire?: { vaultId: string; generation: number; expectedHash: string | null; restoredHash: string };
 }
 
 export function parseRestoreIntents(value: unknown): RestoreIntent[] {
@@ -25,9 +26,14 @@ export function parseRestoreIntents(value: unknown): RestoreIntent[] {
 			|| (request.expectedHash === null ? request.expectedRevision !== null : !isSyncRevision(request.expectedRevision))
 			|| ids.has(request.operationId) || keys.has(version.storage_key)) throw new Error('Invalid saved restore precondition');
 		ids.add(request.operationId); keys.add(version.storage_key);
+		const wire = entry.encryptedWire;
+		if (wire !== undefined && (!isRecord(wire) || typeof wire.vaultId !== 'string' || !wire.vaultId
+			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
+			|| !isSyncHash(wire.restoredHash) || (wire.expectedHash !== null && !isSyncHash(wire.expectedHash))
+			|| (wire.expectedHash === null) !== (request.expectedHash === null))) throw new Error('Invalid encrypted restore journal');
 		return { version, phase: entry.phase, request: {
 			operationId: request.operationId, path: version.path, storageKey: version.storage_key,
 			expectedHash: request.expectedHash, expectedRevision: request.expectedRevision as string | null,
-		} };
+		}, ...(wire === undefined ? {} : { encryptedWire: wire as RestoreIntent['encryptedWire'] }) };
 	});
 }

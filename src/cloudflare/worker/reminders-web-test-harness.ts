@@ -101,6 +101,7 @@ function createDb(options?: {
 					return statement;
 				}),
 				run: vi.fn(async () => {
+					if (sql.includes('INSERT INTO staged_uploads')) return { meta: { changes: 1 } };
 					if (sql.startsWith('CREATE TABLE') || sql.startsWith('ALTER TABLE')) {
 						return {};
 					}

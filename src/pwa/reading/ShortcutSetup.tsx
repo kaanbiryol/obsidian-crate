@@ -55,9 +55,10 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
         {!online && <p role="status">Connect to the internet to pair your shortcut.</p>}
         {error && <p role="alert">{error}</p>}
       </SettingsSection></li>
-      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Wait for <strong>Saved to Crate</strong> before closing the share sheet.</p></SettingsSection></li>
+      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Crate opens with your link. Select <strong>Save</strong> to store it.</p></SettingsSection></li>
     </ol>
-    <SettingsSection title="Privacy and access"><p>The shortcut can save links but cannot read your library. Access lasts up to 90 days. Revoke it in Obsidian’s connected devices, or run setup again to reconnect.</p></SettingsSection>
-    <SettingsSection title="Updates and troubleshooting"><p>Server updates keep compatible shortcuts working. When a newer shortcut is available, the save page offers a download. Install it in Shortcuts, then return here to create a pairing code.</p><p>If a save fails, use <strong>Copy diagnostics</strong> or <strong>Report on GitHub</strong> on the error page. Wait for <strong>Saved to Crate</strong>; the shortcut completion checkmark alone does not confirm a save.</p></SettingsSection>
+    <SettingsSection title="Privacy and access"><p>The shortcut opens your link in Crate using a private URL fragment. Unlock Reading in Safari if asked. Your browser encrypts the saved link before syncing it; the shortcut cannot read your library. Reinstall the current shortcut after enabling encryption.</p></SettingsSection>
+    <SettingsSection title="Updates and troubleshooting"><p>Install the current shortcut, then return here to create a pairing code. If setup fails, use <strong>Copy diagnostics</strong> or <strong>Report on GitHub</strong> on the error page. Select <strong>Save</strong> in Reading to finish saving your link.</p></SettingsSection>
+
   </div>;
 }

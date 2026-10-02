@@ -1,3 +1,8 @@
+import { resetReadingEncryption } from './encryption-lifecycle';
+import { pendingReadingCapture, forgetReadingCapture } from '../encryption-fragments';
+import { readingUrl } from '@/reading/core/model';
+import { prepareReadingEncryption } from './encryption-session';
+import { receiveReadingShare } from '@/cloudflare/worker/reading/share-target';
 import type { PendingReading } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { manifestHrefForUrl } from '@/cloudflare/worker/pwa/pwa-params';
@@ -15,6 +20,7 @@ import { isReadingSession } from './storage-validation';
 /** Owns enrollment, session invalidation and hydration of this session's durable data. */
 export function useReadingSession(enabled = true) {
   const [session, setSession] = useState<ReadingSession | null>(null);
+  const [lockedSession, setLockedSession] = useState<ReadingSession | null>(null);
   const [ready, setReady] = useState(false), [connecting, setConnecting] = useState(false);
   const [cache, setCache] = useState<ReadingCache | null>(null), [pending, setPending] = useState<PendingReading[]>([]);
   const [error, setError] = useState<string | null>(null), [storageError, setStorageError] = useState<string | null>(null);
@@ -30,10 +36,10 @@ export function useReadingSession(enabled = true) {
     }
   }, []);
   const resetSession = useCallback(() => {
-    generation.current++;
-    setSession(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-    if (!share) { setUrl(''); setAdding(false); }
-  }, [share]);
+    generation.current++; resetReadingEncryption();
+    setSession(null); setLockedSession(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
+    setUrl(''); setAdding(false); setShare(null);
+  }, []);
   const hydrate = useCallback(async (current: ReadingSession) => {
     const revision = generation.current;
     const currentRequest = () => {
@@ -42,6 +48,11 @@ export function useReadingSession(enabled = true) {
     };
     if (!currentRequest()) return;
     setDraftReady(false); setStorageError(null);
+    try { await prepareReadingEncryption(current); } catch (cause) {
+      if (!currentRequest()) return;
+      setLockedSession(current); setError(cause instanceof Error ? cause.message : String(cause)); return;
+    }
+    setLockedSession(null);
     // Read each lifetime separately: a disposable cache failure must not hide a
     // saved draft, and an unreadable draft must never be replaced by empty input.
     const results = await Promise.allSettled([
@@ -63,6 +74,7 @@ export function useReadingSession(enabled = true) {
       if (draft.value?.url) { setUrl(draft.value.url); setAdding(true); }
       setDraftReady(true);
     }
+    return true;
   }, []);
   const connect = useCallback(async () => {
     if (!enabled || connectingRef.current || !navigator.onLine || !localStorage.getItem(AUTH_TOKEN_KEY)) return;
@@ -98,13 +110,29 @@ export function useReadingSession(enabled = true) {
               && expectedSession === localStorage.getItem(READING_SESSION_KEY);
           } catch { return false; }
         };
+        const incoming = pendingReadingCapture();
+        if (incoming) {
+          // A Shortcut can arrive in a locked Safari partition. Protect its URL
+          // locally before enrollment/unlock reloads; this is a local function,
+          // never a POST to the server's native-share fallback.
+          const saved = await receiveReadingShare(new Request(location.origin + '/notifications/share/reading', {
+            method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ url: readingUrl(incoming) }).toString(),
+          }));
+          if (saved.status !== 303) throw new Error(await saved.text());
+          if (!bootstrapCurrent()) return;
+          const url = new URL(location.href);
+          url.searchParams.set('share', new URL(saved.headers.get('Location')!).searchParams.get('share')!);
+          history.replaceState(history.state, '', url); forgetReadingCapture();
+        }
         const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
         if (manifest) manifest.href = manifestHrefForUrl(location.href);
         const fragment = new URLSearchParams(location.hash.slice(1)), installed = isStandaloneApp();
         const installGrant = installed && !readingSession() ? document.cookie.split('; ').find(c => c.startsWith('crate-reading-install='))?.split('=')[1] : null;
         const grant = fragment.get('reading') || installGrant;
         if (grant) {
-          history.replaceState(null, '', '/notifications?section=reading');
+          const shareId = new URL(location.href).searchParams.get('share');
+          history.replaceState(null, '', '/notifications?section=reading' + (shareId ? '&share=' + encodeURIComponent(shareId) : ''));
           const { installToken, ...next } = await readingRequest<ReadingSession & { installToken?: string }>('/reading/exchange', null, JSON.stringify({ token: grant }));
           if (!isReadingSession(next)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
           if (!bootstrapCurrent()) {
@@ -122,7 +150,8 @@ export function useReadingSession(enabled = true) {
           if (!installed && installToken) document.cookie = `crate-reading-install=${installToken}; Max-Age=600; Path=/notifications; SameSite=Strict; Secure`;
         }
         const current = readingSession();
-        if (current) await hydrate(current);
+        let unlocked = false;
+        if (current) unlocked = Boolean(await hydrate(current));
         else {
           const earlier = await hasEarlierReadingChanges();
           if (!bootstrapCurrent()) return;
@@ -130,7 +159,7 @@ export function useReadingSession(enabled = true) {
         }
         if (!bootstrapCurrent()) return;
         const shareId = new URL(location.href).searchParams.get('share');
-        if (shareId) {
+        if (shareId && (!current || unlocked)) {
           const draft = await readReadingDraft(`share:${shareId}`);
           if (!bootstrapCurrent()) return;
           if (draft) { setUrl(draft.url); setAdding(true); setShare(shareId); }
@@ -162,6 +191,6 @@ export function useReadingSession(enabled = true) {
   useEffect(() => {
     if (session && ready && draftReady) void run(() => writeValue(`draft:${session.id}`, { url }, session));
   }, [session, ready, draftReady, url, run]);
-  return { session, ready, connecting, connect, resetSession, cache, setCache, pending, setPending, error: storageError ?? error,
+  return { session, lockedSession, ready, connecting, connect, resetSession, cache, setCache, pending, setPending, error: storageError ?? error,
     setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run };
 }

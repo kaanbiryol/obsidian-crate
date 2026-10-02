@@ -1,6 +1,7 @@
+import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import type { Dispatch, SetStateAction } from 'react';
-import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
 	makeApiFetch,
 	registerPwaServiceWorker,
@@ -43,6 +44,7 @@ const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
 
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;
+	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
 	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authSession, setAuthSession] = useState(() => ({ token: localStorage.getItem(AUTH_TOKEN_KEY) }));
@@ -68,6 +70,7 @@ function useRemindersController() {
 
 
 	useEffect(() => {
+		if (!bootstrapped) return;
 		const reportVersion = () => navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
 		navigator.serviceWorker?.addEventListener('controllerchange', reportVersion);
 		document.addEventListener('visibilitychange', reportVersion);
@@ -79,7 +82,7 @@ function useRemindersController() {
 			navigator.serviceWorker?.removeEventListener('controllerchange', reportVersion);
 			document.removeEventListener('visibilitychange', reportVersion);
 		};
-	}, [showToast]);
+	}, [bootstrapped, showToast]);
 
 	const apiFetch = useMemo(
 		() => makeApiFetch(authSession.token, () => handleUnauthorizedRef.current()),
@@ -98,7 +101,7 @@ function useRemindersController() {
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
-	} = usePushNotifications({ authToken, apiFetch, showToast });
+	} = usePushNotifications({ authToken, apiFetch, prepareSession: apiFetch.ready, showToast });
 	const {
 		reminders,
 		projects,
@@ -286,7 +289,7 @@ function useRemindersController() {
 	});
 
 	return {
-		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
+		encryption, logOut, loggingOut, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
 		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
 		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
 		showToast, homeScreenInstall, loading, refreshing, error,

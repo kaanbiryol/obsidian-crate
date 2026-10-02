@@ -1,3 +1,4 @@
+import { readEncryptionState } from './encryption-state';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
 import { parseReminderSource } from './reminder-source-parse';
@@ -5,14 +6,14 @@ import { recordReminderSourceState } from './reminder-source-state';
 import { getReminderFolder, isReminderPath } from './reminder-scope';
 
 /** File bytes, identity ownership and first observation share one commit. */
-export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false): Promise<D1PreparedStatement[]> {
+export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false, encrypted?: boolean): Promise<D1PreparedStatement[]> {
   const folder = await getReminderFolder(db);
   if (!isReminderPath(path, folder)) return [];
   const guard = storageKey === null ? `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`
     : `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;
   const args = storageKey === null ? filePathArgs(path) : [...filePathArgs(path), storageKey];
   const token = crypto.randomUUID();
-  const parsed = content === null ? { reminders: [], issue: undefined } : parseReminderSource(path, content, folder!);
+  const parsed = content === null ? { reminders: [], issue: undefined } : parseReminderSource(path, content, folder!, encrypted ?? (await readEncryptionState(db))?.mode === 'active');
   const reset = preserveRetries ? [] : [db.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(path, ...args)];
   if (parsed.issue) {
     // Preserve the last verified identities and schedules. This quarantine is

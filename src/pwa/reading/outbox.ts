@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, type ReadingChanges } from '@/reading/core/model';
 import { loadReading, readingRequest } from './api';
 import { ReadingApiError } from './api-error';
-import { assertReadingSession, readingDrainLock, readingLock, pendingReading, writeValue, type ReadingSession, type ReadingCache } from './storage';
+import { assertReadingSession, readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, writeValue, type ReadingSession, type ReadingCache } from './storage';
 import { isReadingCommand } from './storage-validation';
 
 export interface ReadingUpdateIntent { id: string; changes: ReadingChanges; before: ReadingChanges }
@@ -112,6 +112,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
     await readingLock(async () => {
       const current = await pendingReading(session);
       await writeValue(`pending:${session.id}`, current.filter(op => !confirmed.has(op.id)), session);
+      await pruneReadingAttempts(session).catch(() => { /* Committed changes remain settled; cleanup can retry later. */ });
     });
     return cache;
   });

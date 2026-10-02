@@ -9,6 +9,7 @@ vi.mock('./router', () => ({ handleAuthenticatedRoute: vi.fn(), isAuthenticatedR
 vi.mock('./auth/index', () => ({ authenticateWorkerRequest: vi.fn(async () => ({ principal: { id: 'device', scope: 'vault' } })) }));
 vi.mock('./request-diagnostics', () => ({ logMutation: vi.fn() }));
 vi.mock('./maintenance/lifecycle', () => ({ runMaintenanceEpisode: vi.fn() }));
+vi.mock('./encryption-state', () => ({ readEncryptionState: vi.fn(async () => null), EncryptionStateError: class extends Error {} }));
 
 function fixture() {
   const values = new Map<string, unknown>();

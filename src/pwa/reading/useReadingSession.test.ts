@@ -7,6 +7,7 @@ import { READING_SESSION_KEY, readReadingCache, readReadingDraft, writeValue, ty
 import { connectReadingFromReminders } from './api';
 import { invalidatePwaSession } from '../session-generation';
 
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../api', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),

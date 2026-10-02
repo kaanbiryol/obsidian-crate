@@ -22,6 +22,7 @@ const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
 	private renameDependencies = new Map<string, string>();
+	private appliedRename?: string;
 	private app: App;
 	private manifestPath: string;
 	private tmpPath: string;
@@ -82,7 +83,7 @@ export class LocalManifest {
 				|| JSON.stringify(main.settledUploads) !== JSON.stringify(tmp.settledUploads)
 				|| JSON.stringify(main.restoreIntents) !== JSON.stringify(tmp.restoreIntents)
 				|| JSON.stringify(main.initialConfigPull) !== JSON.stringify(tmp.initialConfigPull)
-				|| JSON.stringify([...main.renames]) !== JSON.stringify([...tmp.renames])))) {
+				|| main.appliedRename !== tmp.appliedRename || JSON.stringify([...main.renames]) !== JSON.stringify([...tmp.renames])))) {
 			throw new Error('Conflicting manifest checkpoints. Preserve both generations before recovering sync.');
 		}
 		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
@@ -100,6 +101,7 @@ export class LocalManifest {
 			this.restoreIntents = selected.restoreIntents;
 			this.initialConfigPull = selected.initialConfigPull;
 			this.renameDependencies = selected.renames;
+			this.appliedRename = selected.appliedRename;
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
 			this.generation = selected.generation;
@@ -141,7 +143,7 @@ export class LocalManifest {
 	}
 
 	private serialize(): string {
-		return JSON.stringify({ ...this.manifest, version: CHECKPOINT_VERSION, ...(this.initialConfigPull ? { initialConfigPull: this.initialConfigPull } : {}), ...(this.restoreIntents.length ? { restoreIntents: this.restoreIntents } : {}), ...(this.uploadDiagnostics.length ? { uploadDiagnostics: this.uploadDiagnostics } : {}), ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
+		return JSON.stringify({ ...this.manifest, version: CHECKPOINT_VERSION, ...(this.appliedRename ? { appliedRename: this.appliedRename } : {}), ...(this.initialConfigPull ? { initialConfigPull: this.initialConfigPull } : {}), ...(this.restoreIntents.length ? { restoreIntents: this.restoreIntents } : {}), ...(this.uploadDiagnostics.length ? { uploadDiagnostics: this.uploadDiagnostics } : {}), ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
 	}
 
 	private async persist(): Promise<void> {
@@ -223,13 +225,30 @@ export class LocalManifest {
 	}
 
 	renameDestination(path: string): string | undefined { return this.renameDependencies.get(path); }
+	getRenameDependencies(): Record<string, string> { return Object.fromEntries(this.renameDependencies); }
+
+	/** The journal keeps ordered IDs until checkpoint publication succeeds. The
+	 * last receipt is enough to resume a prefix without applying nested moves twice. */
+	applyJournalRenames(moves: Array<{ id: string; from: string; to: string; rename?: boolean; priorRenames?: Record<string, string> }>): void {
+		const start = moves.findIndex(move => move.id === this.appliedRename) + 1;
+		for (const move of moves.slice(start)) {
+			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.renameDependencies.set(source, target);
+			if (move.rename !== false) this.recordRename(move.from, move.to);
+			this.appliedRename = move.id;
+			this.revision++; this.dirty = true;
+		}
+	}
 
 	recordRename(source: string, destination: string): void {
 		const move = (path: string) => path === source ? destination : path.startsWith(`${source}/`) ? destination + path.slice(source.length) : path;
-		for (const [old, target] of this.renameDependencies) this.renameDependencies.set(old, move(target));
+		for (const [old, target] of this.renameDependencies) {
+			const next = move(target);
+			if (old === next) this.renameDependencies.delete(old);
+			else this.renameDependencies.set(old, next);
+		}
 		for (const path of this.getAllPaths()) {
 			const target = move(path);
-			if (target !== path) this.renameDependencies.set(path, target);
+			if (target !== path && !this.renameDependencies.has(path)) this.renameDependencies.set(path, target);
 		}
 		this.revision++;
 		this.dirty = true;

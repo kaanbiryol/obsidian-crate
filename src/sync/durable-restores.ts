@@ -4,8 +4,12 @@ import type { FileMetadataResponse, RemoteFileVersion, RestoreFileRequest, Uploa
 import { getPathEntry } from '../protocol/path-record';
 import type { LocalManifest } from './manifest';
 import { HttpError } from './worker-api/http';
+import type { RestoreIntent } from './restore-intent';
 
 interface RestoreTransport {
+	resolveLegacyRestore?(intent: RestoreIntent): Promise<UploadResult | null>;
+	prepareRestoreWire?(intent: RestoreIntent): Promise<RestoreIntent['encryptedWire']>;
+	assertPreparedRestore?(intent: RestoreIntent): void;
 	getServerInfo(): Promise<CrateServerInfo>;
 	getFileMetadata(paths: string[]): Promise<FileMetadataResponse>;
 	restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult>;
@@ -34,13 +38,18 @@ export class DurableRestores {
 			if (current && !current.revision) throw new Error('The server did not return the current file revision. Update it before restoring.');
 			intent = { version, phase: 'pending', request: { operationId: createReminderOperationId(info.reminderOperationDay),
 				path: version.path, storageKey: version.storage_key, expectedHash: current?.hash ?? null, expectedRevision: current?.revision ?? null } };
+			const wire = await this.transport.prepareRestoreWire?.(intent);
+			if (wire) intent.encryptedWire = wire;
 			this.manifest.setRestoreIntent(intent);
 		}
 		// Also retry failed checkpoint writes before dispatching an existing intent.
 		await this.manifest.save();
 		try {
-			const result = await this.transport.restoreFileVersion(intent.request);
-			if (!result.success || result.path !== intent.request.path || result.hash !== intent.version.hash || !result.revision) {
+			const legacy = await this.transport.resolveLegacyRestore?.(intent);
+			if (!legacy) this.transport.assertPreparedRestore?.(intent);
+			const result = legacy ?? await this.transport.restoreFileVersion(intent.encryptedWire
+				? { ...intent.request, expectedHash: intent.encryptedWire.expectedHash } : intent.request);
+			if (!result.success || result.path !== intent.request.path || result.hash !== (intent.encryptedWire?.restoredHash ?? intent.version.hash) || !result.revision) {
 				throw new Error('Invalid restore receipt. The original restore is preserved; retry after checking the server.');
 			}
 		} catch (error) {

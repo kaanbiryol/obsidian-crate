@@ -31,7 +31,7 @@ function writeGeneratedJson(fileName, payload) {
 	);
 }
 
-async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets) {
+async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, encryptedPush) {
 	const result = await build({
 		absWorkingDir: root,
 		entryPoints: [resolve(root, 'src/cloudflare/worker/index.ts')],
@@ -55,6 +55,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaAssetVersion),
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
+			__CRATE_ENCRYPTED_PUSH_JS__: JSON.stringify(encryptedPush),
 		},
 		plugins: [rawTextPlugin(path => rawInputs.add(path)), readingExtractionPlugin()],
 	});
@@ -66,9 +67,9 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 	return result.metafile;
 }
 
-async function buildPwaClientBundle() {
+async function buildPwaClientBundle(encryptedPush) {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER, root);
-	const version = createPwaAssetVersion(versionTemplate.assets, root, path => rawInputs.add(path));
+	const version = createPwaAssetVersion({ ...versionTemplate.assets, 'encrypted-push.js': encryptedPush }, root, path => rawInputs.add(path));
 	const { assets, startupAssets, metafile } = await bundlePwaClient(version, root);
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
@@ -82,8 +83,11 @@ async function buildPwaClientBundle() {
 	return { assets, version, startupAssets, metafile };
 }
 
-const pwaClient = await buildPwaClientBundle();
-const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets);
-writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile], rawInputs));
-
+const encryptedPush = await build({ absWorkingDir: root, entryPoints: [resolve(root, 'src/pwa/encrypted-push.ts')],
+	bundle: true, format: 'iife', globalName: 'crateEncryptedPush', platform: 'browser', target: 'es2022',
+	write: false, metafile: true, minify: true, legalComments: 'eof' });
+const encryptedPushScript = encryptedPush.outputFiles[0].text;
+const pwaClient = await buildPwaClientBundle(encryptedPushScript);
+const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets, encryptedPushScript);
+writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile, encryptedPush.metafile], rawInputs));
 writeGeneratedJson('build-identity.json', { development: development ?? null, workerSha256: createHash('sha256').update(readFileSync(resolve(generatedDir, 'worker.mjs'))).digest('hex'), release: JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8')) });

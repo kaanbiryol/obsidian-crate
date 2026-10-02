@@ -1,3 +1,4 @@
+import { SECRET_KEYS } from '../plugin/settings-types';
 import { captureDesktopArticle } from './desktop-capture';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Platform, TFile, TFolder } from 'obsidian';
@@ -28,7 +29,7 @@ function harness() {
 		}, offref: (ref: { name: string; callback: (file: TFile, oldPath?: string) => void }) => { events.get(ref.name)!.delete(ref.callback); },
 	};
 	const workspace = { layoutReady: false, onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
-	const plugin = { settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
+	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading' } }, '.obsidian'),
 		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace }, registerEvent: vi.fn(),
 		syncRuntime: { getState: () => ({ status }), addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
 	} as unknown as CratePlugin;
@@ -40,12 +41,20 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('Reading runtime lifecycle', () => {
+  it('waits for a pending encrypted folder move before starting policy or capture work', () => {
+    const h = harness(); h.workspace.layoutReady = true;
+    Object.assign(h.plugin.secretStorage, { get: (key: string) => key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending' : null });
+    startReading(h.plugin);
+    expect(getReadingLibrary(h.plugin)).toBeUndefined();
+    expect(readingServerRequest).not.toHaveBeenCalled();
+    expect(h.events.size).toBe(0);
+  });
   it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
     const h = harness();
     h.plugin.settings.workerUrl = 'https://original.example';
     h.workspace.layoutReady = true;
     const writeSettings = vi.fn();
-    Object.assign(h.plugin, { secretStorage: { get: () => 'synthetic' }, registerInterval: vi.fn(), writeSettings });
+    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
     vi.mocked(readingServerRequest).mockImplementationOnce(async () => {
       h.plugin.settings.workerUrl = 'https://replacement.example';
       return { policy: kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', revision: 'old' } };
@@ -80,7 +89,7 @@ describe('Reading runtime lifecycle', () => {
       const content = update(saved.get(file.path)!); saved.set(file.path, content); return content;
     });
     h.plugin.settings.workerUrl = 'https://crate.example.com';
-    Object.assign(h.plugin, { secretStorage: { get: () => 'device-token' }, manifest: { id: 'crate' }, registerInterval: vi.fn() });
+    Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'device-token' : null }, manifest: { id: 'crate' }, registerInterval: vi.fn() });
     startReading(h.plugin);
     const library = getReadingLibrary(h.plugin)!;
     const { item } = await library.add('https://example.com/desktop');
@@ -89,13 +98,13 @@ describe('Reading runtime lifecycle', () => {
     expect(captureDesktopArticle).toHaveBeenCalledWith('https://example.com/desktop', expect.any(AbortSignal));
     stopReading(h.plugin);
   });
-  it('retains server capture on mobile', () => {
+  it('uses trusted native article capture on mobile', () => {
     const h = harness();
     const desktop = Platform.isDesktopApp;
     try {
       Platform.isDesktopApp = false;
       startReading(h.plugin);
-      expect(getReadingLibrary(h.plugin)!.canCaptureLocally).toBe(false);
+      expect(getReadingLibrary(h.plugin)!.canCaptureLocally).toBe(true);
     } finally { Platform.isDesktopApp = desktop; stopReading(h.plugin); }
   });
   it('updates mounted workspaces when the local library is replaced or stopped', () => {

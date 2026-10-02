@@ -44,10 +44,24 @@ import { NotificationsWorkerApi } from './worker-api/notifications';
 import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
 import { SyncWorkerApi } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
+import { EncryptedFiles } from './encrypted-files';
+import type { VaultKeyBundle } from '../encryption/key-bundle';
+import { createReminderProjection } from '../encryption/reminder-projection';
+import { readServerEncryption } from './encryption-conversion';
 
 export { HttpError } from './worker-api/http';
 
 export class SyncApiClient {
+	getEncryptionState() { return readServerEncryption(this.http); }
+	private encryption?: EncryptedFiles;
+	async configureEncryption(bundle: VaultKeyBundle): Promise<void> {
+		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(bundle, path, bytes));
+		this.syncApi.setEncryption(encryption);
+		this.sharedHistory.setEncryption(encryption);
+		this.sharedSettingsApi.setEncryption(encryption);
+		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
+		this.encryption = encryption;
+	}
   readonly initialImport: InitialImportApi;
 	private durableUploads?: DurableUploads;
 	private durableRestores?: DurableRestores;
@@ -79,6 +93,7 @@ export class SyncApiClient {
 	}
 
 	updateCredentials(workerUrl: string, authToken: string): void {
+		if (this.encryption) throw new Error('Reinitialize encrypted sync before changing connection credentials');
 		if (this.durableUploads && normalizeWorkerUrl(workerUrl) !== normalizeWorkerUrl(this.getWorkerUrl())) throw new Error('Stop this sync engine and preserve its pending uploads before connecting another server');
 		this.http.updateCredentials(workerUrl, authToken);
 	}
@@ -88,6 +103,8 @@ export class SyncApiClient {
 	}
 
 	async fetchPageTitle(url: string): Promise<string | null> {
+		if (this.encryption) return null;
+		if (await readServerEncryption(this.http, 7000)) return null;
 		const result = await this.http.requestJson<{ title?: unknown }>('/links/title', {
 			method: 'POST', body: JSON.stringify({ url }),
 		}, 7000);

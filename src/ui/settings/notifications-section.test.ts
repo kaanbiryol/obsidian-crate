@@ -312,6 +312,7 @@ const updateNotificationPolicy = vi.fn(async (policy: Record<string, unknown>) =
 
 function createPlugin(apiClient: Record<string, unknown>): never {
 	return {
+		secretStorage: { get: vi.fn(() => null) },
 		app: {},
 		settings: {
 			pushEnabled: true,

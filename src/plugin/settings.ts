@@ -234,11 +234,15 @@ export function normalizeCrateSettings(
 	value: Partial<CrateSettings> | null | undefined,
 	configDir: string,
 ): CrateSettings {
+	const workerUrl = normalizeWorkerUrl(normalizeString(value?.workerUrl));
+	const scopeUrl = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.workerUrl));
+	const authority = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.authority));
 	return {
 		...DEFAULT_SETTINGS,
 		reading: normalizeReadingSettings(value?.reading),
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
-		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
+		workerUrl,
+		...(workerUrl && scopeUrl === workerUrl && authority ? { checkpointScope: { workerUrl, authority } } : {}),
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		cloudflareRestore: validRestoreState(value?.cloudflareRestore) ? structuredClone(value.cloudflareRestore) : null,
 		lastSync: normalizeNullableString(value?.lastSync),

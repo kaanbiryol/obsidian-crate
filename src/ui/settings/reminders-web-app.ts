@@ -2,6 +2,9 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import { QRModal } from '../qr-modal';
+import { loadEncryptionKeys } from '../../plugin/encryption-storage';
+import { createReminderKeyGrant } from '../../encryption/key-bundle';
+import { encodeWebAppKey } from '../../encryption/web-app-key';
 
 export function renderCrateWebApp(containerEl: HTMLElement, plugin: CratePlugin): void {
 	if (!plugin.syncRuntime.getApiClient()) return;
@@ -54,6 +57,12 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
   }
 	const { token, browserToken } = await apiClient.createRemindersEnrollmentToken(plugin.remindersSettings.remindersFolderPath);
 	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
+	const keys = loadEncryptionKeys(plugin.secretStorage);
+	if (keys) {
+		const fragment = new URLSearchParams({ crateKey: encodeWebAppKey([createReminderKeyGrant(keys, plugin.remindersSettings.remindersFolderPath)]) });
+		if (keys.scopes.some(scope => scope.folderPath === plugin.settings.reading.folderPath)) fragment.set('crateReadingKey', encodeWebAppKey([createReminderKeyGrant(keys, plugin.settings.reading.folderPath)]));
+		subscribeUrl.hash = fragment.toString();
+	}
 	subscribeUrl.searchParams.set('token', token);
 	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
 	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);

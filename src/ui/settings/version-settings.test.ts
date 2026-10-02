@@ -67,7 +67,7 @@ it('requires a live comparison before declaring a same-revision mismatch', async
 	const { renderUpdateVersions } = await import('./version-settings');
 	renderUpdateVersions(row as never, plugin as never, vi.fn(), available);
 	expect(row.nameEl.textContent).toBe('Check server version');
-	expect(row.descEl.textContent).toContain('Select Check live server');
+	expect(row.descEl.textContent).toContain('Check for updates');
 	expect(available).toHaveBeenLastCalledWith(false);
 	expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
 });
@@ -105,4 +105,17 @@ it.each([true, false])('enables a same-revision development update or stable pro
   row.buttons.at(-1)!.click();
   await vi.waitFor(() => expect(available).toHaveBeenLastCalledWith(true));
   expect(row.descEl.textContent).toContain(`${release.revision}-dev.1`);
+});
+
+
+it('rejects a delayed response after switching the connected server', async () => {
+  const { plugin, row } = await setup(release.revision);
+  let finish!: (info: { serverRevision: number; deploymentFingerprint: string }) => void;
+  plugin.syncRuntime.getVersionInfo.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  row.buttons[0]!.click();
+  plugin.settings.workerUrl = 'https://another.example.com';
+  finish({ serverRevision: 1, deploymentFingerprint: 'b'.repeat(64) });
+  await vi.waitFor(() => expect(row.descEl.textContent).toContain('Could not check the server'));
+  expect(plugin.writeSettings).not.toHaveBeenCalled();
+  expect(row.nameEl.textContent).not.toBe('Cloudflare update available');
 });

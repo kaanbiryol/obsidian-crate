@@ -359,8 +359,9 @@ Phone / Obsidian → https://crate.example.com → Cloudflare Tunnel → Crate o
 ```
 
 The database, files, and alarm state remain on the Mac. Cloudflare terminates
-public HTTPS and handles the traffic passing through the tunnel; Crate does not
-end-to-end encrypt vault contents. Remote access is optional: only the explicit
+public HTTPS and handles traffic passing through the tunnel. Optional
+[end-to-end encryption](e2ee-implementation.md) protects content before it reaches
+the tunnel or the local server; paths and scheduling metadata remain visible. Remote access is optional: only the explicit
 **setup** command provisions a tunnel. Ordinary local startup does not.
 
 ### One-time setup

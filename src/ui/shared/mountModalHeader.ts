@@ -6,11 +6,12 @@ import { ThemeIconProvider } from './ThemeIcon';
 import { ObsidianIcon } from '../obsidian-icon';
 
 /** Shared React header for dialogs whose body uses Obsidian's DOM controls. */
-export function mountModalHeader(container: HTMLElement, title: string, onClose: () => void): () => void {
+export function mountModalHeader(container: HTMLElement, title: string, onClose: () => void): (() => void) & { setTitle(title: string): void } {
 	const root = createRoot(container);
-	flushSync(() => root.render(createElement(ThemeIconProvider, {
+	const setTitle = (title: string) => flushSync(() => root.render(createElement(ThemeIconProvider, {
 		renderer: ObsidianIcon,
 		children: createElement(ModalHeader, { title, closeLabel: 'Close dialog', onClose }),
 	})));
-	return () => root.unmount();
+	setTitle(title);
+	return Object.assign(() => root.unmount(), { setTitle });
 }

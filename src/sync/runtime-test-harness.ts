@@ -108,11 +108,12 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 				dir: PLUGIN_DIR,
 			},
 		};
+	const secrets = new Map<string, string>([['crate-auth-token', 'auth-token']]);
 	const secretStorage = {
-		has: vi.fn(() => true),
-		get: vi.fn(() => 'auth-token'),
-		set: vi.fn(),
-		delete: vi.fn(),
+		has: vi.fn((key: string) => secrets.has(key)),
+		get: vi.fn((key: string): string | null => secrets.get(key) ?? null),
+		set: vi.fn((key: string, value: string) => { secrets.set(key, value); }),
+		delete: vi.fn((key: string) => { secrets.delete(key); }),
 	};
 	const persistSettings = vi.fn(async () => {});
 

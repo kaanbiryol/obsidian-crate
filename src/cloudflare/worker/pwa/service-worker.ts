@@ -1,6 +1,8 @@
 import { READING_SHARE_SW } from '../reading/share-target';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_CLIENT_ASSETS } from '../pwa-client-bundle';
+declare const __CRATE_ENCRYPTED_PUSH_JS__: string | undefined;
+const encryptedPushScript = typeof __CRATE_ENCRYPTED_PUSH_JS__ === 'string' ? __CRATE_ENCRYPTED_PUSH_JS__ : '';
 
 const pwaClientChunkUrls = Object.keys(PWA_CLIENT_ASSETS)
 	.filter(fileName => fileName !== 'app.js')
@@ -9,6 +11,7 @@ const pwaClientChunkUrls = Object.keys(PWA_CLIENT_ASSETS)
 export const SERVICE_WORKER_JS = `
 ${READING_SHARE_SW}
 
+${encryptedPushScript}
 const PWA_SHELL_CACHE = 'crate-reminders-shell-${PWA_ASSET_VERSION}';
 const PWA_SHELL_URL = '/notifications';
 const PWA_PRECACHE_URLS = [
@@ -25,8 +28,14 @@ const PWA_PRECACHE_URLS = [
 self.addEventListener('install', function(event) {
 	event.waitUntil(
 		caches.open(PWA_SHELL_CACHE)
-			.then(function(cache) {
-				return cache.addAll(PWA_PRECACHE_URLS);
+			.then(async function(cache) {
+				// Limit installation traffic while enrollment and key storage
+				// are running; keep activation conditional on a complete shell.
+				for (const url of PWA_PRECACHE_URLS) {
+					const response = await fetch(url, { cache: 'reload' });
+					if (!response.ok) throw new Error('Offline asset unavailable: ' + url);
+					await cache.put(url, response);
+				}
 			})
 	);
 });
@@ -111,12 +120,16 @@ self.addEventListener('fetch', function(event) {
 });
 
 self.addEventListener('push', function(event) {
-	var payload = event.data ? event.data.json() : {};
+	var payload = {};
+	try { payload = event.data ? event.data.json() : {}; } catch {}
 	var notification = payload.notification || payload;
 	var notificationData = notification.data || {};
 	event.waitUntil(
-		self.registration.showNotification(notification.title || 'Reminder', {
-			body: notification.body || '',
+		(async function() {
+		var display = notificationData.encrypted && typeof crateEncryptedPush !== 'undefined'
+			? await crateEncryptedPush.decryptPushDisplay(notificationData.encrypted) : null;
+		return self.registration.showNotification(display ? display.title : notificationData.encrypted ? 'Crate reminder' : notification.title || 'Reminder', {
+			body: display ? display.body : notificationData.encrypted ? 'Open Crate to view your reminder' : notification.body || '',
 			tag: notification.tag || 'crate-reminder',
 			icon: notification.icon || '/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}',
 			data: {
@@ -124,7 +137,8 @@ self.addEventListener('push', function(event) {
 				reminderId: notificationData.reminderId || payload.reminderId || '',
 				navigate: notification.navigate || '',
 			},
-		})
+		});
+		})()
 	);
 });
 

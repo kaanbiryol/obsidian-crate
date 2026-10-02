@@ -35,6 +35,7 @@ export function recordSyncHistory(
 }
 
 export function resetStoredSyncState(settings: CrateSettings): void {
+	delete settings.checkpointScope;
   settings.lastSeq = 0;
   settings.lastSync = null;
   settings.syncHistory = [];

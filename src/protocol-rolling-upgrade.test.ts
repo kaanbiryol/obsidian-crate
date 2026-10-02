@@ -21,12 +21,12 @@ it('the current plugin negotiates protocol 1 for an ordinary mutation on the bas
 });
 
 it('the current PWA negotiates protocol 1 without altering a saved operation body', async () => {
-	vi.stubGlobal('localStorage', { getItem: () => 'token' });
-	const network = vi.fn(async (path: string, _init?: RequestInit) => Response.json(path === '/.well-known/crate' ? baselineServer : { success: true }));
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'crate-auth-token' ? 'token' : null });
+	const network = vi.fn(async (path: string, _init?: RequestInit) => path === '/encryption' ? new Response(null, { status: 404 }) : Response.json(path === '/.well-known/crate' ? baselineServer : { success: true }));
 	vi.stubGlobal('fetch', network);
 	const body = JSON.stringify({ operationId: 'e1_00020707_00000000-0000-4000-8000-000000000001', id: 'e1_00020707_00000000-0000-4000-8000-000000000001', folderPath: 'Reminders', content: 'Saved offline' });
 	await makeApiFetch('token', vi.fn())('/reminders/create', { method: 'POST', body });
-	const init = network.mock.calls[1]![1];
+	const init = network.mock.calls.find(([path]) => path === '/reminders/create')![1];
 	expect(new Headers(init?.headers).get('X-Crate-Protocol')).toBe('1');
 	expect(init?.body).toBe(body);
 });

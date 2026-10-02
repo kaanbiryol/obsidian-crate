@@ -1,6 +1,10 @@
-import { parseJsonObject } from './utils';
-
 const ROUTES = new Set([
+  'POST /notifications/reminders-enrollment-token', 'POST /notifications/subscribe', 'DELETE /notifications/subscribe',
+  'DELETE /auth/tokens', 'DELETE /auth/session',
+  'POST /sync/checkpoints',
+  'POST /sync/import/prune',
+  'PUT /settings',
+  'POST /reminders/encrypted-commit',
   'POST /sync/import/complete',
   'POST /sync/delete', 'POST /sync/batch-delete', 'POST /sync/restore-version',
   'POST /reminders/create', 'POST /reminders/update', 'POST /reminders/set-completed',
@@ -11,15 +15,6 @@ const ROUTES = new Set([
 /** Uploads coordinate individual Markdown commits after staging; binary changes need no wake. */
 export async function affectsNotifications(request: Request): Promise<boolean> {
   const path = new URL(request.url).pathname;
-  if (!ROUTES.has(`${request.method} ${path}`)) return false;
-  if (path === '/sync/import/complete') return true;
-  if (!path.startsWith('/sync/')) return true;
-  const body = await parseJsonObject(request.clone());
-  if (!body.ok) return false; // The route returns the validation error without scheduling work.
-  if (path === '/sync/batch-delete') {
-    const files = body.value.files;
-    return Array.isArray(files) && files.some((file: unknown) => file !== null && typeof file === 'object'
-      && 'path' in file && typeof file.path === 'string' && file.path.toLowerCase().endsWith('.md'));
-  }
-  return typeof body.value.path === 'string' && body.value.path.toLowerCase().endsWith('.md');
+  if (path === '/encryption/reset' || path.startsWith('/encryption/conversion')) return true;
+  return ROUTES.has(`${request.method} ${path}`);
 }

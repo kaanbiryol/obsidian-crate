@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from './outbox';
-import { exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY, type ReadingSession } from './storage';
+import { assertReadingSession, exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY, type ReadingSession } from './storage';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 const download = vi.hoisted(() => vi.fn());
 vi.mock('../download', () => ({ downloadJson: download }));
+vi.mock('../encryption-keys', () => ({ exportWrappedLocalKeys: async () => [] }));
 vi.mock('idb', () => ({ openDB: async () => ({
   get: async (_store: string, key: string) => values.get(key),
   getAllKeys: async () => [...values.keys()],
@@ -24,6 +25,12 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn());
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('rejects stale folder authority even when the saved credential and generation are unchanged', () => {
+  expect(() => assertReadingSession(session)).not.toThrow();
+  vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify({ ...session, folderPath: 'Other reading' }) : null });
+  expect(() => assertReadingSession(session)).toThrow('Reading sign-in changed');
+});
 
 it('retains the exact dispatched bytes and unknown metadata during validation', async () => {
   const saved = { ...command(), futureMetadata: { label: '保留' } };
@@ -53,7 +60,7 @@ it.each([
   expect(fetch).not.toHaveBeenCalled();
   expect(values.get(`pending:${session.id}`)).toBe(original);
   await exportReadingData();
-  expect(download).toHaveBeenCalledWith('crate-reading-recovery.json', { format: 1, origin: 'https://crate.example', data: { [`pending:${session.id}`]: original } });
+  expect(download).toHaveBeenCalledWith('crate-reading-recovery.json', { format: 2, origin: 'https://crate.example', data: { [`pending:${session.id}`]: original }, wrappedKeys: [], unreadable: [] });
 });
 
 it('rejects duplicate identities and null queues without interpreting them as empty', async () => {

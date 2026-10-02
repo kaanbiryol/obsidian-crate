@@ -38,7 +38,7 @@ describe('Crate protocol contract', () => {
 	it('requires the plugin and server compatibility ranges to overlap', () => {
 		expect(areProtocolRangesCompatible(
 			CRATE_PLUGIN_PROTOCOL,
-			{ current: 2, oldestCompatible: 2 },
+			{ current: CRATE_PLUGIN_PROTOCOL.current + 1, oldestCompatible: CRATE_PLUGIN_PROTOCOL.current + 1 },
 		)).toBe(false);
 		expect(areProtocolRangesCompatible(
 			{ current: 3, oldestCompatible: 2 },

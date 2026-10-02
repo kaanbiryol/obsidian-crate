@@ -43,7 +43,15 @@ function AuthLayout({ title, description, notice, config, children }: {
 	);
 }
 
-export function EmptyAuthState({ config }: { config: StoredConfig }) {
+interface SessionResetProps { onLogout?: () => void; loggingOut?: boolean }
+function SessionReset({ onLogout, loggingOut }: SessionResetProps) {
+	return onLogout ? <>
+		<p>If encryption was turned off in Obsidian, log out to discard this browser’s saved keys, drafts and pending edits before opening a fresh app link.</p>
+		<Button className="secondary-button" type="button" disabled={loggingOut} onClick={onLogout}>Log out</Button>
+	</> : null;
+}
+
+export function EmptyAuthState({ config, ...reset }: { config: StoredConfig } & SessionResetProps) {
 	return (
 		<AuthLayout
 			title="Connect to Crate"
@@ -53,11 +61,12 @@ export function EmptyAuthState({ config }: { config: StoredConfig }) {
 			config={config}
 		>
 			<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
+			<SessionReset {...reset} />
 		</AuthLayout>
 	);
 }
 
-export function ErrorState({ error, config, onRetry }: { error: string; config: StoredConfig; onRetry: () => void }) {
+export function ErrorState({ error, config, onRetry, ...reset }: { error: string; config: StoredConfig; onRetry: () => void } & SessionResetProps) {
 	const needsCleanup = /clear this site[’']s data|remote cleanup could not finish/i.test(error);
 	const needsLink = /enrollment token|session expired|not authenticated|unauthorized|missing auth token/i.test(error);
 	return (
@@ -92,6 +101,7 @@ export function ErrorState({ error, config, onRetry }: { error: string; config: 
 					<Button className="secondary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 				</>
 			)}
+			<SessionReset {...reset} />
 		</AuthLayout>
 	);
 }

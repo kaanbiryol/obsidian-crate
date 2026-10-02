@@ -43,6 +43,8 @@ export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 		pwaClient = await readGeneratedPwaClient();
 	}
 
+	const encryptedPush = await build({ entryPoints: [resolve('src/pwa/encrypted-push.ts')], bundle: true,
+		format: 'iife', globalName: 'crateEncryptedPush', platform: 'browser', target: 'es2022', write: false, minify: true });
 	const pwaBundle = await build({
 		stdin: {
 			contents: "export * from './src/cloudflare/worker/pwa'; export { CRATE_PLUGIN_PROTOCOL } from './src/protocol';",
@@ -56,6 +58,7 @@ export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 		target: 'es2020',
 		write: false,
 		define: {
+			__CRATE_ENCRYPTED_PUSH_JS__: JSON.stringify(encryptedPush.outputFiles[0].text),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaClient.version),
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClient.assets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(pwaClient.startupAssets),

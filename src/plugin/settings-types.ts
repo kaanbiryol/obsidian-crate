@@ -10,6 +10,8 @@ export interface CrateSettings {
 	usageSnapshot?: UsageSnapshot | null;
 	automaticSync: boolean;
 	workerUrl: string;
+	/** Retain local journals only across an authenticated address change of the same vault. */
+	checkpointScope?: { workerUrl: string; authority: string };
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	lastSync: string | null;
 	lastSeq: number;
@@ -59,6 +61,10 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 export const SECRET_KEYS = {
 	AUTH_TOKEN: 'crate-auth-token',
 	DEVICE_ID: 'crate-device-id',
+	ENCRYPTION_KEYS: 'crate-encryption-keys',
+	ENCRYPTION_RESET: 'crate-encryption-reset',
+	ENCRYPTION_FOLDER_MOVES: 'crate-encryption-folder-moves',
+	ENCRYPTION_RECOVERY: 'crate-encryption-recovery',
 } as const;
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS] | `crate-analytics-${string}` | `crate-usage-oauth-${string}`;

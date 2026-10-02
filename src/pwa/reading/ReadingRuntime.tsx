@@ -10,6 +10,7 @@ import { logoutReadingApp } from './logout';
 import { assertReadingSession, exportReadingData } from './storage';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
+import { readingKeys } from './encryption-session';
 
 
 const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ default: module.ShortcutSetup })));
@@ -18,7 +19,7 @@ function useReadingController() {
   const enabled = useSharedFeatures().reading;
   const showToast = useSyncFeedback();
   const connection = useReadingSession(enabled);
-  const { session, ready, connecting, cache, pending, error, setError, recovery, connectionState,
+  const { session, lockedSession, ready, connecting, cache, pending, error, setError, recovery, connectionState,
     adding, connect, resetSession } = connection;
   const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection, enabled);
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,8 @@ function useReadingController() {
   const readingDisabled = !session && connectionState !== 'available';
   useFeatureSettings('reading', {
     ready: ready && !connecting, connected: Boolean(session), enabled, pendingCount: pending.length,
+    encryption: lockedSession ? { status: 'locked', folderPath: lockedSession.folderPath }
+      : session ? { status: readingKeys() ? 'ready' : 'legacy', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
     retryAt: Math.min(...pending.flatMap(op => op.retryAt !== undefined && !op.review && (op.attempts ?? 0) < 3 ? [op.retryAt] : [])),
     status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
     updateContentReady: ready && !connecting && (!enabled || !session || Boolean(cache) || Boolean(error)),

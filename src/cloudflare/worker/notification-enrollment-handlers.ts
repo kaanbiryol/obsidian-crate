@@ -6,6 +6,7 @@ import { getOrCreateVapidKeys } from './push';
 import { parseJsonObject, parseOptionalString } from './utils';
 import { issueWebEnrollmentToken } from './web-enrollment';
 import { changedRows } from './db';
+import { readEncryptionState } from './encryption-state';
 
 const REMINDERS_AUTH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -19,6 +20,8 @@ export async function handleCreateRemindersEnrollmentToken(db: D1Database, reque
 	if (!parsed.ok) return parsed.response;
 	const folderPath = parseFolderPath(parsed.value.folderPath);
 	if (!folderPath) return corsResponse({ error: 'folderPath required' }, 400);
+	const encryption = await readEncryptionState(db);
+	if (encryption && !encryption.scopes.some(scope => scope.folderPath === folderPath)) return corsResponse({ error: 'This folder was not included when encryption was enabled.' }, 409);
 	const installEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	const browserEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	return corsResponse({

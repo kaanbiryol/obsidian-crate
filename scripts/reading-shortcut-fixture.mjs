@@ -3,7 +3,7 @@ import { DOMParser } from 'linkedom';
 import { readingShortcutTemplate } from './reading-shortcut-template.mjs';
 
 // Read the release source on every test platform, including Linux CI.
-const document = new DOMParser().parseFromString(await readFile(new URL('../docs/shortcuts/save-to-crate.plist', import.meta.url), 'utf8'), 'text/xml');
+const parseSource = async path => plist(new DOMParser().parseFromString(await readFile(new URL(path, import.meta.url), 'utf8'), 'text/xml').documentElement.firstElementChild);
 function plist(element) {
   const children = [...element.children];
   switch (element.localName) {
@@ -17,7 +17,9 @@ function plist(element) {
     default: throw new Error(`Unsupported shortcut plist value: ${element.localName}`);
   }
 }
-export const shortcutSource = plist(document.documentElement.firstElementChild);
+// Frozen source for compatibility tests of already distributed native captures.
+export const shortcutSource = await parseSource('../tests/fixtures/reading-shortcut-v1.plist');
+export const privateShortcutSource = await parseSource('../docs/shortcuts/save-to-crate.plist');
 export const shortcutTemplate = readingShortcutTemplate(shortcutSource);
 export const shortcutIdentifier = action => action.WFWorkflowActionIdentifier.replace('is.workflow.actions.', '');
 

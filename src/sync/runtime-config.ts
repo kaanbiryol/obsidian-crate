@@ -2,10 +2,12 @@ import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../plugin/secret-storage";
 import { SECRET_KEYS, type CrateSettings, type SharedSettings } from '../plugin/settings-types';
 import { requireNormalizedWorkerUrl } from "./worker-url";
+import type { VaultKeyBundle } from '../encryption/key-bundle';
 
 interface ApplyInfrastructureConfigInput {
   workerUrl: string;
   authToken: string;
+  encryption?: { bundle: VaultKeyBundle; recovery: string };
 }
 
 /** Caller must stop the old engine and await its checkpoint I/O first. */
@@ -65,7 +67,10 @@ export function clearSyncConfigurationState(
   settings: CrateSettings,
   secretStorage: SecretStorageService,
 ): void {
-  secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
+  for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY, SECRET_KEYS.AUTH_TOKEN]) {
+    secretStorage.delete(key);
+    if (secretStorage.get(key)) throw new Error('Could not remove this device’s previous sync credentials');
+  }
   settings.workerUrl = "";
 }
 

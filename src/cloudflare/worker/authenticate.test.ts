@@ -11,7 +11,7 @@ function createDb(tokenHash: string, row: { id: string; scope: string; folder_pa
 					statement.args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path, reading_generation, expires_at FROM auth_tokens')
+				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path,') && sql.includes('FROM auth_tokens')
 					&& statement.args[0] === tokenHash
 					? row
 					: null),
@@ -34,7 +34,7 @@ describe('worker authentication principals', () => {
 			db as never,
 		);
 
-		expect(result).toEqual({ principal: { tokenId: 'pwa-id', scope: 'reminders', folderPath: 'Reminders' } });
+		expect(result).toEqual({ principal: { tokenId: 'pwa-id', scope: 'reminders', folderPath: 'Reminders' }, resetGeneration: null });
 		expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('expires_at > ?'));
 	});
 

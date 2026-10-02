@@ -41,7 +41,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const dialog = page.getByRole('dialog', { name: 'Set up iPhone shortcut' });
     await expect(dialog).toBeVisible().catch(async error => { console.error('Setup page:', await page.locator('body').innerText(), errors); throw error; });
     const download = dialog.getByRole('link', { name: 'Download Save to Crate' });
-    await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v1/Save%20to%20Crate%20(iOS%2027).shortcut');
+    await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v2/Save%20to%20Crate%20(iOS%2027).shortcut');
     await expect(download).toHaveAttribute('rel', 'noopener noreferrer');
     await mkdir('test-results/reading', { recursive: true });
     await page.screenshot({ path: `test-results/reading/${name}-shortcut-start.png`, fullPage: true, animations: 'disabled' });

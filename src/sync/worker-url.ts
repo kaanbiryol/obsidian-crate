@@ -1,4 +1,5 @@
 import { createLogger } from '../plugin/logger';
+import type { CrateSettings } from '../plugin/settings-types';
 
 const logger = createLogger('WorkerUrl');
 const LOCALHOST_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
@@ -41,4 +42,11 @@ export function requireNormalizedWorkerUrl(workerUrl: string): string {
 		throw new Error('Worker URL must use HTTPS (or localhost over HTTP) and be a valid URL');
 	}
 	return normalized;
+}
+
+/** A verified relocation changes transport, not ownership of pending disk work. */
+export function getCheckpointAuthority(settings: Pick<CrateSettings, 'workerUrl' | 'checkpointScope'>): string {
+	const workerUrl = normalizeWorkerUrl(settings.workerUrl);
+	return settings.checkpointScope?.workerUrl === workerUrl
+		? requireNormalizedWorkerUrl(settings.checkpointScope.authority) : workerUrl;
 }

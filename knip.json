@@ -8,7 +8,8 @@
 		"tests/editor-contract/fixture.tsx",
 		"tests/editor-contract/*.spec.ts",
 		"tests/editor-contract/*.config.{ts,mts}",
-		"tests/reading-extraction/*.ts"
+		"tests/reading-extraction/*.ts",
+		"src/pwa/encrypted-push.ts!"
 	],
 	"project": [
 		"tests/visual/**/*.{ts,tsx}",

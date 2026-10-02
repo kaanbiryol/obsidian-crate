@@ -12,7 +12,7 @@ import {
 	saveConfig,
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
-import { exchangeEnrollmentToken } from '../api';
+import { exchangeEnrollmentToken, makeApiFetch } from '../api';
 import { loadCachedReminderSnapshot } from '../reminder-cache';
 import { scopeLegacyReminderDrafts } from '../reminder-drafts';
 import type { CachedReminderSnapshot, ShowToast, StartTab, StoredConfig } from '../types';
@@ -131,6 +131,8 @@ export function usePwaBootstrap({
 					resetReminderState();
 					return;
 				}
+				await makeApiFetch(nextToken, () => { void suspendLocalSession(); }).ready();
+				if (cancelled || !sessionCurrent()) return;
 
 				const cached = await loadCachedReminderSnapshot(nextConfig.folderPath);
 				if (cancelled || !sessionCurrent()) return;

@@ -56,11 +56,11 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showSync) {
-			renderSyncSection({
+			this.cleanupFns.push(renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.update(),
-			});
+			}));
 		}
 
 		if (isConfigured) renderCrateWebApp(containerEl, this.plugin);

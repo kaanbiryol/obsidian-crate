@@ -3,6 +3,10 @@ import { capturePwaSession } from './session-generation';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
+import { preparePwaEncryption, encryptionSnapshot } from './encryption-session';
+import type { EncryptedReminderApi } from './encrypted-reminder-api';
+import type { StoredReminderKeys } from './encryption-keys';
+import { EncryptionScopeChangedError, routeFolderRequest } from './encryption-folder-routing';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleServer();
@@ -26,7 +30,10 @@ export async function exchangeEnrollmentToken(token: string, previousAuthToken: 
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	const sessionCurrent = capturePwaSession();
 	const clientSession = crypto.randomUUID();
-	return async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+	let keys: StoredReminderKeys | null = null;
+	let encrypted: EncryptedReminderApi | null = null;
+	let preparing: Promise<void> | undefined;
+	async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
 		if (!authToken) throw new Error('Not authenticated');
 		// Capture authority at invocation. Only revocation may finish dispatching
@@ -45,6 +52,10 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleServer()));
 		if (!sessionCurrent() && !revokingSession) throw new Error('Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
+		if (keys) {
+			headers.set('X-Crate-Encryption-Vault', keys.vaultId);
+			headers.set('X-Crate-Encryption-Generation', String(keys.generation));
+		}
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 
 		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) });
@@ -55,8 +66,35 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			onUnauthorized();
 			throw new Error('Session expired. Open a fresh link from Crate.');
 		}
+		if (keys && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
 		return response;
-	};
+	}
+	function ready(refresh = false): Promise<void> {
+		if (!authToken) return Promise.resolve();
+		if (refresh) preparing = undefined;
+		return preparing ??= preparePwaEncryption(authToken, rawFetch, refresh).then(async value => {
+			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;
+			if (!sessionCurrent()) throw new Error('Session changed before unlocking');
+			keys = value;
+			encrypted = keys && Constructor ? new Constructor(keys, rawFetch) : null;
+		}).finally(() => { if (!keys) preparing = undefined; });
+	}
+	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
+		if (path === '/encryption' || (path === '/auth/session' && init.method === 'DELETE')) return rawFetch(path, init);
+		for (let attempt = 0; ; attempt++) {
+			await ready(attempt > 0);
+			try {
+				if (encrypted) {
+					const response = await encrypted.handle(path, init);
+					if (response) return response;
+				}
+				const routed = keys ? routeFolderRequest(path, init, keys.localFolderPath ?? keys.folderPath, keys.folderPath) : { path, init };
+				return await rawFetch(routed.path, routed.init);
+			} catch (error) { if (!(error instanceof EncryptionScopeChangedError) || attempt > 0) throw error; }
+		}
+	}
+	return Object.assign(apiFetch, { ready });
 }
 
 export async function fetchPwaAssetVersion(): Promise<string | null> {
@@ -95,7 +133,7 @@ export async function getPwaPushManager({
 	windowPushManager = getWindowPushManager(),
 	registerServiceWorker = registerPwaServiceWorker,
 }: PwaPushManagerOptions = {}): Promise<PushManager | null> {
-	if (windowPushManager) return windowPushManager;
+	if (windowPushManager && encryptionSnapshot().status === 'legacy') return windowPushManager;
 	const registration = await registerServiceWorker();
 	return registration?.pushManager ?? null;
 }

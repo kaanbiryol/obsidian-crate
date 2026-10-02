@@ -5,8 +5,10 @@ import { drainReading, queueReading } from './outbox';
 import { pendingReading, writeValue } from './storage';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('./storage', () => ({
 	READING_SESSION_KEY: 'reading-session',
+  pruneReadingAttempts: vi.fn(async () => {}),
 	assertReadingSession: () => { if (!storage.current) throw new Error('Reading sign-in changed.'); },
 	readingLock: async <T>(action: () => Promise<T>) => action(),
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),

@@ -1,3 +1,4 @@
+import { readEncryptionState } from '../encryption-state';
 import { limitNotificationAction } from '../rate-limit';
 import { changedRows } from '../db';
 import { sha256Hex } from '../auth';
@@ -17,6 +18,8 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
   if (existing && folder !== existing.folder_path) {
     if (existing.enabled || body.enabled || await db.prepare('SELECT 1 FROM reading_jobs UNION ALL SELECT 1 FROM reading_captures LIMIT 1').first()) throw new ReadingError('Let pending extraction finish, then turn off article fetching before changing its folder.', 409);
   }
+  const encryption = await readEncryptionState(db);
+  if (encryption && !encryption.scopes.some(scope => scope.folderPath === folder && scope.purpose === 'reading')) throw new ReadingError('Select the Reading folder included in encryption setup.', 409);
   const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
     generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };
   await db.prepare(`INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)

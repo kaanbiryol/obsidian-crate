@@ -29,7 +29,7 @@ async function setup(connected = true, enabled = true) {
 	const plugin = {
 		app: { workspace: { detachLeavesOfType: vi.fn() } },
 		remindersSettings: { enabled: true },
-		secretStorage: { get: () => 'synthetic' },
+		secretStorage: { get: (key: string) => key === 'crate-auth-token' ? 'synthetic' : null },
 		settings: { reading: { enabled, folderPath: 'Reading' }, workerUrl: connected ? 'https://crate.example' : '' },
 		writeSettings: vi.fn(async ({ reading }: { reading: { enabled: boolean; folderPath: string } }) => { plugin.settings.reading = reading; }),
 	};

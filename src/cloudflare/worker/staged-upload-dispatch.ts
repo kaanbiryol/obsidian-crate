@@ -5,6 +5,7 @@ import { FileNamespaceConflictError } from './file-namespace';
 import type { Env } from './types';
 import { isReminderPath } from './reminder-scope';
 import { getNotificationPolicy } from './notification-policy';
+import { readEncryptionState } from './encryption-state';
 
 type UploadParams = Parameters<typeof commitStagedFile>[2];
 export type CommitUpload = typeof commitStagedFile;
@@ -30,7 +31,7 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
   const metadata = await request.json() as Omit<UploadParams, 'content'>;
   const policy = await getNotificationPolicy(env.DB);
   metadata.reminderPolicyRevision = policy?.revision ?? null;
-  if (!isReminderPath(metadata.path, policy?.folderPath ?? null)) return { ...metadata, content: new ArrayBuffer(0) };
+  if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
   const object = await env.BUCKET.get(metadata.objectKey);
   if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
   const content = await object.arrayBuffer();

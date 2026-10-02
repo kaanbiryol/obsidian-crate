@@ -4,7 +4,7 @@ import { mountModalHeader } from './mountModalHeader';
 /** Obsidian owns focus and dismissal; Crate owns the shared header and body. */
 export abstract class SharedModal extends Modal {
 	protected bodyEl!: HTMLDivElement;
-	private unmountHeader?: () => void;
+	private unmountHeader?: ReturnType<typeof mountModalHeader>;
 
 	protected openLayout(title: string): void {
 		this.modalEl.addClass('crate-shared-modal', 'crate-custom-modal-close');
@@ -13,6 +13,10 @@ export abstract class SharedModal extends Modal {
 		const header = this.contentEl.createDiv({ cls: 'crate-modal-header-host' });
 		this.unmountHeader = mountModalHeader(header, title, () => this.close());
 		this.bodyEl = this.contentEl.createDiv({ cls: 'crate-modal-body' });
+	}
+	protected setLayoutTitle(title: string): void {
+		this.setTitle(title);
+		this.unmountHeader?.setTitle(title);
 	}
 
 	onClose(): void {

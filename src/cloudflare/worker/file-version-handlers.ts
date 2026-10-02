@@ -5,9 +5,9 @@ import { isSyncRevision } from '@/protocol/sync-validation';
 import { corsResponse } from './cors';
 import { commitStagedFile } from './sync-mutations';
 import { FileNamespaceConflictError } from './file-namespace';
+import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../encryption/file-format';
 import {
 	createManagedObjectKey,
-	MAX_FILE_BYTES,
 	getStoredFileRow,
 	storedObjectMatchesMetadata,
 } from './sync-storage';
@@ -56,7 +56,7 @@ export async function handleRestoreFileVersion(
 	if (version.path !== path) return corsResponse({ error: 'Retained version does not belong to the requested path' }, 409);
 
 	const object = await bucket.get(version.storage_key);
-	if (!object || object.size > MAX_FILE_BYTES || !storedObjectMatchesMetadata(object, {
+	if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType) || !storedObjectMatchesMetadata(object, {
 		hash: version.hash,
 		size: version.size,
 		storageKey: version.storage_key,
@@ -72,7 +72,7 @@ export async function handleRestoreFileVersion(
 	// Expiry cleanup may already own the retained key. Never make it live again.
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
-		await trackStagedUpload(db, objectKey, path);
+		await trackStagedUpload(db, objectKey, path, object.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE);
 	await bucket.put(objectKey, content, {
 			httpMetadata: object.httpMetadata,
 			customMetadata: { hash: version.hash },

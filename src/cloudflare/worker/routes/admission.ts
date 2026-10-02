@@ -8,6 +8,13 @@ const assets = new Set([
 		'open-obsidian', 'open-obsidian.js', 'save-reading', 'save-reading.js'].map(name => `/notifications/${name}`),
 ]);
 const api = new Set([
+	...['', '/capture-recovery', '/upload-receipt', '/deletion-precondition', '/folders', '/reset', '/conversion', '/conversion/file', '/conversion/settings', '/conversion/checkpoints'].map(suffix => `GET /encryption${suffix}`),
+	...['/metadata', '/reset', '/conversion', '/conversion/finish'].map(suffix => `POST /encryption${suffix}`),
+	...['file', 'settings', 'receipt', 'checkpoint', 'reading-capture'].map(name => `PUT /encryption/conversion/${name}`),
+	...['files', 'file', 'receipt'].map(name => `GET /reminders/encrypted-${name}`),
+	'POST /reminders/encrypted-commit',
+	'GET /reading/encryption', 'GET /reading/encrypted-receipt',
+	'GET /reading/encrypted-files', 'GET /reading/encrypted-file', 'POST /reading/encrypted-commit',
 	'GET /health', 'GET /diagnostics', 'GET /settings', 'PUT /settings', 'GET /features', 'POST /features',
 	'GET /auth/tokens', 'DELETE /auth/tokens', 'DELETE /auth/session', 'POST /links/title',
 	...['checkpoints', 'checkpoint', 'checkpoint-file', 'check', 'changes', 'manifest', 'download', 'version-preview', 'versions'].map(name => `GET /sync/${name}`),

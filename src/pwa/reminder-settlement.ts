@@ -4,6 +4,7 @@ import { mergeReminderRecord } from './reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from './reminder-list-state';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ReminderRecord } from './types';
+import { sealPrivateValue, openPrivateValue } from './private-storage';
 
 interface ReminderSettlement {
 	version: 1;
@@ -32,14 +33,14 @@ export async function createReminderSettlementChannel(authToken: string, folderP
 				recordId: change.recordId, previousRevision: body.expectedRevision, project: change.project,
 				orderedIds: change.orderedIds, expectedOrder: body.expectedOrder, reminder: result.reminder };
 			try {
-				localStorage.setItem(key, JSON.stringify(settlement));
+				localStorage.setItem(key, sealPrivateValue(JSON.stringify(settlement), key));
 				localStorage.removeItem(key);
 			} catch { throw new Error('Could not share the confirmed change with other tabs. Free up browser storage and retry.'); }
 		},
 		read(event: Pick<StorageEvent, 'key' | 'newValue'>): ReminderSettlement | null {
 			if (event.key !== key || !event.newValue) return null;
 			try {
-				const value = JSON.parse(event.newValue) as Partial<ReminderSettlement> | null;
+				const value = JSON.parse(openPrivateValue(event.newValue, key)) as Partial<ReminderSettlement> | null;
 				if (!value || value.version !== 1 || typeof value.operationId !== 'string'
 					|| !/^[a-zA-Z0-9_-]{16,128}$/.test(value.operationId)
 					|| (value.previousRevision !== undefined && typeof value.previousRevision !== 'string')) return null;

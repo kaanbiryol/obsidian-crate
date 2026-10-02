@@ -61,6 +61,25 @@ class ArchiveTests(unittest.TestCase):
         db.close()
     def tearDown(self):
         self.temp.cleanup()
+    def test_encrypted_configuration_descriptors_and_settings_survive_restore(self):
+        values = {'e2ee:state': '{"version":1,"mode":"active","recovery":{"envelope":"opaque"}}',
+                  'e2ee:file:retained-revision': '{"metadata":"encrypted descriptor"}',
+                  'e2ee:settings': '{"settings":{"envelope":"encrypted settings"}}'}
+        database = load_database(self.remote.sql)
+        for key, value in values.items():
+            database.execute('INSERT INTO maintenance_state(key, value) VALUES (?, ?)', (key, value))
+        database.commit()
+        self.remote.sql = '\n'.join(database.iterdump()).encode()
+        database.close()
+        recovery.backup(self.remote, self.directory)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        recovery.restore(target, self.directory)
+        restored = load_database(target.sql)
+        self.addCleanup(restored.close)
+        for key, value in values.items():
+            self.assertEqual(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone()[0], value)
+
     def test_paired_restore_preserves_bytes_and_receipts_and_resets_derived_state(self):
         self.remote.sql += b"\nINSERT INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', '20524');"
         recovery.backup(self.remote, self.directory)

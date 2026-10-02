@@ -1,4 +1,6 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
+import { EncryptionSettings } from './EncryptionSettings';
+
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { PwaPushStack } from './PwaPushStack';
@@ -121,6 +123,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 						{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
 						{reminderExport}
 					</SettingsSection></div>
+					<EncryptionSettings reading={reading} remindersConnected={Boolean(reminders?.connected)} />
 					{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
 					<SettingsSection title="About">
 						<VersionSettings />

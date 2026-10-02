@@ -3,6 +3,7 @@ import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../sy
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
+import { SECRET_KEYS } from '../../plugin/settings-types';
 
 export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }: ConfigSectionContext): void {
 	if (!plugin.syncRuntime.isConfigured() || plugin.settings.cloudflareDeployment) return;
@@ -16,7 +17,9 @@ export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }
 			errorEl.hidden = true;
 			try {
 				await updateSelfHostedServerAddress(plugin, address);
-				new Notice('Server address updated. Sync your vault, then create a new link to enroll the web app.');
+				new Notice(plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)
+					? 'Server address updated. Open Manage encryption to resume the reset.'
+					: 'Server address updated. Sync your vault, then create a new link to enroll the web app.');
 				rerender();
 			} catch (error) {
 				errorEl.setText(selfHostedConnectionMessage(error, address));

@@ -57,11 +57,13 @@ jobs:
         run: node --test scripts/reading-shortcut.test.mjs
       - name: Build shortcut support page
         run: node scripts/build-shortcut-support.mjs
-      - name: Download the latest published shortcut
+      - name: Download both supported shortcut versions
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: node scripts/download-release-shortcut.mjs published site/shortcuts/v1
+        run: |
+          node scripts/download-release-shortcut.mjs published site/shortcuts/v1 --legacy
+          node scripts/download-release-shortcut.mjs published site/shortcuts/v2
       - name: Upload static site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

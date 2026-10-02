@@ -9,6 +9,8 @@ import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
+import { SECRET_KEYS } from '../plugin/settings-types';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
@@ -107,6 +109,13 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 		return;
 	}
 	registeredVaultHandlers.add(plugin);
+	const resumeFolders = () => {
+		if (!plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) return;
+		void resumeEncryptedFolderMoves(plugin).then(() => {
+			new Notice('Encrypted folders updated. Open fresh web app links to reconnect reading and reminders.');
+		}).catch(error => new Notice(`Folder move saved on this device. ${errorMessage(error)} Open Manage encryption to resume.`));
+	};
+	plugin.app.workspace.onLayoutReady(resumeFolders);
 
 	plugin.registerEvent(
 		plugin.app.vault.on('create', (file: TAbstractFile) => {
@@ -128,7 +137,11 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 
 	plugin.registerEvent(
 		plugin.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
-			plugin.syncRuntime.onFileRename(file, oldPath);
+			try {
+				if (queueEncryptedFolderMove(plugin, oldPath, file.path)) resumeFolders();
+				else plugin.syncRuntime.onFileRename(file, oldPath);
+			}
+			catch (error) { plugin.syncRuntime.destroy(); new Notice(`Could not update the encrypted folder: ${errorMessage(error)}`); }
 		}),
 	);
 
@@ -148,6 +161,7 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 	});
 
 	plugin.registerDomEvent(window, 'online', () => {
+		resumeFolders();
 		triggerForegroundSync('online');
 	});
 

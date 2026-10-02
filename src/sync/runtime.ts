@@ -8,13 +8,18 @@ import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
+import { loadEncryptionKeys, saveEncryptionKeys } from '../plugin/encryption-storage';
+import { createEncryptionReset, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError, verifyEncryptionResetAddress } from './encryption-reset';
+import type { EncryptionServerState } from '../encryption/server-state';
+import { WorkerApiHttpClient } from './worker-api/http';
+import { prepareEncryptedAddressChange } from './encrypted-connection';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
-import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from './worker-url';
+import { getCheckpointAuthority, normalizeWorkerUrl, requireNormalizedWorkerUrl } from './worker-url';
 import { buildDiagnosticExport } from './diagnostic-export';
 import {
 	applyInfrastructureConfigState,
@@ -211,7 +216,7 @@ export class SyncRuntime {
 		return this.startupSyncTask;
 	}
 
-	async initialize(options: { skipStartupSync?: boolean } = {}): Promise<void> {
+	async initialize(options: { skipStartupSync?: boolean; resumeEncryptionReset?: boolean } = {}): Promise<void> {
 		logger.info('Initializing sync engine');
 
 		const initializationRevision = ++this.initializationRevision;
@@ -228,12 +233,35 @@ export class SyncRuntime {
 
 		await this.stoppingWork;
 		if (this.initializationRevision !== initializationRevision) return;
+		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) {
+			this.apiClient = null;
+			this.initializationError = 'An encrypted folder move is unfinished. Open Manage encryption to resume on this device.';
+			this.emitCurrentState();
+			return;
+		}
+		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET) && !options.resumeEncryptionReset) {
+			this.apiClient = null;
+			this.initializationError = 'Encryption reset is unfinished. Open Manage encryption to resume on this device.';
+			this.emitCurrentState();
+			return;
+		}
 
 		this.apiClient = new SyncApiClient(
 			this.settings.workerUrl,
 			this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || ''
 		);
-		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
+		try {
+			const keys = loadEncryptionKeys(this.secretStorage);
+			if (keys) await this.apiClient.configureEncryption(keys);
+		} catch (error) {
+			if (this.initializationRevision !== initializationRevision) return;
+			this.initializationError = errorMessage(error);
+			this.apiClient = null;
+			this.statusBar?.update(this.getState());
+			throw error;
+		}
+		if (this.initializationRevision !== initializationRevision) return;
+		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, options.resumeEncryptionReset ? { ...this.settings, automaticSync: false } : this.settings);
 		const syncEngine = this.syncEngine;
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
@@ -346,6 +374,122 @@ export class SyncRuntime {
 		return task;
 	}
 
+	/** Keep the current connection stable and wait for local journal I/O before
+	 * moving its server into conversion. Failed conversions remain resumable. */
+	runEncryptionSetup(operation: () => Promise<void>): Promise<void> {
+		return this.changeConfiguration(async () => {
+			this.destroy();
+			await this.stoppingWork;
+			await operation();
+			await this.initialize({ skipStartupSync: true });
+		});
+	}
+
+	/** A durable checkpoint blocks ordinary sync until the remote reset, local
+	 * invalidation and reconciliation with the new server copy have finished. */
+	turnOffEncryption(state: EncryptionServerState | null, progress: (message: string) => void,
+		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
+		return this.changeConfiguration(async () => {
+			signal?.throwIfAborted();
+			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before turning encryption off.');
+			if (expected.workerUrl !== this.settings.workerUrl || expected.authToken !== this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) {
+				throw new Error('The server connection changed. Reopen Manage encryption.');
+			}
+			let reset = loadEncryptionReset(this.secretStorage);
+			if (reset && (reset.workerUrl !== this.settings.workerUrl || ![reset.oldToken, reset.replacementToken].includes(expected.authToken))) {
+				throw new Error('Reconnect the original server before resuming this reset');
+			}
+			if (!reset) {
+				if (!state) throw new Error('No encryption reset is pending');
+				const probeRevision = this.initializationRevision;
+				const probe = new WorkerApiHttpClient(expected.workerUrl, expected.authToken);
+				if (signal) probe.setAbortSignal(signal);
+				if (!(await probe.getServerInfo()).capabilities.includes('e2ee-reset-v1')) throw new Error('Update your Crate server before turning encryption off');
+				this.assertTransitionActive(probeRevision, signal);
+				if (expected.workerUrl !== this.settings.workerUrl || expected.authToken !== this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) throw new Error('The server connection changed. Reopen Manage encryption.');
+				reset = createEncryptionReset(this.settings.workerUrl, expected.authToken, state, this.settings.automaticSync);
+				saveEncryptionReset(this.secretStorage, reset);
+			}
+			this.destroy();
+			let revision = this.initializationRevision;
+			const verify = () => this.assertTransitionActive(revision, signal);
+			try {
+				await this.stoppingWork;
+				verify();
+				this.settings.automaticSync = false;
+				await this.persistSettings({ automaticSync: false });
+				verify();
+				if (reset.phase === 'remote') {
+					await resetRemoteEncryption(reset, progress, verify, token => {
+						const http = new WorkerApiHttpClient(expected.workerUrl, token);
+						if (signal) http.setAbortSignal(signal);
+						return http;
+					}, checkpoint => saveEncryptionReset(this.secretStorage, checkpoint));
+					verify();
+					reset = { ...reset, phase: 'local' };
+					saveEncryptionReset(this.secretStorage, reset);
+				}
+				if (reset.phase === 'local') {
+					progress('Clearing this device’s previous sync state…');
+					await deleteManifestFile(this.plugin, signal);
+					verify();
+					this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, reset.replacementToken);
+					if (this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== reset.replacementToken) throw new Error('Could not save the new device credential');
+					for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
+						this.secretStorage.delete(key);
+						if (this.secretStorage.has(key)) throw new Error('Could not clear this device’s previous encryption keys');
+					}
+					resetStoredSyncState(this.settings);
+					await this.persistSettings();
+					verify();
+					reset = { ...reset, phase: 'upload' };
+					saveEncryptionReset(this.secretStorage, reset);
+				}
+				revision++;
+				await this.initialize({ skipStartupSync: true, resumeEncryptionReset: true });
+				verify();
+				this.acceptingEvents = false;
+				const engine = this.syncEngine;
+				if (!engine || !this.apiClient) throw new Error('Could not start the new sync connection');
+				progress('Uploading this device’s vault without end-to-end encryption…');
+				// The wipe is complete. Another reconnected device may already have
+				// edited the new server copy; retries must retain the normal sync baseline.
+				const result = await engine.sync((current, total) => progress(`Syncing files: ${current} of ${total}`));
+				verify();
+				if (!result.success || result.conflicts.length) throw new Error('The server reset is complete, but uploading needs attention. Resume to retry the upload.');
+				if (!await this.pushSharedSettingsBestEffort()) throw new Error('Files were uploaded, but shared settings need to be retried. Resume the reset.');
+				verify();
+				await this.persistSettings({ automaticSync: reset.automaticSync });
+				verify();
+				this.secretStorage.delete(SECRET_KEYS.ENCRYPTION_RESET);
+				if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Could not clear the completed reset checkpoint');
+				this.settings.automaticSync = reset.automaticSync;
+				engine.updateSettings(this.settings);
+				this.acceptingEvents = true;
+				progress('Encryption is off. Reconnect your other devices and web apps.');
+			} catch (error) {
+				this.settings.automaticSync = false;
+				this.destroy();
+				if (error instanceof EncryptionResetRejectedError && reset.phase === 'remote') {
+					// The durable rejection marker makes cleanup retryable without another POST.
+					const cleanupRevision = this.initializationRevision;
+					this.assertTransitionActive(cleanupRevision, signal);
+					await this.persistSettings({ automaticSync: reset.automaticSync });
+					this.assertTransitionActive(cleanupRevision, signal);
+					this.secretStorage.delete(SECRET_KEYS.ENCRYPTION_RESET);
+					if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Could not clear the rejected reset checkpoint. Resume to retry.');
+					this.settings.automaticSync = reset.automaticSync;
+					this.initializationError = error.message;
+					this.emitCurrentState();
+					throw error;
+				}
+				this.initializationError = 'Encryption reset is unfinished. Open Manage encryption to resume.';
+				this.emitCurrentState();
+				throw error;
+			}
+		});
+	}
+
 	private assertTransitionActive(revision: number, signal?: AbortSignal): void {
 		signal?.throwIfAborted();
 		if (this.initializationRevision !== revision) throw new DOMException('Sync configuration changed during reset', 'AbortError');
@@ -367,6 +511,8 @@ export class SyncRuntime {
 		if (!this.acceptingEvents && !isConflictFile(file.path)) return;
 		this.syncEngine?.onFileDelete(file);
 	}
+
+	getRenameDependencies(): Record<string, string> { return this.syncEngine?.getRenameDependencies() ?? {}; }
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (this.plugin.app.workspace.layoutReady === false) return;
@@ -393,8 +539,86 @@ export class SyncRuntime {
 		}, FOREGROUND_SYNC_DEBOUNCE_MS);
 	}
 
+	/** Authenticate a changed transport address without losing pending disk work. */
+	updateEncryptedServerAddress(address: string, signal: AbortSignal, expected: { workerUrl: string; authToken: string }): Promise<void> {
+		return this.changeConfiguration(async () => {
+			const workerUrl = requireNormalizedWorkerUrl(address);
+			let revision = this.initializationRevision;
+			const verify = () => {
+				this.assertTransitionActive(revision, signal);
+				if (this.settings.cloudflareDeployment || this.settings.workerUrl !== expected.workerUrl || this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken) {
+					throw new Error('The server connection changed. Reopen settings and try again.');
+				}
+			};
+			verify();
+			const http = new WorkerApiHttpClient(workerUrl, expected.authToken);
+			http.setAbortSignal(signal);
+			const copy = await prepareEncryptedAddressChange(this.secretStorage, http, workerUrl);
+			verify();
+			if (workerUrl === expected.workerUrl) return;
+			this.destroy(); revision = this.initializationRevision;
+			await this.stoppingWork;
+			verify(); copy();
+			const previous = this.settings.checkpointScope;
+			this.settings.checkpointScope = { workerUrl, authority: getCheckpointAuthority(this.settings) };
+			this.settings.workerUrl = workerUrl;
+			try { await this.persistSettings(); }
+			catch (error) { this.settings.workerUrl = expected.workerUrl; this.settings.checkpointScope = previous; throw error; }
+			this.assertTransitionActive(revision, signal);
+			await this.initialize({ skipStartupSync: true });
+		});
+	}
+
+	/** Relocate only the same self-hosted reset, retaining both scopes until settings save. */
+	updateEncryptionResetAddress(address: string, signal?: AbortSignal): Promise<void> {
+		return this.changeConfiguration(async () => {
+			if (this.settings.cloudflareDeployment) throw new Error('Only self-hosted server addresses can be changed');
+			const reset = loadEncryptionReset(this.secretStorage);
+			if (!reset || reset.workerUrl !== this.settings.workerUrl) throw new Error('The pending reset connection changed. Reopen settings.');
+			const workerUrl = requireNormalizedWorkerUrl(address);
+			let revision = this.initializationRevision;
+			const verify = () => this.assertTransitionActive(revision, signal);
+			verify();
+			await verifyEncryptionResetAddress(reset, token => {
+				const http = new WorkerApiHttpClient(workerUrl, token);
+				if (signal) http.setAbortSignal(signal);
+				return http;
+			});
+			verify();
+			if (workerUrl === reset.workerUrl) return;
+			this.destroy();
+			revision = this.initializationRevision;
+			await this.stoppingWork;
+			verify();
+			const target = this.secretStorage.forScope(workerUrl);
+			const existing = loadEncryptionReset(target);
+			if (existing && existing.id !== reset.id) throw new Error('The new address has a different unfinished reset');
+			for (const key of [SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]) {
+				const value = this.secretStorage.get(key);
+				if (value) target.set(key, value); else target.delete(key);
+				if (target.get(key) !== value) throw new Error('Could not verify the moved reset credentials');
+			}
+			saveEncryptionReset(target, { ...reset, workerUrl });
+			// These records name the old URL. Preserve recovery copies and reconcile
+			// from scratch, rather than replaying old authority against the new address.
+			await deleteManifestFile(this.plugin, signal);
+			verify();
+			const oldUrl = this.settings.workerUrl;
+			this.settings.workerUrl = workerUrl;
+			resetStoredSyncState(this.settings);
+			try { await this.persistSettings(); }
+			catch (error) { this.settings.workerUrl = oldUrl; throw error; }
+			verify();
+			// The old scoped recovery copy is deliberately retained if saving or
+			// shutdown was interrupted. Only the persisted URL is active on restart.
+			this.emitCurrentState();
+		});
+	}
+
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal, expected?: ApplyInfrastructureConfigInput): Promise<void> {
 		return this.changeConfiguration(async () => {
+			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before changing this device’s connection.');
+			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this device’s connection.');
 			signal?.throwIfAborted();
 			if (expected && (this.settings.workerUrl !== expected.workerUrl || this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken)) {
 				throw new Error('The server connection changed. Reopen settings and try again.');
@@ -409,6 +633,7 @@ export class SyncRuntime {
 			if (changingServer) await deleteManifestFile(this.plugin, signal);
 			this.assertTransitionActive(revision, signal);
 			applyInfrastructureConfigState(this.settings, this.secretStorage, { ...config, workerUrl });
+			if (config.encryption) saveEncryptionKeys(this.secretStorage, config.encryption.bundle, config.encryption.recovery);
 			if (changingServer) resetStoredSyncState(this.settings);
 			await this.persistSettings();
 			this.assertTransitionActive(revision, signal);
@@ -418,6 +643,8 @@ export class SyncRuntime {
 
 	async clearSyncConfiguration(signal?: AbortSignal): Promise<void> {
 		return this.changeConfiguration(async () => {
+			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before disconnecting this device.');
+			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before disconnecting this device.');
 			signal?.throwIfAborted();
 			const api = this.apiClient;
 			this.destroy();
@@ -442,6 +669,7 @@ export class SyncRuntime {
 	}
 
 	updateSyncSettings(): void {
+		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) return;
 		this.syncEngine?.updateSettings(this.settings);
 		if (this.settings.automaticSync) this.clearServerCheck();
 		else this.scheduleServerCheck();
@@ -579,6 +807,7 @@ export class SyncRuntime {
 		progressCallback?: (current: number, total: number) => void,
 		logMessage?: string,
 	): Promise<SyncResult> {
+		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) return createSyncFailureResult('Open Manage encryption to finish the reset before syncing.');
 		if (this.stopSyncTask) return createSyncFailureResult('Sync is stopping. Try again when it finishes.');
 		if (!this.syncEngine) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 

@@ -26,7 +26,7 @@ const request = (path: string, id: string, body?: unknown, method = 'POST', prot
 });
 const subscription = (suffix: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`, keys: { p256dh: 'key', auth: 'auth' } });
 
-it.each(['', '2', '3', '4', '5', String(CRATE_PLUGIN_PROTOCOL.current + 1)])('rejects protocol %s before committing a mutation', async protocol => {
+it.each(['', '0', 'invalid', ...[1, 2, 3].map(offset => String(CRATE_PLUGIN_PROTOCOL.current + offset))])('rejects protocol %s before committing a mutation', async protocol => {
   await token('vault-token', 'vault', null);
   expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
   expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);

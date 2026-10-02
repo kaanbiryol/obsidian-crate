@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { ReadingCaptureOutbox, type CaptureStorage } from './capture-outbox';
+import { parseCaptureRecord, ReadingCaptureOutbox, type CaptureStorage } from './capture-outbox';
 function harness() {
 	const files = new Map<string, string>();
 	const storage: CaptureStorage = { list: async () => [...files.keys()], read: async key => files.get(key)!, write: async (key, value) => { files.set(key, value); }, remove: async key => { files.delete(key); } };
@@ -27,4 +27,13 @@ it('retains damaged and differently scoped records without sending them', async 
 it('does not report a successful save when storage fails', async () => {
 	const h = harness(); h.storage.write = async () => { throw new Error('Disk full'); };
 	await expect(h.open().add('https://example.com')).rejects.toThrow('Disk full');
+});
+it('keeps exact queued requests across an authenticated address relocation', async () => {
+  const h = harness(); await h.open('original authority').add('https://example.com/private');
+  const raw = [...h.files.values()][0]!;
+  const moved = new ReadingCaptureOutbox(h.storage, 'new authority', 'Reading', new AbortController().signal, ['original authority']);
+  const send = vi.fn(); await moved.drain([], send);
+  expect(send).toHaveBeenCalledWith(parseCaptureRecord(raw).body);
+  expect([...h.files.values()]).toEqual([raw]);
+  await expect(new ReadingCaptureOutbox(h.storage, 'new authority', 'Elsewhere', new AbortController().signal, ['original authority']).list()).rejects.toThrow('another server or folder');
 });

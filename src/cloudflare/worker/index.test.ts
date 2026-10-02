@@ -55,7 +55,7 @@ function createDb(
 					statement._args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => sql.includes('INSERT INTO request_rate_limits') ? { count: 1 } : sql.includes('SELECT id, scope, folder_path, reading_generation, expires_at FROM auth_tokens')
+				first: vi.fn(async () => sql.includes('INSERT INTO request_rate_limits') ? { count: 1 } : sql.includes('SELECT id, scope, folder_path,') && sql.includes('FROM auth_tokens')
 					? { id: 'authenticated-token', scope: options?.authenticatedScope ?? 'vault', folder_path: 'Reminders' }
 					: sql.startsWith('SELECT id FROM push_subscriptions WHERE endpoint = ?')
 						? [...subscriptions.values()].find(row => row.endpoint === statement._args[0]) ?? null

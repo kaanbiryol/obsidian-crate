@@ -17,7 +17,8 @@ const files = (extension = 'svg') => Array.from({ length: 4 }, (_, index) => ({
 }));
 const send = (payload: ReturnType<typeof files>) => handleBatchUpload(new Request('https://test/sync/batch-upload', {
   method: 'POST', body: JSON.stringify({ files: payload }),
-}), env.BUCKET, env.DB);
+// Production authentication supplies both snapshots before this handler runs.
+}), env.BUCKET, env.DB, undefined, undefined, null, null);
 
 it('uses one lease write and commit-returned receipts for a larger asset batch', async () => {
   const payload = files();

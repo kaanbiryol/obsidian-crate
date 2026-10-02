@@ -4,7 +4,10 @@ Automatic sync is off by default on new installs. Connecting a server, restartin
 Obsidian, editing files, and opening Sync activity or History do not start file
 transfers while it is off. Start a manual sync with **Crate: Sync - sync now** or
 enable **Automatic sync** in Crate settings. A manual sync leaves automatic sync
-off. Explicitly saved preferences are preserved when upgrading or restarting.
+off. Enabling encryption preserves this setting and does not trigger normal
+sync. Empty remotes activate encryption before the first file upload; existing
+remote files and retained versions are converted on the client. Pending local
+changes and upload receipts reconcile on the next encrypted sync. Explicitly saved preferences are preserved when upgrading or restarting.
 
 ## Sync Modes
 

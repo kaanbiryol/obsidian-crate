@@ -8,6 +8,7 @@ import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontma
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
+	privateFilenames?(): boolean;
 	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
 	pendingCaptures?(): Promise<ReadingItem[]>;
 	queueCapture?(url: string, title?: string): Promise<ReadingItem>;
@@ -126,7 +127,7 @@ export class ReadingLibrary {
 			const id = crypto.randomUUID();
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
-			const path = await readingCapturePath(this.folder, parseReadingNote(content)!.title, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
+			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? 'Article' : parseReadingNote(content)!.title, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
 			this.signal.throwIfAborted();
 			await this.vault.create(path, content);
 			await this.scan();
@@ -152,7 +153,7 @@ export class ReadingLibrary {
 				if (!file) throw new Error('This reading note was moved or deleted.');
 				const content = await this.vault.read(file), metadata = parseReadingNote(content), block = managedArticle(content);
 				if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
-					|| metadata.capture_method !== 'url' || metadata.extraction_status !== 'unavailable' || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
+					|| metadata.capture_method !== 'url' || !['unavailable', 'pending'].includes(metadata.extraction_status) || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
 				return file;
 			});
 			this.signal.throwIfAborted();

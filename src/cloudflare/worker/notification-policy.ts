@@ -5,6 +5,7 @@ import { changedRows } from './db';
 import { corsResponse } from './cors';
 import { parseJsonObject } from './utils';
 import { parseFolderPath } from './reminders-web/requests';
+import { readEncryptionState } from './encryption-state';
 
 export async function getNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
   const row = await db.prepare('SELECT enabled, folder_path, timezone, all_day_time, revision FROM notification_policy WHERE id = 1')
@@ -24,6 +25,8 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }); } catch { return corsResponse({ error: 'Invalid timezone' }, 400); }
   const reading = await db.prepare('SELECT folder_path FROM reading_policy WHERE id=1').first<{ folder_path: string }>();
   if (reading) { try { validateReadingFolder(reading.folder_path, folder); } catch { return corsResponse({ error: 'Choose separate Reading and reminders folders.' }, 400); } }
+  const encryption = await readEncryptionState(db);
+  if (encryption && !encryption.scopes.some(scope => scope.folderPath === folder)) return corsResponse({ error: 'Select a reminders folder included when encryption was enabled.' }, 409);
   const revision = crypto.randomUUID();
   const mutation = request.method === 'POST'
     ? db.prepare('INSERT INTO notification_policy (id, folder_path, timezone, all_day_time, revision, enabled) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0)

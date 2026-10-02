@@ -9,18 +9,36 @@ import { assertUniqueReminderSources } from './reminder-source-identity';
 import { getStoredFileRow } from './sync-storage';
 import { readStoredMarkdownFiles } from './storage';
 import { getNotificationPolicy } from './notification-policy';
-import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError } from './reminder-source-parse';
-import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache';
+import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from './reminder-source-parse';
 import { hasVerifiedReminderSource } from './reminder-source-state';
 import type { Env } from './types';
 import type { RemoteReminderRecord } from './reminders-web/types';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import { isReminderPath } from './reminder-scope';
+import { readEncryptionState } from './encryption-state';
 
 export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDate' | 'dueDatetime'>, policy: NotificationPolicy): string | undefined {
   if (reminder.dueDatetime) return reminder.dueDatetime;
   if (!reminder.dueDate || !policy.allDayTime) return undefined;
   return toZoned(parseDateTime(`${reminder.dueDate}T${policy.allDayTime}`), policy.timezone).toDate().toISOString();
+}
+
+/** Bound each D1 value without imposing a second, smaller per-note limit.
+ * All chunks are published in one guarded transaction below. */
+function operationChunks(operations: Awaited<ReturnType<typeof planNotificationOperations>>): string[] {
+  const limit = 1536 * 1024, encoder = new TextEncoder();
+  const chunks: string[] = [];
+  let items: string[] = [], bytes = 2;
+  for (const operation of operations) {
+    const json = JSON.stringify(operation), size = encoder.encode(json).byteLength;
+    if (size + 2 > limit) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
+    if (bytes + size + (items.length ? 1 : 0) > limit) {
+      chunks.push(`[${items.join(',')}]`); items = []; bytes = 2;
+    }
+    bytes += size + (items.length ? 1 : 0); items.push(json);
+  }
+  if (items.length || !chunks.length) chunks.push(`[${items.join(',')}]`);
+  return chunks;
 }
 
 /** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
@@ -30,17 +48,18 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
   if (!policy) return;
   const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
     READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
+  const encrypted = jobs.length > 0 && (await readEncryptionState(env.DB))?.mode === 'active';
   for (const job of jobs) {
     try {
       const file = await getStoredFileRow(env.DB, job.path);
       let reminders: RemoteReminderRecord[] = [];
       if (file && isReminderPath(job.path, policy.folderPath)) {
-        if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
+        if (file.size > reminderSourceByteLimit(encrypted)) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
         const [text] = await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
         if (!text) throw new Error('Committed reminder content could not be verified');
         // Policy changes can revisit sources outside the current folder. Their
         // uncertain content still cannot authorize removal of prior reminders.
-        const parsed = parseReminderSource(job.path, text.content, policy.folderPath);
+        const parsed = parseReminderSource(job.path, text.content, policy.folderPath, encrypted);
         if (parsed.issue) throw new PermanentReminderSourceError(parsed.issue);
         if (!await hasVerifiedReminderSource(env.DB, job.path, file.storageKey)) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
         if (job.path.startsWith(`${policy.folderPath}/`)) reminders = parsed.reminders;
@@ -64,8 +83,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         } } : { id: reminder.id, operation: 'cancel', payload: null };
       });
       const token = crypto.randomUUID();
-      const json = JSON.stringify(await planNotificationOperations(env.DB, operations, token));
-      if (new TextEncoder().encode(json).byteLength > 1536 * 1024) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
+      const chunks = operationChunks(await planNotificationOperations(env.DB, operations, token));
       const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
         AND ${file ? `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)` : `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`} `;
@@ -77,18 +95,18 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
       await env.DB.batch([
         env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
           SELECT reminder_id, ?, 'cancel', NULL, 0, 0 FROM reminder_projections WHERE file_path = ?
-          AND reminder_id NOT IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard} ${upsertJob}`)
-          .bind(token, job.path, json, ...args),
-        env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
+          AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard} ${upsertJob}`)
+          .bind(token, job.path, JSON.stringify([...ids]), ...args),
+        ...chunks.map(json => env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
           SELECT json_extract(value, '$.id'), json_extract(value, '$.token'), json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
           FROM json_each(?) WHERE json_extract(value, '$.enqueue') = 1 AND ${guard}
-          ${upsertJob}`).bind(json, ...args),
+          ${upsertJob}`).bind(json, ...args)),
         env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ? AND ${guard}`).bind(job.path, ...args),
-        env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision)
+        ...chunks.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision)
           SELECT json_extract(value, '$.id'), ?, ?, json_extract(value, '$.token'), ? FROM json_each(?) WHERE ${guard}
           ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, file_revision = excluded.file_revision,
           notification_token = excluded.notification_token, policy_revision = excluded.policy_revision`)
-          .bind(job.path, file?.storageKey ?? '', policy.revision, json, ...args),
+          .bind(job.path, file?.storageKey ?? '', policy.revision, json, ...args)),
         env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(job.path, ...args),
         env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
       ]);

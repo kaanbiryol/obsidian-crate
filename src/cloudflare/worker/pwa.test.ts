@@ -304,7 +304,8 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS.endsWith('`')).toBe(false);
 		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_CACHE = 'crate-reminders-shell-");
 		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_URL = '/notifications'");
-		expect(SERVICE_WORKER_JS).toContain("cache.addAll(PWA_PRECACHE_URLS)");
+		expect(SERVICE_WORKER_JS).toContain("for (const url of PWA_PRECACHE_URLS)");
+		expect(SERVICE_WORKER_JS).toContain("await cache.put(url, response)");
 		expect(SERVICE_WORKER_JS).not.toContain('apple-startup');
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === PWA_SHELL_URL");
 		expect(SERVICE_WORKER_JS).toContain("return cache.match(PWA_SHELL_URL)");

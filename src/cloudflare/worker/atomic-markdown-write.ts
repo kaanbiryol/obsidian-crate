@@ -1,4 +1,6 @@
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
+import type { EncryptionServerState } from '../../encryption/server-state';
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
 import { enqueueFileProjection } from './notification-projection-queue';
 import type { CommitEffects } from './commit-effects';
@@ -18,13 +20,21 @@ function destinationMutation(
 	db: D1Database,
 	destination: StagedMarkdownFile,
 	source: StagedMarkdownFile,
+	encryptionState: EncryptionServerState | null,
 ): D1PreparedStatement {
 	const destinationNamespace = fileNamespaceGuard(destination.path);
 	const sourceNamespace = fileNamespaceGuard(source.path);
 	const destinationLease = stagedUploadGuard(destination.objectKey);
   const sourceLease = stagedUploadGuard(source.objectKey);
-  const namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql}`;
-	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args];
+  const encryption = encryptionWriteGuard(encryptionState);
+  let namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql} AND ${encryption.sql}`;
+	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args, ...encryption.args];
+	for (const file of [source, destination]) {
+		if (file.expectedRevision) {
+			namespaceGuard += ` AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;
+			namespaceArgs.push(...filePathArgs(file.path), file.expectedRevision);
+		}
+	}
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
 			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
@@ -120,9 +130,9 @@ export async function writeCommittedMarkdownFilePair(
 	bucket: R2Bucket,
 	db: D1Database,
 	params: {
-		source: { path: string; content: string; expectedHash: string };
+		source: { path: string; content: string; expectedHash: string; expectedRevision?: string };
 		effects?: CommitEffects;
-		destination: { path: string; content: string; expectedHash: string | null };
+		destination: { path: string; content: string; expectedHash: string | null; expectedRevision?: string };
 	},
 ): Promise<{
 	source: { hash: string; size: number };
@@ -131,6 +141,8 @@ export async function writeCommittedMarkdownFilePair(
 	if (params.source.path === params.destination.path) {
 		throw new Error('Atomic reminder move requires two distinct files');
 	}
+	const sourceEncryption = await prepareEncryptedFileCommit(db, params.source.path, params.source.content);
+	const destinationEncryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content);
 
 	const [previousSource, previousDestination] = await Promise.all([
 		getStoredFileRow(db, params.source.path),
@@ -144,6 +156,7 @@ export async function writeCommittedMarkdownFilePair(
 			params.destination.path,
 			params.destination.content,
 			params.destination.expectedHash,
+			Boolean(destinationEncryption.state),
 		));
 		stagedFiles.push(await stageMarkdownFile(
 			bucket,
@@ -151,6 +164,7 @@ export async function writeCommittedMarkdownFilePair(
 			params.source.path,
 			params.source.content,
 			params.source.expectedHash,
+			Boolean(sourceEncryption.state),
 		));
 	} catch (error) {
 		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
@@ -158,6 +172,8 @@ export async function writeCommittedMarkdownFilePair(
 	}
 
 	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
+	source.expectedRevision = params.source.expectedRevision;
+	destination.expectedRevision = params.destination.expectedRevision;
 	const previousVersions = [
 		...(previousSource && collectCleanupKeys(previousSource, source.objectKey).length > 0
 			? [{ path: source.path, ...previousSource }]
@@ -170,13 +186,15 @@ export async function writeCommittedMarkdownFilePair(
 	// An exception may follow a committed transaction. Never reclaim those keys
 	// here; the orphan sweep checks references after the uncertainty window.
 	const results: unknown[] = await db.batch([
-			destinationMutation(db, destination, source),
+			destinationMutation(db, destination, source, sourceEncryption.state),
 			sourceMutation(db, source, destination),
+			...recordEncryptedFile(db, source.path, source.objectKey, sourceEncryption.descriptor),
+			...recordEncryptedFile(db, destination.path, destination.objectKey, destinationEncryption.descriptor),
 			changelogStatement(db, destination),
 			changelogStatement(db, source),
 			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
-			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content),
-			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content),
+			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
+			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
 			finishStagedUpload(db, source.objectKey, source.path),
 			finishStagedUpload(db, destination.objectKey, destination.path),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),

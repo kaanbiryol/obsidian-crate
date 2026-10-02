@@ -16,9 +16,10 @@ async function notificationPermission(manager: PushManager): Promise<PermissionS
 	return permission;
 }
 
-export function usePushNotifications({ authToken, apiFetch, showToast }: {
+export function usePushNotifications({ authToken, apiFetch, prepareSession, showToast }: {
 	authToken: string | null;
 	apiFetch: ApiFetch;
+	prepareSession: () => Promise<void>;
 	showToast: ShowToast;
 }): {
 	push: PushState;
@@ -45,6 +46,10 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 					update({ phase: 'install', status: 'Add Crate to your Home Screen as a web app to enable notifications on iPhone and iPad.' });
 					return;
 				}
+				// Another tab can replace this session after bootstrap. Confirm its
+				// encryption mode before choosing the window or decrypting SW provider.
+				await prepareSession();
+				if (!isCurrent()) return;
 				const manager = await getPwaPushManager();
 				if (!isCurrent()) return;
 				if (!manager) {
@@ -100,7 +105,7 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		})().finally(() => { if (operation === sequence.current) inFlight.current = null; });
 		inFlight.current = { authToken, promise };
 		return promise;
-	}, [authToken, apiFetch, showToast]);
+	}, [authToken, apiFetch, prepareSession, showToast]);
 	const refreshPushState = useCallback(() => reconcile(false), [reconcile]);
 	const enablePushNotifications = useCallback(() => reconcile(true), [reconcile]);
 
@@ -120,9 +125,10 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		const pending = inFlight.current?.promise;
 		const operation = ++sequence.current;
 		inFlight.current = null;
-		await pending;
+		// Capture the provider before logout resets the encryption status. Still
+		// wait for an outstanding confirmation and fence a newly adopted session.
+		const [manager] = await Promise.all([getPwaPushManager(), pending]);
 		if (operation !== sequence.current) return;
-		const manager = await getPwaPushManager();
 		const subscription = await manager?.getSubscription();
 		if (operation !== sequence.current) return;
 		// Logout revokes owned server rows even if browser cleanup fails.

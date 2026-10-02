@@ -169,6 +169,16 @@ Warm lists prepared three SQL statements; unchanged requests prepared one and to
 
 The full list still grows with folder size. Before promising support for large folders, repeat the 1,000/10,000 cases on a disposable hosted deployment and physical devices, recording Worker CPU/errors, D1 rows read, transfer size, time to first usable screen, scroll responsiveness and memory. If large folders are a release requirement, use these measurements to set the supported limit and evaluate a paginated per-reminder index; do not infer hosted support from the local pass.
 
+Hosted capacity tests spend the account's shared D1 quota, even in a disposable
+database. Run write-heavy fixtures locally by default. Before any hosted write
+test, agree on a total row-write budget and account headroom; without one, the
+hosted write budget is zero. Include index updates, reminder projections,
+background jobs, retries and reset/deletion writes in the estimate. Do not infer
+row-write cost from the number of requests or notes. Keep the 1,000/10,000-reminder
+fixtures off a daily-quota-constrained account. For disposable resource cleanup,
+delete the database through the resource API instead of resetting its rows just
+to prepare it for deletion; empty R2 separately without D1 mutations.
+
 ### Browser list capacity
 
 `npm run benchmark:pwa` measures the production PWA with a local synthetic API in Chromium and WebKit at a 390 × 844 viewport. It is also included in `test:pwa-browser`. The test checks page navigation, off-page editing, saved changes, complete reorder payloads and bounded rendered rows at 1,000 and 10,000 reminders. The fixture deliberately stresses a single Inbox; it does not claim that 10,000 reminders fit the real per-file indexing limits.
@@ -634,3 +644,50 @@ rapid switching, reduced motion, and compact project sheets. Run `node scripts/p
 `node scripts/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
 components’ PWA adapters. Actual Obsidian panes, popout windows and mobile navbar
 insets still require host/device acceptance.
+## Encryption acceptance
+
+`encryption-setup.integration.ts` exercises both empty and populated remotes through the production conversion client and local Worker bindings. It checks that setup leaves local files unsent, first sync uploads ciphertext, existing history survives conversion, pending edits wait for encrypted sync, and file counts advance only after verified acknowledgments. A lost response resumes with the remaining count. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
+
+Folder-move coverage uses only disposable local storage. `encryption-folder-moves.integration.ts` checks retained credentials, Reading policy generation, push subscriptions and accepted/unaccepted Reading attempts; selecting a different configured folder must revoke the old connection. The native storage harness authenticates multiple offline moves, rejects substituted paths/access identities and preserves drafts through key recovery. The full Reminders and Reading browser scripts exercise the production apps after conversion and normal conditional file moves, retaining their original sessions without new links. Reading also follows a move in the already-open page. Reminder API regression tests preserve queued semantic revisions while encrypting replacements for the current path.
+
+`node scripts/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and conversion with absent or populated shared settings, including the first encrypted settings write.
+
+The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encrypted-settings.integration.ts` converts and updates settings at the former failure size and the full plaintext request limit, preserves committed settings after oversized writes, and verifies that preflight rejects unsupported stored settings before freezing sync. The full encryption browser test uses a 2,000-entry exclusion list for conversion and encrypted writes.
+
+`node scripts/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, folder isolation, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
+
+`CRATE_PWA_PREBUILT=1 node scripts/pwa-encryption-regressions-test.mjs` checks long reminder completion, large legacy receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
+
+Worker `encrypted-source-rebuild.integration.ts` covers conversion of previously indexed folders, parser upgrades repairing missing/quarantined encrypted sources, notes exceeding the former 1 MiB source and 2 MiB reparse limits, and atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens.
+
+Worker `encrypted-sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and cross-key-scope rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
+
+`encryption-upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
+
+After `npm run build:plugin`, run `node scripts/encryption-setup-test.mjs` for the
+Obsidian encryption setup UI. It uses production key verification with a synthetic
+Obsidian host in Chromium and WebKit, at desktop, phone and small-screen sizes in
+both themes. It checks that loading and setup keep the same bounds and
+header/footer positions, including reduced motion and touch-sized screens. It
+also checks full recovery-key visibility, a compact field with Copy above it,
+centered checkbox alignment, native settings-row spacing, keyboard acknowledgment, disabling the
+action when unchecked, the visible footer, expanded details, clipboard success and
+fallback, conversion progress, retry and connection changes without
+contacting a server. Set `CRATE_OBSIDIAN_CSS_PATH` to an extracted installed
+Obsidian `app.css` to repeat the checks with the actual host stylesheet; it is
+used only locally and is not committed. The synthetic host also includes the
+modal settings-row selector that previously overrode the key field’s spacing.
+Physical Obsidian mobile and keyboard behavior still need
+manual verification. Unit tests in `src/ui/settings/encryption-section.test.ts`
+cover automatic key-verification failure before setup and recovery of missing,
+damaged or incorrect local keys before resuming conversion. The optional saved-key
+check retains wrong-key, edit and stale-result coverage.
+
+### Reading encryption acceptance
+
+- `reading-encryption.integration.ts` covers ciphertext-only capture/edit/replay, folder isolation, blocked plaintext paths, queued captures, converted receipts and adding a scope to an already encrypted vault after a lost conversion response.
+- `encryption-reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
+- `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. Use `CRATE_TEST_BROWSER=webkit` for WebKit.
+- `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic legacy migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
+- `node scripts/pwa-web-app-unlock-test.mjs`: combined Reading/Reminders unlock in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
+- Native iOS Shortcut signing/import and physical iOS/Android offline/push delivery remain manual acceptance. Test encrypted Android after reinstalling its changed manifest. Hosted quota validation must use an explicitly budgeted disposable deployment; do not run local test fixtures against hosted D1.

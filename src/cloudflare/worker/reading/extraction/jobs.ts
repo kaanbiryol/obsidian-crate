@@ -1,3 +1,4 @@
+import { readEncryptionState } from '../../encryption-state';
 import { publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled } from '../../feature-policy';
 import type { Env } from '../../types';
@@ -15,6 +16,7 @@ export interface Publication { job: Job; result: ReturnType<typeof extractDocume
 
 /** Called under the file coordinator's lock. Never recreate a missing or changed source. */
 export async function publishExtraction(env: Env, publication: Publication | CapturePublication): Promise<void> {
+  if (await readEncryptionState(env.DB)) return ;
   if ('captureId' in publication) {
     if (await featureEnabled(env.DB, 'reading')) await publishCapture(env, publication.captureId, publication.generation, publication.result, publication.resolvedUrl);
     return;
@@ -47,6 +49,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
 }
 
 export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {
+  if (await readEncryptionState(env.DB)) return ;
   // A persisted maintenance fence stops new network work during backup/upgrade.
   if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
   if (!await featureEnabled(env.DB, 'reading')) return;
@@ -67,7 +70,12 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
         await env.DB.batch([env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision),
           env.DB.prepare('DELETE FROM reading_sources WHERE path=?').bind(job.path)]);
       } else {
-        try { const [{ fetchArticle }, { extractDocument }] = await Promise.all([import('./transport'), import('./document')]); const article = await fetchArticle(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = extractDocument(article.html, article.url); resolvedUrl = article.url; }
+        try {
+          const { fetchArticle } = await import('./transport');
+          const article = await fetchArticle(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
+          const { extractDocument } = await import('./document');
+          result = extractDocument(article.html, article.url); resolvedUrl = article.url;
+        }
         catch { if (job.attempts < 2) return; }
         const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
         const response = await stub.fetch('https://do/reading-publish', { method: 'POST', body: JSON.stringify({ job, result, resolvedUrl }) });
@@ -84,6 +92,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 
 /** Return the next projection deadline, distinguishing a backlog from an outage. */
 export async function scheduleReading(env: Env): Promise<number | null> {
+  if (await readEncryptionState(env.DB)) return null;
   if (!await featureEnabled(env.DB, 'reading')) return null;
   const current = await policy(env.DB);
   if (!current) return null;

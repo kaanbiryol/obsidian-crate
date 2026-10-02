@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assetName, metadataName, selectRelease, sha256, validateTag, verifyShortcut } from './shortcut-release.mjs';
+import { assetName, metadataName, legacyAssetName, legacyMetadataName, selectRelease, sha256, validateTag, verifyShortcut } from './shortcut-release.mjs';
 
 const release = (tag, published, overrides = {}) => ({ tag_name: tag, published_at: published, draft: false, assets: [{ name: assetName }, { name: metadataName }], ...overrides });
 const bytes = Buffer.from('AEA1test archive');
@@ -17,6 +17,14 @@ test('Pages selects the most recently published shortcut, including prereleases,
 test('an incomplete newer shortcut release fails instead of silently serving an old shortcut', () => {
   assert.throws(() => selectRelease([release('0.4.0', '2026-09-28', { assets: [{ name: metadataName }] })]), /missing/);
   assert.throws(() => selectRelease([]), /No release/);
+});
+test('v2 and legacy downloads select and verify their own release assets', () => {
+  const legacy = release('0.3.1', '2026-09-20', { assets: [{ name: legacyAssetName }, { name: legacyMetadataName }] });
+  const current = release('0.4.0', '2026-09-29');
+  assert.equal(selectRelease([legacy, current]), current);
+  assert.equal(selectRelease([legacy, current], undefined, { assetName: legacyAssetName, metadataName: legacyMetadataName }), legacy);
+  assert.throws(() => verifyShortcut({ ...metadata(), file: legacyAssetName }, bytes, '0.4.0'), /metadata/);
+  verifyShortcut({ ...metadata(), file: legacyAssetName }, bytes, '0.4.0', undefined, legacyAssetName);
 });
 test('release verification selects only the requested draft tag', () => {
   const draft = release('0.4.0', null, { draft: true });

@@ -4,7 +4,7 @@ import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
 import { portablePathKey } from '../../protocol/portable-path';
 import { corsHeaders, corsResponse } from './cors';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { fileTransportLimit } from '../../encryption/file-format';
 import { storedObjectMatchesMetadata } from './sync-storage';
 import { sanitizePath } from './utils';
 import { isSyncRevision } from '../../protocol/sync-validation';
@@ -80,12 +80,14 @@ export async function listSharedCheckpoints(bucket: R2Bucket): Promise<Response>
     return response({ version: 1, checkpoints: index.checkpoints.filter(entry => entry.expiresAt > Date.now()) });
 }
 
-async function loadCheckpoint(bucket: R2Bucket, id: string): Promise<SharedCheckpointDocument | null> {
+async function loadCheckpoint(bucket: R2Bucket, id: string): Promise<SharedCheckpointDocument | { version: 1; checkpoint: SharedCheckpoint; encrypted: string } | null> {
     const entry = (await readIndex(bucket)).checkpoints.find(entry => entry.id === id && entry.expiresAt > Date.now());
     if (!entry) return null;
     const object = await bucket.get(keyFor(id));
-    if (!object || object.size > MAX_CHECKPOINT_BYTES) throw new Error('Shared checkpoint is unavailable');
-    const document = parseSharedCheckpointDocument(JSON.parse(await object.text()));
+    if (!object || object.size > 12 * 1024 * 1024) throw new Error('Shared checkpoint is unavailable');
+    const raw = JSON.parse(await object.text()) as { version?: number; checkpoint?: SharedCheckpoint; encrypted?: string };
+    const document = typeof raw.encrypted === 'string' && raw.version === 1 && raw.checkpoint
+        ? { version: 1 as const, checkpoint: raw.checkpoint, encrypted: raw.encrypted } : parseSharedCheckpointDocument(raw);
     if (JSON.stringify(document.checkpoint) !== JSON.stringify(entry)) throw new Error('Checkpoint metadata does not match its index');
     return document;
 }
@@ -111,7 +113,7 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
         .bind(portablePathKey(path), path, revision, revision, path, Date.now()).first<{ hash: string; size: number }>();
     if (!file) return response({ error: 'A file version required by this checkpoint is no longer available.' }, 410);
     const object = await bucket.get(revision);
-    if (!object || object.size > MAX_FILE_SIZE_BYTES || !storedObjectMatchesMetadata(object, { hash: file.hash, size: file.size, storageKey: revision })) return response({ error: 'Checkpoint file contents are unavailable.' }, 503);
+    if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType) || !storedObjectMatchesMetadata(object, { hash: file.hash, size: file.size, storageKey: revision })) return response({ error: 'Checkpoint file contents are unavailable.' }, 503);
     return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), 'X-File-Hash': file.hash } });
 }
 

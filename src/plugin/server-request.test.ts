@@ -4,6 +4,8 @@ import type CratePlugin from './CratePlugin';
 import { endPluginLifecycle } from './lifecycle-state';
 import { serverRequest } from './server-request';
 import { readingServerRequest } from '../reading/server';
+import { SECRET_KEYS } from './settings-types';
+import { createVaultKeyBundle } from '../encryption/key-bundle';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 
 const transport = vi.hoisted(() => vi.fn<(request: string | RequestUrlParam) => Promise<RequestUrlResponse>>());
@@ -24,7 +26,7 @@ function harness(capabilities = ['reading-v1', 'shared-features-v1']) {
 	let token = 'old-token';
 	const plugin = {
 		settings: { workerUrl: 'https://old.example' },
-		secretStorage: { get: () => token },
+		secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? token : null },
 	} as unknown as CratePlugin;
 	const info = response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
 	transport.mockImplementation(async request => {
@@ -94,4 +96,15 @@ it('does not dispatch when the plugin is already unloaded', async () => {
 	change('unload');
 	await expect(serverRequest(plugin, '/features')).rejects.toMatchObject({ name: 'AbortError' });
 	expect(transport).not.toHaveBeenCalled();
+});
+
+it('sends saved encryption authority without exposing any key material', async () => {
+	const { plugin } = harness(['shared-features-v1']);
+	const bundle = createVaultKeyBundle();
+	vi.spyOn(plugin.secretStorage, 'get').mockImplementation(key => key === SECRET_KEYS.AUTH_TOKEN ? 'old-token'
+		: key === SECRET_KEYS.ENCRYPTION_KEYS ? JSON.stringify(bundle) : null);
+	await serverRequest(plugin, '/features', { feature: 'reminders', enabled: false });
+	const request = transport.mock.calls.at(-1)![0] as RequestUrlParam;
+	expect(request.headers).toMatchObject({ 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) });
+	expect(JSON.stringify(transport.mock.calls)).not.toContain(bundle.vault.secret);
 });

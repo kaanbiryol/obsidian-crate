@@ -1,5 +1,6 @@
 import { featureEnabled, handleFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
+import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
 import { parseJsonObject } from './utils';
 import { limitNotificationAction } from './rate-limit';
 import { handleAuthRoute } from './routes/auth';
@@ -15,10 +16,21 @@ import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
 import { canPrepareReadingHandoff } from './reading/common';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
+import { handleEncryptionRoute } from './routes/encryption';
+import { handleEncryptedReminders } from './encrypted-reminders';
+import { handleEncryptionReset } from './encryption-reset';
+import { handleEncryptionConversion } from './encryption-conversion';
+import type { EncryptionServerState } from '../../encryption/server-state';
+
 
 export { handlePublicRoute };
 
 const REMINDERS_SCOPE_ROUTES = new Set([
+	'GET /encryption',
+	'GET /reminders/encrypted-files',
+	'GET /reminders/encrypted-file',
+	'POST /reminders/encrypted-commit',
+	'GET /reminders/encrypted-receipt',
 	'GET /health',
 	'POST /links/title',
 	'GET /reminders/list',
@@ -33,6 +45,10 @@ const REMINDERS_SCOPE_ROUTES = new Set([
 ]);
 
 const READING_LIBRARY_ROUTES = new Set([
+	'GET /reading/encryption', 'GET /reading/encrypted-receipt',
+	'GET /reading/encrypted-files',
+	'GET /reading/encrypted-file',
+	'POST /reading/encrypted-commit',
 	'POST /reading/shortcut-pairing',
 	'GET /reading/session',
 	'GET /reading/fetching',
@@ -65,7 +81,9 @@ export async function handleAuthenticatedRoute(
 	path: string,
 	method: RouteMethod,
 	principal: AuthPrincipal,
+	resetGeneration: string | null,
 	requestId?: string,
+	encryption?: EncryptionServerState | null,
 ): Promise<Response | null> {
 	if (!isAuthenticatedRouteAllowed(principal, path, method)) {
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
@@ -79,7 +97,7 @@ export async function handleAuthenticatedRoute(
 	if (principal.scope === 'reminders' && path.startsWith('/reminders/')) {
 		let folder: unknown = new URL(request.url).searchParams.get('folderPath');
 		if (method !== 'GET') {
-			const parsed = await parseJsonObject(request.clone());
+			const parsed = await parseJsonObject(request.clone(), path === '/reminders/encrypted-commit' ? MAX_ENCRYPTED_REMINDER_REQUEST_BYTES : undefined);
 			if (!parsed.ok) return parsed.response;
 			folder = parsed.value.folderPath;
 		}
@@ -96,7 +114,11 @@ export async function handleAuthenticatedRoute(
 		return handleLinkTitle(request, env.READING_FETCH);
 	}
 
-	return await handleSyncRoute(request, env, path, method, mutationAuditContext(request, principal, requestId))
+	return await handleEncryptionReset(request, env, path, principal)
+		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
+		?? await handleEncryptionRoute(request, db, path, principal, encryption)
+		?? await handleEncryptedReminders(request, env, path)
+		?? await handleSyncRoute(request, env, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
 		?? await handleNotificationsRoute(request, db, path, method, principal);
