@@ -349,8 +349,6 @@
 
         .premium-reminder-content {
             @include list-item.flat-surface;
-            // 12px padding + 20px checkbox footprint + 12px gap.
-            @include list-item.inset-divider(44px, 12px);
             gap: 12px;
             padding: 14px 12px;
         }
@@ -375,6 +373,16 @@
 
         &[data-press-active] .premium-reminder-content {
             background: var(--crate-reminder-card-active-bg);
+        }
+    }
+
+    // Only rows followed by another item in the same group get a divider.
+    // Exiting motion rows do not count as the next visible item.
+    :is(.reminder-render-item, .reorderable-reminder-item):has(~ :is(.reminder-render-item, .reorderable-reminder-item):not([aria-hidden="true"])),
+    .sidebar-reminder-card-wrapper:has(~ .sidebar-reminder-card-wrapper) {
+        .premium-reminder-card[data-reminder-list-style="flat"] .premium-reminder-content {
+            // 12px padding + 20px checkbox footprint + 12px gap.
+            @include list-item.inset-divider(44px, 12px);
         }
     }
 

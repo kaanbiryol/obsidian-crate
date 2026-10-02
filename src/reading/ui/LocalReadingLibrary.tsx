@@ -1,3 +1,4 @@
+import { useRemindersSettingsStore } from '@/reminders/settings';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import React, { useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
@@ -11,11 +12,12 @@ import './reading.scss';
 
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';
 export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plugin: CratePlugin; library: ReadingLibrary; renderNavigation?: ReadingLibraryProps['renderNavigation'] }) {
+	const listStyle = useRemindersSettingsStore(state => state.listStyle);
 	const reduceMotion = useReducedMotion();
 	const snapshot = useSyncExternalStore(library.subscribe, library.getSnapshot);
 	const { article, item, focusHighlight, open, close, update } = useLocalReadingArticle(library, snapshot.items);
 	const capturing = Boolean(item && library.isCapturing(item));
-	return <><ReadingLibraryPanel snapshot={snapshot} pendingItemIds={new Set(snapshot.items.filter(item => !item.path).map(item => item.crate_reading_id))}
+	return <><ReadingLibraryPanel listStyle={listStyle} snapshot={snapshot} pendingItemIds={new Set(snapshot.items.filter(item => !item.path).map(item => item.crate_reading_id))}
         renderNavigation={renderNavigation}
         readerMotion={reduceMotion ? 'none' : 'slide'}
         renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}

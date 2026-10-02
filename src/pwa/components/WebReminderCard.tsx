@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
-import type { ReminderListStyle } from '@/reminders/types/reminder-list-style';
+import type { ListStyle } from '@/ui/shared/list-style';
 
 export const WebReminderCard = memo(function WebReminderCard({
 	reminder,
@@ -13,7 +13,7 @@ export const WebReminderCard = memo(function WebReminderCard({
 	onToggleComplete,
 }: {
 	reminder: SharedReminder;
-	listStyle?: ReminderListStyle;
+	listStyle?: ListStyle;
 	index: number;
 	hideProject: boolean;
 	onEdit: (id: string) => void;

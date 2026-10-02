@@ -1,3 +1,4 @@
+import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { PWA_CONTROL_SPRING, PWA_FADE } from '../motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
@@ -42,6 +43,7 @@ export type PwaReminderCardRenderer = (props: {
 }) => React.ReactNode;
 
 interface PwaRemindersAppShellProps {
+	listStyle?: ListStyle;
 	reminders: Reminder[];
 	projects: string[];
 	isDarkMode: boolean;
@@ -73,6 +75,7 @@ interface PwaRemindersAppShellProps {
  * shared with the plugin.
  */
 export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
+	listStyle = DEFAULT_LIST_STYLE,
 	reminders,
 	projects,
 	isDarkMode,
@@ -269,6 +272,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				data-pwa-opening={initializing || undefined}
 				data-pwa-loading={showLoadingIndicator || undefined}
 				aria-busy={initializing}
+				data-list-style={listStyle}
 				className={[
 					'pwa-screen',
 					'reminders-view',

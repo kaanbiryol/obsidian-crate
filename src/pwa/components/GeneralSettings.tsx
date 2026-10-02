@@ -1,10 +1,12 @@
+import type { ComponentProps } from 'react';
+import { ListStyleSetting } from './ListStyleSetting';
 import { Button } from '@/ui/shared/Button';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 
-export function GeneralSettings() {
+export function GeneralSettings(props: ComponentProps<typeof ListStyleSetting>) {
 	const { themePreference, setThemePreference } = usePwaColorScheme();
 	return <SettingsSection title="General">
 		<SettingsRow className="settings-row--theme" title="Theme">
@@ -19,5 +21,6 @@ export function GeneralSettings() {
 					onClick={() => setThemePreference(value)}><Icon size={15} aria-hidden="true" /><span>{label}</span></Button>)}
 			</div>
 		</SettingsRow>
+		<ListStyleSetting {...props} />
 	</SettingsSection>;
 }

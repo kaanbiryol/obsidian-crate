@@ -22,6 +22,25 @@ try {
       await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=browse`);
       const target = page.getByRole('button', { name: 'Open Errands', exact: true });
       await expect(target).toBeVisible();
+      const surface = page.locator('[data-project="Errands"] .premium-project-content');
+      await expect(surface).toHaveCSS('border-top-width', '0px');
+      await expect(surface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const gear = page.getByRole('button', { name: 'Open settings', exact: true });
+      await gear.click();
+      const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+      const listStyle = settings.getByRole('combobox', { name: 'List style', exact: true });
+      await listStyle.selectOption('cards');
+      await expect(surface).toHaveCSS('border-top-width', '1px');
+      await expect(page.locator('.premium-project-group').first()).toHaveCSS('border-top-width', '1px');
+      await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
+      await page.reload();
+      await expect(surface).toHaveCSS('border-top-width', '1px');
+      await gear.click();
+      await expect(listStyle).toHaveValue('cards');
+      await listStyle.selectOption('flat');
+      await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
+      await expect(surface).toHaveCSS('border-top-width', '0px');
+      await expect(page.locator('.premium-project-group').first()).toHaveCSS('border-top-width', '0px');
       await checkDetailHistoryFreshness(page, {
         open: async () => { await target.click(); await expect(page.locator('.pwa-project-layer')).toHaveAttribute('data-project-open', 'true'); },
         close: async () => { await page.goBack(); await page.waitForFunction(() => history.state?.reminderProjectList === true); },

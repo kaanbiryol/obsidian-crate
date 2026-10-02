@@ -1,3 +1,4 @@
+import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { AppDock, DockAddButton } from '@/ui/shared/navigation/AppDock';
 import { DOCK_TABS } from '@/ui/shared/navigation/dock-destinations';
 import { ScheduleSwitcher } from '@/ui/shared/navigation/ScheduleSwitcher';
@@ -35,6 +36,7 @@ export type PluginReminderCardRenderer = (props: {
 }) => React.ReactNode;
 
 interface PluginRemindersAppShellProps {
+  listStyle?: ListStyle;
   reminders: Reminder[];
   projects?: string[];
   isInitialLoadComplete: boolean;
@@ -66,6 +68,7 @@ interface PluginRemindersAppShellProps {
 
 /** Local navigation state with the same dock, date switcher and transitions as the PWA. */
 export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = ({
+  listStyle = DEFAULT_LIST_STYLE,
   reminders,
   projects: providedProjects,
   isInitialLoadComplete,
@@ -212,7 +215,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   );
   const add = !loadingContent && !suppressFab ? handleAdd : undefined;
   return <MotionConfig reducedMotion={prefersReducedMotion ? 'always' : 'user'}>
-    <div ref={shell} className={[
+    <div ref={shell} data-list-style={listStyle} className={[
       'reminders-view is-primary plugin-reminders-navigation',
       isDarkMode ? 'dark' : 'light', isFullScreen ? 'is-fullscreen' : '',
       isModal ? 'is-modal' : '', isCompact || hideTabBar ? 'is-compact' : '',

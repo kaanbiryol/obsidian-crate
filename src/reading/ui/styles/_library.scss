@@ -72,3 +72,16 @@
 	@include compact-layout;
 	@include stacked-layout;
 }
+
+.crate-reminders-ui .crate-reading[data-list-style="flat"] {
+	.crate-reading__item {
+		@include list-item.flat-surface;
+		margin-bottom: 0;
+		&:not(:last-child) { @include list-item.inset-divider(52px, 12px); }
+		@media (hover: hover) and (pointer: fine) {
+			&:hover { background: var(--crate-reminder-card-hover-bg); }
+		}
+		&:has(button[data-press-active]) { background: var(--crate-reminder-card-active-bg); }
+	}
+	button.crate-reading__open { gap: 12px; padding-block: 14px; }
+}

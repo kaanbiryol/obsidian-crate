@@ -27,25 +27,29 @@ both hosts together.
   correct before React loads.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
-  Reading uses the same cards on desktop and phones, retaining its source icon,
+  Reading uses the same list presentation on desktop and phones, retaining its source icon,
   favorite action, and one stacked library/reader flow at every width in both hosts.
   Reading uses bottom navigation, floating Highlights, and sheets; do not introduce
   desktop sidebars, split panes, or centered dialogs. Desktop support is separate
   future work. Covered library cards keep their resting surface on return. Shared Sass mixins preserve each
   feature's existing DOM and interaction semantics. Flat surfaces and inset
-  dividers are reusable mixins here; reminders opt into them through
-  `_reminder-cards.scss`. Reading retains its card presentation.
+  dividers are reusable mixins here; reminders, projects, and Reading all opt into them.
+  Dividers appear only between items within each group, never after its final item.
   Existing reminder surface tokens remain host-theme inputs.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-  **Reminders → Reminder list style** selects **Flat** (the default) or **Cards**
-  locally in each host. The plugin setting applies immediately to open views,
-  project lists, and embedded notes; the PWA stores its own preference and updates
+  **Appearance → List style** in Obsidian and **General → List style** in the PWA
+  select **Flat** (the default) or **Cards** for reminders, projects, and Reading locally in each
+  host. Existing saved choices are retained. The plugin setting applies immediately to open views,
+  project lists, embedded notes, and Reading; the PWA stores its own preference and updates
   open tabs. Flat rows retain completion targets, priority, keyboard focus,
   press/drag feedback, and theme colors while removing card surfaces and metadata
-  pill outlines. Their dividers align with the reminder title.
+  pill outlines. Their dividers align with the reminder title. Reading library dividers align with
+  article titles, and Reading highlights follow the same flat/card preference.
+  Project cards and subproject groups share this setting, retaining their colored
+  accents, progress, disclosures, and focus/press feedback in either presentation.
 - Reading search and PWA Save a link fields opt into `crate-field--rounded`: 16px
   corners, 48px minimum height, and 16px horizontal padding. Their filled
   surfaces, borders, and focus rings retain shared theme colors. Reminder

@@ -1,3 +1,4 @@
+import { useRemindersSettingsStore } from '@/reminders/settings';
 import { IconButton } from '@/ui/shared/IconButton';
 import React, { useCallback, useEffect, useState } from "react";
 import type CratePlugin from "@/main";
@@ -33,6 +34,7 @@ interface RemindersViewContentProps {
 }
 
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
+    const listStyle = useRemindersSettingsStore(state => state.listStyle);
     const isDarkMode = useObsidianDarkMode();
     // Startup sync can defer the index scan even after the view is registered.
     // Publish readiness with its reminders so no render sees a stale empty list.
@@ -82,6 +84,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     return (
         <ThemeIconProvider renderer={ObsidianIcon}><PluginRemindersAppShell
+            listStyle={listStyle}
             activeTab={activeTab}
             onTabChange={onTabChange}
             renderNavigation={renderNavigation}

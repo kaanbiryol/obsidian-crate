@@ -101,6 +101,7 @@ export function RemindersApp() {
 			data-ui-host="pwa"
 		>
 			<PwaRemindersAppShell
+				listStyle={preferences.reminderListStyle}
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				initializing={!initialContentReady}
 				reminders={initialContentReady ? sharedReminders : []}

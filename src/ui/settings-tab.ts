@@ -2,6 +2,7 @@
  * Settings tab for Crate configuration
  */
 
+import { renderAppearanceSettings } from './settings/appearance-section';
 import { createSettingsDisclosure, createSettingsSectionHeading } from './settings/section-helpers';
 import { renderUsageSection } from './settings/usage-section';
 import { renderConnectionStatus } from './settings/connection-status';
@@ -63,6 +64,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (isConfigured) renderCrateWebApp(containerEl, this.plugin);
+
+		renderAppearanceSettings({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 
 		if (sections.showReminders || sections.showReading || sections.showNotifications) {
 			createSettingsSectionHeading(containerEl, 'Features');

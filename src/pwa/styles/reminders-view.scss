@@ -36,6 +36,7 @@
 	@include reminder-pagination.styles;
 	@include schedule-switcher.styles;
 	@include reminder-cards.flat-styles;
+	@include projects.flat-styles;
 
 	// Empty screens use the visible space above the overlapping dock. Keep
 	// short viewports scrollable instead of clipping the message at the top.

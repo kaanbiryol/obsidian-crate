@@ -52,7 +52,7 @@ try {
 				await page.screenshot({ path: 'test-results/settings/' + name + '-maintenance-' + colorScheme + '.png' });
 			}
 			await checkSettingsFocus(page, sheet);
-			const listStyle = sheet.getByRole('combobox', { name: 'Reminder list style', exact: true });
+			const listStyle = sheet.getByRole('combobox', { name: 'List style', exact: true });
 			const reminderRow = page.locator('.premium-reminder-card').first();
 			await expect(listStyle).toHaveValue('flat');
 			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'flat');
@@ -129,12 +129,20 @@ try {
 			await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText('Inbox');
 
 			await switchFeature(page, 'Reading');
+			const readingLibrary = page.locator('.crate-reading-workspace');
+			await expect(readingLibrary).toHaveAttribute('data-list-style', 'flat');
 			await page.getByRole('searchbox', { name: 'Search reading' }).fill('retained query');
 			await checkCompoundFocus(page, page.getByRole('searchbox', { name: 'Search reading' }), page.locator('.crate-feature-panel[data-active="true"] .crate-field--search .crate-field__control'));
 			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');
 			await gear.click();
 			await checkSettingsFocus(page, sheet);
 			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveValue('17');
+			await listStyle.selectOption('cards');
+			await expect(readingLibrary).toHaveAttribute('data-list-style', 'cards');
+			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');
+			await listStyle.selectOption('flat');
+			await expect(readingLibrary).toHaveAttribute('data-list-style', 'flat');
+
 			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
 			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
 			const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
@@ -195,6 +203,12 @@ try {
 			const peer = await context.newPage();
 			try {
 				await peer.goto(origin + '/notifications?tab=inbox');
+				await peer.evaluate(() => {
+					const preferences = JSON.parse(localStorage.getItem('crate-reminders-preferences'));
+					localStorage.setItem('crate-reminders-preferences', JSON.stringify({ ...preferences, reminderListStyle: 'cards' }));
+				});
+				await expect(readingLibrary).toHaveAttribute('data-list-style', 'cards');
+				await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');
 				await peer.evaluate(() => localStorage.setItem('crate-reminders-theme', 'system'));
 				await expectTheme(page, 'light', 'system');
 				await gear.click();

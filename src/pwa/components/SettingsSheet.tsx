@@ -105,9 +105,9 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 					</div>}
 					<PwaUpdateNotice disabled={busy || unsynced} />
 					<PwaUpdateFeedback />
-					<GeneralSettings />
+					<GeneralSettings preferences={preferences} onPreferencesChange={changePreferences} />
 					<TabSettings preferences={preferences} onChange={changePreferences} />
-					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} preferences={preferences} onPreferencesChange={changePreferences} />
+					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
 					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
 					<div data-settings-sync=""><SettingsSection title="Sync and device">
 						<SettingsRow title="Reminders"><span className="settings-value">{!reminders?.ready ? 'Checking…' : reminders.enabled === false ? reminders.status.label : reminders.connected ? reminders.status.label : 'Not connected'}</span></SettingsRow>

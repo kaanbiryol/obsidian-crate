@@ -17,6 +17,7 @@
 	@include card-interactions.styles;
 	@include card-presentation.styles;
 	@include reminder-cards.flat-styles;
+	@include projects.flat-styles;
 
 	.crate-reminder-source-notice {
 		flex-shrink: 0;

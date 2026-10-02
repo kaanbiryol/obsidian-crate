@@ -165,12 +165,18 @@ describe('settings controls', () => {
 		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ autoOpenView: 'none' });
 		const tab = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Default reminders tab')!;
 		expect(tab.dropdowns[0]!.value).toBe('today');
-		const style = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Reminder list style')!.dropdowns[0]!;
-		expect(style.value).toBe('flat');
-		await style.change('cards');
-		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ listStyle: 'cards' });
+		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders debug logging')).toBe(false);
+	});
+
+	it('shares the appearance preference even when reminders are disabled', async () => {
+		const { renderAppearanceSettings } = await import('./appearance-section');
+		const plugin = { remindersSettings: { enabled: false, listStyle: 'cards' }, writeRemindersSettings: vi.fn(async () => {}) };
+		renderAppearanceSettings({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		const style = MockSetting.instances.find(setting => setting.nameEl.textContent === 'List style')!.dropdowns[0]!;
+		expect(style.value).toBe('cards');
 		await style.change('flat');
 		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ listStyle: 'flat' });
-		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders debug logging')).toBe(false);
+		await style.change('cards');
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ listStyle: 'cards' });
 	});
 });

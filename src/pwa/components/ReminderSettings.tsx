@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { PwaButton as Button } from './PwaButton';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 import type { RemindersSettings } from '../settings-store';
 import type { PwaPreferences } from '../preferences';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
-import { normalizeReminderListStyle } from '@/reminders/types/reminder-list-style';
 
-export function ReminderSettings({ model, homeScreenPlatform, preferences, onPreferencesChange }: {
+export function ReminderSettings({ model, homeScreenPlatform, onPreferencesChange }: {
 	model: RemindersSettings | null;
-	preferences: PwaPreferences;
 	homeScreenPlatform: HomeScreenPlatform | null;
 	onPreferencesChange: (patch: Partial<PwaPreferences>) => void;
 }) {
@@ -18,16 +16,6 @@ export function ReminderSettings({ model, homeScreenPlatform, preferences, onPre
 	const push = model?.push;
 	const available = model?.ready && model.connected;
 	return <SettingsSection title="Reminders">
-		<SettingsRow as="label" className="settings-row--preference" title="Reminder list style" description="This device">
-			<span className="settings-preference-control settings-preference-control--select">
-				<select aria-label="Reminder list style" className="settings-preference-input" value={preferences.reminderListStyle}
-					onChange={event => onPreferencesChange({ reminderListStyle: normalizeReminderListStyle(event.currentTarget.value) })}>
-					<option value="flat">Flat</option>
-					<option value="cards">Cards</option>
-				</select>
-				<ChevronDown size={14} aria-hidden="true" />
-			</span>
-		</SettingsRow>
 		{!available ? <SettingsRow description={!model?.ready ? 'Loading reminder settings…' : 'Open a fresh web app link from Obsidian to connect Reminders.'} /> : <>
 			<SettingsRow title="Push notifications" description={push && ['blocked', 'error', 'install'].includes(push.phase) ? <span aria-live="polite">{push.status}</span> : undefined}>
 				{push?.phase === 'enabled' ? <span className="settings-status is-success"><Check size={12} /> On</span>

@@ -1,3 +1,5 @@
+@use "../../../ui/shared/styles/list-item";
+
 .crate-reminders-ui .crate-reading-highlights {
 	list-style: none; margin: 0; padding: 0; display: grid; gap: 16px;
 	&__card { padding: 20px; border: 1px solid var(--crate-divider); border-radius: 12px; background: var(--crate-panel-bg); overflow-wrap: anywhere; }
@@ -21,6 +23,15 @@
 			@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { color: var(--text-normal); } }
 			&[data-press-active]:not(:disabled), &:focus-visible { color: var(--text-normal); }
 		}
+	}
+}
+.crate-reminders-ui .crate-reading[data-list-style="flat"] .crate-reading-highlights {
+	gap: 0;
+	&__card {
+		@include list-item.flat-surface;
+		position: relative;
+		padding: 20px 12px;
+		&:not(:last-child) { @include list-item.inset-divider(12px, 12px); }
 	}
 }
 .crate-reminders-ui .crate-reading-reader {

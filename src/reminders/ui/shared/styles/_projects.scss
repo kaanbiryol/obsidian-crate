@@ -1,3 +1,5 @@
+@use "../../../../ui/shared/styles/list-item";
+
 // ============================================
 // Shared projects list design
 // ============================================
@@ -308,4 +310,52 @@
     opacity: 0.4;
     transition: opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
+}
+
+// Apply after host density and interaction rules, just like flat reminders.
+@mixin flat-styles {
+    .reminders-view[data-list-style="flat"] .reminders-browse-view {
+        .premium-project-tree { gap: 0; }
+
+        .premium-project-group,
+        .premium-project-content {
+            @include list-item.flat-surface;
+        }
+
+        .premium-project-content { padding-block: 14px; }
+        .premium-project-children > .premium-project-tree > li { border-top: 0; }
+
+        .premium-project-tree > li {
+            // 12px padding + 3px accent + 10px gap, aligned with the title.
+            --crate-project-divider-start: 25px;
+            position: relative;
+
+            &:has(> .premium-project-tree-row > .premium-project-group-name) {
+                --crate-project-divider-start: 12px;
+            }
+
+            &:not(:last-child) {
+                @include list-item.inset-divider(var(--crate-project-divider-start), 12px);
+            }
+        }
+
+        .premium-project-group[data-open] > .premium-project-tree-row {
+            @include list-item.inset-divider(var(--crate-project-divider-start), 12px);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .premium-project-card:hover .premium-project-content {
+                background: var(--crate-project-card-hover-bg);
+            }
+        }
+
+        .premium-project-card[data-press-active] .premium-project-content {
+            background: var(--crate-reminder-card-active-bg);
+        }
+
+        .premium-project-card:focus-visible .premium-project-content {
+            outline: 2px solid var(--crate-focus-ring);
+            outline-offset: -2px;
+        }
+    }
 }

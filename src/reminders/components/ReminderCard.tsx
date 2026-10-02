@@ -12,7 +12,7 @@ import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 import { useReminderClock } from '../ui/useReminderClock';
-import { DEFAULT_REMINDER_LIST_STYLE, type ReminderListStyle } from '../types/reminder-list-style';
+import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 
 function renderContentWithLinks(content: string): React.ReactNode[] {
     const links = parseMarkdownLinks(content);
@@ -66,7 +66,7 @@ interface ReminderData {
 
 interface ReminderCardProps {
     reminder: ReminderData;
-    listStyle?: ReminderListStyle;
+    listStyle?: ListStyle;
     index?: number;
     animationConfig?: AnimationConfig;
     className?: string;
@@ -81,7 +81,7 @@ interface ReminderCardProps {
  */
 const ReminderCard: React.FC<ReminderCardProps> = ({
     reminder,
-    listStyle = DEFAULT_REMINDER_LIST_STYLE,
+    listStyle = DEFAULT_LIST_STYLE,
     index = 0,
     animationConfig = { enabled: true },
     className = '',
