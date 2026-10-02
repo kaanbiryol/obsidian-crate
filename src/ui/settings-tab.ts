@@ -63,9 +63,10 @@ export class CrateSettingTab extends PluginSettingTab {
 			});
 		}
 
-		if (isConfigured) renderCrateWebApp(containerEl, this.plugin);
-
-		renderAppearanceSettings({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		if (isConfigured) {
+			renderCrateWebApp(containerEl, this.plugin);
+			renderAppearanceSettings({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		}
 
 		if (sections.showReminders || sections.showReading || sections.showNotifications) {
 			createSettingsSectionHeading(containerEl, 'Features');
