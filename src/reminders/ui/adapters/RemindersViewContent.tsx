@@ -1,5 +1,4 @@
 import { useRemindersSettingsStore } from '@/reminders/settings';
-import { IconButton } from '@/ui/shared/IconButton';
 import React, { useCallback, useEffect, useState } from "react";
 import { TFile } from 'obsidian';
 import type CratePlugin from "@/main";
@@ -100,7 +99,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             initialProject={initialProject}
             hideTabBar={hideTabBar}
             renderHeader={renderHeader}
-            headerRightContent={<IconButton icon="settings" size="large" iconSize="l" label="Crate settings" onClick={() => plugin.openSettingsTab()} />}
             upcomingDays={plugin.remindersSettings.upcomingDaysDefault ?? 7}
             renderCard={renderCard}
             onAdd={handleAdd}
