@@ -41,8 +41,13 @@ describe('PWA header sync indicator', () => {
 		expect(render()).toContain('All changes synced');
 	});
 
-	it('does not report cached or disconnected data as synced', () => {
-		expect(render({ dataMode: 'cached' })).toContain('data-sync-state="cached"');
+	it('keeps cached online startup yellow before the refresh begins', () => {
+		expect(render({ dataMode: 'cached' })).toContain('data-sync-state="syncing"');
+		expect(render({ dataMode: 'cached' })).toContain('Checking reminders');
+		expect(render({ dataMode: 'cached', isOffline: true })).toContain('data-sync-state="offline"');
+	});
+
+	it('does not report disconnected data as synced', () => {
 		expect(render({ isOffline: true })).toContain('data-sync-state="offline"');
 		expect(render({ isOffline: true, changes: [pending] })).toContain('Offline: 1 change waiting to sync');
 	});

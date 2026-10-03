@@ -17,7 +17,9 @@ function render(props: Partial<Parameters<typeof readingSyncStatus>[0]> = {}) {
 
 describe('Reading sync indicator', () => {
 	it('only confirms success after an online refresh of the current session', () => {
-		expect(render({ confirmed: false })).toContain('data-sync-state="cached"');
+		expect(render({ confirmed: false })).toContain('data-sync-state="syncing"');
+		expect(render({ confirmed: false })).toContain('Checking Reading');
+		expect(render({ confirmed: false, isOffline: true })).toContain('data-sync-state="offline"');
 		expect(render({ loading: true, confirmed: false })).toContain('Loading Reading');
 		expect(render({ refreshing: true })).toContain('Refreshing Reading');
 		expect(render()).toContain('aria-label="Sync status: All changes synced"');

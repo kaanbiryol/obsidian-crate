@@ -20,6 +20,8 @@ export function readingSyncStatus({ pending, isOffline, loading, refreshing, con
 	if (isOffline) return { state: 'offline', label: pending.length ? `Offline: ${changes} waiting to sync` : 'Offline: showing saved Reading data' };
 	if (loading && !pending.length) return { state: 'syncing', label: 'Loading Reading' };
 	if (pending.length || refreshing) return { state: 'syncing', label: pending.length ? `Syncing ${changes}` : 'Refreshing Reading' };
-	if (!confirmed) return { state: 'cached', label: 'Showing saved Reading data: waiting to refresh' };
+	// Include connection verification before the list request starts, so cached
+	// startup stays yellow until this session has a confirmed server result.
+	if (!confirmed) return { state: 'syncing', label: 'Checking Reading' };
 	return { state: 'synced', label: 'All changes synced' };
 }

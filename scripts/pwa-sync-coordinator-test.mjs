@@ -56,6 +56,32 @@ try {
 		const browser = await engine.launch();
 		try {
 			{
+				const { page, context, errors } = await setup(browser);
+				await page.goto(origin + '/notifications?tab=inbox');
+				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');
+				let release; const waiting = new Promise(resolve => { release = resolve; });
+				// Warm startup has a saved Reading list, but connection verification
+				// precedes its refresh flag. Keep the whole interval yellow.
+				await page.route('**/reading/session', async route => {
+					await waiting;
+					await route.fulfill({ json: { ...session, id: 'coordinator', day: Math.floor(Date.now() / 86400000) } });
+				});
+				await context.addInitScript(() => {
+					window.startupSyncStates = [];
+					new MutationObserver(() => {
+						const state = document.querySelector('.pwa-sync-indicator')?.getAttribute('data-sync-state');
+						if (state && window.startupSyncStates.at(-1) !== state) window.startupSyncStates.push(state);
+					}).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-sync-state'] });
+				});
+				await page.reload();
+				await expect(indicator(page)).toBeVisible();
+				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'syncing');
+				release();
+				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');
+				expect(await page.evaluate(() => window.startupSyncStates)).toEqual(['syncing', 'synced']);
+				expect(errors).toEqual([]); await context.close();
+			}
+			{
 				const { page, context, errors } = await setup(browser, { pendingReading: true });
 				let release; const waiting = new Promise(resolve => { release = resolve; }); let captures = 0;
 				await page.route('**/reading/capture', async route => { captures++; await waiting; await route.fulfill({ json: {} }); });

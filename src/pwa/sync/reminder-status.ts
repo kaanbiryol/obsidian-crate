@@ -27,6 +27,8 @@ export function reminderSyncStatus({ changes, isOffline, refreshing, loading, da
 	if (isOffline) return { state: 'offline', label: pendingCount ? `Offline: ${pendingLabel} waiting to sync` : 'Offline: showing saved reminders' };
 	if (loading && !pendingCount) return { state: 'syncing', label: 'Loading reminders' };
 	if (pendingCount || refreshing) return { state: 'syncing', label: pendingCount ? `Syncing ${pendingLabel}` : 'Refreshing reminders' };
-	if (dataMode === 'cached') return { state: 'cached', label: 'Showing saved reminders: waiting to refresh' };
+	// Hydration can finish before the startup refresh begins. Online startup is
+	// still checking the server, even while the saved snapshot is already visible.
+	if (dataMode === 'cached') return { state: 'syncing', label: 'Checking reminders' };
 	return { state: 'synced', label: 'All changes synced' };
 }

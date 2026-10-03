@@ -55,7 +55,6 @@ export function useReminderMutations(options: {
 			enqueue(change);
 			discardReminderDraft(modal, config.folderPath);
 			closeModal();
-			showToast('success', modal.mode === 'create' ? 'Reminder created' : 'Reminder updated');
 			return true;
 		} catch (error) { if (sessionCurrent()) report(error); return false; }
 		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }

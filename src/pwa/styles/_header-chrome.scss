@@ -28,7 +28,7 @@
   @container reading (max-width: 719px) {
     .crate-detail-navigation { padding: 6px 12px; }
   }
-  .reminders-view .pwa-navigation-screen--project .project-detail-header { margin-top: var(--pwa-detail-heading-gap); }
+  .reminders-view .pwa-navigation-screen--project .project-detail-header { margin-top: 8px; }
   :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions button { border-radius: 50%; }
 
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

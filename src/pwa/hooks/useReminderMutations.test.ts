@@ -63,7 +63,7 @@ describe('PWA optimistic mutations', () => {
 	});
 
 	it('persists a save and closes the editor without waiting for its network attempt', async () => {
-		const { hook, render, outbox, changes, closeModal, setSaving, apiFetch, commitReminderState, memory } = harness();
+		const { hook, render, outbox, changes, closeModal, setSaving, apiFetch, commitReminderState, memory, showToast } = harness();
 		const modal = draft();
 		saveReminderDraft(modal, 'Reminders');
 		expect(await hook.saveReminder(modal)).toBe(true);
@@ -76,6 +76,7 @@ describe('PWA optimistic mutations', () => {
 		expect(memory.size).toBe(0);
 		expect(apiFetch).not.toHaveBeenCalled();
 		expect(commitReminderState).not.toHaveBeenCalled();
+		expect(showToast).not.toHaveBeenCalled();
 		expect(changes[0]).toMatchObject({ kind: 'save', path: '/reminders/create', status: 'pending',
 			operationId: modal.operationId, recordId: modal.operationId, modal });
 		expect(body(changes[0]!)).toMatchObject({ content: 'My reminder', description: 'Details',
