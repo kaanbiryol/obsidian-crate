@@ -26,7 +26,7 @@ const request = (path: string, id: string, body?: unknown, method = 'POST', prot
 });
 const subscription = (suffix: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`, keys: { p256dh: 'key', auth: 'auth' } });
 
-it.each(['', '2', '3', '4', '5', String(CRATE_PLUGIN_PROTOCOL.current + 1)])('rejects protocol %s before committing a mutation', async protocol => {
+it.each(['', '0', 'invalid', ...[1, 2, 3].map(offset => String(CRATE_PLUGIN_PROTOCOL.current + offset))])('rejects protocol %s before committing a mutation', async protocol => {
   await token('vault-token', 'vault', null);
   expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
   expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);
@@ -111,7 +111,7 @@ it('composes browser logout with the real API wrapper and Worker revocation', as
   await token('browser-logout');
   await handleSubscribe(request('/notifications/subscribe', 'browser-logout', subscription('logout')), env.DB, 'browser-logout');
   let localToken: string | null = 'browser-logout';
-  vi.stubGlobal('localStorage', { getItem: () => localToken });
+  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'crate-reminders-auth-token' ? localToken : null });
   vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh) Version/26.0 Safari/604.1', maxTouchPoints: 0 });
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
   const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));

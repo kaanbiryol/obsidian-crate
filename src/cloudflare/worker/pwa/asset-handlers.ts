@@ -27,8 +27,10 @@ function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 		'Content-Security-Policy': [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
-			`script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''}`,
-			"connect-src 'self'",
+			`script-src 'self'${nonce ? ` 'nonce-${nonce}' 'strict-dynamic'` : ''}`,
+			"script-src-attr 'none'",
+			"worker-src 'self'",
+			"connect-src 'self' https:",
 			"img-src 'self' data: https:",
 			"manifest-src 'self'",
 			"base-uri 'none'",
@@ -106,8 +108,8 @@ export function handlePwaThemeBootstrap(request: Request): Response {
 	return javascriptAssetResponse(request, PWA_THEME_BOOTSTRAP_JS);
 }
 
-export function handleManifest(request: Request): Response {
-	return new Response(createManifestJson(request.url), {
+export function handleManifest(request: Request, encrypted = false): Response {
+	return new Response(createManifestJson(request.url, encrypted), {
 		headers: {
 			'Content-Type': 'application/manifest+json',
 			...staticAssetHeaders(),

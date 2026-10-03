@@ -1,4 +1,5 @@
 import { queryRows } from './db';
+import { parseEncryptedNotification } from '../../encryption/notification-format';
 
 interface SchedulePayload {
   reminderId: string;
@@ -22,8 +23,17 @@ interface ExistingNotification {
 }
 
 function samePayload(left: SchedulePayload | null, right: SchedulePayload): boolean {
-  return left?.reminderId === right.reminderId && left.content === right.content
+  return left?.reminderId === right.reminderId && sameContent(left.content, right.content)
     && (left.project || null) === (right.project || null) && left.dueDatetime === right.dueDatetime;
+}
+
+function sameContent(left: string, right: string): boolean {
+  if (left === right) return true;
+  try {
+    const a = parseEncryptedNotification(left), b = parseEncryptedNotification(right);
+    return !!a && !!b && a.vaultId === b.vaultId && a.scopeId === b.scopeId && a.keyId === b.keyId
+      && a.reminderId === b.reminderId && a.fingerprint === b.fingerprint;
+  } catch { return false; }
 }
 
 function canReuse(row: ExistingNotification, operation: NotificationOperation): boolean {

@@ -1,4 +1,5 @@
 import { REMINDER_OPERATION_FLOOR } from '../reminders-web/operation-expiry';
+import { pruneEncryptionPairings } from '../encryption-pairing';
 
 /**
  * Only forgotten occurrences far outside the 24-hour delivery window expire.
@@ -18,6 +19,7 @@ export async function pruneReminderOccurrences(db: D1Database): Promise<void> {
 
 /** Expiration is published before deleting receipts, in the same transaction. */
 export async function pruneReminderOperations(db: D1Database): Promise<void> {
+  await pruneEncryptionPairings(db);
 	const prefix = `'e1_' || printf('%08d', ${REMINDER_OPERATION_FLOOR}) || '_'`;
 	await db.batch([
  db.prepare(`DELETE FROM reading_operations WHERE day < ${REMINDER_OPERATION_FLOOR}`),

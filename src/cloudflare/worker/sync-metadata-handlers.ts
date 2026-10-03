@@ -1,4 +1,5 @@
 import { portablePathKey } from '../../protocol/portable-path';
+import { MAX_SHARED_SETTINGS_BYTES } from '../../encryption/settings-format';
 import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
 import { parseJsonObject, sanitizePath } from './utils';
@@ -146,7 +147,7 @@ export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
 }
 
 export async function handlePutSettings(request: Request, bucket: R2Bucket): Promise<Response> {
-	const parsedBody = await parseJsonObject(request);
+	const parsedBody = await parseJsonObject(request, MAX_SHARED_SETTINGS_BYTES);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}

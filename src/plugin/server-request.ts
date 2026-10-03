@@ -1,3 +1,4 @@
+import { loadEncryptionKeys } from './encryption-storage';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { SECRET_KEYS } from './settings-types';
@@ -39,6 +40,8 @@ export async function serverRequest<T>(
 		finally { assertCurrent(); }
 	});
 	client.setAbortSignal(signal);
+	const keys = loadEncryptionKeys(plugin.secretStorage);
+	if (keys) client.setEncryptionAuthority(keys.vaultId, keys.generation);
 	const info = await client.getServerInfo(timeout);
 	assertCurrent();
 	for (const [capability, message] of Object.entries(capabilities)) {

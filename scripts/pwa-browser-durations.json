@@ -1,9 +1,15 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/36695803953",
   "additionalSources": {
-    "scripts/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds"
+    "scripts/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds",
+    "scripts/pwa-reading-encryption-test.mjs": "local encrypted Reading workflow; conservative 45-second scheduling estimate",
+    "scripts/pwa-reading-encryption-storage-test.mjs": "local Chromium/WebKit storage and key recovery; conservative 10-second scheduling estimate",
+    "scripts/pwa-web-app-unlock-test.mjs": "local Chromium/WebKit combined key import and draft recovery; conservative 10-second scheduling estimate"
   },
   "seconds": {
+	"scripts/pwa-encryption-onboarding-test.mjs": 30,
+    "scripts/pwa-pairing-test.mjs": 65,
+    "scripts/reading-content-security-test.mjs": 8,
     "scripts/pwa-sync-coordinator-test.mjs": 12.4,
     "scripts/pwa-sheet-field-test.mjs": 18.9,
     "scripts/pwa-ios27-header-test.mjs": 8.8,
@@ -50,6 +56,12 @@
     "scripts/pwa-update-notice-test.mjs": 17.2,
     "scripts/reading-touch-test.mjs": 39.2,
     "scripts/shared-press-feedback-test.mjs": 9,
-    "scripts/reading-appearance-test.mjs": 17.2
+    "scripts/reading-appearance-test.mjs": 17.2,
+    "scripts/pwa-encryption-storage-test.mjs": 10,
+    "scripts/pwa-encryption-test.mjs": 35,
+    "scripts/pwa-encryption-regressions-test.mjs": 45,
+    "scripts/pwa-reading-encryption-test.mjs": 45,
+    "scripts/pwa-reading-encryption-storage-test.mjs": 10,
+    "scripts/pwa-web-app-unlock-test.mjs": 10
   }
 }

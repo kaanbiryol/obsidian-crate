@@ -186,6 +186,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return statement;
 				}),
 				run: vi.fn(async () => {
+					if (sql.includes('INSERT INTO staged_uploads')) return { meta: { changes: 1 } };
 					if (sql.startsWith('CREATE TABLE') || sql.startsWith('ALTER TABLE')) {
 						return {};
 					}
@@ -211,6 +212,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return null;
 				}) as MockD1Statement['first'],
 				all: vi.fn(async <T = Record<string, unknown>>() => {
+					if (sql.includes('INSERT INTO staged_uploads')) return { results: (JSON.parse(String(statement._args[1])) as unknown[]).map(() => ({ encryption_state: null })) as T[] };
 					if (sql.includes('FROM files WHERE portable_path IN')) {
 						const results = statement._args.flatMap((value) => {
 							if (typeof value !== 'string') return [];

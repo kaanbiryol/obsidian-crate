@@ -41,29 +41,7 @@
 	width: 100%;
 	background: var(--background-primary);
 }
-.pwa-mode-opening__header {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 10px;
-	min-height: 0;
-	padding: calc(var(--pwa-safe-area-top) + var(--pwa-header-top-gap)) 18px var(--pwa-header-bottom-gap);
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-.pwa-mode-opening__heading { min-width: 0; }
-.pwa-mode-opening__heading h1 { overflow: hidden; margin: 0; color: var(--text-normal); font-size: var(--crate-view-title-size, 30px); font-weight: var(--crate-view-title-weight, 700); line-height: 1.12; letter-spacing: var(--crate-view-title-spacing, -.04em); text-overflow: ellipsis; white-space: nowrap; }
-.pwa-mode-opening__meta { width: 82px; height: 10px; margin-top: 10px; border-radius: 5px; }
-.pwa-mode-opening__actions { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-.pwa-mode-opening__action { width: 44px; height: 44px; border-radius: 12px; }
 .pwa-mode-opening__content { flex: 1; min-height: 0; overflow: hidden; }
-.pwa-mode-opening__fab { position: absolute; right: 18px; bottom: calc(var(--reminders-tabbar-height) + 16px); width: 56px; height: 56px; border-radius: 50%; background: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-primary)); }
-.pwa-mode-opening__nav { display: flex; align-items: center; flex-shrink: 0; height: var(--reminders-tabbar-height); padding-bottom: var(--pwa-tabbar-safe-area); box-sizing: border-box; background: var(--pwa-tabbar-surface); box-shadow: inset 0 1px 0 var(--background-modifier-border); }
-.pwa-mode-opening__nav-item { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-width: 0; height: var(--pwa-tabbar-content-height); }
-.pwa-mode-opening__nav-icon { width: 23px; height: 23px; border-radius: 6px; }
-.pwa-mode-opening__nav-label { width: 42px; height: 8px; border-radius: 4px; }
-.pwa-mode-opening__nav-item:nth-child(2) .pwa-mode-opening__nav-label { width: 34px; }
-
-@media (min-width: 760px) { .pwa-mode-opening__fab { width: 48px; height: 48px; } }
 
 @media (prefers-reduced-motion: reduce) {
 	.crate-feature-panel .pwa-feature-switch-button,

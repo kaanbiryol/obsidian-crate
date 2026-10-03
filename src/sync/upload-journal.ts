@@ -1,7 +1,7 @@
 import type { DataAdapter } from 'obsidian';
 import { createReminderOperationId, reminderOperationDay } from '@/protocol/reminder-operation';
 import { isRecord } from '@/platform/validation';
-import { validateUploadIntent, type IntendedUpload, type JournalUpload } from './upload-intent';
+import { validateUploadIntent, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 
 /** One immutable file per dispatched upload, separate from the large manifest.
  * Receipts are removed only after their resulting checkpoint is durable. */
@@ -28,8 +28,9 @@ export class UploadJournal {
 			let raw: unknown;
 			try { raw = JSON.parse(await this.adapter.read(path)); } catch { throw new Error('Unreadable upload journal. Preserve the vault and its sync metadata before resetting.'); }
 			if (!isRecord(raw) || raw.authority !== this.authority || !isRecord(raw.file)) throw new Error('Upload journal belongs to another server or is damaged. Preserve it before resetting sync.');
-			if (raw.version !== 2) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing; older records do not identify merge preimages.');
+			if (raw.version !== 2 && raw.version !== 3) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing; older records do not identify merge preimages.');
 			const file = raw.file;
+			if ((raw.version === 3) !== (file.encryptedWire !== undefined)) throw new Error('Invalid encrypted upload journal version');
 			if (typeof raw.sequence !== 'number' || !Number.isSafeInteger(raw.sequence) || raw.sequence < 1) throw new Error('Invalid upload journal sequence');
 			this.sequence = Math.max(this.sequence, raw.sequence);
 			if (typeof file.operationId !== 'string' || reminderOperationDay(file.operationId) === null
@@ -44,7 +45,7 @@ export class UploadJournal {
 	completedSnapshot(): string[] { return [...this.completed]; }
 	complete(id: string): void { this.entries.delete(id); this.completed.add(id); }
 
-	prepare(files: IntendedUpload[], day: number, clientSession: string = crypto.randomUUID()): Promise<JournalUpload[]> {
+	prepare(files: IntendedUpload[], day: number, clientSession: string = crypto.randomUUID(), prepareWire?: PrepareUploadWire): Promise<JournalUpload[]> {
 		const task = this.writing.catch(() => {}).then(async () => {
 			if (this.closed) throw new DOMException('Sync engine closed', 'AbortError');
 			if (!await this.adapter.exists(this.directory)) await this.adapter.mkdir(this.directory);
@@ -56,11 +57,13 @@ export class UploadJournal {
 					result.push(prior);
 					continue;
 				}
-				const durable = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
+				const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
 				if (reminderOperationDay(durable.operationId) === null || (this.entries.has(durable.operationId) || this.completed.has(durable.operationId))) throw new Error('Invalid or reused upload operation identity');
+				const encryptedWire = await prepareWire?.(durable);
+				if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable); }
 				// A failed write must not dispatch the request. A partial journal file
 				// makes restart fail closed instead of guessing that no upload ran.
-				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: 2, authority: this.authority, sequence: ++this.sequence, file: durable }));
+				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: encryptedWire ? 3 : 2, authority: this.authority, sequence: ++this.sequence, file: durable }));
 				this.entries.set(durable.operationId, durable);
 				result.push(durable);
 			}

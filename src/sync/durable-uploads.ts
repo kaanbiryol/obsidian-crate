@@ -4,13 +4,17 @@ import type { MarkdownBaseCache } from './markdown-base-cache';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from './manifest';
 import { base64ToArrayBuffer } from './encoding';
-import { mergeUploadIntent, type IntendedUpload, type JournalUpload } from './upload-intent';
+import { mergeUploadIntent, uploadWire, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 import { UNVERIFIED_MODIFIED } from './applied-content';
 import { computeHash } from './hasher';
 import type { UploadApplyPhase, UploadPhase } from './upload-diagnostics';
 import { HttpError } from './worker-api/http';
 
 interface UploadTransport {
+	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;
+	resolveLegacyUpload?(file: JournalUpload): Promise<UploadResult | null>;
+	prepareUploadWire?: PrepareUploadWire;
+	assertPreparedUpload?(file: JournalUpload): Promise<void>;
 	getServerInfo(): Promise<{ reminderOperationDay?: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	uploadFile(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId?: string): Promise<UploadResult>;
@@ -23,14 +27,33 @@ export class DurableUploads {
 	constructor(private manifest: LocalManifest, private transport: UploadTransport, private cache: MarkdownBaseCache, private clientSession: string) {}
 
 	async batch(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
-		const durable = await this.prepare(files.map(file => ({ ...file, intent: { kind: 'local' } })));
-		return this.sendBatch(durable);
+		const durable: JournalUpload[] = [];
+		const rejected: UploadResult[] = [];
+		for (const file of files) {
+			try {
+				durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }]));
+			} catch (error) {
+				// Encryption resolves the plaintext precondition before journaling.
+				// A stale file has not been dispatched and can reconcile independently.
+				if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
+				rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
+			}
+		}
+		const response = durable.length ? await this.sendBatch(durable) : { success: true, results: [] };
+		const results = new Map([...response.results, ...rejected].map(result => [result.path, result]));
+		return { success: response.success && rejected.length === 0, results: files.map(file => results.get(file.path)!) };
 	}
 
 	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {
+		if (durable.some(file => this.transport.requiresLegacyUploadRecovery?.(file))) {
+			const results = [];
+			for (const file of durable) { const result = await this.sendSingle(file); results.push(result); if (result.success || this.definitive(result)) await onSettled?.(); }
+			return { success: results.every(result => result.success), results };
+		}
 		for (const file of durable) this.active.add(file.operationId);
 		try {
-			const response = await this.transport.batchUpload(durable.map(({ intent: _intent, origin: _origin, ...file }) => file));
+			for (const file of durable) await this.transport.assertPreparedUpload?.(file);
+			const response = await this.transport.batchUpload(durable.map(uploadWire));
 			if (response.results.length !== durable.length || new Set(response.results.map(file => file.path)).size !== durable.length) throw new Error('Invalid upload receipt batch');
 			const receipts = new Map(response.results.map(result => [result.path, result]));
 			for (const file of durable) this.validate(file, receipts.get(file.path));
@@ -39,7 +62,7 @@ export class DurableUploads {
 				await this.accept(file, receipt);
 				if (receipt.success || this.definitive(receipt)) await onSettled?.();
 			}
-			return response;
+			return { ...response, results: response.results.map(result => this.localReceipt(durable.find(file => file.path === result.path)!, result)) };
 		} finally { for (const file of durable) this.active.delete(file.operationId); }
 	}
 
@@ -96,7 +119,8 @@ export class DurableUploads {
 			if (!Number.isInteger(info.reminderOperationDay)) throw new Error('Server did not provide an upload retry window. Update the server before syncing.');
 			this.serverDay = { day: info.reminderOperationDay!, expires: performance.now() + 60_000 };
 		}
-		const prepared = await this.manifest.uploadJournal.prepare(files, this.serverDay.day, this.clientSession);
+		const prepared = await this.manifest.uploadJournal.prepare(files, this.serverDay.day, this.clientSession,
+			this.transport.prepareUploadWire?.bind(this.transport));
 		for (const file of prepared) await this.trace(file, 'prepared');
 		return prepared;
 	}
@@ -106,14 +130,20 @@ export class DurableUploads {
 		try {
 			let result: UploadResult;
 			try {
-				result = await this.transport.uploadFile(file.path, base64ToArrayBuffer(file.content), file.hash, file.size, file.contentType, file.expectedHash, file.operationId);
+				const legacy = await this.transport.resolveLegacyUpload?.(file);
+				if (legacy) result = legacy;
+				else {
+					await this.transport.assertPreparedUpload?.(file);
+					const wire = uploadWire(file);
+					result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
+				}
 			} catch (error) {
 				if (!(error instanceof HttpError) || !['version_conflict', 'namespace_conflict'].includes(error.code ?? '')) throw error;
 				result = { success: false, path: file.path, status: error.status, code: error.code as 'version_conflict' | 'namespace_conflict', error: error.message };
 			}
 			this.validate(file, result);
 			await this.accept(file, result);
-			return result;
+			return this.localReceipt(file, result);
 		} finally { this.active.delete(file.operationId); }
 	}
 
@@ -121,7 +151,10 @@ export class DurableUploads {
 		return result.status === 409 && (result.code === 'version_conflict' || result.code === 'namespace_conflict');
 	}
 	private validate(file: JournalUpload, result?: UploadResult): void {
-		if (!result || result.path !== file.path || (result.success && (result.hash !== file.hash || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
+		if (!result || result.path !== file.path || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');
+	}
+	private localReceipt(file: JournalUpload, receipt: UploadResult): UploadResult {
+		return receipt.success && file.encryptedWire ? { ...receipt, hash: file.hash } : receipt;
 	}
 	private async accept(file: JournalUpload, result: UploadResult): Promise<void> {
 		if (result.success) {

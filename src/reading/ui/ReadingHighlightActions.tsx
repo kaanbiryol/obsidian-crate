@@ -12,7 +12,7 @@ type Geometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top:
 /** Native initial selection; portable handles for editing a saved annotation. */
 export function ReadingHighlightActions({ body, article, content, highlights, onSave, onCopyComplete, disabled }: {
 	body: React.RefObject<HTMLDivElement | null>; article: React.RefObject<HTMLElement | null>;
-	content: string; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
+	content: DocumentFragment | null; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
 	onCopyComplete?: () => void;
 }) {
 	const controls = useRef<HTMLDivElement>(null), editing = useRef<Editing | null>(null), saving = useRef(false);

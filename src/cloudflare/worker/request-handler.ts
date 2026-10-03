@@ -20,6 +20,9 @@ import type { Env } from './types';
 import { FileVersionConflictError } from './storage/index';
 import { FileNamespaceConflictError } from './file-namespace';
 import { ReminderMarkdownContextError } from '@/reminders/core/markdownTaskContext';
+import { EncryptionStateError } from './encryption-state';
+import { ENCRYPTION_PROTOCOL } from '../../encryption/server-state';
+import { forwardTransferRequest } from './transfer-dispatch';
 
 function withRequestId(response: Response, requestId: string, started: number): Response {
 	const headers = new Headers(response.headers);
@@ -32,12 +35,12 @@ function withRequestId(response: Response, requestId: string, started: number): 
 	});
 }
 
-export async function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
-  const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, coordinatorState));
+export async function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState, transfer = false): Promise<Response> {
+  const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, coordinatorState, transfer));
   return shortcutLaunchResponse(request, response, env.CRATE_DEPLOYMENT_FINGERPRINT);
 }
 
-async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, coordinatorState?: DurableObjectState): Promise<Response> {
+async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, coordinatorState?: DurableObjectState, transfer = false): Promise<Response> {
 	const requestId = crypto.randomUUID();
 	const started = performance.now();
 	if (request.method === 'OPTIONS') {
@@ -85,6 +88,31 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
     }
 
     if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);
+		const encryption = authResult.encryption ?? null;
+		if (encryption?.mode === 'resetting' && !['/encryption/reset', '/encryption', '/health'].includes(path)) {
+			throw new EncryptionStateError('Encryption reset is in progress. Resume it on the device that started it.', 423);
+		}
+		// Feature visibility is authenticated public policy, not private vault content.
+		if (encryption && !(['/features', '/reading/encryption', '/reading/session'].includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
+			const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
+			if (!Number.isInteger(protocol) || protocol < ENCRYPTION_PROTOCOL || protocol > CRATE_PLUGIN_PROTOCOL.current) {
+				throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
+			}
+			if (request.headers.get('X-Crate-Encryption-Vault') !== encryption.vaultId
+				|| request.headers.get('X-Crate-Encryption-Generation') !== String(encryption.generation)) {
+				throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
+			}
+			if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);
+			if (path === '/links/title' || (path.startsWith('/reminders/') && path !== '/reminders/notification-policy' && !path.startsWith('/reminders/encrypted')) || path.startsWith('/sync/import')) {
+				throw new EncryptionStateError('This operation requires the encrypted client workflow', 428);
+			}
+		}
+		if (!coordinatorState && !transfer && ((path === '/sync/upload' && method === 'PUT') || (path === '/sync/batch-upload' && method === 'POST'))) {
+			// Stream without decoding or hashing on the public Worker's CPU budget.
+			// The transfer object reauthenticates after queuing, before reading bytes.
+			const response = await forwardTransferRequest(request, env, path === '/sync/upload' ? '/sync-upload' : '/sync-batch-upload');
+			return withRequestId(response, response.headers.get('X-Crate-Request-Id') ?? requestId, started);
+		}
 		const mutation = isCrateMutation(path, method);
     if (coordinatorState && (path.startsWith('/reading/') || path === '/features' && method === 'POST')) await armNotificationCoordinator(coordinatorState);
     const notificationMutation = await affectsNotifications(request);
@@ -107,11 +135,12 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
       if (!scheduled.ok) throw new Error('Unable to schedule cleanup');
     }
     const routeEnv = coordinatorState ? env : { ...env, commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) };
-		const response = await handleAuthenticatedRoute(request, routeEnv, path, method, authResult.principal, requestId)
+		const response = await handleAuthenticatedRoute(request, routeEnv, path, method, authResult.principal, authResult.resetGeneration, requestId, encryption)
 			?? corsResponse({ error: 'Not found' }, 404);
 		if (mutation) await logMutation(request, response, requestId, authResult.principal);
 		return withRequestId(response, requestId, started);
 	} catch (error) {
+		if (error instanceof EncryptionStateError) return withRequestId(corsResponse({ error: error.message, code: 'encryption_required' }, error.status), requestId, started);
 		if (error instanceof MarkdownEncodingError) return withRequestId(corsResponse({ error: error.message, code: 'unsupported_markdown_encoding' }, 409), requestId, started);
 		if (error instanceof ReminderInputError) return withRequestId(corsResponse({ error: error.message, field: error.field, code: 'invalid_reminder_input' }, 400), requestId, started);
 		if (error instanceof ReminderMarkdownContextError) return withRequestId(corsResponse({ error: error.message, code: 'reminder_markdown_context' }, 409), requestId, started);

@@ -27,7 +27,7 @@ async function harness(browser, existing = false) {
   const rows = new Map();
   const attempts = [];
   const held = [];
-  const control = { mode: 'ok', holdToken: null };
+  const control = { mode: 'ok', holdToken: null, notificationsEnabled: true };
   await context.addInitScript(({ authKey, providerKey, token, existing, firstEndpoint }) => {
     if (!localStorage.getItem(providerKey)) {
       localStorage.setItem(authKey, token);
@@ -85,7 +85,7 @@ async function harness(browser, existing = false) {
     rows.set(body.endpoint, row);
     if (control.holdToken === token) await new Promise(resolve => held.push(resolve));
     if (control.mode === 'after') return route.fulfill({ status: 503, body: 'Registration response lost' });
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(control.mode === 'malformed' ? {} : { id: row.id }) });
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(control.mode === 'malformed' ? {} : { id: row.id, notificationsEnabled: control.notificationsEnabled }) });
   });
   const page = await context.newPage();
   const open = async () => {
@@ -210,6 +210,40 @@ async function logoutDuringConfirmation(browser) {
   } finally { await state.close(); }
 }
 
+async function pausedVault(browser) {
+  const state = await harness(browser);
+  const { page, open, control, rows } = state;
+  try {
+    control.notificationsEnabled = false;
+    await open();
+    await page.getByRole('button', { name: 'Enable', exact: true }).click();
+    await page.getByText('Off for vault', { exact: true }).waitFor();
+    await expect(on(page)).toHaveCount(0);
+    expect(rows.size).toBe(1);
+    expect((await providerState(page)).permission).toBe('granted');
+    const section = page.getByRole('region', { name: 'Reminders', exact: true });
+    await expect(section).toContainText('This device is registered, but notifications are off for this vault.');
+    await expect(section).toContainText('Obsidian');
+    control.notificationsEnabled = true;
+    await resume(page);
+    await on(page).waitFor();
+    control.notificationsEnabled = false;
+    await resume(page);
+    await page.getByText('Off for vault', { exact: true }).waitFor();
+    await expect(on(page)).toHaveCount(0);
+    // An older or malformed response cannot turn an unconfirmed server green.
+    control.notificationsEnabled = undefined;
+    await resume(page);
+    await retry(page).waitFor();
+    await expect(section).toContainText('Update your Crate server');
+    await expect(on(page)).toHaveCount(0);
+    control.notificationsEnabled = true;
+    await retry(page).click();
+    await on(page).waitFor();
+    expect((await providerState(page)).subscribes).toBe(1);
+  } finally { await state.close(); }
+}
+
 try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
@@ -217,7 +251,8 @@ try {
       for (const failure of ['before', 'after']) await registrationFailure(browser, failure);
       await renewalAndProviderChanges(browser);
       await logoutDuringConfirmation(browser);
-      console.log(`${browserType.name()}: server confirmation gates On; failed/lost registrations retry, renewal/restored rows repair, provider changes and unknown states stay truthful, and late logout cleanup preserves a fresh session`);
+      await pausedVault(browser);
+      console.log(`${browserType.name()}: server confirmation gates On; vault pause/resume is shown without re-subscribing, failed/lost registrations retry, renewal/restored rows repair, provider changes and unknown states stay truthful, and late logout cleanup preserves a fresh session`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

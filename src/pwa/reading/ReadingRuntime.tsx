@@ -6,10 +6,11 @@ import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
-import { logoutReadingApp } from './logout';
+import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { assertReadingSession, exportReadingData } from './storage';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
+import { readingKeys } from './encryption-session';
 
 
 const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ default: module.ShortcutSetup })));
@@ -17,9 +18,11 @@ const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ def
 function useReadingController() {
   const enabled = useSharedFeatures().reading;
   const showToast = useSyncFeedback();
-  const connection = useReadingSession(enabled);
-  const { session, ready, connecting, cache, pending, error, setError, recovery, connectionState,
+  const app = useAppConnection();
+  const connection = useReadingSession(app.reading);
+  const { session, lockedSession, ready, connecting, cache, pending, error, recovery, connectionState,
     adding, connect, resetSession } = connection;
+  useConnectionReset(resetSession);
   const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection, enabled);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -41,6 +44,8 @@ function useReadingController() {
   const readingDisabled = !session && connectionState !== 'available';
   useFeatureSettings('reading', {
     ready: ready && !connecting, connected: Boolean(session), enabled, pendingCount: pending.length,
+    encryption: lockedSession ? { status: 'locked', folderPath: lockedSession.folderPath }
+      : session ? { status: readingKeys() ? 'ready' : 'legacy', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
     retryAt: Math.min(...pending.flatMap(op => op.retryAt !== undefined && !op.review && (op.attempts ?? 0) < 3 ? [op.retryAt] : [])),
     status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
     updateContentReady: ready && !connecting && (!enabled || !session || Boolean(cache) || Boolean(error)),
@@ -50,12 +55,7 @@ function useReadingController() {
     onRefresh: () => session ? refreshManually() : connect(),
     onExport: pending.length || recovery ? exportReadingData : undefined,
     clearView: resetSession,
-    onLogout: async () => {
-      setSettingsOpen(false); resetSession();
-      const error = await logoutReadingApp();
-      setError(error);
-      if (error) showToast('error', error);
-    },
+    onLogout: app.logOut,
     shortcut: session ? <DeferredNotice><ShortcutSetup session={session} /></DeferredNotice> : null,
     issues: <>
       {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}

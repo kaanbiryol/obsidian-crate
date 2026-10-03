@@ -30,6 +30,7 @@ function harness() {
 	const saveData = vi.fn(async (next: unknown) => { data = structuredClone(next); });
 	const reinitializeWithFolder = vi.fn(async () => {});
 	Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } },
+		secretStorage: { get: () => null },
 		settings: normalizeCrateSettings({ workerUrl: 'https://first.example' }, '.obsidian'),
 		syncRuntime: { getApiClient }, saveData, loadData: async () => data,
 		reinitializeWithFolder });

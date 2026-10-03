@@ -74,6 +74,17 @@ export class FakeElement {
 		this.textContent = '';
 	}
 
+	remove(): void {
+		if (this.parentElement) {
+			const index = this.parentElement.children.indexOf(this);
+			if (index !== -1) this.parentElement.children.splice(index, 1);
+		}
+		this.parentElement = null;
+		this.isConnected = false;
+	}
+
+	removeAttribute(name: string): void { this.attributes.delete(name); }
+
 	setText(text: string): void {
 		this.textContent = text;
 	}

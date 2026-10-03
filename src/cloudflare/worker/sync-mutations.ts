@@ -1,4 +1,7 @@
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
+import type { EncryptionServerState } from '../../encryption/server-state';
+import { syncResetGenerationGuard } from './sync-reset-generation';
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
 import { stagedBatchGuard } from './staged-upload-batches';
 import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
@@ -31,8 +34,16 @@ export function uploadMutation(
 	expectedRevision?: string,
 	stagingBatchId?: string,
 	importToken?: string,
+	encryptionState: EncryptionServerState | null = null,
+	resetGeneration?: string | null,
 ): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
+	const encryption = encryptionWriteGuard(encryptionState);
+	namespace.sql += ` AND ${encryption.sql}`;
+	namespace.args.push(...encryption.args);
+	const resetGuard = syncResetGenerationGuard(resetGeneration);
+	namespace.sql += ` AND ${resetGuard.sql}`;
+	namespace.args.push(...resetGuard.args);
   const lease = stagingBatchId ? stagedBatchGuard(stagingBatchId, objectKey) : stagedUploadGuard(objectKey);
   namespace.sql += ` AND ${lease.sql}`;
   namespace.args.push(...lease.args);
@@ -78,12 +89,15 @@ export async function commitStagedFile(
 		objectKey: string;
 		content: string | ArrayBuffer;
 		effects?: CommitEffects;
+		encryptionState?: EncryptionServerState | null;
+		resetGeneration?: string | null;
 		operation?: UploadOperation;
 		expectedHash: ExpectedFileHash;
 		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
+	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState);
 	const cleanupKeys = collectCleanupKeys(params.previousFile, params.objectKey);
 	const mutation = uploadMutation(
 		db,
@@ -94,9 +108,14 @@ export async function commitStagedFile(
 		params.expectedHash,
 		params.operation,
 		params.expectedRevision,
+		undefined,
+		undefined,
+		encryption.state,
+		params.resetGeneration,
 	);
 	const results: unknown[] = await db.batch([
 		mutation,
+		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
 		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
 			SELECT ?, 'put', ?, ?, ?
 			WHERE EXISTS (
@@ -115,7 +134,7 @@ export async function commitStagedFile(
 			...filePathArgs(params.path),
 			params.objectKey,
 		)),
-		...await enqueueFileProjection(db, params.path, params.objectKey, params.content),
+		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state)),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),

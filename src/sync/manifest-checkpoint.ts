@@ -18,11 +18,13 @@ export function parseCheckpoint(value: unknown) {
 		|| (value.authority !== undefined && (typeof value.authority !== 'string' || !value.authority))
 		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before recovering sync.');
 	const settled = value.settledUploads ?? [];
+	if (value.appliedRename !== undefined && (typeof value.appliedRename !== 'string' || !value.appliedRename || value.appliedRename.length > 128)) throw new Error('Invalid rename receipt checkpoint');
 	if (!Array.isArray(settled) || settled.some(id => typeof id !== 'string' || reminderOperationDay(id) === null)
 		|| new Set(settled).size !== settled.length) throw new Error('Invalid upload receipt checkpoint');
 	return {
 		manifest: parseLocalManifest(value), generation: value.generation, authority: value.authority,
 		settledUploads: settled, renames: parseRenameDependencies(value.renameDependencies),
+		appliedRename: value.appliedRename,
 		uploadDiagnostics: normalizeUploadDiagnostics(value.uploadDiagnostics),
 		restoreIntents: parseRestoreIntents(value.restoreIntents),
 		initialConfigPull: parseInitialConfigPull(value.initialConfigPull),

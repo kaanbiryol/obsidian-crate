@@ -63,7 +63,7 @@ import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
-import { normalizeWorkerUrl } from './worker-url';
+import { getCheckpointAuthority } from './worker-url';
 import { LocalContentVerifier } from './content-verifier';
 import { verifyUnchangedPendingPaths } from './pending-verification';
 
@@ -104,11 +104,11 @@ export class SyncEngine {
 		this.vault = plugin.app.vault;
 		this.api = api;
 		this.settings = settings;
-		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, normalizeWorkerUrl(settings.workerUrl) || 'unconfigured');
+		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
 		this.contentVerifier = new LocalContentVerifier({
 			adapter: this.vault.adapter,
 			path: `${plugin.manifest.dir}/content-verification.json`,
-			authority: normalizeWorkerUrl(settings.workerUrl) || 'unconfigured',
+			authority: getCheckpointAuthority(settings) || 'unconfigured',
 		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		this.api.configureUploadJournal(this.localManifest, this.vault, this.markdownBaseCache);
@@ -588,6 +588,8 @@ export class SyncEngine {
 		}
 		this.queueController.onFileDelete(file);
 	}
+
+	getRenameDependencies(): Record<string, string> { return this.localManifest.getRenameDependencies(); }
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path);

@@ -30,7 +30,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: Reading source 
         await api.writeValue(listKey, { items: [item], issues: [], savedAt: 1 }, session);
       };
       let body = {}, status = 503;
-      window.fetch = async () => new Response(JSON.stringify(body), { status });
+      window.fetch = async path => path === '/reading/encryption' ? Response.json({ encryption: null }) : new Response(JSON.stringify(body), { status });
       await seed();
       let failed = false;
       try { await api.loadReading(session); } catch { failed = true; }

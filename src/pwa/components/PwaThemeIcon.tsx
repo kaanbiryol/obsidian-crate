@@ -41,6 +41,7 @@ import {
   Repeat,
   Sparkles,
   SquarePen,
+  Smartphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -90,6 +91,7 @@ const ICONS: Record<string, LucideIcon> = {
   repeat: Repeat,
   sparkles: Sparkles,
   'square-pen': SquarePen,
+  smartphone: Smartphone,
 };
 
 const ICON_SIZES: Record<ThemeIconSize, number> = {

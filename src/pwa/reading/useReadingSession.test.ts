@@ -1,12 +1,15 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
+import { useReadingConnection } from './useReadingConnection';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY, PWA_LOGOUT_KEY } from '../config';
 import { READING_SESSION_KEY, readReadingCache, readReadingDraft, writeValue, type ReadingSession } from './storage';
 import { connectReadingFromReminders } from './api';
 import { invalidatePwaSession } from '../session-generation';
+import { prepareReadingEncryption } from './encryption-session';
 
+vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../api', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),
@@ -36,7 +39,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', network);
 });
 function renderSession() {
-  return renderHook(useReadingSession, () => {
+  return renderHook(() => useReadingSession(useReadingConnection(true, true)), () => {
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) });
     document.cookie = '';
   });
@@ -107,6 +110,17 @@ describe('Reading enrollment authority', () => {
     await act(async () => { damaged.release(new Response(JSON.stringify(session))); });
     expect(damaged.rendered.current).toMatchObject({ session, recovery: true, error: 'Saved draft needs recovery' });
     expect(writeValue).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a connection when encryption finishes after reset', async () => {
+    const encryption = deferred<null>();
+    vi.mocked(prepareReadingEncryption).mockReturnValueOnce(encryption.promise);
+    const h = start();
+    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    await act(async () => h.rendered.current.resetSession());
+    await act(async () => encryption.resolve(null));
+    expect(h.rendered.current.session).toBeNull();
+    expect(readReadingCache).not.toHaveBeenCalled();
   });
 
   it('removes connection listeners after enrollment and on unmount', async () => {

@@ -261,7 +261,7 @@
 					<span class="privacy-principle__index">03</span><h3>Scoped phone access</h3><p>The companion app receives a reminder-only token. It cannot call vault sync or device-management APIs.</p>
 				</article>
 			</div>
-			<aside class="privacy-disclosure"><span>Encryption boundary</span><p><strong>Crate does not add end-to-end encryption.</strong> Your Cloudflare account and Worker can access synced vault contents.</p></aside>
+			<aside class="privacy-disclosure"><span>Encryption boundary</span><p><strong>End-to-end encryption is optional.</strong> Enable it in Crate settings to protect synced content. Paths, sizes and notification times remain visible to your server.</p></aside>
 		</section>
 
         <section class="faq-section content-rail mx-auto w-[min(100%-2rem,76rem)] sm:w-[min(100%-3rem,76rem)]" id="faq" aria-labelledby="faq-title">
@@ -271,7 +271,7 @@
                 <details><summary>What does it cost?</summary><p>Crate is open source. Cloudflare usage is billed separately to your account; costs depend on your storage and activity. Review your Cloudflare plan and usage before connecting a vault.</p></details>
                 <details><summary>How does it work on my phone?</summary><p>Install the plugin in Obsidian mobile to sync your vault. The companion web app is for reminders and notifications; it does not browse or sync your notes. Phone notifications require setup and permission.</p></details>
                 <details><summary>How do I install it?</summary><p>Crate is an early release and is not in the community plugin catalog yet. Follow the <a href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">installation guide</a> to build and install it manually. Start with a non-critical vault.</p></details>
-                <details><summary>Are my notes end-to-end encrypted?</summary><p>No. Crate does not add end-to-end encryption. Your Cloudflare account and Worker can access synced vault contents. <a href="/privacy/">Read the privacy policy</a> for the full data handling details.</p></details>
+                <details><summary>Are my notes end-to-end encrypted?</summary><p>Crate offers optional end-to-end encryption on Cloudflare and self-hosted servers. Save your recovery key and enable it in Crate settings. Without it, your server operator can read synced contents. <a href="/privacy/">Read the privacy policy</a> for the full data handling details.</p></details>
             </div>
         </section>
 

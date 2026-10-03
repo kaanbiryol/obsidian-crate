@@ -57,6 +57,7 @@ __pycache__/
 # Signed public shortcuts are downloaded from release assets by the Pages build.
 /site/shortcuts/**/*.shortcut
 /site/shortcuts/help/
+/site/shortcuts/v2/index.html
 
 # Machine-local development server version
 /server-development.local.json

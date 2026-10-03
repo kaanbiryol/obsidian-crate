@@ -1,4 +1,5 @@
 import { pruneSharedCheckpoints } from './history-checkpoints';
+import { readEncryptionState } from './encryption-state';
 import { cleanStagedUploads } from './maintenance/staged-upload-cleanup';
 import { cleanStagedBatches } from './maintenance/staged-batch-cleanup';
 import { pruneChangelog } from './db';
@@ -8,9 +9,12 @@ import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { pruneReminderOccurrences, pruneReminderOperations } from './maintenance/reminder-history';
+import { pruneEncryptedReceiptChunks } from './encrypted-receipt-storage';
+import { pruneEncryptionMetadata } from './maintenance/encryption-metadata';
 
 export async function runScheduledMaintenance(env: Env): Promise<number> {
   if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return 0;
+	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return 0;
 	const errors: string[] = [];
   let removedObjects = 0;
 	const tasks: Array<[string, () => Promise<unknown>]> = [
@@ -31,6 +35,8 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, env.DB); }],
+		['prune expired encrypted response chunks', () => pruneEncryptedReceiptChunks(env.DB)],
+		['prune unused encryption metadata', () => pruneEncryptionMetadata(env.DB)],
 		['scan legacy orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
 	];
 	for (const [name, task] of tasks) {

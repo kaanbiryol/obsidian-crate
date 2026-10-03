@@ -8,13 +8,13 @@ import { getAllVaultFiles } from './file-discovery';
 import { readLocalFileEntry } from './local-file-entry';
 import { createHistoryRestore } from './history-restore';
 import { findHistorySource } from './history-source';
-import { normalizeWorkerUrl } from './worker-url';
+import { getCheckpointAuthority } from './worker-url';
 
 interface EngineHistoryContext {
   vault: Vault;
   api: SyncApiClient;
   pluginDir: string;
-  getSettings(): Pick<CrateSettings, 'workerUrl' | 'ignorePatterns'>;
+  getSettings(): Pick<CrateSettings, 'workerUrl' | 'checkpointScope' | 'ignorePatterns'>;
   getManifest(): FileManifest;
   shouldIgnore: (path: string) => boolean;
   assertActive(): void;
@@ -26,7 +26,7 @@ interface EngineHistoryContext {
 
 /** Checkpoint and restore policy; the engine retains operation/lifecycle authority. */
 export function createEngineHistory(context: EngineHistoryContext) {
-  const checkpoints = () => new HistoryCheckpoints(context.vault.adapter, `${context.pluginDir}/history-checkpoints`, normalizeWorkerUrl(context.getSettings().workerUrl));
+  const checkpoints = () => new HistoryCheckpoints(context.vault.adapter, `${context.pluginDir}/history-checkpoints`, getCheckpointAuthority(context.getSettings()));
   const load = (id: string, shared: boolean) => shared
     ? context.api.sharedHistory.load(id) : checkpoints().load(id, context.getSettings().ignorePatterns);
   return {

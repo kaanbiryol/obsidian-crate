@@ -70,3 +70,6 @@ Collect the server request ID, approximate time, plugin/PWA/Worker versions, ope
 ### In-app restore implementation checks
 
 `src/cloudflare/restore/` owns archive decoding, isolated copy/verification, saved recovery state, and Obsidian dialogs. The deployment service supplies OAuth, operation exclusion, and lifecycle/source fencing. Tests exercise real upgrade-writer archives for each schema supported by the installed build, literal SQL decoding, source preservation, database and object interruptions, and explicit device reconnection. D1 row/checkpoint updates share one [REST query batch](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/); local D1 tests also check rollback and replay. Hosted OAuth, R2 management API, publication, and physical-device restore acceptance require a separate Cloudflare rehearsal.
+## Encrypted vaults
+
+Paired archives preserve encryption configuration, recovery envelopes, immutable descriptors and ciphertext. Restoring those bytes does not decrypt them. Keep the recovery key outside the archive and vault, restore with an encryption-capable server, and unlock clients before syncing. Old archives created before conversion remain plaintext. Server authentication and push credentials in an archive still require private storage even when note content is encrypted.

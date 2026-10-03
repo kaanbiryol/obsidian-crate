@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 import { readingShortcutWithFirstRunSetup } from './reading-shortcut-first-run.mjs';
-import { shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from './reading-shortcut-fixture.mjs';
+import { privateShortcutSource, shortcutSource, shortcutTemplate, shortcutIdentifier as identifier, shortcutRequest, shortcutValue } from './reading-shortcut-fixture.mjs';
 
 const workflows = () => [shortcutTemplate, readingShortcutWithFirstRunSetup(shortcutSource), readingShortcutWithFirstRunSetup(shortcutSource, { pairing: true })];
 const token = value => {
@@ -12,7 +12,7 @@ const token = value => {
   return value.Value.attachmentsByRange['{0, 1}'];
 };
 test('portable release fixture matches the macOS signing parser', { skip: process.platform !== 'darwin' }, () => {
-  assert.deepEqual(shortcutSource, JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', fileURLToPath(new URL('../docs/shortcuts/save-to-crate.plist', import.meta.url))], { encoding: 'utf8' })));
+  assert.deepEqual(shortcutSource, JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', fileURLToPath(new URL('../tests/fixtures/reading-shortcut-v1.plist', import.meta.url))], { encoding: 'utf8' })));
 });
 test('all signed variants preserve shared input and resolve every action output', () => {
   const before = structuredClone(shortcutSource);
@@ -130,4 +130,26 @@ test('stored legacy endpoints are upgraded locally without another pairing reque
   assert.equal(identifier(endpoint), 'text.replace');
   const p = endpoint.WFWorkflowActionParameters;
   for (const path of ['/reading/prepare', contract.preparePath]) assert.equal(`https://crate.example${path}`.replace(new RegExp(p.WFReplaceTextFind), p.WFReplaceTextReplace), `https://crate.example${contract.preparePath}`);
+});
+
+
+test('private capture variants keep URLs in fragments and resolve their native outputs', () => {
+  for (const workflow of [privateShortcutSource, readingShortcutWithFirstRunSetup(privateShortcutSource), readingShortcutWithFirstRunSetup(privateShortcutSource, { pairing: true })]) {
+    const actions = workflow.WFWorkflowActions, capture = actions.slice(-5), seen = new Set();
+    const check = value => {
+      if (!value || typeof value !== 'object') return;
+      if (value.Type === 'ActionOutput') assert.ok(seen.has(value.OutputUUID), `Unresolved output: ${value.OutputUUID}`);
+      Object.values(value).forEach(check);
+    };
+    for (const action of actions) { check(action); const id = action.WFWorkflowActionParameters.UUID; assert.ok(!seen.has(id)); seen.add(id); }
+    assert.deepEqual(capture.map(identifier), ['getitemfromlist', 'urlencode', 'text.replace', 'gettext', 'openurl']);
+    assert.equal(capture[1].WFWorkflowActionParameters.WFEncodeMode, 'Encode');
+    assert.equal(token(capture[1].WFWorkflowActionParameters.WFInput).OutputUUID, capture[0].WFWorkflowActionParameters.UUID);
+    const prefix = capture[2].WFWorkflowActionParameters;
+    for (const path of ['/reading/prepare', contract.preparePath]) assert.equal(('https://crate.example' + path).replace(new RegExp(prefix.WFReplaceTextFind), prefix.WFReplaceTextReplace), 'https://crate.example/notifications?section=reading#readingCapture=');
+    const assembled = capture[3].WFWorkflowActionParameters.WFTextActionText;
+    assert.equal(assembled.Value.attachmentsByRange['{0, 1}'].OutputUUID, prefix.UUID);
+    assert.equal(assembled.Value.attachmentsByRange['{1, 1}'].OutputUUID, capture[1].WFWorkflowActionParameters.UUID);
+    assert.equal(token(capture[4].WFWorkflowActionParameters.WFInput).OutputUUID, capture[3].WFWorkflowActionParameters.UUID);
+  }
 });

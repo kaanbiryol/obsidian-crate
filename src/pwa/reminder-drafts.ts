@@ -1,6 +1,9 @@
 import type { ModalState } from './types';
 import { isStoredReminderDraft } from './reminder-storage-validation';
 import { isStoredReminderModal } from './reminder-draft-validation';
+import { privateStorage } from './private-storage';
+
+const draftStorage = () => privateStorage(sessionStorage);
 
 const PREFIX = 'crate-reminder-draft:';
 function key(modal: ModalState, folderPath: string): string {
@@ -11,7 +14,7 @@ function key(modal: ModalState, folderPath: string): string {
 export function scopeLegacyReminderDrafts(folderPath: string): void {
 	for (const entry of Object.keys(sessionStorage)) {
 		if (!entry.startsWith(PREFIX)) continue;
-		const raw = sessionStorage.getItem(entry);
+		const raw = draftStorage().getItem(entry);
 		let saved: (ModalState & { legacyFolderPath?: unknown }) | null;
 		try { saved = JSON.parse(raw ?? 'null') as typeof saved; } catch { continue; }
 		if (!saved || entry !== PREFIX + (saved.reminderId ?? 'new') || !isStoredReminderDraft(saved.draft)
@@ -19,21 +22,21 @@ export function scopeLegacyReminderDrafts(folderPath: string): void {
 			|| (saved.filePath != null && (typeof saved.filePath !== 'string' || !saved.filePath.startsWith(`${folderPath}/`)))
 			|| (saved.pendingSave && saved.pendingSave.input?.folderPath !== folderPath)) continue;
 		const destination = key(saved, folderPath);
-		const existing = sessionStorage.getItem(destination);
+		const existing = draftStorage().getItem(destination);
 		if (existing !== null) {
 			if (existing === raw) sessionStorage.removeItem(entry);
 			// Retain both drafts on collision without letting a later folder
 			// enrollment claim the older, otherwise unscoped create draft.
-			else sessionStorage.setItem(entry, JSON.stringify({ ...saved, legacyFolderPath: folderPath }));
+			else draftStorage().setItem(entry, JSON.stringify({ ...saved, legacyFolderPath: folderPath }));
 			continue;
 		}
-		sessionStorage.setItem(destination, raw!);
+		draftStorage().setItem(destination, raw!);
 		sessionStorage.removeItem(entry);
 	}
 }
 
 export function saveReminderDraft(modal: ModalState, folderPath: string): void {
-	try { sessionStorage.setItem(key(modal, folderPath), JSON.stringify(modal)); } catch { /* The open editor still retains the draft. */ }
+	try { draftStorage().setItem(key(modal, folderPath), JSON.stringify(modal)); } catch { /* The open editor still retains the draft. */ }
 }
 export function restoreReminderDraft(initial: ModalState, folderPath: string): ModalState {
 	return inspectReminderDraft(initial, folderPath).modal;
@@ -44,7 +47,7 @@ export function inspectReminderDraft(initial: ModalState, folderPath: string): {
 } {
 	let raw: string | null;
 	const storageKey = key(initial, folderPath);
-	try { raw = sessionStorage.getItem(storageKey); } catch { return { modal: initial, unavailable: true }; }
+	try { raw = draftStorage().getItem(storageKey); } catch { return { modal: initial, unavailable: true }; }
 	if (raw === null) return { modal: initial };
 	try {
 		const saved: unknown = JSON.parse(raw);
@@ -57,7 +60,7 @@ export function inspectReminderDraft(initial: ModalState, folderPath: string): {
 }
 
 export function discardReviewedReminderDraft(entry: { key: string; raw: string }, initial: ModalState, folderPath: string): void {
-	if (entry.key !== key(initial, folderPath) || sessionStorage.getItem(entry.key) !== entry.raw) {
+	if (entry.key !== key(initial, folderPath) || draftStorage().getItem(entry.key) !== entry.raw) {
 		throw new Error('The saved draft changed. Close and reopen it to review the current copy.');
 	}
 	sessionStorage.removeItem(entry.key);

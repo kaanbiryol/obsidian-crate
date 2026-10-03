@@ -7,14 +7,14 @@ describe('clearSyncConfigurationState', () => {
 	it('deletes the scoped credential before clearing its Worker URL scope', () => {
 		const settings = { workerUrl: 'https://crate.example.workers.dev' } as CrateSettings;
 		const deleteSecret = vi.fn((key: string) => {
-			expect(key).toBe(SECRET_KEYS.AUTH_TOKEN);
+			expect([SECRET_KEYS.AUTH_TOKEN, SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY]).toContain(key);
 			expect(settings.workerUrl).toBe('https://crate.example.workers.dev');
 		});
-		const secretStorage = { delete: deleteSecret } as unknown as SecretStorageService;
+		const secretStorage = { delete: deleteSecret, get: () => null } as unknown as SecretStorageService;
 
 		clearSyncConfigurationState(settings, secretStorage);
 
-		expect(deleteSecret).toHaveBeenCalledOnce();
+		expect(deleteSecret).toHaveBeenCalledTimes(3);
 		expect(settings.workerUrl).toBe('');
 	});
 });

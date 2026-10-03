@@ -1,3 +1,4 @@
+import { AppConnectionGate } from './connection/AppConnectionGate';
 import { PwaSyncProvider } from './sync/PwaSyncProvider';
 import { SharedFeaturesContext, useServerFeatures } from './shared-features';
 import { Button } from '@/ui/shared/Button';
@@ -163,7 +164,7 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		<p>Enable it in Crate settings in Obsidian. Your notes and setup are preserved.</p>
 		{features[feature === 'reading' ? 'reminders' : 'reading'] && <Button onClick={() => switchSection(feature === 'reading' ? 'reminders' : 'reading')}>Open {feature === 'reading' ? 'Reminders' : 'Reading'}</Button>}
 	</div>;
-	return <DockMorphContext.Provider value={dockMorph}><SharedFeaturesContext.Provider value={features}><ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><PwaSyncProvider><div ref={root} className="crate-feature-shell" onTransitionEnd={event => {
+	return <DockMorphContext.Provider value={dockMorph}><SharedFeaturesContext.Provider value={features}><ThemeIconProvider renderer={PwaThemeIcon}><PwaUpdateProvider activeSection={section}><PwaSyncProvider><AppConnectionGate section={section} onOpenFeature={switchSection}><div ref={root} className="crate-feature-shell" onTransitionEnd={event => {
 		const panel = event.target as HTMLElement;
 		if (event.propertyName === 'opacity' && panel.dataset.crateSection === frontSection) finishSettledSection();
 	}}>
@@ -172,5 +173,5 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" style={panelStyle('reminders')} data-front={frontSection === 'reminders'} data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{features.reminders ? visited.has('reminders') && reminders : paused('reminders')}</FeatureNavigationContext.Provider></div>
 		</div>
 		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet navigation={settingsNavigation} onOpenEnd={settingsOpened} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
-	</div></PwaSyncProvider></PwaUpdateProvider></ThemeIconProvider></SharedFeaturesContext.Provider></DockMorphContext.Provider>;
+	</div></AppConnectionGate></PwaSyncProvider></PwaUpdateProvider></ThemeIconProvider></SharedFeaturesContext.Provider></DockMorphContext.Provider>;
 }

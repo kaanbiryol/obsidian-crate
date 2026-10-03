@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type CratePlugin from '../plugin/CratePlugin';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from './self-hosted-connection';
+import { createVaultKeyBundle } from '../encryption/key-bundle';
+import { SECRET_KEYS } from '../plugin/settings-types';
 
 const api = vi.hoisted(() => ({
-	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(),
+	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(),
 }));
 const exchange = vi.hoisted(() => vi.fn());
 vi.mock('./self-hosted-pairing', () => ({ exchangeSelfHostedPairingCode: exchange }));
@@ -13,10 +15,10 @@ vi.mock('./api', () => ({ SyncApiClient: class { constructor() { return api; } }
 function plugin() {
 	return {
 		settings: { cloudflareDeployment: null, workerUrl: 'https://previous.trycloudflare.com' },
-		secretStorage: { get: vi.fn(() => token) },
+		secretStorage: { get: vi.fn((key: string) => key === 'crate-auth-token' ? token : null) },
 		cloudflareDeploymentService: { isBusy: false, pendingIntent: null },
 		clearSettingsUiState: vi.fn(), saveSettings: vi.fn(),
-		syncRuntime: { isConfigured: vi.fn(() => false), applyInfrastructureConfig: vi.fn(), updateSyncSettings: vi.fn() },
+		syncRuntime: { isConfigured: vi.fn(() => false), applyInfrastructureConfig: vi.fn(), updateEncryptedServerAddress: vi.fn(), updateEncryptionResetAddress: vi.fn(), updateSyncSettings: vi.fn() },
 	};
 }
 const token = 'a'.repeat(64);
@@ -25,6 +27,7 @@ beforeEach(() => {
 	api.testConnection.mockResolvedValue({ success: true });
 	api.listTokens.mockResolvedValue({ tokens: [] });
 	api.getSharedSettings.mockResolvedValue({ settings: null });
+	api.getEncryptionState.mockResolvedValue(null);
 });
 
 describe('self-hosted server connection', () => {
@@ -45,12 +48,40 @@ describe('self-hosted server connection', () => {
 			{ workerUrl: 'https://next.trycloudflare.com', authToken: token }, expect.any(AbortSignal),
 			{ workerUrl: 'https://previous.trycloudflare.com', authToken: token });
 	});
+	it('routes a pending reset through receipt verification instead of the revoked old credential', async () => {
+		const owner = plugin();
+		owner.syncRuntime.isConfigured.mockReturnValue(true);
+		owner.secretStorage.get.mockImplementation(key => key === SECRET_KEYS.ENCRYPTION_RESET ? 'pending reset' : token);
+		await updateSelfHostedServerAddress(owner as unknown as CratePlugin, 'https://next.trycloudflare.com');
+		expect(owner.syncRuntime.updateEncryptionResetAddress).toHaveBeenCalledWith('https://next.trycloudflare.com', expect.any(AbortSignal));
+		expect(api.listTokens).not.toHaveBeenCalled();
+		expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+	});
 	it('keeps the old connection when a new tunnel rejects the saved token', async () => {
 		const owner = plugin();
 		owner.syncRuntime.isConfigured.mockReturnValue(true);
 		api.listTokens.mockRejectedValue(new Error('Unauthorized'));
 		await expect(updateSelfHostedServerAddress(owner as unknown as CratePlugin, 'https://next.trycloudflare.com')).rejects.toThrow('Unauthorized');
 		expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+	});
+	it('moves encryption authority with a verified self-hosted tunnel address before restarting sync', async () => {
+		const owner = plugin();
+		owner.syncRuntime.isConfigured.mockReturnValue(true);
+		const bundle = createVaultKeyBundle();
+		owner.secretStorage.get.mockImplementation(key => key === SECRET_KEYS.AUTH_TOKEN ? token
+			: key === SECRET_KEYS.ENCRYPTION_KEYS ? JSON.stringify(bundle) : key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending move' : null);
+		await updateSelfHostedServerAddress(owner as unknown as CratePlugin, 'https://next.trycloudflare.com');
+		expect(owner.syncRuntime.updateEncryptedServerAddress).toHaveBeenCalledWith(
+			'https://next.trycloudflare.com', expect.any(AbortSignal),
+			{ workerUrl: 'https://previous.trycloudflare.com', authToken: token });
+		expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+	});
+	it('connects a new device to an encrypted server without reading settings before recovery', async () => {
+		const owner = plugin();
+		api.getEncryptionState.mockResolvedValue({ mode: 'active' });
+		await connectSelfHostedServer(owner as unknown as CratePlugin, 'https://crate.example', token);
+		expect(api.getSharedSettings).not.toHaveBeenCalled();
+		expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledWith({ workerUrl: 'https://crate.example', authToken: token }, expect.any(AbortSignal));
 	});
 	it('validates vault access before storing credentials through the existing lifecycle', async () => {
 		const owner = plugin();

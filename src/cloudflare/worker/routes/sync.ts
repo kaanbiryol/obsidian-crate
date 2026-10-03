@@ -1,4 +1,5 @@
-import { listSharedCheckpoints } from '../history-checkpoints';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import { listSharedCheckpoints, createSharedCheckpoint } from '../history-checkpoints';
 import { handleFileVersionPreview } from '../file-version-preview';
 import {
 	handleBatchDelete,
@@ -31,13 +32,15 @@ export async function handleSyncRoute(
 	env: Env,
 	path: string,
 	method: RouteMethod,
+	resetGeneration: string | null,
 	audit?: MutationAuditContext,
+	encryption?: EncryptionServerState | null,
 ): Promise<Response | null> {
 	const db = env.DB;
   if (path === '/notifications/retry' && method === 'POST') return retryPausedNotifications(db);
 	const bucket = env.BUCKET;
     if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
-    if (path === '/sync/checkpoints' && method === 'POST') return forwardTransferRequest(request, env, '/history-checkpoint-create');
+    if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
     if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint');
     if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, '/history-checkpoint-file');
   if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
@@ -71,7 +74,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleGetFileMetadata(request, requiredDb));
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
-		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, env.commitUpload));
+		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, env.commitUpload, encryption, resetGeneration));
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
@@ -80,7 +83,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload, env.commitNewFiles));
+		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload, env.commitNewFiles, encryption, resetGeneration));
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
 		return forwardTransferRequest(request, env, '/batch-download');

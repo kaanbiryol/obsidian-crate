@@ -1,3 +1,4 @@
+import { readEncryptionState } from '../encryption-state';
 import { readingShareFallback } from '../reading/share-target';
 import { readingSavePage, readingSaveScript } from '../reading/save-page';
 import {
@@ -32,7 +33,7 @@ export async function handlePublicRoute(
 	method: RouteMethod,
 ): Promise<Response | null> {
 	const db = env.DB;
- if (path === '/notifications/share/reading' && method === 'POST') return readingShareFallback(request);
+ if (path === '/notifications/share/reading' && method === 'POST') return db && await readEncryptionState(db) ? new Response('Encrypted Reading requires the updated shortcut or saving a link inside Crate. Remove and reinstall older share targets.', { status: 428, headers: { 'Cache-Control': 'no-store' } }) : readingShareFallback(request);
  if (path === '/notifications/save-reading' && method === 'GET') return readingSavePage();
  if (path === '/notifications/save-reading.js' && method === 'GET') return readingSaveScript({ serverFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT });
 	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo(env);
@@ -44,7 +45,7 @@ export async function handlePublicRoute(
 	}
 	if (path === '/notifications/theme-bootstrap.js' && method === 'GET') return handlePwaThemeBootstrap(request);
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
-	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
+	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request, Boolean(db && await readEncryptionState(db)));
 	if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
 	if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon(request);
 	if (path === '/notifications/crate-icon-192.png' && method === 'GET') return handleCrateIcon192(request);

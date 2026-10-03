@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../protocol/web-session';
 import { exchangeEnrollmentToken, makeApiFetch } from './api';
 
+vi.mock('./encryption-session', () => ({ preparePwaEncryption: async () => null, encryptionSnapshot: () => ({ status: 'legacy' }) }));
 vi.mock('./server-compatibility', () => ({ requireCompatibleServer: vi.fn().mockResolvedValue({ protocol: { current: 1, oldestCompatible: 1 } }) }));
 afterEach(() => vi.unstubAllGlobals());
 

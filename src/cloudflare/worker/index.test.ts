@@ -55,9 +55,9 @@ function createDb(
 					statement._args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => sql.includes('INSERT INTO request_rate_limits') ? { count: 1 } : sql.includes('SELECT id, scope, folder_path, reading_generation, expires_at FROM auth_tokens')
+				first: vi.fn(async () => sql.includes('INSERT INTO request_rate_limits') ? { count: 1 } : sql.includes('SELECT id, scope, folder_path,') && sql.includes('FROM auth_tokens')
 					? { id: 'authenticated-token', scope: options?.authenticatedScope ?? 'vault', folder_path: 'Reminders' }
-					: sql.startsWith('SELECT id FROM push_subscriptions WHERE endpoint = ?')
+					: sql.startsWith('SELECT id, folder_path FROM push_subscriptions WHERE endpoint = ?')
 						? [...subscriptions.values()].find(row => row.endpoint === statement._args[0]) ?? null
 					: null),
 				run: vi.fn(async () => applyMutation({ subscriptions }, sql, statement._args)),
@@ -314,10 +314,13 @@ describe('worker entrypoint', () => {
 		const pageHtml = await pageResponse.text();
 		const nonce = /<script nonce="([^"]+)"/.exec(pageHtml)?.[1];
 		expect(nonce).toBeTruthy();
-		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}';`);
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic';`);
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("img-src 'self' data: https:");
 		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");
 		expect(handoffResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("script-src-attr 'none'");
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("worker-src 'self'");
+		expect([...pageHtml.matchAll(/<script\b[^>]*>/g)].every(([tag]) => tag.includes(`nonce="${nonce}"`))).toBe(true);
 		expect(pageHtml).not.toContain('<script>');
 		expect(await handoffResponse.text()).not.toContain('<script>');
 		expect(themeScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');

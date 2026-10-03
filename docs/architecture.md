@@ -107,6 +107,25 @@ queues, storage formats, API endpoints and confirmation rules. Pausing a feature
 stops new sends and refreshes while retaining its local hydration, recovery state
 and settings actions; already dispatched operations can still settle safely.
 
+`pwa/connection/AppConnection.tsx` owns the app connection: enrollment, startup,
+credential changes, service-worker registration and logout. Reading connects with
+the existing app credential after enrollment completes. `AppConnectionGate` presents
+one unlock/reconnect surface above the feature screens; a failure confined to one
+feature still allows opening the other. Scope-specific encryption adapters share
+verification and key-import policy through `connection/encryption.ts`, retaining
+their local storage migration and cache responsibilities. Expired credentials are
+matched against the current connection before suspension; expiry preserves drafts
+and pending changes, while explicit logout clears both features' local data.
+`reading/useReadingConnection.ts` handles Reading connection readiness, and
+`reading/useReadingSession.ts` hydrates its articles, drafts and pending changes.
+This shared lifecycle does not transfer browser storage into an installed iOS app.
+Mobile enrollment links first show `connection/BrowserSetup`: **Continue to web**
+opens the browser UI and remembers that preference; **Install Crate** reveals
+platform instructions while feature screens stay unmounted. Enrollment and local
+key import can finish behind this choice; imported keys survive page reloads.
+Standalone launches bypass it. The preference contains no credentials
+and does not replace the installed app's encryption unlock.
+
 `pwa/sync/state.ts` derives the overall indicator and update readiness from both
 runtime registrations. An uninitialized feature is unverified, while a hydrated
 paused feature remains ready for settings and logout. Paused or disconnected
@@ -276,3 +295,19 @@ One-off calendar recognition also belongs to Chrono. Dates, times and timestamps
 Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing revisions require reconciliation. Local remote-deletion application always uses vault trash so bytes written after the hash check remain recoverable. Supported text updates use Obsidian's atomic process API. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
+
+Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public scope/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+
+`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract and exact setting destinations; `encryption-folder-moves.ts` runs conversion and recovery through `SyncRuntime`'s existing configuration serialization.
+
+Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
+
+App key approval separates the cryptographic state machine (`encryption/pairing/`)
+from the relay (`worker/encryption-pairing.ts`). `plugin/web-app-pairing.ts` captures
+one unlocked vault connection and limits approved grants to the browser features;
+`ui/settings/web-app-pairing-modal.ts` owns the human approval. The shared PWA
+connection gate presents `AppPairing`; `pairing-client.ts` binds requests to the
+current app session, and `web-app-unlock.ts` validates and persists grants while
+preserving existing draft encryption secrets. Pairing polls exist only for open
+screens, stop on close, and pause while hidden. They do not belong in startup or
+normal sync loops.

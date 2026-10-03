@@ -5,6 +5,7 @@ import { requireNormalizedWorkerUrl } from './worker-url';
 import { applySharedSettings } from './shared-settings';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
+import { loadEncryptionKeys } from '../plugin/encryption-storage';
 
 const connecting = new WeakSet<CratePlugin>();
 
@@ -13,8 +14,8 @@ export function isSelfHostedConnectionPending(plugin: CratePlugin): boolean {
 }
 
 /** A Quick Tunnel can change address while its persisted server stays the same.
- * Verify the existing credential, then use normal server-change reconciliation
- * because checkpoints and pending journals are scoped to the old URL. */
+ * Authenticate the encrypted vault before retaining its pending disk work.
+ * Unencrypted connections keep normal server-change reconciliation. */
 export async function updateSelfHostedServerAddress(plugin: CratePlugin, address: string): Promise<void> {
 	if (plugin.settings.cloudflareDeployment || !plugin.syncRuntime.isConfigured()) throw new Error('Connect to a self-hosted server first.');
 	if (connecting.has(plugin) || plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
@@ -27,11 +28,20 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 	signal.throwIfAborted();
 	connecting.add(plugin);
 	try {
+		if (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) {
+			await plugin.syncRuntime.updateEncryptionResetAddress(workerUrl, signal);
+			return;
+		}
 		const api = new SyncApiClient(workerUrl, expected.authToken);
 		api.setAbortSignal(signal);
 		const check = await api.testConnection();
 		if (!check.success) throw new Error(check.error || 'Could not connect to this server.');
 		await api.listTokens();
+		const keys = loadEncryptionKeys(plugin.secretStorage);
+		if (keys) {
+			await plugin.syncRuntime.updateEncryptedServerAddress(workerUrl, signal, expected);
+			return;
+		}
 		signal.throwIfAborted();
 		if (plugin.settings.cloudflareDeployment) throw new Error('The server connection changed. Reopen settings and try again.');
 		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken: expected.authToken }, signal, expected);
@@ -68,7 +78,8 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		// Health alone is not proof of vault authority. Reminder-only sessions
 		// cannot list devices or read shared settings.
 		await api.listTokens();
-		const shared = await api.getSharedSettings();
+		const encryption = await api.getEncryptionState();
+		const shared = encryption ? { settings: null } : await api.getSharedSettings();
 		signal.throwIfAborted();
 		assertAvailable();
 		plugin.clearSettingsUiState();

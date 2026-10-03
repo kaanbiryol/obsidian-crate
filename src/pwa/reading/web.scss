@@ -39,7 +39,6 @@
 
 // Use the library's real header tracks while the Reading module/session loads.
 .crate-reminders-ui .pwa-reading-opening__header .view-header-count { display: none; }
-.crate-reminders-ui .pwa-reading-opening__header .pwa-mode-opening__meta { margin-top: 0; }
 .crate-reminders-ui .pwa-reading-opening__sync { width: 44px; height: 44px; flex-shrink: 0; }
 
 // Transform the sticky header without changing article layout or scroll position.

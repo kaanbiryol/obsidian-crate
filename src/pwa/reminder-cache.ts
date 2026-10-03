@@ -4,6 +4,7 @@ import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from
 import { AUTH_TOKEN_KEY } from './config';
 import { CACHE_STORE_NAME, FRESHNESS_STORE_NAME, deleteCacheDatabase, openCacheDatabase, reminderCacheHealth, reportCacheProblem } from './reminder-cache-database';
 import { normalizeSnapshot } from './reminder-cache-validation';
+import { sealPrivateValue, openPrivateValue, privateStorageEnabled } from './private-storage';
 
 let cacheGeneration = 0;
 
@@ -28,11 +29,16 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 		const [, [raw, freshness]] = await Promise.all([
 			transaction.done,
 			(async () => Promise.all([
-				transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as Promise<{ sessionScope?: string } | undefined>,
+				transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as Promise<{ sessionScope?: string; encrypted?: string } | undefined>,
 				transaction.objectStore(FRESHNESS_STORE_NAME).get(folderPath) as Promise<CacheFreshness | undefined>,
 			]))(),
 		]);
-		const snapshot = raw?.sessionScope === sessionScope ? normalizeSnapshot(raw, folderPath) : null;
+		if (raw && !raw.encrypted && privateStorageEnabled()) {
+			await database.delete(CACHE_STORE_NAME, folderPath);
+			return null;
+		}
+		const opened: unknown = raw?.encrypted ? JSON.parse(openPrivateValue(raw.encrypted, `cache:${sessionScope}:${folderPath}`)) : raw;
+		const snapshot = raw?.sessionScope === sessionScope ? normalizeSnapshot(opened, folderPath) : null;
 		reportCacheProblem(raw && !snapshot ? 'damaged' : null);
 		// A late revalidation must never update the timestamp of a different revision.
 		if (snapshot?.etag && freshness?.etag === snapshot.etag && Number.isFinite(freshness.savedAt)) {
@@ -55,7 +61,10 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 		await Promise.all([
 			transaction.done,
 			(async () => {
-				await transaction.objectStore(CACHE_STORE_NAME).put({ ...snapshot, sessionScope });
+				const plain = JSON.stringify({ ...snapshot, sessionScope });
+				const protectedValue = sealPrivateValue(plain, `cache:${sessionScope}:${snapshot.folderPath}`);
+				await transaction.objectStore(CACHE_STORE_NAME).put(protectedValue === plain ? { ...snapshot, sessionScope }
+					: { folderPath: snapshot.folderPath, sessionScope, encrypted: protectedValue });
 				await transaction.objectStore(FRESHNESS_STORE_NAME).delete(snapshot.folderPath);
 			})(),
 		]);
@@ -94,7 +103,8 @@ export async function saveCachedReminderSnapshot(
 	}
 }
 
-export async function clearCachedReminderSnapshots(): Promise<boolean> {
+export async function clearCachedReminderSnapshots(isCurrent: () => boolean = () => true): Promise<boolean> {
+	if (!isCurrent()) return true;
 	cacheGeneration += 1;
 	return deleteCacheDatabase();
 }

@@ -19,6 +19,12 @@ export async function handleCoordinatorRequest(
   withStateLock: StateLock, handleReminder: () => Promise<Response>,
 ): Promise<Response> {
   const path = new URL(request.url).pathname;
+  if ((path === '/sync-upload' && request.method === 'PUT') || (path === '/sync-batch-upload' && request.method === 'POST')) {
+    // Reauthenticate inside the transfer queue so reset/revocation fences waiting writers.
+    const target = new URL(request.url);
+    target.pathname = path === '/sync-upload' ? '/sync/upload' : '/sync/batch-upload';
+    return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, undefined, true));
+  }
   if (path === '/commit-new-files' && request.method === 'POST') {
     const prepared = await prepareCoordinatedNewFiles(request, env);
     return withStateLock(() => commitCoordinatedNewFiles(prepared, state, env));

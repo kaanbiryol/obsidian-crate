@@ -8,7 +8,6 @@ import {
 } from './reminder-cache/persist';
 import {
 	REMINDER_CACHE_PARSER_VERSION,
-	REMINDER_INDEX_MAX_FILE_BYTES,
 	type IncrementalReminderIndexResult,
 	type ReminderFileCacheEntry,
 } from './reminder-cache/types';
@@ -17,7 +16,7 @@ import { getProjectFromPath } from './scan';
 import type { RemoteReminderRecord } from './types';
 import { ReminderIdentityConflictError } from '../reminder-source-identity';
 
-export { REMINDER_CACHE_PARSER_VERSION, REMINDER_INDEX_MAX_FILE_BYTES, saveReminderFileCache };
+export { REMINDER_CACHE_PARSER_VERSION, saveReminderFileCache };
 
 export async function loadIncrementalReminderIndex(
 	env: Env,

@@ -1,3 +1,4 @@
+import { readEncryptionState } from '../encryption-state';
 import { managedArticle } from '@/reading/core/article';
 export { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
@@ -12,6 +13,7 @@ const LEGACY_SOURCE_ERROR = 'This note could not be read as a Reading note. Open
 
 /** Rebuildable projection: all responses still verify the current immutable file revision. */
 export async function projectReading(env: Env, current: ReadingPolicy): Promise<'complete' | 'pending' | 'unavailable'> {
+  if (await readEncryptionState(env.DB)) return 'complete';
   const db = env.DB;
   await db.prepare(`DELETE FROM reading_sources WHERE generation != ? OR NOT EXISTS
     (SELECT 1 FROM files WHERE path = reading_sources.path)`).bind(current.generation).run();

@@ -130,6 +130,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 			sendJson(res, 200, { success: true });
 			return;
 		}
+		if (method === 'GET' && ['/encryption', '/reading/encryption'].includes(path)) { sendJson(res, 200, { encryption: null }); return; }
 		if (method === 'GET' && path === '/.well-known/crate') {
       sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: assets.CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
       return;
@@ -215,7 +216,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 				return;
 			}
 
-			sendJson(res, 200, { id: 'preview-subscription' });
+			sendJson(res, 200, { id: 'preview-subscription', notificationsEnabled: true });
 			return;
 		}
 

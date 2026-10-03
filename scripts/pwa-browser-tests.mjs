@@ -5,6 +5,15 @@ import { readFileSync } from 'node:fs';
 export const browserDurations = JSON.parse(readFileSync(new URL('./pwa-browser-durations.json', import.meta.url), 'utf8')).seconds;
 
 export const browserScripts = [
+	'scripts/reading-content-security-test.mjs',
+	'scripts/pwa-encryption-test.mjs',
+	'scripts/pwa-reading-encryption-test.mjs',
+	'scripts/pwa-reading-encryption-storage-test.mjs',
+	'scripts/pwa-web-app-unlock-test.mjs',
+	'scripts/pwa-encryption-onboarding-test.mjs',
+	'scripts/pwa-pairing-test.mjs',
+	'scripts/pwa-encryption-regressions-test.mjs',
+	'scripts/pwa-encryption-storage-test.mjs',
 	'scripts/react-shadow-dom-test.mjs',
 	'scripts/base-ui-plugin-test.mjs',
 	'scripts/pwa-storage-safety-test.mjs',

@@ -8,6 +8,7 @@ import {
 import { queryRows } from '../db';
 import { sendPushNotificationWithoutContact } from './web-push';
 import { PUSH_RECIPIENT_AUTHORITY } from './recipient-authority';
+import { parseEncryptedNotification, type EncryptedNotification } from '../../../encryption/notification-format';
 
 interface SerializedVapidKeys {
 	publicKey: string;
@@ -42,8 +43,10 @@ export interface PushNotificationPayload {
 
 interface DeclarativePushPayload {
 	web_push: 8030;
+	mutable?: boolean;
 	notification: {
 		title: string;
+		mutable?: boolean;
 		body: string;
 		navigate: string;
 		tag?: string;
@@ -51,12 +54,14 @@ interface DeclarativePushPayload {
 		data: {
 			project: string;
 			reminderId: string;
+			encrypted?: EncryptedNotification;
 		};
 	};
 }
 
 // iOS may accept a push but never display it when declarative URLs are relative.
 export function createDeclarativePushPayload(payload: PushNotificationPayload, origin: string): DeclarativePushPayload {
+	const encrypted = parseEncryptedNotification(payload.title);
 	const params = new URLSearchParams();
 	// The stable ID locates the reminder and its current project after a move.
 	if (payload.project && !payload.reminderId) params.set('project', payload.project);
@@ -64,15 +69,19 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload, o
 
 	return fitPushDisplay({
 		web_push: 8030,
+		...(encrypted ? { mutable: true } : {}),
 		notification: {
-			title: readableLinkText(payload.title),
-			body: payload.body,
+			title: encrypted ? 'Crate reminder' : readableLinkText(payload.title),
+			body: encrypted ? 'Open Crate to view your reminder.' : payload.body,
+			// Older Safari releases read mutable here; the standard uses the root.
+			...(encrypted ? { mutable: true } : {}),
 			navigate: new URL(`/notifications${params.size > 0 ? `?${params.toString()}` : ''}`, origin).href,
 			...(payload.tag ? { tag: payload.tag } : {}),
 			icon: new URL('/notifications/crate-icon-192.png', origin).href,
 			data: {
 				project: payload.reminderId ? '' : payload.project ?? '',
 				reminderId: payload.reminderId ?? '',
+				...(encrypted ? { encrypted } : {}),
 			},
 		},
 	});

@@ -1,4 +1,6 @@
 import { commitNewFiles } from '../bulk-new-file-commit';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { BULK_NEW_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import { BATCH_ASSET_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import { trackStagedUploads } from '../staged-uploads';
@@ -8,6 +10,7 @@ import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
 import { commitStagedFile } from '../sync-mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
+import { EncryptionStateError, validateUploadEncryption } from '../encryption-state';
 import {
 	isSha256Hex,
 	parseJsonObject,
@@ -35,6 +38,8 @@ export async function handleBatchUpload(
 	db: D1Database,
   commitUpload = commitStagedFile,
   commitBulk = commitNewFiles,
+  expectedEncryption?: EncryptionServerState | null,
+  resetGeneration?: string | null,
 ): Promise<Response> {
 	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
 	if (!parsedBody.ok) {
@@ -46,6 +51,7 @@ export async function handleBatchUpload(
 		return corsResponse({ error: 'files array required' }, 400);
 	}
 	const bulkNew = parsedBody.value.bulkNewFiles === true;
+	if (bulkNew && expectedEncryption) return corsResponse({ error: 'Bulk imports are unavailable for encrypted requests' }, 428);
 	if (bulkNew && !(files as BatchFile[]).every(file => parseExpectedFileHash(file?.expectedHash) === null)) {
 		return corsResponse({ error: 'Bulk new-file uploads require absent preconditions' }, 400);
 	}
@@ -193,10 +199,13 @@ export async function handleBatchUpload(
 	}
 
 	let stagingBatchId: string | undefined;
+	let encryptionState: EncryptionServerState | null = null;
 	try {
-		if (bulkNew) stagingBatchId = await trackStagedBatch(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })));
-		else await trackStagedUploads(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })));
+		const validatedEncryption = await validateUploadEncryption(db, uploads.map(file => ({ path: file.safePath, content: file.bytes, contentType: file.contentType })), expectedEncryption);
+		if (bulkNew) stagingBatchId = await trackStagedBatch(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), resetGeneration);
+		else encryptionState = await trackStagedUploads(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), uploads.every(file => file.contentType === ENCRYPTED_FILE_CONTENT_TYPE), validatedEncryption, resetGeneration);
 	} catch (error) {
+		if (error instanceof EncryptionStateError) return corsResponse({ error: error.message, code: 'encryption_required' }, error.status);
 		return corsResponse({ success: false, results: results.concat(uploads.map(file => ({
 			path: file.safePath, success: false as const, code: 'storage' as const, status: 503,
 			error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
@@ -222,7 +231,7 @@ export async function handleBatchUpload(
 		try {
 			results.push(...await commitBulk(bucket, db, staged.map(file => ({
 				path: file.safePath, hash: file.hash, size: file.size, objectKey: file.objectKey,
-				operation: file.operation, content: file.bytes, stagingBatchId,
+				operation: file.operation, content: file.bytes, stagingBatchId, resetGeneration,
 			}))));
 		} catch (error) {
 			failed = true;
@@ -241,6 +250,8 @@ export async function handleBatchUpload(
 				customMetadata: { hash: file.hash },
 			});
 			const commit = await commitUpload(bucket, db, {
+				encryptionState,
+				resetGeneration,
 				operation: file.operation,
 				path: file.safePath,
 				hash: file.hash,

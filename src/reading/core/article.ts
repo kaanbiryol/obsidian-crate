@@ -13,7 +13,7 @@ export function managedArticle(content: string): { start: number; end: number; t
 export function applyLocalArticle(content: string, item: ReadingItem, article: CapturedArticle): string {
   const metadata = parseReadingNote(content), block = managedArticle(content);
   if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
-    || metadata.capture_method !== 'url' || metadata.extraction_status !== 'unavailable' || !block || block.text.trim()) {
+    || metadata.capture_method !== 'url' || !['unavailable', 'pending'].includes(metadata.extraction_status) || !block || block.text.trim()) {
     throw new Error('The reading note changed. Its current contents have been kept.');
   }
   let result = `${content.slice(0, block.start)}\n\n${article.markdown}\n\n${content.slice(block.end)}`;

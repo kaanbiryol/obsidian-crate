@@ -1,0 +1,61 @@
+@mixin styles {
+  .pwa-app-pairing { display: grid; gap: 16px; }
+  .pwa-app-pairing__verification { margin-bottom: 16px; padding: 16px 8px; border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-card); text-align: center; font-size: 12px; color: var(--text-muted); }
+  .pwa-app-pairing__code { display: block; margin-top: 8px; color: var(--text-normal); font: 500 22px/1.4 var(--font-monospace, monospace); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+	.auth-card.browser-setup, .auth-card.crate-encryption-unlock {
+		max-width: 416px;
+		padding: calc(var(--pwa-safe-area-top, env(safe-area-inset-top)) + clamp(32px, 16svh, 120px)) 24px calc(var(--pwa-safe-area-bottom, env(safe-area-inset-bottom)) + 24px);
+		gap: 28px;
+		.auth-card__content { margin: 0; }
+		.auth-card__heading { gap: 8px; }
+		.auth-card__heading p { font-size: 14px; }
+		.auth-card__brand { font-size: 15px; }
+		.auth-card__mark { width: 32px; height: 32px; }
+		h1 { font-size: 22px; letter-spacing: -.025em; }
+		.auth-card__actions { gap: 24px; }
+	}
+
+	.auth-card.crate-encryption-unlock {
+		padding-top: calc(var(--pwa-safe-area-top, env(safe-area-inset-top)) + 32px);
+		overflow-wrap: anywhere;
+		.auth-card__actions { gap: 12px; }
+		p { font-size: 14px; }
+		form { display: flex; flex-direction: column; gap: 12px; }
+		input { width: 100%; min-height: 44px; font-size: 16px; }
+	}
+	.crate-encryption-unlock__options {
+		margin-top: 8px;
+		border-top: 1px solid var(--crate-divider);
+		summary { padding: 14px 0; min-height: 44px; cursor: pointer; color: var(--text-muted); font-size: 13px; }
+		.auth-card__actions { padding: 4px 0 12px; }
+	}
+
+	.browser-setup__choices {
+		padding: 4px;
+		border: 1px solid var(--crate-divider);
+		border-radius: var(--crate-radius-card);
+		background: var(--crate-panel-bg);
+	}
+
+	.browser-setup .browser-setup__choice {
+		position: relative;
+		display: grid;
+		grid-template-columns: 20px minmax(0, 1fr) 16px;
+		gap: 12px;
+		width: 100%;
+		min-height: 76px;
+		padding: 14px 12px;
+		text-align: left;
+		color: var(--text-muted);
+		> span { display: grid; gap: 4px; font-size: 13px; line-height: 1.4; }
+		strong { color: var(--text-normal); font-size: 15px; font-weight: 500; }
+		& + .browser-setup__choice::before { content: ''; position: absolute; top: -1px; left: 12px; right: 12px; height: 1px; background: var(--crate-divider); }
+	}
+
+	.browser-setup .settings-panel__section {
+		padding: 0;
+		.settings-panel__title { margin-bottom: 12px; font-size: 14px; font-weight: 500; }
+		.pwa-home-screen-instructions { padding: 0; background: transparent; border: 0; font-size: 13px; }
+		p { font-size: 13px; }
+	}
+}

@@ -4,6 +4,7 @@ import { errorMessage } from '../../plugin/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { renderSyncInterval } from './sync-interval';
+import { renderEncryptionSection } from './encryption-section';
 import { renderExclusionsSetting } from './exclusions-setting';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 
@@ -13,8 +14,9 @@ export interface SyncSectionContext {
 	rerender: () => void;
 }
 
-export function renderSyncSection(context: SyncSectionContext): void {
+export function renderSyncSection(context: SyncSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
+	const cleanup = renderEncryptionSection(containerEl, plugin);
 	const persistSettings = async (update: Partial<CrateSettings>): Promise<boolean> => {
 		try {
 			await plugin.writeSettings(update);
@@ -66,5 +68,5 @@ export function renderSyncSection(context: SyncSectionContext): void {
 	renderExclusionsSetting(options, plugin, async ignorePatterns => {
 		if (await persistSettings({ ignorePatterns })) plugin.syncRuntime.updateSyncSettings();
 	});
-
+	return cleanup;
 }

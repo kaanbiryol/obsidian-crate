@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { basename, resolve } from 'node:path';
 import { getPwaClientAssets, getPwaStartupAssets } from './pwa-startup-assets.mjs';
+import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
 export async function bundlePwaClient(assetVersion, root) {
 	const result = await build({
@@ -30,6 +31,7 @@ export async function bundlePwaClient(assetVersion, root) {
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import', 'production'],
 		legalComments: 'eof',
+		plugins: [readingExtractionPlugin()],
 	});
 	const reachableAssets = new Set(getPwaClientAssets(result.metafile));
 	return {

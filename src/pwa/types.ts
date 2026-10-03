@@ -45,7 +45,7 @@ export interface ToastState {
 }
 
 export interface PushState {
-	phase: 'checking' | 'off' | 'enabled' | 'error' | 'blocked' | 'unsupported' | 'install';
+	phase: 'checking' | 'off' | 'enabled' | 'paused' | 'error' | 'blocked' | 'unsupported' | 'install';
 	status: string | null;
 }
 

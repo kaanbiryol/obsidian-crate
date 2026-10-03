@@ -1,3 +1,6 @@
+import { readEncryptedReceipt } from '../encrypted-receipt-storage';
+import { readEncryptionState } from '../encryption-state';
+import { handleEncryptedReminders } from '../encrypted-reminders';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
 import { armNotificationCoordinator } from '../notification-lifecycle';
@@ -16,10 +19,31 @@ import { validateReadingMetadata } from '@/reading/core/model';
 export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState): Promise<Response> {
   try {
     const url = new URL(request.url), path = url.pathname;
+    const encryption = await readEncryptionState(env.DB);
+    const shortcut = shortcutTransport(request);
+    if (path.startsWith('/reading/encrypted-')) {
+      if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
+      const current = await authority(env.DB, principal);
+      const limited = await limitNotificationAction(request, env.DB, principal.tokenId); if (limited) return limited;
+      if (path === '/reading/encrypted-receipt' && request.method === 'GET') {
+        const id = url.searchParams.get('operationId') ?? '';
+        const wire = url.searchParams.get('wire') === '1';
+        const row = await (wire ? env.DB.prepare('SELECT response_json FROM reminder_operations WHERE operation_id=?').bind(id)
+          : env.DB.prepare('SELECT response_json FROM reading_operations WHERE operation_id=? AND generation=?').bind(id, current.generation)).first<{ response_json: string }>();
+        const legacy = row ? (await readEncryptedReceipt(env.DB, wire ? 'reminder' : 'reading', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
+        const scope = encryption?.scopes.find(scope => scope.folderPath === current.folder_path);
+        return readingResponse({ envelope: legacy?.scopes.find(item => item.id === scope?.id)?.envelope ?? null });
+      }
+      return await handleEncryptedReminders(request, env, path, '/reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
+    }
+    if (encryption && (shortcut?.kind === 'prepare' || ['/reading/prepare', '/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
+    if (path === '/reading/encryption' && request.method === 'GET' && principal) {
+      const current = await authority(env.DB, principal);
+      return readingResponse({ encryption: encryption ? { version: encryption.version, vaultId: encryption.vaultId, generation: encryption.generation, mode: encryption.mode, recovery: encryption.recovery, scope: encryption.scopes.find(scope => scope.folderPath === current.folder_path) ?? null } : null });
+    }
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;
     const body = parsed.value;
-    const shortcut = shortcutTransport(request);
     if (shortcut && (!shortcut.legacy || shortcut.kind === 'exchange' || principal?.scope === 'reading_capture')) validateShortcutBody(body, shortcut.kind);
     if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
     if (path === '/reading/shortcut-exchange' && request.method === 'POST') return await exchangeShortcutPairing(env.DB, body, request);

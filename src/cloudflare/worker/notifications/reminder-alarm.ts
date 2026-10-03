@@ -97,7 +97,7 @@ export class ReminderAlarm implements DurableObject {
 			if (!parsedBody.ok) return parsedBody.response;
 
 			const reminderId = parseOptionalString(parsedBody.value.reminderId, 256);
-			const content = parseOptionalString(parsedBody.value.content, 1024);
+			const content = parseOptionalString(parsedBody.value.content, 4096);
 			const dueDatetime = parseOptionalString(parsedBody.value.dueDatetime, 128);
 			const project = parsedBody.value.project === undefined
 				? undefined

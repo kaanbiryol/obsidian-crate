@@ -1,3 +1,4 @@
+import { SECRET_KEYS } from '../../plugin/settings-types';
 import { renderVersionSettings, renderUpdateVersions } from './version-settings';
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
 import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
@@ -62,9 +63,12 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
         update.setName('Verify server update')
             .setDesc('The live server matches this plugin, but the saved update has not been confirmed. Check its status and recover any interrupted update.');
         updateButton.setButtonText('Check and recover update').setDisabled(false);
+        updateButton.buttonEl.show();
     }, available => {
         canUpdate = available;
         updateButton.setDisabled(!available);
+        if (available) updateButton.buttonEl.show();
+        else updateButton.buttonEl.hide();
     });
 }
 
@@ -135,8 +139,10 @@ export function renderAccountSection(context: ConfigSectionContext): void {
 						message: 'Sync will stop on this device.',
 						details: [deployment
 							? 'Your local files, server data, and Cloudflare login are kept. Other devices stay connected.'
-							: 'Your access token is revoked when the server is reachable. Local files and server data are kept. Other devices stay connected. Generate a new pairing code on your server to reconnect.'],
+							: 'Your access token is revoked when the server is reachable. Local files and server data are kept. Other devices stay connected. Generate a new pairing code on your server to reconnect.',
+							...(plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS) ? ['Encryption keys saved on this device will be removed. Keep your recovery key outside this vault before disconnecting.'] : [])],
 						checkbox: deployment && !deployment.reset && !deployment.deletion ? {
+
 							label: 'Forget saved connection',
 							description: 'You’ll need to select a server to reconnect.',
 							onChange: checked => { forgetConnection = checked; },

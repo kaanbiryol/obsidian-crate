@@ -6,6 +6,7 @@ import type { ApiFetch, PushState, ShowToast } from '../types';
 
 const CHECKING: PushState = { phase: 'checking', status: 'Checking notification registration…' };
 const ENABLED: PushState = { phase: 'enabled', status: 'Notifications enabled on this device.' };
+const PAUSED = { phase: 'paused', status: 'This device is registered, but notifications are off for this vault. Check Reminders and Notifications in Obsidian’s Crate settings.' } satisfies PushState;
 const BLOCKED: PushState = { phase: 'blocked', status: 'Notifications are blocked. Allow them in browser settings, then reopen Crate.' };
 
 async function notificationPermission(manager: PushManager): Promise<PermissionState> {
@@ -16,9 +17,10 @@ async function notificationPermission(manager: PushManager): Promise<PermissionS
 	return permission;
 }
 
-export function usePushNotifications({ authToken, apiFetch, showToast }: {
+export function usePushNotifications({ authToken, apiFetch, prepareSession, showToast }: {
 	authToken: string | null;
 	apiFetch: ApiFetch;
+	prepareSession: () => Promise<void>;
 	showToast: ShowToast;
 }): {
 	push: PushState;
@@ -45,6 +47,10 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 					update({ phase: 'install', status: 'Add Crate to your Home Screen as a web app to enable notifications on iPhone and iPad.' });
 					return;
 				}
+				// Another tab can replace this session after bootstrap. Confirm its
+				// encryption mode before choosing the window or decrypting SW provider.
+				await prepareSession();
+				if (!isCurrent()) return;
 				const manager = await getPwaPushManager();
 				if (!isCurrent()) return;
 				if (!manager) {
@@ -77,8 +83,9 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 					method: 'POST', body: JSON.stringify({ endpoint: body.endpoint, keys: body.keys, deviceName: detectDeviceName() }),
 				});
 				if (!response.ok) throw new Error(await response.text());
-				const result = await response.json() as { id?: unknown };
+				const result = await response.json() as { id?: unknown; notificationsEnabled?: unknown };
 				if (typeof result.id !== 'string' || !result.id) throw new Error('The server did not confirm notification registration.');
+				if (typeof result.notificationsEnabled !== 'boolean') throw new Error('This device is registered. Update your Crate server to confirm its notification settings.');
 				// Provider permission and endpoints can change during a request.
 				const currentSubscription = await manager.getSubscription();
 				const currentBody = currentSubscription?.toJSON();
@@ -89,8 +96,8 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 					|| currentBody.keys?.p256dh !== body.keys?.p256dh || currentBody.keys?.auth !== body.keys?.auth) {
 					throw new Error('Browser notification settings changed. Retry to confirm registration.');
 				}
-				update(ENABLED);
-				if (enable) showToast('success', 'Notifications enabled');
+				update(result.notificationsEnabled ? ENABLED : PAUSED);
+				if (enable) showToast(result.notificationsEnabled ? 'success' : 'info', result.notificationsEnabled ? 'Notifications enabled' : PAUSED.status);
 			} catch (error) {
 				if (!isCurrent()) return;
 				const message = error instanceof Error ? error.message : String(error);
@@ -100,7 +107,7 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		})().finally(() => { if (operation === sequence.current) inFlight.current = null; });
 		inFlight.current = { authToken, promise };
 		return promise;
-	}, [authToken, apiFetch, showToast]);
+	}, [authToken, apiFetch, prepareSession, showToast]);
 	const refreshPushState = useCallback(() => reconcile(false), [reconcile]);
 	const enablePushNotifications = useCallback(() => reconcile(true), [reconcile]);
 
@@ -120,9 +127,10 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		const pending = inFlight.current?.promise;
 		const operation = ++sequence.current;
 		inFlight.current = null;
-		await pending;
+		// Capture the provider before logout resets the encryption status. Still
+		// wait for an outstanding confirmation and fence a newly adopted session.
+		const [manager] = await Promise.all([getPwaPushManager(), pending]);
 		if (operation !== sequence.current) return;
-		const manager = await getPwaPushManager();
 		const subscription = await manager?.getSubscription();
 		if (operation !== sequence.current) return;
 		// Logout revokes owned server rows even if browser cleanup fails.

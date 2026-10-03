@@ -1,6 +1,6 @@
 import { setSharedFeature } from '../../plugin/feature-settings';
 import { captureServerConnection } from '../../plugin/server-request';
-import { Notice, Platform, Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../ui/settings/section-helpers';
 import { FolderSuggest } from '../../ui/settings/folder-suggest';
@@ -13,7 +13,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 	let folderSuggest: FolderSuggest | undefined;
 	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
 		new Setting(options).setName('Enable reading')
-			.setDesc(`All devices · pause or resume reading and article downloads. ${Platform.isDesktopApp ? 'This device downloads saved links directly into your vault.' : 'Your server downloads saved links.'} Saved notes and vault sync are preserved.`)
+			.setDesc('All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. Saved notes and vault sync are preserved.')
 			.addToggle(toggle => toggle.setValue(plugin.settings.reading.enabled).onChange(async enabled => {
 				toggle.setDisabled(true);
 				try {
@@ -33,6 +33,8 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 						const { assertCurrent } = captureServerConnection(plugin);
 						const reading = { enabled: true, folderPath };
 						validateReadingConfiguration(plugin, reading);
+						const { changeEncryptedFolder } = await import('../../plugin/encryption-folder-moves');
+						if (await changeEncryptedFolder(plugin, plugin.settings.reading.folderPath, folderPath)) { rerender(); return; }
 						if (plugin.settings.workerUrl) {
 							const { policy } = await readingServerRequest<{ policy: ServerReadingPolicy | null }>(plugin, '/reading/policy');
 							assertCurrent();

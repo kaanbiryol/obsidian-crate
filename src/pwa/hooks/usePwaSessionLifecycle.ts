@@ -1,4 +1,5 @@
-import { clearReadingData, readingSession } from '../reading/storage';
+import { SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
+import { clearReadingData, readingSession, READING_SESSION_KEY } from '../reading/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
@@ -7,19 +8,24 @@ import { clearReminderOutbox } from '../reminder-outbox-storage';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ShowToast, StoredConfig } from '../types';
+import { captureEncryptionCleanupAuthority, clearEncryptionSessionMarkers, clearPersistedEncryption } from '../encryption-cleanup';
+import { resetPwaEncryption } from '../encryption-session';
+import { resetReadingEncryption } from '../reading/encryption-lifecycle';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;
 	clearLocalSession: () => void | Promise<void>;
 	disablePushNotifications: () => Promise<void>;
+	revokeAppSession?: boolean;
 }
 
-const SESSION_RECOVERY_MESSAGE = 'Session expired. Pending changes and drafts are kept on this device. Reconnect to their original reminders folder to recover them.';
 
 export async function performPwaLogout({
 	apiFetch,
 	clearLocalSession,
 	disablePushNotifications,
+	revokeAppSession = true,
 }: PwaLogoutOperations): Promise<boolean> {
 	// Start remote cleanup while credentials are valid, then clear local state
 	// immediately even if either network operation hangs or fails.
@@ -27,24 +33,24 @@ export async function performPwaLogout({
 		try { return Promise.resolve(operation()); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
 	};
 	let reading: ReturnType<typeof readingSession> = null;
-  try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { /* Corrupt credentials must not prevent clearing local data. */ }
+	let unreadableCredential = false;
+	try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { unreadableCredential = true; }
 	const cleanup = Promise.allSettled([
-    ...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, 'X-Crate-Protocol': '1' } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
+    ...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${reading.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
-		start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
+		...(revokeAppSession ? [start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');
-		})),
+		}))] : []),
 	]);
 	await clearLocalSession();
-	return (await cleanup).some(result => result.status === 'rejected');
+	return (await cleanup).some(result => result.status === 'rejected') || unreadableCredential;
 }
 
 export function usePwaSessionLifecycle({
 	apiFetch,
-	resetEditor,
+	resetView,
 	disablePushNotifications,
 	handleUnauthorizedRef,
-	resetReminderState,
 	setAuthToken,
 	setConfig,
 	reportError,
@@ -52,10 +58,9 @@ export function usePwaSessionLifecycle({
 	showToast,
 }: {
 	apiFetch: ApiFetch;
-	resetEditor: () => void;
+	resetView: () => void;
 	disablePushNotifications: () => Promise<void>;
 	handleUnauthorizedRef: MutableRefObject<() => void>;
-	resetReminderState: () => void;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
 	reportError: (message: string | null) => void;
@@ -76,25 +81,46 @@ export function usePwaSessionLifecycle({
 
 	const resetLocalSession = useCallback(async (nextToken: string | null, discardPrivateData = false) => {
 		cleanupWarning.current = null;
+		// Unified settings lazily mount Reminders while a Reading-only session is
+		// open. Initializing that unauthenticated feature must not close the sheet.
+		let closeSettings = discardPrivateData;
+		try { closeSettings ||= localStorage.getItem(AUTH_TOKEN_KEY) !== null; } catch { closeSettings = true; }
 		invalidatePwaSession();
+		resetPwaEncryption(discardPrivateData);
 		setAuthToken(nextToken);
-		resetReminderState();
-		resetEditor();
-		setSettingsOpen(false);
+		resetReadingEncryption();
+		resetView();
+		if (closeSettings) setSettingsOpen(false);
+		// A derived Reading credential belongs to the same app connection. Remove
+		// its sign-in on expiry/replacement, preserving durable drafts and queues.
+		try {
+			const reading = readingSession();
+			if (reading?.source === 'reminders' && reading.token !== nextToken) localStorage.removeItem(READING_SESSION_KEY);
+		} catch { /* Remaining storage cleanup reports failures below. */ }
 		// Revoke in-memory authority before touching fallible browser storage.
 		try { if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY); }
 		catch { reportCleanupFailure('The saved sign-in could not be removed. Clear this site’s data in browser settings and revoke this browser session in Obsidian.'); }
 		window.dispatchEvent(new Event(PWA_AUTH_CHANGED_EVENT));
+		let isCurrent: () => boolean;
+		try { isCurrent = captureEncryptionCleanupAuthority(); }
+		catch { isCurrent = () => { throw new Error('Browser storage is unavailable'); }; }
+		if (discardPrivateData) {
+			try { clearEncryptionSessionMarkers(isCurrent); }
+			catch { reportCleanupFailure('The previous encryption session could not be cleared. Clear this site’s data before enrolling again.'); }
+		}
 		if (discardPrivateData && !clearReminderDrafts()) reportCleanupFailure('Drafts could not be cleared. Clear this site’s data in browser settings.');
 		try { if (discardPrivateData) clearReminderOutbox(); }
 		catch { reportCleanupFailure('Could not clear pending changes from this device. Clear this site’s data in browser settings.'); }
-		if (discardPrivateData) { try { await clearReadingData(); } catch { reportCleanupFailure('Reading data could not be cleared. Clear this site’s data in browser settings.'); } }
-		if (!await clearCachedReminderSnapshots().catch(() => false)) {
+		if (discardPrivateData) { try { await clearReadingData(isCurrent); } catch { reportCleanupFailure('Reading data could not be cleared. Clear this site’s data in browser settings.'); } }
+		if (!await clearCachedReminderSnapshots(isCurrent).catch(() => false)) {
 			reportCleanupFailure('Offline data could not be cleared. Close other Crate tabs, then clear this site’s data in browser settings.');
 		}
+		if (discardPrivateData) {
+			try { await clearPersistedEncryption(isCurrent); }
+			catch { reportCleanupFailure('Encrypted data or keys could not be removed. Clear this site’s data in browser settings.'); }
+		}
 	}, [
-		resetEditor,
-		resetReminderState,
+		resetView,
 		setAuthToken,
 		setSettingsOpen,
 		reportCleanupFailure,
@@ -147,15 +173,20 @@ export function usePwaSessionLifecycle({
 		return () => window.removeEventListener('storage', onStorage);
 	}, [resetLocalSession, setConfig, reportError]);
 
+	const logoutPending = useRef(false);
 	const logOut = useCallback(async () => {
-		if (loggingOut) return;
+		if (logoutPending.current) return;
+		logoutPending.current = true;
 		try { finishEnrollment(false); } catch { /* Local logout must still complete. */ }
 		setLoggingOut(true);
 		try {
+			let revokeAppSession = true;
+			try { revokeAppSession = localStorage.getItem(AUTH_TOKEN_KEY) !== null; } catch { /* Still clear local data if credentials cannot be read. */ }
 			const remoteCleanupFailed = await performPwaLogout({
 				apiFetch,
 				clearLocalSession,
 				disablePushNotifications,
+				revokeAppSession,
 			});
 			reportError([cleanupWarning.current, remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null].filter(Boolean).join(' ') || null);
 			showToast(
@@ -165,9 +196,10 @@ export function usePwaSessionLifecycle({
 					: 'Logged out'),
 			);
 		} finally {
+			logoutPending.current = false;
 			setLoggingOut(false);
 		}
-	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, reportError, showToast]);
+	}, [apiFetch, clearLocalSession, disablePushNotifications, reportError, showToast]);
 
 	return { loggingOut, logOut, clearLocalSession, suspendLocalSession };
 }

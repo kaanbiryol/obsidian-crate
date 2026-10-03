@@ -132,7 +132,7 @@ try {
 				await indicator(page).getByRole('button').click();
 				await page.getByRole('button', { name: 'Log out', exact: true }).click();
 				await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
-				await expect(page.getByRole('heading', { name: 'Your reading, everywhere' })).toBeVisible();
+				await expect(page.getByRole('heading', { name: 'Connect to Crate' })).toBeVisible();
 				await expect(page.locator('.pwa-reminders-view')).toHaveCount(0);
 				release();
 				await expect(page.locator('.toast')).toContainText('Remote session cleanup could not finish');

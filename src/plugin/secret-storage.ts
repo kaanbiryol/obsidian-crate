@@ -13,13 +13,18 @@ export class SecretStorageService {
 	private secretStorage: App['secretStorage'];
 
 	constructor(
-		app: App,
+		private readonly app: App,
 		private readonly authScopeProvider: () => string | null = () => null,
 	) {
 		if (!app.secretStorage) {
 			throw new Error('Obsidian secret storage is unavailable on this platform or app version');
 		}
 		this.secretStorage = app.secretStorage;
+	}
+
+	/** Prepare a verified connection move without changing the active settings scope. */
+	forScope(scope: string): SecretStorageService {
+		return new SecretStorageService(this.app, () => scope);
 	}
 
 	get(key: SecretKey): string | null {
@@ -40,12 +45,12 @@ export class SecretStorageService {
 	}
 
 	private storageId(key: SecretKey): string {
-		if (key !== SECRET_KEYS.AUTH_TOKEN) {
+		if (key !== SECRET_KEYS.AUTH_TOKEN && key !== SECRET_KEYS.ENCRYPTION_KEYS && key !== SECRET_KEYS.ENCRYPTION_RECOVERY && key !== SECRET_KEYS.ENCRYPTION_RESET && key !== SECRET_KEYS.ENCRYPTION_FOLDER_MOVES) {
 			return key;
 		}
 
 		const scope = this.authScopeProvider()?.trim();
-		return scope ? `crate-${hashSecretScope(scope)}-auth-token` : key;
+		return scope ? `crate-${hashSecretScope(scope)}-${key.slice('crate-'.length)}` : key;
 	}
 }
 

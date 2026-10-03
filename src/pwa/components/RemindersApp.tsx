@@ -2,7 +2,6 @@ import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { lazy, useCallback, useContext } from 'react';
 import { useLaunchReminderModal } from '../hooks/useLaunchReminderModal';
 import { usePrepareReminderEditor } from '../hooks/usePrepareReminderEditor';
-import { EmptyAuthState, ErrorState } from './AuthStates';
 import { DeferredNotice } from './DeferredNotice';
 import { FeatureNavigationContext } from './FeatureSwitcherButton';
 import { HomeScreenInstallPrompt } from './HomeScreenInstall';
@@ -33,7 +32,7 @@ export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const {
-		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
+		encryption, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
 		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
 		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
 		showToast, homeScreenInstall, loading, refreshing, error,
@@ -81,18 +80,9 @@ export function RemindersApp() {
 
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.
+
 	if (!bootstrapped || launchPending) {
 		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
-	}
-
-	if (bootstrapped && !authToken) {
-		return (
-			<div>
-				{error
-					? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
-					: <EmptyAuthState config={config} />}
-			</div>
-		);
 	}
 
 	return (
@@ -150,7 +140,7 @@ export function RemindersApp() {
 							{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
 							{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
-								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
+								<HomeScreenInstallPrompt encrypted={encryption.status === 'ready'} platform={homeScreenInstall.platform} onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
 						</PwaTopNotices>
 					</>

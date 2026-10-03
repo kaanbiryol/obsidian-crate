@@ -6,11 +6,12 @@ import { queryRows } from './db';
 import { enqueueFileProjection } from './notification-projection-queue';
 import { recordReminderSourceState } from './reminder-source-state';
 import { readStoredMarkdownFiles } from './storage';
-import { REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError } from './reminder-source-parse';
-import { REMINDER_CACHE_PARSER_VERSION, REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache/types';
+import { REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from './reminder-source-parse';
+import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 import type { Env } from './types';
 import { getReminderFolder } from './reminder-scope';
 import { retireOutOfScopeSources } from './reminder-scope-cleanup';
+import { readEncryptionState } from './encryption-state';
 
 const SCAN_KEY = `reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}`;
 const SCAN_BATCH_SIZE = 100;
@@ -39,7 +40,8 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
   return next !== '';
 }
 
-/** At most limit files and 2 MiB of R2 content per invocation; durable rows resume across restarts. */
+/** At most limit files and 2 MiB plaintext / 4 MiB encrypted transport per pass.
+ * The byte budget always admits one valid file, so a large source cannot stall it. */
 export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null }): Promise<boolean> {
   if (!scope && await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return false;
   const folder = scope ? scope.folder : await getReminderFolder(env.DB);
@@ -60,6 +62,9 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
         AND s.verified = 0 AND s.parser_version = ?
       ORDER BY r.available_at, r.path) s`).bind(`${folder}/`, `${folder}0`, count - sources.length, REMINDER_CACHE_PARSER_VERSION)));
   const stored = await loadStoredFileRows(env.DB, sources.map(file => file.path));
+  const encrypted = sources.length > 0 && (await readEncryptionState(env.DB))?.mode === 'active';
+  const sourceLimit = reminderSourceByteLimit(encrypted);
+  const reparseBudget = Math.max(MAX_REPARSE_BYTES, sourceLimit);
   let bytes = 0;
   for (const { path } of sources) {
     const current = stored.get(path);
@@ -73,15 +78,15 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
     if (upgraded.has(file.path)) await env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ?
       AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND parser_version < ?)`)
       .bind(file.path, file.path, REMINDER_CACHE_PARSER_VERSION).run();
-    const readableBytes = file.size <= REMINDER_INDEX_MAX_FILE_BYTES ? file.size : 0;
-    if (bytes + readableBytes > MAX_REPARSE_BYTES) break;
+    const readableBytes = file.size <= sourceLimit ? file.size : 0;
+    if (bytes + readableBytes > reparseBudget) break;
     bytes += readableBytes;
     try {
-      if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
+      if (file.size > sourceLimit) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
       const [text] = await readStoredMarkdownFiles(env.BUCKET, [file]);
       if (!text) throw new Error('Committed reminder content could not be verified');
       await env.DB.batch([
-        ...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, true),
+        ...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, true, encrypted),
         env.DB.prepare(`UPDATE notification_file_retries SET available_at = NULL WHERE path = ?
           AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND file_revision = ? AND verified = 1)`)
           .bind(file.path, file.path, file.storageKey),

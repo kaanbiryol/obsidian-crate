@@ -92,6 +92,10 @@ both hosts together.
 - `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
   primitives, and PWA header defaults for every feature. The PWA stylesheet
   entry point loads it independently of the reminder layout stylesheet.
+  The browser setup screen uses `_browser-setup.scss` to keep its brand, heading,
+  and install/browser choices together. Choice rows reuse shared buttons and
+  theme icons; inline installation steps leave the actions in place. This layout
+  is scoped to setup so connection recovery screens retain their own geometry.
   `_sheet-headers.scss` owns the rounded, tinted 44px close/back controls for
   all PWA sheets, including Settings, Reading dialogs, reminder editors, and
   pickers. Keep this treatment here rather than adding feature-specific overrides.
@@ -732,6 +736,12 @@ so copying and annotation offsets remain stable. Colors use `--reading-code-*`
 palette tokens in both PWA themes, with Obsidian’s `--code-*` theme tokens as
 the plugin fallback.
 
+`reading-content.ts` returns a sanitized DOM fragment. `ReadingBody` inserts a
+clone directly, without serializing it into HTML for a second parse. Equivalent
+fragments retain existing paragraphs so highlight edits preserve scroll anchors.
+Keep this boundary for both Obsidian's Shadow DOM and the PWA; browser CSP is an
+additional defense, not a replacement for sanitizing article content.
+
 Supported article code languages and formats: JavaScript (including JSX),
 TypeScript (including TSX), Python, Bash, shell sessions, Swift, Java, Kotlin,
 C, C++, C#, Objective-C, Go, Rust, Ruby, PHP, Dart, R, MATLAB, Julia, Lua,
@@ -835,3 +845,10 @@ use a 20px/8px spacing rhythm. Expanded controls sit inside the disclosure witho
 nested card backgrounds. Narrow panes stack fields and multi-button actions below
 their labels; buttons retain 44px targets. All colors come from Obsidian theme
 variables and native summary keyboard behavior is preserved.
+
+Encrypted app unlock defaults to **Connect with Obsidian**, with manual recovery
+behind **Use recovery key instead**. Both app sections share this view. Pairing
+uses one selectable, tabular comparison code, short instructions and existing
+buttons; it does not expose key text fields. The Obsidian approval uses
+`SharedModal` and native `Setting` buttons. Keep the code hidden until both peers
+have completed the handshake and make approval an explicit action.

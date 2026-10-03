@@ -6,10 +6,10 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 
 | Contract | Current value |
 | --- | --- |
-| Server candidate revision | 4 |
+| Server candidate revision | 5 |
 | Fresh database schema | 2 |
 | Oldest supported database schema | 1 |
-| Wire protocol | 1 |
+| Wire protocol | 2 |
 | Oldest compatible wire protocol | 1 |
 | Shortcut capture contract | 1 |
 | Shortcut template revision | 2 |

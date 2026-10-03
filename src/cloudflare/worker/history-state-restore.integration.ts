@@ -62,7 +62,7 @@ function historyRuntime(device: SyncTestDevice, checkpoint: string): SyncRuntime
     const entry: SyncHistoryEntry = { timestamp: new Date().toISOString(), type: 'sync', success: true,
         uploaded: 1, downloaded: 0, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, historyCheckpoint: checkpoint };
     device.settings.syncHistory.push(entry);
-    const runtime = new SyncRuntime({} as never, device.settings, {} as never, async update => { Object.assign(device.settings, update); });
+    const runtime = new SyncRuntime({} as never, device.settings, { get: () => null } as never, async update => { Object.assign(device.settings, update); });
     (runtime as unknown as { syncEngine: SyncEngine }).syncEngine = device.engine;
     return runtime;
 }

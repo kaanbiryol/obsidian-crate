@@ -1,5 +1,5 @@
 /** This self-contained function also runs inside the service worker, including offline. */
-async function receiveReadingShare(request: Request): Promise<Response> {
+export async function receiveReadingShare(request: Request): Promise<Response> {
   try {
     if (!request.headers.get('Content-Type')?.startsWith('application/x-www-form-urlencoded')) throw new Error('Unsupported share format.');
     const reader = request.body?.getReader(); if (!reader) throw new Error('The shared link is missing.');
@@ -12,6 +12,29 @@ async function receiveReadingShare(request: Request): Promise<Response> {
     const urls = [...new Set(candidates)]; if (urls.length !== 1) throw new Error('Share one complete web link at a time.');
     const url = new URL(urls[0]!); if (url.username || url.password || url.href.length > 8192) throw new Error('Unsupported shared link.');
     const id = crypto.randomUUID();
+    // Shares can arrive before the page unlocks. Use a device-local, non-exportable
+    // key instead of ever storing the URL as a plaintext draft.
+    const generated = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const shareKey = await new Promise<{ key: CryptoKey; id: string }>((resolve, reject) => {
+      let expired = false;
+      const timer = setTimeout(() => { expired = true; reject(new Error('Reading storage is unavailable. Open Crate, then share again.')); }, 4000);
+      const opening = indexedDB.open('crate-reading-v1', 1);
+      opening.onupgradeneeded = () => { if (expired) opening.transaction?.abort(); else opening.result.createObjectStore('values'); };
+      opening.onerror = () => { clearTimeout(timer); reject(new Error('Reading storage is unavailable.')); };
+      opening.onsuccess = () => {
+        const db = opening.result; if (expired) { db.close(); return; }
+        const tx = db.transaction('values', 'readwrite'), store = tx.objectStore('values');
+        const get = store.get('share-key'), getId = store.get('share-key-id'); let key: CryptoKey, keyId: string;
+        getId.onsuccess = () => { keyId = typeof getId.result === 'string' ? getId.result : crypto.randomUUID(); if (!getId.result) store.put(keyId, 'share-key-id'); };
+        get.onsuccess = () => { key = get.result as CryptoKey ?? generated; if (!get.result) store.put(key, 'share-key'); };
+        tx.oncomplete = () => { clearTimeout(timer); db.close(); resolve({ key, id: keyId }); };
+        tx.onabort = tx.onerror = () => { clearTimeout(timer); db.close(); reject(new Error('Shared links could not be protected.')); };
+      };
+    });
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(`share:${id}`) }, shareKey.key,
+      new TextEncoder().encode(JSON.stringify({ url: url.href, title: (input.get('title') ?? '').slice(0, 1000), savedAt: Date.now() })));
+    const protectedShare = { encryptedShare: 1, iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertext)) };
     await new Promise<void>((resolve, reject) => {
       let expired = false;
       const opening = indexedDB.open('crate-reading-v1', 1);
@@ -24,7 +47,8 @@ async function receiveReadingShare(request: Request): Promise<Response> {
         const store = tx.objectStore('values');
         const count = store.count(IDBKeyRange.bound('share:', 'share;'));
         count.onsuccess = () => { if (count.result >= 200) { tx.abort(); return; }
-        store.put({ url: url.href, title: (input.get('title') ?? '').slice(0, 1000), savedAt: Date.now() }, `share:${id}`); };
+        const currentKey = store.get('share-key-id');
+        currentKey.onsuccess = () => { if (currentKey.result !== shareKey.id) tx.abort(); else store.put(protectedShare, `share:${id}`); }; };
         tx.onabort = () => { clearTimeout(timer); db.close(); reject(new Error('Shared links could not be saved. Open Reading and save or export existing shares first.')); };
         tx.oncomplete = () => { clearTimeout(timer); db.close(); resolve(); };
         tx.onerror = () => { clearTimeout(timer); db.close(); reject(new Error('The shared link could not be stored.')); };

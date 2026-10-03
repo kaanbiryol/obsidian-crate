@@ -31,6 +31,8 @@ function pendingFolder(plugin: CratePlugin, workerUrl: string) {
 export async function changeReminderFolder(plugin: CratePlugin, folderPath: string): Promise<void> {
 	const folder = normalizeRemindersFolderPath(folderPath);
 	if (plugin.settings.reading?.enabled) validateReadingFolder(plugin.settings.reading.folderPath, folder, plugin.app.vault.configDir);
+	const { changeEncryptedFolder } = await import('../plugin/encryption-folder-moves');
+	if (await changeEncryptedFolder(plugin, plugin.remindersSettings.remindersFolderPath, folder)) return;
 	await plugin.writeRemindersSettings({ remindersFolderPath: folder,
 		pendingServerFolder: plugin.settings.workerUrl
 			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });

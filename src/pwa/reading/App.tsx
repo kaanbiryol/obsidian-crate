@@ -1,4 +1,6 @@
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
+import { readingKeys } from './encryption-session';
+
 import type { ReadingHighlight } from '@/reading/core/highlights';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 import type { ReadingChanges, ReadingItem } from '@/reading/core/model';
@@ -108,10 +110,12 @@ function ReadingAppContent() {
   const migratingHighlights = Boolean(visibleReader && !visibleReader.highlight_format && visibleReader.highlights?.length
     && pending.some(op => op.action !== 'capture' && op.intent.id === visibleReader.crate_reading_id));
   const readingDisabled = !session && connectionState !== 'available';
+
   if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
   const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const syncIssue = pending.find(op => op.error || op.review);
   const notices = <>{recovery && <p className="crate-reading__notice">Changes from an earlier sign-in are still stored here. <Button variant="outline" onClick={() => void run(exportReadingData)}>Export earlier changes</Button></p>}
+    {session && readingKeys() && visibleItems.some(item => item.extraction_status === 'pending') && <p className="crate-reading__notice">Links are saved with end-to-end encryption. Open Obsidian to download articles that this browser cannot access.</p>}
     {error && !readingDisabled && !adding && <p className="crate-reading__notice" role="alert">{error} <Button variant="outline" onClick={() => { if (session) void run(refreshManually); else void connect(); }}>Retry</Button></p>}
     {!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'} <Button variant="outline" onClick={() => setSettingsOpen(true)}>Review changes</Button></p>}
   </>;

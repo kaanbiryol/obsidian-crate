@@ -6,8 +6,11 @@ import type { Env } from './types';
 import { drainNotificationProjections } from './notification-projection';
 import { dispatchNotificationJobs } from './notification-outbox';
 import { revalidateReminderSources } from './reminder-source-migration';
+import { readEncryptionState } from './encryption-state';
 
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
+  const encryption = await readEncryptionState(env.DB);
+  if (['converting', 'resetting'].includes(encryption?.mode ?? '')) return;
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
   const readingAt = await scheduleReading(env);
   let sourceWork = false;
@@ -19,9 +22,11 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
   try {
     // Source verification and projection share this budget. Dispatch has its own
     // invocation so a reminder backlog does not compete with source scans.
+    // Encrypted descriptors need extra reads; leave room for shared feature and
+    // Reading scheduling checks within the per-invocation query budget.
     const policy = await getNotificationPolicy(env.DB);
     hasPolicy = Boolean(policy);
-    sourceWork = await revalidateReminderSources(env, 2, { folder: policy?.folderPath ?? null });
+    sourceWork = await revalidateReminderSources(env, encryption ? 1 : 2, { folder: policy?.folderPath ?? null });
     if (hasPolicy) {
       await drainNotificationProjections(env, 1);
       await dispatchNotificationJobs(env);

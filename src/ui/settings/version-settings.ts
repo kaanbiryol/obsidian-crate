@@ -1,8 +1,9 @@
 import { canReplaceServerBuild, serverBuildLabel, type DevelopmentBuild } from '../../cloudflare/server-build';
-import { Setting } from 'obsidian';
+import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import release from '../../cloudflare/server-release.json';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
+import type { CrateServerInfo } from '../../protocol';
 
 function localRevision(plugin: CratePlugin): number | undefined {
 	const deployment = plugin.settings.cloudflareDeployment;
@@ -14,6 +15,9 @@ async function checkVersion(plugin: CratePlugin) {
 	const deployment = plugin.settings.cloudflareDeployment;
 	const url = plugin.settings.workerUrl;
 	const info = await plugin.syncRuntime.getVersionInfo();
+	const current = plugin.settings.cloudflareDeployment;
+	if (url !== plugin.settings.workerUrl || deployment?.workerName !== current?.workerName
+		|| deployment?.accountId !== current?.accountId || deployment?.d1DatabaseId !== current?.d1DatabaseId) throw new Error('Server connection changed');
 	if (deployment && deployment === plugin.settings.cloudflareDeployment && url === plugin.settings.workerUrl
 		&& url === `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`
 		&& info.serverRevision && deployment.lastKnownRevision !== info.serverRevision) {
@@ -48,13 +52,23 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 }
 
 export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMatchingServer: () => void, onAvailability?: (available: boolean) => void): void {
+	let checkButton: ButtonComponent | undefined;
+	let updateAvailable = false;
+	const setAvailability = (available: boolean) => {
+		updateAvailable = available;
+		if (checkButton) {
+			if (available) checkButton.buttonEl.hide();
+			else checkButton.buttonEl.show();
+		}
+		onAvailability?.(available);
+	};
 	const describe = (revision: number | undefined, development?: DevelopmentBuild, fingerprint?: string) => {
 		const versions = `Current version: ${revision ? serverBuildLabel(revision, development) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}`;
 		const designated = !EMBEDDED_CLOUDFLARE_ARTIFACT.development || EMBEDDED_CLOUDFLARE_ARTIFACT.development.worker === plugin.settings.cloudflareDeployment?.workerName;
     const available = designated && revision !== undefined && (revision < release.revision || Boolean(fingerprint && canReplaceServerBuild(
       { revision, fingerprint, development }, { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development })));
-    if (available) { onAvailability?.(true); setting.setName('Cloudflare update available'); return versions; }
-		onAvailability?.(available);
+    setAvailability(available);
+    if (available) { setting.setName('Cloudflare update available'); return versions; }
 		if (revision === undefined) {
 			setting.setName('Check server version');
 			return versions;
@@ -62,7 +76,7 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 		if (revision === release.revision) {
 			if (!fingerprint) {
 				setting.setName('Check server version');
-				return `${versions}. Select Check live server to compare builds.`;
+				return `${versions}. Check for updates to compare the installed build.`;
 			}
 			setting.setName('Server build differs');
 			return `${versions}. Update the plugin to get a newer server release.`;
@@ -76,26 +90,37 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 	};
 	let saved = describe(localRevision(plugin));
 	setting.setDesc(saved);
-	setting.addButton(button => button.setButtonText('Check live server').onClick(async () => {
-		button.setDisabled(true);
-		setting.setDesc('Checking live server…');
-		try {
-			const info = await checkVersion(plugin);
-			if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) {
-				onMatchingServer();
-				return;
-			}
-			saved = describe(info.serverRevision, info.developmentBuild, info.deploymentFingerprint);
-			if (!info.deploymentFingerprint) {
-				onAvailability?.(false);
-				setting.setName('Check server version');
-				saved = `Current version: ${info.serverRevision ?? 'Unknown'} · Bundled version: ${release.revision}. Build unverified.`;
-			}
-			setting.setDesc(saved);
-		} catch {
-			setting.setDesc(`${saved}. Could not check the server. Try again.`);
-		} finally {
-			button.setDisabled(false);
+	const showVersion = (info: CrateServerInfo) => {
+		if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) {
+			checkButton?.buttonEl.hide();
+			onMatchingServer();
+			return;
 		}
-	}));
+		saved = describe(info.serverRevision, info.developmentBuild, info.deploymentFingerprint);
+		if (!info.deploymentFingerprint) {
+			setAvailability(false);
+			setting.setName('Check server version');
+			saved = `Current version: ${info.serverRevision ? serverBuildLabel(info.serverRevision, info.developmentBuild) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Build unverified. Retry when connected.`;
+		}
+		setting.setDesc(saved);
+	};
+	setting.addButton(button => {
+		checkButton = button;
+		if (updateAvailable) button.buttonEl.hide();
+		const check = async () => {
+			button.setDisabled(true).setButtonText('Checking…');
+			setting.setDesc('Checking live server…');
+			try {
+				showVersion(await checkVersion(plugin));
+			} catch {
+				setting.setDesc(`${saved}. Could not check the server. Try again.`);
+			} finally {
+				button.setDisabled(false).setButtonText('Check for updates');
+			}
+		};
+		button.setButtonText('Check for updates').onClick(check);
+		const cached = plugin.syncRuntime.getCachedVersionInfo();
+		if (cached) showVersion(cached);
+		else if (!updateAvailable && (localRevision(plugin) === undefined || localRevision(plugin) === release.revision)) void check();
+	});
 }

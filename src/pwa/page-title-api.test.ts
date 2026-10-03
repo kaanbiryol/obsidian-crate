@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
 import { invalidatePwaSession } from './session-generation';
 
+vi.mock('./encryption-session', () => ({ preparePwaEncryption: async () => null, encryptionSnapshot: () => ({ status: 'legacy' }) }));
+
 beforeEach(() => {
 	vi.stubGlobal('localStorage', { getItem: () => 'session' });
 	vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
@@ -29,6 +31,7 @@ describe('PWA page title requests', () => {
 		let finish!: (response: Response) => void;
 		vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
 		const pending = makeApiFetch('old-session', vi.fn())('/links/title', options());
+		await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
 		invalidatePwaSession(); finish(Response.json({ title: 'Old session result' }));
 		await expect(pending).rejects.toThrow('Session changed');
 	});

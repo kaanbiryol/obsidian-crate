@@ -16,6 +16,7 @@ export async function beginInitialImport(db: D1Database, wakeReminders?: () => P
       SELECT 1, ?, 'importing' WHERE NOT EXISTS (SELECT 1 FROM files)
         AND NOT EXISTS (SELECT 1 FROM changelog) AND NOT EXISTS (SELECT 1 FROM file_versions)
         AND NOT EXISTS (SELECT 1 FROM file_deletion_receipts) AND NOT EXISTS (SELECT 1 FROM upload_operations)
+        AND NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = 'e2ee:state')
       ON CONFLICT(id) DO NOTHING`).bind(crypto.randomUUID()).run();
     current = await readInitialImport(db);
   }

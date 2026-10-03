@@ -2,6 +2,7 @@ import { stringDigest } from './string-digest';
 import * as v from 'valibot';
 import { isStoredReminderChange, OPERATION_ID, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
+import { privateStorage } from './private-storage';
 
 const PREFIX = 'crate-reminder-outbox:';
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
@@ -39,7 +40,7 @@ function readStored(raw: string, operationId: string, folderPath: string): Store
 
 function browserStorage(): Storage {
 	try {
-		if (typeof localStorage !== 'undefined') return localStorage;
+		if (typeof localStorage !== 'undefined') return privateStorage(localStorage);
 	} catch { /* Access may be disabled by browser policy. */ }
 	throw new Error(STORAGE_ERROR);
 }

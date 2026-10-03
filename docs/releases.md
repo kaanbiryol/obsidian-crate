@@ -42,7 +42,8 @@ waits for an existing branch verification before dispatch, avoiding a duplicate
 full test run. Existing local or remote tags resume their exact commit and are
 never moved. Ordinary pushes refuse divergent branches and tags.
 
-Shortcut metadata records the signed file's SHA-256 and the source fingerprint.
+The private-fragment v2 assets are `save-to-crate-ios-27-v2.shortcut` and
+`reading-shortcut-v2.json`. Shortcut metadata records the signed file's SHA-256 and the source fingerprint.
 No file is selected by modification time, and stale files in the original checkout's
 `dist/` are never used. Retries reuse an existing draft shortcut only after its tag,
 source and checksum pass verification; `--resign` explicitly signs a replacement.
@@ -87,7 +88,7 @@ an explicit maintainer action; preparing the release does not publish it.
 
 Publishing triggers **Deploy GitHub Pages**. It selects the most recently published
 release containing shortcut metadata, including prereleases, verifies the download,
-and serves it at the existing `shortcuts/v1/Save to Crate (iOS 27).shortcut` path.
+and serves it at `shortcuts/v2/Save to Crate (iOS 27).shortcut`. It separately downloads the latest legacy artifact to preserve the v1 path for installed older servers. Publish a signed v2 release asset before shipping the encrypted Reading app; the Pages build fails closed if the v2 artifact is missing.
 Plugin-only releases do not replace that selection. An incomplete or corrupted
 shortcut release fails deployment instead of silently serving another version.
 

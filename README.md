@@ -65,17 +65,16 @@ and vault sync are preserved. Resume either feature without redeploying or setti
 it up again. Changes require a connection; plugins check on startup, focus, and
 every 30 seconds, and the web app checks on focus and every 15 seconds. Offline
 devices retain their last confirmed state until they reconnect.
-On desktop Obsidian, saving a Reading link first writes a bookmark into your vault,
+In Obsidian, saving a Reading link first writes a bookmark into your vault,
 then downloads and extracts the article on that device. No Crate server connection
 is required for that save; the resulting note uses normal vault sync. Failed or
-offline downloads keep the bookmark and offer **Try again** in the reader. Mobile
-Obsidian and PWA saves use server extraction. Each save form explains which device
+offline downloads keep the bookmark and offer **Try again** in the reader. Unencrypted PWA saves use server extraction. With E2EE enabled, the PWA downloads directly where the website allows it; other links wait for an unlocked Obsidian device to extract the article. Each save form explains which device
 downloads the article. There is no separate article-fetching switch.
 Notifications retain their own **Push notifications** opt-in.
 Under **Crate web app**, select **Open app** for this device, or **Connect another
 device** to show a QR code with a **Copy link** option. Reminders and Reading share the same web app.
 The web app works without Obsidian open.
-The server saves the bookmark first, then extracts article text with Defuddle.
+Without E2EE, the server saves the bookmark first, then extracts article text with Defuddle.
 Your server contacts the saved website without browser cookies or Crate credentials;
 there is no third-party extraction service. Failed or restricted pages remain saved
 links. Requests, extraction jobs, database operations, and files use your hosting resources.
@@ -106,8 +105,7 @@ it connects to this server and remembers its own capture-only access. Codes work
 once and expire after 10 minutes. The download comes from Crate’s public website
 and contains no credentials; pairing stays on your server. In Obsidian, **Set up
 shortcut → Copy phone setup link** opens this flow on a newly connected phone.
-**Share → Save to Crate** presents a branded confirmation in an iOS browser sheet; **Saved** means the
-bookmark is committed on your server. Android browsers supporting Web Share Target
+**Share → Save to Crate** opens the link in Crate using a private URL fragment. Unlock Reading if asked, then select **Save**. Reinstall the current v2 shortcut after enabling E2EE. For unencrypted vaults, Android browsers supporting Web Share Target
 can use **Share → Crate** after installing the web app. Pasting a link works in
 both the plugin and web library.
 
@@ -145,10 +143,10 @@ Cloudflare deployment and device connection use OAuth Authorization Code + PKCE.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
 - Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
-- The reminders web app stores its scoped session and pending reminder changes in browser local storage, and caches confirmed reminder and project content in IndexedDB for offline use. Signing out clears both.
+- The reminders web app stores its scoped session and pending changes locally and caches confirmed reminders in IndexedDB for offline use. With end-to-end encryption enabled, private cache, queue and draft content is encrypted; remembered folder keys allow offline access and service-worker notification decryption. Signing out clears private data and keys. Browser storage can be evicted, so retain the recovery key.
 - Remote code is not fetched or evaluated at runtime.
-- Pasting a web URL into a reminder title or description automatically requests its page title through your Crate server and uses it as the link label. The server contacts the pasted website without your cookies or authorization headers. Selected text keeps its own label. Offline, blocked, slow, or untitled pages keep the URL label. This requires an updated plugin/web app and Crate server.
-- Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker, or the operator of your local server, can access the synced data.
+- Pasting a web URL into a reminder title or description automatically requests its page title through your Crate server and uses it as the link label. The server contacts the pasted website without your cookies or authorization headers. Selected text keeps its own label. Offline, blocked, slow, or untitled pages keep the URL label. This requires an updated plugin/web app and Crate server. With end-to-end encryption enabled, title lookup is disabled and pasted links keep their URL labels.
+- Optional [end-to-end encryption](docs/e2ee-implementation.md) protects notes, attachments, retained history, shared settings and reminder text on both hosting options. Enable it explicitly in **Crate settings → Sync → Manage encryption** and save the recovery key outside your vault. Paths, sizes and notification scheduling metadata remain visible. Without this option, your server operator can read synced content. In the PWA, select **Connect with Obsidian** and confirm matching codes on both devices to transfer its keys without copying. The same recovery key remains a fallback for Obsidian and the PWA. The browser remembers only Reading and Reminders keys; its server permissions remain limited to those features, including whole notes in their folders. Treat the PWA as a trusted client because it can access unlocked content and handles your vault recovery key if you use manual recovery. To turn encryption off, **Reset sync and turn off encryption** deletes remote files and history, then uploads this device’s local vault unencrypted. Other devices must reconnect; web apps must log out and enroll again. Encrypted external backups still need the old recovery key. Reading uses a separate folder key for articles, URLs, metadata and browser data; server capture is replaced by trusted-client extraction. Encrypted vaults use in-app link saving instead of Android’s native share-target POST. See [Reading encryption](docs/reading-e2ee-assessment.md).
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate. **Server and usage → Restore backup…** restores an automatic upgrade backup into a separate Cloudflare server. The [recovery guide and paired D1/R2 CLI](docs/recovery.md) cover interrupted restores and downloadable archives.
 - Remote deletions always move local files into the vault's `.trash` folder, even if Obsidian is set to delete permanently. Check that folder when recovering an edit made during sync. Crate never syncs `.trash`.
 
