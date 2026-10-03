@@ -1,4 +1,5 @@
-import { Setting } from 'obsidian';
+import { createModalActions, createModalFooter } from '../shared/modal-elements';
+import type { Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { SharedModal } from '../shared/SharedModal';
 import { openWebAppPairing } from '../../plugin/web-app-pairing';
@@ -24,9 +25,10 @@ export class WebAppPairingModal extends SharedModal {
     codePanel.createSpan({ text: 'Verification code' });
     const code = codePanel.createEl('output', { cls: 'crate-web-pairing-code', attr: { 'aria-label': 'Verification code' } });
     codePanel.hidden = true;
-    const actions = this.contentEl.createDiv({ cls: 'crate-encryption-footer' });
+    const actions = createModalFooter(this.contentEl);
+    actions.addClass('crate-encryption-footer');
     const addCancel = (setting: Setting) => setting.addButton(button => button.setButtonText('Cancel').onClick(() => this.close()));
-    addCancel(new Setting(actions));
+    addCancel(createModalActions(actions));
     const showError = (error: unknown) => {
       if (this.controller.signal.aborted) return;
       heading.setText('Couldn’t connect');
@@ -63,7 +65,7 @@ export class WebAppPairingModal extends SharedModal {
             codePanel.hidden = false;
             if (firstCode) {
               actions.empty();
-              addCancel(new Setting(actions)).addButton(button => button.setButtonText('Approve').setCta().onClick(async () => {
+              addCancel(createModalActions(actions)).addButton(button => button.setButtonText('Approve').setCta().onClick(async () => {
                 button.setDisabled(true);
                 this.approving = true;
                 window.clearTimeout(this.timer);
@@ -78,7 +80,7 @@ export class WebAppPairingModal extends SharedModal {
                   instructions.createEl('strong', { text: 'Confirm and unlock' });
                   instructions.appendText(' on your phone.');
                   actions.empty();
-                  new Setting(actions).addButton(done => done.setButtonText('Done').onClick(() => this.close()));
+                  createModalActions(actions).addButton(done => done.setButtonText('Done').onClick(() => this.close()));
                 } catch (error) { showError(error); button.setDisabled(false); }
                 finally { this.approving = false; }
               }));
@@ -89,8 +91,8 @@ export class WebAppPairingModal extends SharedModal {
           if (this.controller.signal.aborted || this.approving || this.approved) return;
           showError(error); codePanel.hidden = true; actions.empty();
           if (error instanceof PairingEndedError) this.attempt = undefined;
-          addCancel(new Setting(actions)).addButton(button => button.setButtonText('Try again').onClick(() => {
-            actions.empty(); addCancel(new Setting(actions)); void poll();
+          addCancel(createModalActions(actions)).addButton(button => button.setButtonText('Try again').onClick(() => {
+            actions.empty(); addCancel(createModalActions(actions)); void poll();
           }));
         }
         finally { polling = false; }

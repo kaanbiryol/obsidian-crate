@@ -3,7 +3,8 @@ import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, reset
 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('./shared/SharedModal', () => ({ SharedModal: class {
-	bodyEl = new FakeElement('div');
+	contentEl = new FakeElement('div');
+	bodyEl = this.contentEl.createDiv();
 	modalEl = new FakeElement('div');
 	openLayout() {}
 	onClose() {}

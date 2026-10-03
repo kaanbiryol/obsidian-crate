@@ -1,3 +1,4 @@
+import { obsidianDomHelpers, obsidianDialogModule, hostStyles } from './obsidian-dialog-fixture.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
@@ -11,20 +12,7 @@ const { outputFiles } = await build({
     import { verifyRecoveryCode } from './src/encryption/recovery-verification';
     import { mountModalHeader } from './src/ui/shared/mountModalHeader';
     import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';
-    HTMLElement.prototype.createEl = function(tag, options = {}) {
-      const el = document.createElement(tag); el.className = options.cls ?? ''; el.textContent = options.text ?? '';
-      for (const [key,value] of Object.entries(options.attr ?? {})) el.setAttribute(key,value);
-      this.append(el); return el;
-    };
-    HTMLElement.prototype.createSpan = function(options) { return this.createEl('span',options); };
-    HTMLElement.prototype.createDiv = function(options) { return this.createEl('div',options); };
-    HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
-    HTMLElement.prototype.setText = function(text) { this.textContent = text; };
-    HTMLElement.prototype.empty = function() { this.replaceChildren(); };
-    HTMLElement.prototype.toggleClass = function(name, value) { this.classList.toggle(name, value); };
-    HTMLElement.prototype.hide = function() { this.style.display = 'none'; };
-    HTMLElement.prototype.show = function() { this.style.removeProperty('display'); };
-    Object.defineProperty(HTMLElement.prototype,'win',{get:()=>window});
+    ${obsidianDomHelpers}
     window.mount = async (resuming = false, delayed = false) => {
       window.disposeContent?.(); window.unmountHeader?.(); document.body.replaceChildren();
       window.calls = []; window.connectionChanged = false;
@@ -71,57 +59,23 @@ const { outputFiles } = await build({
   plugins: [{ name: 'obsidian-host', setup(builder) {
     builder.onResolve({ filter: /^obsidian$/ }, () => ({path:'obsidian',namespace:'host'}));
     builder.onLoad({ filter: /.*/, namespace: 'host' }, () => ({ contents: `
-      export function setIcon(el) {
-        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 24 24');
-        svg.setAttribute('width','18');svg.setAttribute('height','18');svg.setAttribute('stroke','currentColor');
-        const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M6 6l12 12M18 6 6 18');svg.append(path);el.append(svg);
-      }
-      export class Setting {
-        constructor(el) {
-          this.settingEl=el.createDiv({cls:'setting-item'});
-          this.infoEl=this.settingEl.createDiv({cls:'setting-item-info'});
-          this.nameEl=this.infoEl.createDiv({cls:'setting-item-name'});this.descEl=this.infoEl.createDiv({cls:'setting-item-description'});
-          this.controlEl=this.settingEl.createDiv({cls:'setting-item-control'});
-        }
-        setName(text){this.nameEl.textContent=text;return this;}
-        setDesc(text){this.descEl.textContent=text;return this;}
-        setClass(name){this.settingEl.classList.add(name);return this;}
-        addText(build){
-          const input=this.controlEl.createEl('input');
-          const api={inputEl:input,setValue:v=>{input.value=v;return api;},setPlaceholder:v=>{input.placeholder=v;return api;},onChange:fn=>{input.oninput=()=>fn(input.value);return api;}};
-          build(api);return this;
-        }
-        addButton(build){
-          const button=this.controlEl.createEl('button');
-          const api={buttonEl:button,setButtonText:v=>{button.textContent=v;return api;},setDisabled:v=>{button.disabled=v;return api;},
-            onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>{button.classList.add('mod-warning');return api;}};
-          build(api);return this;
-        }
-      }
+${obsidianDialogModule}
     ` }));
   } }],
 });
-const css = await readFile('dist/styles.css','utf8');
+const css = await readFile(process.env.CRATE_PLUGIN_CSS_PATH ?? 'dist/styles.css','utf8');
 const obsidianCss = process.env.CRATE_OBSIDIAN_CSS_PATH ? await readFile(process.env.CRATE_OBSIDIAN_CSS_PATH,'utf8') : '';
 const hostName = obsidianCss ? 'obsidian-' : '';
 const output = '.generated/encryption-ui-review';
 await mkdir(output,{recursive:true});
-const hostStyles = `
-  :root{--background-primary:#fff;--background-secondary:#f5f5f5;--background-modifier-border:#ddd;--background-modifier-hover:#eee;--text-normal:#242424;--text-muted:#666;--text-accent:#7057b8;--interactive-accent:#7057b8;--text-on-accent:white;--interactive-normal:#eee;--text-success:#26763d;--text-error:#c33636;--font-ui-small:14px;--font-ui-smaller:12px;--font-ui-medium:16px;--radius-m:8px;--radius-s:4px;--font-interface:system-ui;--font-monospace:monospace}
-  .theme-dark{--background-primary:#1e1e1e;--background-secondary:#262626;--background-modifier-border:#393939;--background-modifier-hover:#303030;--text-normal:#ddd;--text-muted:#aaa;--interactive-normal:#292929;--text-success:#87c693;--text-error:#ed9696}
-  *{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:16px system-ui;display:flex;align-items:center;justify-content:center;height:100dvh}
-  button,input,textarea{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}
-  .modal:not(.mod-settings) .setting-item:not(.setting-item-heading):where(:not(.setting-group *)){padding:16px 0;border-top:1px solid var(--background-modifier-border)}
-  .modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}
-  .setting-item{display:flex;align-items:center;padding:18px 0;border-top:1px solid var(--background-modifier-border)}.setting-item-info{flex:1 1 auto;margin-right:16px}.setting-item-control{display:flex;flex:1 0 auto;justify-content:flex-end;align-items:center;gap:8px}
-`;
+
 for (const browserType of [chromium,webkit]) {
   const browser = await browserType.launch();
   try {
     for (const [width,height] of [[1100,900],[390,844],[320,568]]) for (const theme of ['light','dark']) {
       const page = await browser.newPage({viewport:{width,height},hasTouch:width<700,reducedMotion:theme==='light'?'reduce':'no-preference'});
       const errors = []; page.on('pageerror',error=>errors.push(error.message));
-      await page.route('https://encryption-ui.test/**',route=>route.fulfill({contentType:'text/html',body:`<html class="theme-${theme}"><head><style>${hostStyles}</style><style>${obsidianCss}</style><style>body{display:flex;align-items:center;justify-content:center;height:100dvh}</style><style>${css}</style></head><body class="theme-${theme}"></body></html>`}));
+      await page.route('https://encryption-ui.test/**',route=>route.fulfill({contentType:'text/html',body:`<html class="theme-${theme}"><head><style>${hostStyles}</style><style>${obsidianCss}</style><style>body{display:flex;align-items:center;justify-content:center;height:100dvh}</style><style>${css}</style></head><body class="theme-${theme} ${width<700?'is-mobile is-phone':''}"></body></html>`}));
       await page.goto('https://encryption-ui.test/');
       await page.addScriptTag({content:outputFiles[0].text});
       await page.evaluate(()=>{window.mounted=window.mount(false,true);});

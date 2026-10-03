@@ -133,7 +133,7 @@ const { outputFiles } = await build({
  }}], bundle:true,write:false,format:'iife',platform:'browser',loader:{'.scss':'empty'},
 });
 await mkdir('.generated/file-history',{recursive:true});
-const css=await readFile('dist/styles.css','utf8');
+const css=await readFile(process.env.CRATE_PLUGIN_CSS_PATH ?? 'dist/styles.css','utf8');
 for(const browserType of [chromium,webkit]) {
  const browser=await browserType.launch();
  try {
@@ -391,7 +391,7 @@ for(const browserType of [chromium,webkit]) {
    await expect(stateModal.locator('nav, .crate-history-preview-pane')).toHaveCount(0);
    assert.equal(await page.evaluate(()=>window.stateFilePreviews),0);
    assert.equal(await page.evaluate(()=>window.stateRestores),0);
-   assert.equal((await stateModal.boundingBox()).width,Math.min(380,width-32));
+   assert.equal((await stateModal.boundingBox()).width,Math.min(440,width-32));
    await expect(stateModal.getByRole('button',{name:'Restore',exact:true})).toBeEnabled();
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-state-restore.png'});
    await stateModal.getByRole('button',{name:'Cancel',exact:true}).click();

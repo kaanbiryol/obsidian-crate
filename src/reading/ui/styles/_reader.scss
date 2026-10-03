@@ -1,4 +1,24 @@
 .crate-reminders-ui .crate-reading-reader {
+	// Keep the navigation and any metadata above the remaining loading area.
+	&:has(.crate-content-loading) {
+		display: flex;
+		flex-direction: column;
+		.crate-reading-reader__nav { flex-shrink: 0; }
+		.crate-reading-reader__page {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+			width: 100%;
+			box-sizing: border-box;
+			padding-block: 16px;
+		}
+		.crate-reading-reader__page > div:not([hidden]):has(> .pwa-reading-article-opening__body),
+		.pwa-reading-article-opening__body {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+		}
+	}
 	position: relative; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 	&__nav { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 76px; padding: 8px 20px; border-bottom: 1px solid var(--crate-divider); background: var(--crate-app-bg); }
 	&__selection { position: absolute; z-index: 3; display: flex; align-items: center; gap: 2px; box-sizing: border-box; width: 208px; height: 52px; padding: 3px; border: 1px solid var(--crate-divider); border-radius: 10px; background: var(--crate-app-bg); box-shadow: 0 2px 4px rgba(0, 0, 0, .04), 0 6px 18px rgba(0, 0, 0, .1); user-select: none; -webkit-user-select: none; }

@@ -51,6 +51,15 @@
   --crate-modal-border-color: var(--modal-border-color, var(--crate-divider));
   --crate-modal-backdrop-filter: var(--blur-l, none);
 
+  /* Dialog content and native Setting rows share one spacing and typography scale. */
+  --crate-dialog-padding: 16px;
+  --crate-dialog-gap: 16px;
+  --crate-dialog-footer-padding: 12px;
+  --crate-settings-row-padding: 12px;
+  --crate-settings-row-gap: 12px;
+  --crate-settings-label-size: var(--font-ui-small, 14px);
+  --crate-settings-description-size: var(--font-ui-smaller, 12px);
+
   /* Selection roles follow themed navigation states instead of tinting Crate's accent. */
   --crate-selection-bg: var(--nav-item-background-active, var(--crate-control-active-bg));
   --crate-selection-color: var(--nav-item-color-active, var(--text-normal));

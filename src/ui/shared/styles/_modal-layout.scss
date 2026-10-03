@@ -1,10 +1,32 @@
+@use "action";
+
+@mixin actions {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    .setting-item-info { display: none; }
+    .setting-item-control { flex: 1; width: 100%; justify-content: flex-end; }
+    button { @include action.control; @include action.dialog-button; width: auto; }
+    @media (pointer: coarse) {
+      button { flex: 1 1 auto; }
+    }
+}
+
 @mixin styles {
+  .crate-modal-actions { @include actions; }
+
   .crate-modal-body {
-    padding: 20px;
+    padding: var(--crate-dialog-padding, 16px);
   }
 
   .crate-modal-footer {
-    padding: 12px 20px;
+    flex: none;
+    padding: var(--crate-dialog-footer-padding, 12px) var(--crate-dialog-padding, 16px);
     border-top: 1px solid var(--background-modifier-border);
   }
 }

@@ -1,15 +1,13 @@
 @use "../../../ui/shared/styles/list-item";
 @use "../../../ui/shared/styles/loading-indicator";
 @use "../../../ui/shared/styles/empty-state";
+@use "../../../ui/shared/styles/view-header";
 .crate-reminders-ui .crate-reading-workspace { height: 100%; min-height: 0; container: reading / inline-size; }
 .crate-reminders-ui .crate-reading {
 	&__layout { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 	&__sidebar { display: flex; flex-direction: column; min-height: 0; padding: 0 12px; border-right: 1px solid var(--crate-divider); background: var(--crate-panel-bg); }
 	&__library { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--crate-divider); }
-	&__header.view-header { min-height: 80px; padding: var(--crate-view-header-padding); gap: 8px; }
-	&__header .view-header-title { font-size: var(--crate-view-title-size); font-weight: var(--crate-view-title-weight); letter-spacing: var(--crate-view-title-spacing); line-height: var(--crate-view-title-leading); }
-	&__header .view-header-meta { min-height: 21px; margin-top: 6px; }
-	&__header .view-header-count { font-size: var(--reminder-font-xs); font-weight: var(--reminder-font-weight-medium); color: var(--text-faint); }
+	&__header.view-header { @include view-header.primary-screen; }
 	&__mobile-nav, button.crate-reading__mobile-add { display: none; }
 	&__search { margin: 14px 18px 12px; }
 	&__tag-picker { position: relative; display: none; align-items: center; gap: 12px; margin: 0 18px 12px; color: var(--text-muted); font-size: 13px; }
@@ -22,7 +20,7 @@
 	&__item { position: relative; display: flex; align-items: center; min-width: 0; @include list-item.surface; margin-bottom: 8px; }
 	@media (hover: hover) and (pointer: fine) { &__item:hover { @include list-item.hover; } }
 	&__item:has(button[data-press-active]) { @include list-item.active; }
-	button.crate-reading__open { display: flex; color: var(--text-normal); box-shadow: none; flex: 1; align-items: flex-start; justify-content: flex-start; min-width: 0; @include list-item.primary-spacing; border: 0; padding-right: 0; text-align: left; min-height: 66px; background: transparent; }
+	button.crate-reading__open { display: flex; color: var(--text-normal); box-shadow: none; flex: 1; align-items: flex-start; justify-content: flex-start; min-width: 0; @include list-item.primary-spacing; border: 0; text-align: left; min-height: 66px; background: transparent; }
 	button.crate-reading__open:disabled { opacity: .5; }
 	button.crate-reading__open:hover:not(:disabled) { background: transparent; }
 	&__source-icon { position: relative; overflow: hidden; display: inline-flex; flex: 0 0 26px; align-items: center; justify-content: center; height: 26px; width: 26px; border-radius: 7px; background: var(--crate-panel-bg); border: 0; color: var(--text-muted); font: 500 13px/1 var(--font-interface, system-ui, sans-serif); }
@@ -31,9 +29,6 @@
 	&__item-copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 	&__open strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; @include list-item.title; }
 	&__meta { color: var(--text-muted); font-size: var(--reminder-font-xs); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-	button.crate-reading__favorite { align-self: center; margin: 0 2px; color: var(--text-faint, var(--text-muted)); }
-	button.crate-reading__favorite[aria-pressed="true"] { color: var(--text-normal); }
-	@media (hover: hover) and (pointer: fine) { &__item:not(:hover):not(:focus-within) button.crate-reading__favorite[aria-pressed="false"] { opacity: 0; } }
 	&__list-scroll:has(> .crate-reading__empty) {
 		@include empty-state.body;
 		padding-block: 16px;
@@ -77,7 +72,6 @@
 	.crate-reading__item {
 		@include list-item.flat-surface;
 		margin-bottom: 0;
-		&:not(:last-child) { @include list-item.inset-divider(52px, 12px); }
 		@media (hover: hover) and (pointer: fine) {
 			&:hover { background: var(--crate-reminder-card-hover-bg); }
 		}

@@ -1,3 +1,4 @@
+import { createModalActions, createModalFooter } from './shared/modal-elements';
 import { Setting, type App } from 'obsidian';
 import { SharedModal } from './shared/SharedModal';
 
@@ -56,8 +57,7 @@ class ConfirmationModal extends SharedModal {
 				.addToggle(toggle => toggle.setValue(false).onChange(checkbox.onChange));
 		}
 
-		new Setting(contentEl)
-			.setClass('crate-confirmation-actions')
+		createModalActions(createModalFooter(this.contentEl))
 			.addButton(button => button
 				.setButtonText(cancelText)
 				.onClick(() => this.finish(false)))

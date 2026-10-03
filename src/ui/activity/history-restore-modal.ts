@@ -1,4 +1,5 @@
-import { Notice, Setting, type App } from 'obsidian';
+import { createModalActions, createModalFooter } from '../shared/modal-elements';
+import { Notice, type App } from 'obsidian';
 import type { HistoryRestoreReview } from '../../sync/history-restore';
 import { SharedModal } from '../shared/SharedModal';
 import type { SyncHistoryEntry } from '../../sync/types';
@@ -31,7 +32,7 @@ export class HistoryRestoreModal extends SharedModal {
             cls: 'crate-confirmation-details',
         });
         this.status = this.bodyEl.createEl('p', { cls: 'crate-confirmation-details', attr: { role: 'status', 'aria-live': 'polite' } });
-        new Setting(this.bodyEl).setClass('crate-confirmation-actions')
+        createModalActions(createModalFooter(this.contentEl))
             .addButton(button => {
                 this.cancel = button.buttonEl;
                 button.setButtonText('Cancel').onClick(() => this.close());

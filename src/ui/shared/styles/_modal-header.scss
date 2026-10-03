@@ -3,6 +3,7 @@
   --reminder-modal-header-control-size: var(--crate-icon-button-size);
 
   display: grid;
+  flex-shrink: 0;
   grid-template-columns: var(--reminder-modal-header-control-size) minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 6px;
@@ -12,6 +13,7 @@
 }
 
 .reminder-modal-header-close {
+  --crate-icon-button-control-size: var(--reminder-modal-header-control-size);
   justify-self: start;
   border-color: transparent !important;
   background: transparent !important;
@@ -125,4 +127,12 @@
 .reminder-modal-header-action[data-tone="danger"].is-enabled {
   color: var(--crate-danger);
 }
+@media (max-width: 640px) {
+  .reminder-modal-header { padding-inline: 12px; }
+}
+
+@media (pointer: coarse) {
+  .reminder-modal-header { --reminder-modal-header-control-size: 44px; }
+}
+
 }

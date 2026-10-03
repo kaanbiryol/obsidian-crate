@@ -1,0 +1,151 @@
+@use "action";
+
+// Obsidian owns these controls; Crate supplies their shared geometry inside dialogs.
+@mixin styles {
+  .setting-item:not(.setting-item-heading) {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--crate-settings-row-gap);
+    margin: 0;
+    padding: var(--crate-settings-row-padding) 0;
+    border: 0;
+    border-top: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    &:first-child { border-top: 0; }
+
+    .setting-item-control { width: auto; }
+    .setting-item-control button { width: auto; }
+    .setting-item-info { flex: 1; min-width: 0; margin: 0; }
+    .setting-item-name {
+      margin: 0;
+      padding: 0;
+      color: var(--text-normal);
+      font-size: var(--crate-settings-label-size);
+      font-weight: var(--font-normal, 400);
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .setting-item-description {
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: var(--crate-settings-description-size);
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+      &:empty { display: none; }
+    }
+  }
+  .setting-item-control {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    &:empty { display: none; }
+    button { @include action.control; }
+    :is(input, textarea, select) { max-width: 100%; }
+  }
+
+/* Secondary settings share the native row inset, with a quiet trailing chevron. */
+.crate-settings-disclosure {
+	margin: 6px 0 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-primary);
+
+	> summary {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 12px;
+		column-gap: var(--crate-dialog-gap);
+		row-gap: 2px;
+		align-items: center;
+		min-height: 48px;
+		box-sizing: border-box;
+		padding: 10px var(--crate-dialog-padding);
+		margin: 0;
+		list-style: none;
+		font-size: var(--crate-settings-label-size);
+		font-weight: var(--font-medium, 500);
+		line-height: 1.4;
+		color: var(--text-normal);
+		cursor: pointer;
+		border-radius: inherit;
+		background: transparent;
+		box-shadow: none;
+
+		&::-webkit-details-marker { display: none; }
+		&::marker { content: ''; }
+		> span { grid-column: 1; min-width: 0; overflow-wrap: anywhere; }
+		&::after {
+			content: '';
+			grid-column: 2;
+			grid-row: 1 / span 2;
+			justify-self: center;
+			width: 6px;
+			height: 6px;
+			border-right: 1.5px solid var(--text-muted);
+			border-bottom: 1.5px solid var(--text-muted);
+			transform: rotate(-45deg);
+		}
+		&:focus-visible {
+			outline: 2px solid var(--interactive-accent);
+			outline-offset: 2px;
+		}
+	}
+
+	&[open] > summary {
+		border-bottom: 1px solid var(--background-modifier-border);
+		border-radius: var(--radius-m, 8px) var(--radius-m, 8px) 0 0;
+		&::after { transform: rotate(45deg); }
+	}
+
+	> div {
+		padding: 0 var(--crate-dialog-padding) 8px;
+		> .setting-item:first-child { border-top: 0; }
+		> .crate-settings-disclosure { margin: 8px 0; }
+	}
+}
+
+.crate-settings-disclosure-summary {
+	color: var(--text-muted);
+	font-size: var(--crate-settings-description-size);
+	font-weight: var(--font-normal, 400);
+	line-height: 1.45;
+}
+
+
+  .crate-settings-disclosure--inline {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    background: transparent;
+    > summary { padding-inline: 0; min-height: 44px; }
+    &[open] > summary { border: 0; border-radius: 0; }
+    > div { padding: 0 0 var(--crate-settings-row-padding); }
+    > div > :first-child { margin-top: 0; }
+    > div > :last-child { margin-bottom: 0; }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .crate-settings-disclosure > summary:hover { background: var(--background-modifier-hover); }
+  }
+
+  // Wrap fields and multiple actions inside narrow dialogs.
+  @container crate-dialog (max-width: 400px) {
+    .setting-item:not(.setting-item-heading):where(:not(.crate-modal-actions)):has(input:not([type='checkbox']), textarea, select),
+    .setting-item:where(:not(.crate-modal-actions)):has(.setting-item-control > button ~ button) {
+      flex-wrap: wrap;
+      gap: 8px;
+      .setting-item-info { flex-basis: 100%; }
+      .setting-item-control { width: 100%; justify-content: flex-start; }
+    }
+  }
+}

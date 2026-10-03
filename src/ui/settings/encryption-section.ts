@@ -1,3 +1,5 @@
+import { createSettingsDisclosure } from '../shared/settings-disclosure';
+import { createModalActions } from '../shared/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { SharedModal } from '../shared/SharedModal';
@@ -119,7 +121,7 @@ class EncryptionModal extends SharedModal {
 	private unavailable(error: unknown): void {
 		this.clearContent();
 		new Setting(this.bodyEl).setName('Encryption status unavailable').setDesc(errorMessage(error));
-		new Setting(this.bodyEl).addButton(button => button.setButtonText('Retry connection').onClick(async () => {
+		createModalActions(this.bodyEl).addButton(button => button.setButtonText('Retry connection').onClick(async () => {
 			button.setDisabled(true);
 			try { await this.load(); } catch (failure) { this.unavailable(failure); }
 		}));
@@ -205,8 +207,7 @@ class EncryptionModal extends SharedModal {
 		const vault = new Setting(overview).setName('Vault encryption').setDesc(state?.mode === 'active' ? 'Active · conversion complete'
 			: state ? 'Conversion in progress · sync and notifications are paused. Resume below.' : 'Not enabled');
 		if (!state) return vault;
-		const devices = overview.createEl('details', { cls: 'crate-encryption-details' });
-		devices.createEl('summary', { text: keys ? 'This device is unlocked' : 'This device needs a recovery key' });
+		const devices = createSettingsDisclosure(overview, keys ? 'This device is unlocked' : 'This device needs a recovery key', { inline: true });
 		new Setting(devices).setName('This device').setDesc(keys ? 'Unlocked · keys saved on this device.' : 'Locked · enter your saved recovery key below.');
 		const scope = keys?.scopes.find(item => item.folderPath === this.plugin.remindersSettings.remindersFolderPath);
 		new Setting(devices).setName('Notification keys').setDesc(!keys ? 'Unavailable until this device is unlocked.'
@@ -220,7 +221,7 @@ class EncryptionModal extends SharedModal {
 		let code = '';
 		new Setting(this.bodyEl).setName('Recovery key').addText(text => { text.inputEl.type = 'password'; text.setPlaceholder('Paste your recovery key').onChange(value => { code = value.trim(); }); });
 		const status = this.bodyEl.createEl('p', { attr: { role: 'status' } });
-		new Setting(this.bodyEl).addButton(button => button.setButtonText('Unlock vault').setCta().onClick(async () => {
+		createModalActions(this.bodyEl).addButton(button => button.setButtonText('Unlock vault').setCta().onClick(async () => {
 			const recoveryCode = code;
 			button.setDisabled(true);
 			try {
@@ -261,8 +262,7 @@ class EncryptionModal extends SharedModal {
 			turnOff: () => { this.close(); new EncryptionResetModal(this.plugin, state, this.onChanged).open(); },
 			advanced: container => {
 				container.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep this key private. It unlocks your synced vault on Obsidian devices and in the web app. Notification text is encrypted too.' });
-				const verify = container.createEl('details', { cls: 'crate-encryption-details' });
-				verify.createEl('summary', { text: 'Check recovery key' });
+				const verify = createSettingsDisclosure(container, 'Check recovery key', { inline: true });
 				const verification = renderRecoveryVerification(verify, state.recovery, keys, () => {}, () => this.assertCurrentConnection());
 
 				return verification.dispose;

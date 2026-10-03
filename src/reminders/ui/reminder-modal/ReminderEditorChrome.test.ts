@@ -347,7 +347,7 @@ describe('reminder editor chrome', () => {
         expect(markup).not.toContain('Select Project');
     });
 
-    it('renders a compact delete confirmation without redundant chrome', () => {
+    it('uses the shared dialog layout for delete confirmation', () => {
         const markup = renderToStaticMarkup(React.createElement(DeleteConfirmationModal, {
             isOpen: true,
             onClose: vi.fn(),
@@ -363,9 +363,11 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('autofocus=""');
         expect(markup).not.toContain('style="opacity:0');
         expect(markup).not.toMatch(/transform:(?!none)/);
-        expect(markup).toContain('delete-confirmation-header');
+        expect(markup).toContain('crate-modal-footer');
+        expect(markup).toContain('crate-modal-actions');
+        expect(markup).toContain('data-tone="danger"');
         expect(markup).not.toContain('aria-label="Close confirmation"');
-        expect(markup).not.toContain('reminder-modal-header');
+        expect(markup).toContain('reminder-modal-header');
         expect(markup).not.toContain('data-icon="triangle-alert"');
     });
 });

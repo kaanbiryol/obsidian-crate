@@ -1,3 +1,4 @@
+import { createModalActions, createModalFooter } from './shared/modal-elements';
 import { Notice, Setting, type App } from 'obsidian';
 import { SharedModal } from './shared/SharedModal';
 import qrcode from 'qrcode-generator';
@@ -42,7 +43,7 @@ export class QRModal extends SharedModal {
 
 		const fallback = contentEl.createDiv({ cls: 'crate-qr-link-fallback' });
 		fallback.hide();
-		new Setting(contentEl).setClass('crate-qr-actions')
+		createModalActions(createModalFooter(this.contentEl))
 			.addButton(button => button.setButtonText('Copy link').onClick(async () => {
 				try {
 					await navigator.clipboard.writeText(this.data);

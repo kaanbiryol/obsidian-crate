@@ -195,4 +195,9 @@
     margin: 8px 0 12px;
     background: var(--background-modifier-border);
 }
+
+// Preserve section spacing without showing or announcing a decorative line.
+.reminders-view[data-list-style="flat"] .premium-divider {
+    visibility: hidden;
+}
 }

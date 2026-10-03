@@ -19,7 +19,7 @@ class ExternalBrowserModal extends SharedModal {
 		this.bodyEl.createEl('p', { text: this.options.message });
 		const link = this.bodyEl.createEl('a', {
 			text: this.options.linkText,
-			cls: 'external-link crate-external-browser-link',
+			cls: 'external-link mod-cta crate-external-browser-link',
 		});
 		link.setAttribute('href', this.url);
 		link.setAttribute('target', '_blank');

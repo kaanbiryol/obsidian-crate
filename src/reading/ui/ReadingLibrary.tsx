@@ -9,7 +9,7 @@ import { NavigationBar } from '../../ui/shared/NavigationBar';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { FloatingActionButton } from '../../reminders/components/FloatingActionButton';
 import { EmptyState } from '../../reminders/components/EmptyState';
-import type { ReadingChanges, ReadingItem } from '../core/model';
+import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
 import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from './reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
@@ -26,7 +26,6 @@ export interface ReadingLibraryProps {
 	renderLibraryContent?: (section: ReadingSection, content: React.ReactNode) => React.ReactNode;
 	onAdd: () => void;
 	onOpen: (item: ReadingItem, highlight: ReadingHighlight | undefined, section: ReadingSection) => Promise<void>;
-	onUpdate: (item: ReadingItem, changes: ReadingChanges) => Promise<void>;
 	onRefresh: () => Promise<void>;
 	onSettings?: () => void;
 	settingsLabel?: string;
@@ -43,7 +42,6 @@ export interface ReadingLibraryProps {
 	beforeListContent?: React.ReactNode;
 	/** Host-owned unavailable state, keeping library navigation mounted. */
 	listContent?: React.ReactNode;
-	pendingItemIds?: ReadonlySet<string>;
 }
 
 const sectionIcons = { inbox: 'inbox', favorites: 'star', archived: 'archive', highlights: 'highlighter' };
@@ -51,7 +49,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
-export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onUpdate, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent, pendingItemIds }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
@@ -141,7 +139,7 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
 							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
 								<ReadingItemContent item={item} />
-							</Button><IconButton size="large" icon="star" className="crate-reading__favorite" label={item.favorite ? 'Remove favorite' : 'Favorite'} aria-pressed={item.favorite} data-filled={item.favorite} disabled={pendingItemIds?.has(item.crate_reading_id)} aria-disabled={busy.has(item.crate_reading_id) || pendingItemIds?.has(item.crate_reading_id)} onClick={() => run(item.crate_reading_id, () => onUpdate(item, { favorite: !item.favorite }))} />
+							</Button>
 						</li>)}</ul></section>)}
 						{visible < count && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
 					</>)}

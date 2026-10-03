@@ -138,7 +138,7 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('<html lang="en">');
+		expect(html).toContain('<html lang="en" style="background:#0d0d0f;background:light-dark(#f7f7f8,#0d0d0f);color-scheme:light dark">');
 		expect(html).toContain('<meta name="color-scheme" content="light dark">');
 		expect(html).toContain(`<meta id="pwa-theme-color" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">`);
 		expect(html).toContain(`<meta name="theme-color" content="${PWA_LIGHT_CHROME_COLOR}" media="(prefers-color-scheme: light)">`);

@@ -27,14 +27,15 @@ both hosts together.
   correct before React loads.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
-  Reading uses the same list presentation on desktop and phones, retaining its source icon,
-  favorite action, and one stacked library/reader flow at every width in both hosts.
+  Reading uses the same list presentation on desktop and phones, retaining its source icon
+  and one stacked library/reader flow at every width in both hosts.
+  Favorite actions are available only inside the article reader.
   Reading uses bottom navigation, floating Highlights, and sheets; do not introduce
   desktop sidebars, split panes, or centered dialogs. Desktop support is separate
   future work. Covered library cards keep their resting surface on return. Shared Sass mixins preserve each
-  feature's existing DOM and interaction semantics. Flat surfaces and inset
-  dividers are reusable mixins here; reminders, projects, and Reading all opt into them.
-  Dividers appear only between items within each group, never after its final item.
+  feature's existing DOM and interaction semantics. Flat surfaces are reusable
+  mixins here. Reminders, projects, Reading articles, and Highlights use spacing
+  between flat rows without dividers.
   Existing reminder surface tokens remain host-theme inputs.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
@@ -46,10 +47,26 @@ both hosts together.
   project lists, embedded notes, and Reading; the PWA stores its own preference and updates
   open tabs. Flat rows retain completion targets, priority, keyboard focus,
   press/drag feedback, and theme colors while removing card surfaces and metadata
-  pill outlines. Their dividers align with the reminder title. Reading library dividers align with
-  article titles, and Reading highlights follow the same flat/card preference.
+  pill outlines. Flat reminder and project rows have no dividers, including expanded
+  subproject groups; the main header separator remains. Inbox hides its redundant project
+  label while retaining dates and recurrence; mixed-project views keep project labels.
+  Reading articles and highlights follow the same divider-free flat/card preference.
   Project cards and subproject groups share this setting, retaining their colored
   accents, progress, disclosures, and focus/press feedback in either presentation.
+  Project counts use smaller, regular-weight text with a dot separator. Flat project
+  rows share the reminders’ rounded hover/press fills; expanded parent rows have
+  no persistent background. Subproject rows use tighter vertical padding, with
+  extra space after an expanded top-level group to distinguish the next project.
+  Flat reminder rows keep compact internal spacing with more separation after
+  description rows, slightly smaller metadata icons, and slightly larger checkbox
+  circles. They retain 44px completion targets and softly rounded hover/press fills;
+  row motion reads `--crate-reminder-row-gap` so it preserves the selected style.
+  Today shows overdue reminders and those due today in one continuous list,
+  ordered by due date without section headings. Flat Upcoming and Completed sections
+  hide their decorative separators while preserving group spacing, date headings,
+  and the Completed toggle. Header, settings, picker, toolbar, and article-content
+  separators retain their existing treatment. Metadata and overdue dates use the host's
+  original text and error colors; only hover/press fills add surface blending.
 - Reading search and PWA Save a link fields opt into `crate-field--rounded`: 16px
   corners, 48px minimum height, and 16px horizontal padding. Their filled
   surfaces, borders, and focus rings retain shared theme colors. Reminder
@@ -99,9 +116,17 @@ both hosts together.
   `_sheet-headers.scss` owns the rounded, tinted 44px close/back controls for
   all PWA sheets, including Settings, Reading dialogs, reminder editors, and
   pickers. Keep this treatment here rather than adding feature-specific overrides.
-- `src/ui/shared/styles/_view-header.scss` owns common header presentation.
-  `foundation.scss` supplies PWA title/count geometry for both features and their
-  loading screens. Feature adapters retain their safe-area ownership.
+- `src/ui/shared/styles/_view-header.scss` owns common header presentation. Its
+  `primary-screen` mixin supplies shared responsive padding, title rows, and count
+  rows to reminder screens and Reading in both hosts. Count text has an explicit
+  shared line height. Titles use their natural line height; compact count rows
+  fit overdue badges without changing header height and grow with theme text.
+  Obsidian retains theme-sized titles; `foundation.scss`
+  supplies PWA typography and loading-screen geometry, with a 6px title-to-count
+  gap for its larger headings. Both features retain the
+  shared header inset on desktop. Plugin and PWA headers reserve the count row
+  while loading; PWA loading screens also reserve the floating dock's space
+  throughout startup. Feature adapters retain their safe-area ownership.
 - `src/pwa/components/SettingsSection.tsx` and `SettingsRow.tsx` own settings
   grouping and row structure. Settings reuses the shared list-item surface and title
   mixins, with semantic filled controls and shared button press feedback for its
@@ -143,6 +168,14 @@ both hosts together.
   Recovery features retain their announcements, retry/discard decisions, and
   review-before-removal safeguards. Standard actions use `Button`/`PwaButton`;
   PWA feature code cannot import Base UI Button directly.
+- The plugin's `PluginReminderSourceNotice` shows local scan failures in a subtle
+  tinted surface using compact shared typography, icons, and action buttons. Lead
+  with a plain-language problem, then the filename and available line number;
+  include the full path when affected filenames would be ambiguous. Known scanner
+  messages get readable descriptions while original diagnostics remain intact.
+  Keep **Editing is paused** secondary, emphasize **Open note**, and keep **Retry**
+  quieter. All details stay visible without a disclosure; long lists scroll.
+  Successful recovery removes the notice and any old action error.
 - `src/ui/shared/CopyableText.tsx` owns clipboard feedback and the selectable
   readonly fallback. It uses the control's owner window, ignores stale copy
   completions, and runs an optional synchronous feature guard before copying.
@@ -197,7 +230,9 @@ both hosts together.
   Initialize unvisited features and picker modules after the entrance completes.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
-  Stationary tab dissolves and toasts share a 160ms fade. Press feedback uses
+  Stationary tab dissolves use 240ms ease-in-out so outgoing content stays visible
+  through the early frames and both screens blend at the midpoint. Feature
+  handoffs and toasts retain their 160ms fade. Press feedback uses
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.
@@ -811,6 +846,28 @@ features must not opt in by action name or duplicate the surface styling.
 Disabled server Reading keeps the library header, search, sidebar, and tab bar.
 Show setup guidance inline in the list area with the shared empty-state styles,
 without an error alert. Keep navigation mounted while **Check again** is pending.
+
+## Plugin dialogs
+
+Native dialogs use `SharedModal`; React content in an Obsidian shell uses
+`ModalLayout`. Both use `ModalHeader`, 16px body insets, and a 12px/16px footer.
+`modal-elements.ts` provides native footer/action builders with the same layout as
+React's `crate-modal-actions`. Buttons use the shared action mixins and semantic
+variants, with 44px touch targets. Footers stay outside scrolling content.
+Encryption setup retains a stable height through loading, progress and completion;
+file history, conflict review and editor/picker sheets retain their workspace sizing.
+Reminder deletion also uses `ModalLayout`, including its disabled close control
+while deletion is pending. Diagnostics uses `SharedModal` and the shared text field.
+
+`SettingsDisclosure.tsx` and `settings-disclosure.ts` provide React and native
+disclosure adapters, including an
+inline variant for dialog sections. `_native-settings.scss` owns native `Setting`
+row spacing, labels, descriptions and buttons inside shared native dialogs.
+The main settings page retains its existing styles in `plugin/_settings.scss`
+and `plugin-ui/_settings-alignment.scss`. Use these components and the dialog/settings tokens in `_tokens.scss`
+instead of adding feature-specific row or footer geometry. Narrow dialogs stack
+fields and multiple row actions; async callbacks, focus ownership and persistence
+remain in the feature adapters.
 
 ## Plugin settings disclosure
 

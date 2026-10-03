@@ -53,26 +53,26 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 				} finally { await browser.close(); }
 			});
 
-			test(`${host} keeps other library items usable while a favorite saves`, async ({ baseURL }) => {
+			test(`${host} favorites articles only inside the reader`, async ({ baseURL }) => {
 				const browser = await ({ chromium, webkit })[browserName].launch();
 				try {
 					const page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
 					await page.route(/^https:\/\//, route => route.abort());
-					await page.goto(`/?host=${host}&scene=reading&theme=dark&reader-delayed-update`);
+					await page.goto(`/?host=${host}&scene=reading&theme=dark`);
 					const rows = page.locator('.crate-reading__item');
 					const first = rows.filter({ hasText: 'The pleasure of reading slowly' });
-					const other = rows.filter({ hasText: 'Good design is as little design as possible' });
-					await first.getByRole('button', { name: 'Favorite', exact: true }).click();
-					await expect(first.getByRole('button', { name: 'Favorite', exact: true })).toHaveAttribute('aria-disabled', 'true');
-					await expect(other.getByRole('button', { name: 'Favorite', exact: true })).toBeEnabled();
-					await other.hover();
-					await expect(other.getByRole('button', { name: 'Favorite', exact: true })).toHaveCSS('opacity', '1');
-					await expect(page.getByRole('button', { name: 'Save a link', exact: true }).filter({ visible: true })).toBeEnabled();
-					await other.getByRole('button', { name: 'Favorite', exact: true }).click();
-					await expect(other.getByRole('button', { name: 'Favorite', exact: true })).toHaveAttribute('aria-disabled', 'true');
-					await page.evaluate(() => window.dispatchEvent(new CustomEvent('reading-settle-update')));
-					await expect(first.getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
-					await expect(other.getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
+					await expect(first).toBeVisible();
+					await expect(rows.getByRole('button', { name: /^(Favorite|Favorite article|Remove favorite)$/ })).toHaveCount(0);
+					await first.getByRole('button').click();
+					const article = page.locator('article.crate-reading-reader');
+					await article.getByRole('button', { name: 'Favorite article', exact: true }).click();
+					await expect(article.getByRole('button', { name: 'Remove favorite', exact: true })).toHaveAttribute('aria-pressed', 'true');
+					await article.getByRole('button', { name: 'Back to reading', exact: true }).click();
+					await expect(first).toBeVisible();
+					await expect(rows.getByRole('button', { name: /^(Favorite|Favorite article|Remove favorite)$/ })).toHaveCount(0);
+					await first.getByRole('button').click();
+					await article.getByRole('button', { name: 'Remove favorite', exact: true }).click();
+					await expect(article.getByRole('button', { name: 'Favorite article', exact: true })).toHaveAttribute('aria-pressed', 'false');
 				} finally { await browser.close(); }
 			});
 

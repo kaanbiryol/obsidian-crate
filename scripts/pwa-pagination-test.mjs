@@ -81,10 +81,16 @@ async function checkAllPages(page, reminders, label) {
 }
 
 async function checkViews(browser) {
-  const today = fixture(401, () => ({ dueDate: '2000-01-01' }));
+  const today = fixture(401, index => ({ dueDate: index < 225 ? '2000-01-01' : '2026-09-21' }));
   await withReminders(browser, today, async page => {
+    await page.clock.setFixedTime(new Date('2026-09-21T12:00:00Z'));
     await page.goto(`${origin}/notifications?folder=Reminders&tab=today`);
     await expect(page.locator(cardSelector)).toHaveCount(pageSize);
+    await expect(page.getByRole('heading', { name: 'Overdue', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Due today', exact: true })).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Active reminders page', exact: true }).selectOption('1');
+    await expect(page.locator('.premium-pill.is-overdue')).toHaveCount(25);
+    await expect(page.locator('.premium-reminder-content .premium-pill:not(.premium-pill-project):not(.is-overdue)')).toHaveCount(175);
     await checkAllPages(page, today, 'Active reminders');
   });
 

@@ -3,6 +3,7 @@ import type { ConflictRecord } from '../../sync/types';
 import type { ConflictChoice, ConflictReview } from '../../sync/conflict-review';
 import { buildConflictDiff, renderConflictDiffLine } from './conflict-diff';
 import { getPendingFileActions } from './file-actions';
+import { createModalFooter } from '../shared/modal-elements';
 import { SharedModal } from '../shared/SharedModal';
 
 export class ConflictReviewModal extends SharedModal {
@@ -115,7 +116,8 @@ export class ConflictReviewModal extends SharedModal {
         const editor = label.createEl('textarea', { cls: 'crate-conflict-editor', attr: { 'aria-label': 'Result text', spellcheck: 'false' } });
         editor.value = this.draft ?? review.currentText ?? '';
         editor.addEventListener('input', () => { this.draft = editor.value; });
-        const actions = this.contentEl.createDiv({ cls: 'crate-conflict-actions' });
+        const actions = createModalFooter(this.contentEl);
+        actions.addClass('crate-conflict-actions');
         const choices = actions.createEl('fieldset', { cls: 'crate-conflict-choices' });
         choices.createEl('legend', { text: 'Resolution' });
         if (!textPreview && this.selected === 'manual') this.selected = undefined;

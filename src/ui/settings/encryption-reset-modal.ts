@@ -1,3 +1,4 @@
+import { createModalActions, createModalFooter } from '../shared/modal-elements';
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -31,7 +32,7 @@ export class EncryptionResetModal extends SharedModal {
 			text.setPlaceholder('Type confirmation').onChange(value => { this.confirmed = value === 'reset'; action?.setDisabled(!this.confirmed || this.running); });
 		});
 		const status = this.bodyEl.createEl('p', { attr: { role: 'status', 'aria-live': 'polite' } });
-		new Setting(this.bodyEl).addButton(button => {
+		createModalActions(createModalFooter(this.contentEl)).addButton(button => {
 			action = button;
 			button.setButtonText(resuming ? 'Resume reset' : 'Reset sync and turn off encryption').setDestructive().setDisabled(!this.confirmed).onClick(async () => {
 				if (!this.confirmed || this.running) return;

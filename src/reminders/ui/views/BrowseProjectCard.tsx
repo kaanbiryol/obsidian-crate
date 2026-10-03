@@ -54,12 +54,11 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
               ) : (
                 <>
                   <span className="premium-project-stat">
-                    <ThemeIcon size="xs" id="circle" />
                     {stats.active} active
                   </span>
                   {stats.completed > 0 && (
                     <span className="premium-project-stat premium-project-stat-done">
-                      <ThemeIcon size="xs" id="circle-check" />
+                      <span className="premium-project-stat-separator" aria-hidden="true">·</span>
                       {stats.completed} done
                     </span>
                   )}
@@ -72,22 +71,24 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
         <div className="premium-project-right">
           {stats.total > 0 && (
             <div className="premium-project-progress">
-              <ProgressMeter
+              {stats.completionPercentage > 0 && <ProgressMeter
                 percentage={stats.completionPercentage}
                 color={isComplete ? 'var(--text-success)' : accentColor}
                 label={`${project} completion`}
-              />
+              />}
               <span className="premium-project-percentage">
                 {stats.completionPercentage}%
               </span>
             </div>
           )}
 
-          {!hideChevron && <ThemeIcon
-            size="s"
-            id="chevron-right"
-            className="premium-project-chevron"
-          />}
+          <span className="premium-project-chevron-slot" aria-hidden="true">
+            <ThemeIcon
+              size="s"
+              id="chevron-right"
+              className={`premium-project-chevron${hideChevron ? ' premium-project-chevron--hidden' : ''}`}
+            />
+          </span>
         </div>
       </div>
     </ShadowDOMNativeMotionButton>

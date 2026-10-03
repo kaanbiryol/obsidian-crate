@@ -27,7 +27,8 @@ beforeEach(() => {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../shared/SharedModal', () => ({ SharedModal: class {
 		modalEl = new FakeElement('div');
-		bodyEl = body = new FakeElement('div');
+		contentEl = new FakeElement('div');
+		bodyEl = body = this.contentEl.createDiv();
 		openLayout(title: string) { titles.push(title); }
 		setLayoutTitle(title: string) { titles.push(title); }
 		onOpen() {}

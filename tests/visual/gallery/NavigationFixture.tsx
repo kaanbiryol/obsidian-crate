@@ -7,6 +7,7 @@ import { ReminderCard } from '@/reminders/components/ReminderCard';
 import type { Reminder } from '@/reminders/types/reminder';
 import { ReadingFixture } from './ReadingFixture';
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';
+import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
 
 const reminders: Reminder[] = Array.from({ length: 36 }, (_, index) => ({
   id: String(index), content: `Reminder ${index + 1}`, completed: false, priority: 4,
@@ -16,16 +17,23 @@ const reminders: Reminder[] = Array.from({ length: 36 }, (_, index) => ({
 export function NavigationFixture({ isDark, onAdd }: { isDark: boolean; onAdd: (value: string) => void }) {
   const [tabs, setTabs] = useState<DockTab[]>([...DEFAULT_DOCK_TABS]);
   const [readingEnabled, setReadingEnabled] = useState(true);
+  const [isInitialLoadComplete, setInitialLoadComplete] = useState(() => !new URLSearchParams(location.search).has('loading'));
   // Exercise disabling a feature without remounting the workspace.
   React.useEffect(() => {
     const disable = () => setReadingEnabled(false);
+    const finishLoading = () => setInitialLoadComplete(true);
     window.addEventListener('disable-reading', disable);
-    return () => window.removeEventListener('disable-reading', disable);
+    window.addEventListener('finish-reminder-loading', finishLoading);
+    return () => {
+      window.removeEventListener('disable-reading', disable);
+      window.removeEventListener('finish-reminder-loading', finishLoading);
+    };
   }, []);
   const compact = new URLSearchParams(location.search).has('compact');
-  const renderShell = (props = {}) => <PluginRemindersAppShell {...props} reminders={reminders} isDarkMode={isDark} isInitialLoadComplete
+  const renderShell = (props = {}) => <PluginRemindersAppShell {...props} reminders={reminders} isDarkMode={isDark} isInitialLoadComplete={isInitialLoadComplete}
+    loadingContent={!isInitialLoadComplete ? <RemindersLoading /> : undefined}
     hideTabBar={compact} renderHeader={compact ? (_title, actions) => <header className="crate-modal-header">Projects{actions}</header> : undefined}
-    headerRightContent={<IconButton icon="settings" label="Crate settings" onClick={() => onAdd("settings")} />}
+    headerRightContent={<IconButton icon="settings" size="large" iconSize="l" label="Crate settings" onClick={() => onAdd("settings")} />}
     initialTab={compact ? 'browse' : undefined} initialProject={compact ? 'Project 01' : undefined}
     upcomingDays={7} onAdd={project => onAdd(project)} onReorder={() => {}}
     renderCard={({ reminder, hideProject }) => <ReminderCard reminder={reminder} hideProject={hideProject} animationConfig={{ enabled: false }} />} />;

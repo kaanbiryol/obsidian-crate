@@ -31,7 +31,11 @@ async function loadingChrome(page, cardSelector = '.crate-content-loading') {
   return { header: rect(header), title: rect(title), text: title.textContent,
    font: [font.fontFamily, font.fontSize, font.fontWeight, font.lineHeight, font.letterSpacing, font.color],
    settings: rect(settings), settingsColor: getComputedStyle(settings).color,
-   cards: Array.from(document.querySelectorAll(cardSelector)).map(rect) };
+   cards: Array.from(document.querySelectorAll(cardSelector)).map(rect),
+   spinnerCenters: Array.from(document.querySelectorAll('.crate-content-loading__spinner')).map(spinner => {
+    const box = spinner.getBoundingClientRect();
+    return [box.x + box.width / 2, box.y + box.height / 2].map(value => Math.round(value * 100) / 100);
+   }) };
  }, cardSelector);
 }
 
@@ -139,6 +143,7 @@ export async function checkLaunchThemes(browser, origin) {
    await expect(page.locator('html')).toHaveAttribute('data-pwa-color-scheme', scheme);
    await expect(page.locator('.pwa-launch-splash')).toHaveCSS('background-color', expected);
    await expect(page.locator('.pwa-launch-splash .view-header-title')).toHaveText('Inbox');
+   if (system === 'dark') await page.addStyleTag({ content: ':root{--pwa-safe-area-top:57px;--pwa-safe-area-bottom:34px}' });
    await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();
    await expect(page.locator('.pwa-launch-splash .crate-content-loading')).toHaveCount(1);
    await expect(page.locator('.pwa-dock svg:visible')).toHaveCount(6);
@@ -186,13 +191,18 @@ export async function checkEarlyLaunchTheme(browser, assets) {
   const scheme = saved === 'system' ? system : saved;
   const expected = scheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)';
   const tail = Promise.withResolvers();
+  const head = Promise.withResolvers();
   const html = assets.createPwaHtml('http://localhost/notifications', 'launch-test');
+  const charset = '<meta charset="utf-8">';
+  const rootEnd = html.indexOf(charset) + charset.length;
   const boundary = '<meta name="application-name" content="Crate">';
   const split = html.indexOf(boundary) + boundary.length;
   assert.ok(split >= boundary.length);
   const server = http.createServer(async (_req, response) => {
    response.writeHead(200, { 'Content-Type': 'text/html', 'Content-Security-Policy': "script-src 'self' 'nonce-launch-test'" });
-   response.write(html.slice(0, split));
+   response.write(html.slice(0, rootEnd));
+   await head.promise;
+   response.write(html.slice(rootEnd, split));
    await tail.promise;
    response.end(html.slice(split));
   });
@@ -201,6 +211,11 @@ export async function checkEarlyLaunchTheme(browser, assets) {
   try {
    await page.addInitScript(saved => localStorage.setItem('crate-reminders-theme', saved), saved);
    await page.goto(`http://127.0.0.1:${server.address().port}/notifications`, { waitUntil: 'commit' });
+   // Hold every stylesheet and script back: iOS can expose the root canvas
+   // during its native launch handoff, before viewport or theme setup.
+   await expect(page.locator('html')).toHaveCSS('background-color', system === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)');
+   await expect(page.locator('style, script, meta:not([charset])')).toHaveCount(0);
+   head.resolve();
    await page.waitForFunction(() => document.querySelector('meta[name="application-name"]'));
    await expect(page.locator('#app')).toHaveCount(0);
    await expect(page.locator('html')).toHaveCSS('background-color', expected);
@@ -208,6 +223,7 @@ export async function checkEarlyLaunchTheme(browser, assets) {
    await expect(page.locator('#pwa-theme-color')).toHaveAttribute('content', scheme === 'light' ? '#f7f7f8' : '#0d0d0f');
   } finally {
    await page.close();
+   head.resolve();
    tail.resolve();
    await new Promise(resolve => server.close(resolve));
   }

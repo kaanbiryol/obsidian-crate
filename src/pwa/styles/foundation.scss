@@ -50,6 +50,9 @@
 // The host selector takes precedence over shared .reminders-view.is-primary
 // geometry even when a feature stylesheet is loaded after this foundation.
 .crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) :is(.pwa-reminders-view.is-primary, .pwa-opening-screen, .crate-reading-web) .view-header {
+	// The standalone app uses a larger title than Obsidian. Give its count row
+	// a clear gap at every width, including the cached and React launch shells.
+	--crate-header-meta-gap: 6px;
 	@include view-header.screen-spacing;
 	.view-header-title {
 		font-size: var(--crate-view-title-size);

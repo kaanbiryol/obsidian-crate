@@ -514,7 +514,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.locator('.crate-reading-reader__body')).toHaveCount(1);
     await page.goBack();
     await page.waitForFunction(() => history.state?.readingLibrary === true);
-    await page.getByRole('button', { name: 'Favorite', exact: true }).click();
+    await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
+    await page.getByRole('button', { name: 'Favorite article', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
+
     for (const [section, title] of [['favorites', 'Favorites'], ['inbox', 'Reading'], ['favorites', 'Favorites'], ['inbox', 'Reading']]) {
       await page.locator('.pwa-reading-root [data-dock-group]').click({ button: 'right' });
       await page.locator(`[data-dock-destination="${section === 'inbox' ? 'reading' : section}"]`).click();
@@ -529,8 +533,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
       }
     }
+    await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
     await page.getByRole('button', { name: 'Remove favorite', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Favorite', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Favorite article', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
     await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
     console.log(`${name}: native Back predecessors preserve Favorites and Reading titles across repeated visits`);
     await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
@@ -673,12 +680,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Back to reading',exact:true}).click();
     await assertArticleStaysDismissed(page, offlineHistoryLength);
     assert.equal(await page.evaluate(() => window.__readingDocument), offlineDocument, 'Back after a library reload must not restore an older page');
-    await page.getByRole('button',{name:'Favorite',exact:true}).click();
+    await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
+    await page.getByRole('button',{name:'Favorite article',exact:true}).click();
+    await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
     await assertNoPendingBanner(page);
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Offline: 1 change waiting to sync');
     await context.setOffline(false);
     await refreshReadingFromSettings(page);
-    await page.getByRole('button',{name:'Remove favorite',exact:true}).waitFor();
+    await expect(page.locator('.crate-reading__library').getByRole('button', { name: /^(Favorite|Favorite article|Remove favorite)$/ })).toHaveCount(0);
     await assertNoPendingBanner(page);
     await expect(readingSync).toHaveAttribute('data-sync-state','synced');
     // Archiving is visible immediately in the reader and filters, without a banner.
@@ -711,10 +721,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const updateStarted = Promise.withResolvers(), updateReleased = Promise.withResolvers();
     heldResponses.push(updateReleased.resolve);
     holdUpdate = { started: updateStarted.resolve, release: updateReleased.promise };
+    await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
     await page.getByRole('button',{name:'Remove favorite',exact:true}).click();
     await updateStarted.promise;
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Syncing 1 change');
-    await expect(page.getByRole('button',{name:'Favorite',exact:true})).toHaveAttribute('aria-pressed','false');
+    await expect(page.getByRole('button',{name:'Favorite article',exact:true})).toHaveAttribute('aria-pressed','false');
+    await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await page.waitForFunction(() => history.state?.readingLibrary === true);
     await assertNoPendingBanner(page);
     await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
     await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();

@@ -42,6 +42,7 @@ export class Modal {
 }
 export class Setting {
  constructor(el){this.settingEl=el.createDiv({cls:'setting-item'});this.settingEl.createDiv({cls:'setting-item-info'});this.el=this.settingEl.createDiv({cls:'setting-item-control'});}
+ setClass(name){this.settingEl.classList.add(name);return this;}
  addButton(build){const b=this.el.createEl('button');const api={setButtonText:v=>{b.textContent=v;return api;},setCta:()=>{b.classList.add('mod-cta');return api;},setDisabled:v=>{b.disabled=v;return api;},onClick:fn=>{b.onclick=fn;return api;}};build(api);return this;}
 }
 ` : `

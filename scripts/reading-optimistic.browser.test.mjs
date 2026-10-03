@@ -227,7 +227,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     if (name === 'chromium') {
       await page.reload();
       await expect(page.getByRole('button', { name: 'offline.example.invalid offline.example.invalid', exact: true })).toBeVisible();
-      await expect(page.locator('.crate-reading__library').getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
+      await page.locator(`[data-reading-id="${saved.id}"]`).click();
+      await expect(page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
+      await back();
     }
     await context.setOffline(false);
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');

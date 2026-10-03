@@ -21,11 +21,12 @@ const updateScreenHtml = createPwaUpdateScreenHtml(`data:image/png;base64,${btoa
 export function createPwaHtml(requestUrl?: string, nonce: string = crypto.randomUUID()): string {
 	const manifestHref = manifestHrefForUrl(requestUrl);
 	return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:${PWA_CHROME_COLOR};background:light-dark(${PWA_LIGHT_CHROME_COLOR},${PWA_CHROME_COLOR});color-scheme:light dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Paint the themed canvas before native chrome or the rest of the shell is parsed. -->
+<!-- The root already paints the system palette before head metadata is parsed.
+     Resolve the saved override before native launcher metadata and app startup. -->
 <style>
 :root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
 html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}

@@ -1,15 +1,15 @@
 // Screen spacing is shared by Obsidian, live PWA screens, and launch shells.
 @mixin screen-spacing-tokens {
-    --crate-header-top-gap: 17px;
-    --crate-header-bottom-gap: 11px;
-    --crate-header-meta-height: 28px;
-    --crate-header-meta-gap: 6px;
+    --crate-header-top-gap: 12px;
+    --crate-header-bottom-gap: 10px;
+    --crate-header-meta-height: max(24px, calc(var(--reminder-font-xs, 14px) * var(--reminder-line-height-normal, 1.4)));
+    --crate-header-meta-gap: 2px;
     --crate-view-header-padding: var(--crate-header-top-gap) 18px var(--crate-header-bottom-gap);
 
     @media (max-width: 759px) {
         --crate-header-top-gap: 4px;
         --crate-header-bottom-gap: 8px;
-        --crate-header-meta-height: 20px;
+        --crate-header-meta-height: max(20px, calc(var(--reminder-font-xs, 14px) * var(--reminder-line-height-normal, 1.4)));
         --crate-header-meta-gap: 0px;
     }
 }
@@ -21,10 +21,33 @@
         min-height: var(--crate-header-meta-height);
         margin-top: var(--crate-header-meta-gap);
     }
-    // Preserve the PWA's 44px row at its 32px title size without reserving
-    // the same oversized row around Obsidian's smaller, theme-sized headings.
-    .view-header-title-row { min-height: calc(var(--crate-view-title-size) * 1.375); }
+    // The title uses its natural line height; only the metadata row reserves
+    // space so loading and overdue counts cannot change the header's height.
     .view-header-title-row > h1 { text-box: normal; padding-block: 0; margin-block: 0; }
+}
+
+// Primary list screens share geometry and typography in both hosts. The host
+// supplies the title tokens; the PWA adds its safe-area inset separately.
+@mixin primary-screen {
+    @include screen-spacing-tokens;
+    @include screen-spacing;
+    padding: var(--crate-view-header-padding);
+    gap: 10px;
+
+    .view-header-title {
+        font-size: var(--crate-view-title-size);
+        font-weight: var(--crate-view-title-weight);
+        letter-spacing: var(--crate-view-title-spacing);
+        line-height: var(--crate-view-title-leading);
+    }
+
+    .view-header-meta { gap: 6px; }
+
+    .view-header-count {
+        color: var(--text-faint);
+        font-size: var(--reminder-font-xs);
+        font-weight: var(--reminder-font-weight-medium);
+    }
 }
 
 @mixin styles {
@@ -88,6 +111,7 @@
 .view-header-count {
     color: var(--text-muted);
     font-size: var(--reminder-font-sm);
+    line-height: var(--reminder-line-height-normal);
 }
 
 .view-header-overdue {

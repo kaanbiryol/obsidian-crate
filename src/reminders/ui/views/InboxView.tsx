@@ -58,6 +58,7 @@ export const InboxView = memo(function InboxView({
       index={index}
       animationConfig={{ enabled: false }}
       colorScheme={colorScheme}
+      hideProject
     />
   );
 

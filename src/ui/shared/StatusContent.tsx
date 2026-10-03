@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SettingsDisclosure } from './SettingsDisclosure';
 import { ThemeIcon } from './ThemeIcon';
 
 export interface StatusContentProps {
@@ -29,9 +30,8 @@ export function StatusContent({ state, description, details, technicalDetails }:
         </div>
         {state === 'working' && <WorkingDuration />}
         {details?.map((detail, index) => <p className="crate-status-guidance" key={index}>{detail}</p>)}
-        {technicalDetails && <details className="crate-status-details">
-            <summary>Technical details</summary>
+        {technicalDetails && <SettingsDisclosure title="Technical details">
             <p>{technicalDetails}</p>
-        </details>}
+        </SettingsDisclosure>}
     </>;
 }

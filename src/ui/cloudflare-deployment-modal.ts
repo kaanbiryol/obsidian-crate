@@ -57,7 +57,7 @@ export class CloudflareDeploymentModal extends Modal {
 	onOpen(): void {
 		this.closed = false;
 		if (this.content.state === 'working') activeOperations.set(this.app, this);
-		this.modalEl.addClass('crate-cloudflare-deployment-modal');
+		this.modalEl.addClass('crate-shared-modal', 'crate-cloudflare-deployment-modal');
 		this.modalEl.addClass('crate-custom-modal-close');
 		this.contentEl.addClass('crate-reminders-ui');
 		this.root = createRoot(this.contentEl);
@@ -158,28 +158,28 @@ export class CloudflareDeploymentModal extends Modal {
 					createElement('p', null, deployments.length ? (missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Each server syncs one vault. To keep this vault separate, create a new server. Select an existing server only to sync another copy of the same vault.') : (missing ? 'Your previous server is gone. Create a new Cloudflare server for this vault.' : 'Create a Cloudflare server for this vault.')),
 					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync - sync now from the command palette to start syncing.'),
 					...deployments.map(deployment => createElement(Button, {
-						key: deployment.metadata.workerName,
+						key: deployment.metadata.workerName, variant: 'outline',
 						onClick: () => this.finishSelection(deployment), title: deployment.metadata.workerName,
 						children: vaultChoiceLabel(deployment.metadata, deployments.map(item => item.metadata)),
 					})),
 					createElement('p', null, 'Cloudflare usage charges may apply.'),
 				),
-				footer: createElement('div', { className: 'crate-status-actions' },
-					createElement(Button, { onClick: () => this.close(), children: 'Cancel' }),
-					createElement(Button, { className: 'mod-cta', onClick: () => this.finishSelection('create'), children: 'Create server' })),
+				footer: createElement('div', { className: 'crate-modal-actions' },
+					createElement(Button, { variant: 'outline', onClick: () => this.close(), children: 'Cancel' }),
+					createElement(Button, { variant: 'primary', onClick: () => this.finishSelection('create'), children: 'Create server' })),
 			}) }));
 			return;
 		}
 		this.modalEl.toggleClass('is-working', this.content.state === 'working');
 		this.setTitle(this.content.title);
 		const action = this.content.action;
-		const footer = this.content.state === 'working' ? undefined : createElement('div', { className: 'crate-status-actions' },
+		const footer = this.content.state === 'working' ? undefined : createElement('div', { className: 'crate-modal-actions' },
 			createElement(Button, {
-				onClick: () => this.close(),
+				variant: 'outline', onClick: () => this.close(),
 				children: this.content.dismissLabel ?? (this.content.state === 'success' ? 'Done' : 'Close'),
 			}),
 			action && createElement(Button, {
-				className: 'mod-cta',
+				variant: 'primary',
 				onClick: () => { this.close(); action.onClick(); },
 				children: action.label,
 			}),

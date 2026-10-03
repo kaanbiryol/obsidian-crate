@@ -8,17 +8,6 @@
     box-shadow: none;
 }
 
-@mixin inset-divider($start, $end) {
-    &::after {
-        content: '';
-        position: absolute;
-        inset-inline: $start $end;
-        bottom: 0;
-        height: 1px;
-        background: var(--crate-divider);
-        pointer-events: none;
-    }
-}
 @mixin surface {
     border-radius: var(--crate-radius-card);
     background: var(--crate-reminder-card-bg);

@@ -1,3 +1,4 @@
+import { createSettingsDisclosure } from '../shared/settings-disclosure';
 import { Setting } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 
@@ -14,7 +15,7 @@ export function renderEncryptionManagement(container: HTMLElement, options: {
   status.createSpan({ text: 'Unlocked on this device' });
   const feedback = container.createEl('p', { cls: 'crate-encryption-feedback', attr: { role: 'status', 'aria-live': 'polite' } });
   const copyRow = (name: string, description: string, copy: () => Promise<void>) => {
-    new Setting(container).setClass('crate-encryption-action').setName(name).setDesc(description).addButton(button => {
+    new Setting(container).setName(name).setDesc(description).addButton(button => {
       button.setButtonText('Copy').onClick(async () => {
         button.setDisabled(true); feedback.setText('');
         try { await copy(); if (!disposed) button.setButtonText('Copied'); }
@@ -23,13 +24,13 @@ export function renderEncryptionManagement(container: HTMLElement, options: {
       });
     });
   };
-  new Setting(container).setClass('crate-encryption-action').setName('Connect web app').setDesc('Connect without copying keys.')
+  new Setting(container).setName('Connect web app').setDesc('Connect without copying keys.')
     .addButton(button => button.setButtonText('Connect').onClick(() => options.connectApp()));
   copyRow('Recovery key', 'Keep a copy for recovery.', () => options.copyRecovery());
-  const advanced = container.createEl('details', { cls: 'crate-encryption-details crate-encryption-manage__advanced' });
-  advanced.createEl('summary', { text: 'Advanced' });
+  const advanced = createSettingsDisclosure(container, 'Advanced', { inline: true });
+  advanced.parentElement!.addClass('crate-encryption-manage__advanced');
   const disposeAdvanced = options.advanced(advanced);
-  new Setting(container).setClass('crate-encryption-action').setName('Turn off encryption').setDesc('Resets synced data and history.')
+  new Setting(container).setName('Turn off encryption').setDesc('Resets synced data and history.')
     .addButton(button => button.setButtonText('Turn off').setDestructive().onClick(() => options.turnOff()));
   return () => { disposed = true; disposeAdvanced(); };
 }

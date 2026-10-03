@@ -1,8 +1,32 @@
 .crate-reminders-ui .crate-content-loading {
 	display: flex;
+	flex: 1;
+	align-items: center;
 	justify-content: center;
+	min-height: 0;
+	box-sizing: border-box;
 	padding: 16px 20px;
 	color: var(--text-muted);
+}
+
+// Let initial loaders occupy the remaining content track in both hosts,
+// including the static launch shell before React mounts.
+.crate-reminders-ui :is(.reminders-content, .reminders-view-scroll, .crate-reading__list-scroll, .pwa-mode-opening__content):has(> .crate-content-loading, > .reminders-loading) {
+	display: flex;
+	flex-direction: column;
+}
+
+.crate-reminders-ui .reminders-loading {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+// Keep the dock reservation through the static shell, React opening shell, and
+// live loading screen. The loading state overrides fullscreen content padding.
+.crate-reminders-ui :is(.pwa-reminders-view[data-pwa-loading], .pwa-mode-opening) :is(.reminders-content, .pwa-mode-opening__content):has(> .crate-content-loading) {
+	padding-bottom: var(--pwa-dock-height, 0px);
 }
 .crate-reminders-ui .crate-content-loading__spinner {
 	display: block;

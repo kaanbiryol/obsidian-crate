@@ -60,6 +60,18 @@ describe("reminder view models", () => {
     expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["done-today"]);
   });
 
+  it("deduplicates elapsed reminders and keeps due-date order", () => {
+    const now = new Date(2026, 0, 10, 12);
+    const elapsed = makeReminder({ id: "elapsed", dueDatetime: new Date(2026, 0, 10, 9).toISOString() });
+    const viewModel = buildTodayViewModel([
+      makeReminder({ id: "all-day", dueDate: "2026-01-10" }),
+      elapsed,
+      makeReminder({ id: "later", dueDatetime: new Date(2026, 0, 10, 15).toISOString() }),
+      elapsed,
+    ], now);
+    expect(viewModel.active.map(reminder => reminder.id)).toEqual(["all-day", "elapsed", "later"]);
+  });
+
   it("builds the upcoming reminder order and project stats/details", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));

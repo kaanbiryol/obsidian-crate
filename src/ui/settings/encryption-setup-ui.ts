@@ -1,3 +1,5 @@
+import { createSettingsDisclosure } from '../shared/settings-disclosure';
+import { createModalActions, createModalFooter } from '../shared/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 import type { EncryptionProgress } from '../../sync/encryption-conversion';
@@ -10,8 +12,9 @@ export function renderEncryptionLoading(container: HTMLElement): void {
   content.createEl('p', { cls: 'crate-encryption-intro', text: 'Loading encryption settings…', attr: { role: 'status' } });
   const placeholders = content.createDiv({ attr: { 'aria-hidden': 'true' } });
   for (let i = 0; i < 2; i++) placeholders.createDiv({ cls: 'crate-encryption-placeholder' });
-  const footer = container.createDiv({ cls: 'crate-encryption-footer' });
-  new Setting(footer).addButton(button => button.setButtonText('Loading…').setDisabled(true));
+  const footer = createModalFooter(container);
+  footer.addClass('crate-encryption-footer');
+  createModalActions(footer).addButton(button => button.setButtonText('Loading…').setDisabled(true));
 }
 
 /** The owner verifies the recovery key before rendering and retains conversion. */
@@ -29,7 +32,7 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
   let busy = false, disposed = false;
   let primary: ButtonComponent | undefined;
   const key = content.createDiv({ cls: 'crate-encryption-key' });
-  const field = new Setting(key).setClass('crate-encryption-action').setClass('crate-encryption-key__header')
+  const field = new Setting(key).setClass('crate-encryption-key__header')
     .setName('Recovery key').setDesc('Save a copy outside your vault.');
   field.nameEl.id = `crate-key-${crypto.randomUUID()}`;
   const output = key.createEl('textarea', { cls: 'crate-text-input crate-encryption-recovery' });
@@ -64,8 +67,8 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
   saved.addEventListener('change', () => {
     if (!busy && !disposed) primary?.setDisabled(!saved.checked);
   });
-  const details = content.createEl('details', { cls: 'crate-encryption-details crate-encryption-setup__details' });
-  details.createEl('summary', { text: 'What changes with encryption?' });
+  const details = createSettingsDisclosure(content, 'What changes with encryption?', { inline: true });
+  details.parentElement!.addClass('crate-encryption-details', 'crate-encryption-setup__details');
   const changes = details.createEl('ul');
   for (const text of [
     'Existing synced files and history are encrypted. Local vault files stay readable.',
@@ -100,8 +103,9 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
       }
     } finally { busy = false; }
   };
-  const footer = container.createDiv({ cls: 'crate-encryption-footer' });
-  new Setting(footer).setName(options.resuming ? 'Resume encryption' : 'Enable encryption')
+  const footer = createModalFooter(container);
+  footer.addClass('crate-encryption-footer');
+  createModalActions(footer).setName(options.resuming ? 'Resume encryption' : 'Enable encryption')
     .addButton(button => {
       primary = button;
       button.setButtonText(label).setCta().setDisabled(true).onClick(run);

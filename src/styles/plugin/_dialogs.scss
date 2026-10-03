@@ -1,4 +1,7 @@
 @use "../../ui/shared/styles/action";
+@use "../../ui/shared/styles/tokens";
+@use "../../ui/shared/styles/native-settings";
+@use "../../ui/shared/styles/modal-layout";
 /* Crate supplies its own accessible close control in these modal shells. */
 .crate-custom-modal-close > .modal-close-button,
 .crate-custom-modal-close > .modal-header-button {
@@ -58,103 +61,71 @@
 }
 
 .modal.crate-shared-modal {
-	width: min(440px, calc(100vw - 32px));
-	height: auto;
-	min-height: 0;
-	padding: 0;
-	overflow: hidden;
-	> .modal-header { display: none; }
-	.modal-content { margin: 0; padding: 0; max-height: calc(100dvh - 80px); overflow-y: auto; }
-	.crate-modal-body { padding: 16px; }
-	.reminder-modal-header-title { white-space: normal; }
-	.setting-item-control button {
-		@include action.styles;
-		&.mod-cta { background: var(--interactive-accent); color: var(--text-on-accent); }
-		&.mod-warning { background: color-mix(in srgb, var(--text-error) 10%, transparent); color: var(--text-error); }
-	}
+  @include tokens.styles;
+  @include native-settings.styles;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  height: auto;
+  min-height: 0;
+  max-height: calc(100dvh - 80px);
+  padding: 0;
+  overflow: hidden;
+  > .modal-header { display: none; }
+  .modal-content {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    flex: 1;
+    max-height: none;
+    overflow: hidden;
+    container: crate-dialog / inline-size;
+  }
+  .crate-modal-header-host, .reminder-modal-header { flex: none; }
+  .reminder-modal-header-title { white-space: normal; }
+  .crate-modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: var(--crate-dialog-padding);
+    font-size: var(--font-ui-small);
+    line-height: 1.5;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    > :where(p, ul) {
+      margin: 0 0 var(--crate-dialog-gap);
+      font-size: var(--font-ui-small);
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    > :last-child { margin-bottom: 0; }
+    > [role="status"]:empty { display: none; }
+  }
+  .setting-item.crate-modal-actions { @include modal-layout.actions; }
 }
 
 .modal.crate-confirmation-modal {
-	width: min(380px, calc(100vw - 32px));
-	max-width: 380px;
-	height: auto;
-	min-height: 0;
-	padding: 0;
-
-	.crate-confirmation-body { padding: 20px; }
-
-	.crate-confirmation-message {
-		margin: 0;
-		font-size: var(--font-ui-medium);
-		line-height: 1.5;
-		overflow-wrap: anywhere;
-	}
-
-	.crate-confirmation-details {
-		margin: 6px 0 0;
-		color: var(--text-muted);
-		font-size: var(--font-ui-small);
-		line-height: 1.5;
-		overflow-wrap: anywhere;
-	}
-
-	ul.crate-confirmation-details {
-		padding-left: 18px;
-		li + li { margin-top: 8px; }
-	}
-
-	.crate-confirmation-option {
-		margin-top: 16px;
-		padding: 12px;
-		border: 0;
-		border-radius: var(--radius-m, 8px);
-		background: var(--background-secondary);
-		gap: 12px;
-		align-items: center;
-
-		.setting-item-info { margin: 0; min-width: 0; }
-		.setting-item-name { font-size: var(--font-ui-small); line-height: 1.4; }
-		.setting-item-description { margin-top: 4px; font-size: var(--font-ui-smaller); line-height: 1.4; }
-		.setting-item-control { flex: 0 0 auto; padding: 0; }
-	}
-
-	.crate-confirmation-actions {
-		margin-top: 20px;
-		padding: 0;
-		border: 0;
-
-		.setting-item-info { display: none; }
-		.setting-item-control {
-			width: 100%;
-			justify-content: flex-end;
-			flex-wrap: wrap;
-			gap: 8px;
-		}
-		.setting-item-control button {
-			@include action.styles;
-			height: auto;
-			max-width: 100%;
-			white-space: normal;
-			overflow-wrap: anywhere;
-			&.mod-cta {
-				background: var(--interactive-accent);
-				color: var(--text-on-accent);
-				&:hover:not(:disabled) { background: var(--interactive-accent-hover); }
-			}
-			&.mod-warning {
-				background: var(--crate-danger, var(--text-error));
-				color: var(--crate-on-accent, var(--text-on-accent));
-				&:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger, var(--text-error)) 88%, black); }
-			}
-		}
-	}
-}
-
-@media (pointer: coarse) {
-	.modal.crate-confirmation-modal .crate-confirmation-actions .setting-item-control button {
-		min-height: 44px;
-		flex: 1;
-	}
+  .crate-confirmation-message { margin: 0; }
+  .crate-confirmation-details {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  ul.crate-confirmation-details {
+    padding-left: 20px;
+    li + li { margin-top: 8px; }
+  }
+  .setting-item.crate-confirmation-option {
+    margin-top: var(--crate-dialog-gap);
+    padding: var(--crate-settings-row-padding);
+    border: 0;
+    border-radius: var(--radius-m, 8px);
+    background: var(--background-secondary);
+  }
 }
 
 /* External browser links */
@@ -169,17 +140,8 @@
 	}
 	.crate-cloudflare-authorization-link,
 	.crate-external-browser-link {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 44px;
-		padding: 0 16px;
-		border-radius: var(--button-radius, 8px);
-		background: var(--interactive-accent);
-		color: var(--text-on-accent);
-		text-decoration: none;
-		&:hover { background: var(--interactive-accent-hover); color: var(--text-on-accent); }
-		&:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+    @include action.control;
+    @include action.dialog-button;
 	}
 	.crate-cloudflare-authorization-help { color: var(--text-muted); font-size: var(--font-ui-small); }
 	.crate-external-browser-url {
@@ -192,29 +154,6 @@
 
 /* Cloudflare deployment progress */
 .modal.crate-cloudflare-deployment-modal {
-	width: min(380px, calc(100vw - 32px));
-	max-width: 380px;
-	height: auto;
-	min-height: 0;
-	padding: 0;
-	overflow: hidden;
-
-	// Obsidian nests the title inside .modal-header. Hide the host header too
-	// so it cannot reserve space above our shared header.
-	.modal-header,
-	.modal-title { display: none !important; }
-
-	.modal-content {
-		margin: 0;
-		padding: 0;
-		max-height: calc(100dvh - 80px);
-		overflow-y: auto;
-	}
-
-	.crate-modal-body {
-		padding: 16px;
-	}
-
 	.crate-vault-selection {
 		display: flex;
 		flex-direction: column;
@@ -236,32 +175,19 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.crate-modal-footer { padding: 10px 16px; }
-	.reminder-modal-header { padding: 4px 8px; }
-	.reminder-modal-header-title { white-space: normal; }
 }
 
 
 .modal.crate-cloudflare-server-picker-modal {
-	width: min(480px, calc(100vw - 32px));
-	max-width: 480px;
-
 	.crate-cloudflare-server-picker-description { margin: 0; line-height: 1.5; }
 	.crate-cloudflare-server-picker-help {
-		margin: 8px 0 20px;
+		margin: 8px 0 var(--crate-dialog-gap);
 		color: var(--text-muted);
 		font-size: var(--font-ui-small);
 		line-height: 1.5;
 	}
-	.setting-item { gap: 12px; }
-	.setting-item-info { min-width: 0; overflow-wrap: anywhere; }
-	.setting-item-control { flex-shrink: 0; }
-	.setting-item-control button { min-height: 36px; height: auto; white-space: normal; }
 }
 
-@media (pointer: coarse) {
-	.modal.crate-cloudflare-server-picker-modal .setting-item-control button { min-height: 44px; }
-}
 
 .modal.crate-shared-modal.crate-file-history-modal {
 	width: min(800px, calc(100vw - 48px));
@@ -271,14 +197,19 @@
 	box-sizing: border-box;
 	.modal-content { display: flex; flex-direction: column; height: 100%; max-height: none; overflow: hidden; }
 	.crate-modal-header-host { flex-shrink: 0; }
-	.reminder-modal-header { border-bottom: 0; }
 	.reminder-modal-header-title:focus { outline: none; }
-	.crate-modal-body { padding: 8px 24px 24px; }
+
 	&.is-mobile {
 		width: 100%;
 		max-width: none;
 		height: 85dvh;
 		max-height: 90dvh;
-		.crate-modal-body { padding: 12px; }
 	}
+}
+
+.modal.crate-sync-diagnostics-modal .crate-sync-diagnostics-export {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-monospace);
 }

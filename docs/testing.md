@@ -755,3 +755,19 @@ and native storage. Their headless WebKit context disables the native push manag
 `getSubscription()` freezes the page on the current macOS test host, reproducible
 on an empty page without Crate. Chromium keeps its native provider. These suites
 do not establish physical-device push acceptance.
+
+## Plugin dialog consistency
+
+After building the plugin, run `npm run test:plugin-dialogs`. It compares computed
+header, body, footer, row and button geometry across native dialogs,
+and exercises reminder deletion in Shadow DOM. Coverage includes Chromium/WebKit,
+light/dark themes, desktop/phone/short screens, narrow dialog containers,
+clipboard actions, expanded disclosures and pending-delete dismissal. The encryption
+suite also checks stable loading/progress/completion geometry and recovery-key
+acknowledgment. Screenshots are saved under `.generated/plugin-dialog-review/` and
+`.generated/encryption-ui-review/`.
+
+Set `CRATE_PLUGIN_CSS_PATH` to an isolated plugin build's stylesheet when another
+build is using `dist/`. `CRATE_OBSIDIAN_CSS_PATH` optionally overlays a locally
+extracted Obsidian `app.css` in both dialog harnesses. These fixtures do not replace
+manual acceptance in Obsidian, community themes, or physical iOS/Android devices.

@@ -52,13 +52,13 @@
   }
   &[data-variant="ghost"] { border-color: transparent !important; }
   &[data-tone="danger"] { color: var(--crate-danger); }
-  &[data-variant="primary"] {
+  &[data-variant="primary"], &.mod-cta, &.mod-warning {
     color: var(--crate-on-accent);
     background: var(--crate-accent);
     border-color: transparent !important;
     @media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-accent-hover); } }
     &[data-press-active]:not(:disabled) { background: var(--crate-accent-hover); }
-    &[data-tone="danger"] {
+    &[data-tone="danger"], &.mod-warning {
       background: var(--crate-danger);
       &[data-press-active]:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
       @media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }

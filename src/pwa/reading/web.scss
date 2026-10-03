@@ -99,6 +99,9 @@ html.pwa-document-reader {
     min-height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
     overflow: visible;
     padding-bottom: var(--pwa-safe-area-bottom, env(safe-area-inset-bottom));
+    &:has(.crate-content-loading) {
+      height: calc(100dvh - var(--pwa-safe-area-top, env(safe-area-inset-top)));
+    }
   }
   // The fixed body preserves the passage behind a sheet; clipping #app would
   // otherwise cut off a long article at the original viewport's bottom edge.

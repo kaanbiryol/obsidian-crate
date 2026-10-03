@@ -11,37 +11,75 @@ export function reminderListStyleCases() {
       const metadata = first.locator('.premium-pill');
       await expect(picker).toHaveValue('flat');
       await expect(first).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(first).toHaveCSS('border-radius', '0px');
+      await expect(first).toHaveCSS('border-radius', '8px');
+      await expect(page.getByRole('heading', { name: 'Overdue', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Due today', exact: true })).toHaveCount(0);
       for (const pill of await metadata.all()) {
         await expect(pill).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await expect(pill).toHaveCSS('border-top-width', '0px');
       }
       const geometry = await first.evaluate(el => ({
-        divider: parseFloat(getComputedStyle(el, '::after').left),
-        title: el.querySelector('.premium-reminder-title')!.getBoundingClientRect().left - el.getBoundingClientRect().left,
         target: el.querySelector('.premium-checkbox')!.getBoundingClientRect().width,
       }));
-      expect(Math.abs(geometry.divider - geometry.title)).toBeLessThan(1);
       expect(geometry.target).toBeGreaterThanOrEqual(44);
       const projects = page.getByTestId('projects-list');
       const projectSurface = projects.locator('.premium-project-content').first();
       for (const surface of await projects.locator('.premium-project-content, .premium-project-group').all()) {
         await expect(surface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-        await expect(surface).toHaveCSS('border-radius', '0px');
+        await expect(surface).toHaveCSS('border-radius', await surface.evaluate(el => el.classList.contains('premium-project-content')) ? '8px' : '0px');
         await expect(surface).toHaveCSS('border-top-width', '0px');
       }
       for (const tree of await projects.locator('.premium-project-tree').all()) {
-        const branches = tree.locator(':scope > li');
+        const branches = tree.locator(':scope > li, :scope > li > .premium-project-tree-row');
         const count = await branches.count();
         for (let index = 0; index < count; index++) {
-          expect(await branches.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe(index === count - 1 ? 'none' : '""');
+          expect(await branches.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
         }
       }
-      const projectInset = await projectSurface.evaluate(el => parseFloat(getComputedStyle(el.closest('li')!, '::after').left) -
-        (el.querySelector('.premium-project-name')!.getBoundingClientRect().left - el.getBoundingClientRect().left));
-      expect(Math.abs(projectInset)).toBeLessThan(1);
+      for (const row of await projects.locator('.premium-project-tree-row').all()) {
+        expect(await row.evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
+      }
+      await expect(projects.locator('.premium-project-stat').first()).toHaveCSS('font-weight', '400');
+      const zeroProject = projects.getByRole('button', { name: 'Open Work', exact: true });
+      await expect(zeroProject.locator('.premium-project-percentage')).toHaveText('0%');
+      await expect(zeroProject.getByRole('progressbar')).toHaveCount(0);
+      const progressingProject = projects.getByRole('button', { name: 'Open Product launch', exact: true });
+      await expect(progressingProject.getByRole('progressbar')).toBeVisible();
+      const progressGeometry = await progressingProject.evaluate(el => {
+        const bar = el.querySelector('.crate-progress-meter')!.getBoundingClientRect();
+        const percent = el.querySelector('.premium-project-percentage')!.getBoundingClientRect();
+        const chevron = el.querySelector('.premium-project-chevron-slot')!.getBoundingClientRect();
+        return { barWidth: bar.width, gap: percent.left - bar.right,
+          percentOffset: Math.abs(bar.top + bar.height / 2 - percent.top - percent.height / 2),
+          chevronOffset: Math.abs(bar.top + bar.height / 2 - chevron.top - chevron.height / 2) };
+      });
+      expect(progressGeometry.barWidth).toBe(56);
+      expect(progressGeometry.gap).toBeGreaterThanOrEqual(8);
+      expect(progressGeometry.percentOffset).toBeLessThan(1);
+      expect(progressGeometry.chevronOffset).toBeLessThan(1);
+      expect(await zeroProject.locator('.premium-project-progress').evaluate(el =>
+        el.getBoundingClientRect().width - el.querySelector('.premium-project-percentage')!.getBoundingClientRect().width)).toBeLessThan(1);
+
+      const percentageRight = async (button: typeof zeroProject) => button.locator('.premium-project-percentage').evaluate(el => el.getBoundingClientRect().right);
+      expect(Math.abs(await percentageRight(zeroProject) - await percentageRight(progressingProject))).toBeLessThan(1);
+      await page.mouse.move(0, 0);
+      const financeRow = projects.getByRole('button', { name: 'Open Personal/Finance', exact: true });
+      await expect(financeRow.locator('.premium-project-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(financeRow.locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const parentRow = projects.getByRole('button', { name: 'Open Personal', exact: true }).locator('..');
-      expect(await parentRow.evaluate(el => getComputedStyle(el, '::after').content)).toBe('""');
+      await expect(parentRow).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const expandButton = projects.getByRole('button', { name: 'Collapse Personal subprojects', exact: true });
+      await expandButton.hover();
+      const disclosureGeometry = await parentRow.evaluate(el => {
+        const button = el.querySelector('.premium-project-expand')!.getBoundingClientRect();
+        const progress = el.querySelector('.premium-project-progress')!.getBoundingClientRect();
+        return { gap: button.left - progress.right, width: button.width, height: button.height };
+      });
+      expect(disclosureGeometry.gap).toBeGreaterThanOrEqual(8);
+      expect(disclosureGeometry.width).toBeGreaterThanOrEqual(44);
+      expect(disclosureGeometry.height).toBeGreaterThanOrEqual(44);
+      expect(Math.abs(await percentageRight(projects.getByRole('button', { name: 'Open Personal', exact: true })) - await percentageRight(zeroProject))).toBeLessThan(1);
+      expect(await parentRow.evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       await projects.getByRole('button', { name: 'Collapse Personal subprojects', exact: true }).click();
       await expect(projects.getByRole('button', { name: 'Open Personal/Finance', exact: true })).toBeHidden();
       expect(await parentRow.evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
@@ -51,7 +89,7 @@ export function reminderListStyleCases() {
         ...await page.getByTestId('grouped-list').locator('section').all()]) {
         const rows = list.locator('.premium-reminder-content');
         for (let index = 0; index < await rows.count(); index++) {
-          expect(await rows.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe(index === await rows.count() - 1 ? 'none' : '""');
+          expect(await rows.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
         }
       }
       const readingRows = page.locator('.crate-reading__item');
@@ -61,12 +99,7 @@ export function reminderListStyleCases() {
         const rows = list.locator('.crate-reading__item');
         const count = await rows.count();
         for (let index = 0; index < count; index++) {
-          expect(await rows.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe(index === count - 1 ? 'none' : '""');
-        }
-        if (count > 1) {
-          const inset = await rows.first().evaluate(el => parseFloat(getComputedStyle(el, '::after').left) -
-            (el.querySelector('strong')!.getBoundingClientRect().left - el.getBoundingClientRect().left));
-          expect(Math.abs(inset)).toBeLessThan(1);
+          expect(await rows.nth(index).evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
         }
       }
       await page.getByRole('searchbox', { name: 'Search reading' }).fill('field guide');
@@ -75,10 +108,11 @@ export function reminderListStyleCases() {
       await page.getByRole('searchbox', { name: 'Search reading' }).fill('');
       const highlights = page.locator('.crate-reading-highlights__card');
       await expect(highlights.first()).toHaveCSS('border-top-width', '0px');
-      expect(await highlights.first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('""');
+      expect(await highlights.first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       expect(await highlights.last().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       await expect(page.getByTestId('embedded-list').locator('.reminders-list')).toHaveCSS('gap', '0px');
       await expect(page.locator('.reminder-render-item').first()).toHaveCSS('margin-bottom', '0px');
+      await expect(page.locator('.reorderable-reminder-item').first()).toHaveCSS('margin-bottom', '0px');
       expect(await first.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath('flat.png'), fullPage: true });
 
@@ -86,6 +120,7 @@ export function reminderListStyleCases() {
       await page.mouse.move(0, 0);
       await expect(first).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(first).toHaveCSS('border-top-width', '1px');
+      await expect(page.locator('.reminder-render-item').first()).toHaveCSS('margin-bottom', '8px');
       await expect(metadata.first()).toHaveCSS('border-top-width', '1px');
       await expect(projectSurface).toHaveCSS('border-top-width', '1px');
       await expect(projects.locator('.premium-project-group').first()).toHaveCSS('border-top-width', '1px');
@@ -118,8 +153,10 @@ export function reminderListStyleCases() {
       await row.press('Enter');
       await expect(page.getByRole('status', { name: 'Edited reminder' })).toHaveText('1');
       await first.getByRole('checkbox').click();
-      await expect(first.getByRole('checkbox')).toBeChecked();
-      await expect(first.locator('.premium-reminder-title')).toHaveCSS('text-decoration-line', 'line-through');
+      await expect(page.locator('.reminders-view-scroll [data-reminder-id="1"]')).toHaveCount(0);
+      const completed = page.getByTestId('embedded-list').locator('.premium-reminder-content').first();
+      await expect(completed.getByRole('checkbox')).toBeChecked();
+      await expect(completed.locator('.premium-reminder-title')).toHaveCSS('text-decoration-line', 'line-through');
       for (const el of await page.locator('.premium-reminder-content').all()) {
         expect(await el.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       }

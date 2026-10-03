@@ -9,7 +9,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: var(--font-ui-medium);
+  font-size: var(--font-ui-small);
   line-height: 1.5;
 
   p { margin: 0; min-width: 0; font-size: inherit; line-height: inherit; }
@@ -37,25 +37,12 @@
   &.is-working svg { animation: crate-spin 1s linear infinite; }
 }
 
-.crate-status-guidance,
-.crate-status-details {
+.crate-status-guidance {
   margin: 14px 0 0;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.5;
   overflow-wrap: anywhere;
-}
-
-.crate-status-details {
-  summary { cursor: pointer; }
-  p { margin: 8px 0 0; user-select: text; }
-}
-
-.crate-status-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -175,7 +162,7 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
   overflow: hidden;
 }
 .crate-exclusion-modal > .crate-modal-header-host { flex-shrink: 0; }
-.crate-exclusion-body { padding: 16px 20px 0; }
+.crate-exclusion-body { padding: var(--crate-dialog-padding) var(--crate-dialog-padding) 0; }
 .crate-exclusion-description, .crate-exclusion-count {
   flex-shrink: 0;
   margin: 0 0 16px;

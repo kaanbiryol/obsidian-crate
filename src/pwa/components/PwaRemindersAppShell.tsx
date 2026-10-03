@@ -208,7 +208,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			hideProject: viewMode === 'browse' && selectedProject !== null,
 		});
 	}, [renderCard, selectedProject, viewMode]);
-	const listCardRenderer = useCallback((reminder: Reminder, index: number) => renderCard({ reminder, index, hideProject: false }), [renderCard]);
+	const listCardRenderer = useCallback((reminder: Reminder, index: number) => renderCard({ reminder, index, hideProject: viewMode === 'inbox' }), [renderCard, viewMode]);
 
 	const renderToggleButton = useCallback(({ onPress, showCompleted, count }: {
 		onPress: () => void;

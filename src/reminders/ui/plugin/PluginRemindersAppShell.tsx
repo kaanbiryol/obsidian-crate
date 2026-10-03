@@ -201,7 +201,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       projects={projects}
       showFab={!suppressFab}
       upcomingDays={upcomingDays}
-      renderCard={(reminder, index) => renderCard({ reminder, index, hideProject: false })}
+      renderCard={(reminder, index) => renderCard({ reminder, index, hideProject: viewMode === 'inbox' })}
       renderToggleButton={renderToggleButton}
       onProjectSelect={handleProjectSelect}
       onBackToProjects={handleBackToProjects}
@@ -229,7 +229,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
         <TabTransition viewKey={primaryTab}>
           {!renderHeader && <ViewHeader {...currentHeader} title={primaryTab === 'today' ? 'Reminders' : currentHeader.title}
             countUnit={viewMode === 'browse' ? 'project' : 'reminder'} large={isFullScreen}
-            showMeta={isInitialLoadComplete && !loadingContent} rightContent={headerRightContent} />}
+            showMeta={isInitialLoadComplete && !loadingContent} reserveMetaSpace rightContent={headerRightContent} />}
           {(viewMode === 'today' || viewMode === 'upcoming') && <ScheduleSwitcher value={viewMode} onChange={handleViewModeChange} />}
           {belowHeaderContent}
           <div className="reminders-content">

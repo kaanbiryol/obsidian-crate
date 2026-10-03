@@ -18,7 +18,7 @@ class CloudflareAuthorizationModal extends SharedModal {
 		});
 		const link = this.bodyEl.createEl('a', {
 			text: 'Open Cloudflare',
-			cls: 'external-link crate-cloudflare-authorization-link',
+			cls: 'external-link mod-cta crate-cloudflare-authorization-link',
 		});
 		link.setAttribute('href', this.url);
 		link.setAttribute('target', '_blank');

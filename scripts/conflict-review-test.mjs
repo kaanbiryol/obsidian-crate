@@ -38,6 +38,7 @@ const { outputFiles } = await build({
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `
             export const Platform = { isMobile: innerWidth < 600, isDesktopApp: innerWidth >= 600 };
             export class Notice {}
+            export class Setting {}
             export function setIcon() {}
         ` : args.path === './file-actions' ? `export const getPendingFileActions = (_app, path) => innerWidth < 600 ? [] : [{ id: 'reveal', title: 'Reveal in Finder', run: async () => { window.revealed.push(path); } }];` : `
             export class SharedModal {
@@ -53,7 +54,7 @@ const { outputFiles } = await build({
         ` }));
     } }], bundle: true, write: false, format: 'iife', platform: 'browser',
 });
-const css = compileString("@use 'src/styles/plugin/activity';", { loadPaths: [process.cwd()] }).css;
+const css = compileString("@use 'src/styles/plugin/dialogs'; @use 'src/styles/plugin/activity'; @use 'src/ui/shared/styles/modal-layout'; .crate-reminders-ui { @include modal-layout.styles; }", { loadPaths: [process.cwd()] }).css;
 await mkdir('.generated/conflict-review', { recursive: true });
 for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();

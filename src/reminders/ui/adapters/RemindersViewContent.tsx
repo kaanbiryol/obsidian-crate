@@ -1,6 +1,7 @@
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { IconButton } from '@/ui/shared/IconButton';
 import React, { useCallback, useEffect, useState } from "react";
+import { TFile } from 'obsidian';
 import type CratePlugin from "@/main";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
@@ -99,7 +100,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             initialProject={initialProject}
             hideTabBar={hideTabBar}
             renderHeader={renderHeader}
-            headerRightContent={<IconButton icon="settings" size="large" label="Crate settings" onClick={() => plugin.openSettingsTab()} />}
+            headerRightContent={<IconButton icon="settings" size="large" iconSize="l" label="Crate settings" onClick={() => plugin.openSettingsTab()} />}
             upcomingDays={plugin.remindersSettings.upcomingDaysDefault ?? 7}
             renderCard={renderCard}
             onAdd={handleAdd}
@@ -107,6 +108,12 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             belowHeaderContent={<PluginReminderSourceNotice
                 issues={plugin.reminderIndex.sourceIssues}
                 onRefresh={() => plugin.reminderIndex.load()}
+                onOpenNote={async path => {
+                    const file = plugin.app.vault.getAbstractFileByPath(path);
+                    if (!(file instanceof TFile)) throw new Error('This note is no longer available. Retry the scan to update the list.');
+                    await plugin.app.workspace.getLeaf(false).openFile(file);
+                    onClose?.();
+                }}
             />}
             topOverlay={onClose ? (
                 <>

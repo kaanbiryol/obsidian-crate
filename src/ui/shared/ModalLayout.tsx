@@ -3,6 +3,7 @@ import { ModalHeader } from './ModalHeader';
 
 interface ModalLayoutProps {
     title: string;
+    titleId?: string;
     onClose: () => void;
     children: ReactNode;
     footer?: ReactNode;
@@ -10,9 +11,9 @@ interface ModalLayoutProps {
 }
 
 /** Content layout hosted by an Obsidian modal; the host owns focus and dismissal. */
-export function ModalLayout({ title, onClose, children, footer, closeDisabled }: ModalLayoutProps) {
+export function ModalLayout({ title, titleId, onClose, children, footer, closeDisabled }: ModalLayoutProps) {
     return <>
-        <ModalHeader title={title} closeLabel="Close dialog" onClose={onClose} closeDisabled={closeDisabled} titleLive="polite" />
+        <ModalHeader title={title} titleId={titleId} closeLabel="Close dialog" onClose={onClose} closeDisabled={closeDisabled} titleLive="polite" />
         <div className="crate-modal-body">{children}</div>
         {footer && <div className="crate-modal-footer">{footer}</div>}
     </>;

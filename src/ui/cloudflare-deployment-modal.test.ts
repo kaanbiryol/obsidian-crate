@@ -55,7 +55,7 @@ describe('CloudflareDeploymentModal', () => {
 		});
 		const markup = MockModal.instances[0]!.contentEl.collectText();
 		expect(markup).toContain('reminder-modal-header');
-		expect(markup).toContain('<summary>Technical details</summary>');
+		expect(markup).toContain('<summary><span>Technical details</span></summary>');
 		expect(markup).toContain('Namespace listing incomplete');
 		expect(markup).toContain('Open settings');
 		expect(markup).not.toContain('<ul');

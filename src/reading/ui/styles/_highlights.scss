@@ -31,7 +31,6 @@
 		@include list-item.flat-surface;
 		position: relative;
 		padding: 20px 12px;
-		&:not(:last-child) { @include list-item.inset-divider(12px, 12px); }
 	}
 }
 .crate-reminders-ui .crate-reading-reader {

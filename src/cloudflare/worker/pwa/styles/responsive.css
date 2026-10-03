@@ -10,8 +10,6 @@
 @media (min-width: 760px){
 	body{display:block}
 	#app{width:100vw;border-left:none;border-right:none;background:var(--background-primary)}
-	:is(.pwa-reminders-view,.pwa-opening-screen) .view-header{padding-left:40px!important;padding-right:40px!important}
-	.pwa-reminders-view .ios-scroll{padding-left:40px!important;padding-right:40px!important}
 	.fab{right:18px}
 	.toast{width:max-content;max-width:calc(100vw - 28px)}
 	.pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 80px))!important}

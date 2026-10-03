@@ -45,7 +45,9 @@
     border: 0;
     background: transparent;
     box-shadow: none;
-    color: var(--text-muted);
+    color: var(--text-faint);
+
+    svg { opacity: 0.65; }
 }
 
 .premium-project-group-name {
@@ -86,12 +88,6 @@
     border: 1px solid var(--crate-project-card-border, var(--crate-divider));
     border-radius: var(--crate-radius-card);
     background: var(--crate-project-card-bg, var(--crate-panel-bg));
-
-    > .premium-project-tree-row {
-        .premium-project-content {
-            padding-inline-end: 44px;
-        }
-    }
 
     .premium-project-content {
         border: 0;
@@ -197,7 +193,7 @@
 }
 
 .premium-project-accent {
-    width: 4px;
+    width: 2px;
     height: 32px;
     border-radius: 2px;
     transition: box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
@@ -232,20 +228,23 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-medium);
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--font-normal, 400);
     color: var(--text-muted);
 
     svg {
+        width: 11px;
+        height: 11px;
         opacity: 0.7;
     }
 }
 
 .premium-project-stat-done {
-    color: var(--crate-success);
+    color: color-mix(in srgb, var(--crate-success) 60%, var(--text-muted));
 
-    svg {
-        opacity: 1;
+    .premium-project-stat-separator {
+        margin-inline-end: 4px;
+        color: var(--text-faint);
     }
 }
 
@@ -259,12 +258,13 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-medium);
-    color: var(--crate-success);
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--font-normal, 400);
+    color: color-mix(in srgb, var(--crate-success) 60%, var(--text-muted));
 }
 
 .premium-project-right {
+    margin-inline-end: 0;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -272,16 +272,18 @@
 }
 
 .premium-project-progress {
+    min-width: 0;
     display: flex;
     flex-direction: row;
     align-items: center;
     flex-shrink: 0;
     gap: 8px;
-    min-width: var(--crate-project-progress-width, 48px);
+
+    .crate-progress-meter { height: 3px; }
 }
 
 .crate-progress-meter {
-    width: var(--crate-project-progress-width, 48px);
+    width: var(--crate-project-progress-width, 56px);
     height: var(--progress-bar-height, 4px);
     flex-shrink: 0;
     overflow: hidden;
@@ -299,6 +301,8 @@
 }
 
 .premium-project-percentage {
+    width: 4ch;
+    text-align: end;
     font-size: var(--reminder-font-xxs);
     font-weight: var(--reminder-font-weight-semibold);
     color: var(--text-muted);
@@ -307,9 +311,23 @@
 
 .premium-project-chevron {
     color: var(--text-faint);
-    opacity: 0.4;
+    opacity: 0.55;
     transition: opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
+
+// Reserve the full disclosure hit area, including when the chevron is hidden.
+// Together with the row inset, this keeps progress clear of the 44px button.
+.premium-project-chevron-slot {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex: 0 0 32px;
+    width: 32px;
+}
+
+.premium-project-chevron--hidden { visibility: hidden; }
+
+.premium-project-stat-complete svg { width: 11px; height: 11px; }
 }
 
 // Apply after host density and interaction rules, just like flat reminders.
@@ -322,35 +340,29 @@
             @include list-item.flat-surface;
         }
 
-        .premium-project-content { padding-block: 14px; }
+        .premium-project-content {
+            padding-block: 14px;
+            border-radius: 8px;
+        }
+
+        .premium-project-children .premium-project-content {
+            padding-block: 10px;
+        }
+
+        .premium-projects-list > .premium-project-tree > .premium-project-group[data-open]:not(:last-child) {
+            margin-bottom: 8px;
+        }
+
         .premium-project-children > .premium-project-tree > li { border-top: 0; }
-
-        .premium-project-tree > li {
-            // 12px padding + 3px accent + 10px gap, aligned with the title.
-            --crate-project-divider-start: 25px;
-            position: relative;
-
-            &:has(> .premium-project-tree-row > .premium-project-group-name) {
-                --crate-project-divider-start: 12px;
-            }
-
-            &:not(:last-child) {
-                @include list-item.inset-divider(var(--crate-project-divider-start), 12px);
-            }
-        }
-
-        .premium-project-group[data-open] > .premium-project-tree-row {
-            @include list-item.inset-divider(var(--crate-project-divider-start), 12px);
-        }
 
         @media (hover: hover) and (pointer: fine) {
             .premium-project-card:hover .premium-project-content {
-                background: var(--crate-project-card-hover-bg);
+                background: color-mix(in srgb, var(--crate-control-hover-bg) 60%, var(--background-primary));
             }
         }
 
         .premium-project-card[data-press-active] .premium-project-content {
-            background: var(--crate-reminder-card-active-bg);
+            background: color-mix(in srgb, var(--crate-control-active-bg) 75%, var(--background-primary));
         }
 
         .premium-project-card:focus-visible .premium-project-content {

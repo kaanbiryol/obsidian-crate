@@ -27,6 +27,7 @@
 .premium-reminder-content {
     position: relative;
     display: flex;
+    min-height: 44px;
     align-items: flex-start;
     gap: 12px;
     padding: 14px 16px;
@@ -343,14 +344,26 @@
         --crate-card-project-border: transparent;
         --crate-reminder-card-shadow: none;
         --crate-reminder-card-hover-shadow: none;
+        --crate-reminder-card-hover-bg: color-mix(in srgb, var(--crate-control-hover-bg) 60%, var(--background-primary));
+        --crate-reminder-card-active-bg: color-mix(in srgb, var(--crate-control-active-bg) 75%, var(--background-primary));
 
         margin-bottom: 0;
         border-radius: 0;
 
         .premium-reminder-content {
             @include list-item.flat-surface;
+            border-radius: 8px;
             gap: 12px;
-            padding: 14px 12px;
+            // Keep the top inset for the 44px completion target and separate adjacent rows.
+            padding: 11px 12px 7px;
+
+            &:has(.premium-reminder-description) {
+                padding-bottom: 9px;
+            }
+        }
+
+        .premium-checkbox {
+            --premium-checkbox-size: calc(var(--checkbox-size, var(--icon-size-s, 18px)) + 2px);
         }
 
         .premium-reminder-description { margin-top: 0; }
@@ -363,6 +376,11 @@
             border: 0;
             border-radius: 0;
             background: transparent;
+
+            svg {
+                width: calc(var(--icon-xs, 14px) * 0.9);
+                height: calc(var(--icon-xs, 14px) * 0.9);
+            }
         }
 
         @media (hover: hover) and (pointer: fine) {
@@ -376,17 +394,8 @@
         }
     }
 
-    // Only rows followed by another item in the same group get a divider.
-    // Exiting motion rows do not count as the next visible item.
-    :is(.reminder-render-item, .reorderable-reminder-item):has(~ :is(.reminder-render-item, .reorderable-reminder-item):not([aria-hidden="true"])),
-    .sidebar-reminder-card-wrapper:has(~ .sidebar-reminder-card-wrapper) {
-        .premium-reminder-card[data-reminder-list-style="flat"] .premium-reminder-content {
-            // 12px padding + 20px checkbox footprint + 12px gap.
-            @include list-item.inset-divider(44px, 12px);
-        }
-    }
-
-    .reminders-view.is-primary :is(.reminder-render-item, .reorderable-reminder-item):has([data-reminder-list-style="flat"]) {
+    :is(.reminder-render-item, .reorderable-reminder-item):has([data-reminder-list-style="flat"]) {
+        --crate-reminder-row-gap: 0px;
         margin-bottom: 0;
     }
 
