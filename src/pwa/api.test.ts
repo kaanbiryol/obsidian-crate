@@ -23,6 +23,13 @@ describe('service worker startup registration', () => {
 		await registerPwaServiceWorker();
 		expect(register).toHaveBeenCalledWith(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`, { scope: '/notifications' });
 	});
+	it.each(['active', 'waiting', 'installing'])('does not replace a newer %s worker from an older document', async slot => {
+		const existing = { [slot]: { scriptURL: 'https://crate.test/notifications/sw.js?v=new', state: slot === 'active' ? 'activated' : slot === 'waiting' ? 'installed' : 'installing' } };
+		const register = vi.fn();
+		vi.stubGlobal('navigator', { serviceWorker: { getRegistration: vi.fn().mockResolvedValue(existing), register } });
+		await expect(registerPwaServiceWorker()).resolves.toBe(existing);
+		expect(register).not.toHaveBeenCalled();
+	});
 });
 
 describe('getPwaPushManager', () => {
