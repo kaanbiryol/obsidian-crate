@@ -25,6 +25,9 @@ export function useReadingSession(connection: ReadingConnection) {
     setUrl(''); setAdding(false); setShare(null);
   }, [resetConnection]);
   useEffect(() => {
+    // A null session during unlock is not a disconnected session. Scanning here
+    // treats this session's encrypted queue as unreadable earlier-session work.
+    if (!connection.ready || connection.connecting || connection.lockedSession) return;
     alive.current = true;
     const lifetime = generation;
     const revision = ++lifetime.current;
@@ -73,7 +76,7 @@ export function useReadingSession(connection: ReadingConnection) {
       }
     });
     return () => { alive.current = false; lifetime.current++; };
-  }, [connection.session, run]);
+  }, [connection.session, connection.ready, connection.connecting, connection.lockedSession, run]);
   const ready = connection.ready && (!connection.session || hydrated === connection.session || Boolean(error));
   useEffect(() => {
     if (session && ready && draftReady) void run(() => writeValue(`draft:${session.id}`, { url }, session));

@@ -1,7 +1,7 @@
 /* global readingEncryption -- Bundled production Reading encryption and persistence. */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { chromium, webkit } from '@playwright/test';
+import { chromium, webkit, expect } from '@playwright/test';
 
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
@@ -13,6 +13,22 @@ export * from './src/pwa/encryption-fragments';
 export * from './src/pwa/encryption-keys';
 export { loadReading } from './src/pwa/reading/api';
 export { createReadingNote, parseReadingNote } from './src/reading/core/notes';
+export { LocalStateCipher } from './src/encryption/local-state';
+export { lockReadingStorage, unlockReadingStorage } from './src/pwa/reading/private-storage';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { useReadingSession } from './src/pwa/reading/useReadingSession';
+function SessionHarness({ connection }) {
+  const state = useReadingSession(connection);
+  window.readingState = state;
+  window.readingStates.push({ recovery: state.recovery, error: state.error, ready: state.ready });
+  return null;
+}
+export function mountSession(connection) {
+  const root = createRoot(document.body.appendChild(document.createElement('div')));
+  window.readingStates = [];
+  return next => root.render(createElement(SessionHarness, { connection: { ...connection, ...next } }));
+}
 `, resolveDir: process.cwd() }, bundle: true, format: 'iife', globalName: 'readingEncryption', write: false })).outputFiles[0].text;
 for (const engine of [chromium, webkit]) {
   const browser = await engine.launch();
@@ -114,5 +130,44 @@ for (const engine of [chromium, webkit]) {
     assert.equal(result.healthyArticle, 'Healthy offline article');
     for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'preservedList', 'recoveryIssue']) assert.equal(result[key], true, key);
     console.log(`Reading encryption migration, damaged-cache isolation, key recovery and stale-session fencing passed (${engine.name()})`);
+    for (const kind of ['empty', 'pending', 'damaged']) {
+      const startup = await browser.newPage();
+      await startup.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Encrypted startup</title>' }));
+      await startup.goto('https://reading-startup.test');
+      await startup.addScriptTag({ content: harness });
+      await startup.evaluate(async kind => {
+        const t = readingEncryption;
+        const session = { id: 'reader', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 100000 };
+        localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
+        const secret = crypto.getRandomValues(new Uint8Array(32)), vault = crypto.randomUUID(), scope = crypto.randomUUID();
+        const unlock = () => t.unlockReadingStorage(new t.LocalStateCipher(vault, scope, secret));
+        unlock();
+        const pending = kind === 'empty' ? [] : kind === 'damaged' ? { damaged: true }
+          : [{ id: 'retained', sessionId: session.id, action: 'capture', intent: { url: 'https://example.com/retained' } }];
+        await t.writeValue('pending:reader', pending, session);
+        await t.writeValue('draft:reader', { url: 'https://example.com/draft' }, session);
+        window.pendingBytes = JSON.stringify(await (await t.readingDatabase()).get('values', 'pending:reader'));
+        t.lockReadingStorage();
+        const render = t.mountSession({ session: null, lockedSession: null, ready: false, connecting: false, error: null, resetSession() {} });
+        window.showLocked = () => render({ ready: true, lockedSession: session });
+        window.finishUnlock = () => { unlock(); render({ ready: true, session }); };
+        render({});
+      }, kind);
+      await expect.poll(() => startup.evaluate(() => Boolean(window.readingState))).toBe(true);
+      // Hold unlock long enough for the old premature IndexedDB scan to finish.
+      await startup.waitForTimeout(100);
+      expect(await startup.evaluate(() => window.readingStates.some(state => state.recovery || state.error))).toBe(false);
+      await startup.evaluate(() => window.showLocked());
+      await startup.waitForTimeout(100);
+      expect(await startup.evaluate(() => window.readingStates.some(state => state.recovery || state.error))).toBe(false);
+      await startup.evaluate(() => window.finishUnlock());
+      await expect.poll(() => startup.evaluate(() => window.readingState.ready)).toBe(true);
+      expect(await startup.evaluate(() => window.readingState.recovery)).toBe(kind === 'damaged');
+      expect(await startup.evaluate(() => window.readingState.pending.length)).toBe(kind === 'pending' ? 1 : 0);
+      expect(await startup.evaluate(() => window.readingState.url)).toBe('https://example.com/draft');
+      expect(await startup.evaluate(async () => JSON.stringify(await (await readingEncryption.readingDatabase()).get('values', 'pending:reader')) === window.pendingBytes)).toBe(true);
+      await startup.close();
+    }
+    console.log(`Encrypted startup waits for unlock and preserves real pending/recovery states (${engine.name()})`);
   } finally { await browser.close(); }
 }
