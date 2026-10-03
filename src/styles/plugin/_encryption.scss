@@ -28,16 +28,14 @@
   .crate-encryption-intro { margin: 0 0 16px; font-size: var(--font-ui-small, 14px); line-height: 1.5; color: var(--text-muted); }
   .crate-encryption-key { display: flex; flex-direction: column; gap: 8px; }
   .setting-item.crate-encryption-key__header { flex-direction: row; align-items: center; gap: 12px; margin: 0; padding: 0; border: 0; }
-  .crate-encryption-key__header .setting-item-info { margin: 0; }
-  .crate-encryption-key__header .setting-item-name { color: var(--text-muted); font-size: var(--font-ui-small, 13px); }
   .crate-encryption-key__header .setting-item-control { flex: none; width: auto; }
-  .setting-item.crate-encryption-key__header button { width: auto; }
+  .setting-item.crate-encryption-key__header button { width: auto; min-width: 64px; }
   textarea.crate-encryption-recovery {
     display: block; width: 100%; min-width: 0; min-height: 0; height: 62px; margin: 0; padding: 10px 12px; resize: none;
-    font: 12px/1.5 var(--font-monospace); word-break: break-all;
+    font: 12px/1.5 var(--font-monospace); word-break: break-all; background: var(--background-secondary);
   }
 
-  .crate-encryption-confirm { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 12px 0 0; padding: 0; font-size: var(--font-ui-small, 14px); line-height: 1.5; cursor: pointer; }
+  .crate-encryption-confirm { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 8px 0; padding: 0; font-size: var(--font-ui-small, 14px); line-height: 1.5; cursor: pointer; }
   .crate-encryption-confirm input { flex: none; width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--interactive-accent); }
 
   .crate-recovery-verification { display: flex; flex-direction: column; align-items: stretch; border: 0; padding: 0; }
@@ -53,6 +51,7 @@
   .crate-encryption-progress { display: block; flex: none; width: 100%; height: var(--progress-bar-height, 6px); accent-color: var(--interactive-accent); }
 
   .crate-encryption-details { margin-top: 8px; font-size: var(--font-ui-small, 13px); line-height: 1.5; color: var(--text-muted); }
+  .crate-encryption-details.crate-encryption-setup__details { margin: 0; border-top: 1px solid var(--background-modifier-border); }
   .crate-encryption-details > summary { min-height: 40px; padding: 10px 0; cursor: pointer; color: var(--text-normal); }
   .crate-encryption-details ul { margin: 0; padding-left: 20px; }
   .crate-encryption-details li + li { margin-top: 8px; }
@@ -72,4 +71,12 @@
 @media (pointer: coarse) {
   .modal.crate-encryption-modal { height: min(460px, calc(100dvh - 80px)); }
   .modal.crate-encryption-modal .setting-item-control button { min-height: 44px; }
+}
+.modal.crate-web-pairing-modal {
+  max-width: calc(100vw - 24px);
+  height: min(312px, calc(100dvh - 80px));
+  @media (pointer: coarse) { height: min(332px, calc(100dvh - 80px)); }
+  .crate-encryption-intro { margin: 8px 0 0; }
+  .crate-web-pairing-verification { margin-top: 16px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); text-align: center; font-size: var(--font-ui-smaller, 12px); color: var(--text-muted); }
+  .crate-web-pairing-code { display: block; margin-top: 6px; color: var(--text-normal); font: 500 22px/1.4 var(--font-monospace); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 }

@@ -7,6 +7,9 @@
     "scripts/pwa-web-app-unlock-test.mjs": "local Chromium/WebKit combined key import and draft recovery; conservative 10-second scheduling estimate"
   },
   "seconds": {
+	"scripts/pwa-encryption-onboarding-test.mjs": 30,
+    "scripts/pwa-pairing-test.mjs": 65,
+    "scripts/reading-content-security-test.mjs": 8,
     "scripts/pwa-sync-coordinator-test.mjs": 12.4,
     "scripts/pwa-sheet-field-test.mjs": 18.9,
     "scripts/pwa-ios27-header-test.mjs": 8.8,

@@ -18,7 +18,7 @@ if (process.env.CRATE_PWA_PREBUILT !== '1') {
 }
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/web-app-key';
+
 export * from './src/encryption/file-codec';
 export * from './src/encryption/file-authority';
 export * from './src/encryption/reminder-projection';
@@ -44,7 +44,10 @@ async function verify(type) {
 	// Inject faults at the HTTP boundary: WebKit does not reliably route requests
 	// owned by an installed service worker through Playwright's route handlers.
 	const server = await listenLocalServer({ origin: runtime.origin, mf: { dispatchFetch: async (url, init) => {
-		if (offlineApis && /^\/(encryption|reminders|sync|settings|\.well-known)(\/|$)/.test(new URL(url).pathname)) return Response.json({ error: 'Injected offline API' }, { status: 503 });
+		// Only the app is offline; its Obsidian peer must still be able to move
+		// folders on the server before the app reconnects.
+		if (offlineApis && new Headers(init.headers).get('Authorization') !== `Bearer ${owner.token}`
+			&& /^\/(encryption|reminders|sync|settings|\.well-known)(\/|$)/.test(new URL(url).pathname)) return Response.json({ error: 'Injected offline API' }, { status: 503 });
 		if (new URL(url).pathname === '/test-encryption-harness.js') return new Response(harness, { headers: { 'Content-Type': 'application/javascript' } });
 		if (new URL(url).pathname !== '/reminders/encrypted-commit' || faultPhase === 'none') return runtime.mf.dispatchFetch(url, init);
 		const body = await new Response(init.body).text(); replays.push(body);
@@ -151,7 +154,7 @@ async function verify(type) {
 			window.encryptedTestApi = api;
 			window.encryptedTestKeys = bundle;
 			window.encryptedTestRecovery = recovery;
-			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: t.encodeWebAppKey([t.createReminderKeyGrant(bundle, 'Reminders')]) };
+			return { ...(await api.createRemindersEnrollmentToken('Reminders')), grant: recovery, scope: t.createReminderKeyGrant(bundle, 'Reminders') };
 		}, { origin, token: owner.token, checkpointId, legacyUploads, initialSettings, seedSettings });
 		const rows = await runtime.db.prepare('SELECT storage_key FROM files UNION SELECT storage_key FROM file_versions').all();
 		for (const row of rows.results) {
@@ -165,6 +168,9 @@ async function verify(type) {
 		// worker runs. Chromium covers real offline navigation; WebKit covers the
 		// same launch policy with an offline signal and unavailable data APIs.
 		if (type === webkit) await context.addInitScript(() => {
+			// Native push queries freeze headless WebKit on this host, including
+			// an empty-page reproduction. SW/storage remain real; push needs devices.
+			Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
 			Object.defineProperty(navigator, 'onLine', { get: () => sessionStorage.getItem('crate-test-offline') !== '1', configurable: true });
 		});
 		const page = await context.newPage();
@@ -181,7 +187,8 @@ async function verify(type) {
 			page.on('response', response => console.log('PWA response:', response.status(), new URL(response.url()).pathname));
 			page.on('requestfailed', request => console.log('PWA request failed:', new URL(request.url()).pathname, request.failure()));
 		}
-		const requests = []; page.on('request', request => { if (request.method() !== 'GET') requests.push({ url: request.url(), body: request.postData() }); });
+		let recoverySent = false;
+		const requests = []; page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(enrolled.grant)) recoverySent = true; if (request.method() !== 'GET') requests.push({ url: request.url(), body: request.postData() }); });
 		await page.goto(`${origin}/notifications?browserToken=${enrolled.browserToken}&folder=Reminders&tab=inbox#crateKey=${encodeURIComponent(enrolled.grant)}`);
 		try { await expect(page.getByText('Encrypted appointment', { exact: true })).toBeVisible({ timeout: 20000 }); }
 		catch (error) {
@@ -241,7 +248,7 @@ async function verify(type) {
 			return response.json();
 		}, legacyCreate);
 		assert.deepEqual(replayedLegacy, oldCreateReceipt);
-		await verifyEncryptedAttemptCleanup(page, enrolled.grant, info.reminderOperationDay);
+		await verifyEncryptedAttemptCleanup(page, enrolled.scope, info.reminderOperationDay);
 		const notification = await admin.evaluate(async () => {
 			const t = window.crateEncryptionTest, bundle = window.encryptedTestKeys;
 			const projection = await t.createReminderProjection(bundle, 'Reminders/Inbox.md', new TextEncoder().encode('- [ ] Private push title 2099-01-02 <!-- crate-id:push-test -->').buffer);
@@ -269,17 +276,21 @@ async function verify(type) {
 			if (!text.includes('Private surrounding note text') || !text.includes('Private browser task')) throw new Error('Whole-note editing lost surrounding text');
 		});
 		// A fresh installed-app storage partition can authenticate, but must ask
-		// for its folder key before downloading/decrypting reminder content.
+		// for the recovery key before downloading/decrypting reminder content.
 		const second = await admin.evaluate(() => window.encryptedTestApi.createRemindersEnrollmentToken('Reminders'));
 		const lockedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+		if (type === webkit) await lockedContext.addInitScript(() => {
+			Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get: () => undefined });
+		});
 		try {
 			const locked = await lockedContext.newPage();
 			await locked.goto(`${origin}/notifications?browserToken=${second.browserToken}&folder=Reminders&tab=inbox`);
-			await expect(locked.getByRole('heading', { name: 'This device is locked' })).toBeVisible();
+			await expect(locked.getByRole('heading', { name: 'Unlock Crate' })).toBeVisible();
 			await mkdir('.generated/browser-encryption', { recursive: true });
 			await locked.screenshot({ path: `.generated/browser-encryption/${type.name()}-unlock.png`, fullPage: true });
-			await locked.getByLabel('Web app key', { exact: true }).fill(enrolled.grant);
-			await locked.getByRole('button', { name: 'Unlock this device', exact: true }).click();
+			await locked.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
+			await locked.getByLabel('Recovery key', { exact: true }).fill(enrolled.grant);
+			await locked.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 			// Partial CryptoKey damage must be repairable through the real unlock UI.
 			await locked.evaluate(async () => {
@@ -289,23 +300,30 @@ async function verify(type) {
 				request.onsuccess = () => { const cursor = request.result; if (cursor) cursor.update({ ...cursor.value, notificationFingerprint: null }); };
 				await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = () => reject(tx.error); }); db.close();
 			});
+			await locked.waitForLoadState('networkidle');
 			await locked.reload();
-			await expect(locked.getByRole('heading', { name: 'This device is locked' })).toBeVisible();
-			await locked.getByLabel('Web app key', { exact: true }).fill(enrolled.grant);
-			await locked.getByRole('button', { name: 'Unlock this device', exact: true }).click();
+			await expect(locked.getByRole('heading', { name: 'Unlock Crate' })).toBeVisible();
+			await locked.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
+			await locked.getByLabel('Recovery key', { exact: true }).fill(enrolled.grant);
+			await locked.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 			const state = JSON.parse((await runtime.db.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:state'").first()).value);
 			await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify({ ...state, mode: 'converting' })).run();
 			try {
+				await locked.waitForLoadState('networkidle');
 				await locked.reload();
 				await expect(locked.getByRole('heading', { name: 'Encryption conversion in progress' })).toBeVisible();
-				await expect(locked.getByRole('button', { name: 'Unlock this device', exact: true })).toHaveCount(0);
+				await expect(locked.getByRole('button', { name: 'Unlock Crate', exact: true })).toHaveCount(0);
 			} finally { await runtime.db.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'e2ee:state'").bind(JSON.stringify(state)).run(); }
-			await locked.getByRole('button', { name: 'Retry connection', exact: true }).click();
+			// Background verification may already have dismissed the conversion
+			// gate. Reload checks durable recovery without racing that dismissal.
+			await locked.waitForLoadState('networkidle');
+			await locked.reload();
 			await expect(locked.getByText('Private browser task', { exact: true })).toBeVisible();
 		} finally { await lockedContext.close(); }
 		await verifyReminderFolderMove({ admin, page, origin, owner, setOffline, setFault: value => { faultPhase = value; }, getFault: () => faultPhase, replays, notification });
 		await verifyEncryptionReset({ admin, page, origin, owner, runtime });
+		assert.equal(recoverySent, false, 'Recovery key must never be sent to the server');
 		assert.deepEqual(errors, []);
 		console.log(`${type.name()}: conversion/resume, recovery, history, enrollment, offline reload, lost-response replay, private storage, push decryption and separate-app unlock, destructive reset and plaintext re-enrollment passed`);
 	} finally {

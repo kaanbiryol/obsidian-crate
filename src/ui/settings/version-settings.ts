@@ -3,6 +3,7 @@ import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import release from '../../cloudflare/server-release.json';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
+import type { CrateServerInfo } from '../../protocol';
 
 function localRevision(plugin: CratePlugin): number | undefined {
 	const deployment = plugin.settings.cloudflareDeployment;
@@ -89,31 +90,37 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 	};
 	let saved = describe(localRevision(plugin));
 	setting.setDesc(saved);
+	const showVersion = (info: CrateServerInfo) => {
+		if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) {
+			checkButton?.buttonEl.hide();
+			onMatchingServer();
+			return;
+		}
+		saved = describe(info.serverRevision, info.developmentBuild, info.deploymentFingerprint);
+		if (!info.deploymentFingerprint) {
+			setAvailability(false);
+			setting.setName('Check server version');
+			saved = `Current version: ${info.serverRevision ? serverBuildLabel(info.serverRevision, info.developmentBuild) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Build unverified. Retry when connected.`;
+		}
+		setting.setDesc(saved);
+	};
 	setting.addButton(button => {
 		checkButton = button;
 		if (updateAvailable) button.buttonEl.hide();
-		button.setButtonText('Check for updates').onClick(async () => {
+		const check = async () => {
 			button.setDisabled(true).setButtonText('Checking…');
 			setting.setDesc('Checking live server…');
 			try {
-				const info = await checkVersion(plugin);
-				if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) {
-					button.buttonEl.hide();
-					onMatchingServer();
-					return;
-				}
-				saved = describe(info.serverRevision, info.developmentBuild, info.deploymentFingerprint);
-				if (!info.deploymentFingerprint) {
-					setAvailability(false);
-					setting.setName('Check server version');
-					saved = `Current version: ${info.serverRevision ? serverBuildLabel(info.serverRevision, info.developmentBuild) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Build unverified. Retry when connected.`;
-				}
-				setting.setDesc(saved);
+				showVersion(await checkVersion(plugin));
 			} catch {
 				setting.setDesc(`${saved}. Could not check the server. Try again.`);
 			} finally {
 				button.setDisabled(false).setButtonText('Check for updates');
 			}
-		});
+		};
+		button.setButtonText('Check for updates').onClick(check);
+		const cached = plugin.syncRuntime.getCachedVersionInfo();
+		if (cached) showVersion(cached);
+		else if (!updateAvailable && (localRevision(plugin) === undefined || localRevision(plugin) === release.revision)) void check();
 	});
 }

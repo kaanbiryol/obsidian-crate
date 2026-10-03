@@ -1,9 +1,8 @@
 import React from 'react';
-import { Folder, ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from 'lucide-react';
+import { ExternalLink, RefreshCw, Link2Off, WifiOff, TriangleAlert } from 'lucide-react';
 import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
-import type { StoredConfig } from '../types';
 import { FeatureSwitcherButton } from './FeatureSwitcherButton';
 
 const brandMarkSrc = `/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}`;
@@ -16,15 +15,15 @@ function openObsidianRecoveryLink() {
 	window.location.href = '/notifications/open-obsidian';
 }
 
-function AuthLayout({ title, description, notice, config, children }: {
+export function AuthLayout({ title, description, notice, children, className = '' }: {
 	title: string;
 	description: string;
 	notice?: React.ReactNode;
-	config: StoredConfig;
 	children: React.ReactNode;
+	className?: string;
 }) {
 	return (
-		<main className="auth-card">
+		<main className={`auth-card ${className}`}>
 			<header className="auth-card__brand"><AuthBrandMark /><span>Crate</span><FeatureSwitcherButton /></header>
 			<section className="auth-card__content" aria-labelledby="auth-title">
 				<div className="auth-card__heading">
@@ -32,11 +31,6 @@ function AuthLayout({ title, description, notice, config, children }: {
 					<p>{description}</p>
 				</div>
 				{notice}
-				<div className="auth-card__folder">
-					<Folder size={18} aria-hidden="true" />
-					<div><span>Reminders folder</span><strong>{config.folderPath}</strong></div>
-					<span className="auth-card__saved">Saved</span>
-				</div>
 				<div className="auth-card__actions">{children}</div>
 			</section>
 		</main>
@@ -51,14 +45,13 @@ function SessionReset({ onLogout, loggingOut }: SessionResetProps) {
 	</> : null;
 }
 
-export function EmptyAuthState({ config, ...reset }: { config: StoredConfig } & SessionResetProps) {
+export function EmptyAuthState(reset: SessionResetProps) {
 	return (
 		<AuthLayout
 			title="Connect to Crate"
 			description={isStandaloneApp()
 				? 'Open Crate in Obsidian and send a new app link to connect this app.'
 				: 'Open a new app link from Crate in Obsidian to connect this browser.'}
-			config={config}
 		>
 			<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>
 			<SessionReset {...reset} />
@@ -66,7 +59,7 @@ export function EmptyAuthState({ config, ...reset }: { config: StoredConfig } & 
 	);
 }
 
-export function ErrorState({ error, config, onRetry, ...reset }: { error: string; config: StoredConfig; onRetry: () => void } & SessionResetProps) {
+export function ErrorState({ error, onRetry, ...reset }: { error: string; onRetry: () => void } & SessionResetProps) {
 	const needsCleanup = /clear this site[’']s data|remote cleanup could not finish/i.test(error);
 	const needsLink = /enrollment token|session expired|not authenticated|unauthorized|missing auth token/i.test(error);
 	return (
@@ -86,7 +79,6 @@ export function ErrorState({ error, config, onRetry, ...reset }: { error: string
 					</div>
 				</div>
 			}
-			config={config}
 		>
 			{needsCleanup ? (
 				<Button variant="primary" className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian<ExternalLink size={16} aria-hidden="true" /></Button>

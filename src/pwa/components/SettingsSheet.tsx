@@ -1,5 +1,6 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
 import { EncryptionSettings } from './EncryptionSettings';
+import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
 
 import { TabSettings } from './TabSettings';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
@@ -35,6 +36,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 	const { reminders, reading } = snapshot;
 	const { preferences, updatePreferences } = usePwaPreferences();
 	const homeScreen = useHomeScreenInstall();
+	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
 	const finish = useCallback(() => store.setOpen(false), [store]);
 	const transition = useSheetTransition(finish);
 	const { page: detailPage, entryId, immediate, closing } = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot);
@@ -124,7 +126,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 						{reminderExport}
 					</SettingsSection></div>
 					<EncryptionSettings reading={reading} remindersConnected={Boolean(reminders?.connected)} />
-					{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} />}
+					{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} encrypted={encryption.status === 'ready' || reading?.encryption?.status === 'ready'} />}
 					<SettingsSection title="About">
 						<VersionSettings />
 					</SettingsSection>

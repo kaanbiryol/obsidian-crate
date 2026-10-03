@@ -1,5 +1,4 @@
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
-import { ReadingEncryptionUnlock } from './EncryptionUnlock';
 import { readingKeys } from './encryption-session';
 
 import type { ReadingHighlight } from '@/reading/core/highlights';
@@ -43,7 +42,7 @@ function ReadingAppContent() {
   const featureNavigation = useContext(FeatureNavigationContext);
   const active = featureNavigation?.active !== false;
   const { connection, sync, showToast, saving, setSaving, savingRef } = useReadingRuntime();
-  const { session, lockedSession, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
+  const { session, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
   const { refresh, refreshManually, isOffline } = sync;
   const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, alive, setError, run });
   const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
@@ -112,7 +111,6 @@ function ReadingAppContent() {
     && pending.some(op => op.action !== 'capture' && op.intent.id === visibleReader.crate_reading_id));
   const readingDisabled = !session && connectionState !== 'available';
 
-  if (lockedSession) return <ReadingEncryptionUnlock session={lockedSession} message={error ?? 'Unlock Reading to continue.'} />;
   if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
   const remindersConnected = Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
   const syncIssue = pending.find(op => op.error || op.review);

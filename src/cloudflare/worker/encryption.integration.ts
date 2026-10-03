@@ -63,7 +63,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	expect(parseEncryptedNotification(alarm!.content)).toMatchObject({ vaultId: bundle.vaultId, reminderId: 'r1' });
 	const scoped = await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' });
 	expect(await scoped!.json()).toMatchObject({ encryption: { scope: { id: bundle.scopes[0]!.id } } });
-	expect(await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' }))!.text()).not.toContain('recovery');
+	expect(await (await handleEncryptionRoute(new Request('https://test/encryption'), env.DB, '/encryption', { tokenId: 'web', scope: 'reminders', folderPath: 'Reminders' }))!.text()).not.toContain(bundle.vault.secret);
 });
 
 it('rejects an in-flight plaintext publication whose SQL was prepared before encryption began', async () => {
@@ -133,7 +133,7 @@ it('resumes an R2 replacement before D1 reconciliation and protects retained his
 });
 
 it('fences old clients and keeps scoped sessions away from vault keys, history and sibling files', async () => {
-	const { bundle } = await configure();
+	const { bundle, state } = await configure();
 	for (const [id, scope, folder] of [['root', 'vault', null], ['web', 'reminders', 'Reminders']] as const) await env.DB.prepare('INSERT INTO auth_tokens(id, token_hash, scope, folder_path) VALUES (?, ?, ?, ?)').bind(id, await sha256Hex(id), scope, folder).run();
 	const request = (path: string, token: string, encrypted = true, protocol = '2') => worker.fetch(new Request(`https://test${path}`, { headers: {
 		Authorization: `Bearer ${token}`, 'X-Crate-Protocol': protocol, ...(encrypted ? { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) } : {}),
@@ -144,7 +144,11 @@ it('fences old clients and keeps scoped sessions away from vault keys, history a
 	expect((await request('/sync/versions', 'web')).status).toBe(403);
 	expect((await request('/reminders/encrypted-files?folderPath=Private', 'web')).status).toBe(403);
 	const publicScope = await (await request('/encryption', 'web')).text();
-	expect(publicScope).not.toContain(bundle.vault.id); expect(publicScope).not.toContain('recovery');
+	expect(publicScope).not.toContain(bundle.vault.id); expect(publicScope).not.toContain(bundle.vault.secret);
+	expect(JSON.parse(publicScope)).toMatchObject({ encryption: { recovery: state.recovery } });
+	expect((await request('/encryption', 'invalid')).status).toBe(401);
+	expect((await request('/sync/manifest', 'web')).status).toBe(403);
+	expect((await request('/settings', 'web')).status).toBe(403);
 	expect((await request('/reminders/encrypted-files?folderPath=Reminders', 'web')).status).toBe(200);
 });
 

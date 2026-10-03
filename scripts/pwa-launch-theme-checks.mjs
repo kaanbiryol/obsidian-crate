@@ -54,8 +54,10 @@ export async function checkReadingOpening(browser, origin) {
    await expect(page.locator('.pwa-launch-splash [data-icon="settings"]')).toBeVisible();
    await expect(page.locator('.crate-content-loading')).toHaveCount(1);
    const initial = await loadingChrome(page, '.crate-content-loading'), dock = await dockAppearance(page);
+   const staticSplash = await page.locator('.pwa-launch-splash').elementHandle();
    app.resolve();
-   await expect(page.locator('.crate-feature-shell .pwa-reading-opening')).toBeVisible();
+   await expect.poll(() => staticSplash.evaluate(node => node.isConnected)).toBe(false);
+   await expect(page.locator('.pwa-reading-opening')).toBeVisible();
    expect(await loadingChrome(page, '.crate-content-loading')).toEqual(initial);
    expect(await dockAppearance(page)).toEqual(dock);
    expect(errors).toEqual([]);
@@ -142,8 +144,10 @@ export async function checkLaunchThemes(browser, origin) {
    await expect(page.locator('.pwa-dock svg:visible')).toHaveCount(6);
    const launchDock = await dockAppearance(page);
    const launchChrome = await loadingChrome(page);
+   const staticSplash = await page.locator('.pwa-launch-splash').elementHandle();
    app.resolve();
-   await expect(page.locator('.crate-feature-shell .pwa-launch-splash')).toBeVisible();
+   await expect.poll(() => staticSplash.evaluate(node => node.isConnected)).toBe(false);
+   await expect(page.locator('.pwa-launch-splash')).toBeVisible();
    expect(await loadingChrome(page)).toEqual(launchChrome);
    await page.evaluate(() => window.__releaseOpeningBootstrap());
    enrollment.resolve();

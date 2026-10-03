@@ -98,7 +98,10 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 it('allows scoped encryption discovery but rejects plaintext saves and sibling-folder access', async () => {
   const h = await setup();
   const response = await worker.fetch(new Request('https://test/reading/encryption', { headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '2' } }), env);
-  expect(response.status).toBe(200); const metadata = await response.text(); expect(metadata).not.toContain(h.bundle.vault.id); expect(metadata).not.toContain('recovery');
+  expect(response.status).toBe(200); const metadata = await response.text(); expect(metadata).not.toContain(h.bundle.vault.id); expect(metadata).not.toContain(h.bundle.vault.secret);
+  expect(JSON.parse(metadata)).toMatchObject({ encryption: { recovery: h.state.recovery } });
+  expect((await h.request('/sync/manifest')).status).toBe(403);
+  expect((await h.request('/settings')).status).toBe(403);
   expect((await h.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example' }))).status).toBe(428);
   expect((await h.request('/reading/encrypted-files?folderPath=Reminders')).status).toBe(403);
   expect((await h.request('/reminders/encrypted-files?folderPath=Reminders')).status).toBe(403);

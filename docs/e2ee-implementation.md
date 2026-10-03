@@ -10,13 +10,50 @@ Crate can encrypt synced content on the client before it reaches either a Cloudf
 2. Open **Crate settings → Sync → End-to-end encryption**. The row checks the server and shows **Off → Enable encryption**, **On → Manage encryption**, or **Converting… → Resume conversion**. Select **Enable encryption** to start. If the status is unavailable, select **Retry**; a failed check never means encryption is off. A saved reset or folder move offers its own resume action.
 3. Select **Copy**, save the recovery key outside your vault, and check **I’ve saved this key somewhere safe outside my vault.** Then select **Enable encryption**. An empty remote activates encryption without uploading local files. An existing remote converts its files and retained history; unsynced local changes wait for the next encrypted sync. Setup preserves the automatic-sync setting and does not force a normal sync. The dialog replaces the key form with conversion progress, shows acknowledged files/versions against the remaining total when supported by the server, and uses indeterminate progress for settings and cleanup. The completion screen explains manual or automatic sync and how to unlock web apps. Retry continues interrupted work with the same recovery key. Crate verifies that the generated key restores every vault, folder, and notification key before showing setup; copying does not check the acknowledgment or start conversion. There is no required paste-back step. Expand **What changes with encryption?** for conversion details, and keep Obsidian open while conversion runs. If interrupted, select **Resume conversion** in settings, acknowledge the saved key, and select **Resume conversion** in the dialog. A missing or damaged local key prompts you to restore your saved copy first.
 4. On another Obsidian device, connect to the server, open **Manage encryption**, and enter the recovery key.
-5. Reopen each connected web app after conversion. If its session is still valid, unlock it with the **Web app key** from **Manage encryption**. One paste unlocks the configured Reading and Reminders folders in that browser or installed app. Reminders shows **This device is locked**; Reading shows **Unlock Reading**. Reading and Reminders keep separate encryption keys internally; the web app code bundles their folder grants without the full-vault key. Alternatively, open a fresh setup link, which includes the folder keys in its URL fragment; the app removes them from the address during startup. An installed iPhone app may use separate storage from Safari, so unlock that app too if prompted. No reinstall is needed. An expired or revoked session needs a fresh setup link; an encryption code alone does not restore server access.
+5. Reopen each connected web app after conversion. Select **Connect with Obsidian**, then open **Crate settings → Sync → Manage encryption → Connect web app** on an unlocked Obsidian device. Compare all three numbers on the two screens and select **Approve** in Obsidian only if they match. Then select **Confirm and unlock** in the app after checking the same code. This unlocks the configured Reading and Reminders folders. The app remembers their keys as non-extractable CryptoKeys; it receives neither the recovery code nor full-vault key through pairing. **Use recovery key instead** remains available when an unlocked Obsidian device is unavailable.
 
-To test manual unlock after encryption is already enabled, select **Connect another device → Copy link** and use a fresh private browser window. Before opening the copied link, remove only its `crateKey` and `crateReadingKey` fragment parameters, leaving authentication parameters intact (including `reading`, if present). The app can sign in but must ask for its web app key. Paste the web app key and verify that both connected features open, then reload to check that the key is remembered. Use a fresh setup link for each new test session; do not log out of or clear storage in an app with unsynced work just to force this screen.
+Safari and the installed iPhone app have separate key storage. After **Install Crate**, open the Home Screen app and confirm the matching code on both devices; no copying or reinstall is needed. An established app whose keys are missing can pair again without deleting pending work. Storage and conversion failures retain their specific errors. An expired or revoked server session still requires a fresh setup link; encryption pairing does not issue a login credential. Fresh setup links can also unlock the browser through their recovery-code fragment, which is removed during startup.
 
-**Manage encryption** shows **Encryption on** and **Unlocked on this device**, with copy actions for the recovery key and web app key. Open **Advanced → Check recovery key** to verify your saved copy again. The PWA's **Settings → Encryption** reports Reading and Reminders separately, including their unlocked folders and Reminders notification keys; push permission and delivery status remain in **Notifications**. During conversion, the PWA explains how to resume in Obsidian. Missing or damaged keys lead to the unlock flow without deleting pending work.
+To test manual unlock after encryption is already enabled, select **Connect another device → Copy link** and use a fresh private browser window. Before opening the copied link, remove only its `crateKey` and `crateReadingKey` fragment parameters, leaving authentication parameters intact (including `reading`, if present). The app can sign in but remains locked. Select **Use recovery key instead**, paste the recovery key and verify that both connected features open, then reload to check that the key is remembered. Use a fresh setup link for each new test session; do not log out of or clear storage in an app with unsynced work just to force this screen.
 
-The recovery key unlocks the complete synced vault. A folder key unlocks complete notes and attachments inside its enrolled Reading or Reminders folder, including text outside reminder lines. The web app code grants access to both included folders, so sharing it shares access to both; it never includes the full-vault key. Authentication credentials are independent of decryption keys. Losing all enrolled keys and the recovery key makes remote content unrecoverable.
+**Manage encryption** shows **Encryption on** and **Unlocked on this device**, with **Connect web app → Connect** for approval and **Recovery key → Copy** for recovery and other Obsidian devices. Open **Advanced → Check recovery key** to verify your saved copy again. The PWA's **Settings → Encryption** reports Reading and Reminders separately, including their unlocked folders and Reminders notification keys; push permission and delivery status remain in **Notifications**. During conversion, the PWA explains how to resume in Obsidian. Missing or damaged keys lead to the unlock flow without deleting pending work.
+
+The recovery key unlocks the complete synced vault. A folder key unlocks complete notes and attachments inside its enrolled Reading or Reminders folder, including text outside reminder lines. The recovery code gives the web app access to the full encrypted key bundle during unlock. Treat the PWA as a trusted client: malicious code served by its origin could capture that code. Server credentials remain limited to the connected Reading and Reminders features and cannot call vault sync or administration routes. Authentication credentials are independent of decryption keys. Losing all enrolled keys and the recovery key makes remote content unrecoverable.
+
+## App approval protocol
+
+The server advertises `web-pairing-v1`. This flow uses WebCrypto ECDH P-256,
+HKDF-SHA256 and AES-256-GCM. The requester commits to its ephemeral public key
+and request context before seeing the responder key. It pins the responder key
+before revealing its own; the responder verifies that reveal against the
+commitment. Both derive the same three four-digit comparison groups (39 bits).
+The key and comparison code use different HKDF labels. AES-GCM authenticates
+the complete transcript, including origin, request ID, vault, generation, scope,
+commitment and both public keys. Private ephemeral keys remain in memory and
+are never exportable. Reloading either pairing screen requires a new attempt.
+
+Only the explicit **Approve** action seals the configured browser grants.
+The recipient requires its own explicit code confirmation, then validates grant identity and its authenticated folder binding
+before storing keys. Import preserves existing wrapped local secrets for drafts
+and queued changes. Changing the connection or closing the screen fences pending
+imports. The relay sees public handshake data and ciphertext. It cannot decrypt
+the packet by itself. Both confirmations are required: a packet claiming approval is not proof of an Obsidian peer. Without recipient confirmation, a malicious relay could invent keys and a matching public configuration for future writes. The human comparison detects a relay that
+substitutes handshake keys; never approve different codes or an unsolicited app.
+
+Requests expire after five minutes. The server retains at most three attempts
+per app per five-minute window and 32 across the server, including cancelled
+attempts until their expiry. Polls do not mutate pairing records. Conditional
+writes restrict each step to its actor and current vault generation. Finish and
+cancel remove the encrypted packet; periodic maintenance and new attempts prune
+expired records. Polling runs only while a pairing screen is open and visible.
+The same Worker route runs on Cloudflare and self-hosted deployments without a
+new table or binding.
+
+The commitment and decimal comparison follow the design principles described
+in [Matrix SAS verification](https://spec.matrix.org/v1.17/client-server-api/#short-authentication-string-sas-verification).
+This is a Crate-specific protocol, not Matrix wire compatibility or an independent
+security review. Approval does not protect against malicious code already running
+in the PWA or Obsidian. A compromised origin can replace the client itself.
 
 ## Turn encryption off
 
@@ -49,7 +86,7 @@ A PWA trusts the JavaScript served by its origin. Non-extractable keys do not pr
 ## Implementation
 
 - JWE uses `jose` with A256KW key wrapping and A256GCM content encryption. Each envelope has a fresh content key. Protected headers bind vault, scope, object, purpose and key identity. Unknown formats and mismatched contexts fail closed.
-- Independent random 256-bit vault, folder and notification keys keep PWA grants narrow. A random 256-bit recovery code encrypts the full key bundle. Plugin keys use Obsidian secret storage, scoped to the connected deployment.
+- Independent random 256-bit vault, folder and notification keys separate content and notification encryption. A random 256-bit recovery code encrypts the full key bundle. Plugin keys use Obsidian secret storage, scoped to the connected deployment.
 - Files use `CRATE-E2EE/1` framing. Authenticated private metadata contains path, original hash, size, content type and a digest of public scheduling data. Conversion verifies the original hash and size before interpreting interrupted ciphertext; ordinary files may start with the encryption framing prefix. Transport hashes identify ciphertext; sync planning and merge bases use verified plaintext hashes.
 - Encrypted upload journals and PWA attempts persist exact ciphertext before dispatch. Lost-response retries reuse those bytes and operation IDs. File preconditions and atomic two-note moves preserve concurrent-edit safety. Converted receipts settle operations accepted before conversion without sending their plaintext again. Large encrypted responses use 512 KiB D1 chunks in the same transaction as their parent receipt and file changes, preserving exact retries without exceeding the D1 row limit. Cleanup reclaims chunks only after the parent receipt is gone.
 - Browser cleanup removes only acknowledged attempts outside the server's 180-day retry window, with no pending outbox reference from any session. It skips deletion while this tab has editor drafts, preserves uncertain, rejected, damaged and unknown-format entries, and touches only the unlocked vault/folder. Batches of at most 100 run under the outbox Web Lock and stop when session authority changes. Storage failures do not block normal use.

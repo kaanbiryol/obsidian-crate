@@ -49,7 +49,7 @@ html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
 <link rel="icon" type="image/png" sizes="256x256" href="/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}">
 <title>Crate</title>
-${PWA_STARTUP_ASSETS.filter(name => name !== 'app.js').map(name => `<link rel="modulepreload" href="/notifications/assets/${name}">`).join('\n')}
+${PWA_STARTUP_ASSETS.filter(name => name !== 'app.js').map(name => `<link nonce="${nonce}" rel="modulepreload" href="/notifications/assets/${name}">`).join('\n')}
 <style>
 ${PWA_STYLES}
 </style>
@@ -62,7 +62,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<div id="pwa-update-transition" role="status" aria-live="polite">${updateScreenHtml}</div>
 	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate">${createPwaOpeningScreenHtml()}</div></div>
 	<script nonce="${nonce}" id="pwa-opening-screen-init">${PWA_OPENING_SCREEN_INIT_JS}</script>
-	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
+	<script nonce="${nonce}" type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;
 }

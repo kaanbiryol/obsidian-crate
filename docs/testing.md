@@ -687,7 +687,52 @@ check retains wrong-key, edit and stale-result coverage.
 
 - `reading-encryption.integration.ts` covers ciphertext-only capture/edit/replay, folder isolation, blocked plaintext paths, queued captures, converted receipts and adding a scope to an already encrypted vault after a lost conversion response.
 - `encryption-reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
-- `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. Use `CRATE_TEST_BROWSER=webkit` for WebKit.
+- `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
+- `node scripts/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
 - `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic legacy migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
-- `node scripts/pwa-web-app-unlock-test.mjs`: combined Reading/Reminders unlock in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
+- `node scripts/pwa-web-app-unlock-test.mjs`: shared recovery-key unlock for Reading/Reminders in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
 - Native iOS Shortcut signing/import and physical iOS/Android offline/push delivery remain manual acceptance. Test encrypted Android after reinstalling its changed manifest. Hosted quota validation must use an explicitly budgeted disposable deployment; do not run local test fixtures against hosted D1.
+
+## Encrypted iPhone onboarding
+
+`node scripts/pwa-encryption-onboarding-test.mjs` checks the production PWA against fixture HTTP responses in Chromium and WebKit: Safari installation guidance, isolated installed-app storage, Reading and Reminders first unlock, wrong-key feedback, pending controls, remembered keys after reload, recovery after key loss, desktop copy and a 320px viewport. These contexts model iOS storage separation; physical Add to Home Screen and background push still require device acceptance.
+
+Mobile setup links first offer **Continue to web** and **Install Crate**. The
+script verifies that installation instructions leave vault screens unmounted,
+reload keeps the choice, continuing opens the browser app and remembers that
+choice, iOS/Android guidance differs, and standalone launches skip the chooser.
+
+The same script starts each destination with one app credential and verifies that
+one unlock opens both sections. It simulates offline API failures while serving
+app assets, restores an encrypted Reading draft after reload, and expires an
+encrypted Reading data request to verify app-wide reconnect without deleting the
+draft. `pwa-sync-coordinator-test.mjs` also covers independent background delivery,
+feature failures and shared logout before delayed/failed remote revocation.
+
+### Copy-free encrypted app approval
+
+`node scripts/pwa-pairing-test.mjs` runs the production PWA and approval modal in
+separate Chromium/WebKit contexts with real WebCrypto and native IndexedDB. The Obsidian DOM host and HTTP relay are fixtures; service workers are blocked
+so requests stay in that fixture. The full encryption suites cover the real worker. It checks both feature entry
+points, matching codes, no key persistence until both sides confirm (even after receiving a packet), no plaintext secrets in requests,
+cancellation, expiry/restart, transient retry, both scopes, non-extractable stored
+keys, reload and 320px light/dark layouts. It runs in `test:pwa-browser`.
+
+Worker `encryption-pairing.integration.ts` checks the actual authenticated relay
+with local D1, including Reading scope checks, concurrent claims, replay,
+cancellation, expiry, revocation, conversion/reset fences and attempt limits.
+`encryption/pairing/protocol.test.ts`, `plugin/web-app-pairing.test.ts`, and
+`pwa/web-app-unlock.test.ts` cover cryptographic binding, vault/session guards,
+limited grants and storage validation. These tests write no hosted D1 rows.
+
+On a physical iPhone, install from Safari, open the Home Screen app, select
+**Connect with Obsidian**, compare the codes in **Manage encryption → Connect web
+app**, and approve. Select **Confirm and unlock** in the app after comparing its code. Verify both sections and relaunch. Repeat after backgrounding
+either screen and after a network interruption. Desktop WebKit does not establish
+native installation, storage-eviction or background-push acceptance.
+
+The full Reading/Reminders encryption browser suites retain real service workers
+and native storage. Their headless WebKit context disables the native push manager:
+`getSubscription()` freezes the page on the current macOS test host, reproducible
+on an empty page without Crate. Chromium keeps its native provider. These suites
+do not establish physical-device push acceptance.

@@ -5,7 +5,7 @@ import { chromium, webkit } from '@playwright/test';
 
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/web-app-key';
+
 export * from './src/pwa/reading/storage';
 export * from './src/pwa/reading/encryption-session';
 export * from './src/pwa/reading/encryption-lifecycle';
@@ -24,12 +24,13 @@ for (const engine of [chromium, webkit]) {
     const result = await page.evaluate(async () => {
       const t = readingEncryption;
       const bundle = t.addReminderScope(t.createVaultKeyBundle(), 'Reading', 'reading'), scope = bundle.scopes[0];
+      const recovery = await t.generateRecoveryCode();
       const session = { id: 'reader', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 100000 };
       localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
-      const state = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active', scope: { id: scope.id, folderPath: scope.folderPath, keyId: scope.data.id, notificationKeyId: scope.notifications.id, purpose: 'reading' } };
+      const state = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active', recovery: await t.sealRecoveryBundle(bundle, recovery), scope: { id: scope.id, folderPath: scope.folderPath, keyId: scope.data.id, notificationKeyId: scope.notifications.id, purpose: 'reading' } };
       window.fetch = async path => Response.json(String(path).startsWith('/reading/encrypted-files')
         ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state });
-      location.hash = 'crateReadingKey=' + encodeURIComponent(t.encodeWebAppKey([t.createReminderKeyGrant(bundle, 'Reading')]));
+      location.hash = 'crateReadingKey=' + encodeURIComponent(recovery);
       t.consumeReadingKeyFragment();
       const db = await t.readingDatabase();
       const original = { url: 'https://private.example/draft' };

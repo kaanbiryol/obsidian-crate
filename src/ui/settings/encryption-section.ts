@@ -3,7 +3,7 @@ import type CratePlugin from '../../main';
 import { SharedModal } from '../shared/SharedModal';
 import { SECRET_KEYS } from '../../plugin/settings-types';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../../plugin/encryption-storage';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, createReminderKeyGrant, type VaultKeyBundle } from '../../encryption/key-bundle';
+import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
 import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../sync/encryption-conversion';
 import { isReadingScopeExtension, READING_ENCRYPTION_CAPABILITY, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
@@ -16,7 +16,7 @@ import { verifyRecoveryCode } from '../../encryption/recovery-verification';
 import { resumeEncryptedFolderMoves, useServerEncryptionFolders } from '../../plugin/encryption-folder-moves';
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
-import { encodeWebAppKey } from '../../encryption/web-app-key';
+import { WebAppPairingModal } from './web-app-pairing-modal';
 
 function encryptionModalTitle(state: EncryptionServerState | null): string {
 	return state?.mode === 'converting' ? 'Resume encryption' : state ? 'Manage encryption' : 'Enable encryption';
@@ -212,7 +212,7 @@ class EncryptionModal extends SharedModal {
 		new Setting(devices).setName('Notification keys').setDesc(!keys ? 'Unavailable until this device is unlocked.'
 			: !scope ? 'This reminders folder was not included in encryption setup. Select an enrolled folder in Reminders settings.'
 			: state.mode === 'converting' ? 'Saved · notifications resume after conversion.'
-			: 'Ready for enrollment · each web app needs its web app key and notification permission.');
+			: 'Ready for enrollment · web apps use the same recovery key and need notification permission.');
 		return vault;
 	}
 	private recover(state: EncryptionServerState): void {
@@ -233,7 +233,7 @@ class EncryptionModal extends SharedModal {
 	}
 	private ready(keys: VaultKeyBundle, state: EncryptionServerState): void {
     if (!state.scopes.some(scope => scope.folderPath === this.plugin.settings.reading.folderPath && scope.purpose === 'reading')) {
-      new Setting(this.bodyEl).setName('Encrypt reading for the web app').setDesc('Add a separate reading folder key and convert its retained notes. Sync pauses during conversion. Reconnect web app devices afterward.').addButton(button => button.setButtonText('Add encrypted reading').onClick(async () => {
+      new Setting(this.bodyEl).setName('Encrypt reading for the web app').setDesc('Encrypt your reading folder and its retained notes using your existing recovery key. Sync pauses during setup.').addButton(button => button.setButtonText('Add encrypted reading').onClick(async () => {
         button.setDisabled(true);
         const progress = this.bodyEl.createEl('p', { attr: { role: 'status' } });
         try {
@@ -250,25 +250,17 @@ class EncryptionModal extends SharedModal {
         finally { button.setDisabled(false); this.onChanged(); }
       }));
     }
-		const webScopes = keys.scopes.filter(scope => scope.purpose === 'reading'
-			? scope.folderPath === this.plugin.settings.reading.folderPath : scope.folderPath === this.plugin.remindersSettings.remindersFolderPath);
-		const features = webScopes.map(scope => scope.purpose === 'reading' ? 'Reading' : 'Reminders').sort().join(' and ');
 		this.disposeContent = renderEncryptionManagement(this.bodyEl, {
-			webAppDescription: features ? `Unlock ${features} with one code.` : 'No configured web app folder is enrolled.',
+      connectApp: () => { this.assertCurrentConnection(); this.close(); new WebAppPairingModal(this.plugin).open(); },
 			copyRecovery: async () => {
 				this.assertCurrentConnection();
 				const recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
 				if (!recovery) throw new Error('This device does not have a saved recovery key. Keep your original saved copy.');
 				await navigator.clipboard.writeText(recovery);
 			},
-			copyWebApp: async () => {
-				this.assertCurrentConnection();
-				if (!webScopes.length) throw new Error('Select an enrolled Reading or Reminders folder first.');
-				await navigator.clipboard.writeText(encodeWebAppKey(webScopes.map(scope => createReminderKeyGrant(keys, scope.folderPath))));
-			},
 			turnOff: () => { this.close(); new EncryptionResetModal(this.plugin, state, this.onChanged).open(); },
 			advanced: container => {
-				container.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep both codes private. The recovery key unlocks your synced vault; the web app key unlocks only the included folders. Notification text is encrypted too.' });
+				container.createEl('p', { cls: 'crate-encryption-intro', text: 'Keep this key private. It unlocks your synced vault on Obsidian devices and in the web app. Notification text is encrypted too.' });
 				const verify = container.createEl('details', { cls: 'crate-encryption-details' });
 				verify.createEl('summary', { text: 'Check recovery key' });
 				const verification = renderRecoveryVerification(verify, state.recovery, keys, () => {}, () => this.assertCurrentConnection());

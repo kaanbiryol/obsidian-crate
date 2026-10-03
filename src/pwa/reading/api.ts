@@ -1,3 +1,4 @@
+import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
 import { EncryptedReadingApi } from '@/reading/encrypted-api';
@@ -21,6 +22,7 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
     headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } });
   const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string; code?: string };
   if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) return readingSession();
+  if (response.status === 401) reportExpiredConnection(token);
   if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status, data.code);
   if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
     || typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
@@ -42,6 +44,10 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
   const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),
     headers: { ...(session ? { Authorization: `Bearer ${session.token}`, ...readingEncryptionHeaders() } : {}), 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) }, body });
   if (session) assertReadingSession(session);
+  if (session && response.status === 401) {
+    reportExpiredConnection(session.token);
+    throw new ReadingApiError(SESSION_RECOVERY_MESSAGE, 401);
+  }
   if (response.status === 428 && path !== '/reading/encryption') throw new EncryptionScopeChangedError('The encrypted Reading folder changed.');
   return response;
 }

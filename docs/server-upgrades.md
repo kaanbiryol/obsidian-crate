@@ -62,7 +62,7 @@ Choose the next public revision once in `src/cloudflare/server-release.json`. Bu
 CRATE_DEV_WORKER=crate-0123456789abcdef npm run build:dev
 ```
 
-Replace the example name with your development Worker's name. To save it for future builds, add `CRATE_DEV_WORKER=crate-0123456789abcdef` (with your actual Worker name) to the ignored `.env.development.local` file. `npm run dev`, `npm run build:dev`, and `npm run build:worker:dev` read this setting; a shell value takes precedence. The watcher rebuilds when environment files change. The existing development-vault configuration controls where the plugin is copied. Reload the plugin and select **Check for updates**. Once the live build comparison confirms an upgrade, the action becomes **Update server**. The bundled and live version displays include labels such as `3-dev.1` and `3-dev.2`.
+Replace the example name with your development Worker's name. To save it for future builds, add `CRATE_DEV_WORKER=crate-0123456789abcdef` (with your actual Worker name) to the ignored `.env.development.local` file. `npm run dev`, `npm run build:dev`, and `npm run build:worker:dev` read this setting; a shell value takes precedence. The watcher rebuilds when environment files change. The existing development-vault configuration controls where the plugin is copied. Reload the plugin and open Crate settings. The update notice automatically compares the live build when needed, then offers **Update server**. **Check for updates** remains available to retry an unsuccessful check. The bundled and live version displays include labels such as `3-dev.1` and `3-dev.2`.
 
 The ignored root file `server-development.local.json` holds a readable version such as `{ "version": "1-dev.2" }`. Each development Worker build increments it automatically; it can also be edited locally without committing it. A new public revision starts its own development sequence at 1. Stable builds leave this file untouched. Keep it across builds, including when cleaning `.generated/`. If it is lost or you change computers, set its version to at least the last deployed development build for the current public revision before rebuilding. Concurrent builds should use separate checkouts. A reused number with different bytes and older build numbers are rejected.
 
@@ -83,15 +83,19 @@ is not enabled by this compatibility export.
 ## Saved revision in plugin settings
 
 The plugin saves `cloudflareDeployment.lastKnownRevision` in its local settings
-only after a verified deployment, completed recovery, or explicit live version
-check. Update notices show this as **Last known server revision** without fetching
-the server when settings open. Existing installations without this field can use
-**Check live server** once or complete an update to populate it. Cached revisions
+only after a verified deployment, completed recovery, or successful live version
+check. The startup notice uses the saved artifact fingerprint to suggest reviewing
+an update. In settings, the update row automatically checks the server when its
+saved revision is missing or equal to the bundled revision. Successful checks
+populate the saved revision; opening the separate server details alone does not
+start a request. Cached revisions
 are informational; deployment verification and update authorization still inspect
 the live server.
 
-Settings distinguish a newer revision from a fingerprint mismatch. Equal saved and bundled revisions prompt a live check before reporting a build mismatch. Missing saved
-revision metadata prompts a manual live check. Matching stable revision numbers
+Settings distinguish a newer revision from a fingerprint mismatch. A recent live
+result is reused for 30 seconds for the same client, server address and deployment
+identity, so reopening settings does not require another check. Failed checks
+offer a manual retry. Matching stable revision numbers
 with different builds require a higher server revision. For a development server,
 a live check can enable a newer development build or promotion to stable within
 the same revision; the database and deployment fence recheck eligibility before

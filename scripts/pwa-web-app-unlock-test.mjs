@@ -5,7 +5,7 @@ import { chromium, webkit } from '@playwright/test';
 
 const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
-export * from './src/encryption/web-app-key';
+
 export * from './src/pwa/web-app-unlock';
 export * from './src/pwa/encryption-keys';
 export { AUTH_TOKEN_KEY, saveConfig } from './src/pwa/config';
@@ -25,14 +25,14 @@ for (const engine of [chromium, webkit]) {
         const bundle = t.addReminderScope(t.addReminderScope(t.createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
         const grants = ['Reminders', 'Reading'].map(folder => t.createReminderKeyGrant(bundle, folder));
         const scope = grants.find(grant => grant.scope.folderPath === primary).scope;
-        const expected = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active',
+        const code = await t.generateRecoveryCode();
+        const expected = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation, mode: 'active', recovery: await t.sealRecoveryBundle(bundle, code),
           scope: { id: scope.id, folderPath: scope.folderPath, purpose: scope.purpose, keyId: scope.data.id, notificationKeyId: scope.notifications.id } };
         localStorage.setItem(t.AUTH_TOKEN_KEY, 'reminder-session');
         t.saveConfig({ folderPath: 'Old reminders', upcomingDays: 7, allDayNotificationTime: null });
         localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify({ token: 'reader-token', id: 'reader', folderPath: 'Old reading', generation: 'policy', expiresAt: Date.now() + 100000 }));
-        const code = t.encodeWebAppKey(grants);
         let rejected = false;
-        try { await t.rememberWebAppKey(code, { ...expected, vaultId: crypto.randomUUID() }, primary, () => true); } catch { rejected = true; }
+        try { await t.rememberRecoveryKey(code, { ...expected, vaultId: crypto.randomUUID() }, primary, () => true); } catch { rejected = true; }
         if (!rejected || (await t.exportWrappedLocalKeys()).length) throw new Error('Wrong-vault code was persisted');
         const originalImport = SubtleCrypto.prototype.importKey;
         let changed = false;
@@ -41,11 +41,11 @@ for (const engine of [chromium, webkit]) {
           return originalImport.apply(this, args);
         };
         rejected = false;
-        try { await t.rememberWebAppKey(code, expected, primary, () => true); } catch { rejected = true; }
+        try { await t.rememberRecoveryKey(code, expected, primary, () => true); } catch { rejected = true; }
         finally { SubtleCrypto.prototype.importKey = originalImport; }
         if (!changed || !rejected || (await t.exportWrappedLocalKeys()).length) throw new Error('Stale unlock persisted keys');
 
-        await t.rememberWebAppKey(code, expected, primary === 'Reading' ? 'Old reading' : 'Old reminders', () => true);
+        await t.rememberRecoveryKey(code, expected, primary === 'Reading' ? 'Old reading' : 'Old reminders', () => true);
         for (const grant of grants) {
           const keys = await t.readReminderKeys(bundle.vaultId, grant.scope.id);
           if (keys.data.key.extractable || keys.notifications.key.extractable || keys.notificationFingerprint.extractable || keys.data.secret) throw new Error('Raw key persisted');
@@ -55,8 +55,8 @@ for (const engine of [chromium, webkit]) {
           cipher.destroy();
         }
         // Recovering either feature must retain the same wrapped local draft keys.
-        await t.rememberWebAppKey(code, expected, primary === 'Reading' ? 'Old reading' : 'Old reminders', () => true);
-        if (Object.values(localStorage).some(value => value.includes('Private draft') || value.includes('crate-web-key'))) throw new Error('Unlock leaked code or plaintext');
+        await t.rememberRecoveryKey(code, expected, primary === 'Reading' ? 'Old reading' : 'Old reminders', () => true);
+        if (Object.values(localStorage).some(value => value.includes('Private draft') || value.includes('crate-recovery-v1.'))) throw new Error('Unlock leaked code or plaintext');
         return grants.map(grant => ({ vaultId: grant.vaultId, scopeId: grant.scope.id }));
       }, primary);
       await page.reload();

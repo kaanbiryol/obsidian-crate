@@ -60,11 +60,9 @@ const { outputFiles } = await build({
       window.unmountHeader = mountModalHeader(content.createDiv({cls:'crate-modal-header-host'}),'Manage encryption',()=>{});
       const body = content.createDiv({cls:'crate-modal-body'});
       window.disposeContent = renderEncryptionManagement(body, {
-        webAppDescription:'Unlock Reading and Reminders with one code.',
-        copyRecovery:async()=>{throw new Error('Clipboard unavailable');},
-        copyWebApp:()=>new Promise(resolve=>{window.finishCopy=resolve;}),
-        turnOff:()=>{window.resetOpened=true;},
-        advanced:container=>{container.createEl('p',{text:'Keep both codes private.'}); return ()=>{};},
+        copyRecovery:()=>window.copyFailed?Promise.reject(new Error('Clipboard unavailable')):new Promise(resolve=>{window.finishCopy=resolve;}),
+        turnOff:()=>{window.resetOpened=true;}, connectApp:()=>{window.connectOpened=true;},
+        advanced:container=>{container.createEl('p',{text:'Keep your recovery key private.'}); return ()=>{};},
       });
     };
 
@@ -140,8 +138,8 @@ for (const browserType of [chromium,webkit]) {
       assert.deepEqual(await page.locator('.crate-encryption-footer').boundingBox(),footerBefore,'Footer must stay in place');
       await expect(page.locator('.crate-modal-body')).toHaveAttribute('aria-busy','false');
       const outputKey = page.getByLabel('Recovery key',{exact:true});
-      const saved = page.getByRole('checkbox',{name:'I’ve saved this key somewhere safe outside my vault.',exact:true});
-      const copy = page.getByRole('button',{name:'Copy',exact:true});
+      const saved = page.getByRole('checkbox',{name:'I’ve saved it outside my vault.',exact:true});
+      const copy = page.locator('.crate-encryption-key__header').getByRole('button');
       const convert = page.getByRole('button',{name:'Enable encryption',exact:true});
       const details = page.locator('.crate-encryption-details');
       const footer = page.locator('.crate-encryption-footer');
@@ -158,6 +156,9 @@ for (const browserType of [chromium,webkit]) {
       await expect(saved).not.toBeChecked();
       await expect(page.getByLabel('Saved recovery key',{exact:true})).toHaveCount(0);
       await expect(details).not.toHaveAttribute('open');
+      await expect(content).toContainText('Save a copy outside your vault.');
+      await expect(outputKey).toHaveAccessibleDescription('Crate cannot recover a lost key.');
+      assert.equal(await content.evaluate(el=>el.scrollHeight>el.clientHeight+1),false,'Setup fits without scrolling until details are opened');
       await expect(outputKey).toHaveJSProperty('readOnly',true);
       await expect(outputKey).not.toHaveAttribute('aria-label'); // Avoid Obsidian's automatic hover tooltip.
       assert.ok(await outputKey.evaluate(el=>el.scrollHeight<=el.clientHeight+1),'The complete recovery key must fit without scrolling');
@@ -188,6 +189,10 @@ for (const browserType of [chromium,webkit]) {
       await page.evaluate(()=>{navigator.clipboard.writeText=async value=>{window.copied=value;};});
       await copy.click();
       assert.equal(await page.evaluate(()=>window.copied),recovery);
+      await expect(copy).toHaveText('Copied');
+      await expect(content).not.toContainText('Clipboard access is unavailable');
+      assert.deepEqual(await copy.boundingBox(),copyBounds,'Copy feedback must not shift the key row');
+      assert.deepEqual(await saved.boundingBox(),checkboxBounds,'Copy feedback must not shift the confirmation');
       await expect(convert).toBeDisabled();
       await expect(saved).not.toBeChecked();
       await saved.check(); await expect(convert).toBeEnabled();
@@ -242,12 +247,10 @@ for (const browserType of [chromium,webkit]) {
       await expect(page.locator('.crate-modal-body')).toContainText('Encryption on');
       const advanced = page.locator('.crate-encryption-manage__advanced');
       await expect(advanced).not.toHaveAttribute('open');
-      const webRow = page.locator('.setting-item').filter({has:page.locator('.setting-item-name',{hasText:'Web app key'})});
       const recoveryRow = page.locator('.setting-item').filter({has:page.locator('.setting-item-name',{hasText:'Recovery key'})});
-      const webCopy = webRow.getByRole('button',{name:'Copy',exact:true});
       const recoveryCopy = recoveryRow.getByRole('button',{name:'Copy',exact:true});
       const turnOff = page.getByRole('button',{name:'Turn off',exact:true});
-      for (const button of [webCopy,recoveryCopy,turnOff]) {
+      for (const button of [recoveryCopy,turnOff]) {
         await expect(button).toBeInViewport();
         if (width<700) assert.ok((await button.boundingBox()).height>=44);
       }
@@ -255,10 +258,10 @@ for (const browserType of [chromium,webkit]) {
       assert.equal(await page.locator('.crate-modal-body').evaluate(el=>el.scrollHeight>el.clientHeight+1),false,'Management actions fit without scrolling: '+JSON.stringify(await page.locator('.crate-modal-body').evaluate(el=>({height:el.clientHeight,scroll:el.scrollHeight,children:[...el.children].map(child=>({text:child.textContent,height:child.getBoundingClientRect().height,margin:getComputedStyle(child).margin}))}))));
       assert.equal(await page.locator('.crate-modal-body').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
       await page.screenshot({path:`${output}/${hostName}${browserType.name()}-${width}-${theme}-manage.png`});
-      await webCopy.click(); await expect(webCopy).toBeDisabled(); await expect(recoveryCopy).toBeEnabled();
-      await page.evaluate(()=>window.finishCopy()); await expect(webRow.getByRole('button',{name:'Copied',exact:true})).toBeEnabled();
-      await recoveryCopy.click(); await expect(page.locator('.crate-modal-body')).toContainText('Clipboard unavailable');
-      await advanced.locator('summary').click(); await expect(advanced).toContainText('Keep both codes private.');
+      await recoveryCopy.click(); await expect(recoveryCopy).toBeDisabled(); await expect(turnOff).toBeEnabled();
+      await page.evaluate(()=>window.finishCopy()); const copied = recoveryRow.getByRole('button',{name:'Copied',exact:true}); await expect(copied).toBeEnabled();
+      await page.evaluate(()=>{window.copyFailed=true;}); await copied.click(); await expect(page.locator('.crate-modal-body')).toContainText('Clipboard unavailable');
+      await advanced.locator('summary').click(); await expect(advanced).toContainText('Keep your recovery key private.');
       await turnOff.click(); assert.equal(await page.evaluate(()=>window.resetOpened),true);
       assert.deepEqual(errors,[]);
       await page.close();

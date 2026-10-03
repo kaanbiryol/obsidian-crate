@@ -5,7 +5,7 @@ import { ErrorState } from './AuthStates';
 
 function render(error: string): string {
 	return renderToStaticMarkup(React.createElement(ErrorState, {
-		error, config: { folderPath: 'Reminders', upcomingDays: 7, allDayNotificationTime: null }, onRetry: vi.fn(),
+		error, onRetry: vi.fn(),
 	}));
 }
 

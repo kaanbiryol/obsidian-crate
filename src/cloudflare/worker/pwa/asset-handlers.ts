@@ -27,7 +27,9 @@ function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 		'Content-Security-Policy': [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
-			`script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''}`,
+			`script-src 'self'${nonce ? ` 'nonce-${nonce}' 'strict-dynamic'` : ''}`,
+			"script-src-attr 'none'",
+			"worker-src 'self'",
 			"connect-src 'self' https:",
 			"img-src 'self' data: https:",
 			"manifest-src 'self'",

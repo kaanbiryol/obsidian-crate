@@ -81,6 +81,3 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 @media(max-width:340px){.pwa-notification-prompt{flex-wrap:wrap}.pwa-notification-prompt__copy{flex-basis:calc(100% - 44px)}.pwa-notification-prompt .pwa-notification-prompt__enable{margin-left:44px}}
 
 @media(prefers-reduced-motion:reduce){.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:none}.pwa-pull-refresh{transition:none}.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{animation:none}}
-.crate-reminders-ui .crate-encryption-unlock { padding: 24px; gap: 16px; overflow-wrap: anywhere; }
-.crate-reminders-ui .crate-encryption-unlock form { display: flex; flex-direction: column; gap: 12px; }
-.crate-reminders-ui .crate-encryption-unlock input { width: 100%; min-height: 44px; font-size: 16px; }

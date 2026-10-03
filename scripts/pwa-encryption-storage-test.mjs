@@ -26,8 +26,8 @@ import { usePwaSessionLifecycle } from './src/pwa/hooks/usePwaSessionLifecycle';
 const noop = () => {};
 function Harness() {
  window.lifecycle = usePwaSessionLifecycle({ apiFetch: async () => Response.json({}),
-  resetEditor: noop, disablePushNotifications: async () => {},
-  handleUnauthorizedRef: {current:noop}, resetReminderState: noop, setAuthToken: noop,
+  resetView: noop, disablePushNotifications: async () => {},
+  handleUnauthorizedRef: {current:noop}, setAuthToken: noop,
   setConfig: noop, reportError: noop, setSettingsOpen: noop, showToast: noop });
  return null;
 }

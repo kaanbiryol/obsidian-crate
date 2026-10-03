@@ -15,8 +15,12 @@ export class QRModal extends SharedModal {
 		const contentEl = this.bodyEl;
 		this.modalEl.addClass('crate-qr-modal');
 
+		const fragment = new URLSearchParams(this.data.split('#')[1]);
+		const hasRecovery = fragment.has('crateKey') || fragment.has('crateReadingKey');
 		contentEl.createEl('p', {
-			text: 'Scan this code with your other device, or copy the link below. This setup link expires in 10 minutes.',
+			text: hasRecovery
+				? 'Scan with a trusted device, or copy the link. Sign-in expires in 10 minutes. The link also contains your recovery key, which does not expire. Keep it private.'
+				: 'Scan this code with your other device, or copy the link below. This setup link expires in 10 minutes.',
 			cls: 'crate-qr-desc',
 		});
 

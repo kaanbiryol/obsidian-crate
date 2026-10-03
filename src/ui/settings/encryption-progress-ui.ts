@@ -42,10 +42,10 @@ export function renderEncryptionProgress(container: HTMLElement) {
       content.createEl('p', { cls: 'crate-encryption-intro', text: automaticSync
         ? 'Automatic sync remains on. Pending local changes will upload encrypted on the next sync.'
         : 'Automatic sync remains off. Select Sync now when you’re ready to upload local changes.' });
-      const next = content.createEl('p', { cls: 'crate-encryption-intro', text: 'Unlock your web apps with one code from ' });
+      const next = content.createEl('p', { cls: 'crate-encryption-intro', text: 'Approve your web apps from ' });
       next.createEl('strong', { text: 'Manage encryption' });
       next.createSpan({ text: ' → ' });
-      next.createEl('strong', { text: 'Web app key' });
+      next.createEl('strong', { text: 'Connect web app' });
       next.createSpan({ text: '. No reinstall is needed.' });
       new Setting(footer)
         .addButton(button => button.setButtonText('Manage encryption').onClick(manage))

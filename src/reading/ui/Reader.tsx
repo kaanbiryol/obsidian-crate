@@ -7,12 +7,11 @@ import { ReadingBody } from './ReadingBody';
 import { ReadingTagsForm } from './ReadingTagsForm';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
-import { readingMarkdown, readingDocument } from '../core/markdown';
-import { READING_DROP_CONTENTS, READING_HTML_TAGS } from '../core/html-policy';
+import { readingDocument } from '../core/markdown';
+import { renderReadingContent } from './reading-content';
 import { anchorHighlight, writeMarkdownHighlights } from '../core/markdown-highlights';
 import type { ReadingHighlight } from '../core/highlights';
 import { HighlightList } from './HighlightList';
-import DOMPurify from 'dompurify';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { BackButton } from '../../ui/shared/BackButton';
@@ -22,46 +21,6 @@ import { ReadingDialog } from './ReadingDialog';
 import { readingSource } from './reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
-
-/** All article HTML is untrusted, including content captured by Web Clipper. */
-function renderReadingText(markdown: string, source: string, highlightCode?: (code: string, language: string) => string | undefined): string {
-	const html = readingMarkdown.parse(markdown, { async: false });
-	const container = DOMPurify.sanitize(html, {
-		// Parse an article fragment: document parsing drops whitespace after an
-		// opening comment (including Crate's article marker), shifting offsets.
-		RETURN_DOM: true, FORCE_BODY: true,
-		ADD_ATTR: (attribute, tag) => Boolean(highlightCode) && tag === 'code' && attribute === 'class',
-		ALLOWED_TAGS: READING_HTML_TAGS, FORBID_CONTENTS: READING_DROP_CONTENTS,
-		ALLOWED_ATTR: ['href', 'title', 'colspan', 'rowspan', 'data-crate-native'], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false,
-	}) as HTMLElement; // RETURN_DOM with WHOLE_DOCUMENT disabled returns the sanitized body.
-	// Metadata paints the current (including offline pending) set. Native markers
-	// are already represented in that set and must also be removable optimistically.
-	for (const mark of Array.from(container.querySelectorAll('mark[data-crate-native]'))) mark.replaceWith(...Array.from(mark.childNodes));
-	for (const link of Array.from(container.querySelectorAll('a'))) {
-		const unlink = () => link.replaceWith(...Array.from(link.childNodes));
-		try {
-			const href = link.getAttribute('href');
-			if (!href) { unlink(); continue; }
-			const url = new URL(href, source || undefined);
-			if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) { unlink(); continue; }
-			link.setAttribute('href', url.href); link.setAttribute('target', '_blank'); link.setAttribute('rel', 'noopener noreferrer');
-		} catch { unlink(); }
-	}
-	let remainingCode = 100_000;
-	for (const code of Array.from(container.querySelectorAll('code'))) {
-		const language = /(?:^|\s)language-([\w+#-]+)/i.exec(code.className)?.[1]?.toLowerCase() ?? '';
-		code.removeAttribute('class');
-		const text = code.textContent ?? '';
-		if (!highlightCode || code.parentElement?.tagName !== 'PRE' || text.length > remainingCode) continue;
-		remainingCode -= text.length;
-		const highlighted = highlightCode(text, language);
-		if (highlighted !== undefined) {
-			const tokens = DOMPurify.sanitize(highlighted, { RETURN_DOM_FRAGMENT: true, ALLOWED_TAGS: ['span'], ALLOWED_ATTR: ['class'], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false });
-			if (tokens.textContent === text) code.replaceChildren(tokens);
-		}
-	}
-	return container.innerHTML;
-}
 
 export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.', mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false, floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange }: {
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
@@ -147,7 +106,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			else { await navigator.clipboard.writeText(item.source_url); setCopied(true); clearCopyTimer(); copyTimer.current = { window: ownerWindow, id: ownerWindow.setTimeout(() => setCopied(false), 2500) }; }
 		} catch (cause) { if (!(cause instanceof Error && cause.name === 'AbortError')) throw cause; }
 	};
-	const html = useMemo(() => markdown === null ? '' : renderReadingText(markdown, item.source_url, highlightCode), [markdown, item.source_url, highlightCode]);
+	const content = useMemo(() => markdown === null ? null : renderReadingContent(markdown, item.source_url, highlightCode), [markdown, item.source_url, highlightCode]);
 	useEffect(() => { if (focusHighlight) { setMode('article'); setTarget(focusHighlight); } }, [focusHighlight]);
 	useEffect(() => {
 		if (!target || mode !== 'article' || markdown === null) return;
@@ -166,7 +125,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		// Let the closing sheet release its scroll lock and restore trigger focus first.
 		const frame = ownerWindow.requestAnimationFrame(() => { targetAfterSheet.current = false; focusPassage(); });
 		return () => ownerWindow.cancelAnimationFrame(frame);
-	}, [target, mode, markdown, html, floatingHighlights]);
+	}, [target, mode, markdown, content, floatingHighlights]);
 	const saveHighlights = async (highlights: ReadingHighlight[]) => {
 		if (!onUpdate || markdown === null) throw new Error('Open the article before saving highlights.');
 		const document = readingDocument(markdown);
@@ -211,11 +170,11 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
 					: <LoadingIndicator label="Loading article" />}
-			</div> : <ReadingBody body={body} article={article} html={html} highlights={item.highlights ?? []} />}
+			</div> : <ReadingBody body={body} article={article} content={content} highlights={item.highlights ?? []} />}
 			{markdown !== null && item.extraction_status === 'ready' && <footer className="crate-reading-reader__end"><span aria-hidden="true">✦</span><p>You’ve reached the end.</p>{onUpdate && item.reading_status === 'inbox' && <Button variant="outline" disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ reading_status: 'archived' }))}><ThemeIcon id="archive" size="m" aria-hidden="true" />Mark as read</Button>}</footer>}
 			</div>
 		</div>
-		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={html} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onCopyComplete={onCopyComplete} />}
+		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onCopyComplete={onCopyComplete} />}
 		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={() => { setHighlightsOpen(false); const action = sheetAction.current; sheetAction.current = null; action?.(); }}>{close => renderHighlights(close)}</ReadingDialog>}
 		{annotation && <ReadingDialog title="Highlight note" busy={busy} onClose={() => setAnnotation(null)}>{close => <form className="crate-reading-reader__annotation" onSubmit={event => { event.preventDefault(); void run(async () => { await saveNote(); onSaveComplete?.('note'); close(); }); }}><blockquote>{annotation.text}</blockquote><label htmlFor="reading-highlight-note">Your note</label><textarea id="reading-highlight-note" data-initial-focus value={note} maxLength={4000} onChange={event => setNote(event.target.value)} disabled={busy || highlightsPending} />{error && <p role="alert">{error}</p>}<div className="crate-dialog-actions crate-reading-dialog__actions"><Button variant="outline" disabled={busy} onClick={close}>Cancel</Button><Button variant="primary" type="submit" disabled={busy || highlightsPending}>Save note</Button></div></form>}</ReadingDialog>}
 		{dialog === 'appearance' && <ReadingDialog title="Reading appearance" onClose={() => setDialog(null)}><div className="crate-reading-reader__preferences"><span>Typeface</span><div className="crate-reading-reader__font-choice"><ToggleButton variant="outline" pressed={!serif} onPressedChange={() => updateAppearance({ serif: false })}>Modern<span>Sans serif</span></ToggleButton><ToggleButton variant="outline" pressed={serif} onPressedChange={() => updateAppearance({ serif: true })}>Literary<span>Serif</span></ToggleButton></div><div className="crate-reading-reader__font-size"><span>Text size</span><IconButton icon="minus" iconSize="s" label="Decrease text size" disabled={fontSize <= 16} onClick={() => updateAppearance({ fontSize: Math.max(16, fontSize - 1) })} /><output aria-label="Text size" aria-live="polite">{fontSize}</output><IconButton icon="plus" iconSize="s" label="Increase text size" disabled={fontSize >= 26} onClick={() => updateAppearance({ fontSize: Math.min(26, fontSize + 1) })} /></div><div className="crate-reading-reader__sample-frame"><p className="crate-reading-reader__sample" style={{ fontSize, fontFamily: serif ? 'Georgia, serif' : 'var(--font-interface)' }}>A little room to read.<br />A little space to think.</p></div></div></ReadingDialog>}

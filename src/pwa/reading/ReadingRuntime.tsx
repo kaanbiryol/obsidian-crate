@@ -6,7 +6,7 @@ import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
-import { logoutReadingApp } from './logout';
+import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { assertReadingSession, exportReadingData } from './storage';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
@@ -18,9 +18,11 @@ const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ def
 function useReadingController() {
   const enabled = useSharedFeatures().reading;
   const showToast = useSyncFeedback();
-  const connection = useReadingSession(enabled);
-  const { session, lockedSession, ready, connecting, cache, pending, error, setError, recovery, connectionState,
+  const app = useAppConnection();
+  const connection = useReadingSession(app.reading);
+  const { session, lockedSession, ready, connecting, cache, pending, error, recovery, connectionState,
     adding, connect, resetSession } = connection;
+  useConnectionReset(resetSession);
   const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection, enabled);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -53,12 +55,7 @@ function useReadingController() {
     onRefresh: () => session ? refreshManually() : connect(),
     onExport: pending.length || recovery ? exportReadingData : undefined,
     clearView: resetSession,
-    onLogout: async () => {
-      setSettingsOpen(false); resetSession();
-      const error = await logoutReadingApp();
-      setError(error);
-      if (error) showToast('error', error);
-    },
+    onLogout: app.logOut,
     shortcut: session ? <DeferredNotice><ShortcutSetup session={session} /></DeferredNotice> : null,
     issues: <>
       {recovery && <SettingsRow title="Earlier changes need review" description="Changes from an earlier sign-in are still stored on this device." />}

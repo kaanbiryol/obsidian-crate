@@ -50,7 +50,7 @@ export async function verifyReadingEnrollmentAuthority(browser, origin) {
       releaseExchange.resolve();
       await pending.bringToFront();
       await expect.poll(() => revocations).toContain(`Bearer ${delayed.token}`);
-      await expect(pending.getByRole('heading', { name: 'Your reading, everywhere' })).toBeVisible();
+      await expect(pending.getByRole('heading', { name: 'Connect to Crate' })).toBeVisible();
       expect(await pending.evaluate(key => localStorage.getItem(key), readingKey)).toBe(change === 'logout' ? null : JSON.stringify(replacement));
       expect(await context.cookies()).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'crate-reading-install' })]));
       expect(listTokens).not.toContain(`Bearer ${delayed.token}`);

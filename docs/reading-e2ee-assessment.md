@@ -5,7 +5,7 @@ Reading now uses a separate folder key when vault encryption is enabled. The sam
 ## Supported workflow
 
 - Obsidian keeps ordinary local Markdown notes. Sync encrypts their contents, including article text, source URLs, tags, reading status and highlights.
-- The PWA receives only its Reading folder key, decrypts and indexes notes locally, and publishes conditional encrypted note replacements. It supports article viewing, search, favorites, archive, tags, highlights, offline article caching and queued offline edits.
+- The PWA uses the same recovery code as Obsidian to open the encrypted key bundle locally, remembers its Reading folder keys, decrypts and indexes notes locally, and publishes conditional encrypted note replacements. It supports article viewing, search, favorites, archive, tags, highlights, offline article caching and queued offline edits.
 - Browser library, article, draft, outbox and immutable retry records are encrypted. Queued edits retain their exact encrypted requests after a lost response. Recovery preserves damaged records and exports wrapped local-key metadata; explicit logout clears both Reading and Reminders keys and data, while fencing newer enrollments.
 - Existing unencrypted Reading notes, queued captures and operation receipts convert before activation. Derived server indexes, extraction jobs and outstanding plaintext handoffs are removed. Already encrypted vaults can select **Manage encryption → Add encrypted reading** to introduce the Reading scope without deleting their data. Conversion is resumable and also converts retained Reading versions.
 - Destructive encryption reset deletes all seven Reading tables, including enrollment and handoff grants, at the start and completion of the reset.

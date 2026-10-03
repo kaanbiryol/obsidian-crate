@@ -1,4 +1,7 @@
+import { preserveIncomingShare } from '../connection/incoming-share';
+import { SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { capturePwaSession } from '../session-generation';
+import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
@@ -13,55 +16,52 @@ import {
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken, makeApiFetch } from '../api';
-import { loadCachedReminderSnapshot } from '../reminder-cache';
 import { scopeLegacyReminderDrafts } from '../reminder-drafts';
-import type { CachedReminderSnapshot, ShowToast, StartTab, StoredConfig } from '../types';
+import type { ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
 	authToken,
 	suspendLocalSession,
-	hydrateCachedSnapshot,
 	setAuthToken,
 	setBootstrapped,
 	setConfig,
 	reportError,
 	setLaunchReminderId,
-	resetReminderState,
 	setSelectedProject,
 	setStartTab,
 	showToast,
 }: {
 	authToken: string | null;
 	suspendLocalSession: () => Promise<void>;
-	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setBootstrapped: Dispatch<SetStateAction<boolean>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
 	reportError: (message: string | null) => void;
 	setLaunchReminderId: Dispatch<SetStateAction<string | null>>;
-	resetReminderState: () => void;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 	setStartTab: Dispatch<SetStateAction<StartTab>>;
 	showToast: ShowToast;
 }): void {
 	// Bootstrap owns a single mount-time session, even if callers rerender during enrollment.
 	const initialOptionsRef = useRef({
-		authToken, suspendLocalSession, hydrateCachedSnapshot,
+		authToken, suspendLocalSession,
 		setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId,
-		resetReminderState, setSelectedProject, setStartTab, showToast,
+		setSelectedProject, setStartTab, showToast,
 	});
 
 	useEffect(() => {
 		const {
-			authToken: initialAuthToken, suspendLocalSession, hydrateCachedSnapshot,
+			authToken: initialAuthToken, suspendLocalSession,
 			setAuthToken, setBootstrapped, setConfig, reportError, setLaunchReminderId,
-			resetReminderState, setSelectedProject, setStartTab, showToast,
+			setSelectedProject, setStartTab, showToast,
 		} = initialOptionsRef.current;
 		let cancelled = false;
 		let sessionCurrent = capturePwaSession();
 
 		async function bootstrap() {
 			try {
+				if (cancelled || !sessionCurrent()) return;
+				await preserveIncomingShare(() => !cancelled && sessionCurrent());
 				if (cancelled || !sessionCurrent()) return;
 				const storedConfig = loadStoredConfig();
 				scopeLegacyReminderDrafts(storedConfig.folderPath);
@@ -127,21 +127,14 @@ export function usePwaBootstrap({
 				}
 				if (!enrollmentFailed) finishEnrollment();
 
-				if (!nextToken) {
-					resetReminderState();
-					return;
-				}
-				await makeApiFetch(nextToken, () => { void suspendLocalSession(); }).ready();
+				if (!nextToken) return;
+				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_MESSAGE); }).ready();
 				if (cancelled || !sessionCurrent()) return;
 
-				const cached = await loadCachedReminderSnapshot(nextConfig.folderPath);
-				if (cancelled || !sessionCurrent()) return;
-				if (cached) {
-					hydrateCachedSnapshot(cached);
-				}
 			} catch (bootstrapError) {
 				if (!cancelled && sessionCurrent()) {
 					if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+						if (bootstrapError instanceof EncryptionKeyRequiredError && bootstrapError.firstUnlock) return;
 						showToast('error', bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
 						return;
 					}

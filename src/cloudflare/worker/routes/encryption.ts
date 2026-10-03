@@ -1,4 +1,5 @@
 import { readEncryptedReceipt } from '../encrypted-receipt-storage';
+import { handleEncryptionPairing } from '../encryption-pairing';
 import { readCaptureRecovery } from '../encrypted-capture-recovery';
 import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption-state';
 import { validateFileDescriptor } from '../../../encryption/file-format';
@@ -10,9 +11,10 @@ import { reminderOperationDay } from '../../../protocol/reminder-operation';
 import { REMINDER_OPERATION_VALID } from '../reminders-web/operation-expiry';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
-/** Control-plane reads never contain a plaintext key. Scoped sessions receive
- * only their own public scope, never the encrypted vault recovery bundle. */
+/** Scoped sessions receive their public scope and the encrypted recovery bundle.
+ * The recovery key never leaves the client; API permissions remain scoped. */
 export async function handleEncryptionRoute(request: Request, db: D1Database, path: string, principal: AuthPrincipal, authenticatedState?: EncryptionServerState | null): Promise<Response | null> {
+  if (path === '/encryption/pairing') return handleEncryptionPairing(request, db, principal, authenticatedState === undefined ? await readEncryptionState(db) : authenticatedState);
 	if (path === '/encryption/capture-recovery' && request.method === 'GET' && principal.scope === 'vault') return readCaptureRecovery(request, db);
 	if (path === '/encryption/upload-receipt' && request.method === 'GET' && principal.scope === 'vault') {
 		const id = new URL(request.url).searchParams.get('operationId') ?? '';
@@ -49,7 +51,7 @@ export async function handleEncryptionRoute(request: Request, db: D1Database, pa
 		const state = authenticatedState === undefined ? await readEncryptionState(db) : authenticatedState;
 		if (!state || principal.scope === 'vault') return corsResponse({ encryption: state }, 200, { 'Cache-Control': 'no-store' });
 		return corsResponse({ encryption: { version: state.version, vaultId: state.vaultId, generation: state.generation,
-			mode: state.mode, scope: state.scopes.find(scope => scope.folderPath === principal.folderPath) ?? null } }, 200, { 'Cache-Control': 'no-store' });
+			mode: state.mode, recovery: state.recovery, scope: state.scopes.find(scope => scope.folderPath === principal.folderPath) ?? null } }, 200, { 'Cache-Control': 'no-store' });
 	}
 	if (path !== '/encryption/metadata' || request.method !== 'POST' || principal.scope !== 'vault') return null;
 	const parsed = await parseJsonObject(request);

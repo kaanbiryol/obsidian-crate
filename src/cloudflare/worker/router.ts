@@ -68,6 +68,7 @@ export function isAuthenticatedRouteAllowed(
   if (path === shortcut.preparePath && method === 'POST') return principal.scope === 'reading_capture';
 	if (path === '/reading/prepare' && method === 'POST') return canPrepareReadingHandoff(principal.scope);
 	if (principal.scope === 'vault') return true;
+  if (path === '/encryption/pairing' && ['GET', 'POST'].includes(method) && ['reminders', 'reading'].includes(principal.scope)) return true;
 	if (path === '/features' && method === 'GET' && ['reading', 'reminders'].includes(principal.scope)) return true;
  if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`) || READING_LIBRARY_ROUTES.has(`${method} ${path}`);
  if (principal.scope === 'reading_capture') return path === '/reading/capture' && method === 'POST';

@@ -19,7 +19,7 @@ export async function verifyReadingPlaintextTransition({ t, browser, origin, own
     // enables encryption and changes the enrollment's key requirements.
     await t.convertEncryptedVault(http, bundle, recovery, () => {});
     await page.getByRole('button', { name: 'Save link', exact: true }).click();
-    await expect(page.getByText(/Could not verify Reading encryption|Reconnect Reading|Reading sign-in|Unlock Reading with the web app key/).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Could not verify encryption|Reconnect Reading|Reading sign-in|Reload Crate to connect with Obsidian/).first()).toBeVisible({ timeout: 15000 });
     assert.ok(!sent.some(body => body.includes(privateUrl)), 'A stale plaintext Reading tab sent a private URL after encryption was enabled');
   } finally {
     await context.close();

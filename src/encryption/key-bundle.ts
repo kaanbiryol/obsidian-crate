@@ -60,7 +60,7 @@ export function moveEncryptionScopes(bundle: VaultKeyBundle, from: string, to: s
 	return next;
 }
 
-/** Explicitly copy the grant: never serialize the full vault key bundle for a PWA. */
+/** Copy only the folder keys needed by a browser feature. */
 export function createReminderKeyGrant(bundle: VaultKeyBundle, folderPath: string): ReminderKeyGrant {
 	validateVaultKeyBundle(bundle);
 	const scope = bundle.scopes.find(candidate => candidate.folderPath === folderPath);

@@ -8,6 +8,7 @@ const assets = new Set([
 		'open-obsidian', 'open-obsidian.js', 'save-reading', 'save-reading.js'].map(name => `/notifications/${name}`),
 ]);
 const api = new Set([
+  'GET /encryption/pairing', 'POST /encryption/pairing',
 	...['', '/capture-recovery', '/upload-receipt', '/deletion-precondition', '/folders', '/reset', '/conversion', '/conversion/file', '/conversion/settings', '/conversion/checkpoints'].map(suffix => `GET /encryption${suffix}`),
 	...['/metadata', '/reset', '/conversion', '/conversion/finish'].map(suffix => `POST /encryption${suffix}`),
 	...['file', 'settings', 'receipt', 'checkpoint', 'reading-capture'].map(name => `PUT /encryption/conversion/${name}`),

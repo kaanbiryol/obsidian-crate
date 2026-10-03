@@ -3,7 +3,6 @@ import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks 
 import { SECRET_KEYS } from '../../plugin/settings-types';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
-import { decodeWebAppKey } from '../../encryption/web-app-key';
 import type { EncryptionProgress } from '../../sync/encryption-conversion';
 
 let state: EncryptionServerState | null;
@@ -275,7 +274,7 @@ it.each(['missing', 'damaged', 'wrong'] as const)('restores the saved copy when 
 it('reports active keys and offers recovery when this device has damaged keys', async () => {
 	await configure('active'); await open();
 	expect(body.collectText()).toContain('Unlocked on this device');
-	expect(setting('Web app key').descEl.textContent).toContain('Unlock Reminders with one code');
+	expect(setting('Recovery key').descEl.textContent).toContain('Keep a copy for recovery.');
 	values.set(SECRET_KEYS.ENCRYPTION_KEYS, 'invalid json');
 	await open();
 	await vi.waitFor(() => expect(setting('This device').descEl.textContent).toContain('Locked'));
@@ -382,7 +381,7 @@ it('refreshes the row once after turning encryption off', async () => {
 });
 
 
-it('copies only the configured web folders and rejects a stale server connection', async () => {
+it('copies one recovery key for Obsidian and the web app and rejects a stale server connection', async () => {
 	const keys = addReminderScope(addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading'), 'Other');
 	const recovery = await generateRecoveryCode();
 	state = { ...createEncryptionState(keys, await sealRecoveryBundle(keys, recovery)), mode: 'active' };
@@ -390,18 +389,16 @@ it('copies only the configured web folders and rejects a stale server connection
 	const writeText = vi.fn(async (_value: string) => {});
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 	const plugin = await open();
-	expect(body.collectText()).toContain('Unlock Reading and Reminders with one code.');
+	expect(body.collectText()).toContain('Connect without copying keys.');
+	expect(body.collectText()).not.toContain('Web app key');
 	expect(body.collectText()).not.toContain('Individual folder keys');
 	expect(body.collectText()).not.toContain('older web apps');
-	setting('Web app key').buttons[0]!.click();
+	setting('Recovery key').buttons[0]!.click();
 	await vi.waitFor(() => expect(writeText).toHaveBeenCalledOnce());
-	const grants = decodeWebAppKey(writeText.mock.calls[0]![0]);
-	expect(grants.map(grant => grant.scope.folderPath)).toEqual(['Reminders', 'Reading']);
-	expect(JSON.stringify(grants)).not.toContain(keys.vault.secret);
-	expect(JSON.stringify(grants)).not.toContain(keys.scopes[2]!.data.secret);
-	await vi.waitFor(() => expect(setting('Web app key').buttons[0]!.buttonEl.textContent).toBe('Copied'));
+	expect(writeText).toHaveBeenCalledWith(recovery);
+	await vi.waitFor(() => expect(setting('Recovery key').buttons[0]!.buttonEl.textContent).toBe('Copied'));
 	plugin.settings.workerUrl = 'https://other.test';
-	setting('Web app key').buttons[0]!.click();
+	setting('Recovery key').buttons[0]!.click();
 	await vi.waitFor(() => expect(body.collectText()).toContain('connection changed'));
 	expect(writeText).toHaveBeenCalledOnce();
 });

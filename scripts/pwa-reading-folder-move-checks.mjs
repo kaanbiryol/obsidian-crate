@@ -15,15 +15,15 @@ export async function verifyReadingFolderMove({ t, page, origin, owner, bundle, 
     };
     const http = new t.WorkerApiHttpClient(origin, owner.token, transport);
     http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-    const enroll = async (keys, folder) => {
+    const enroll = async () => {
       const { token } = await http.requestJson('/reading/access', { method: 'POST', body: JSON.stringify({ kind: 'reading' }) });
       // Open the setup link as a new document, as Obsidian does. Navigating an
       // already-open /notifications page to only a new hash does not reload it.
       await page.goto(origin + '/health');
-      await page.goto(`${origin}/notifications?section=reading#reading=${token}&crateReadingKey=${encodeURIComponent(t.encodeWebAppKey([t.createReminderKeyGrant(keys, folder)]))}`);
+      await page.goto(`${origin}/notifications?section=reading#reading=${token}&crateReadingKey=${encodeURIComponent(recovery)}`);
       await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 });
     };
-    await enroll(bundle, 'Reading');
+    await enroll();
     const oldSession = await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1')));
     const next = t.moveEncryptionScopes(bundle, 'Reading', 'Articles');
     await t.convertEncryptedVault(http, next, recovery, () => {});

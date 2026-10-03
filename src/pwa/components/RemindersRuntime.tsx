@@ -1,24 +1,15 @@
-import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
-import type { Dispatch, SetStateAction } from 'react';
-import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import {
-	makeApiFetch,
-	registerPwaServiceWorker,
-} from '../api';
-import {
-	AUTH_TOKEN_KEY,
-	isStandaloneApp,
-	loadStoredConfig,
-} from '../config';
+import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { isStandaloneApp } from '../config';
+import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
+import { capturePwaSession } from '../session-generation';
+import { loadCachedReminderSnapshot } from '../reminder-cache';
+import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { exportPendingChanges } from '../export-pending-changes';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { usePwaBootstrap } from '../hooks/usePwaBootstrap';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { usePwaRefreshLifecycle } from '../hooks/usePwaRefreshLifecycle';
-import { usePwaSessionLifecycle } from '../hooks/usePwaSessionLifecycle';
 import { usePwaStatus } from '../hooks/usePwaStatus';
 import { useReminderEditor } from '../hooks/useReminderEditor';
 import { useReminderMutations } from '../hooks/useReminderMutations';
@@ -30,8 +21,6 @@ import { toSharedReminder } from '../reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import type {
 	ModalMode,
-	StartTab,
-	StoredConfig,
 } from '../types';
 import { DeferredNotice } from './DeferredNotice';
 import { reminderSyncStatus } from '../sync/reminder-status';
@@ -44,50 +33,20 @@ const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
 
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;
-	const encryption = useSyncExternalStore(subscribeEncryption, encryptionSnapshot);
+	const connection = useAppConnection();
+	const { authority, authToken, apiFetch, config: storedConfig, encryption, logOut, loggingOut,
+		selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, registerPushCleanup } = connection;
+	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
+	const bootstrapped = connection.bootstrapped && hydratedAuthority === authority;
 	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
-	const [authSession, setAuthSession] = useState(() => ({ token: localStorage.getItem(AUTH_TOKEN_KEY) }));
-	const authToken = authSession.token;
-	const setAuthToken = useCallback<Dispatch<SetStateAction<string | null>>>((next) => {
-		// React may batch a clear and re-enrollment with the same token. Retain
-		// the new session identity so its API client captures the new authority.
-		setAuthSession(current => ({ token: typeof next === 'function' ? next(current.token) : next }));
-	}, []);
-	const [bootstrapped, setBootstrapped] = useState(false);
-	const [storedConfig, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
 	const { preferences } = usePwaPreferences();
 	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
-	const [selectedProject, setSelectedProject] = useState<string | null>(null);
-	const [startTab, setStartTab] = useState<StartTab>(() => ['today', 'inbox', 'upcoming', 'browse'].includes(preferences.defaultScreen) ? preferences.defaultScreen as StartTab : 'today');
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
-	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const { modal, saving, setSaving, transition: modalTransition, closeModal, resetEditor, openEditor, openReminder } = useReminderEditor(setSettingsOpen);
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
 	const homeScreenInstall = useHomeScreenInstall();
-	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
-
-
-	useEffect(() => {
-		if (!bootstrapped) return;
-		const reportVersion = () => navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
-		navigator.serviceWorker?.addEventListener('controllerchange', reportVersion);
-		document.addEventListener('visibilitychange', reportVersion);
-		void registerPwaServiceWorker().then(reportVersion).catch((error: unknown) => {
-			const message = error instanceof Error ? error.message : String(error);
-			showToast('error', `Offline support could not start: ${message}`);
-		});
-		return () => {
-			navigator.serviceWorker?.removeEventListener('controllerchange', reportVersion);
-			document.removeEventListener('visibilitychange', reportVersion);
-		};
-	}, [bootstrapped, showToast]);
-
-	const apiFetch = useMemo(
-		() => makeApiFetch(authSession.token, () => handleUnauthorizedRef.current()),
-		[authSession],
-	);
 	const reminderSync = useReminderSync({ apiFetch, authToken, config, setSelectedProject, enabled });
 	const resolvePageTitle = useCallback(async (url: string) => {
 		const response = await apiFetch('/links/title', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(7000) });
@@ -123,33 +82,25 @@ function useRemindersController() {
 		refreshPresentation,
 		reportError,
 	} = reminderSync;
-	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
-		apiFetch,
-		resetEditor,
-		disablePushNotifications,
-		handleUnauthorizedRef,
-		resetReminderState,
-		setAuthToken,
-		setConfig,
-		reportError,
-		setSettingsOpen,
-		showToast,
-	});
-
-	usePwaBootstrap({
-		authToken,
-		suspendLocalSession,
-		hydrateCachedSnapshot,
-		setAuthToken,
-		setBootstrapped,
-		setConfig,
-		reportError,
-		setLaunchReminderId,
-		resetReminderState,
-		setSelectedProject,
-		setStartTab,
-		showToast,
-	});
+	const resetView = useCallback(() => { resetEditor(); resetReminderState(); }, [resetEditor, resetReminderState]);
+	useConnectionReset(resetView);
+	useEffect(() => registerPushCleanup(disablePushNotifications), [registerPushCleanup, disablePushNotifications]);
+	useEffect(() => {
+		if (!connection.bootstrapped) return;
+		let cancelled = false;
+		const current = capturePwaSession();
+		void (async () => {
+			try {
+				if (!authToken) { resetView(); return; }
+				await apiFetch.ready();
+				const cached = await loadCachedReminderSnapshot(config.folderPath);
+				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
+			} catch (cause) {
+				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) reportError(cause instanceof Error ? cause.message : String(cause));
+			} finally { if (!cancelled) setHydratedAuthority(authority); }
+		})();
+		return () => { cancelled = true; };
+	}, [connection.bootstrapped, authority, authToken, apiFetch, config.folderPath, hydrateCachedSnapshot, reportError, resetView]);
 
 	usePwaRefreshLifecycle({
 		enabled,
@@ -281,7 +232,7 @@ function useRemindersController() {
 		onExport: changes.length || recoveryChanges.length ? () => exportPendingChanges([...changes, ...recoveryChanges]) : undefined,
 		onEnablePush: enablePushNotifications,
 		onLogout: logOut,
-		clearView: () => { resetEditor(); resetReminderState(); setAuthToken(null); },
+		clearView: resetView,
 		recovery: <>
 			{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={enabled ? recoverChanges : undefined} /></DeferredNotice>}
 			{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}

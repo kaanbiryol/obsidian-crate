@@ -4,16 +4,18 @@ import { Smartphone } from 'lucide-react';
 import { IconButton } from '@/ui/shared/IconButton';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
 
-export function HomeScreenInstallPrompt({ onShowSteps, onDismiss }: {
+export function HomeScreenInstallPrompt({ onShowSteps, onDismiss, encrypted = false, platform }: {
 	onShowSteps: () => void;
 	onDismiss: () => void;
+	encrypted?: boolean;
+	platform?: HomeScreenPlatform | null;
 }) {
 	return (
 		<section className="pwa-home-screen-prompt" aria-label="Add to home screen">
 			<div className="pwa-notification-prompt__icon" aria-hidden="true"><Smartphone size={18} /></div>
 			<div className="pwa-home-screen-prompt__copy">
 				<strong>Add to home screen</strong>
-				<span>Open Crate like an app, with one tap.</span>
+				<span>{encrypted && platform === 'ios' ? 'After installing, connect with Obsidian to unlock the app.' : 'Open Crate like an app, with one tap.'}</span>
 					<BaseButton variant="ghost" size="touch" className="pwa-home-screen-prompt__action" type="button" onClick={onShowSteps}>Show steps</BaseButton>
 			</div>
 				<IconButton className="pwa-home-screen-prompt__dismiss" size="large" icon="x" label="Dismiss home screen tip" onClick={onDismiss} />
@@ -21,7 +23,7 @@ export function HomeScreenInstallPrompt({ onShowSteps, onDismiss }: {
 	);
 }
 
-export function HomeScreenInstallInstructions({ platform }: { platform: HomeScreenPlatform }) {
+export function HomeScreenInstallInstructions({ platform, encrypted = false }: { platform: HomeScreenPlatform; encrypted?: boolean }) {
 	return (
 		<section className="settings-panel__section" aria-labelledby="settings-home-screen-title">
 			<h3 id="settings-home-screen-title" className="settings-panel__title">Add to home screen</h3>
@@ -30,6 +32,7 @@ export function HomeScreenInstallInstructions({ platform }: { platform: HomeScre
 					<ol>
 						<li>Select <strong>Share</strong> → <strong>View More</strong> → <strong>Add to Home Screen</strong>.</li>
 						<li>Keep <strong>Open as Web App</strong> on, then select <strong>Add</strong>.</li>
+						<li>Open <strong>Crate</strong> from your Home Screen.{encrypted && <> Select <strong>Connect with Obsidian</strong> to unlock Reading and Reminders.</>}</li>
 					</ol>
 				) : (
 					<>
@@ -42,6 +45,7 @@ export function HomeScreenInstallInstructions({ platform }: { platform: HomeScre
 						<p className="pwa-home-screen-instructions__hint">If the option is missing, reopen your Crate setup link in Chrome.</p>
 					</>
 				)}
+				{platform === 'ios' && encrypted && <p className="pwa-home-screen-instructions__hint">In Obsidian, open <strong>Crate settings → Sync → Manage encryption → Connect web app</strong>. Compare the codes and confirm on both devices. Crate will remember this device.</p>}
 			</div>
 		</section>
 	);

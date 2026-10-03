@@ -137,20 +137,32 @@ export class SyncRuntime {
 		return preview;
 	}
 
-	private versionInfo?: { client: SyncApiClient; info: CrateServerInfo };
-	private versionRequest?: { client: SyncApiClient; promise: Promise<CrateServerInfo> };
+	private versionInfo?: { client: SyncApiClient; connection: string; expires: number; info: CrateServerInfo };
+	private versionRequest?: { client: SyncApiClient; connection: string; promise: Promise<CrateServerInfo> };
+
+	private versionConnection(): string {
+		const deployment = this.settings.cloudflareDeployment;
+		return JSON.stringify([this.settings.workerUrl, deployment?.accountId, deployment?.workerName, deployment?.d1DatabaseId]);
+	}
+
+	getCachedVersionInfo(): CrateServerInfo | undefined {
+		const cached = this.versionInfo;
+		return cached?.client === this.apiClient && cached?.connection === this.versionConnection()
+			&& cached.expires > Date.now() ? cached.info : undefined;
+	}
 
 	async getVersionInfo(): Promise<CrateServerInfo> {
 		const client = this.apiClient;
 		if (!client) throw new Error('Not connected');
-		if (this.versionRequest?.client === client) return this.versionRequest.promise;
+		const connection = this.versionConnection();
+		if (this.versionRequest?.client === client && this.versionRequest.connection === connection) return this.versionRequest.promise;
 		this.versionInfo = undefined;
 		const promise = client.getServerInfo().then(info => {
-			if (this.apiClient !== client) throw new Error('Server changed');
-			this.versionInfo = { client, info };
+			if (this.apiClient !== client || connection !== this.versionConnection()) throw new Error('Server changed');
+			this.versionInfo = { client, connection, info, expires: Date.now() + 30_000 };
 			return info;
 		});
-		this.versionRequest = { client, promise };
+		this.versionRequest = { client, connection, promise };
 		try { return await promise; }
 		finally { if (this.versionRequest?.promise === promise) this.versionRequest = undefined; }
 	}

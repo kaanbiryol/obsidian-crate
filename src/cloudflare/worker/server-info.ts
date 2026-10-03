@@ -28,6 +28,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	pwaAssetVersion: PWA_ASSET_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
+    'web-pairing-v1',
 		ENCRYPTION_CAPABILITY,
 		READING_ENCRYPTION_CAPABILITY,
 		ENCRYPTION_FOLDER_MOVES_CAPABILITY,

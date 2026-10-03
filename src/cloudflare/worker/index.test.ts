@@ -314,10 +314,13 @@ describe('worker entrypoint', () => {
 		const pageHtml = await pageResponse.text();
 		const nonce = /<script nonce="([^"]+)"/.exec(pageHtml)?.[1];
 		expect(nonce).toBeTruthy();
-		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}';`);
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic';`);
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("img-src 'self' data: https:");
 		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");
 		expect(handoffResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("script-src-attr 'none'");
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("worker-src 'self'");
+		expect([...pageHtml.matchAll(/<script\b[^>]*>/g)].every(([tag]) => tag.includes(`nonce="${nonce}"`))).toBe(true);
 		expect(pageHtml).not.toContain('<script>');
 		expect(await handoffResponse.text()).not.toContain('<script>');
 		expect(themeScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');

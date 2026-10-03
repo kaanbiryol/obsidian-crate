@@ -10,16 +10,18 @@ export const bundleBudgets = {
 		// measured 5.41 MB raw / 2.74 MB gzip; extraction stays deferred.
 		// Durable rename checkpoints and legacy capture recovery add about 10 KB.
 		// Authenticated PWA folder following adds about 4.5 KB; measured 5.493 MB raw.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5500000', 10),
+		// Encrypted app approval adds the plugin dialog, relay and shared WebCrypto:
+		// measured 5.516 MB raw; allow 9 KB for build variation.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5525000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2780000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
 		// Shared list styles, current activity controls and encryption UI measure
-		// 307.6 KB raw / 39.9 KB gzip, including compact encryption management.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '308000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '40000', 10),
+		// 308.2 KB raw / 40.1 KB gzip, including compact pairing states.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '308500', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '40200', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -43,15 +45,16 @@ export const bundleBudgets = {
 		startupAssets: true,
 		// Unified settings, offline Reading fallback and complete loading chrome measure
 		// 1.141 MB raw / 380 KB gzip with shared encryption cleanup and settings.
-		// Retain a small, explicit growth margin.
+		// App approval adds about 4 KB gzip; measured 387.1 KB including the
+		// shared connection gate. Retain a small, explicit growth margin.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1150000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '385000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '390000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Reading and pairing stay deferred. Unified settings brings totals to
+		// Reading and shortcut pairing stay deferred. Unified settings brings totals to
 		// 1.208 MB raw / 404.6 KB gzip, including the shared control additions.
 		// Deferred Markdown source mapping and highlight review: about 1.37 MB / 470 KB.
 		// Expanded PWA article code highlighting: about 1.54 MB raw / 523 KB gzip.

@@ -2,9 +2,8 @@ import { Setting } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 
 export function renderEncryptionManagement(container: HTMLElement, options: {
-  webAppDescription: string;
   copyRecovery(): Promise<void>;
-  copyWebApp(): Promise<void>;
+  connectApp(): void;
   turnOff(): void;
   advanced(container: HTMLElement): () => void;
 }): () => void {
@@ -24,8 +23,9 @@ export function renderEncryptionManagement(container: HTMLElement, options: {
       });
     });
   };
-  copyRow('Recovery key', 'Unlock your other Obsidian devices.', () => options.copyRecovery());
-  copyRow('Web app key', options.webAppDescription, () => options.copyWebApp());
+  new Setting(container).setClass('crate-encryption-action').setName('Connect web app').setDesc('Connect without copying keys.')
+    .addButton(button => button.setButtonText('Connect').onClick(() => options.connectApp()));
+  copyRow('Recovery key', 'Keep a copy for recovery.', () => options.copyRecovery());
   const advanced = container.createEl('details', { cls: 'crate-encryption-details crate-encryption-manage__advanced' });
   advanced.createEl('summary', { text: 'Advanced' });
   const disposeAdvanced = options.advanced(advanced);

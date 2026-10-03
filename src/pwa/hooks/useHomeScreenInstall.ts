@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { isIosOrIpados, isStandaloneApp } from '../config';
 
 const DISMISSED_KEY = 'crate-home-screen-prompt-dismissed';
+const DISMISSED_EVENT = 'crate-home-screen-prompt-dismissed';
+
+export function dismissHomeScreenInstallPrompt(): void {
+	try { localStorage.setItem(DISMISSED_KEY, 'true'); } catch { /* Still dismiss for this visit. */ }
+	window.dispatchEvent(new Event(DISMISSED_EVENT));
+}
 
 export type HomeScreenPlatform = 'ios' | 'android';
 
@@ -24,11 +30,7 @@ export function useHomeScreenInstall() {
 
 	const dismiss = useCallback(() => {
 		setDismissed(true);
-		try {
-			localStorage.setItem(DISMISSED_KEY, 'true');
-		} catch {
-			// Still dismiss for this visit when browser storage is unavailable.
-		}
+		dismissHomeScreenInstallPrompt();
 	}, []);
 
 	useEffect(() => {
@@ -41,11 +43,14 @@ export function useHomeScreenInstall() {
 			setInstalled(true);
 			dismiss();
 		};
+		const handleDismissed = () => setDismissed(true);
 		displayMode.addEventListener('change', checkDisplayMode);
 		window.addEventListener('appinstalled', handleInstalled);
+		window.addEventListener(DISMISSED_EVENT, handleDismissed);
 		return () => {
 			displayMode.removeEventListener('change', checkDisplayMode);
 			window.removeEventListener('appinstalled', handleInstalled);
+			window.removeEventListener(DISMISSED_EVENT, handleDismissed);
 		};
 	}, [dismiss, platform]);
 

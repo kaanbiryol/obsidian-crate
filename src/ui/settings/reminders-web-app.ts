@@ -3,8 +3,7 @@ import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import { QRModal } from '../qr-modal';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';
-import { createReminderKeyGrant } from '../../encryption/key-bundle';
-import { encodeWebAppKey } from '../../encryption/web-app-key';
+import { SECRET_KEYS } from '../../plugin/settings-types';
 
 export function renderCrateWebApp(containerEl: HTMLElement, plugin: CratePlugin): void {
 	if (!plugin.syncRuntime.getApiClient()) return;
@@ -50,22 +49,36 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	if (!apiClient) {
 		throw new Error('Sync API is unavailable');
 	}
+	const tokenBefore = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+	const keys = loadEncryptionKeys(plugin.secretStorage);
+	const recovery = keys ? plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) : null;
+	if (keys && !recovery) throw new Error('Unlock this vault with your recovery key before connecting the web app.');
+	const folder = plugin.remindersSettings.remindersFolderPath;
+	const readingFolder = plugin.settings.reading.folderPath;
+	const assertCurrent = () => {
+		if (plugin.syncRuntime.getApiClient() !== apiClient || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== tokenBefore
+			|| plugin.remindersSettings.remindersFolderPath !== folder || plugin.settings.reading.folderPath !== readingFolder
+			|| (keys && plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY) !== recovery)) {
+			throw new Error('The connection changed. Create a new setup link.');
+		}
+	};
 
   if (plugin.settings.pushEnabled) {
-    await apiClient.ensureNotificationPolicy({ folderPath: plugin.remindersSettings.remindersFolderPath,
+    await apiClient.ensureNotificationPolicy({ folderPath: folder,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, allDayTime: plugin.remindersSettings.allDayNotificationTime });
   }
-	const { token, browserToken } = await apiClient.createRemindersEnrollmentToken(plugin.remindersSettings.remindersFolderPath);
+	assertCurrent();
+	const { token, browserToken } = await apiClient.createRemindersEnrollmentToken(folder);
+	assertCurrent();
 	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
-	const keys = loadEncryptionKeys(plugin.secretStorage);
-	if (keys) {
-		const fragment = new URLSearchParams({ crateKey: encodeWebAppKey([createReminderKeyGrant(keys, plugin.remindersSettings.remindersFolderPath)]) });
-		if (keys.scopes.some(scope => scope.folderPath === plugin.settings.reading.folderPath)) fragment.set('crateReadingKey', encodeWebAppKey([createReminderKeyGrant(keys, plugin.settings.reading.folderPath)]));
+	if (keys && recovery) {
+		const fragment = new URLSearchParams({ crateKey: recovery });
+		if (keys.scopes.some(scope => scope.folderPath === readingFolder)) fragment.set('crateReadingKey', recovery);
 		subscribeUrl.hash = fragment.toString();
 	}
 	subscribeUrl.searchParams.set('token', token);
 	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
-	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);
+	subscribeUrl.searchParams.set('folder', folder);
 	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
 	if (plugin.remindersSettings.allDayNotificationTime) {
 		subscribeUrl.searchParams.set('allDayTime', plugin.remindersSettings.allDayNotificationTime);

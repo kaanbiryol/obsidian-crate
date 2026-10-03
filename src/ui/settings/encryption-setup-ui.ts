@@ -28,43 +28,51 @@ export function renderEncryptionSetup(container: HTMLElement, options: {
   const content = container.createDiv({ cls: 'crate-encryption-setup__content' });
   let busy = false, disposed = false;
   let primary: ButtonComponent | undefined;
-  content.createEl('p', { cls: 'crate-encryption-intro', text: 'Save this recovery key outside your vault. Crate cannot recover it for you.' });
   const key = content.createDiv({ cls: 'crate-encryption-key' });
-  const field = new Setting(key).setClass('crate-encryption-key__header').setName('Recovery key');
+  const field = new Setting(key).setClass('crate-encryption-action').setClass('crate-encryption-key__header')
+    .setName('Recovery key').setDesc('Save a copy outside your vault.');
   field.nameEl.id = `crate-key-${crypto.randomUUID()}`;
   const output = key.createEl('textarea', { cls: 'crate-text-input crate-encryption-recovery' });
   output.readOnly = true; output.value = options.recovery; output.rows = 2; output.spellcheck = false;
   output.setAttribute('aria-labelledby', field.nameEl.id);
+  const warning = content.createEl('p', { cls: 'crate-encryption-feedback', text: 'Crate cannot recover a lost key.' });
+  warning.id = `${field.nameEl.id}-warning`;
+  output.setAttribute('aria-describedby', warning.id);
   const copyStatus = content.createEl('p', { cls: 'crate-encryption-feedback', attr: { role: 'status' } });
   field.addButton(button => {
+    button.buttonEl.setAttribute('aria-live', 'polite');
     button.setButtonText('Copy').onClick(async () => {
       if (busy || disposed) return;
       try { options.assertCurrent(); }
       catch (error) { copyStatus.setText(errorMessage(error)); return; }
+      button.setDisabled(true); copyStatus.setText('');
       try {
         await output.ownerDocument.defaultView!.navigator.clipboard.writeText(options.recovery);
-        if (!disposed) copyStatus.setText('Copied. Save it somewhere safe outside your vault.');
+        if (!disposed) button.setButtonText('Copied');
       } catch {
-        if (!disposed) copyStatus.setText('Select and copy the key above. Clipboard access is unavailable.');
-      }
+        if (!disposed) {
+          button.setButtonText('Copy');
+          copyStatus.setText('Select and copy the key above. Clipboard access is unavailable.');
+        }
+      } finally { if (!disposed) button.setDisabled(false); }
     });
   });
   const confirmation = content.createEl('label', { cls: 'crate-encryption-confirm' });
   const saved = confirmation.createEl('input', { attr: { type: 'checkbox' } });
   saved.checked = false;
-  confirmation.createSpan({ text: 'I’ve saved this key somewhere safe outside my vault.' });
+  confirmation.createSpan({ text: 'I’ve saved it outside my vault.' });
   saved.addEventListener('change', () => {
     if (!busy && !disposed) primary?.setDisabled(!saved.checked);
   });
-  const details = content.createEl('details', { cls: 'crate-encryption-details' });
+  const details = content.createEl('details', { cls: 'crate-encryption-details crate-encryption-setup__details' });
   details.createEl('summary', { text: 'What changes with encryption?' });
   const changes = details.createEl('ul');
   for (const text of [
     'Existing synced files and history are encrypted. Local vault files stay readable.',
     'An empty server starts encrypted. Local changes wait for your next sync; enabling encryption does not upload them.',
     'Sync and notifications pause while encryption runs. Keep Obsidian open.',
-    'Unlock Reading and Reminders with one web app key, or open a fresh setup link. Existing drafts and queued edits are kept.',
-    'Each web app can read entire notes in its connected Reading or Reminders folder, including text outside reminders.',
+    'Unlock Reading and Reminders with one recovery key, or open a fresh setup link. Existing drafts and queued edits are kept.',
+    'Use your recovery key only in web apps you trust. They handle it during unlock and can read entire notes in their connected Reading and Reminders folders.',
     'Web apps stay connected when you rename or move their folder. Choosing a different folder in settings requires a fresh setup link.',
     'File and folder names, file sizes and notification times remain visible to the server. Notification titles and text are encrypted.',
     'Pasted links keep their URL labels because private URLs are not sent to the server for title lookup.',

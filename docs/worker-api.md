@@ -539,7 +539,7 @@ coordinator. Public one-use Reading grants enter it after admission because
 redemption and capture must be serialized together.
 ## Encryption API (protocol 2)
 
-`GET /encryption` returns public configuration and an encrypted recovery bundle to vault credentials; reminders credentials receive only their own scope metadata. No private key is uploaded. `GET /encryption/folders` inventories existing enrollment folders for setup.
+`GET /encryption` returns public configuration and an encrypted recovery bundle to vault credentials. Reminders credentials receive their own scope metadata plus the same encrypted recovery envelope; `/reading/encryption` does the same after validating Reading enrollment. The user’s recovery code decrypts the bundle locally and is never uploaded. Session route permissions remain scoped; sharing this ciphertext does not grant sync, settings or device-management access. `GET /encryption/folders` inventories existing enrollment folders for setup.
 
 Vault-only `POST /encryption/conversion` starts a frozen, resumable conversion. `GET /encryption/conversion` pages unfinished files and stored receipts. Its optional `includeProgress=1` query adds `remainingFiles`, a count of unfinished live and retained file objects. Clients request it once at the start of each conversion or resume; it performs one read and no additional writes. Clients remain compatible with servers that omit the count by showing activity without a percentage. The `/file`, `/settings`, `/receipt`, `/checkpoints` and `/checkpoint` conversion endpoints read originals and accept encrypted replacements; `POST /encryption/conversion/finish` completes bounded cleanup and activates encryption. Matching vault and generation headers are required after start. Ordinary reads/writes are blocked while converting. Original hashes and sizes distinguish plaintext from interrupted encrypted replacements, including plaintext that begins with `CRATE-E2EE/1` or uses the encrypted MIME type.
 
@@ -556,6 +556,33 @@ Uploads to an active encrypted vault validate both the encrypted content type an
 Single and batch uploads stream through the existing eight-object transfer pool, where hashing, envelope validation and storage use the Durable Object CPU allowance. Each object processes one upload at a time. The public Worker checks authorization before forwarding; the transfer executor repeats authentication after queuing and captures current encryption/reset authority before reading the body. Markdown publication still uses the separate notification coordinator. This applies to hosted and self-hosted deployments without a new binding or schema migration.
 
 Encrypted file transfers permit up to 38 MiB wire bytes for the existing 25 MiB plaintext limit. Encrypted previews transfer ciphertext; the client applies the existing 256 KiB plaintext preview limit. Reminder clients enforce the existing 1 MiB plaintext note limit. See [encryption](e2ee-implementation.md) for metadata disclosure and recovery.
+
+### Encrypted web app approval
+
+Servers advertising `web-pairing-v1` expose non-cacheable `GET` and `POST`
+`/encryption/pairing`. An active encrypted vault is required. This transfers
+ciphertext to an already authenticated app; it never issues login credentials.
+
+- `GET ?id=<request-id>` returns `{ requests }` for the requesting app or a vault
+  device. A vault device may omit the ID to list pending requests. Other app
+  credentials cannot inspect or cancel that request.
+- `POST { action: "start", context, commitment }` creates an app request. Context
+  contains `version: 1`, unique `id`, canonical `origin`, `vaultId`, `generation`
+  and enrolled `scopeId`. A Reminders or Reading credential must own that scope;
+  Reading capture credentials and vault devices cannot start app requests.
+- `accept` supplies `{ id, key }` from one vault device; `reveal` supplies the
+  committed requester public key from the owning app. Public keys are raw P-256
+  points encoded as base64url. `approve` supplies `{ id, payload }` from that
+  same vault device after comparison. The server handles only encrypted packets.
+- `cancel` closes a request; `finish` acknowledges durable key import from its
+  owning app. Both discard the packet. POST responses return `{ request }`.
+
+Records expire in five minutes, with three slots per app and 32 server-wide.
+Cancelled slots count until expiry. Polling does not update these records;
+repeated identical steps are idempotent. Conditional updates check the current
+actor, owner, vault state and generation. Closed, expired, revoked or mismatched
+requests cannot publish a new packet. See [the approval protocol](e2ee-implementation.md#app-approval-protocol)
+for key derivation and comparison requirements.
 
 ### Destructive encryption reset (protocol 2)
 

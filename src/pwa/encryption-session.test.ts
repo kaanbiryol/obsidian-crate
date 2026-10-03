@@ -56,7 +56,7 @@ it('clears the status on session reset and ignores an older response', async () 
 	await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
 	invalidatePwaSession(); resetPwaEncryption();
 	finish(Response.json({ encryption: null }));
-	await expect(pending).rejects.toThrow('Session changed');
+	await expect(pending).rejects.toThrow('Connection changed');
 	expect(encryptionSnapshot().status).toBe('checking');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 });
@@ -104,7 +104,7 @@ it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link whe
 });
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {
-	await expect(preparePwaEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not check');
+	await expect(preparePwaEncryption('session', async () => Response.json({}, { status: 503 }))).rejects.toThrow('Could not verify encryption');
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
 	await preparePwaEncryption('session', async () => Response.json({ encryption: null }));
 	expect(sealPrivateValue('new draft', 'draft')).toBe('new draft');

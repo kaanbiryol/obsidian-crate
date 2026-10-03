@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
 	const result = await page.evaluate(async ({ grant, serverDay }) => {
 		const t = window.crateEncryptionTest;
-		const scope = t.decodeWebAppKey(grant)[0];
+		const scope = grant;
 		const keys = await t.readReminderKeys(scope.vaultId, scope.scope.id);
 		t.unlockPrivateStorage(await t.unlockLocalState(keys), keys.folderPath, localStorage, sessionStorage);
 		const prefix = `${keys.vaultId}:${keys.scopeId}:`;
