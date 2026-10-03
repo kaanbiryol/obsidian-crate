@@ -17,7 +17,7 @@ async function openDialog(writeText: ReturnType<typeof vi.fn>) {
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 	const { QRModal } = await import('./qr-modal');
 	new QRModal({} as never, 'https://crate.example/notifications?token=fresh').onOpen();
-	MockSetting.instances.find(row => row.nameEl.textContent === 'Setup link')!.buttons[0]!.click();
+	MockSetting.instances.flatMap(row => row.buttons).find(button => button.buttonEl.textContent === 'Copy link')!.click();
 }
 
 it('copies the same setup URL shown by the QR dialog', async () => {

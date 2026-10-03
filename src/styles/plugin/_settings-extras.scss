@@ -67,6 +67,16 @@ body.reduce-motion .crate-action-progress {
 	border-radius: var(--image-radius, var(--radius-s));
 }
 
+.crate-qr-modal .crate-qr-actions {
+	border: 0;
+
+	.setting-item-info { display: none; }
+	.setting-item-control {
+		width: 100%;
+		justify-content: flex-end;
+	}
+}
+
 .crate-diagnostics {
 	margin: 8px 0 16px;
 	padding: 8px 10px;

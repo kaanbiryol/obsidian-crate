@@ -42,7 +42,7 @@ export class QRModal extends SharedModal {
 
 		const fallback = contentEl.createDiv({ cls: 'crate-qr-link-fallback' });
 		fallback.hide();
-		new Setting(contentEl).setName('Setup link')
+		new Setting(contentEl).setClass('crate-qr-actions')
 			.addButton(button => button.setButtonText('Copy link').onClick(async () => {
 				try {
 					await navigator.clipboard.writeText(this.data);
