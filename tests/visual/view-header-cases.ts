@@ -53,12 +53,16 @@ export function registerViewHeaderTests() {
           await expect(header.locator('h1')).toHaveText(label);
           await expect.poll(() => headerGeometry(header)).toEqual(inbox);
           if (label === 'Reminders') {
-            const badge = header.locator('.view-header-overdue');
-            await expect(badge).toBeVisible();
-            const bounds = await badge.boundingBox();
-            const meta = await header.locator('.view-header-meta').boundingBox();
-            expect(bounds!.y).toBeCloseTo(meta!.y, 1);
-            expect(bounds!.height).toBeCloseTo(meta!.height, 1);
+            const overdue = header.locator('.view-header-overdue');
+            await expect(overdue).toBeVisible();
+            const bounds = await overdue.boundingBox();
+            const count = await header.locator('.view-header-count').boundingBox();
+            expect(bounds!.y).toBeCloseTo(count!.y, 1);
+            expect(bounds!.height).toBeCloseTo(count!.height, 1);
+            await expect(header.locator('.view-header-meta-separator')).toHaveText('·');
+            await expect(overdue).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+            await expect(overdue).toHaveCSS('border-top-width', '0px');
+            await expect(overdue).toHaveCSS('padding', '0px');
           }
         }
       }

@@ -20,7 +20,7 @@ interface ViewHeaderProps {
 
 /**
  * Shared view header component
- * Displays title, count, and optional overdue badge
+ * Displays title, count, and optional overdue count
  */
 export const ViewHeader = memo(function ViewHeader({
   title,
@@ -54,9 +54,12 @@ export const ViewHeader = memo(function ViewHeader({
             </span>
 
             {overdueCount > 0 && (
-              <span className="view-header-overdue">
-                {overdueCount} overdue
-              </span>
+              <>
+                <span className="view-header-meta-separator" aria-hidden="true">&middot;</span>
+                <span className="view-header-overdue">
+                  {overdueCount} overdue
+                </span>
+              </>
             )}
             {metaContent}
           </div>

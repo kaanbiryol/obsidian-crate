@@ -15,21 +15,6 @@
         @include view-header.primary-screen;
     }
 
-    .view-header-overdue {
-        display: inline-flex;
-        align-items: center;
-        box-sizing: border-box;
-        height: var(--crate-header-meta-height);
-        padding: 0 7px;
-        border: 1px solid color-mix(in srgb, var(--text-error) 18%, transparent);
-        border-radius: var(--tag-radius, var(--radius-s));
-        background: color-mix(in srgb, var(--text-error) 9%, transparent);
-        color: color-mix(in srgb, var(--text-error) 60%, var(--text-normal));
-        font-size: var(--reminder-font-xxs);
-        font-weight: var(--reminder-font-weight-medium);
-        line-height: 1.2;
-    }
-
     .reminders-view-scroll {
         padding-top: 6px;
         padding-right: 14px;
