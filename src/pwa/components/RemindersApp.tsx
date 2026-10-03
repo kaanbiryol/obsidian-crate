@@ -4,7 +4,6 @@ import { useLaunchReminderModal } from '../hooks/useLaunchReminderModal';
 import { usePrepareReminderEditor } from '../hooks/usePrepareReminderEditor';
 import { DeferredNotice } from './DeferredNotice';
 import { FeatureNavigationContext } from './FeatureSwitcherButton';
-import { HomeScreenInstallPrompt } from './HomeScreenInstall';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './PwaChrome';
 import {
 	PwaRemindersAppShell,
@@ -32,10 +31,10 @@ export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const {
-		encryption, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
+		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
 		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
 		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
-		showToast, homeScreenInstall, loading, refreshing, error,
+		showToast, loading, refreshing, error,
 		issues, dataMode, isOffline, loadReminders, rebuildOfflineCache, enablePushNotifications,
 		readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind, handlePullRefresh,
 		toggleSettings, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, visibleReminders,
@@ -139,9 +138,6 @@ export function RemindersApp() {
 							/></DeferredNotice>}
 							{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
 							{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
-							{homeScreenInstall.showPrompt && !isProjectDetail && (
-								<HomeScreenInstallPrompt encrypted={encryption.status === 'ready'} platform={homeScreenInstall.platform} onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
-							)}
 						</PwaTopNotices>
 					</>
 				) : undefined}

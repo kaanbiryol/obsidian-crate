@@ -3,7 +3,6 @@ import { AuthLayout } from '../components/AuthStates';
 import { HomeScreenInstallInstructions } from '../components/HomeScreenInstall';
 import { PwaButton as Button } from '../components/PwaButton';
 import { isIosOrIpados, isStandaloneApp } from '../config';
-import { dismissHomeScreenInstallPrompt } from '../hooks/useHomeScreenInstall';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
 const CHOICE_KEY = 'crate-browser-setup-choice';
@@ -34,7 +33,6 @@ export function BrowserSetup({ onContinue }: { onContinue: () => void }) {
       </Button>
       <Button className="browser-setup__choice" variant="ghost" size="touch" aria-labelledby="crate-web-label" aria-describedby="crate-web-description" onClick={() => {
         try { localStorage.setItem(CHOICE_KEY, 'web'); } catch { /* This visit still continues when storage is unavailable. */ }
-        dismissHomeScreenInstallPrompt();
         onContinue();
       }}>
         <ThemeIcon id="arrow-up-right" size="l" aria-hidden="true" />

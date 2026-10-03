@@ -5,7 +5,6 @@ import { capturePwaSession } from '../session-generation';
 import { loadCachedReminderSnapshot } from '../reminder-cache';
 import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { exportPendingChanges } from '../export-pending-changes';
-import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
@@ -46,7 +45,6 @@ function useRemindersController() {
 	const { modal, saving, setSaving, transition: modalTransition, closeModal, resetEditor, openEditor, openReminder } = useReminderEditor(setSettingsOpen);
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
-	const homeScreenInstall = useHomeScreenInstall();
 	const reminderSync = useReminderSync({ apiFetch, authToken, config, setSelectedProject, enabled });
 	const resolvePageTitle = useCallback(async (url: string) => {
 		const response = await apiFetch('/links/title', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(7000) });
@@ -243,7 +241,7 @@ function useRemindersController() {
 		encryption, logOut, loggingOut, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
 		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
 		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
-		showToast, homeScreenInstall, loading, refreshing, error,
+		showToast, loading, refreshing, error,
 		issues, dataMode, isOffline, loadReminders, rebuildOfflineCache, enablePushNotifications,
 		readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind, handlePullRefresh,
 		toggleSettings, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, visibleReminders,

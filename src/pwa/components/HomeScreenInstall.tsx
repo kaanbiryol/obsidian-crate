@@ -1,27 +1,5 @@
-import { Button as BaseButton } from '@/ui/shared/Button';
 import React from 'react';
-import { Smartphone } from 'lucide-react';
-import { IconButton } from '@/ui/shared/IconButton';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
-
-export function HomeScreenInstallPrompt({ onShowSteps, onDismiss, encrypted = false, platform }: {
-	onShowSteps: () => void;
-	onDismiss: () => void;
-	encrypted?: boolean;
-	platform?: HomeScreenPlatform | null;
-}) {
-	return (
-		<section className="pwa-home-screen-prompt" aria-label="Add to home screen">
-			<div className="pwa-notification-prompt__icon" aria-hidden="true"><Smartphone size={18} /></div>
-			<div className="pwa-home-screen-prompt__copy">
-				<strong>Add to home screen</strong>
-				<span>{encrypted && platform === 'ios' ? 'After installing, connect with Obsidian to unlock the app.' : 'Open Crate like an app, with one tap.'}</span>
-					<BaseButton variant="ghost" size="touch" className="pwa-home-screen-prompt__action" type="button" onClick={onShowSteps}>Show steps</BaseButton>
-			</div>
-				<IconButton className="pwa-home-screen-prompt__dismiss" size="large" icon="x" label="Dismiss home screen tip" onClick={onDismiss} />
-		</section>
-	);
-}
 
 export function HomeScreenInstallInstructions({ platform, encrypted = false }: { platform: HomeScreenPlatform; encrypted?: boolean }) {
 	return (
