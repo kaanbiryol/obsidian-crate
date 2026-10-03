@@ -43,3 +43,15 @@ export function filterReadingHighlights(items: ReadingItem[], query: string, art
 		.sort((a, b) => (b.highlight.createdAt ?? b.item.saved_at).localeCompare(a.highlight.createdAt ?? a.item.saved_at)
 			|| a.item.crate_reading_id.localeCompare(b.item.crate_reading_id) || a.highlight.start - b.highlight.start);
 }
+
+/** Input is already newest-first; preserve that order within and across articles. */
+export function groupReadingHighlights(entries: ReturnType<typeof filterReadingHighlights>) {
+	const groups = new Map<string, { item: ReadingItem; entries: typeof entries }>();
+	for (const entry of entries) {
+		const id = entry.item.crate_reading_id;
+		const group = groups.get(id) ?? { item: entry.item, entries: [] };
+		group.entries.push(entry);
+		groups.set(id, group);
+	}
+	return [...groups.values()];
+}

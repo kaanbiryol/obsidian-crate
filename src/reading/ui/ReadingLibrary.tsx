@@ -11,9 +11,10 @@ import { FloatingActionButton } from '../../reminders/components/FloatingActionB
 import { EmptyState } from '../../reminders/components/EmptyState';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from './reading-presentation';
+import { filterReadingHighlights, filterReadingItems, groupReadingItems, groupReadingHighlights, readingSections, readingSource, readingTitle, type ReadingSection } from './reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
-import { HighlightList } from './HighlightList';
+import { HighlightGroups } from './HighlightGroups';
+import { HighlightArticleFilter } from './HighlightArticleFilter';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 
@@ -88,9 +89,13 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
 	const items = useMemo(() => filterReadingItems(snapshot.items, section, query, tag), [snapshot.items, section, query, tag]);
 	const excerpts = useMemo(() => filterReadingHighlights(items, query, articleFilter), [items, articleFilter, query]);
+	const excerptGroups = useMemo(() => groupReadingHighlights(excerpts), [excerpts]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	const tags = useMemo(() => [...new Set(snapshot.items.flatMap(item => item.tags))].sort((a, b) => a.localeCompare(b)), [snapshot.items]);
+	useEffect(() => {
+		if (articleFilter && !snapshot.loading && !snapshot.items.some(item => item.crate_reading_id === articleFilter && item.highlights?.length)) { setArticleFilter(''); setVisible(PAGE_SIZE); }
+	}, [articleFilter, snapshot.items, snapshot.loading]);
 	useEffect(() => {
 		if (tag && !tags.includes(tag)) { setTag(null); setVisible(PAGE_SIZE); }
 	}, [tag, tags]);
@@ -118,7 +123,7 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count} countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">{headerStatus}{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />{headerActions}</div>} />
 				<TextField fieldClassName="crate-reading__search" label="Search reading" hideLabel type="search" placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />} value={query} onChange={event => { setQuery(event.target.value); resetList(); }} trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
 				{tags.length > 0 && <label className="crate-reading__tag-picker">Tags<select aria-label="Filter by tag" value={tag ?? ''} onChange={event => { setTag(event.target.value || null); resetList(); }}><option value="">All tags</option>{tags.map(value => <option key={value} value={value}>{value}</option>)}</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
-				{section === 'highlights' && <label className="crate-reading__tag-picker">Article<select aria-label="Filter by article" value={articleFilter} onChange={event => { setArticleFilter(event.target.value); resetList(); }}><option value="">All articles</option>{snapshot.items.filter(item => item.highlights?.length).map(item => <option key={item.crate_reading_id} value={item.crate_reading_id}>{item.title}</option>)}</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
+				{section === 'highlights' && <HighlightArticleFilter items={snapshot.items} value={articleFilter} onChange={value => { setArticleFilter(value); resetList(); }} />}
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
@@ -127,7 +132,7 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}
 					{listContent ?? (snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
-							? <HighlightList entries={excerpts.slice(0, visible)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
+							? <HighlightGroups key={`${query}:${articleFilter}:${tag ?? ''}`} disabled={busy.has('open')} entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
 							: <EmptyState className="crate-reading__empty" icon="highlighter"
 								title={query || articleFilter || tag ? 'No matching highlights' : 'Keep the passages that stay with you'}
 								description={query || articleFilter || tag ? 'Try another passage, note, or article.' : 'Select text while reading. Your highlights appear here and in your Obsidian notes.'} />)}
@@ -141,7 +146,7 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 								<ReadingItemContent item={item} />
 							</Button>
 						</li>)}</ul></section>)}
-						{visible < count && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
+						{visible < (section === 'highlights' ? excerptGroups.length : count) && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
 					</>)}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" onClick={onAdd} animateOnMount={false} />}

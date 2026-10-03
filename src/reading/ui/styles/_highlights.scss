@@ -40,3 +40,49 @@
 	&__annotation { display: grid; gap: 14px; }
 	&__annotation textarea { width: 100%; min-height: 140px; resize: vertical; padding: 12px; font: inherit; font-size: 16px; color: var(--text-normal); background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 8px; }
 }
+
+.crate-reminders-ui {
+	.crate-highlight-group {
+		margin-bottom: 8px;
+		&[data-open] { margin-bottom: 16px; }
+		&__header {
+			@include list-item.surface;
+			display: flex; align-items: center; gap: 16px; width: 100%; min-height: 66px;
+			padding: 14px 12px; text-align: left; color: var(--text-normal);
+			> svg { flex-shrink: 0; color: var(--text-muted); }
+			@media (hover: hover) and (pointer: fine) { &:hover { @include list-item.hover; } }
+			&[data-press-active] { @include list-item.active; }
+			&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -2px; }
+		}
+		&__copy { display: grid; gap: 6px; flex: 1; min-width: 0; }
+		&__copy strong { @include list-item.title; overflow-wrap: anywhere; }
+		&__copy > span { color: var(--text-muted); font-size: 13px; font-weight: 400; }
+		&__body { padding: 8px 0 0 16px; }
+	}
+	.crate-reading[data-list-style="flat"] .crate-highlight-group__header {
+		@include list-item.flat-surface;
+		border-radius: 8px;
+		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--crate-control-hover-bg) 60%, var(--background-primary)); } }
+		&[data-press-active] { background: color-mix(in srgb, var(--crate-control-active-bg) 75%, var(--background-primary)); }
+	}
+	.crate-highlight-filter { display: flex; align-items: center; gap: 6px; margin: 0 18px 16px; min-width: 0; }
+	.crate-highlight-filter button.crate-highlight-filter__trigger {
+		min-width: 0; min-height: 44px; height: auto; max-width: 100%; flex-shrink: 1;
+		padding: 10px 12px; border-radius: 10px; gap: 10px;
+		background: var(--crate-panel-bg); box-shadow: none;
+		font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text-normal);
+		&[data-filtered] { background: var(--crate-selection-bg); }
+		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-control-hover-bg); } }
+		&[data-press-active]:not(:disabled) { background: var(--crate-control-active-bg); }
+	}
+	.crate-highlight-filter > .crate-icon-button { flex-shrink: 0; }
+	.crate-highlight-filter__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.crate-highlight-filter__trigger svg { flex-shrink: 0; width: 14px; height: 14px; color: var(--text-muted); }
+	.crate-highlight-picker { display: grid; gap: 8px; }
+	.crate-highlight-picker__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text-normal); text-align: left; }
+	.crate-highlight-picker__option small { display: block; color: var(--text-muted); margin-top: 4px; }
+	.crate-highlight-picker__option svg { flex-shrink: 0; }
+	.crate-highlight-picker__option[aria-pressed="true"] { background: var(--crate-selection-bg); }
+	@media (hover: hover) and (pointer: fine) { .crate-highlight-picker__option:hover { background: var(--crate-control-hover-bg); } }
+	.crate-highlight-picker__option[data-press-active] { background: var(--crate-control-active-bg); }
+}

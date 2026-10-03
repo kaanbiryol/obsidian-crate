@@ -51,6 +51,17 @@ both hosts together.
   subproject groups; the main header separator remains. Inbox hides its redundant project
   label while retaining dates and recurrence; mixed-project views keep project labels.
   Reading articles and highlights follow the same divider-free flat/card preference.
+  The Highlights library groups passages by article, ordered by the newest highlight.
+  Article disclosure headers use flat rows at rest with rounded hover/press feedback,
+  or card surfaces when Cards is selected. The newest group starts expanded; older
+  groups expand on selection. A compact article filter opens the shared searchable
+  Reading picker sheet with a close header and scrolling options. In Obsidian it
+  rises from the pane bottom to a 20px top inset, with rounded upper corners and
+  a drag handle; the PWA uses its tall Settings-style presentation. Closing retains
+  the sheet through its downward exit motion. Article reader highlights retain their existing list.
+  Reading dialogs opened inside the Obsidian workspace portal into a pane-local
+  overlay outside clipped tab and feature layers. Sheets and their backdrops stay
+  inside the pane, above its dock, without covering the rest of Obsidian.
   Project cards and subproject groups share this setting, retaining their colored
   accents, progress, disclosures, and focus/press feedback in either presentation.
   Project counts use smaller, regular-weight text with a dot separator. Flat project

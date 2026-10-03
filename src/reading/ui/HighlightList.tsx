@@ -4,15 +4,16 @@ import type { ReadingMetadata } from '../core/model';
 import { Button } from '../../ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 
-export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, disabled = false }: {
+export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, disabled = false, hideSource = false }: {
 	entries: { item: T; highlight: ReadingHighlight }[];
 	onView?: (item: T, highlight: ReadingHighlight) => void;
 	onAnnotate?: (item: T, highlight: ReadingHighlight) => void;
 	disabled?: boolean;
+	hideSource?: boolean;
 }) {
 	return <ul className="crate-reading-highlights" aria-label="Highlights">{entries.map(({ item, highlight }, index) => <li className="crate-reading-highlights__card" key={`${item.crate_reading_id}:${highlight.id ?? index}`}>
 		<blockquote>{highlight.text}</blockquote>
-		<div className="crate-reading-highlights__source"><strong>{item.title}</strong>{item.author && <span>{item.author}</span>}{highlight.createdAt && <time dateTime={highlight.createdAt}>{new Date(highlight.createdAt).toLocaleDateString()}</time>}</div>
+		{!hideSource && <div className="crate-reading-highlights__source"><strong>{item.title}</strong>{item.author && <span>{item.author}</span>}{highlight.createdAt && <time dateTime={highlight.createdAt}>{new Date(highlight.createdAt).toLocaleDateString()}</time>}</div>}
 		{highlight.note && <p className="crate-reading-highlights__note">{highlight.note}</p>}
 		{(onView || onAnnotate) && <div className="crate-reading-highlights__actions">
 			{onView && <Button variant="ghost" size="touch" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => onView(item, highlight)}>
