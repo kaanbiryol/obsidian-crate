@@ -52,6 +52,13 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 }
 
 export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMatchingServer: () => void, onAvailability?: (available: boolean) => void): void {
+	if (EMBEDDED_CLOUDFLARE_ARTIFACT.development
+		&& EMBEDDED_CLOUDFLARE_ARTIFACT.development.worker !== plugin.settings.cloudflareDeployment?.workerName) {
+		onAvailability?.(false);
+		setting.setName('Server update unavailable')
+			.setDesc('This development build targets a different server. Install a stable plugin release or a development build made for this vault’s server to update it.');
+		return;
+	}
 	let checkButton: ButtonComponent | undefined;
 	let updateAvailable = false;
 	const setAvailability = (available: boolean) => {
@@ -64,8 +71,7 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 	};
 	const describe = (revision: number | undefined, development?: DevelopmentBuild, fingerprint?: string) => {
 		const versions = `Current version: ${revision ? serverBuildLabel(revision, development) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}`;
-		const designated = !EMBEDDED_CLOUDFLARE_ARTIFACT.development || EMBEDDED_CLOUDFLARE_ARTIFACT.development.worker === plugin.settings.cloudflareDeployment?.workerName;
-    const available = designated && revision !== undefined && (revision < release.revision || Boolean(fingerprint && canReplaceServerBuild(
+    const available = revision !== undefined && (revision < release.revision || Boolean(fingerprint && canReplaceServerBuild(
       { revision, fingerprint, development }, { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development })));
     setAvailability(available);
     if (available) { setting.setName('Cloudflare update available'); return versions; }
@@ -83,7 +89,7 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 		}
 		if (revision > release.revision) {
 			setting.setName('Plugin update required');
-			return `${versions}. Update the plugin first.`;
+			return `${versions}. This plugin cannot update the server. Use a plugin build with server revision ${revision} or later.`;
 		}
 		setting.setName('Cloudflare update available');
 		return versions;

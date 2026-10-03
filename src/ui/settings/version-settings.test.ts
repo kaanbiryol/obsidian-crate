@@ -40,6 +40,20 @@ it('shows a known newer revision without requesting remote metadata', async () =
 	expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
 });
 
+it('explains that a newer development server needs a newer plugin bundle and blocks downgrade', async () => {
+	const { plugin, row, available } = await setup({
+		revision: release.revision + 1,
+		development: { number: 13, worker },
+		cached: { serverRevision: release.revision + 1, developmentBuild: { number: 14, worker }, deploymentFingerprint: 'b'.repeat(64) },
+	});
+	expect(row.nameEl.textContent).toBe('Plugin update required');
+	expect(row.descEl.textContent).toContain(`Current version: ${release.revision + 1}-dev.14 · Bundled version: ${release.revision}-dev.13`);
+	expect(row.descEl.textContent).toContain(`Use a plugin build with server revision ${release.revision + 1} or later`);
+	expect(available).toHaveBeenLastCalledWith(false);
+	expect(row.buttons[0]!.buttonEl.style.display).not.toBe('none');
+	expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+});
+
 it('automatically checks a missing revision and persists it for subsequent renders', async () => {
 	const { plugin, row, render } = await setup();
 	await vi.waitFor(() => expect(plugin.writeSettings).toHaveBeenCalledOnce());

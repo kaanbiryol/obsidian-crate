@@ -457,3 +457,20 @@ it.each(['older development', 'stable', 'newer development', 'missing fingerprin
     }
   }
 });
+
+it.each([undefined, release.revision - 1, release.revision, release.revision + 1])('explains a development target mismatch without offering an update or a pointless check (revision=%s)', async revision => {
+  embeddedArtifact.development = { number: 28, worker: 'crate-fedcba9876543210' };
+  const { renderServerUpdateNotice } = await loadConfigSectionModule();
+  const plugin = { settings: {
+    workerUrl: 'https://crate-0123456789abcdef.example.workers.dev',
+    cloudflareDeployment: { workerName: 'crate-0123456789abcdef', workersSubdomain: 'example',
+      lastKnownRevision: revision, lastDeployedVersion: embeddedArtifact.version, lastDeployedFingerprint: 'a'.repeat(64) },
+  }, syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() } };
+  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+  const row = getSettingByName('Server update unavailable');
+  expect(row.descEl.textContent).toContain('This development build targets a different server');
+  expect(row.buttons.filter(button => button.buttonEl.style.display !== 'none')).toHaveLength(0);
+  row.buttons[0]!.click();
+  expect(startCloudflareDeployment).not.toHaveBeenCalled();
+  expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
+});

@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import release from './server-release.json';
+import type { DevelopmentBuild } from './server-build';
 
 const notices: FakeDocumentFragment[] = [];
 const embeddedArtifact = {
 	version: '0.2.0',
 	fingerprint: 'b'.repeat(64),
+	development: undefined as DevelopmentBuild | undefined,
 };
 
 class FakeLink {
@@ -56,17 +59,25 @@ function createPlugin(overrides: {
 	configured?: boolean;
 	lastDeployedVersion?: string;
 	lastDeployedFingerprint?: string | null;
+	lastKnownRevision?: number;
+	cachedRevision?: number;
+	workerUrl?: string;
 	deployment?: boolean;
 } = {}) {
 	return {
 		settings: {
+			workerUrl: overrides.workerUrl ?? 'https://crate-0123456789abcdef.example.workers.dev',
 			cloudflareDeployment: overrides.deployment === false ? null : {
+				workerName: 'crate-0123456789abcdef',
+				workersSubdomain: 'example',
+				lastKnownRevision: overrides.lastKnownRevision,
 				lastDeployedVersion: overrides.lastDeployedVersion ?? embeddedArtifact.version,
 				lastDeployedFingerprint: overrides.lastDeployedFingerprint ?? 'a'.repeat(64),
 			},
 		},
 		syncRuntime: {
 			isConfigured: vi.fn(() => overrides.configured ?? true),
+			getCachedVersionInfo: vi.fn(() => overrides.cachedRevision === undefined ? undefined : { serverRevision: overrides.cachedRevision }),
 		},
 		openSettingsTab: vi.fn(),
 	};
@@ -74,6 +85,7 @@ function createPlugin(overrides: {
 
 beforeEach(() => {
 	notices.length = 0;
+	embeddedArtifact.development = undefined;
 	vi.stubGlobal('DocumentFragment', FakeDocumentFragment);
 });
 
@@ -86,6 +98,32 @@ afterEach(() => {
 });
 
 describe('showCloudflareServerUpdateNotice', () => {
+	it.each(['saved', 'cached'] as const)('explains a newer server using its %s revision instead of suggesting a server update', async source => {
+		const { showCloudflareServerUpdateNotice } = await loadUpdateNotice();
+		const plugin = createPlugin(source === 'saved'
+			? { lastKnownRevision: release.revision + 1 }
+			: { lastKnownRevision: release.revision - 1, cachedRevision: release.revision + 1 });
+
+		showCloudflareServerUpdateNotice(plugin as never);
+
+		expect(notices).toHaveLength(1);
+		expect(notices[0]?.spans).toEqual([
+			'Your Crate server is newer than this plugin’s bundled server. ',
+			' to review the versions. Updating this server requires a newer plugin build.',
+		]);
+		notices[0]?.links[0]?.click();
+		expect(plugin.openSettingsTab).toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		{ workerUrl: 'https://another.example.com' },
+		{ cachedRevision: release.revision - 1 },
+	])('does not use an outdated saved revision when the connected server differs: %j', async overrides => {
+		const { showCloudflareServerUpdateNotice } = await loadUpdateNotice();
+		showCloudflareServerUpdateNotice(createPlugin({ lastKnownRevision: release.revision + 1, ...overrides }) as never);
+		expect(notices[0]?.spans[0]).toBe('Review your Crate server update. ');
+	});
+
 	it('notifies when the Worker or PWA artifact changes within the same plugin version', async () => {
 		const { showCloudflareServerUpdateNotice } = await loadUpdateNotice();
 		const plugin = createPlugin();
@@ -123,4 +161,11 @@ describe('showCloudflareServerUpdateNotice', () => {
 
 		expect(notices).toHaveLength(0);
 	});
+});
+
+it.each([true, false])('only advertises a development update for its target server (matches=%s)', async matches => {
+	embeddedArtifact.development = { number: 28, worker: matches ? 'crate-0123456789abcdef' : 'crate-fedcba9876543210' };
+	const { showCloudflareServerUpdateNotice } = await loadUpdateNotice();
+	showCloudflareServerUpdateNotice(createPlugin({ lastKnownRevision: release.revision - 1 }) as never);
+	expect(notices).toHaveLength(matches ? 1 : 0);
 });

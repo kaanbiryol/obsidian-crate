@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 5 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 8 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -66,7 +66,7 @@ Replace the example name with your development Worker's name. To save it for fut
 
 The ignored root file `server-development.local.json` holds a readable version such as `{ "version": "1-dev.2" }`. Each development Worker build increments it automatically; it can also be edited locally without committing it. A new public revision starts its own development sequence at 1. Stable builds leave this file untouched. Keep it across builds, including when cleaning `.generated/`. If it is lost or you change computers, set its version to at least the last deployed development build for the current public revision before rebuilding. Concurrent builds should use separate checkouts. A reused number with different bytes and older build numbers are rejected.
 
-Development artifacts are restricted to the exact Worker named at build time. The first development build must target a revision newer than the installed stable release. Successive development builds can replace each other within that revision; `npm run build` produces a stable build that can replace the development build at the same revision. Once stable is installed, start development of the next revision. Stable plugin/server packaging and release verification reject development artifacts.
+Development artifacts are restricted to the exact Worker named at build time. For other Workers, settings explain that the bundled development build cannot update that server and offer no update or retry action; startup does not advertise it as an available update. The first development build must target a revision newer than the installed stable release. Successive development builds can replace each other within that revision; `npm run build` produces a stable build that can replace the development build at the same revision. Once stable is installed, start development of the next revision. Stable plugin/server packaging and release verification reject development artifacts.
 
 Development updates retain schema checks, migration receipts, verified backups when required, deployment ownership, exact-artifact recovery and live verification. Do not edit migrations already applied to a database you retain. Protocol, parser and stored-format versions remain independent of the development counter. This workflow targets plugin-managed Cloudflare deployments; the self-hosted storage compatibility contract is unchanged.
 
@@ -85,8 +85,11 @@ is not enabled by this compatibility export.
 The plugin saves `cloudflareDeployment.lastKnownRevision` in its local settings
 only after a verified deployment, completed recovery, or successful live version
 check. The startup notice uses the saved artifact fingerprint to suggest reviewing
-an update. In settings, the update row automatically checks the server when its
-saved revision is missing or equal to the bundled revision. Successful checks
+an update. If a cached live check or the connected server's saved revision is newer
+than the plugin's bundled revision, it explains that updating the server requires
+a newer plugin build instead. Settings show the required server revision and keep
+server downgrades blocked. In settings, the update row automatically checks the
+server when its saved revision is missing or equal to the bundled revision. Successful checks
 populate the saved revision; opening the separate server details alone does not
 start a request. Cached revisions
 are informational; deployment verification and update authorization still inspect
