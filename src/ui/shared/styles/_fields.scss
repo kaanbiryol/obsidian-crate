@@ -4,10 +4,10 @@
 	.crate-text-input {
 		box-sizing: border-box;
 		width: 100%; min-width: 0; min-height: var(--crate-field-height);
-		margin: 0; padding: 10px var(--crate-field-padding-inline, 12px);
+		margin: 0; padding: 10px var(--crate-field-padding-inline, 16px);
 		font: 16px/1.5 var(--font-interface, system-ui, sans-serif);
 		color: var(--text-normal); background: var(--crate-control-bg);
-		border: 1px solid var(--crate-divider); border-radius: var(--crate-field-radius, var(--crate-radius-control, 8px));
+		border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-field-rounded, 16px);
 		box-shadow: none;
 		&:focus { box-shadow: none; }
 		&::placeholder { color: var(--text-faint, var(--text-muted)); }
@@ -20,22 +20,16 @@
 	.crate-copyable-text > .crate-action-button { justify-self: start; }
 	.crate-copyable-text > [role]:empty { display: none; }
 	.crate-field { display: grid; gap: 8px; min-width: 0; }
-	// Opt in per field so reminder editors retain their existing geometry.
-	.crate-field--rounded {
-		--crate-field-radius: var(--crate-radius-field-rounded);
-		--crate-field-height: 48px;
-		--crate-field-padding-inline: 16px;
-	}
 	.crate-field__label { color: var(--text-muted); font-size: 13px; }
 	.crate-field__label--hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 	.crate-field__control { position: relative; display: flex; align-items: center; min-width: 0; }
-	.crate-field__icon { position: absolute; left: var(--crate-field-padding-inline, 12px); display: flex; color: var(--text-muted); pointer-events: none; }
-	.crate-field__icon + .crate-text-input { padding-left: calc(var(--crate-field-padding-inline, 12px) + 28px); }
+	.crate-field__icon { position: absolute; left: var(--crate-field-padding-inline, 16px); display: flex; color: var(--text-muted); pointer-events: none; }
+	.crate-field__icon + .crate-text-input { padding-left: calc(var(--crate-field-padding-inline, 16px) + 28px); }
 	.crate-field__description, .crate-field__error { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 	.crate-field__description { color: var(--text-muted); }
 	.crate-field__error { color: var(--text-error); }
 	.crate-field--search {
-		.crate-field__control { gap: 9px; padding: 0 var(--crate-field-padding-inline, 12px); background: var(--crate-control-bg); border: 1px solid var(--crate-divider); border-radius: var(--crate-field-radius, var(--crate-radius-control, 8px)); }
+		.crate-field__control { gap: 9px; padding: 0 var(--crate-field-padding-inline, 16px); background: var(--crate-control-bg); border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-field-rounded, 16px); }
 		.crate-field__control { @include focus.within; }
 		.crate-field__icon { position: static; flex: none; }
 		.crate-text-input { min-height: calc(var(--crate-field-height) - 2px); padding: 8px 0; border: 0; border-radius: 0; background: transparent; }

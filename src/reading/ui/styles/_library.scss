@@ -71,6 +71,7 @@
 .crate-reminders-ui .crate-reading[data-list-style="flat"] {
 	.crate-reading__item {
 		@include list-item.flat-surface;
+		border-radius: 8px;
 		margin-bottom: 0;
 		@media (hover: hover) and (pointer: fine) {
 			&:hover { background: var(--crate-reminder-card-hover-bg); }

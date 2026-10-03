@@ -67,11 +67,11 @@ both hosts together.
   and the Completed toggle. Header, settings, picker, toolbar, and article-content
   separators retain their existing treatment. Metadata and overdue dates use the host's
   original text and error colors; only hover/press fills add surface blending.
-- Reading search and PWA Save a link fields opt into `crate-field--rounded`: 16px
-  corners, 48px minimum height, and 16px horizontal padding. Their filled
-  surfaces, borders, and focus rings retain shared theme colors. Reminder
-  editor fields retain their existing geometry. Plugin Save a link uses the standard
-  shared text field and reminder header Save action, with no footer actions.
+- Shared text fields use one rounded style in both hosts: 16px corners, 48px
+  minimum height, and 16px horizontal padding. Their filled surfaces, borders,
+  and focus cues retain shared theme colors. Plugin Save a link uses the reminder
+  header Save action, with no footer actions. Flat Reading rows use the same 8px
+  hover/press corners as reminder rows.
 - `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
   `usePressFeedback` owns momentary interaction state for buttons, reminder cards,
   and native picker rows. Style it with `data-press-active`; never use CSS

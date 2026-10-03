@@ -30,7 +30,7 @@ export function ReadingTagsForm({ id: formId, initialTags, busy, error, onSave }
 		event.preventDefault();
 		if (!busy && !composing.current) onSave([...new Set([...tags, ...parseTags(draft)])]);
 	}}>
-		<div className="crate-field crate-field--rounded">
+		<div className="crate-field">
 			<label className="crate-field__label crate-field__label--hidden" htmlFor={id}>Tags</label>
 			<div className="crate-reading-tags__control">
 				{tags.map(tag => <Button key={tag} className="crate-reading-tags__chip" aria-label={`Remove tag ${tag}`} disabled={busy} preventFocusOnPress onClick={() => {

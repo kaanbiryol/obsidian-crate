@@ -93,7 +93,7 @@ export function reminderListStyleCases() {
         }
       }
       const readingRows = page.locator('.crate-reading__item');
-      await expect(readingRows.first()).toHaveCSS('border-radius', '0px');
+      await expect(readingRows.first()).toHaveCSS('border-radius', '8px');
       await expect(readingRows.first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       for (const list of await page.locator('.crate-reading__list').all()) {
         const rows = list.locator('.crate-reading__item');

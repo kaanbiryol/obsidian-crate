@@ -20,7 +20,7 @@ export function SaveLinkDialog({ url, onUrl, saving, error, onSave, onClose, var
   try { readingUrl(url); canSave = !saving; } catch { /* Keep Save disabled until the link is valid. */ }
   return <ReadingDialog title="Save a link" variant={variant} showBackdrop={showBackdrop} busy={saving} onClose={onClose}
     action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: formId, disabled: !canSave, busy: saving }}>
-    <SaveLinkForm id={formId} captureOnDevice={captureOnDevice} headerAction rounded={false} url={url} onUrl={onUrl} saving={saving} error={error}
+    <SaveLinkForm id={formId} captureOnDevice={captureOnDevice} headerAction url={url} onUrl={onUrl} saving={saving} error={error}
       onCancel={onClose} onSave={() => { if (canSave) onSave(); }} />
   </ReadingDialog>;
 }
