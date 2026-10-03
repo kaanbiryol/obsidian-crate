@@ -1,3 +1,4 @@
+import { ObsidianReadingDialog } from '@/reading/ui/ObsidianReadingDialog';
 import { ReminderListStyleFixture } from './ReminderListStyleFixture';
 import { NavigationFixture } from './NavigationFixture';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
@@ -73,7 +74,7 @@ function Gallery() {
   else if (scene === 'source') content = <SourceNoticeFixture isDark={isDark} />;
   else if (scene === 'motion') content = <MotionFixture host={host} />;
   else if (scene === 'controls') content = <ControlsFixture host={host} />;
-  else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : null}><ReadingFixture onAdd={() => setResult('Save link opened')} /></ReadingDialogHost.Provider>;
+  else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : ObsidianReadingDialog}><ReadingFixture onAdd={() => setResult('Save link opened')} /></ReadingDialogHost.Provider>;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server rebuild failed" onClose={noop} footer={<div className="crate-modal-actions"><Button variant="outline" onClick={noop}>Close</Button><Button variant="primary" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish rebuilding your Cloudflare server." details={['In Crate settings → Recovery and troubleshooting → Troubleshooting, select “Resume server rebuild” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;

@@ -31,3 +31,23 @@
 	}
 }
 @media (prefers-reduced-motion: reduce) { .crate-reminders-ui .crate-reading * { transition: none !important; animation: none !important; } }
+
+// Pane-local overlays sit above the dock without escaping into Obsidian's window.
+.crate-reminders-ui .crate-reading-workspace { position: relative; }
+.crate-reminders-ui .crate-reading-pane-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 60;
+	pointer-events: none;
+	.base-modal-container { position: absolute; }
+	.crate-reading-dialog { width: 100%; max-width: 100%; }
+}
+
+.crate-reminders-ui .crate-reading-dialog.crate-reading-dialog--full {
+	display: flex; flex-direction: column; overflow: hidden;
+	.base-modal-drag-region, .reminder-modal-header { flex-shrink: 0; }
+	.crate-modal-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: max(var(--crate-dialog-padding), var(--reminders-host-bottom-inset, 0px)); }
+}
+.crate-reminders-ui .crate-reading-pane-overlay .crate-reading-dialog--full.is-bottom-sheet {
+	height: calc(100% - 20px);
+}
