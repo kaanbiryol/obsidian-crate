@@ -817,7 +817,8 @@ without an error alert. Keep navigation mounted while **Check again** is pending
 Plugin settings use three top-level groups: **Sync** for connection status,
 sync options, and web app access; **Features** for the matching **Reminders**,
 **Reading**, and **Notifications** disclosures; and **Management** for
-**Account and devices**, **Server**, and **Troubleshooting**. Feature switches
+**Account and devices**, **Usage**, **Server**, and **Troubleshooting**. **Usage**
+shows Cloudflare account metrics and allowances when an account is configured. Feature switches
 live inside their disclosures. Collapsed rows summarize folder choices or status.
 The web-app row has two visible actions: **Open app** and **Connect another device**.
 Connecting another device opens a QR dialog with **Copy link**; if clipboard
@@ -828,7 +829,7 @@ available. Notifications remain independent of the local reminders switch.
 Reading folder selection stays available while disabled because server folder
 changes require Reading to be off.
 
-**Account and devices** and **Server** mount their contents on first expansion;
+**Account and devices**, **Usage**, and **Server** mount their contents on first expansion;
 the notification toggle, schedule, and device controls mount when **Notifications**
 opens. The collapsed status and notification toggle check the shared server policy.
 Device lists are not fetched for collapsed sections. Management sections avoid

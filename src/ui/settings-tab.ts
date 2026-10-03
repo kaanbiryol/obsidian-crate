@@ -105,11 +105,18 @@ export class CrateSettingTab extends PluginSettingTab {
 					this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
 				},
 			});
+			if (this.plugin.settings.cloudflareDeployment?.accountId) {
+				createSettingsDisclosure(containerEl, 'Usage', {
+					summary: 'Cloudflare account usage and allowances',
+					onOpen: content => {
+						this.cleanupFns.push(renderUsageSection(content, this.plugin));
+					},
+				});
+			}
 			const serverEl = createSettingsDisclosure(containerEl, 'Server', {
-				summary: 'Versions, usage, backups, and management',
+				summary: 'Versions, backups, and management',
 				onOpen: content => {
 					renderServerSection({ containerEl: content, plugin: this.plugin, rerender: () => this.update() });
-					this.cleanupFns.push(renderUsageSection(content, this.plugin));
 					renderServerActions({ containerEl: content, plugin: this.plugin, isConfigured, rerender: () => this.update() });
 				},
 			});
