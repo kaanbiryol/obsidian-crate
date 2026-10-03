@@ -11,17 +11,19 @@ export const bundleBudgets = {
 		// Durable rename checkpoints and legacy capture recovery add about 10 KB.
 		// Authenticated PWA folder following adds about 4.5 KB; measured 5.493 MB raw.
 		// Encrypted app approval adds the plugin dialog, relay and shared WebCrypto:
-		// measured 5.516 MB raw; allow 9 KB for build variation.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5525000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2780000', 10),
+		// measured 5.516 MB raw. YouTube metadata, browser lookup and video UI
+		// bring the total to 5.526 MB raw / 2.780 MB gzip; retain a small margin.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5530000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2785000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Shared controls, sync/history, responsive Reading panes, reader and sheets:
 		// Shared list styles, current activity controls and encryption UI measure
 		// 308.2 KB raw / 40.1 KB gzip, including compact pairing states.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '308500', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '40200', 10),
+		// YouTube thumbnails add 1.8 KB raw / 0.22 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '310500', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '40500', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

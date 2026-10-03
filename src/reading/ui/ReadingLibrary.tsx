@@ -11,11 +11,11 @@ import { FloatingActionButton } from '../../reminders/components/FloatingActionB
 import { EmptyState } from '../../reminders/components/EmptyState';
 import type { ReadingChanges, ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, type ReadingSection } from './reading-presentation';
+import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from './reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
-import { ReadingSourceIcon } from './ReadingSourceIcon';
+import { ReadingItemContent } from './ReadingItemContent';
 
 export interface ReadingLibraryProps {
 	listStyle?: ListStyle;
@@ -139,8 +139,8 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 							{section === 'inbox' && !query && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}><ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link</Button>}
 						</EmptyState>}
 						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}><h3>{group.label}</h3><ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
-							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${item.title}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
-								<ReadingSourceIcon item={item} /><span className="crate-reading__item-copy"><strong>{item.title}</strong><span className="crate-reading__meta">{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Text pending' : item.source_url ? 'Link only' : 'Empty note'}</>}</span></span>
+							<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`} aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
+								<ReadingItemContent item={item} />
 							</Button><IconButton size="large" icon="star" className="crate-reading__favorite" label={item.favorite ? 'Remove favorite' : 'Favorite'} aria-pressed={item.favorite} data-filled={item.favorite} disabled={pendingItemIds?.has(item.crate_reading_id)} aria-disabled={busy.has(item.crate_reading_id) || pendingItemIds?.has(item.crate_reading_id)} onClick={() => run(item.crate_reading_id, () => onUpdate(item, { favorite: !item.favorite }))} />
 						</li>)}</ul></section>)}
 						{visible < count && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}

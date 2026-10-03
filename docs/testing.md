@@ -576,6 +576,18 @@ Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 `src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
 Browser OAuth handoff and real hosted credentials still require manual acceptance.
 
+## Saved YouTube videos
+
+For YouTube video capture, run the focused `youtube`, `desktop-capture`, and
+Reading extraction transport unit tests plus `reading-captures.integration.ts`
+in the Worker runtime. After building the plugin, run
+`node scripts/visual-test-run.mjs tests/visual/reading-video.spec.ts --workers=2`
+for Chromium/WebKit coverage in both plugin and PWA hosts at phone and desktop
+widths. It checks loaded and failed thumbnails, metadata failure/pending states,
+timestamp-preserving watch links, retained note text, tags, favorites, and watched
+state. Screenshots use synthetic thumbnail fixtures; physical-device playback
+handoff and hosted YouTube availability need separate verification.
+
 ## Reading touch feedback
 
 Run `node scripts/pwa-project-transition-test.mjs` for project navigation and

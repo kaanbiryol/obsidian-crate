@@ -71,8 +71,8 @@ it('rolls back enqueue if its receipt cannot commit', async () => {
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
 });
 
-it('leases failed fetches durably and falls back after three attempts', async () => {
-	const { row } = await capture();
+it.each(['https://example.com/article', 'https://youtu.be/jNQXAC9IVRw?t=42'])('leases failed fetches durably and falls back after three attempts: %s', async url => {
+	const { row } = await capture({ url });
 	const fetch = vi.fn(async () => { throw new Error('Network unavailable'); });
 	const setAlarm = vi.fn(async () => {});
 	const state = { storage: { setAlarm } } as unknown as DurableObjectState;
@@ -88,6 +88,19 @@ it('leases failed fetches durably and falls back after three attempts', async ()
 	expect(fetch).toHaveBeenCalledTimes(3);
 	expect(setAlarm).toHaveBeenCalledTimes(3);
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
-	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/example.com - ${row.id.slice(0, 8)}.md`))!;
-	expect(parseReadingNote(file.content)?.extraction_status).toBe('unavailable');
+	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/${new URL(url).hostname} - ${row.id.slice(0, 8)}.md`))!;
+	expect(parseReadingNote(file.content)).toMatchObject({ extraction_status: 'unavailable', source_url: url });
 }, 15_000); // Three complete D1/R2 attempts need room for slower CI I/O.
+
+it('publishes a video with metadata and its timestamp through the normal capture queue', async () => {
+	const url = 'https://youtu.be/jNQXAC9IVRw?t=42#keep';
+	const { row } = await capture({ url });
+	const fetch = vi.fn(async () => Response.json({ type: 'video', title: 'A video', author_name: 'A channel', html: '<iframe src="https://youtube.com/embed/jNQXAC9IVRw"></iframe>' }));
+	await runCapture({ ...env, READING_FETCH: { fetch } }, { storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, true);
+	expect(fetch).toHaveBeenCalledTimes(1);
+	expect(new URL((fetch.mock.calls[0] as unknown as [Request])[0].url).pathname).toBe('/oembed');
+	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/A video - ${row.id.slice(0, 8)}.md`))!;
+	expect(parseReadingNote(file.content)).toMatchObject({ title: 'A video', author: 'A channel', source_url: url, extraction_status: 'ready' });
+	expect(file.content).not.toContain('<iframe');
+	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
+});

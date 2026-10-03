@@ -1,0 +1,15 @@
+.crate-reminders-ui .crate-reading-video {
+	margin: 0 0 28px;
+	&__thumbnail { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 72px; width: 72px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 7px; background: var(--background-secondary); color: var(--text-muted); }
+	&__thumbnail img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+	&__thumbnail img[data-loaded='true'] { opacity: 1; }
+	&__play { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--crate-app-bg); color: var(--text-normal); }
+	&__thumbnail[data-large='true'] { display: flex; width: 100%; border-radius: 12px; }
+	&__thumbnail[data-large='true'] .crate-reading-video__play { width: 52px; height: 52px; }
+	&__watch { display: block; color: var(--text-normal); text-decoration: none; border-radius: 12px; }
+	&__watch:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 3px; }
+	&__label { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; font-size: 15px; font-weight: 500; }
+	&__hint { margin: 0; text-align: center; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+}
+.crate-reminders-ui .crate-reading__open > .crate-reading-video__thumbnail { align-self: center; margin-left: auto; }
+.crate-reminders-ui .crate-reading__open:has(> .crate-reading-video__thumbnail) .crate-reading__item-copy { flex: 1; }

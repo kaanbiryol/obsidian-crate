@@ -1,4 +1,5 @@
 import type { ReadingItem } from '../core/model';
+import { youtubeVideoId } from '../core/youtube';
 
 export type ReadingSection = 'inbox' | 'favorites' | 'archived' | 'highlights';
 export const readingSections = [
@@ -7,6 +8,10 @@ export const readingSections = [
 ] as const;
 
 export function readingSource(url: string): string { return url ? new URL(url).hostname.replace(/^www\./, '') : 'Vault note'; }
+
+export function readingTitle(item: Pick<ReadingItem, 'title' | 'source_url'>): string {
+	return youtubeVideoId(item.source_url) && item.title === new URL(item.source_url).hostname ? 'YouTube video' : item.title;
+}
 
 export function filterReadingItems(items: ReadingItem[], section: ReadingSection, query: string, tag: string | null): ReadingItem[] {
 	const search = query.trim().toLocaleLowerCase();

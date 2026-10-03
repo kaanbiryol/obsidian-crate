@@ -70,12 +70,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
         await env.DB.batch([env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision),
           env.DB.prepare('DELETE FROM reading_sources WHERE path=?').bind(job.path)]);
       } else {
-        try {
-          const { fetchArticle } = await import('./transport');
-          const article = await fetchArticle(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
-          const { extractDocument } = await import('./document');
-          result = extractDocument(article.html, article.url); resolvedUrl = article.url;
-        }
+        try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
         catch { if (job.attempts < 2) return; }
         const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
         const response = await stub.fetch('https://do/reading-publish', { method: 'POST', body: JSON.stringify({ job, result, resolvedUrl }) });

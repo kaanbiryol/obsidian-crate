@@ -20,6 +20,28 @@ A user shares an article from their phone, sees it in Crate's reading inbox, rea
 
 Deferred: RSS, newsletters, PDFs, video transcripts, AI features, full-library body search, creating/managing highlights inside Crate, automatic offline image downloads, native mobile apps, and reading reminder integration. Existing highlighted text or selections saved by Web Clipper remain ordinary note content. A later **Remind me** action can create a normal Crate reminder linked to the article; the first release does not introduce another scheduling system.
 
+### Saved YouTube videos
+
+Recognize watch, short-link, Shorts, live and embed video URLs on YouTube's exact
+hosts. Existing saved links gain the video presentation without rewriting their
+source URL or timestamp. Playlist and channel URLs remain ordinary links.
+Show a thumbnail and **Video** label in the list; the reader offers **Watch on
+YouTube**, saved note text, tags, favorites and **Mark as watched**. Videos have no
+reading-time estimate or article-extraction failure warning. A failed thumbnail
+uses a play-icon placeholder; failed metadata leaves the saved video usable.
+
+Desktop capture and server capture fetch public oEmbed JSON from YouTube with
+their existing network boundaries and permission rules. Encrypted PWA captures
+request metadata directly in the browser; blocked requests remain encrypted
+pending bookmarks for an unlocked Obsidian device. Limit metadata to 64 KiB;
+retain only title and channel (the existing `author` property). Ignore oEmbed's
+player HTML and image URLs. A successful metadata capture uses `ready` with an
+empty managed article block; failure uses `unavailable`. The note format and API
+remain unchanged. Derive thumbnail URLs from validated video IDs on `i.ytimg.com`.
+The save form and README disclose these requests. Offline availability covers
+saved details and note text; video playback requires a connection. Embedded
+playback and transcript fetching remain deferred.
+
 ## User experience
 
 ### Enable Reading

@@ -25,6 +25,11 @@ initial.push(...[
 ].map(([title, source_url, tag], index): ReadingItem => ({ ...initial[0]!, title: title!, source_url: source_url!, tags: [tag!], author: undefined,
 	crate_reading_id: `5a2786df-f5da-4937-b9c3-83db99c88cc${index}`, saved_at: `2026-09-${index < 2 ? '20' : '18'}T0${9 - index}:00:00.000Z`, path: `Reading/Article-${index}.md`, favorite: index === 1,
 })));
+const videos: ReadingItem[] = [
+	{ ...initial[0]!, title: 'A day at the museum', author: 'The curious channel', source_url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw&t=42s', capture_method: 'url' },
+	{ ...initial[1]!, title: 'youtu.be', source_url: 'https://youtu.be/aqz-KE-bpKQ?t=30', extraction_status: 'unavailable', favorite: false },
+	{ ...initial[2]!, title: 'youtube.com', source_url: 'https://youtube.com/shorts/ScMzIvxBSi4', extraction_status: 'pending', capture_method: 'url' },
+];
 const body = `A good article deserves more than a passing glance. Save something that catches your attention, and return when you have a little time.
 
 ## Make room for the interesting things
@@ -57,8 +62,9 @@ const reading = ['one good thing', 'another'];
 `;
 
 export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, listStyle }: { listStyle?: ReadingLibraryProps['listStyle']; onAdd: () => void; renderNavigation?: ReadingLibraryProps['renderNavigation']; renderLibraryContent?: ReadingLibraryProps['renderLibraryContent'] }) {
+	const videoFixture = new URLSearchParams(location.search).has('reading-video');
 	const immediateReaderReturn = new URLSearchParams(location.search).has('reading-back');
-	const [items, setItems] = useState(() => new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
+	const [items, setItems] = useState(() => videoFixture ? videos : new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
 	const update = async (item: ReadingItem, changes: Partial<ReadingItem>) => {
@@ -70,7 +76,7 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
 	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
-		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status="Available offline" onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
+		onUpdate={update} activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
 		{adding && (new URLSearchParams(location.search).get('host') === 'plugin' ? <SaveLinkDialog variant={innerWidth > 600 ? 'centered' : 'bottom-sheet'} url={url} onUrl={setUrl} saving={false} onClose={() => setAdding(false)} onSave={() => setAdding(false)} /> : <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>)}
 	</>;
 }

@@ -56,12 +56,9 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
   let result: Publication['result'] = null, resolvedUrl: string | undefined;
   if (enabled) {
     try {
-      const { fetchArticle } = await import('./extraction/transport');
-      const article = await fetchArticle(parseReadingNote(capture.note)!.source_url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
-      // Failed downloads need only the durable retry; avoid initializing the
-      // large parser until there is actual article content to extract.
-      const { extractDocument } = await import('./extraction/document');
-      result = extractDocument(article.html, article.url); resolvedUrl = article.url;
+      const { fetchReadingCapture } = await import('./extraction/transport');
+      const captureResult = await fetchReadingCapture(parseReadingNote(capture.note)!.source_url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN);
+      result = captureResult.article; resolvedUrl = captureResult.url;
     } catch { if (capture.attempts < 2) return; }
   }
   const response = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/reading-publish', {

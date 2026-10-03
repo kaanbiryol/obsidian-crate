@@ -85,6 +85,17 @@ or page referrer with the image. Each browser or Obsidian device may cache icons
 independently and may request them again. A letter appears when an icon cannot
 load, including offline. Article images remain suppressed.
 
+YouTube video links show a thumbnail, title and channel, with **Watch on YouTube**
+and **Mark as watched** actions. Saving a video fetches its public title and channel
+from YouTube on the same device or server used for article extraction. Encrypted
+PWA captures request metadata directly in the browser, keeping URLs off the
+Crate server; blocked requests remain pending for an unlocked Obsidian device. Failed
+lookups keep a usable video bookmark. Opening Reading may request video thumbnails
+from `i.ytimg.com`; the same image privacy and browser caching behavior described
+above applies. Video playback opens the original link, including its timestamp,
+and requires an internet connection. Crate does not download videos or transcripts.
+Saved details and any text in the note remain available offline once cached.
+
 For desktop capture, set Obsidian Web Clipper to save into Crate's Reading folder
 in the intended vault, then clip normally. No Crate template is needed. Every
 Markdown note in that folder and its subfolders appears in Reading. Crate adds

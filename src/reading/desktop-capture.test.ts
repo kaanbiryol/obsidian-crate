@@ -10,6 +10,18 @@ const response = (body = html, status = 200, contentType = 'text/html; charset=u
 afterEach(() => { vi.resetAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('desktop article capture', () => {
+  it('fetches only public metadata for a YouTube video', async () => {
+    vi.mocked(requestUrl).mockResolvedValue(response('{"type":"video","title":"A video","author_name":"Channel"}', 200, 'application/json'));
+    expect(await captureDesktopArticle('https://youtu.be/jNQXAC9IVRw?t=42', new AbortController().signal)).toEqual({ markdown: '', title: 'A video', author: 'Channel' });
+    expect(requestUrl).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(requestUrl).mock.calls[0]![0]).toMatchObject({ url: 'https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw&format=json', headers: { Accept: 'application/json' } });
+  });
+  it('rejects oversized or unavailable video details while allowing the caller to retain its bookmark', async () => {
+    vi.mocked(requestUrl).mockResolvedValue(response('x'.repeat(65537), 200, 'application/json'));
+    await expect(captureDesktopArticle('https://youtu.be/jNQXAC9IVRw', new AbortController().signal)).rejects.toThrow('Video details');
+    vi.mocked(requestUrl).mockResolvedValue(response('', 404, 'application/json'));
+    await expect(captureDesktopArticle('https://youtu.be/jNQXAC9IVRw', new AbortController().signal)).rejects.toThrow('Video details');
+  });
   it('uses native HTTP and extracts inert HTML without extra network requests', async () => {
     vi.mocked(requestUrl).mockResolvedValue(response());
     const fetch = vi.fn(() => { throw new Error('No extractor network requests'); });
