@@ -6,8 +6,9 @@ import { EncryptedFiles } from './encrypted-files';
 import { createVaultKeyBundle } from '../encryption/key-bundle';
 import { arrayBufferToBase64 } from './encoding';
 import { computeHash } from './hasher';
-import type { WorkerApiHttpClient } from './worker-api/http';
+import { HttpError, type WorkerApiHttpClient } from './worker-api/http';
 import type { JournalUpload } from './upload-intent';
+import type { BatchUploadFile } from '../protocol/sync-types';
 
 async function fixture() {
 	const disk = new PersistentTestVault();
@@ -87,5 +88,47 @@ it('preserves a legacy upload when encryption cannot establish its old outcome',
 		resolveLegacyUpload: async () => { throw new Error('Old receipt expired'); }, uploadFile, batchUpload: vi.fn(),
 	}, { putBase: vi.fn() } as never, crypto.randomUUID()).recover()).rejects.toThrow('Old receipt expired');
 	expect(uploadFile).not.toHaveBeenCalled(); expect(manifest.uploadJournal.pending()).toHaveLength(1);
+	await manifest.close();
+});
+
+it('reconciles a stale encrypted precondition without blocking the rest of its batch', async () => {
+	const { create, file, encryption } = await fixture();
+	const manifest = create();
+	vi.spyOn(encryption, 'expectedHash').mockImplementation(async path => {
+		if (path === 'stale.md') throw new HttpError('Remote file changed', 409, null, 'version_conflict');
+		return null;
+	});
+	const batchUpload = vi.fn(async (files: BatchUploadFile[]) => ({ success: true,
+		results: files.map(file => ({ path: file.path, hash: file.hash, revision: `revision-${file.path}`, success: true })) }));
+	const files = ['before.md', 'stale.md', 'after.md'].map(path => ({ ...file, path }));
+	const result = await new DurableUploads(manifest, {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: file => encryption.prepare(file),
+		batchUpload, uploadFile: vi.fn(),
+	}, { putBase: vi.fn(async () => {}) } as never, crypto.randomUUID()).batch(files);
+	expect(result.success).toBe(false);
+	expect(result.results).toMatchObject([
+		{ path: 'before.md', success: true, hash: file.hash },
+		{ path: 'stale.md', success: false, status: 409, code: 'version_conflict' },
+		{ path: 'after.md', success: true, hash: file.hash },
+	]);
+	expect(batchUpload).toHaveBeenCalledOnce();
+	expect(batchUpload.mock.calls[0]![0].map(file => file.path)).toEqual(['before.md', 'after.md']);
+	expect(manifest.getEntry('stale.md')).toBeUndefined();
+	expect(manifest.uploadJournal.pending()).toEqual([]);
+	await manifest.close();
+});
+
+it.each([409, 401, 503])('only handles version conflicts when encrypted batch preparation fails (%s)', async status => {
+	const { create, file } = await fixture();
+	const manifest = create(), batchUpload = vi.fn();
+	const error = new HttpError('Preparation failed', status, null, status === 409 ? 'version_conflict' : undefined);
+	const result = new DurableUploads(manifest, {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: async () => { throw error; },
+		batchUpload, uploadFile: vi.fn(),
+	}, { putBase: vi.fn() } as never, crypto.randomUUID()).batch([file]);
+	if (status === 409) await expect(result).resolves.toMatchObject({ success: false, results: [{ path: file.path, status: 409, code: 'version_conflict' }] });
+	else await expect(result).rejects.toBe(error);
+	expect(batchUpload).not.toHaveBeenCalled();
+	expect(manifest.uploadJournal.pending()).toEqual([]);
 	await manifest.close();
 });

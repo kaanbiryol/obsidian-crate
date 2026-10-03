@@ -7,6 +7,7 @@ import { SyncTestDevice } from './sync-engine-test-harness';
 import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
 import { ENCRYPTION_STATE_KEY } from './encryption-state';
+import { SyncWorkerApi } from '../../sync/worker-api/sync';
 
 const devices: SyncTestDevice[] = [];
 let bundle: VaultKeyBundle;
@@ -62,6 +63,43 @@ it('merges encrypted offline edits across three restarted clients using plaintex
 	await converge(clients, { 'note.md': '# Shared\n\nAlpha changed\n\nBeta changed\n\nGamma changed\n' });
 	const stored = await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'note.md'").first<{ storage_key: string }>();
 	expect(await (await env.BUCKET.get(stored!.storage_key))!.text()).not.toContain('Alpha changed');
+});
+
+it.each(['sync', 'selected', 'wire-fallback'])('reconciles encrypted edits made after planning while uploading other files (%s)', async mode => {
+	// Below the plaintext batch limit but above it after encryption framing.
+	const original = '# Note\n\nAlpha.\n\nBeta.\n' + (mode === 'wire-fallback' ? 'x'.repeat(800 * 1024) : '');
+	const first = await device('selected-first');
+	first.disk.write('note.md', original); first.disk.write('other.md', 'Original'); await sync(first);
+	const rival = await device('selected-rival'); await sync(rival);
+	first.disk.write('note.md', original.replace('Alpha.', 'Local alpha.'));
+	first.disk.write('other.md', 'Unrelated local edit');
+	for (const path of ['note.md', 'other.md']) first.engine.onFileChange({ path } as never);
+	const editRemotely = async () => {
+		rival.disk.write('note.md', original.replace('Beta.', 'Remote beta.'));
+		await sync(rival);
+	};
+	if (mode === 'selected') {
+		const metadata = first.api.getFileMetadata.bind(first.api);
+		vi.spyOn(first.api, 'getFileMetadata').mockImplementationOnce(async paths => {
+			const previous = await metadata(paths); await editRemotely(); return previous;
+		});
+	} else if (mode === 'wire-fallback') {
+		// eslint-disable-next-line @typescript-eslint/unbound-method -- Reapplied to the intercepted instance below.
+		const upload = SyncWorkerApi.prototype.uploadFile;
+		vi.spyOn(SyncWorkerApi.prototype, 'uploadFile').mockImplementationOnce(async function (this: SyncWorkerApi, ...args) {
+			await editRemotely(); return upload.apply(this, args);
+		});
+	} else {
+		const upload = first.api.batchUpload.bind(first.api);
+		vi.spyOn(first.api, 'batchUpload').mockImplementationOnce(async files => {
+			await editRemotely(); return upload(files);
+		});
+	}
+	const result = await (mode === 'selected' ? first.engine.syncSelected(['note.md', 'other.md']) : first.engine.sync());
+	expect(result).toMatchObject({ success: true, merged: 1, uploaded: 1, errors: [] });
+	if (mode === 'wire-fallback') expect(first.requests).toContain('PUT /sync/upload');
+	expect((await first.engine.sync())).toMatchObject({ success: true, uploaded: 0, merged: 0, errors: [] });
+	await converge([first, rival], { 'note.md': original.replace('Alpha.', 'Local alpha.').replace('Beta.', 'Remote beta.'), 'other.md': 'Unrelated local edit' });
 });
 
 it('adopts encrypted server settings on an empty vault first sync without uploading its setup defaults', async () => {

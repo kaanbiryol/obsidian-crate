@@ -5,7 +5,7 @@
   "preparePath": "/reading/shortcut/v1/prepare",
   "exchangePath": "/reading/shortcut/v1/exchange",
   "revisionHeader": "X-Crate-Shortcut-Revision",
-  "downloadUrl": "https://crate.kaanbiryol.com/shortcuts/v1/Save%20to%20Crate%20(iOS%2027).shortcut",
+  "downloadUrl": "https://crate.kaanbiryol.com/shortcuts/v2/",
   "supportUrl": "https://crate.kaanbiryol.com/shortcuts/help/",
   "issuesUrl": "https://github.com/kaanbiryol/obsidian-crate/issues/new"
 }

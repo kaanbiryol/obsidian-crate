@@ -11,6 +11,7 @@ export interface FullSyncUploadContext {
 	reportWork?(phase: import('./types').SyncWork['phase'], current?: number, total?: number): void;
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
+	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
 	getLocalManifestEntry(path: string): FileEntry | undefined;
 	throwIfDestroyed(): void;
 	isAbortError(error: unknown): boolean;
@@ -38,6 +39,15 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 		let reported = 0;
 		context.reportWork?.('uploading', processed, diffs.length);
 		await context.uploadPreparedFiles(chunk, result, {
+			...(context.reconcileVersionConflicts ? { onVersionConflicts: async (paths: string[], syncResult: SyncResult) => {
+				await context.reconcileVersionConflicts!(paths, syncResult);
+				// Full sync saves this snapshot later; retain the reconciled baseline.
+				for (const path of paths) {
+					const entry = context.getLocalManifestEntry(path);
+					if (entry) localFiles[path] = entry;
+					else delete localFiles[path];
+				}
+			} } : {}),
 			onProcessed: (count) => {
 				reported += count;
 				processed += count;

@@ -11,6 +11,7 @@ it('sends encrypted display text with a generic mutable fallback within the Web 
 	const projection = await createReminderProjection(bundle, 'Reminders/Personal.md', bytes);
 	const notice = projection!.reminders[0]!.notification;
 	const push = createDeclarativePushPayload({ title: ENCRYPTED_NOTIFICATION_PREFIX + JSON.stringify(notice), body: '', reminderId: 'r1' }, 'https://crate.test');
+	expect(push.mutable).toBe(true);
 	expect(push.notification).toMatchObject({ mutable: true, title: 'Crate reminder', data: { encrypted: notice } });
 	expect(JSON.stringify(push)).not.toContain('Private');
 	expect(JSON.stringify(push)).not.toContain('Personal');

@@ -18,7 +18,36 @@ async function fixture() {
 	return { notice, keys };
 }
 
-it('falls back when reading notification keys never settles', async () => {
+it.each(['declarative', 'legacy'] as const)('decrypts %s pushes and preserves the notification navigation URL', async delivery => {
+	const { notice, keys } = await fixture();
+	vi.mocked(readReminderKeys).mockResolvedValue(keys);
+	const payload = { notification: { title: 'Crate reminder', body: 'Open Crate to view your reminder.',
+		navigate: `https://crate.test/notifications?reminderId=${notice.reminderId}`,
+		data: { encrypted: notice, project: '', reminderId: notice.reminderId } } };
+	const handlers = new Map<string, (event: unknown) => void>();
+	const showNotification = vi.fn(async (_title: string, options: { navigate?: string }) => {
+		// WebKit rejects replacement notifications without a valid navigation URL.
+		if (delivery === 'declarative' && !options.navigate?.startsWith('https://crate.test/')) throw new Error('Missing declarative navigation');
+	});
+	new Script(SERVICE_WORKER_JS).runInNewContext({
+		self: { addEventListener: (name: string, handler: (event: unknown) => void) => handlers.set(name, handler), registration: { showNotification } },
+		crateEncryptedPush: { decryptPushDisplay },
+	});
+	let completed!: Promise<void>;
+	handlers.get('push')!({
+		// Safari supplies a Notification with prototype getters and null event.data.
+		...(delivery === 'declarative' ? { data: null, notification: Object.create(payload.notification) as unknown }
+			: { data: { json: () => payload } }),
+		waitUntil: (work: Promise<void>) => { completed = work; },
+	});
+	await completed;
+	expect(showNotification).toHaveBeenCalledExactlyOnceWith('Private push', expect.objectContaining({
+		navigate: payload.notification.navigate,
+		data: { project: '', reminderId: notice.reminderId, navigate: payload.notification.navigate },
+	}));
+});
+
+it.each(['declarative', 'legacy'] as const)('falls back when reading notification keys never settles for a %s push', async delivery => {
 	const { notice } = await fixture();
 	vi.mocked(readReminderKeys).mockReturnValue(new Promise(() => {}));
 	vi.useFakeTimers();
@@ -29,10 +58,12 @@ it('falls back when reading notification keys never settles', async () => {
 		crateEncryptedPush: { decryptPushDisplay },
 	});
 	let completed!: Promise<void>;
-	handlers.get('push')!({ data: { json: () => ({ notification: { data: { encrypted: notice } } }) }, waitUntil: (work: Promise<void>) => { completed = work; } });
+	const notification = { navigate: 'https://crate.test/notifications?reminderId=one', data: { encrypted: notice, reminderId: 'one' } };
+	handlers.get('push')!({ ...(delivery === 'declarative' ? { data: null, notification } : { data: { json: () => ({ notification }) } }),
+		waitUntil: (work: Promise<void>) => { completed = work; } });
 	await vi.advanceTimersByTimeAsync(3000);
 	await completed;
-	expect(showNotification).toHaveBeenCalledExactlyOnceWith('Crate reminder', expect.objectContaining({ body: 'Open Crate to view your reminder' }));
+	expect(showNotification).toHaveBeenCalledExactlyOnceWith('Crate reminder', expect.objectContaining({ body: 'Open Crate to view your reminder', navigate: notification.navigate }));
 	expect(vi.getTimerCount()).toBe(0);
 });
 

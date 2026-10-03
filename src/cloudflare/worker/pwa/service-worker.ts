@@ -121,8 +121,9 @@ self.addEventListener('fetch', function(event) {
 
 self.addEventListener('push', function(event) {
 	var payload = {};
-	try { payload = event.data ? event.data.json() : {}; } catch {}
-	var notification = payload.notification || payload;
+	try { payload = event.data ? event.data.json() || {} : {}; } catch {}
+	// Safari delivers declarative pushes as a Notification, with event.data null.
+	var notification = event.notification || payload.notification || payload;
 	var notificationData = notification.data || {};
 	event.waitUntil(
 		(async function() {
@@ -130,6 +131,9 @@ self.addEventListener('push', function(event) {
 			? await crateEncryptedPush.decryptPushDisplay(notificationData.encrypted) : null;
 		return self.registration.showNotification(display ? display.title : notificationData.encrypted ? 'Crate reminder' : notification.title || 'Reminder', {
 			body: display ? display.body : notificationData.encrypted ? 'Open Crate to view your reminder' : notification.body || '',
+			// Required by Safari when replacing a declarative notification. Keeping
+			// the URL only inside data makes showNotification reject the replacement.
+			navigate: notification.navigate || undefined,
 			tag: notification.tag || 'crate-reminder',
 			icon: notification.icon || '/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}',
 			data: {

@@ -289,8 +289,15 @@ export class SyncWorkerApi {
 		for (const file of files) this.assertWireContentType(file.contentType);
 		if (this.encryption && (files.some(file => file.size > BATCH_FILE_SIZE_LIMIT) || files.reduce((bytes, file) => bytes + file.size, 0) > 8 * 1024 * 1024)) {
 			const results: UploadResult[] = [];
-			for (const file of files) results.push(await this.uploadFile(file.path, base64ToArrayBuffer(file.content), file.hash,
-				file.size, file.contentType, file.expectedHash, file.operationId));
+			for (const file of files) {
+				try {
+					results.push(await this.uploadFile(file.path, base64ToArrayBuffer(file.content), file.hash,
+						file.size, file.contentType, file.expectedHash, file.operationId));
+				} catch (error) {
+					if (!(error instanceof HttpError) || error.status !== 409 || (error.code !== 'version_conflict' && error.code !== 'namespace_conflict')) throw error;
+					results.push({ path: file.path, success: false, status: error.status, code: error.code, error: error.message });
+				}
+			}
 			return { success: results.every(result => result.success), results };
 		}
 		if (files.some(file => !file.operationId)) {

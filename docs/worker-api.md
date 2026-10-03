@@ -364,7 +364,11 @@ Save a push subscription owned by the authenticated session. Public requests are
 
 Request: `{ endpoint, keys: { p256dh, auth }, deviceName? }`
 
-Response: `{ id }`
+Response: `{ id, notificationsEnabled }`. Registration confirms the device's push
+endpoint; `notificationsEnabled` separately confirms that the shared notification
+policy and Reminders feature allow scheduling for its enrolled folder. Registering
+a device does not enable a paused policy. Clients refresh this status on foreground
+and must not infer that delivery is enabled from device registration alone.
 
 ### DELETE /notifications/subscribe
 

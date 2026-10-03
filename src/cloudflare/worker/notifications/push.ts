@@ -43,6 +43,7 @@ export interface PushNotificationPayload {
 
 interface DeclarativePushPayload {
 	web_push: 8030;
+	mutable?: boolean;
 	notification: {
 		title: string;
 		mutable?: boolean;
@@ -68,9 +69,11 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload, o
 
 	return fitPushDisplay({
 		web_push: 8030,
+		...(encrypted ? { mutable: true } : {}),
 		notification: {
 			title: encrypted ? 'Crate reminder' : readableLinkText(payload.title),
 			body: encrypted ? 'Open Crate to view your reminder.' : payload.body,
+			// Older Safari releases read mutable here; the standard uses the root.
 			...(encrypted ? { mutable: true } : {}),
 			navigate: new URL(`/notifications${params.size > 0 ? `?${params.toString()}` : ''}`, origin).href,
 			...(payload.tag ? { tag: payload.tag } : {}),

@@ -10,6 +10,7 @@ on:
       - ".github/workflows/pages.yml"
       - "scripts/download-release-shortcut.mjs"
       - "scripts/shortcut-release.mjs"
+      - "scripts/shortcut-install-page.mjs"
       - "scripts/sign-reading-shortcut.mjs"
       - "scripts/reading-shortcut-first-run.mjs"
       - "scripts/reading-shortcut.test.mjs"
@@ -63,7 +64,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           node scripts/download-release-shortcut.mjs published site/shortcuts/v1 --legacy
-          node scripts/download-release-shortcut.mjs published site/shortcuts/v2
+          node scripts/download-release-shortcut.mjs published site/shortcuts/v2 --install-page
       - name: Upload static site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

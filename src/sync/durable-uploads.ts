@@ -27,8 +27,21 @@ export class DurableUploads {
 	constructor(private manifest: LocalManifest, private transport: UploadTransport, private cache: MarkdownBaseCache, private clientSession: string) {}
 
 	async batch(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
-		const durable = await this.prepare(files.map(file => ({ ...file, intent: { kind: 'local' } })));
-		return this.sendBatch(durable);
+		const durable: JournalUpload[] = [];
+		const rejected: UploadResult[] = [];
+		for (const file of files) {
+			try {
+				durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }]));
+			} catch (error) {
+				// Encryption resolves the plaintext precondition before journaling.
+				// A stale file has not been dispatched and can reconcile independently.
+				if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
+				rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
+			}
+		}
+		const response = durable.length ? await this.sendBatch(durable) : { success: true, results: [] };
+		const results = new Map([...response.results, ...rejected].map(result => [result.path, result]));
+		return { success: response.success && rejected.length === 0, results: files.map(file => results.get(file.path)!) };
 	}
 
 	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {

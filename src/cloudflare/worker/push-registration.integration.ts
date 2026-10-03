@@ -32,11 +32,33 @@ it('confirms retry and repair with the same recipient identity after a committed
 	await env.DB.prepare("UPDATE push_subscriptions SET disabled_at = 1, last_error = 'provider failure'").run();
 	const confirmation = await attach(token);
 	expect(confirmation.status).toBe(200);
-	expect(await confirmation.json()).toEqual({ id: original!.id });
+	expect(await confirmation.json()).toEqual({ id: original!.id, notificationsEnabled: false });
 	expect(await env.DB.prepare('SELECT id, owner_token_id, folder_path, disabled_at, last_error FROM push_subscriptions').all())
 		.toMatchObject({ results: [{ id: original!.id, owner_token_id: 'browser', folder_path: 'Reminders', disabled_at: null, last_error: null }] });
 	await env.DB.prepare('DELETE FROM push_subscriptions').run();
 	expect((await attach(token)).status).toBe(200);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first()).toEqual({ count: 1 });
+});
+
+it('confirms vault scheduling separately from permission without enabling a paused policy', async () => {
+	const token = await issueToken('phone');
+	const confirmation = async (): Promise<unknown> => {
+		const response = await attach(token);
+		expect(response.status).toBe(200);
+		return response.json();
+	};
+	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
+	await env.DB.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'Europe/Berlin', 'policy', 0)").run();
+	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
+	expect(await env.DB.prepare('SELECT enabled FROM notification_policy').first()).toEqual({ enabled: 0 });
+	await env.DB.prepare('UPDATE notification_policy SET enabled = 1').run();
+	expect(await confirmation()).toMatchObject({ notificationsEnabled: true });
+	await env.DB.prepare("UPDATE notification_policy SET folder_path = 'Other'").run();
+	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
+	await env.DB.prepare("UPDATE notification_policy SET folder_path = 'Reminders'").run();
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_feature_policy', ?)")
+		.bind(JSON.stringify({ reminders: false, reading: true, revision: 'paused' })).run();
+	expect(await confirmation()).toMatchObject({ notificationsEnabled: false });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first()).toEqual({ count: 1 });
 });
 

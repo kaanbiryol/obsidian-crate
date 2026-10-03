@@ -216,7 +216,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 				return;
 			}
 
-			sendJson(res, 200, { id: 'preview-subscription' });
+			sendJson(res, 200, { id: 'preview-subscription', notificationsEnabled: true });
 			return;
 		}
 

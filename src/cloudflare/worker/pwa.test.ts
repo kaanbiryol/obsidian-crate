@@ -401,7 +401,7 @@ describe('PWA activation metadata', () => {
 	});
 
 	it('supports declarative push with a fallback notification handler', () => {
-		expect(SERVICE_WORKER_JS).toContain('var notification = payload.notification || payload');
+		expect(SERVICE_WORKER_JS).toContain('var notification = event.notification || payload.notification || payload');
 		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 

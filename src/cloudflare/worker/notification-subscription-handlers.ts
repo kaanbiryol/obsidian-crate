@@ -1,4 +1,5 @@
 import { featureEnabled } from './feature-policy';
+import { getNotificationPolicy } from './notification-policy';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { corsResponse } from './cors';
 import { changedRows, queryRows } from './db';
@@ -45,10 +46,16 @@ export async function handleSubscribe(request: Request, db: D1Database, ownerTok
 	const result = await insert.run();
 	if (changedRows(result) !== 1) return corsResponse({ error: 'Subscription limit reached or endpoint already enrolled. Remove an old device before trying again.' }, 429);
 	// Confirmation retries must preserve IDs already captured by delivery work.
-	const confirmed = await db.prepare('SELECT id FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?')
-		.bind(endpoint, ownerTokenId).first<{ id: string }>();
+	const confirmed = await db.prepare('SELECT id, folder_path FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?')
+		.bind(endpoint, ownerTokenId).first<{ id: string; folder_path: string | null }>();
 	if (!confirmed) return corsResponse({ error: 'Subscription registration changed. Try again.' }, 503);
-	return corsResponse({ id: confirmed.id });
+	// Browser permission confirms this device, but the vault's shared policy can
+	// still prevent scheduling. Report both without changing the user's policy.
+	const policy = await getNotificationPolicy(db);
+	const notificationsEnabled = Boolean(policy && policy.enabled !== false
+		&& (!confirmed.folder_path || confirmed.folder_path === policy.folderPath)
+		&& await featureEnabled(db, 'reminders'));
+	return corsResponse({ id: confirmed.id, notificationsEnabled });
 }
 
 export async function handleUnsubscribe(request: Request, db: D1Database, ownerTokenId?: string): Promise<Response> {

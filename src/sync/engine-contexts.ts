@@ -148,6 +148,7 @@ export class SyncEngineContexts {
 			processDiff: dependencies.processDiff,
 			prepareFullSyncUpload: (diff: UploadDiff) => prepareUploadFromPath(this.transfer(), diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
 			uploadPreparedFiles: dependencies.uploadPreparedFiles,
+			reconcileVersionConflicts: dependencies.reconcileVersionConflicts,
 			parallelDownloadAndSaveFiles: dependencies.parallelDownloadAndSaveFiles,
 			getLocalManifestEntry: (path: string) => dependencies.getLocalManifest().getEntry(path),
 			setLocalManifestEntry: (path: string, entry: FileEntry) => {

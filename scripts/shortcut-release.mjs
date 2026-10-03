@@ -21,10 +21,11 @@ export async function sourceHash(root = '.') {
 export function validateTag(tag) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag ?? '')) throw new Error('Supply a release version, without a leading v.');
 }
-export function selectRelease(items, tag, names = { assetName, metadataName }) {
+export function selectRelease(items, tag, names = { assetName, metadataName }, { allowMissing = false } = {}) {
   const release = tag ? items.find(item => item.tag_name === tag) : items
-    .filter(item => !item.draft && item.assets.some(asset => asset.name === names.metadataName))
+    .filter(item => !item.draft && item.assets.some(asset => [names.assetName, names.metadataName].includes(asset.name)))
     .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))[0];
+  if (!release && !tag && allowMissing) return null;
   if (!release) throw new Error('No release with a prepared shortcut was found. Run npm run release:prepare first.');
   for (const name of [names.assetName, names.metadataName]) {
     if (!release.assets.some(asset => asset.name === name)) throw new Error(`Release ${release.tag_name} is missing ${name}.`);

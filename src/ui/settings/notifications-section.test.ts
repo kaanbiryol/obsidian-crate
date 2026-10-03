@@ -311,12 +311,14 @@ describe('renderNotificationsSection', () => {
 const updateNotificationPolicy = vi.fn(async (policy: Record<string, unknown>) => ({ policy: { ...policy, revision: 'policy-2' } }));
 
 function createPlugin(apiClient: Record<string, unknown>): never {
+	let stableApi: Record<string, unknown> | undefined;
 	return {
 		secretStorage: { get: vi.fn(() => null) },
 		app: {},
 		settings: {
 			pushEnabled: true,
 			workerUrl: 'https://worker.example.com',
+			reading: { folderPath: 'Reading' },
 		},
 		remindersSettings: {
 			allDayNotificationTime: '09:00',
@@ -329,7 +331,7 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 		}),
 		writeRemindersSettings: vi.fn(),
 		syncRuntime: {
-			getApiClient: () => ({
+			getApiClient: () => stableApi ??= ({
 				getNotificationPolicy: vi.fn(async () => ({ policy: { folderPath: 'Reminders', timezone: 'America/New_York', allDayTime: '09:00', revision: 'policy-1', enabled: true } })),
         ensureNotificationPolicy: vi.fn(async (policy: unknown) => ({ policy })),
         updateNotificationPolicy,

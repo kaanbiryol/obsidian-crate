@@ -5,6 +5,7 @@ import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 import { verifyBlockedEncryptionStorage } from './pwa-encryption-blocked-storage-checks.mjs';
 import { verifyFolderKeyFollowing } from './pwa-encryption-folder-storage-checks.mjs';
+import { buildEncryptedPushWorker, verifyEncryptedPushWorker } from './pwa-encrypted-push-checks.mjs';
 
 // Exercise the production session hook and native CryptoKey/IDB persistence.
 // Only cache completion is delayed, to make the logout/re-enrollment race deterministic.
@@ -36,7 +37,11 @@ export function mountLifecycle() { createRoot(document.getElementById('root')).r
 platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mocks/obsidian.ts') }, plugins: [{ name: 'delay-cache-cleanup', setup(build) {
 	build.onLoad({ filter: /src\/pwa\/reminder-cache\.ts$/ }, () => ({ contents: 'export async function clearCachedReminderSnapshots() { await window.cacheGate; return true; }', loader: 'js' }));
 } }] })).outputFiles[0].text;
+const pushWorker = await buildEncryptedPushWorker();
 const server = createServer((req, res) => {
+	if (req.url === '/encrypted-push-worker.js') {
+		res.setHeader('Content-Type', 'application/javascript'); res.end(pushWorker); return;
+	}
 	res.setHeader('Content-Type', req.url === '/harness.js' ? 'application/javascript' : 'text/html');
 	res.end(req.url === '/harness.js' ? harness : '<!doctype html><div id="root"></div><script src="/harness.js"></script>');
 });
@@ -166,13 +171,14 @@ try {
 		const browser = await type.launch();
 		try {
 			const page = await browser.newPage(); await page.goto(origin);
-			await verifyKeyRecovery(page); await verifyFolderKeyFollowing(page); await page.close();
+			await verifyKeyRecovery(page); await verifyFolderKeyFollowing(page);
+			await verifyEncryptedPushWorker(page, origin); await page.close();
 			await verifyLogout(browser);
 			const blocked = await browser.newPage(), errors = [];
 			blocked.on('pageerror', error => errors.push(error.message));
 			await blocked.goto(origin); await verifyBlockedEncryptionStorage(blocked); await blocked.close();
 			assert.deepEqual(errors, []);
-			console.log(`${type.name()}: key recovery, logout fencing, bounded blocked storage, push fallback, late-open fencing and future-format preservation passed`);
+			console.log(`${type.name()}: key recovery, logout fencing, bounded blocked storage, service-worker push decryption and fallback, late-open fencing and future-format preservation passed`);
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }

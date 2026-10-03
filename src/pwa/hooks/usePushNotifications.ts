@@ -6,6 +6,7 @@ import type { ApiFetch, PushState, ShowToast } from '../types';
 
 const CHECKING: PushState = { phase: 'checking', status: 'Checking notification registration…' };
 const ENABLED: PushState = { phase: 'enabled', status: 'Notifications enabled on this device.' };
+const PAUSED = { phase: 'paused', status: 'This device is registered, but notifications are off for this vault. Check Reminders and Notifications in Obsidian’s Crate settings.' } satisfies PushState;
 const BLOCKED: PushState = { phase: 'blocked', status: 'Notifications are blocked. Allow them in browser settings, then reopen Crate.' };
 
 async function notificationPermission(manager: PushManager): Promise<PermissionState> {
@@ -82,8 +83,9 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 					method: 'POST', body: JSON.stringify({ endpoint: body.endpoint, keys: body.keys, deviceName: detectDeviceName() }),
 				});
 				if (!response.ok) throw new Error(await response.text());
-				const result = await response.json() as { id?: unknown };
+				const result = await response.json() as { id?: unknown; notificationsEnabled?: unknown };
 				if (typeof result.id !== 'string' || !result.id) throw new Error('The server did not confirm notification registration.');
+				if (typeof result.notificationsEnabled !== 'boolean') throw new Error('This device is registered. Update your Crate server to confirm its notification settings.');
 				// Provider permission and endpoints can change during a request.
 				const currentSubscription = await manager.getSubscription();
 				const currentBody = currentSubscription?.toJSON();
@@ -94,8 +96,8 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 					|| currentBody.keys?.p256dh !== body.keys?.p256dh || currentBody.keys?.auth !== body.keys?.auth) {
 					throw new Error('Browser notification settings changed. Retry to confirm registration.');
 				}
-				update(ENABLED);
-				if (enable) showToast('success', 'Notifications enabled');
+				update(result.notificationsEnabled ? ENABLED : PAUSED);
+				if (enable) showToast(result.notificationsEnabled ? 'success' : 'info', result.notificationsEnabled ? 'Notifications enabled' : PAUSED.status);
 			} catch (error) {
 				if (!isCurrent()) return;
 				const message = error instanceof Error ? error.message : String(error);

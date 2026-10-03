@@ -41,7 +41,7 @@ it('batches cold uploads with absent-file guards and preserves confirmed revisio
 	}
 });
 
-it('keeps a stale member and healthy batch members recoverable across a concurrent remote edit', async () => {
+it('reconciles a stale member while committing healthy batch members across a concurrent remote edit', async () => {
 	const client = await device(); const other = await device();
 	const original = '# Shared\n\nAlpha\n\nBeta\n';
 	client.disk.write('shared.md', original); client.disk.write('healthy.md', 'Original');
@@ -58,18 +58,15 @@ it('keeps a stale member and healthy batch members recoverable across a concurre
 		return batch(files);
 	});
 	const result = await client.engine.sync();
-	expect(result.success).toBe(false);
-	expect(result.errors).toEqual(['shared.md: Remote file changed since it was read']);
+	expect(result).toMatchObject({ success: true, merged: 1, errors: [] });
 	expect(result.uploadedPaths).toEqual(['healthy.md']);
-	expect(client.checkpoint().files['shared.md']).toEqual(base);
-	expect(client.disk.text('shared.md')).toContain('Beta local');
-	expect(await remote(client, 'shared.md')).toContain('Alpha remote');
-	expect(await remote(client, 'healthy.md')).toBe('Healthy local');
-	expect(client.settings.lastSeq).toBe(0);
-	expect((await client.engine.sync()).errors).toEqual([]);
 	const merged = original.replace('Alpha', 'Alpha remote').replace('Beta', 'Beta local');
 	expect(client.disk.text('shared.md')).toBe(merged);
 	expect(await remote(client, 'shared.md')).toBe(merged);
+	expect(await remote(client, 'healthy.md')).toBe('Healthy local');
+	const saved = (await client.api.getFileMetadata(['shared.md'])).files['shared.md']!;
+	expect(client.checkpoint().files['shared.md']).toMatchObject({ hash: saved.hash, revision: saved.revision });
+	expect(await client.engine.sync()).toMatchObject({ success: true, uploaded: 0, merged: 0, errors: [] });
 });
 
 it('resumes a cold batch after committed response loss and retains a later local edit', async () => {
