@@ -90,7 +90,17 @@ export function renderServerSection(context: ConfigSectionContext): void {
     }
     renderServerBackupSetting(context);
 	const details = containerEl;
-	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');
+	const serverAddress = plugin.settings.workerUrl;
+	new Setting(details).setName('Server address').setDesc(serverAddress || 'Not connected on this device')
+		.addButton(button => button.setButtonText('Copy').setDisabled(!serverAddress).onClick(async () => {
+			if (!serverAddress) return;
+			try {
+				await navigator.clipboard.writeText(serverAddress);
+				new Notice('Server address copied');
+			} catch {
+				new Notice('Could not copy the server address. Select and copy it manually.');
+			}
+		}));
 	if (!deployment) {
 		renderSelfHostedAddressSetting({ ...context, containerEl: details });
 		new Setting(details).setName('Self-hosted server')

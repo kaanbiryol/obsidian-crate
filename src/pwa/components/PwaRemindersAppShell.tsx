@@ -2,7 +2,8 @@ import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { PWA_CONTROL_SPRING, PWA_FADE } from '../motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { FeatureNavigationContext } from './FeatureSwitcherButton';
 
 import { PwaDock, PwaDockAddButton } from './PwaDock';
 import { PwaTabTransition } from './PwaTabTransition';
@@ -98,7 +99,11 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	onReorder,
 	onReorderDragActiveChange,
 }) => {
-	const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? 'browse' : initialTab);
+	const requested = useContext(FeatureNavigationContext)?.destination;
+	// Seed the real screen from the same destination as its lazy loading shell.
+	// Applying it later via the dock retains the default tab as an outgoing fade.
+	const [viewMode, setViewMode] = useState<ViewMode>(() => initialProject ? 'browse'
+		: requested?.section === 'reminders' ? requested.tab : initialTab);
 	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
 	const reduceMotion = useReducedMotion();
 	const shell = useRef<HTMLDivElement>(null);

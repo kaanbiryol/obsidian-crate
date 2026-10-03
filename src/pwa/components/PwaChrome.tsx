@@ -1,6 +1,7 @@
 import { PwaUpdateButton } from './PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { FeatureNavigationContext } from './FeatureSwitcherButton';
 import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
@@ -136,12 +137,20 @@ export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
 	// Enrollment cleans the URL while this screen is visible. Keep its original
 	// destination until the real shell is ready so the title cannot jump back.
 	const [openingHtml] = useState(() => createPwaOpeningScreenHtml(resolvePwaOpeningDestination(location.search, loadPwaPreferences().defaultScreen)));
+	const navigation = useContext(FeatureNavigationContext);
+	const requested = navigation?.destination;
+	// Feature entry can happen long after launch, while its chunk or data is
+	// still loading. Paint the dock destination throughout that handoff, and
+	// follow another tap without waiting for the full reminder shell to mount.
+	const destinationHtml = navigation?.section === 'reminders' && requested?.section === 'reminders'
+		? createPwaOpeningScreenHtml(resolvePwaOpeningDestination(`?tab=${requested.tab}`))
+		: openingHtml;
 	return (
 		<div
 			className={`pwa-launch-splash${updating ? ' is-updating' : ''}`}
 			role="status"
 			aria-label={updating ? 'Updating Crate' : 'Loading Crate'}
-			dangerouslySetInnerHTML={{ __html: updating ? updateHtml : openingHtml }}
+			dangerouslySetInnerHTML={{ __html: updating ? updateHtml : destinationHtml }}
 		/>
 	);
 }

@@ -242,8 +242,9 @@ both hosts together.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
   Stationary tab dissolves use 240ms ease-in-out so outgoing content stays visible
-  through the early frames and both screens blend at the midpoint. Feature
-  handoffs and toasts retain their 160ms fade. Press feedback uses
+  through the early frames and both screens blend at the midpoint. Switching
+  to or from Reading uses that same tab dissolve in both hosts. Toasts retain
+  their 160ms fade. Press feedback uses
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.

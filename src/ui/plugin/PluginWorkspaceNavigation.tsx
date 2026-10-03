@@ -55,7 +55,7 @@ export function PluginWorkspaceNavigation({ initialSection = 'reminders', initia
     zIndex: panel === front ? 2 : 1,
     opacity: panel === front ? Number(panel === activeSection) : 1,
     visibility: panel !== front && panel !== activeSection ? 'hidden' as const : undefined,
-    transition: panel === front ? 'opacity var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease)' : undefined,
+    transition: panel === front ? 'opacity var(--pwa-motion-tab-duration) var(--pwa-motion-tab-ease)' : undefined,
   });
   const destinations = DOCK_TABS.filter(item => ['inbox', 'today', 'browse'].includes(item.id) ? remindersEnabled : readingEnabled);
   const visibleTabs = tabs.filter(tab => destinations.some(item => item.id === tab));

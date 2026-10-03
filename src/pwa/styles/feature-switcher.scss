@@ -16,7 +16,7 @@
 // Keep both modes in the paint tree so iOS can animate a previously inactive
 // panel. Dissolve the outgoing panel over a fully opaque incoming panel so
 // shared chrome and backgrounds never dim halfway through the transition.
-.crate-feature-panel[data-front="true"] { transition: opacity var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease); }
+.crate-feature-panel[data-front="true"] { transition: opacity var(--pwa-motion-tab-duration) var(--pwa-motion-tab-ease); }
 
 // Screen changes are a stationary dissolve; content keeps its scroll and geometry.
 .crate-feature-panel .pwa-feature-switch-button {

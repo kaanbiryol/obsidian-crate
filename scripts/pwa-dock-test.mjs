@@ -120,7 +120,62 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await direct('Projects');
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await direct('Reminders');
-    // A reading destination must survive its first lazy mount.
+    // Exercise the actual four-tab dock, including the feature boundary, with
+    // the same visible blend contract for every directed pair of destinations.
+    await direct('Inbox');
+    for (const label of ['Reading', 'Projects', 'Reading', 'Reminders', 'Reading', 'Inbox', 'Projects', 'Reminders', 'Projects', 'Inbox', 'Reminders', 'Inbox']) {
+      const blend = await page.evaluate(async label => {
+        const previous = document.querySelector('.crate-feature-panel[data-active="true"]');
+        const crossFeature = (label === 'Reading') !== (previous.dataset.crateSection === 'reading');
+        const outgoing = crossFeature ? previous : previous.querySelector('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])');
+        const button = previous.querySelector(`.pwa-dock [aria-label="${label}"]`);
+        button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        button.click();
+        await Promise.resolve();
+        const fade = outgoing.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+        if (!fade) throw new Error(`No dissolve to ${label}`);
+        fade.pause();
+        const opacity = time => { fade.currentTime = time; return Number(getComputedStyle(outgoing).opacity); };
+        const result = { crossFeature, early: opacity(60), middle: opacity(120), inert: outgoing.inert };
+        fade.finish();
+        return result;
+      }, label);
+      assert.ok(blend.early >= .7 && blend.early < 1 && blend.middle >= .35 && blend.middle <= .65 && blend.inert,
+        `${name}: all four tabs must share a visible fade to ${label}: ${JSON.stringify(blend)}`);
+      await closed(); await active(label);
+      await expect(page.locator('.crate-feature-panel[data-entering="true"], .pwa-tab-panel[data-leaving]')).toHaveCount(0);
+    }
+    // A local tab tap must fade immediately, without waiting for the Reading
+    // return animation or its one-second recovery timer to finish.
+    for (const label of ['Inbox', 'Reminders', 'Projects']) {
+      await direct('Reading');
+      const next = label === 'Projects' ? 'Inbox' : 'Projects';
+      const immediate = await page.evaluate(async ({ label, next }) => {
+        const select = label => {
+          const button = document.querySelector(`.crate-feature-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`);
+          button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); button.click();
+        };
+        select(label); await Promise.resolve();
+        const front = document.querySelector('.crate-feature-panel[data-front="true"]');
+        const outer = front.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+        if (!outer) throw new Error(`Missing Reading return to ${label}`);
+        outer.pause(); outer.currentTime = 120;
+        await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+        const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
+        const outgoing = panel.querySelector('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])');
+        select(next); await Promise.resolve();
+        const fade = outgoing.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+        if (fade) { fade.pause(); fade.currentTime = 120; }
+        const result = { entering: panel.dataset.entering, retained: outgoing.isConnected,
+          opacity: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0 };
+        fade?.finish(); outer.finish(); return result;
+      }, { label, next });
+      assert.ok(immediate.entering === 'true' && immediate.retained && immediate.opacity >= .35 && immediate.opacity <= .65,
+        `${name}: Reading → ${label} → ${next} must fade immediately: ${JSON.stringify(immediate)}`);
+      await closed(); await active(next);
+    }
+    await direct('Reminders');
+    // A Reading destination must survive opening from the overflow menu.
     await openViews();
     const handoff = await views.evaluate(async menu => {
       const labels = () => [...menu.querySelectorAll('button')].map(button => button.textContent);
