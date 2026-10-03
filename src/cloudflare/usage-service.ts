@@ -15,7 +15,7 @@ export interface UsageGroup {
 
 const CLASS_A = new Set(['ListBuckets', 'PutBucket', 'ListObjects', 'ListBucket', 'PutObject', 'CopyObject', 'CompleteMultipartUpload', 'CreateMultipartUpload', 'LifecycleStorageTierTransition', 'ListMultipartUploads', 'UploadPart', 'UploadPartCopy', 'ListParts', 'PutBucketEncryption', 'PutBucketCors', 'PutBucketLifecycleConfiguration']);
 const CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
-const FREE = new Set(['DeleteObject', 'DeleteBucket', 'AbortMultipartUpload']);
+const FREE = new Set(['DeleteObject', 'DeleteObjects', 'DeleteBucket', 'AbortMultipartUpload']);
 const LIMIT = 10000;
 
 type Row = { sum?: Record<string, unknown>; max?: Record<string, unknown>; dimensions?: Record<string, unknown> };
@@ -67,13 +67,18 @@ export async function fetchCloudflareUsage(
 		{ label: 'R2 · this calendar month (UTC)', load: async () => {
 			const rows = await query('r2OperationsAdaptiveGroups', monthly, 'dimensions { actionType } sum { requests }');
 			let a = 0, b = 0;
+			const unknown = new Map<string, number>();
 			for (const row of rows) {
 				const action = row.dimensions?.actionType;
 				if (typeof action !== 'string') throw new Error('Cloudflare returned incomplete operation data.');
 				const count = number(row.sum?.requests);
 				if (CLASS_A.has(action)) a += count;
 				else if (CLASS_B.has(action)) b += count;
-				else if (!FREE.has(action) && count > 0) throw new Error('Cloudflare reported unrecognized operations; remaining allowance is unavailable.');
+				else if (!FREE.has(action) && count > 0) unknown.set(action, (unknown.get(action) ?? 0) + count);
+			}
+			if (unknown.size) {
+				const details = [...unknown].map(([action, count]) => `${action}: ${count}`).join(', ');
+				throw new Error(`Cloudflare reported unrecognized operations (${details}); remaining allowance is unavailable.`);
 			}
 			return [
 				{ label: 'Class A operations', used: a, allowance: 1_000_000 },

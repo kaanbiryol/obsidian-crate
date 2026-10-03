@@ -26,11 +26,34 @@ describe('Cloudflare usage', () => {
 	it('does not count free deletes as class B, and rejects unknown actions', async () => {
 		const result = await fetchCloudflareUsage(transportFor([
 			{ dimensions: { actionType: 'DeleteObject' }, sum: { requests: 900 } },
+			{ dimensions: { actionType: 'DeleteObjects' }, sum: { requests: 3 } },
 			{ dimensions: { actionType: 'PutObject' }, sum: { requests: 3 } },
 		]), 'token', 'account');
+		expect(result[2]?.error).toBeUndefined();
 		expect(result[2]?.metrics.map(m => m.used)).toEqual([3, 0]);
 		const unknown = await fetchCloudflareUsage(transportFor([{ dimensions: { actionType: 'NewAction' }, sum: { requests: 1 } }]), 'token', 'account');
 		expect(unknown[2]?.error).toContain('unrecognized');
+	});
+
+	it('reports every unknown operation and its total count without estimating remaining quota', async () => {
+		const result = await fetchCloudflareUsage(transportFor([
+			{ dimensions: { actionType: 'NewAction' }, sum: { requests: 2 } },
+			{ dimensions: { actionType: 'GetObject' }, sum: { requests: 10 } },
+			{ dimensions: { actionType: 'AnotherAction' }, sum: { requests: 7 } },
+			{ dimensions: { actionType: 'NewAction' }, sum: { requests: 3 } },
+			{ dimensions: { actionType: 'UnusedAction' }, sum: { requests: 0 } },
+		]), 'token', 'account');
+		expect(result[2]?.error).toBe('Cloudflare reported unrecognized operations (NewAction: 5, AnotherAction: 7); remaining allowance is unavailable.');
+		expect(result[2]?.metrics).toEqual([]);
+	});
+
+	it('ignores unknown operations with no requests', async () => {
+		const result = await fetchCloudflareUsage(transportFor([
+			{ dimensions: { actionType: 'UnusedAction' }, sum: { requests: 0 } },
+			{ dimensions: { actionType: 'GetObject' }, sum: { requests: 10 } },
+		]), 'token', 'account');
+		expect(result[2]?.error).toBeUndefined();
+		expect(result[2]?.metrics.map(m => m.used)).toEqual([0, 10]);
 	});
 
 	it('does not present missing, malformed, or truncated data as unused quota', async () => {

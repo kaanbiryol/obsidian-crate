@@ -159,10 +159,11 @@ export class CloudflareUsageConnection {
 				return response;
 			}, credentials.accessToken, accountId, new Date(updatedAt));
 			this.check(accountId, revision);
-			if (groups.some(group => group.error) && this.snapshot) {
-				throw new Error('Some usage could not be refreshed. Showing the last saved data. Try again later.');
+			const failures = groups.filter(group => group.error).map(group => `${group.label}: ${group.error}`).join(' ');
+			if (failures && this.snapshot) {
+				throw new Error(`Some usage could not be refreshed. Showing the last saved data. ${failures}`);
 			}
-			if (!groups.some(group => group.metrics.length)) throw new Error('Usage is unavailable. Try again later.');
+			if (!groups.some(group => group.metrics.length)) throw new Error(`Usage is unavailable. ${failures}`);
 			await this.options.cache?.write({ accountId, updatedAt, groups });
 			this.check(accountId, revision);
 			return groups;

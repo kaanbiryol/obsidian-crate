@@ -104,6 +104,24 @@ it('keeps saved results when a later refresh fails and isolates them by account'
 	expect(h.connection.snapshot).toBeNull();
 });
 
+it('exposes current unknown operation details even when retaining a saved snapshot', async () => {
+	const h = setup(); await h.connect();
+	await h.connection.fetchUsage();
+	const saved = h.connection.snapshot;
+	h.transport.mockResolvedValue({ status: 200, text: JSON.stringify({ data: { viewer: { accounts: [{ usage: [
+		{ dimensions: { actionType: 'NewAction' }, sum: { requests: 12, rowsRead: 0, rowsWritten: 0 }, max: { databaseSizeBytes: 1, payloadSize: 1, metadataSize: 0 } },
+	] }] } } }) });
+	await expect(h.connection.fetchUsage()).rejects.toThrow('unrecognized operations (NewAction: 12)');
+	expect(h.connection.snapshot).toBe(saved);
+});
+
+it('exposes service failures when no saved snapshot exists', async () => {
+	const h = setup(); await h.connect();
+	h.transport.mockResolvedValue({ status: 503, text: '{}' });
+	await expect(h.connection.fetchUsage()).rejects.toThrow('HTTP 503');
+	expect(h.connection.snapshot).toBeNull();
+});
+
 it('renews saved deployment access and preserves scopes when renewal omits them', async () => {
 	const h = setup();
 	h.connection.acceptAuthorization('account-a', { accessToken: 'old', refreshToken: 'refresh', expiresIn: 1, scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') });
