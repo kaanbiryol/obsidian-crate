@@ -10,6 +10,7 @@ interface TabLayer extends TabContent { id: number; preparing: boolean }
 /** Dissolve screens without changing their paint order when a switch reverses. */
 export function TabTransition({ viewKey, children }: TabContent) {
 	const container = useRef<HTMLDivElement>(null);
+	const featureEntryPainted = useRef(false);
 	const [{ layers, nextId }, setLayers] = useState<{ layers: TabLayer[]; nextId: number }>({
 		layers: [{ viewKey, children, id: 0, preparing: false }], nextId: 1,
 	});
@@ -37,12 +38,30 @@ export function TabTransition({ viewKey, children }: TabContent) {
 	}, [discardDepartedLayers]);
 
 	useLayoutEffect(() => {
+		const panel = container.current?.closest('.crate-feature-panel, .plugin-workspace-panel');
+		if (!panel) return;
+		// A retained tab need not render when its feature leaves or finishes
+		// entering. Reset the handoff guard even when only the shell updates.
+		const owner = panel.ownerDocument.defaultView ?? window;
+		const observer = new owner.MutationObserver(() => { featureEntryPainted.current = false; });
+		observer.observe(panel, { attributes: true, attributeFilter: ['data-entering'] });
+		return () => observer.disconnect();
+	}, []);
+
+	useLayoutEffect(() => {
 		// The feature shell already owns the dissolve when returning from Reading.
 		// Returning to the same tab must also discard an interrupted local fade;
 		// its view key and cleanup callbacks have not changed in that case.
-		if (container.current?.closest('.crate-feature-panel, .plugin-workspace-panel')?.getAttribute('data-entering') === 'true') {
-			discardDepartedLayers();
-		}
+		const panel = container.current?.closest('.crate-feature-panel, .plugin-workspace-panel');
+		const entering = panel?.getAttribute('data-entering') === 'true';
+		if (!entering) { featureEntryPainted.current = false; return; }
+		if (featureEntryPainted.current) return;
+		discardDepartedLayers();
+		// Only settle the initial handoff. Once it has painted, another tab tap
+		// needs its own fade even if the outer feature dissolve is still running.
+		const owner = container.current?.ownerDocument.defaultView ?? window;
+		const frame = owner.requestAnimationFrame(() => { featureEntryPainted.current = panel?.getAttribute('data-entering') === 'true'; });
+		return () => owner.cancelAnimationFrame(frame);
 	});
 
 	useLayoutEffect(() => {

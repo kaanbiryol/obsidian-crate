@@ -8,6 +8,19 @@ import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
+const headerGeometry = page => page.locator('.crate-feature-panel[data-active="true"] .view-header').evaluate(header => {
+  const rect = selector => {
+    const bounds = header.querySelector(selector).getBoundingClientRect();
+    return [bounds.x, bounds.y, bounds.height];
+  };
+  return {
+    bottom: header.getBoundingClientRect().bottom,
+    title: rect('.view-header-title'),
+    meta: rect('.view-header-meta'),
+    count: rect('.view-header-count'),
+    settings: rect('[data-icon="settings"]'),
+  };
+});
 try {
   for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     const browser = await engine.launch({headless:true});
@@ -21,11 +34,14 @@ try {
         await expect(page.locator('.crate-feature-panel[data-crate-section="reading"]')).toHaveCSS('transition-duration', '0s');
         const title = page.locator('.crate-feature-panel[data-active="true"] .view-header-title');
         const visibleTitle = await title.innerText();
+        const remindersHeader = await headerGeometry(page);
+        expect(remindersHeader.meta[1] - (remindersHeader.title[1] + remindersHeader.title[2])).toBeCloseTo(6, 1);
         await mkdir('test-results/feature-switcher',{recursive:true});
         const historyLength = await page.evaluate(() => history.length);
         await checkBackGesture(page, '[data-crate-section="reminders"]');
         await switchFeature(page, 'Reading');
         await page.getByRole('heading',{name:'Connect your Reading folder',exact:true}).waitFor();
+        expect(await headerGeometry(page)).toEqual(remindersHeader);
         await checkBackGesture(page, '[data-crate-section="reading"]');
         assert.equal(await page.evaluate(() => history.length), historyLength);
         await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -48,7 +64,11 @@ try {
         await switchFeature(page, 'Reading'); await switchFeature(page, 'Reminders');
         await expect(title).toHaveText(visibleTitle);
         await page.setViewportSize({width:1280,height:900});
+        const desktopHeader = await headerGeometry(page);
+        expect(desktopHeader.meta[1] - (desktopHeader.title[1] + desktopHeader.title[2])).toBeCloseTo(6, 1);
+        expect(desktopHeader.title[0]).toBe(18);
         await switchFeature(page, 'Reading');
+        expect(await headerGeometry(page)).toEqual(desktopHeader);
         await expect(featureNavigationTarget(page)).toBeFocused();
         await switchFeature(page, 'Reminders');
         await expect(title).toHaveText(visibleTitle);
@@ -68,6 +88,30 @@ try {
           await expect(panel(section === 'reading' ? 'reminders' : 'reading')).toHaveCSS('opacity', '0');
           await expect(page.locator('.crate-feature-panel[data-leaving="true"]')).toHaveCount(0);
         };
+        // A transition existing is insufficient: retain visible outgoing content
+        // through the early frames instead of making ordinary dock taps look instant.
+        for (const tab of ['today', 'projects', 'inbox', 'projects', 'today', 'inbox']) {
+          const dissolve = await page.evaluate(async tab => {
+            const panel = document.querySelector('[data-crate-section="reminders"]');
+            const container = panel.querySelector('.pwa-navigation-viewport > .pwa-tab-transition');
+            const outgoing = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
+            panel.querySelector(`.pwa-dock [data-tab="${tab}"]`).click();
+            await Promise.resolve();
+            const fade = outgoing.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+            if (!fade) throw new Error(`Missing screen dissolve to ${tab}`);
+            fade.pause();
+            const opacity = time => { fade.currentTime = time; return Number(getComputedStyle(outgoing).opacity); };
+            const incoming = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
+            const result = { early: opacity(60), middle: opacity(120), duration: Number(fade.effect.getTiming().duration),
+              interactive: !incoming.inert && outgoing.inert, covered: getComputedStyle(incoming).opacity === '1' };
+            fade.finish();
+            return result;
+          }, tab);
+          assert.ok(dissolve.early >= .7 && dissolve.early < 1, `${name} → ${tab}: keep the outgoing screen visible at 60ms: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.middle >= .35 && dissolve.middle <= .65, `${name} → ${tab}: show both screens at 120ms: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.duration <= 320 && dissolve.interactive && dissolve.covered);
+          await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+        }
         // A lazy feature must show an opaque loading surface under the dissolve.
         let releaseReading;
         const heldReading = new Promise(resolve => { releaseReading = resolve; });
@@ -141,6 +185,41 @@ try {
         });
         assert.equal(delayed, true, 'Cleanup must follow the painted fade');
         await settled('reading');
+        // A second tab tap during the feature handoff must retain its own
+        // outgoing screen, rather than being discarded by handoff cleanup.
+        for (const tab of ['projects', 'inbox', 'projects']) {
+          const localFade = await page.evaluate(async tab => {
+            await window.__switchFeature('Reminders');
+            const front = document.querySelector('.crate-feature-panel[data-front="true"]');
+            const outer = front.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+            if (!outer) throw new Error('Expected a return dissolve');
+            outer.pause(); outer.currentTime = 60;
+            await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+            const panel = document.querySelector('[data-crate-section="reminders"]');
+            const container = panel.querySelector('.pwa-tab-transition');
+            const outgoing = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
+            const entering = panel.dataset.entering;
+            panel.querySelector(`.pwa-dock [data-tab="${tab}"]`).click();
+            await Promise.resolve();
+            const fade = outgoing.getAnimations().find(animation => animation.transitionProperty === 'opacity');
+            if (fade) { fade.pause(); fade.currentTime = 60; }
+            const result = { entering, retained: outgoing.isConnected, inert: outgoing.inert,
+              opacity: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0,
+              opaque: [...container.children].some(layer => getComputedStyle(layer).opacity === '1'),
+              stationary: [...container.children].every(layer => getComputedStyle(layer).transform === 'none'),
+              active: container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView };
+            fade?.finish(); outer.finish();
+            return result;
+          }, tab);
+          assert.equal(localFade.entering, 'true');
+          assert.ok(localFade.retained && localFade.inert && localFade.opacity > 0 && localFade.opacity < 1, JSON.stringify(localFade));
+          assert.equal(localFade.active, tab === 'projects' ? 'browse' : tab);
+          assert.ok(localFade.opaque && localFade.stationary, 'The tab dissolve stays covered and stationary');
+          await settled('reminders');
+          await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+          await switchFeature(page, 'Reading');
+          await settled('reading');
+        }
         await page.emulateMedia({ reducedMotion: 'reduce' });
         const reduced = await sampleSwitch('Reminders');
         assert.ok(reduced.every(frame => frame.coverage === 1 && frame.stationary && frame.outgoing === 0));

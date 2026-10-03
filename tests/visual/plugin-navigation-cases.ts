@@ -306,6 +306,53 @@ export function registerPluginNavigationTests() {
         await expect(panels).toHaveAttribute('data-tab-view', 'inbox');
         await expect(active).toHaveCSS('opacity', '1');
       });
+      test(`plugin preserves a tab fade during repeated feature returns at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=plugin&scene=navigation&theme=${width === 320 ? 'light' : 'dark'}`);
+        const workspace = page.locator('.plugin-workspace-navigation');
+        const active = workspace.locator('.plugin-workspace-panel[data-active="true"]');
+        for (let iteration = 0; iteration < 3; iteration++) {
+          await active.getByRole('button', { name: 'Reading', exact: true }).click();
+          await expect(active).toHaveAttribute('data-entering', 'false');
+          const fade = await workspace.evaluate(async root => {
+            const select = (label: string) => {
+              const button = root.querySelector<HTMLElement>(`.plugin-workspace-panel[data-active="true"] .pwa-dock [aria-label="${label}"]`)!;
+              button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+              button.click();
+            };
+            select('Inbox');
+            await Promise.resolve();
+            const front = root.querySelector('.plugin-workspace-panel[data-front="true"]')!;
+            const outer = front.getAnimations().find(animation => (animation as CSSTransition).transitionProperty === 'opacity');
+            if (!outer) throw new Error('Expected a feature return fade');
+            outer.pause(); outer.currentTime = 60;
+            await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+            const panel = root.querySelector<HTMLElement>('.plugin-workspace-panel[data-active="true"]')!;
+            const container = panel.querySelector('.pwa-navigation-viewport > .pwa-tab-transition')!;
+            const outgoing = container.querySelector<HTMLElement>(':scope > .pwa-tab-panel:not([data-leaving])')!;
+            const entering = panel.dataset.entering;
+            select('Projects');
+            await Promise.resolve();
+            const local = outgoing.getAnimations().find(animation => (animation as CSSTransition).transitionProperty === 'opacity');
+            if (local) { local.pause(); local.currentTime = 60; }
+            const result = { entering, retained: outgoing.isConnected, inert: outgoing.inert,
+              opacity: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0,
+              opaque: Array.from(container.children).some(layer => getComputedStyle(layer).opacity === '1'),
+              active: container.querySelector<HTMLElement>(':scope > .pwa-tab-panel:not([data-leaving])')?.dataset.tabView };
+            local?.finish(); outer.finish();
+            return result;
+          });
+          expect(fade.entering).toBe('true');
+          expect(fade.retained && fade.inert && fade.opaque, JSON.stringify(fade)).toBe(true);
+          expect(fade.opacity).toBeGreaterThan(0);
+          expect(fade.opacity).toBeLessThan(1);
+          expect(fade.active).toBe('browse');
+          await expect(active).toHaveAttribute('data-entering', 'false');
+          await expect(workspace.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+          await expect(active.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute('aria-current', 'page');
+        }
+      });
       test(`plugin dock, date views, feature retention and project Back at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto('/?host=plugin&scene=navigation&theme=light');

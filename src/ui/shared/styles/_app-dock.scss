@@ -109,11 +109,19 @@
   .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination { background: transparent; }
   .pwa-dock__menu[data-dragging="true"] .pwa-dock__destination[data-preview="true"] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
   .pwa-dock :is(button):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+  // Selection uses the sliding fill. Keyboard focus gets one inset cue rather
+  // than a second pill around that fill; pointer focus stays undecorated.
+  .pwa-dock .pwa-dock__tab:focus { box-shadow: none; }
+  .pwa-dock .pwa-dock__tab:focus:not(:focus-visible) { outline: none; }
+  .pwa-dock .pwa-dock__tab:focus-visible { outline-offset: -4px; }
   .pwa-dock :is(button)[data-press-active] { opacity: .65; }
   .pwa-dock .pwa-dock__tab[data-press-active] { opacity: calc(var(--dock-tabs-opacity, 1) * .65); }
   @media (hover: hover) and (pointer: fine) {
     .pwa-dock :is(button):hover { background-color: color-mix(in srgb, var(--text-normal) 7%, transparent); }
-
+    // Reserve the pill fill for selection so clicking never clears a hover
+    // background before the moving indicator reaches the destination.
+    .pwa-dock .pwa-dock__tab:hover { background-color: transparent; }
+    .pwa-dock .pwa-dock__tab:hover > svg:first-child { color: var(--text-normal); }
 
     .pwa-dock .pwa-dock__add:hover { background-color: var(--dock-surface-hover); }
   }

@@ -3,6 +3,8 @@
   --pwa-motion-dismiss-duration: 320ms;
   --pwa-motion-fade-duration: 160ms;
   --pwa-motion-fade-ease: ease-out;
+  --pwa-motion-tab-duration: 240ms;
+  --pwa-motion-tab-ease: ease-in-out;
   --pwa-motion-feedback-duration: 120ms;
   --pwa-motion-control-duration: 180ms;
   --pwa-motion-dock-duration: 300ms;
@@ -27,6 +29,7 @@
     --pwa-motion-dismiss-duration: 0ms;
     --pwa-motion-navigation-duration: 0ms;
     --pwa-motion-fade-duration: 0ms;
+    --pwa-motion-tab-duration: 0ms;
     --pwa-motion-feedback-duration: 0ms;
     --pwa-motion-control-duration: 0ms;
     --pwa-motion-dock-duration: 0ms;

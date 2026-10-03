@@ -233,7 +233,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         const click = target => panel.querySelector(target).click();
         click(selector);
         // Seek the browser's real CSS transitions. Sampling wall-clock rAFs can
-        // miss an entire 160ms dissolve when a CI runner drops a frame.
+        // miss an entire dissolve when a CI runner drops a frame.
         const samples = [], animations = new Map();
         for (let time = 0; time <= 420; time += 20) {
           if (reducedMotion) await new Promise(requestAnimationFrame);
@@ -284,7 +284,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       // scroller before React removes its node (especially with reduced motion).
       if (!interruptWith) assert.ok(samples.filter(frame => frame.outgoing > 0).every(frame => frame.oldTitle && frame.oldScroll),
         'The visible outgoing title and scroll position must remain intact: ' + JSON.stringify({ selector, samples }));
-      assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.16s', 'ease-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs keep the feature fade duration and easing with reversible opacity transitions');
+      assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.24s', 'ease-in-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs use the perceptible tab dissolve with reversible opacity transitions');
       assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
       await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
     };
