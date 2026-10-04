@@ -76,3 +76,48 @@ fallback, scroll/outside dismissal, late share completion, and reopening control
 Chromium verifies real clipboard contents; platform failure/share cases use browser
 stubs. Installed iPhone and native Obsidian
 selection/Markdown rendering remain physical/manual acceptance checks.
+
+## Video transcripts
+
+Timestamp paragraphs from Defuddle/Clipper remain ordinary Markdown. The shared
+reader adds seek controls and a transient current-passage marker without changing
+visible text or its source offsets. Transcript highlights use the same markers,
+context anchors, offline queue and recovery behavior as article highlights. A
+highlight's video moment is derived from its current passage when opened, rather
+than persisting a second timing anchor that older clients could discard.
+
+The player is constructed from a validated video ID outside sanitized article
+content. Its bundled message bridge checks the exact frame and origin, cleans up
+on navigation, and pauses when the reader is hidden. Selecting Play, tapping a
+passage or completing a text selection loads the frame and starts playback at the
+selected timestamp. Timed transcripts open with the video pinned above the transcript,
+which smoothly follows playback and player seeks. The outlined Pin video / Unpin
+video control changes only pinning and following; selecting text plays in either state.
+Pointer holds, native selection and the highlight editor suspend automatic scroll
+so annotation controls stay stable. Unpinning allows independent scrolling and
+keeps the same iframe mounted. Following scrolls only the host's actual reader
+scroll owner, accounts for the pinned video's height and respects reduced motion.
+The PWA permits only YouTube's privacy
+embed origin as a frame source; arbitrary note iframes remain stripped.
+
+The resize handle changes the player's width and height together at 16:9, from
+240px (or smaller when the pane or available pinning height requires it) to the
+reader's full available width. It expands beyond the centered text column without changing transcript layout or
+replacing the iframe. Pointer capture owns the resize gesture; cancellation and
+Escape restore the prior size. Double-click resets, arrows resize, and Home/End
+select the minimum/maximum. The size is retained while that reader is open and
+adapts to pane changes. An oversized player temporarily stops pinning/following
+so the handle remains reachable; shrinking it restores the requested pin state.
+**Pin video** remains available for oversized players and reduces only their size
+as needed to leave space for the transcript. It preserves the mounted player,
+playback position, and an already fitting video size.
+The preview, playing iframe, and both pin states keep the same layout height;
+pinning must never change the geometry used to decide whether it fits.
+The pinned background spans the reader pane at every video size, covering and
+blocking pointer access to transcript lines that scroll behind the player and controls.
+
+Run `node scripts/reading-video.browser.test.mjs` after building the plugin for
+Chromium/WebKit tests in document and Shadow DOM hosts. The player transport is
+simulated; actual playback, fullscreen, app backgrounding and installed iOS/Android
+selection require manual checks. Transcript fetching has separate bounded-transport
+and real Defuddle fixture tests.

@@ -88,14 +88,14 @@ an explicit maintainer action; preparing the release does not publish it.
 
 Publishing triggers **Deploy GitHub Pages**. It selects the most recently published
 release containing shortcut metadata, including prereleases, verifies the download,
-and serves it at `shortcuts/v2/Save to Crate (iOS 27).shortcut`. It separately downloads the latest legacy artifact to preserve the v1 path for installed older servers. Publish a signed v2 release asset before shipping the encrypted Reading app; the Pages build fails closed if the v2 artifact is missing.
+and serves it at `shortcuts/v2/Save to Crate.shortcut`. Retired development shortcut
+downloads are no longer distributed.
 Plugin-only releases do not replace that selection. An incomplete or corrupted
 shortcut release fails deployment instead of silently serving another version.
 
-The first deployment using this flow needs a published release prepared this way.
-Existing `0.3.0` has no shortcut metadata and is not modified automatically. Until
-that first release is published, Pages fails with an explicit missing-release
-message and the previously deployed site remains live. Publishing manually through
+Until a v2 shortcut release is published, Pages generates an unavailable install
+page with a manual-save alternative. Existing releases without shortcut metadata
+are not modified automatically. Publishing manually through
 GitHub triggers Pages; if publishing via a workflow's `GITHUB_TOKEN`, explicitly
 run **Deploy GitHub Pages**, because token-created events do not start another
 workflow.

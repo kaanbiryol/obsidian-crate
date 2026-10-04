@@ -1,6 +1,6 @@
 ---
-title: Make yourself at home.
-description: Start with Crate, then explore sync, reminders, and reading in your Obsidian vault.
+title: Get started with Crate
+description: Set up Crate, choose the features you want, and use sync, reminders, and reading across your devices.
 tableOfContents: false
 prev: false
 next:
@@ -10,30 +10,46 @@ next:
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Sync your Obsidian vault. Keep your reminders close. Save something good to read later.
-These guides take you from installing Crate to a working setup on your devices.
+Crate brings vault sync, reminders, and read-it-later articles to Obsidian. Your notes stay in your vault as ordinary files. For sync and the web app, you run a Crate server in your Cloudflare account or on your own hardware. There is no Crate account to create.
+
+Start with the features you need; you can turn the others off.
+
+## What would you like to do?
+
+| I want to… | Start here |
+| --- | --- |
+| Keep my whole vault on several devices | Install Crate, choose a host, then connect each Obsidian device below. |
+| Save articles in Obsidian | [Try Reading](/docs/features/reading/) with its default folder. Local saves do not need a Crate server. |
+| Keep tasks in my notes | [Create a reminder](/docs/features/reminders/). Local reminders work without a server. |
+| Read and manage reminders on my phone without Obsidian | Set up a server, then [connect the web app](/docs/features/web-app/). |
+| Choose what runs and where | [Manage features and settings](/docs/features/settings/). |
 
 ## Start here
 
 <CardGrid>
   <LinkCard title="01 · Install Crate" description="Add the beta to Obsidian with BRAT." href="/docs/getting-started/installation/" />
   <LinkCard title="02 · Choose your hosting" description="Your Cloudflare account or your own hardware." href="/docs/getting-started/hosting/" />
-  <LinkCard title="03 · Connect your devices" description="Bring your vault, reading, and reminders with you." href="/docs/getting-started/devices/" />
-  <LinkCard title="Just here for Reading?" description="Save and read articles in desktop Obsidian without a server." href="/docs/features/reading/" />
+  <LinkCard title="03 · Connect your devices" description="Sync a second Obsidian device or connect the web app." href="/docs/getting-started/devices/" />
+  <LinkCard title="04 · Make it yours" description="Choose features, turn on automatic sync, and set your preferences." href="/docs/features/settings/" />
 </CardGrid>
 
-Crate runs on infrastructure you control. There is no Crate account to create.
-It is currently a beta; start with a non-critical vault and keep a separate backup.
+Crate is currently a beta; try it with a non-critical vault and keep a separate backup. Read [What to know before you start](/docs/getting-started/limits/) for the practical limits.
+
+:::tip[Your first sync]
+Connecting a server does not transfer your files. Run **Crate: Sync - sync now** in Obsidian, then enable **Settings → Crate → Sync → Automatic sync** on each device if you want ongoing automatic transfers.
+:::
 
 ## Get more from Crate
 
 - [Sync](/docs/features/sync/) — understand what syncs and review pending changes.
 - [Reminders](/docs/features/reminders/) — plan your day with tasks stored as Markdown.
 - [Reading](/docs/features/reading/) — collect articles, highlight passages, and read offline.
+- [Notifications](/docs/features/notifications/) — choose when and where reminders alert you.
+- [Web app](/docs/features/web-app/) — install on your phone and check what works offline.
 - [Encryption](/docs/features/encryption/) — protect synced content, connect devices, and save your recovery key.
 
 ## When you need a hand
 
 Resolve [conflicts](/docs/troubleshooting/conflicts/), [recover an earlier version](/docs/troubleshooting/recovery/),
 or troubleshoot [connections](/docs/troubleshooting/connection/) and [notifications](/docs/troubleshooting/notifications/).
-If you are building on Crate, start with the [architecture reference](/docs/reference/architecture/).
+Developer and operator details live in the collapsed **Developer reference** section. If you are building on Crate, start with the [architecture reference](/docs/reference/architecture/).

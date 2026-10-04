@@ -146,7 +146,7 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 App writes use the current protocol range in [the release contract](current-contract.md). Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Native capture uses the separate [Shortcut contract](reading-shortcuts.md), including narrow adapters for released templates.
 
-Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 3. Schema 1 is the first supported baseline; schemas 1 and 2 upgrade through the registered migrations after a verified recovery checkpoint. Existing schema-3 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
+Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 2, the first supported baseline. There are no registered migrations. Existing supported schema-2 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
 
 The ordered server revision and schema identity are recorded in D1 after live verification. Different stable artifacts sharing a server revision cannot replace each other. Explicitly targeted development builds use a separate ordered build number and may promote to stable; see [development deployments](server-upgrades.md#testing-development-deployments). Updates preserve the database and bucket bindings, file references, history and receipts. The deployment fence stays held until the exact Worker, database version and metadata endpoint are verified.
 

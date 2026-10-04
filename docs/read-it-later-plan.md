@@ -1,4 +1,4 @@
-> Historical implementation plan. The pre-launch cleanup replaces schemas 1–3 and their migrations with a fresh schema-1 baseline. Migration requirements below describe the earlier implementation, not a supported upgrade path.
+> Historical implementation plan. The current pre-launch cleanup uses the complete schema-2 baseline with no registered migrations. Migration requirements below describe the earlier implementation, not a supported upgrade path.
 
 # Read-it-later implementation plan
 

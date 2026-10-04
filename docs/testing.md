@@ -6,7 +6,7 @@
 fences and indented blocks, alongside ordinary prose and independent-block controls.
 `sync-engine.integration.ts` checks authored conflict copies across both arrival
 orders, restart, retry and a third device. `reading-projection-recovery.integration.ts`
-injects R2 failures, missing/invalid bytes, legacy error rows and permanent parse
+injects R2 failures, missing/invalid bytes, permanent parse
 errors; it checks duplicate-capture prevention, healthy-source progress, retained
 identity and delayed coordinator retry.
 
@@ -29,7 +29,7 @@ background, like Reminders. Unsent edits combine while preserving their original
 preconditions; edits made during a request queue behind its immutable request body.
 Interrupted requests get the same short, bounded retries as Reminders, using those
 exact bytes and their original operation identity. Automatic retry limits survive
-foreground events and reload; **Settings → Sync and device → Refresh all** can
+foreground events and reload; **Settings → Sync → Refresh all** can
 retry uncertain changes explicitly. The browser test covers this against real
 server receipts, including repeated lost acknowledgements.
 `useReadingSession.test.ts` and `useReadingSync.test.ts` use real React effects and
@@ -58,11 +58,11 @@ a device check.
 After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`
 for Chromium and WebKit coverage of both settings entry points, retained view/search
 and focus, shared theme and preferences, Reading launch destinations, explicit-link
-precedence, shortcut navigation, pending Reading warnings from Reminders, and shared
+precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared
 logout. The test uses the built client, local synthetic APIs, and native browser
 storage; screenshots include light/dark, 320px phone, and desktop layouts.
-The navigation checks cover Default tab in Tabs, always-visible About and Sync
-and device sections, always-visible storage and version tools, conditional tab
+The navigation checks cover Open app to in Tabs, always-visible About, Sync,
+and Device storage sections, always-visible storage and version tools, conditional tab
 reset, touch targets, retained settings scroll/focus, native Back/Forward, the
 header Back action, Escape, and shared edge-gesture eligibility. Motion checks
 sample full-page push/pop frames, including the moving header, opaque surface,
@@ -70,6 +70,10 @@ stationary parent, fixed header during scrolling, and restored scroll/focus. Des
 can check history and gesture arbitration; the interactive OS swipe preview and
 cancellation still need an installed iPhone check. `pushed-screen-history.test.ts`
 covers preserving an underlying feature, repeated visits and quick reopening.
+Installation checks cover iPhone/Android instructions, narrow light/dark layouts,
+Back/Forward, focus/scroll restoration, and hiding the entry after installation.
+`EncryptionSettings.test.ts` covers unknown, disconnected, mixed, locked/converting,
+and unlocked states without hiding problems behind the details disclosure.
 Theme checks cover one document update with both features mounted, system-theme
 changes, explicit overrides, settings close/reopen, feature switching, and native
 cross-tab updates including invalid or removed preferences. Early HTML theme

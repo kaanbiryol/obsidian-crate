@@ -36,6 +36,20 @@ Edit Markdown or MDX in `src/content/docs/`. Each page needs `title` and
 and links to a useful next step. Start headings at `##`; Starlight supplies the
 page title. Keep current behavior separate from features in development.
 
+Write for people using Crate, with setup and everyday tasks before implementation
+details. Use the actual UI labels in bold and arrows for navigation. When documenting
+a switch, explain its default, where to find it, which devices it affects, and what
+turning it off preserves or stops. Verify these against the settings UI and runtime,
+not just older documentation.
+
+The user guide has four paths: getting started, using Crate, troubleshooting, and
+the collapsed developer reference. Keep practical limits in
+`src/content/docs/getting-started/limits.md`, with brief reminders next to the tasks
+they affect. Feature settings, notification setup, and web app use each have their
+own page under `src/content/docs/features/`. Link to those pages instead of repeating
+their full setup steps. Keep protocol numbers, database details, and operator
+procedures in the reference unless users need them to make a decision.
+
 `astro.config.mjs` controls sidebar groups and order. Unlike Fumadocs, this setup
 does not need `meta.json` files. Internal documentation links include `/docs/`
 and a trailing slash. Pages use Starlight's navigation, theme controls, search,

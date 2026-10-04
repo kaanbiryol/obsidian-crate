@@ -179,9 +179,15 @@ Dock morphs use the shared collapsed height.
   Sections generate unique heading associations;
   rows can wrap a native control with a label. Feature settings keep their own
   validation, async actions, and persistence.
-  **Default tab** belongs to **Tabs** and retains the saved opening preference.
-  **Sync and device** and **About** are always-visible sections. Shortcut setup
-  uses these same section surfaces, typography and shared action controls.
+  Primary settings labels use the same 16px regular typography as the main lists,
+  with readable 14px descriptions. **Open app to** belongs to **Tabs** and retains
+  the saved opening preference; visible instructions explain replacing and reordering tabs.
+  **Sync**, **Device storage**, and **About** are always-visible sections. Shortcut setup
+  uses these same section surfaces, typography and shared action controls. Encryption
+  uses compact per-feature status rows and one shared setup note; locked/converting
+  guidance stays visible, while unlocked folder and notification details expand in place.
+  **Web app → Add to home screen** pushes a dedicated instructions page with retained
+  settings scroll/focus and browser Back/Forward. Installed apps hide this entry.
 - `PwaPushStack` owns retained sheet pages, push/pop motion and focus return.
   Each opaque page includes its fixed header and scrolling body. It slides over
   the stationary root with the Projects navigation spring; its resting offscreen
@@ -375,7 +381,7 @@ Each row has a replacement picker and a drag handle (also movable with arrow
 keys). There are no add or remove actions. Older saved layouts with fewer than four
 tabs retain their selections and fill the remaining slots from the defaults.
 Preferences persist on the device and update across browser tabs.
-**Reset tabs** restores Inbox, Reminders, Projects, and Reading. **Default tab** and
+**Reset tabs** restores Inbox, Reminders, Projects, and Reading. **Open app to** and
 explicit links remain independent of visibility. Pinned Reading destinations open
 directly. The last dock slot always opens the Reading view picker on hold or upward
 slide, regardless of its destination; a normal tap still opens that slot’s view.
@@ -579,7 +585,7 @@ retain it on the right without a Settings button. Loading headers reserve the sa
 current session online; cached, offline, and unconfirmed changes stay distinct.
 Reading applies saved local edits immediately and uses the header indicator for
 background sync. There is no pending-change banner in its library or reader;
-failed changes, refresh, and export are available under **Settings → Sync and device**.
+failed changes, refresh, and export are available under **Settings → Sync**.
 Keep article typography and library layout in Reading rather than
 overriding every button or dialog there. Native text fields retain browser editing
 and selection behavior; composite search fields draw one focus cue around the
@@ -600,7 +606,7 @@ Article HTML still passes through the existing sanitizer. Source badges begin as
 letter marks and load HTTPS favicons when available; an unavailable or offline icon
 leaves the letter in place. Each host uses its own browser image cache. Appearance,
 tags, and capture use the existing Base UI modal primitive with portals in the
-current host document. Device/session controls live under **Settings → Sync and device**.
+current host document. Sync controls live under **Settings → Sync**; browser storage controls live under **Settings → Device storage**.
 The shared `src/ui/shared/styles/_base-modal.scss` mixin provides dialog geometry
 in both hosts. Reading and reminder sheets share the PWA modal header layout.
 Phone sheets follow the visual viewport while an input is focused,
@@ -618,9 +624,8 @@ that order. The first three tabs keep their configured destinations, including
 Reading when it sits there. The displaced fourth destination returns to the menu,
 and the new fourth destination is excluded. Today and Upcoming are date views
 inside Reminders, so neither appears
-as a dock slot or expanded-menu choice. **Default tab** can open **Reminders — Today**
-or **Reminders — Upcoming** at launch. Older Today/Upcoming dock slots migrate to
-one Reminders slot. Settings changes and resets immediately update the menu.
+as a dock slot or expanded-menu choice. **Open app to** can open **Reminders — Today**
+or **Reminders — Upcoming** at launch. The dock contains one Reminders slot. Settings changes and resets immediately update the menu.
 The feature shell routes explicit tab requests across lazy feature mounts, while
 each feature owns its view, search, and list state. The same controls remain
 available while reading, so returning to a reminder view takes one tap.
@@ -667,7 +672,7 @@ Reduced motion switches tabs and features immediately.
 Both header gears open the same **Settings** sheet above the feature panels.
 The feature shell owns its visibility and preserves the underlying tab, search,
 scroll position, and focus. Settings use General, Reminders, and Reading sections,
-with visible Sync and device and About sections. Settings actions use full-width
+with separate Sync, Device storage, Encryption, and About sections. Settings actions use full-width
 text rows with shared spacing and touch targets. Device storage and version diagnostics stay visible alongside sync status.
 Reading has no general export action in Settings; unsynced reminder exports
 appear only when needed. Web app and server versions show directly without

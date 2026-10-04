@@ -29,6 +29,7 @@ export default defineConfig({
           label: 'Getting started',
           items: [
             'getting-started/installation',
+            'getting-started/limits',
             'getting-started/hosting',
             'getting-started/cloudflare',
             'getting-started/self-hosting',
@@ -36,12 +37,15 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Features',
+          label: 'Using Crate',
           items: [
+            'features/settings',
             'features/sync',
             'features/reminders',
             'features/embedded-reminders',
+            'features/notifications',
             'features/reading',
+            'features/web-app',
             'features/encryption',
           ],
         },

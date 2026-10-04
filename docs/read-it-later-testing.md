@@ -1,6 +1,6 @@
 # Test Reading
 
-This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-1 launch baseline; protocol 1 is the launch contract.
+This branch contains the plugin, server, web library, background extraction, automatic Reading-folder imports, and iPhone/Android capture flows. Reading is included in the schema-2 launch baseline; protocol 1 is the launch contract.
 
 ## Try the browser now
 
@@ -20,14 +20,14 @@ The reader suppresses remote article images and active HTML. Source badges may r
 
 ## Test iPhone
 
-For iOS 27, prepare the signed v2 Shortcut on macOS 27 with `npm run release:prepare -- <tag>` before publishing the updated server. Pages verifies release checksums and serves the new private-fragment flow at `/shortcuts/v2/Save%20to%20Crate%20(iOS%2027).shortcut`, while preserving the latest legacy v1 asset for installed older servers. To sign locally without publishing, run `npm run build:reading-shortcut -- --pairing`. Generated files stay in `dist/`; only the public placeholder template is sent to Apple’s signing service. Reinstall old Shortcuts when enabling E2EE. Native iOS testing must verify pairing, fragment handoff, Safari unlock and explicit Save.
+For iOS 27, prepare the signed v2 Shortcut on macOS 27 with `npm run release:prepare -- <tag>` before publishing the updated server. Pages verifies release checksums and serves the new private-fragment flow at `/shortcuts/v2/Save%20to%20Crate%20(iOS%2027).shortcut`. To sign locally without publishing, run `npm run build:reading-shortcut -- --pairing`. Generated files stay in `dist/`; only the public placeholder template is sent to Apple’s signing service. Reinstall old Shortcuts when enabling E2EE. Native iOS testing must verify pairing, fragment handoff, Safari unlock and explicit Save.
 
 Publish the generated `/shortcuts/help/` fallback before distributing the updated pairing flow. Its versioned pairing contract stays independent of the app protocol; see [shortcut maintenance](reading-shortcuts.md).
 
 
 1. On the enrolled phone, select **Reading settings → Set up iPhone shortcut** in the PWA. For a new phone, in Obsidian select **Set up shortcut → Copy phone setup link**, then open that link in Safari within 10 minutes.
 2. Select **Download Save to Crate**, open the file in Shortcuts, and select **Add Shortcut**. If Safari saves it to Downloads, open the file from Files. Return to Crate, select **Create pairing code → Copy pairing code**, then run the shortcut from **All Shortcuts** and paste when asked. Wait for **Crate setup saved**. Use HTTPS; the code expires after 10 minutes and works once. A new code replaces the previous one. If an exchange reply is lost, create a new code and run setup again. No permanent credential is copied out of the PWA.
-3. Share a web link and select **Save to Crate (iOS 27)**. Allow access to your Crate server if Shortcuts asks. **Show Web View** presents the branded page in an iOS browser sheet. **Saved to Crate** appears after the bookmark is committed; article extraction continues in the background. Dismiss the sheet when finished. iOS controls its size and browser controls.
+3. Share a web link and select **Save to Crate**. Allow access to your Crate server if Shortcuts asks. **Show Web View** presents the branded page in an iOS browser sheet. **Saved to Crate** appears after the bookmark is committed; article extraction continues in the background. Dismiss the sheet when finished. iOS controls its size and browser controls.
 4. Retry on the same page after an interrupted save. Sharing the same URL again returns **Already saved**, without moving an archived item back to the inbox.
 5. To read, open a Reading setup link in Safari. For installation, select **Share → Add to Home Screen** within 10 minutes. Library access and shortcut capture access are separate. The shortcut cannot read the library or vault.
 
@@ -96,9 +96,9 @@ and deletes a highlight deep in a long article, asserting stable scroll position
 and retained paragraph nodes through server confirmation.
 
 
-## Desktop direct capture
+## Native direct capture
 
-Save a public article on desktop with no server configured, and with a configured
+Save a public article in Obsidian with no server configured, and with a configured
 server offline. The bookmark must appear immediately; article text arrives locally
 without sync or a Worker capture request. Enable normal sync and confirm the same
 note reaches another device without a second article download on the server.
@@ -108,9 +108,68 @@ Disconnect the network, save a link, and reopen the reader. The bookmark remains
 retry the retained bookmark after restart. Edit the article block, replace or delete
 the note while downloading; a late result must never overwrite or recreate it.
 Metadata and personal notes outside an unchanged empty article block are preserved.
-Mobile plugin and PWA captures must still use the existing server queue.
+The mobile plugin uses the same native capture path. Unencrypted PWA captures use
+the server queue; encrypted PWA captures run locally in the browser and retain
+pending work for an unlocked Obsidian device when browser access rules block it.
 
 Automated coverage: `src/reading/desktop-capture.test.ts`,
 `src/reading/data/library.test.ts`, `src/reading/runtime.test.ts`, and
 `npm run test:reading-extraction`. Native request transport, redirects, installed
 Obsidian appearance and device-to-device sync still require host acceptance.
+
+## Unified saves and YouTube transcripts
+
+Use matching plugin and Worker/PWA builds. Reload Obsidian after installing the
+plugin build; update the server and accept the PWA update before testing its new
+reader. This change does not publish a server or GitHub release automatically.
+
+1. Import [Crate Reading](../templates/crate-reading-clipper.json) into Web Clipper
+   and set its note location to your configured Reading folder. Clip a normal
+   article and a YouTube video whose preview includes timestamped transcript text.
+2. Save the clipped video's shortened URL in the sidebar and PWA. The existing
+   note should open, retaining tags, favorites, archive status and highlights.
+   Repeat with a watch URL, Shorts URL, and a different timestamp.
+3. Save a new video URL. Metadata remains useful if captions fail. Select **Play
+   video**, seek using timestamps, select and highlight transcript text, and add a
+   personal note. Open its Highlights view and select **Seek to** or **Open moment
+   on YouTube**. Check that another save does not replace those edits.
+4. With the video pinned, confirm it stays above the transcript, which follows
+   smoothly. Seek in the video, then tap passage text: both directions should
+   stay synchronized. Select text: the video should seek without moving the text
+   during selection or highlight editing. Select **Unpin video** and scroll freely
+   while the video plays; playback must not move your reading position. Confirm
+   tapping or selecting text starts playback even from a paused or unopened player,
+   with the hand cursor over the whole passage. Toggle **Pin video** / **Unpin video**
+   while playing and confirm playback is retained. Check reduced motion, long transcripts,
+   small screens, larger text, fullscreen, background/resume and closing the reader.
+   Drag the handle below the player to shrink and enlarge it to the full reader
+   width. Confirm the transcript width and playback position stay unchanged. Try
+   touch dragging, keyboard arrows, Home/End, Escape during a drag, double-click
+   reset and rotating the screen. If the video grows too tall to pin, select
+   **Pin video**: it must remain enabled and shrink the player only enough to fit,
+   preserving playback. Repeat with an unopened preview and a short landscape
+   window. Pinning an already fitting video must keep its size. Enlarge the preview
+   before starting playback by selecting transcript text: the player must keep its size without repeatedly
+   pinning/unpinning or making the page jump near the maximum pinned height.
+   Shrink a pinned video narrower than the transcript, then scroll. Earlier text
+   must stay hidden across the full pinned area; clicking beside the video or
+   controls must not seek to a covered passage.
+5. Reopen a cached transcript offline. Read and annotate it, reload, then reconnect
+   and confirm the same highlights in Obsidian and the PWA. Playback needs network
+   access; unavailable playback must retain the original YouTube link.
+6. Save an empty bookmark, then clip the same source into another note. **Review
+   duplicate sources** should show both paths. In Obsidian, fill the empty bookmark
+   from the clip, verify its original identity/state/personal notes, and verify the
+   clip was kept. Repeating this on a filled bookmark must preserve its content.
+7. With encryption enabled, a PWA caption request blocked by browser access rules
+   should retain an encrypted pending note. Open an unlocked Obsidian device and
+   let it attempt capture after sync. Keep both the source URL and text off the
+   plaintext Worker capture routes.
+
+Automated coverage: Reading unit tests; local Worker Reading/encryption integration;
+`reading-video.browser.test.mjs` for real Chromium/WebKit document and Shadow DOM
+selection with a simulated player transport; and the existing content-security
+browser harness. Physical iOS/Android playback, fullscreen, installed-app gestures
+and background/resume remain manual acceptance. A public-video smoke check also
+confirmed real transcript extraction and iframe playback messages from Chromium;
+it does not establish availability for every YouTube video or device.

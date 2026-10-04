@@ -1,18 +1,17 @@
 ---
-title: Notifications
-description: Enable reminder notifications and check permissions, server availability, and scheduling when alerts do not arrive.
+title: Notification problems
+description: Fix blocked permissions, unconfirmed device registration, and reminders that do not send an alert.
 ---
 
-Reminder notifications need permission on your device and a registered push subscription on your Crate server.
+Reminder alerts need the vault's notification setting, permission on your device, and confirmed registration with your server. For a new setup, start with [Set up notifications](/docs/features/notifications/).
 
-## Enable notifications
+## The app says “Off for vault”
 
-1. [Connect the web app](/docs/getting-started/devices/#open-the-web-app) on the device where you want alerts.
-2. On iPhone, add the app to your Home Screen and open the installed app.
-3. Enable **Push notifications** in Crate and allow notifications when the browser or device asks.
-4. Wait for Crate to confirm that notifications are on.
+This device is registered, but alerts are paused on the server. In Obsidian, open **Settings → Crate** and turn on both **Reminders → Enable reminders** and **Notifications → Push notifications**. Reopen the web app to check its status.
 
-Do this on each device where you want to receive reminders. Browser permission alone does not confirm that server registration succeeded.
+## The app says “Install first”
+
+On iPhone or iPad, open the connected app in Safari, add it to the Home Screen, then open the installed app. Enable notifications there. See the [installation steps](/docs/features/web-app/#install-on-your-phone) if the installed app asks to connect again.
 
 ## Permission is blocked
 
@@ -26,11 +25,11 @@ Check these in order:
 
 1. Confirm the reminder has the intended future date and time, including the notification timezone and all-day reminder time.
 2. Make sure the note has synced to the server. A reminder saved only in an offline Obsidian vault cannot be scheduled there yet.
-3. Check that **Enable reminders** is on. Pausing Reminders also pauses processing and notification delivery.
+3. Check that **Enable reminders** and the vault's **Push notifications** setting are both on. Pausing Reminders also pauses processing and notification delivery.
 4. Confirm the server is reachable. A Docker host must remain awake, online, and running Docker.
 5. Check that this web app session still has notifications enabled. Reconnect and register again if the session expired.
 
-After repairing a delivery problem, schedule a reminder for a new future time to verify it. Re-enabling notifications does not guarantee a replay of an old missed occurrence.
+Use **Settings → Crate → Notifications → Test notification → Send test** in Obsidian to check delivery to registered devices. After repairing a delivery problem, schedule a reminder for a new future time to verify scheduling too. Re-enabling notifications does not guarantee a replay of an old missed occurrence.
 
 ## Still not working
 

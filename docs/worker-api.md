@@ -97,8 +97,6 @@ source revision as successfully indexed or permit capture deduplication against
 an incomplete index. Background storage-failure retries use a 30-second delay;
 ordinary bounded indexing backlog can continue immediately. Verified malformed or
 oversized notes instead produce stable source issues until the source changes.
-Legacy rows that conflated a read failure with invalid properties are revisited
-without requiring a source edit. The wire protocol and database schema are unchanged.
 
 `POST /reading/prepare` accepts vault, reminders, Reading, and capture credentials
 when the Reading library is configured and available. Its five-minute launch URL
@@ -128,11 +126,8 @@ fields. A newer unsupported capture contract receives 426
 `shortcut_update_required`. The live, uncached save page performs the handoff
 with the server's current app wire protocol.
 
-Released shortcuts remain supported through narrow legacy adapters:
-`/reading/prepare` with header 1 or 11 can bypass app protocol retirement only
-with capture access; `/reading/shortcut-exchange` with header 1 retains its
-single-use pairing semantics. Other scopes and routes still enforce the app
-protocol. Legacy and versioned paths share the same action rate limits.
+Only the versioned shortcut routes bypass the general app protocol. Unversioned routes enforce the normal protocol checks.
+
 See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
 
 ### POST /sync/import/readiness
@@ -264,13 +259,13 @@ Response: `{ success: true }`
 
 Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
 
-Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
+Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
 
 ### PUT /settings
 
 Stores shared plugin preferences to R2.
 
-Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true, pushEnabled: false }, expectedVersion }`
+Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, pushEnabled: false }, expectedVersion }`
 
 Response: `{ success: true, settingsVersion }`. A stale version returns `409` instead of overwriting another device's edit.
 
@@ -448,7 +443,7 @@ retention, cleanup, restore validation, and older-server behavior.
 
 Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
 
-`POST /reading/shortcut-exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Both routes require the normal mutation protocol header, have separate per-minute action limits, and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
 
 Reading updates also accept optional `highlights` alongside their `before.highlights`
 precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader

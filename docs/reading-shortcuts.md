@@ -32,10 +32,7 @@ installed v1 shortcuts.
   app protocol. It shows **Saved to Crate** only after a valid durable receipt.
   Retry and reload reuse the same capability and operation.
 
-The exact released legacy requests also have adapters: preparation with app
-headers 1 or 11, and pairing exchange with header 1. Only capture access bypasses
-app protocol retirement on preparation. All other scopes and routes retain
-normal app protocol checks. Native and legacy paths share rate limits.
+Only the versioned shortcut routes bypass the general app protocol. Unversioned routes enforce the normal protocol checks.
 
 ## Future changes
 
@@ -54,10 +51,7 @@ continuing support would violate current invariants, with explicit update
 guidance. A newer client reaching an older supported Worker receives
 **Update your Crate server**; a retired client receives **Update your shortcut**.
 
-The revision-2 template can upgrade a stored legacy preparation endpoint locally
-without another exchange if Shortcuts retains its storage. A new installation
-may need pairing. The update instructions always include creating a fresh
-pairing code in the enrolled Crate app. Failed re-pairing must leave previous
+New installations use a fresh pairing code from the enrolled Crate app. Failed re-pairing must leave previous
 stored configuration intact; a lost successful exchange needs a new one-use code.
 
 ## Failure pages and privacy
@@ -85,9 +79,7 @@ checkmark alone is never confirmation that Reading committed an article.
 ## Rollout and verification
 
 Publish the public fallback page before distributing a template that uses it.
-Server revision 4 supports the legacy v1 download and recovers the released
-header-11 shortcut without reinstalling it. Before installing v2, update the
-Crate server and connect Reading in the browser the shortcut opens.
+Before installing the shortcut, update the Crate server and connect Reading in the browser the shortcut opens.
 Sign the public template locally with
 `npm run build:reading-shortcut -- --pairing`, prepare its release using the
 existing release workflow, and let Pages serve the signed published asset.
@@ -98,8 +90,7 @@ release downloader. Before the first signed v2 release is published, it explains
 that the shortcut is unavailable and directs users to **Reading → Save a link**.
 Once published, Pages verifies its metadata, signature framing and checksum before
 showing the download. Incomplete releases, download errors and verification failures
-still stop deployment. The draft release gate remains strict; v1 is retained only
-at its original path and is never substituted for the encrypted capture shortcut.
+still stop deployment. The draft release gate remains strict. Retired development shortcut downloads are no longer distributed.
 
 Run the native source tests, real-server shortcut tests, Chromium/WebKit tests,
 and the relevant protocol, handoff, and rate-limit suites. The browser suite

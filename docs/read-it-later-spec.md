@@ -1,3 +1,5 @@
+> Historical design notes. The current pre-launch baseline is schema 2 with no registered migrations; see [current contract](current-contract.md). Earlier upgrade requirements below are historical.
+
 # Read it later
 
 Status: implemented for integrated testing on `codex/read-it-later`. See [current implementation and acceptance status](read-it-later-plan.md#implementation-status) and [testing instructions](read-it-later-testing.md). This is not a published release.
@@ -78,7 +80,7 @@ If Clipper creates another file for a previously saved URL, preserve both notes 
 
 ### iPhone capture
 
-One-time setup lives in the enrolled web app under **Reading settings → Set up iPhone shortcut**. Obsidian offers **Copy phone setup link** to enroll a phone and open this screen. The user downloads the credential-free **Save to Crate (iOS 27)** template from Crate’s website and explicitly installs it in Shortcuts. Do not promise automatic silent installation.
+One-time setup lives in the enrolled web app under **Reading settings → Set up iPhone shortcut**. Obsidian offers **Copy phone setup link** to enroll a phone and open this screen. The user downloads the credential-free **Save to Crate** template from Crate’s website and explicitly installs it in Shortcuts. Do not promise automatic silent installation.
 
 The iOS 27 template has no import questions. The PWA creates a ten-minute, single-use pairing code containing the server endpoint and a temporary secret in its fragment. The user runs the Shortcut from its library and pastes that code. The Shortcut separates the fragment locally, sends the secret only in a POST body, and receives a new capture-only credential. It stores the derived capture endpoint and validated Authorization header together using shortcut-scoped Storage. The browser never receives that long-lived credential. Later shares reuse setup; a library run pairs again. Cancellation or invalid input preserves the previous configuration. Stored values can sync through Shortcuts. Keep the import-question template and manual Obsidian setup for older iOS. The new pairing flow still requires physical-device acceptance.
 
@@ -303,4 +305,4 @@ The full `crate_reading_id` remains in frontmatter. Existing notes, Clipper file
 
 The PWA retains its existing durable offline outbox until the server accepts the save. Obsidian stores immutable pending requests under its plugin directory in `reading-captures/`, bound to server credentials and the Reading folder, and retries the exact operation until normal sync brings the note into the vault. These records survive plugin reloads and network failures. Damaged or differently scoped records remain in place for recovery and block dispatch. The `reading-deferred-captures-v1` capability gates plugin dispatch to compatible servers.
 
-Schema 2 adds the durable queue through the registered `002-reading-captures` migration from schema 1. Backup and restore retain pending captures; extraction jobs for existing files remain rebuildable projections.
+The schema-2 launch baseline includes the durable queue. Backup and restore retain pending captures; extraction jobs for existing files remain rebuildable projections.

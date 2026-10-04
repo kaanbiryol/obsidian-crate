@@ -25,7 +25,9 @@ Open **Settings → Crate** to finish setup. For help with BRAT itself, see [BRA
 
 For vault sync and the web app, [choose a host](/docs/getting-started/hosting/). You can deploy into your Cloudflare account or run Crate on your own computer with Docker.
 
-For local reading on desktop, you can go straight to [Reading](/docs/features/reading/). Saving and reading articles in desktop Obsidian does not require a server.
+To try local features first, use **Crate: Reading - add link** or **Crate: Reminders - create reminder** from Obsidian's command palette. They start enabled and use the `Reading` and `Reminders` folders. A server is needed for vault sync, the web app, and notifications; the current settings screen also shows feature controls after connection.
+
+Follow [Reading](/docs/features/reading/) or [Reminders](/docs/features/reminders/) for everyday use, and [Choose and manage features](/docs/features/settings/) when you are ready to adjust the setup.
 
 ## Install release files manually
 

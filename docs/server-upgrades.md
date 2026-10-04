@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 8 and schema 2. The registered `002-reading-captures` migration upgrades the supported schema-1 baseline without replacing vault files. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. This does not apply to schema 1 in the current migration chain. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 8 and schema 2. The complete schema 2 is the pre-launch baseline with no registered migrations. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -8,8 +8,8 @@ The current candidate uses server revision 8 and schema 2. The registered `002-r
 
 - `revision` is the public server release number. Advance it exactly once from the last published release when server inputs change, and keep it fixed throughout development of that release. Never distribute different stable server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
-- `minimumSchemaVersion` is the oldest supported database source, currently 1. Retiring an old source version within the launch chain never deletes its migration history.
-- `migrations` is an ordered, contiguous registry. It currently contains `002-reading-captures` from schema 1 to schema 2. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
+- `minimumSchemaVersion` is the oldest supported database source, currently 2. Future released migration history remains immutable.
+- `migrations` is an ordered, contiguous registry. It is empty for the pre-launch baseline. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
 
 The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different stable fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment. Development builds additionally store a fingerprint-bound identity in `maintenance_state`, in the same transaction as the verified release record.
 
@@ -50,7 +50,7 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 ## Release evidence
 
-`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source/schema baseline after the intentional pre-launch reset; earlier prereleases belong to the retired sequence. Its `initialRevision: 2` reserves revision 1, which was already deployed during development, and starts the first public candidate at revision 2 so those installations can upgrade. This is independent of the baseline commit’s development revision. Once a release is published after that baseline, subsequent checks use that release. Keep the baseline fixed. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
+`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source baseline for this pre-launch cleanup and retains candidate revision 8. All development releases at or before that baseline are retired. The unpublished baseline may discard development migration entries; after publication, migration immutability and schema/revision checks apply normally. Keep the baseline fixed after launch. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
 A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
 
@@ -154,10 +154,9 @@ rules in `src/cloudflare/restore/restore-policy.json`. Both run the fixture in
 are discarded while queued captures and operation receipts survive. Each adapter
 keeps its own schema migration and destination publication workflow.
 
-The in-app restore adapter supports source schemas 1 and 2 into the current
+The in-app restore adapter supports source schema 2 into the current
 schema-2 database. Schema 2 adds only the durable Reading capture queue, so restore
 preserves queued captures (including their retry state and notes) alongside the
-Reading policy and generation. Schema-1 archives restore with an empty capture
-queue. Credentials and derived extraction jobs are still reset, and migration
+Reading policy and generation. Schema-1 archives are unsupported. Credentials and derived extraction jobs are still reset, and migration
 receipts are validated before creating destination resources. Future target
 schemas remain blocked until their recovery adapter is implemented.

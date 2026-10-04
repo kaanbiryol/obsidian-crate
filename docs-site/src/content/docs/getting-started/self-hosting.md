@@ -25,17 +25,31 @@ The first run builds the image from the repository. Wait for the log message con
 3. Enter the complete HTTPS address and the pairing code.
 4. Open the command palette and select **Crate: Sync - sync now**.
 
-Pairing codes work once and expire after ten minutes. The [server command reference](/docs/reference/self-hosting/#storage-and-lifecycle) explains how to create another code.
+Wait for completion and check **Crate: Sync - show activity** for errors. Automatic sync starts off; enable **Settings → Crate → Sync → Automatic sync** if you want this device to continue syncing automatically.
+
+Pairing codes work once and expire after ten minutes. If yours expires, [create another code](#create-another-pairing-code).
 
 You can press **Ctrl+C** to leave the log viewer; Crate keeps running in the background.
 
 Use the public HTTPS address even if Obsidian is on the same computer. The internal `127.0.0.1:8787` listener shown in Docker logs is inside the container and is not published to the host.
 
+## Create another pairing code
+
+Keep the server running. From the same repository folder on the host, run:
+
+```sh
+docker compose exec crate crate pair --name "My phone"
+```
+
+Use the new code and existing server address under **Connect to your server** on the next Obsidian device. You do not need to restart the server. Give each device its own code.
+
+For a server running directly with Node instead of Docker, use the [server command reference](/docs/reference/self-hosting/#storage-and-lifecycle).
+
 ## Keep it available
 
 Keep the computer awake, online, and running Docker. Scheduled notifications and sync cannot reach a stopped server.
 
-The default Quick Tunnel address changes when the server restarts. On each Obsidian device, use **Server details → Update server address**, sync, then reconnect the web app. For a permanent address, follow the [custom-domain tunnel setup](/docs/reference/self-hosting/#access-away-from-home-with-cloudflare-tunnel).
+The default Quick Tunnel address changes when the server restarts. On each Obsidian device, use **Settings → Crate → Server → Update server address**, sync, then reconnect the web app. For a permanent address, follow the [custom-domain tunnel setup](/docs/reference/self-hosting/#access-away-from-home-with-cloudflare-tunnel).
 
 ## Look after your data
 

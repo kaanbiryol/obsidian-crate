@@ -11,6 +11,14 @@ Crate is not a hosted service and does not require a Crate account.
 [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/),
 then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/).
 
+For everyday use, see [feature settings](https://crate.kaanbiryol.com/docs/features/settings/),
+[vault sync](https://crate.kaanbiryol.com/docs/features/sync/),
+[reminders](https://crate.kaanbiryol.com/docs/features/reminders/),
+[Reading](https://crate.kaanbiryol.com/docs/features/reading/), and
+[the web app](https://crate.kaanbiryol.com/docs/features/web-app/).
+The guides also cover [notification setup](https://crate.kaanbiryol.com/docs/features/notifications/)
+and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
+
 [Deployment and OAuth setup](docs/deployment.md)
 
 [Run on your own computer](docs/self-hosting.md) — local setup, remote access, device tokens, backups, and updates.
@@ -90,16 +98,36 @@ or page referrer with the image. Each browser or Obsidian device may cache icons
 independently and may request them again. A letter appears when an icon cannot
 load, including offline. Article images remain suppressed.
 
-YouTube video links show a thumbnail, title and channel, with **Watch on YouTube**
-and **Mark as watched** actions. Saving a video fetches its public title and channel
-from YouTube on the same device or server used for article extraction. Encrypted
-PWA captures request metadata directly in the browser, keeping URLs off the
-Crate server; blocked requests remain pending for an unlocked Obsidian device. Failed
-lookups keep a usable video bookmark. Opening Reading may request video thumbnails
-from `i.ytimg.com`; the same image privacy and browser caching behavior described
-above applies. Video playback opens the original link, including its timestamp,
-and requires an internet connection. Crate does not download videos or transcripts.
-Saved details and any text in the note remain available offline once cached.
+YouTube links share one Reading identity across watch, Shorts, and shortened URLs.
+Saving fetches public video details and attempts to save a transcript with bundled
+Defuddle. Caption availability depends on YouTube and the capture environment;
+failed captions leave a usable bookmark. Encrypted PWA requests stay on the device;
+blocked transcript requests leave an encrypted pending note for an unlocked
+Obsidian device. No third-party extraction service receives the link.
+
+Select the play icon, tap a transcript passage, or select transcript text to load
+YouTube's embedded player and play from that point. It contacts YouTube and
+may use YouTube cookies, display its player content, and send the embedding origin
+as a referrer; it never receives Crate credentials or your note contents.
+**Open in YouTube** appears if embedded playback fails. Playback requires
+an internet connection. Crate does not download videos. Reading may load thumbnails
+from `i.ytimg.com` with the same image privacy behavior described above.
+
+Saved timestamped transcripts support seeking, ordinary Markdown highlights and
+annotations in both readers. **Pin video** keeps the video above the transcript
+and smoothly follows playback, including when you seek in the video. Tapping or
+selecting a passage starts playback there while preserving highlighting.
+Scrolling holds still while selecting or editing a highlight. **Unpin video** lets
+you scroll independently, with the video remaining in the page. Transcript text, highlights,
+and notes remain available offline once cached. In **Highlights**, open a passage
+in its transcript to seek to or open its YouTube moment. Plain transcripts without
+timestamps remain readable and highlightable.
+
+Drag the handle below a video up or down to resize it, up to the full reader
+width. Double-click the handle to reset its size; keyboard arrows resize it too.
+The transcript keeps its reading width. Videos too tall to fit while pinned scroll
+with the page, keeping the handle reachable. Select **Pin video** to automatically
+shrink an oversized video just enough to fit above the transcript.
 
 For desktop capture, set Obsidian Web Clipper to save into Crate's Reading folder
 in the intended vault, then clip normally. No Crate template is needed. Every
@@ -108,6 +136,19 @@ reading status, favorites, and identity automatically, preserves the body and
 filename, and syncs the note without re-extracting it. Existing Crate Reading
 templates still work. Notes without a source URL appear as vault notes.
 Changing the Reading folder does not move files.
+
+The optional [Crate Reading Clipper template](templates/crate-reading-clipper.json)
+saves the full extracted content, including available YouTube transcripts. Import
+it in Web Clipper's template settings and change **Note location** if your Reading
+folder differs. A template that saves only an embed does not save the transcript;
+check the preview before clipping. Opening YouTube's transcript panel before
+clipping can help when automatic caption fetching fails.
+
+**Review duplicate sources** lets you compare independently clipped notes. In
+Obsidian, **Fill empty bookmark** copies a clip into an empty saved-link note,
+preserving its identity, state, annotations, and personal text. Both originals stay
+in the vault; move the extra note outside Reading after reviewing them. Existing
+article text is never replaced by this action.
 
 Select **Tags** in an article to add or remove comma-separated tags. Clipper's
 existing tags carry over automatically. Filter by tag in the desktop sidebar or

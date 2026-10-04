@@ -54,7 +54,9 @@ extraction of those pages.
 - Desktop plugin: save the bookmark first, download with Obsidian's native API,
   extract using the same bundled Defuddle pipeline as the Worker, then fill the
   unchanged empty article block. Existing metadata and personal notes survive.
-- Mobile plugin and PWA: keep the durable server extraction flow.
+- Mobile plugin: uses the same native extraction path as desktop. Unencrypted
+  PWA saves retain server extraction; encrypted PWA saves attempt direct capture
+  and hand pending notes to an unlocked Obsidian device.
 - No automatic server fallback for a new desktop capture. An offline/error bookmark
   remains in the vault and can be retried. The resulting Markdown syncs normally.
 - Parse only successful HTML responses up to 2 MiB and use the existing 1 MiB note
@@ -65,5 +67,6 @@ extraction of those pages.
   Obsidian owns redirect handling. Its API does not expose each redirect target or
   the final URL, so relative article links resolve against the submitted URL;
   redirecting sites can require clipping the final page URL instead.
-- Extraction does not fetch images, scripts, embeds, or third-party fallback
-  services. It remains independent of reading/favicons and normal vault sync.
+- Generic article extraction does not fetch images, scripts, embeds, or third-party fallback
+  services. YouTube capture additionally uses a bounded allowlist for caption
+  requests through the same host transport. It remains independent of reading/favicons and normal vault sync.

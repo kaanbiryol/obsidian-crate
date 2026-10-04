@@ -203,9 +203,13 @@ modified article blocks, changed identities, duplicates, and stopped runtimes re
 late publication. A failed or interrupted download remains a retryable bookmark.
 
 HTML extraction lives in `src/reading/extraction/` and is shared with the Worker.
-It uses inert parsing and disables extractor network requests. Desktop capture
-loads it on demand; all executable code is bundled with the plugin. Mobile plugin
-captures and the PWA retain the durable server queue. Previously queued desktop
+Generic article extraction uses inert parsing and disables extractor network requests.
+The YouTube-specific enrichment adapter grants bundled Defuddle bounded access
+to an allowlist of YouTube watch/player/caption endpoints; failed captions preserve
+video metadata. Encrypted PWA captures leave missing transcripts pending for a
+trusted Obsidian device. Plugin capture on desktop and mobile
+loads it on demand; all executable code is bundled with the plugin. Unencrypted
+PWA captures retain the durable server queue. Previously queued desktop
 server captures still drain through their original path. See
 [article fetching and CORS](reading-fetch-research.md) for transport limits and browser evidence.
 
@@ -256,7 +260,7 @@ lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
 
-The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 2 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. The registered schema-1 upgrade uses the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
+The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 2 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 
