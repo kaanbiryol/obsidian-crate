@@ -58,7 +58,7 @@ window.addEventListener('scroll', () => {
 window.addEventListener('resize', updateNavigation);
 updateNavigation();
 
-// Hold the last frame, then fade through each replay instead of jumping to zero.
+// Hold the last frame, then fade the video over its stationary phone backdrop.
 document.querySelectorAll('.reminder-recording video').forEach((recording) => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const isGalleryPreview = Boolean(recording.closest('a[data-gallery-video]'));

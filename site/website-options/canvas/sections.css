@@ -276,6 +276,8 @@
  .notification-story video { max-height:340px; }
 }
 
+/* The idle phone remains visible while the recording fades for replay. */
+.plugin-notification-demo .gallery-video-trigger { background:url("/assets/screenshots/plugin-notifications-idle.png") center / 100% 100% no-repeat; }
 .reminder-recording video { opacity:1; transition:opacity 350ms ease; }
 .reminder-recording video.is-restarting { opacity:0; }
 @media(prefers-reduced-motion:reduce) { .reminder-recording video { transition:none; } }
