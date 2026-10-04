@@ -13,7 +13,7 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 	let folderSuggest: FolderSuggest | undefined;
 	createSettingsDisclosure(container, 'Reading', { summary: plugin.settings.reading.enabled ? `Folder: ${plugin.settings.reading.folderPath}` : 'Paused', onOpen: options => {
 		new Setting(options).setName('Enable reading')
-			.setDesc('All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. Saved notes and vault sync are preserved.')
+			.setDesc('All devices · pause or resume reading and article downloads. This device downloads saved links directly into your vault. YouTube links also request available transcripts. Playback connects to YouTube only when you select play. Saved notes and vault sync are preserved.')
 			.addToggle(toggle => toggle.setValue(plugin.settings.reading.enabled).onChange(async enabled => {
 				toggle.setDisabled(true);
 				try {

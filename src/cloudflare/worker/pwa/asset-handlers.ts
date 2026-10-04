@@ -30,6 +30,7 @@ function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 			`script-src 'self'${nonce ? ` 'nonce-${nonce}' 'strict-dynamic'` : ''}`,
 			"script-src-attr 'none'",
 			"worker-src 'self'",
+			"frame-src https://www.youtube-nocookie.com",
 			"connect-src 'self' https:",
 			"img-src 'self' data: https:",
 			"manifest-src 'self'",

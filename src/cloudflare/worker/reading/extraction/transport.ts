@@ -16,7 +16,10 @@ export async function fetchArticle(source: string, fetchPublic: (request: Reques
 export async function fetchReadingCapture(source: string, fetchPublic: (request: Request) => Promise<Response> = fetch, ownOrigin?: string): Promise<{ article: CapturedArticle; url: string }> {
   const url = extractionUrl(source).href, videoId = youtubeVideoId(url);
   const resource = videoId ? await fetchResource(youtubeMetadataUrl(videoId), fetchPublic, ownOrigin, true) : await fetchArticle(url, fetchPublic, ownOrigin);
-  if (videoId) return { article: youtubeMetadata(resource.html), url };
+  if (videoId) {
+    const { withYoutubeTranscript } = await import('@/reading/extraction/youtube-transcript');
+    return { article: await withYoutubeTranscript(youtubeMetadata(resource.html), videoId, fetchPublic), url };
+  }
   // Failed downloads and video metadata need no DOM parser.
   const { extractDocument } = await import('./document');
   return { article: extractDocument(resource.html, resource.url), url: resource.url };

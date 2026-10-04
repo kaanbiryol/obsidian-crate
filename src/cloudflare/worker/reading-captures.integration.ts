@@ -104,3 +104,17 @@ it('publishes a video with metadata and its timestamp through the normal capture
 	expect(file.content).not.toContain('<iframe');
 	expect(await env.DB.prepare('SELECT 1 FROM reading_captures').first()).toBeNull();
 });
+
+it('matches old queued YouTube identities and rebuilt source indexes without rewriting receipts', async () => {
+  const { row, body, response } = await capture({ url: 'https://youtu.be/jNQXAC9IVRw?t=42' });
+  await env.DB.prepare('UPDATE reading_captures SET url_identity=? WHERE id=?').bind(body.url, row.id).run();
+  const duplicate = await command('capture', { url: 'https://www.youtube.com/shorts/jNQXAC9IVRw', operationId: operation() });
+  expect(await duplicate.json()).toMatchObject({ alreadySaved: true, id: row.id });
+  expect(await (await command('capture', body)).json()).toEqual(response);
+  await publishCapture(env, row.id, row.generation, { title: 'Video', markdown: '## Transcript\n\n**0:42** · Saved passage.' });
+  await list();
+  await env.DB.prepare("UPDATE reading_sources SET url_identity=?, metadata_json=json_set(metadata_json, '$._highlightIndex', 3)").bind(body.url).run();
+  const projected = await command('capture', { url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw&t=99', operationId: operation() });
+  expect(await projected.json()).toMatchObject({ alreadySaved: true, id: row.id });
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM files').first()).toMatchObject({ n: 1 });
+});

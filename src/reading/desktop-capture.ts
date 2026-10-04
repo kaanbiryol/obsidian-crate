@@ -31,7 +31,16 @@ export async function captureDesktopArticle(source: string, signal: AbortSignal)
     if (videoId) {
       if (response.status < 200 || response.status >= 300 || !/^application\/json\b/i.test(headers.get('Content-Type') ?? '')
         || response.arrayBuffer.byteLength > YOUTUBE_METADATA_MAX_BYTES) throw new Error('Video details are unavailable.');
-      return youtubeMetadata(new TextDecoder().decode(response.arrayBuffer));
+      const article = youtubeMetadata(new TextDecoder().decode(response.arrayBuffer));
+      const { withYoutubeTranscript } = await import('./extraction/youtube-transcript');
+      const captured = await withYoutubeTranscript(article, videoId, async request => {
+        signal.throwIfAborted(); request.signal.throwIfAborted();
+        const result = await requestUrl({ url: request.url, method: request.method, headers: Object.fromEntries(request.headers), ...(request.method === 'POST' ? { body: await request.text() } : {}), throw: false });
+        signal.throwIfAborted(); request.signal.throwIfAborted();
+        if (result.arrayBuffer.byteLength > MAX_BYTES) throw new Error('Transcript response too large');
+        return new Response(result.arrayBuffer, { status: result.status, headers: result.headers });
+      }, signal);
+      signal.throwIfAborted(); return captured;
     }
     if (response.status < 200 || response.status >= 300 || !/^(text\/html|application\/xhtml\+xml)\b/i.test(headers.get('Content-Type') ?? '')) {
       throw new Error('The website did not return a readable article.');

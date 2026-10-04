@@ -20,6 +20,8 @@ import type { ReadingMetadata, ReadingChanges } from '../core/model';
 import { ReadingDialog } from './ReadingDialog';
 import { youtubeVideoId } from '../core/youtube';
 import { ReadingVideo } from './ReadingVideo';
+import { decorateTranscript } from './transcript-content';
+import { transcriptSegments, transcriptMoment } from '../core/transcript';
 import { readingSource, readingTitle } from './reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
@@ -64,6 +66,9 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	const markdown = deferContentUntilEntered && enteredId !== item.crate_reading_id ? null : loadedMarkdown;
 	const videoId = youtubeVideoId(item.source_url);
 	const kind = videoId ? 'video' : 'article';
+	const segments = useMemo(() => videoId && markdown !== null ? transcriptSegments(markdown) : [], [videoId, markdown]);
+	const [videoSeek, setVideoSeek] = useState<{ seconds: number; reveal?: boolean } | null>(null);
+	const [videoPinned, setVideoPinned] = useState(true);
 	const hasVideoNotes = useMemo(() => Boolean(videoId && markdown !== null && readingDocument(markdown).text.trim()), [videoId, markdown]);
 	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
 	useEffect(() => {
@@ -78,12 +83,12 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		});
 		return () => { cancelled = true; };
 	}, [deferContentUntilEntered, item.crate_reading_id]);
-	useReaderNavigation(article, autoHideNavigation, item.crate_reading_id);
+	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), item.crate_reading_id);
 	const copyTimer = useRef<{ window: Window; id: number } | undefined>(undefined);
 	const clearCopyTimer = () => { if (copyTimer.current) copyTimer.current.window.clearTimeout(copyTimer.current.id); };
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
-		setError(null); setCopied(false); setDialog(null);
+		setError(null); setCopied(false); setDialog(null); setVideoSeek(null); setVideoPinned(true);
 		setMode('article'); setAnnotation(null); setHighlightsOpen(false); sheetAction.current = null;
 		return clearCopyTimer;
 	}, [item.crate_reading_id]);
@@ -111,7 +116,12 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			else { await navigator.clipboard.writeText(item.source_url); setCopied(true); clearCopyTimer(); copyTimer.current = { window: ownerWindow, id: ownerWindow.setTimeout(() => setCopied(false), 2500) }; }
 		} catch (cause) { if (!(cause instanceof Error && cause.name === 'AbortError')) throw cause; }
 	};
-	const content = useMemo(() => markdown === null ? null : renderReadingContent(markdown, item.source_url, highlightCode), [markdown, item.source_url, highlightCode]);
+	const content = useMemo(() => {
+		if (markdown === null) return null;
+		const result = renderReadingContent(markdown, item.source_url, highlightCode);
+		if (videoId) decorateTranscript(result, markdown, segments);
+		return result;
+	}, [markdown, item.source_url, highlightCode, videoId, segments]);
 	useEffect(() => { if (focusHighlight) { setMode('article'); setTarget(focusHighlight); } }, [focusHighlight]);
 	useEffect(() => {
 		if (!target || mode !== 'article' || markdown === null) return;
@@ -149,7 +159,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 	};
 	const renderHighlights = (close?: () => void) => <>
 		{!item.highlights?.length && <p className="crate-reading__notice">Select a passage in the article to save your first highlight.</p>}
-		<HighlightList entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => perform(() => { targetAfterSheet.current = Boolean(close); setMode('article'); setTarget(highlight); }, close)} onAnnotate={onUpdate ? (_item, highlight) => perform(() => { setError(null); setAnnotation(highlight); setNote(highlight.note ?? ''); }, close) : undefined} />
+		<HighlightList moment={highlight => transcriptMoment(segments, highlight.start, highlight.end)} onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)} entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending} onView={(_item, highlight) => perform(() => { targetAfterSheet.current = Boolean(close); setMode('article'); setTarget(highlight); }, close)} onAnnotate={onUpdate ? (_item, highlight) => perform(() => { setError(null); setAnnotation(highlight); setNote(highlight.note ?? ''); }, close) : undefined} />
 		{!!item.highlight_recovery?.length && <details className="crate-reading__notice"><summary>{item.highlight_recovery.length} saved highlights need reselecting</summary><p>The original excerpts are preserved here. Select their current passages in the article to highlight them again.</p><HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} /></details>}
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
@@ -162,17 +172,18 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		<div className="crate-reading-reader__page">
 			{notice}
 			{showHeader && <header className="crate-reading-reader__header">{item.source_url ? <a className="crate-reading-reader__source" href={item.source_url} target="_blank" rel="noopener noreferrer"><ReadingSourceIcon item={item} />{readingSource(item.source_url)}<ThemeIcon id="arrow-up-right" size="xs" aria-hidden="true" /></a> : <span className="crate-reading-reader__source"><ReadingSourceIcon item={item} />Vault note</span>}<h1 ref={heading} tabIndex={-1}>{readingTitle(item)}</h1>
-				<div className="crate-reading-reader__byline">{item.author && <span>{item.author}</span>}<time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{videoId && <span>Video</span>}{!videoId && markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}</div>
+				<div className="crate-reading-reader__byline">{item.author && <span>{item.author}</span>}<time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{videoId && <span>Video</span>}{videoId && segments.length > 0 && item.transcript_language && <span>Transcript: {item.transcript_language}</span>}{!videoId && markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}</div>
 				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing} onClick={() => void run(share, 'share')} />}</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
 			</header>}
 			{error && <p role="alert" className="crate-reading__notice">{error}</p>}
 			{copied && <span className="crate-reading__sr-only" role="status">Link copied</span>}
-			{!floatingHighlights && (!videoId || hasVideoNotes) && <div className="crate-reading-reader__tabs" role="group" aria-label="Article view"><ToggleButton pressed={mode === 'article'} onPressedChange={() => setMode('article')}>{videoId ? 'Notes' : 'Article'}</ToggleButton><ToggleButton pressed={mode === 'highlights'} onPressedChange={() => setMode('highlights')}>Highlights{item.highlights?.length ? ` (${item.highlights.length})` : ''}</ToggleButton></div>}
+			{!floatingHighlights && (!videoId || hasVideoNotes) && <div className="crate-reading-reader__tabs" role="group" aria-label="Article view"><ToggleButton pressed={mode === 'article'} onPressedChange={() => setMode('article')}>{videoId ? segments.length ? 'Transcript' : 'Notes' : 'Article'}</ToggleButton><ToggleButton pressed={mode === 'highlights'} onPressedChange={() => setMode('highlights')}>Highlights{item.highlights?.length ? ` (${item.highlights.length})` : ''}</ToggleButton></div>}
 			{!floatingHighlights && mode === 'highlights' && renderHighlights()}
 			<div hidden={mode !== 'article'}>
-			{videoId && showHeader && <ReadingVideo id={videoId} source={item.source_url} />}
-			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">{videoId ? (item.extraction_status === 'pending' ? 'Your video is saved. Fetching its title and channel…' : 'Your video is saved. You can watch it on YouTube.') : item.extraction_status === 'pending' ? pendingMessage : item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.'}{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>{videoId ? 'Retry details' : 'Try again'}</Button>}</p>}
+			{videoId && showHeader && <ReadingVideo key={item.crate_reading_id} id={videoId} source={item.source_url} body={body} content={content} hasTranscript={segments.length > 0} pinned={videoPinned} onPinnedChange={setVideoPinned} seekTarget={videoSeek} />}
+			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">{videoId ? (item.extraction_status === 'pending' ? item.title === new URL(item.source_url).hostname ? 'Your video is saved. Fetching details and transcript…' : 'Video details are saved. The transcript is pending; an unlocked Obsidian device can finish encrypted captures.' : 'Your video is saved. You can watch it on YouTube.') : item.extraction_status === 'pending' ? pendingMessage : item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.'}{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>{videoId ? 'Retry capture' : 'Try again'}</Button>}</p>}
+			{videoId && markdown !== null && item.extraction_status === 'ready' && !segments.length && <p className="crate-reading__notice">{hasVideoNotes ? 'Saved notes are available. No timed transcript was found.' : 'Transcript unavailable. You can add one with the Crate Web Clipper template.'}{!hasVideoNotes && onRetry && item.capture_method === 'url' && <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Retry transcript</Button>}</p>}
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
 					: <LoadingIndicator label={videoId ? "Loading video details" : "Loading article"} />}
@@ -180,7 +191,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{markdown !== null && (videoId || item.extraction_status === 'ready') && <footer className="crate-reading-reader__end">{!videoId && <><span aria-hidden="true">✦</span><p>You’ve reached the end.</p></>}{onUpdate && item.reading_status === 'inbox' && <Button variant="outline" disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ reading_status: 'archived' }))}><ThemeIcon id="archive" size="m" aria-hidden="true" />{videoId ? 'Mark as watched' : 'Mark as read'}</Button>}</footer>}
 			</div>
 		</div>
-		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onCopyComplete={onCopyComplete} />}
+		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onCopyComplete={onCopyComplete} onSelect={videoId ? highlight => { const seconds = transcriptMoment(segments, highlight.start, highlight.end); if (seconds !== undefined) setVideoSeek({ seconds, reveal: false }); } : undefined} />}
 		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={() => { setHighlightsOpen(false); const action = sheetAction.current; sheetAction.current = null; action?.(); }}>{close => renderHighlights(close)}</ReadingDialog>}
 		{annotation && <ReadingDialog title="Highlight note" busy={busy} onClose={() => setAnnotation(null)}>{close => <form className="crate-reading-reader__annotation" onSubmit={event => { event.preventDefault(); void run(async () => { await saveNote(); onSaveComplete?.('note'); close(); }); }}><blockquote>{annotation.text}</blockquote><label htmlFor="reading-highlight-note">Your note</label><textarea id="reading-highlight-note" data-initial-focus value={note} maxLength={4000} onChange={event => setNote(event.target.value)} disabled={busy || highlightsPending} />{error && <p role="alert">{error}</p>}<div className="crate-dialog-actions crate-reading-dialog__actions"><Button variant="outline" disabled={busy} onClick={close}>Cancel</Button><Button variant="primary" type="submit" disabled={busy || highlightsPending}>Save note</Button></div></form>}</ReadingDialog>}
 		{dialog === 'appearance' && <ReadingDialog title="Reading appearance" onClose={() => setDialog(null)}><div className="crate-reading-reader__preferences"><span>Typeface</span><div className="crate-reading-reader__font-choice"><ToggleButton variant="outline" pressed={!serif} onPressedChange={() => updateAppearance({ serif: false })}>Modern<span>Sans serif</span></ToggleButton><ToggleButton variant="outline" pressed={serif} onPressedChange={() => updateAppearance({ serif: true })}>Literary<span>Serif</span></ToggleButton></div><div className="crate-reading-reader__font-size"><span>Text size</span><IconButton icon="minus" iconSize="s" label="Decrease text size" disabled={fontSize <= 16} onClick={() => updateAppearance({ fontSize: Math.max(16, fontSize - 1) })} /><output aria-label="Text size" aria-live="polite">{fontSize}</output><IconButton icon="plus" iconSize="s" label="Increase text size" disabled={fontSize >= 26} onClick={() => updateAppearance({ fontSize: Math.min(26, fontSize + 1) })} /></div><div className="crate-reading-reader__sample-frame"><p className="crate-reading-reader__sample" style={{ fontSize, fontFamily: serif ? 'Georgia, serif' : 'var(--font-interface)' }}>A little room to read.<br />A little space to think.</p></div></div></ReadingDialog>}

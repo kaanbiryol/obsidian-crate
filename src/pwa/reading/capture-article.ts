@@ -14,7 +14,12 @@ export async function captureBrowserArticle(source: string): Promise<CapturedArt
     for (;;) { const { value, done } = await reader.read(); if (done) break; length += value.length; if (length > (videoId ? YOUTUBE_METADATA_MAX_BYTES : 2 * 1024 * 1024)) throw new Error('Reading content exceeds the download limit.'); chunks.push(value); }
   } finally { await reader.cancel(); }
   const bytes = new Uint8Array(length); let at = 0; for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-  if (videoId) return youtubeMetadata(new TextDecoder().decode(bytes));
+  if (videoId) {
+    const article = youtubeMetadata(new TextDecoder().decode(bytes));
+    const { withYoutubeTranscript } = await import('@/reading/extraction/youtube-transcript');
+    const captured = await withYoutubeTranscript(article, videoId, request => fetch(request));
+    return { ...captured, ...(!captured.markdown ? { deferTranscript: true as const } : {}) };
+  }
   const { extractDocument } = await import('@/reading/extraction/document');
   return extractDocument(new TextDecoder().decode(bytes), response.url || source);
 }

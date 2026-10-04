@@ -10,6 +10,7 @@ import { sha256Hex } from '../../auth';
 import { commitStagedFile } from '../../sync-mutations';
 import { stageMarkdownFile } from '../../markdown-file-staging';
 import type { extractDocument } from './document';
+import { transcriptMetadata } from '@/reading/extraction/types';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
 export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }
@@ -34,6 +35,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
     let content = source.content;
     if (result) content = `${content.slice(0, block.start)}\n\n${result.markdown}\n\n${content.slice(block.end)}`;
     content = patchReadingFrontmatter(content, { extraction_status: result ? 'ready' : 'unavailable',
+      ...(result ? transcriptMetadata(result) : {}),
       ...(result?.title && item.title === new URL(item.source_url).hostname ? { title: result.title } : {}),
       ...(result?.author && !item.author ? { author: result.author } : {}),
       ...(result?.faviconUrl && !item.favicon_url ? { favicon_url: result.faviconUrl } : {}),

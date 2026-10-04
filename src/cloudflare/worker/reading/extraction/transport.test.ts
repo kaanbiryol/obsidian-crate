@@ -7,14 +7,16 @@ it('rejects private, metadata, reserved, encoded and non-web destinations before
   expect(isPublicIPv4('8.8.8.8')).toBe(true); expect(extractionUrl('https://example.com/page#anchor').href).toBe('https://example.com/page');
 });
 
-it('fetches YouTube metadata through the public binding without a watch-page or player request', async () => {
+it('fetches metadata and optionally a transcript through the public binding', async () => {
   const seen: Request[] = [];
   const result = await fetchReadingCapture('https://youtu.be/jNQXAC9IVRw?t=42', async request => {
     seen.push(request);
     return Response.json({ type: 'video', title: 'A video', author_name: 'A channel', html: '<iframe>untrusted</iframe>' });
   });
   expect(result).toEqual({ article: { markdown: '', title: 'A video', author: 'A channel' }, url: 'https://youtu.be/jNQXAC9IVRw?t=42' });
-  expect(seen).toHaveLength(1);
+  expect(seen).toHaveLength(2);
+  expect(seen[1]!.url).toBe('https://www.youtube.com/watch?v=jNQXAC9IVRw');
+  expect(seen[1]!.redirect).toBe('error');
   expect(new URL(seen[0]!.url).pathname).toBe('/oembed');
   expect(new URL(seen[0]!.url).searchParams.get('url')).toBe('https://www.youtube.com/watch?v=jNQXAC9IVRw');
   expect(seen[0]!.credentials).toBe('omit');

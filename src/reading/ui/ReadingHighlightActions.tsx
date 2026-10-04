@@ -10,14 +10,14 @@ type Box = { left: number; top: number; width: number; height: number };
 type Geometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top: number }; feedback: { left: number; top: number } };
 
 /** Native initial selection; portable handles for editing a saved annotation. */
-export function ReadingHighlightActions({ body, article, content, highlights, onSave, onCopyComplete, disabled }: {
+export function ReadingHighlightActions({ body, article, content, highlights, onSave, onCopyComplete, onSelect, disabled }: {
 	body: React.RefObject<HTMLDivElement | null>; article: React.RefObject<HTMLElement | null>;
 	content: DocumentFragment | null; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
-	onCopyComplete?: () => void;
+	onCopyComplete?: () => void; onSelect?: (highlight: ReadingHighlight) => void;
 }) {
 	const controls = useRef<HTMLDivElement>(null), editing = useRef<Editing | null>(null), saving = useRef(false);
-	const latest = useRef({ highlights, onSave, onCopyComplete, disabled });
-	useLayoutEffect(() => { latest.current = { highlights, onSave, onCopyComplete, disabled }; }, [highlights, onSave, onCopyComplete, disabled]);
+	const latest = useRef({ highlights, onSave, onCopyComplete, onSelect, disabled });
+	useLayoutEffect(() => { latest.current = { highlights, onSave, onCopyComplete, onSelect, disabled }; }, [highlights, onSave, onCopyComplete, onSelect, disabled]);
 	const [draft, setDraft] = useState<Editing | null>(null), [geometry, setGeometry] = useState<Geometry | null>(null);
 	const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
 	const commands = useRef({ copy: () => {}, share: () => {}, save: () => {}, remove: () => {} });
@@ -130,6 +130,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			if (held || drag || !nativeIntent || saving.current || controls.current?.contains(activeElement())) return;
 			const highlight = selectedHighlight(text);
 			if (!highlight) return;
+			latest.current.onSelect?.(highlight);
 			nativeIntent = false; suppressClickUntil = Date.now() + 400;
 			const original = latest.current.highlights.find(entry => entry.start === highlight.start && entry.end === highlight.end) ?? null;
 			const value = { original, highlight }; edit(value); setError(null); setFeedback(null);
@@ -150,6 +151,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			event.preventDefault(); nativeIntent = false;
 			const start = Number(mark.dataset.highlightStart), end = Number(mark.dataset.highlightEnd);
 			const highlight = { start, end, text: (text.textContent ?? '').slice(start, end) };
+			latest.current.onSelect?.(highlight);
 			edit({ original: highlight, highlight }); setError(null); setFeedback(null);
 		};
 		const updateDrag = () => {
@@ -197,7 +199,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			const previous = drag; drag = null; window.cancelAnimationFrame(frame);
 			if (previous.target.hasPointerCapture(previous.pointer)) previous.target.releasePointerCapture(previous.pointer);
 			if (cancel) edit(previous.initial);
-			else if (editing.current) void persist(editing.current);
+			else if (editing.current) { latest.current.onSelect?.(editing.current.highlight); void persist(editing.current); }
 			suppressClickUntil = Date.now() + 400;
 		};
 		const up = (event: PointerEvent) => {

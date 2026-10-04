@@ -1,6 +1,8 @@
 import { ARTICLE_END, ARTICLE_START, readingTimestamp, readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingMetadata } from './model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
 import { readMarkdownHighlights, writeMarkdownHighlights } from './markdown-highlights';
+import { youtubeVideoId } from './youtube';
+import { transcriptSegments } from './transcript';
 
 export function parseReadingNote(markdown: string): ReadingMetadata | null {
 	const parsed = readReadingFrontmatter(markdown);
@@ -58,6 +60,7 @@ export async function adoptReadingClip(markdown: string, path: string, savedAt: 
 	const body = parsed?.body ?? markdown;
 	// Default Clipper templates use source and may save authors as a list.
 	const source = value.source_url ?? value.source ?? value.url;
+	const transcript = typeof source === 'string' && youtubeVideoId(source) && transcriptSegments(body).length > 0;
 	const author = Array.isArray(value.author) && value.author.every(entry => typeof entry === 'string')
 		? value.author.join(', ') : value.author;
 	const metadata = validateReadingMetadata({
@@ -66,6 +69,7 @@ export async function adoptReadingClip(markdown: string, path: string, savedAt: 
 		saved_at: readingTimestamp(value.saved_at ?? savedAt), reading_status: value.reading_status ?? 'inbox', favorite: value.favorite ?? false,
 		tags: typeof value.tags === 'string' ? value.tags.split(/[,\s]+/).filter(Boolean) : value.tags ?? [],
 		author: author ?? (Object.prototype.hasOwnProperty.call(value, 'author') ? '' : undefined), extraction_status: body.trim() ? 'ready' : 'unavailable', capture_method: 'web-clipper',
+		...(transcript ? { transcript_source: 'web-clipper', ...(typeof value.language === 'string' && value.language.length <= 64 && /^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$/.test(value.language) ? { transcript_language: value.language } : {}) } : {}),
 	});
 	return patchReadingFrontmatter(markdown, { ...metadata });
 }

@@ -1,3 +1,4 @@
+import { youtubeVideoId } from '@/reading/core/youtube';
 import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
@@ -34,8 +35,19 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       await env.DB.batch([operationStatement(env.DB, op, response)]);
       return readingResponse(response);
     }
-    const queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
-      .bind(current.generation, readingUrlIdentity(url)).first<{ id: string }>();
+    const identity = readingUrlIdentity(url);
+    let queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
+      .bind(current.generation, identity).first<{ id: string }>();
+    // Only legacy video variants need a bounded fallback. Preserve their
+    // operation identities and original note bytes; ordinary saves use the index.
+    if (!queued && youtubeVideoId(url)) {
+      const pending = await env.DB.prepare('SELECT id, note FROM reading_captures WHERE generation=? LIMIT 1000')
+        .bind(current.generation).all<{ id: string; note: string }>();
+      queued = pending.results.find(capture => {
+        const item = parseReadingNote(capture.note);
+        return item?.source_url && readingUrlIdentity(item.source_url) === identity;
+      }) ?? null;
+    }
     if (queued) {
       const response = { saved: true, alreadySaved: true, id: queued.id };
       await env.DB.batch([operationStatement(env.DB, op, response)]);
@@ -68,7 +80,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   let content: string;
   if (action === 'retry') {
     if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
-    if (source.item.capture_method !== 'url' || !managedArticle(source.content)) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
+    const block = managedArticle(source.content);
+    if (source.item.capture_method !== 'url' || !block || block.text.trim()) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
     content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
   } else {
     const changes = body.changes;

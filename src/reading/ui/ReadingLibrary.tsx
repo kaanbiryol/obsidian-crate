@@ -1,3 +1,4 @@
+import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -28,6 +29,7 @@ export interface ReadingLibraryProps {
 	onAdd: () => void;
 	onOpen: (item: ReadingItem, highlight: ReadingHighlight | undefined, section: ReadingSection) => Promise<void>;
 	onRefresh: () => Promise<void>;
+	onEnrich?: (target: ReadingItem, source: ReadingItem) => Promise<void>;
 	onSettings?: () => void;
 	settingsLabel?: string;
 	headerActions?: React.ReactNode;
@@ -50,7 +52,7 @@ const navigationItems = readingSections.map(item => ({ ...item, iconName: sectio
 const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
-export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent }: ReadingLibraryProps) {
+export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich, onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false, notice, beforeListContent, listContent }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
@@ -127,6 +129,7 @@ export function ReadingLibraryPanel({ listStyle = DEFAULT_LIST_STYLE, renderNavi
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
+					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))} onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
 					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error} <Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <details className="crate-reading__notice"><summary>{snapshot.issues.length} {snapshot.issues.length === 1 ? 'note needs' : 'notes need'} attention</summary><ul>{snapshot.issues.map(issue => <li key={issue.path}><strong>{issue.path}</strong>: {issue.message}</li>)}</ul></details>}
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}><ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span></Button>}

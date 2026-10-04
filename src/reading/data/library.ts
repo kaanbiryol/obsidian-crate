@@ -1,3 +1,5 @@
+import { youtubeVideoId } from '../core/youtube';
+import { enrichReadingBookmark } from '../core/duplicates';
 import { applyLocalArticle, managedArticle } from '../core/article';
 import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath } from '../core/filename';
@@ -137,6 +139,23 @@ export class ReadingLibrary {
 		});
 	}
 	get canCaptureLocally(): boolean { return Boolean(this.vault.captureArticle); }
+	enrich(target: ReadingItem, clip: ReadingItem): Promise<void> {
+		return this.enqueue(async () => {
+			await this.scan();
+			const files = this.vault.files(), destination = files.find(file => file.path === target.path), source = files.find(file => file.path === clip.path);
+			if (!destination || !source) throw new Error('A note moved or was deleted. Refresh Reading.');
+			const [before, clipped] = await Promise.all([this.vault.read(destination), this.vault.read(source)]);
+			if (parseReadingNote(before)?.crate_reading_id !== target.crate_reading_id || parseReadingNote(clipped)?.crate_reading_id !== clip.crate_reading_id) throw new Error('A note changed. Refresh Reading.');
+			const next = enrichReadingBookmark(before, clipped);
+			parseReadingNote(next);
+			await this.vault.process(destination, current => {
+				this.signal.throwIfAborted();
+				if (current !== before) throw new Error('The bookmark changed. Its content has been kept.');
+				return next;
+			});
+			this.invalidate(target.path); await this.scan();
+		});
+	}
 	isCapturing(item: ReadingItem): boolean { return this.captures.has(item.crate_reading_id); }
 	retryCapture(item: ReadingItem): Promise<void> {
 		const existing = this.captures.get(item.crate_reading_id);
@@ -153,7 +172,7 @@ export class ReadingLibrary {
 				if (!file) throw new Error('This reading note was moved or deleted.');
 				const content = await this.vault.read(file), metadata = parseReadingNote(content), block = managedArticle(content);
 				if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
-					|| metadata.capture_method !== 'url' || !['unavailable', 'pending'].includes(metadata.extraction_status) || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
+					|| metadata.capture_method !== 'url' || !(['unavailable', 'pending'].includes(metadata.extraction_status) || youtubeVideoId(metadata.source_url)) || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
 				return file;
 			});
 			this.signal.throwIfAborted();

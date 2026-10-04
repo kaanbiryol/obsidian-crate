@@ -5,7 +5,7 @@ import { readingKeys } from './encryption-session';
 import type { ReadingHighlight } from '@/reading/core/highlights';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
 import type { ReadingChanges, ReadingItem } from '@/reading/core/model';
-import { readingUrl, validateReadingMetadata } from '@/reading/core/model';
+import { readingUrl, readingUrlIdentity, validateReadingMetadata } from '@/reading/core/model';
 import { ReadingReader } from '@/reading/ui/Reader';
 import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
@@ -88,6 +88,13 @@ function ReadingAppContent() {
     const link = readingUrl(url);
     savingRef.current = true; setSaving(true); setError(null);
     try {
+      const matches = visibleItems.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
+      if (matches.length > 1) throw new Error('Several notes save this link. Review duplicates in Reading.');
+      if (matches[0]) {
+        await open(matches[0]); assertReadingSession(session);
+        if (share) await writeValue(`share:${share}`, null, session);
+        setUrl(''); setShare(null); showToast('info', 'Opened your saved link'); return;
+      }
       const fetchArticle = true;
       const work = await queueChange({ action: 'capture', intent: { url: link, fetchArticle } });
       assertReadingSession(session);

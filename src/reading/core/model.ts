@@ -1,4 +1,5 @@
 import { readingHighlights, type ReadingHighlight } from './highlights';
+import { youtubeVideoId } from './youtube';
 /** The portable Markdown contract shared by local capture and the server. */
 export interface ReadingMetadata {
 	crate_reading_version: 1;
@@ -18,6 +19,8 @@ export interface ReadingMetadata {
 	author?: string;
 	resolved_url?: string;
 	favicon_url?: string;
+	transcript_source?: 'youtube' | 'web-clipper';
+	transcript_language?: string;
 }
 
 export type ReadingChanges = Partial<Pick<ReadingMetadata, 'reading_status' | 'favorite' | 'tags' | 'highlights'>>;
@@ -54,6 +57,8 @@ export function readingFaviconUrl(value: unknown): string {
 /** Keep query parameters and their order: they may identify different articles. */
 export function readingUrlIdentity(value: string): string {
 	const url = new URL(readingUrl(value));
+	const video = youtubeVideoId(url.href);
+	if (video) return `https://www.youtube.com/watch?v=${video}`;
 	url.hash = '';
 	return url.href;
 }
@@ -78,6 +83,8 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 	if (value.extraction_status !== 'pending' && value.extraction_status !== 'ready' && value.extraction_status !== 'unavailable') throw new Error('Invalid extraction status.');
 	if (value.capture_method !== undefined && value.capture_method !== 'url' && value.capture_method !== 'web-clipper') throw new Error('Invalid capture method.');
 	if (value.author !== undefined && (typeof value.author !== 'string' || value.author.length > 1000)) throw new Error('Invalid author.');
+	if (value.transcript_source !== undefined && !['youtube', 'web-clipper'].includes(value.transcript_source as string)) throw new Error('Invalid transcript source.');
+	if (value.transcript_language !== undefined && (typeof value.transcript_language !== 'string' || !/^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$/.test(value.transcript_language) || value.transcript_language.length > 64)) throw new Error('Invalid transcript language.');
 	return {
 		crate_reading_version: 1, crate_reading_id: value.crate_reading_id.toLowerCase(), title: value.title,
 		source_url: value.source_url === '' && value.capture_method === 'web-clipper' ? '' : readingUrl(value.source_url), saved_at: readingTimestamp(value.saved_at),
@@ -90,5 +97,7 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 		...(value.author === undefined ? {} : { author: value.author }),
 		...(value.resolved_url === undefined ? {} : { resolved_url: readingUrl(value.resolved_url) }),
 		...(value.favicon_url === undefined ? {} : { favicon_url: readingFaviconUrl(value.favicon_url) }),
+		...(value.transcript_source === undefined ? {} : { transcript_source: value.transcript_source as 'youtube' | 'web-clipper' }),
+		...(value.transcript_language === undefined ? {} : { transcript_language: value.transcript_language }),
 	};
 }

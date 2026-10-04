@@ -198,3 +198,20 @@ function deferred<T>() {
   const promise = new Promise<T>(accept => { resolve = accept; });
   return { promise, resolve };
 }
+
+it('reuses a clipped video for equivalent URL saves and safely enriches a bookmark clipped later', async () => {
+  const h = harness();
+  h.files.set('Reading/Clipped video.md', '---\ntitle: Clipped video\nsource: https://www.youtube.com/watch?v=jNQXAC9IVRw\n---\n**0:42** · A useful passage.\n');
+  const first = await h.library.add('https://youtu.be/jNQXAC9IVRw?t=99', undefined, false);
+  expect(first.duplicate).toBe(true);
+  expect(h.files.size).toBe(1);
+  const other = harness();
+  const bookmark = (await other.library.add('https://youtu.be/jNQXAC9IVRw', undefined, false)).item;
+  other.files.set('Reading/Clipped video.md', h.files.get('Reading/Clipped video.md')!);
+  await other.library.refresh();
+  const clip = other.library.getSnapshot().items.find(item => item.capture_method === 'web-clipper')!;
+  await other.library.enrich(bookmark, clip);
+  expect(other.files.size).toBe(2);
+  expect((await other.library.read(bookmark)).markdown).toContain('**0:42**');
+  await expect(other.library.enrich(bookmark, clip)).rejects.toThrow('empty bookmark');
+});

@@ -10,6 +10,7 @@ import type { Env } from '../types';
 import { policy } from './common';
 import { managedArticle } from './projection';
 import type { Publication } from './extraction/jobs';
+import { transcriptMetadata } from '@/reading/extraction/types';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
@@ -33,6 +34,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   if (!current.enabled) result = null;
   const title = result?.title?.trim() && item.title === new URL(item.source_url).hostname ? result.title : item.title;
   let content = patchReadingFrontmatter(capture.note, { title, extraction_status: result ? 'ready' : 'unavailable',
+    ...(result ? transcriptMetadata(result) : {}),
     ...(result?.author ? { author: result.author } : {}), ...(result?.faviconUrl ? { favicon_url: result.faviconUrl } : {}),
     ...(result && resolvedUrl ? { resolved_url: resolvedUrl } : {}) });
   if (result) {

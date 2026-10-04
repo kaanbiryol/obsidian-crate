@@ -145,6 +145,11 @@ export default tseslint.config(
 		},
 	},
 	{
+		// This shared capture deadline also runs in workerd, which has no window.
+		files: ['src/reading/extraction/youtube-transcript.ts'],
+		rules: { 'obsidianmd/prefer-window-timers': 'off' },
+	},
+	{
 		files: ['src/reminders/core/**/*.{ts,tsx}'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {

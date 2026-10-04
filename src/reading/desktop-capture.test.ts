@@ -10,10 +10,10 @@ const response = (body = html, status = 200, contentType = 'text/html; charset=u
 afterEach(() => { vi.resetAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('desktop article capture', () => {
-  it('fetches only public metadata for a YouTube video', async () => {
+  it('keeps public metadata when the optional transcript is unavailable', async () => {
     vi.mocked(requestUrl).mockResolvedValue(response('{"type":"video","title":"A video","author_name":"Channel"}', 200, 'application/json'));
     expect(await captureDesktopArticle('https://youtu.be/jNQXAC9IVRw?t=42', new AbortController().signal)).toEqual({ markdown: '', title: 'A video', author: 'Channel' });
-    expect(requestUrl).toHaveBeenCalledTimes(1);
+    expect(requestUrl).toHaveBeenCalledTimes(2);
     expect(vi.mocked(requestUrl).mock.calls[0]![0]).toMatchObject({ url: 'https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw&format=json', headers: { Accept: 'application/json' } });
   });
   it('rejects oversized or unavailable video details while allowing the caller to retain its bookmark', async () => {
