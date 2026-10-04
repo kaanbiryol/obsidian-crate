@@ -1,292 +1,271 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="referrer" content="no-referrer">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
-	<meta name="description" content="Open-source Obsidian sync and Markdown reminders, powered by infrastructure in your own Cloudflare account.">
-	<meta name="theme-color" content="#08090c">
-	<meta property="og:title" content="Crate — Self-hosted sync and reminders for Obsidian">
-	<meta property="og:description" content="Sync your Obsidian vault across devices and get Markdown reminder notifications using your own Cloudflare account.">
-	<meta property="og:type" content="website">
-	<meta property="og:url" content="https://crate.kaanbiryol.com/">
-	<meta property="og:image" content="https://crate.kaanbiryol.com/assets/og.png">
-	<meta property="og:image:width" content="1200">
-	<meta property="og:image:height" content="630">
-	<meta property="og:image:alt" content="Crate — self-hosted sync and reminders for Obsidian.">
-	<meta name="twitter:card" content="summary_large_image">
-	<meta name="twitter:title" content="Crate — Self-hosted sync and reminders for Obsidian">
-	<meta name="twitter:description" content="Sync your Obsidian vault across devices and get Markdown reminder notifications using your own Cloudflare account.">
-	<meta name="twitter:image" content="https://crate.kaanbiryol.com/assets/og.png">
-	<title>Crate — Self-hosted sync and reminders for Obsidian</title>
-	<link rel="icon" href="/assets/logo.png" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/site.generated.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Sync your Obsidian vault, save articles, and keep your reading and reminders with you. Hosted in your own Cloudflare account or on your own server.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="theme-color" content="#0c0c0f">
+  <link rel="canonical" href="https://crate.kaanbiryol.com/">
+  <meta property="og:title" content="Crate — Sync, reminders and reading for Obsidian">
+  <meta property="og:description" content="Your notes, reminders, and saved articles. Together in your Obsidian vault.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://crate.kaanbiryol.com/">
+  <meta property="og:image" content="https://crate.kaanbiryol.com/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Crate — sync, reminders and reading for Obsidian.">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Crate — Sync, reminders and reading for Obsidian</title>
+  <link rel="icon" href="/assets/logo.png">
+  <link rel="stylesheet" href="/website-options/studies.css">
+  <link rel="stylesheet" href="/website-options/canvas/style.css?v=ui-polish-1">
+  <link rel="stylesheet" href="/website-options/canvas/sections.css?v=reminder-docs-1">
+  <link rel="stylesheet" href="/website-options/canvas/gallery.css?v=video-preview-1">
+  <script src="/assets/canvas.js?v=video-preview-1" defer></script>
+  <script src="/assets/gallery.js?v=phone-frame-1" defer></script>
 </head>
 <body>
-	<a class="fixed left-4 top-4 z-50 -translate-y-24 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition-transform focus:translate-y-0" href="#main">Skip to content</a>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="canvas-header"><header class="site-nav wrap">
+<a class="wordmark" href="#main" aria-label="Crate home"><span class="brand-tile"><img src="/assets/logo.png" width="25" height="25" alt=""></span>Crate</a>
+<button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-navigation">Menu <svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#chevron"></use></svg></button>
+<nav class="nav-links" id="main-navigation" aria-label="Main navigation"><a href="#sync">Sync</a><a href="#reminders">Reminders</a><a href="#reading">Reading</a><a href="#hosting">Hosting</a><a href="/docs/">Docs</a><a class="nav-github" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span aria-hidden="true">↗</span></a></nav>
+<a class="header-github" href="https://github.com/kaanbiryol/obsidian-crate" aria-label="View Crate source code on GitHub" title="View source on GitHub"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 19 4.77 5.07 5.07 0 0 0 18.91 1S17.73.65 15 2.48a13.38 13.38 0 0 0-7 0C5.27.65 4.09 1 4.09 1A5.07 5.07 0 0 0 4 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 8 18.13V22"></path></svg></a>
+<a class="header-action" href="#setup">Install beta <svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#arrow"></use></svg></a>
+</header></div>
+<main id="main">
+<section class="hero-band"><div class="hero-grid wrap">
+<div class="hero-copy">
+<h1><span>Sync. Reminders.</span> <span>Read it later.</span></h1>
+<p class="body-copy">Your notes, reminders, and saved articles. Together in your Obsidian vault.</p>
+<div class="actions"><a class="button" href="#setup"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#download"></use></svg> Install beta</a></div>
+<p class="release-note">Beta release · Installs with BRAT</p>
+</div>
+<figure class="hero-visual hero-devices" id="markdown-example">
 
-	<div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[58rem] overflow-hidden" aria-hidden="true">
-		<div class="page-grid absolute inset-0 opacity-40"></div>
-		<div class="violet-glow absolute -right-48 -top-64 size-[56rem] blur-3xl"></div>
-		<div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-b from-transparent to-ink-950"></div>
-	</div>
+<div class="product-image hero-screenshot"><img decoding="async" id="hero-screenshot" src="/assets/screenshots/plugin-today.png?v=20261004-4" width="3714" height="2324" fetchpriority="high" alt="Crate’s Today note with seven active reminders and two overdue, beside the Upcoming reminders sidebar in Obsidian."></div><div class="product-image hero-phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-today.png" width="1179" height="2556" alt="Crate’s mobile Today view with seven reminders and two overdue."></div></figure>
+</div></section>
+<section class="section sync-showcase wrap" id="sync" aria-label="Sync"><span id="sync-activity"></span>
+<figure class="reminder-recording sync-intro"><figcaption><h2>Your notes, on every device.</h2><p>Keep writing in Obsidian on desktop or mobile. Crate syncs your vault through a server in your Cloudflare account or on your own hardware.</p></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-sync.mp4?v=20261004-133957" data-gallery="sync" data-gallery-video="crate-note-sync" aria-haspopup="dialog" aria-label="Play video: Your notes, on every device"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="crate-note-sync" muted playsinline preload="none" width="4048" height="2658" poster="/assets/screenshots/plugin-sync-poster.png?v=20261004-133957" aria-label="Your notes sync automatically."><source src="/assets/videos/plugin-sync.mp4?v=20261004-133957" type="video/mp4"></video></a>
+</div></figure>
+<section class="feature-group" id="conflict-management" aria-labelledby="conflict-management-title">
+<header class="feature-group-heading"><h3 id="conflict-management-title">Conflict management</h3><p>Edited the same note on two devices? Compare both versions and choose what to keep.</p></header>
+<p class="gallery-hint">Select a preview to explore.</p>
+<div class="feature-preview-grid feature-preview-grid--conflicts">
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-conflicts.png?v=20261004" data-gallery="sync" aria-label="Enlarge Review conflicting notes" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/crate-conflicts.png?v=20261004" width="3714" height="2324" loading="lazy" alt="Sync activity listing three saved conflict copies: Reading notes, Launch plan, and Copenhagen weekend, each with a Review action."></div></a>
+<figcaption><h4>Review conflicting notes.</h4><p>Conflicting copies are kept for review. See the affected notes together, then open a comparison.</p></figcaption>
+</figure>
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-conflict-review.png?v=20261004" data-gallery="sync" aria-label="Enlarge Choose what to keep" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/crate-conflict-review.png?v=20261004" width="3714" height="2324" loading="lazy" alt="Two versions of Reading notes shown side by side, with highlighted changes and options to keep either version, keep both, or create a custom result."></div></a>
+<figcaption><h4>Choose what to keep.</h4><p>See exactly what changed. Keep either version, keep both, or combine your edits into a custom result.</p></figcaption>
+</figure>
+</div>
+</section>
+<div class="sync-detail-galleries">
+<section class="feature-group" id="sync-details" aria-labelledby="sync-details-title">
+<header class="feature-group-heading"><h3 id="sync-details-title">Sync activity</h3><p>See what’s changing before you sync, and what was included afterward.</p></header>
+<div class="feature-preview-grid">
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-sync-pending.png?v=20261004" data-gallery="sync" aria-label="Enlarge Pending changes" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/crate-sync-pending.png?v=20261004" width="3714" height="2324" loading="lazy" alt="One pending change to Copenhagen weekend, selected for sync with added and removed text shown in a diff."></div></a>
+<figcaption><h4>Pending changes</h4><p>Compare edits and choose which files to sync.</p></figcaption>
+</figure>
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-sync-history.png?v=20261004" data-gallery="sync" aria-label="Enlarge Sync history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/crate-sync-history.png?v=20261004" width="3714" height="2324" loading="lazy" alt="Sync history showing uploaded and deleted Reading files, plus an earlier Copenhagen weekend upload."></div></a>
+<figcaption><h4>Sync history</h4><p>Check recent transfers and the files included in each sync.</p></figcaption>
+</figure>
+</div>
+</section>
+<section class="feature-group" id="history-recovery" aria-labelledby="history-recovery-title">
+<header class="feature-group-heading"><h3 id="history-recovery-title">History and recovery</h3><p>Revisit an earlier file or a saved state of your vault.</p></header>
+<div class="feature-preview-grid recovery-grid">
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-file-history.png?v=20261004" data-gallery="sync" aria-label="Enlarge File history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog"><img decoding="async" src="/assets/screenshots/crate-file-history.png?v=20261004" width="3714" height="2324" loading="lazy" alt="File history comparing a saved version of Copenhagen weekend with the current file, showing two added and two removed lines."></div></a>
+<figcaption><h4>File history</h4><p>Compare earlier versions with your current file and restore a saved copy.</p></figcaption>
+</figure>
+<figure class="feature-preview">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/crate-vault-history.png?v=20261004" data-gallery="sync" aria-label="Enlarge Vault history" aria-haspopup="dialog"><div class="product-image product-image--dialog product-image--sync-dialog product-image--vault"><img decoding="async" src="/assets/screenshots/crate-vault-history.png?v=20261004" width="3714" height="2324" loading="lazy" alt="Vault history comparing the current vault with a selected saved state, with a Copenhagen weekend diff and a restore action."></div></a>
+<figcaption><h4>Vault history</h4><p>Browse saved sync points, inspect changed files, and restore an earlier state.</p></figcaption>
+</figure>
+</div>
+</section>
+</div>
+<aside class="recovery-feature"><div class="recovery-window" aria-label="30-day recovery window"><strong>30</strong><span>days to recover</span></div><div><h3>Recover an earlier copy.</h3><p>Remote files replaced or deleted by sync are kept for 30 days. Open <strong>Restore remote file</strong> in Crate settings to recover a copy.</p><p class="recovery-note">Sync is not a backup. Keep a separate backup of your vault.</p></div></aside>
+<section class="encryption-feature" id="end-to-end-encryption" aria-labelledby="encryption-title">
+<div class="encryption-layout">
+<header class="encryption-copy">
+<p class="encryption-status">Optional · Cloudflare &amp; self-hosted</p>
+<h3 id="encryption-title">End-to-end encryption.</h3>
+<p class="encryption-description">Keep your synced content private from your server. Notes, attachments, saved articles, and reminder text are encrypted on your devices.</p>
+<a class="encryption-guide" href="/docs/features/encryption/">Set up encryption <span aria-hidden="true">↗</span></a>
+</header>
+<figure class="encryption-diagram">
+<figcaption>Encrypted before upload</figcaption>
+<ol class="encryption-flow">
+<li><span class="encryption-node"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#desktop"></use></svg></span><strong>Your device</strong><span>Encrypt locally</span></li>
+<li><span class="encryption-node encryption-node--server"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"></rect><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"></path></svg></span><strong>Your server</strong><span>Encrypted data</span></li>
+<li><span class="encryption-node"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#phone"></use></svg></span><strong>Your devices</strong><span>Decrypt locally</span></li>
+</ol>
+</figure>
+</div>
+<div class="encryption-details">
+<p><strong>Your keys, on your devices.</strong> Enable encryption in Crate settings and save your recovery key outside your vault. It also protects existing synced files and retained history.</p>
+<p><strong>Content stays private. Some metadata stays visible.</strong> Your server still sees file paths, sizes, and notification times. Your local Obsidian files stay readable.</p>
+</div>
+</section>
+</section>
 
-	<div class="site-header-shell">
-		<header class="site-header content-rail mx-auto flex h-16 w-[min(100%-2rem,76rem)] items-center justify-between sm:w-[min(100%-3rem,76rem)]">
-			<a class="group inline-flex items-center gap-2.5" href="/" aria-label="Crate home">
-				<span class="brand-tile brand-tile--header" aria-hidden="true"><img class="brand-tile__mark" src="/assets/logo.png" alt=""></span>
-				<span class="text-sm font-semibold tracking-[-0.02em]">Crate</span>
-			</a>
-			<nav class="site-nav hidden items-center text-[13px] font-medium text-zinc-400 md:flex" aria-label="Primary navigation">
-				<a class="site-nav__link" href="#features">Features</a>
-				<a class="site-nav__link" href="#reminders">Reminders</a>
-				<a class="site-nav__link" href="#sync">Sync</a>
-				<a class="site-nav__link" href="#setup">Setup</a>
-				<a class="site-nav__link" href="/docs/">Docs</a>
-			</nav>
-			<a class="header-action inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span class="text-zinc-400" aria-hidden="true">↗</span></a>
-		</header>
-	</div>
+<section class="section sync-showcase wrap" id="reminders" aria-labelledby="reminders-title">
+<figure class="reminder-recording"><figcaption><h2 id="reminders-title">Write it down. Come back to it.</h2><p>Add reminders while you work in Obsidian. Write “tomorrow at 10” and use # to choose a project.</p></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut650" data-gallery="reminders" data-gallery-video="crate-reminder-entry" aria-haspopup="dialog" aria-label="Play video: Create a reminder in Obsidian"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="crate-reminder-entry" muted playsinline preload="none" width="3490" height="2100" poster="/assets/screenshots/plugin-reminders-natural-language-poster.png?v=20261004" aria-label="Create a reminder with a date, project, and priority in Obsidian."><source src="/assets/videos/plugin-reminders-natural-language.mp4?v=20261004-cut650" type="video/mp4"></video></a>
+</div></figure>
+<div class="embedded-reminders" id="embedded-reminders"><header class="embed-heading"><h3>Your reminders, inside any note.</h3><p>Keep a live reminder list beside your writing in a daily note, project page, or dashboard.</p></header><div class="embed-demo"><a class="gallery-trigger product-image embedded-note-image" href="/assets/screenshots/plugin-reminders-embedded-note.png?v=20261004" data-gallery="reminders" data-gallery-title="Your reminders, inside any note." data-gallery-description="A live reminder list beside your writing in a daily note, project page, or dashboard." aria-label="Enlarge Your reminders, inside any note" aria-haspopup="dialog"><img decoding="async" src="/assets/screenshots/plugin-reminders-embedded-note.png?v=20261004" width="3714" height="2324" loading="lazy" alt="The Copenhagen weekend note in Obsidian with three embedded Travel reminders under Before we go, alongside the Upcoming reminders sidebar."></a><div class="embed-example"><h4>Add this to your note</h4><pre><code>```reminders
+project: Travel
+show-completed: false
+```</code></pre><p class="embed-help">Shows unfinished reminders from your Travel project. Switch to Reading view or Live Preview to see the list.</p></div></div><p class="embed-help embed-documentation"><a href="/docs/features/embedded-reminders/">Explore block types and options <span aria-hidden="true">↗</span></a></p></div>
+<section class="feature-group reminders-mobile" id="mobile" aria-labelledby="mobile-title">
+<header class="feature-group-heading"><h3 id="mobile-title">Plan your day, wherever you are.</h3><p>Keep your reminders with you. Plan, organize, and make space for routines on your phone.</p></header>
+<p class="gallery-hint">Select a preview to explore.</p>
+<div class="feature-preview-grid mobile-gallery">
+<figure id="mobile-inbox" class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-inbox.png?v=20261004-1415" data-gallery="reminders" aria-label="Enlarge Inbox" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-inbox.png?v=20261004-1415" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Inbox with three reminders ready to organize."></div></a>
+<figcaption><h4>Inbox</h4><p>Capture reminders now and organize them later.</p></figcaption>
+</figure>
+<figure id="mobile-plan" class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-today.png" data-gallery="reminders" aria-label="Enlarge Reminders" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-today.png" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Reminders view with Today and Upcoming tabs, seven reminders, and two overdue items."></div></a>
+<figcaption><h4>Reminders</h4><p>See what’s due today and next, and catch overdue reminders.</p></figcaption>
+</figure>
+<figure id="mobile-organize" class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-projects.png?v=20261004-1442" data-gallery="reminders" aria-label="Enlarge Projects" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-projects.png?v=20261004-1442" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Projects view with nine projects, completion progress, and nested Finance and Health projects."></div></a>
+<figcaption><h4>Projects</h4><p>Organize related reminders and track progress.</p></figcaption>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-project-picker.png?v=20261004-1322" data-gallery="reminders" aria-label="Enlarge Choose a project" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-project-picker.png?v=20261004-1322" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Project sheet with color-coded projects, nested Personal projects, and Home selected."></div></a>
+<figcaption><h4>Choose a project</h4><p>Move a reminder into the right project.</p></figcaption>
+</figure>
+<figure id="mobile-schedule" class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-edit.png?v=20261004" data-gallery="reminders" aria-label="Enlarge Edit a reminder" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-edit.png?v=20261004" width="1179" height="2556" loading="lazy" alt="Editing Review launch notes on iPhone, with a due date, Product launch project, priority, description, and the keyboard open."></div></a>
+<figcaption><h4>Edit a reminder</h4><p>Update its title, date, project, or priority in one place.</p></figcaption>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-schedule.png?v=20261004-1322" data-gallery="reminders" aria-label="Enlarge Schedule" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-schedule.png?v=20261004-1322" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Schedule sheet with Today selected, quick date options, and custom date and time fields."></div></a>
+<figcaption><h4>Schedule</h4><p>Set a date and time.</p></figcaption>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reminders-repeat.png?v=20261004-1322" data-gallery="reminders" aria-label="Enlarge Repeat" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reminders-repeat.png?v=20261004-1322" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Repeat sheet with Daily selected, an interval of one day, and a reminder time of 09:00."></div></a>
+<figcaption><h4>Repeat</h4><p>Repeat daily, weekly, or monthly.</p></figcaption>
+</figure>
+</div>
+</section>
+<figure class="reminder-recording plugin-notification-demo notification-story" id="reminder-notifications"><figcaption><h3>A reminder, even with your phone locked.</h3><p>Get a nudge when it’s due. Enable notifications to see reminders on your lock screen.</p></figcaption><div class="recording-media"><a class="gallery-video-trigger" href="/assets/videos/plugin-notifications.mp4" data-gallery="reminders" data-gallery-video="plugin-notifications" aria-haspopup="dialog" aria-label="Play video: Reminder notifications"><video aria-hidden="true" controlslist="nofullscreen noremoteplayback" disablepictureinpicture disableremoteplayback id="plugin-notifications" data-replay-delay="3000" muted playsinline preload="none" width="922" height="1822" poster="/assets/screenshots/plugin-notifications-poster.png" aria-label="A reminder notification arriving on the phone lock screen"><source src="/assets/videos/plugin-notifications-transparent.webm" type="video/webm"><source src="/assets/videos/plugin-notifications.mp4" type="video/mp4"></video></a></div></figure>
+</section>
 
-	<main id="main">
-		<section class="hero-section content-rail mx-auto grid w-[min(100%-2rem,76rem)] gap-12 py-16 sm:w-[min(100%-3rem,76rem)] sm:py-22 lg:py-28" aria-labelledby="hero-title">
-			<div class="relative z-10 max-w-[52rem]">
-				<p class="product-eyebrow mb-6 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.1em] text-crate-300 uppercase"><span class="size-1.5 rounded-full bg-crate-400"></span> Sync + reminders for Obsidian</p>
-				<h1 id="hero-title" class="hero-heading text-balance leading-[0.96] font-medium tracking-[-0.06em] text-white">Own your Obsidian sync.</h1>
-				<p class="text-pretty mt-7 max-w-[38rem] text-base leading-7 text-zinc-300">Sync your Obsidian notes across devices. Turn Markdown tasks into reminders on your phone. All through your own Cloudflare account.</p>
-				<div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-					<a class="primary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-bold text-ink-950" href="/docs/getting-started/installation/">View installation guide <span aria-hidden="true">↗</span></a>
-					<a class="secondary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-semibold text-zinc-300" href="#reminders">See how it works <span aria-hidden="true">↓</span></a>
-				</div>
-				<p class="hero-release">Early release <span aria-hidden="true">·</span> Manual installation</p>
-			</div>
+<section class="section wrap reading-section" id="reading" aria-labelledby="reading-title">
+<header class="reading-intro"><h2 id="reading-title">Save now.<br>Read when you’re ready.</h2><p class="body-copy">A home for the articles you want to come back to. Read, highlight, and add your own notes in Obsidian or the Crate web app.</p></header>
+<p class="gallery-hint">Select a preview to explore.</p>
+<div class="feature-preview-grid reading-previews">
+<figure class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reading-library.png" data-gallery="reading" aria-label="Enlarge Your reading, together" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reading-library.png" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Reading library with two saved articles, grouped by day, and a search field."></div></a>
+<figcaption><h3>Your reading, together.</h3><p>Keep saved articles in one place. Find your next read with search.</p></figcaption>
+</figure>
+<figure class="feature-preview feature-preview--phone">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reading-reader.png" data-gallery="reading" aria-label="Enlarge Read and highlight" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reading-reader.png" width="1179" height="2556" loading="lazy" alt="Crate’s mobile article reader showing a code example and a highlighted passage with Copy and Share actions."></div></a>
+<figcaption><h3>Read and highlight.</h3><p>Save passages as you read. Opened article text stays available offline.</p></figcaption>
+</figure>
+<figure class="feature-preview feature-preview--phone" id="reading-highlights">
+<a class="feature-preview-media gallery-trigger" href="/assets/screenshots/pwa-reading-highlights.png" data-gallery="reading" aria-label="Enlarge Revisit what matters" aria-haspopup="dialog"><div class="product-image product-image--phone phone-frame"><span class="phone-frame-camera" aria-hidden="true"></span><img decoding="async" src="/assets/screenshots/pwa-reading-highlights.png" width="1179" height="2556" loading="lazy" alt="Crate’s mobile Highlights view with saved passages grouped by article, search, and View in article links."></div></a>
+<figcaption><h3>Revisit what matters.</h3><p>Search your highlights across articles and jump back to the original passage.</p></figcaption>
+</figure>
+</div>
+<dl class="reading-details">
+<div><dt><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 .5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>Save from anywhere</dt><dd>Paste a link, use Obsidian Web Clipper, or send a page from your phone.</dd></div>
+<div><dt><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 11 8-8 4 4-8 8M9 11l4 4-1 4-3 1-5-5 1-3zM3 21h7"></path></svg>Highlights and notes</dt><dd>Mark passages, add your thoughts, and revisit your excerpts together in Highlights.</dd></div>
+<div><dt><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#note"></use></svg>Yours, as Markdown</dt><dd>Articles live as files in your vault. Saved reads, highlights, and notes travel with your vault sync.</dd></div>
+</dl>
+<p class="reading-guide"><a href="/docs/features/reading/">Explore Reading <span aria-hidden="true">↗</span></a><span>Included with Crate.</span></p>
+</section>
 
-			<figure class="hero-visual" aria-label="Illustrated example of a Markdown task appearing as a phone reminder">
-                <div class="hero-note">
-                    <div class="hero-window-bar"><span aria-hidden="true">● ● ●</span><span>Obsidian / Product launch.md</span></div>
-                    <div class="hero-note-content"><p class="hero-demo-kicker">YOUR NOTE</p><h2>Something worth sharing.</h2><p>A little space to think. A clear next step.</p>
-                    <div class="hero-markdown"><span>- [ ]</span> Review launch notes<br><mark>@today 18:00</mark><br><small>Check the final copy before sharing.</small></div>
-                    <div class="hero-note-check"><span aria-hidden="true">✓</span> Notes and attachments synced</div></div>
-                </div>
-                <div class="hero-reminder-phone">
-                    <div class="hero-phone-notch" aria-hidden="true"></div>
-                    <div class="hero-phone-brand"><img src="/assets/logo.png" width="22" height="22" alt=""><span>Crate</span><span aria-hidden="true">↻</span></div>
-                    <p class="hero-demo-kicker">TUESDAY</p><h2>Today <small>1 reminder</small></h2>
-                    <div class="hero-reminder-card"><i aria-hidden="true"></i><div><b>Review launch notes</b><p>Check the final copy before sharing.</p><span>18:00</span><span>Product launch</span></div></div>
-                    <p class="hero-phone-note">Your next step, wherever you are.</p>
-                    <div class="hero-phone-tabs" aria-hidden="true"><span>Inbox</span><span>Today</span><span>Upcoming</span></div>
-                </div>
-                <figcaption class="hero-example-caption">Example workflow · Written in Markdown. Ready on your phone.</figcaption>
-            </figure>
-		</section>
+<section class="hosting-section" id="hosting" aria-labelledby="hosting-title">
+<span class="hosting-anchor" id="how-it-works" aria-hidden="true"></span>
+<div class="section wrap">
+<header class="hosting-intro">
+<h2 id="hosting-title">Choose where Crate runs.</h2>
+<p class="body-copy">Sync through your own Cloudflare account or a server you control.</p>
+</header>
+<div class="hosting-options">
+<article class="hosting-option" aria-labelledby="hosting-cloudflare-title">
+<svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#cloud"></use></svg>
+<h3 id="hosting-cloudflare-title">Cloudflare</h3>
+<p>Connect your account in Obsidian. Crate guides you through creating the server and storage for your vault.</p>
+<ul><li>Stays available while your computer sleeps.</li><li>Enable R2 in your account. Usage charges may apply.</li></ul>
+<a class="hosting-guide" href="/docs/getting-started/cloudflare/">Set up with Cloudflare <span aria-hidden="true">↗</span></a>
+</article>
+<article class="hosting-option" id="self-hosting" aria-labelledby="hosting-server-title">
+<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"></rect><rect x="3" y="14" width="18" height="7" rx="2"></rect><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"></path></svg>
+<h3 id="hosting-server-title">Your own server</h3>
+<p>Run Crate with Docker on hardware you control. You manage the storage, updates, and backups.</p>
+<ul><li>Keep your host awake, online, and running Docker.</li><li>HTTPS included. No Cloudflare account or domain required.</li></ul>
+<a class="hosting-guide" href="/docs/getting-started/self-hosting/">Set up your own server <span aria-hidden="true">↗</span></a>
+</article>
+</div>
+<div class="hosting-flow">
+<div class="hosting-flow-copy">
+<h3>How sync works</h3>
+<p>Your notes stay local in Obsidian. Crate syncs changes through your chosen server to your other devices.</p>
+<p>Connect the web app for your reading and reminders on the go. Both hosting options work the same way, with no separate Crate account.</p>
+<a class="hosting-guide" href="/docs/getting-started/devices/">Connect your devices <span aria-hidden="true">↗</span></a>
+</div>
+<div class="sync-map"><div class="sync-map-hub"><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#cloud"></use></svg><span>Your Crate server</span><small>Cloudflare or your own hardware</small></div>
+<div class="sync-map-branches" aria-hidden="true"><span>↕</span><span>↕</span></div>
+<div class="sync-map-devices"><div><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#desktop"></use></svg><strong>Obsidian</strong><span>Your vault, on each device</span></div><div><svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#phone"></use></svg><strong>Web app</strong><span>Your reading and reminders</span></div></div>
+</div>
+</div>
+<p class="sync-map-note hosting-privacy"><a href="#end-to-end-encryption">Optional end-to-end encryption</a> protects your content on either host. File paths, sizes, and notification times remain visible to your server. Keep a separate backup.</p>
+</div>
+</section>
+<section class="section wrap install-section" id="setup" aria-labelledby="installation-title">
+<header class="install-intro"><p class="section-index">Get started</p><h2 id="installation-title">Install the beta.</h2><p class="body-copy">Install Crate in Obsidian, then connect your Cloudflare account or your own server for sync and the web app.</p><p class="install-note">Requires Obsidian 1.13.0+. Desktop reading also works without a server. <a href="/docs/getting-started/installation/">Read the setup guide <span aria-hidden="true">↗</span></a></p></header>
+<ol class="install-steps" id="installation-steps">
+<li><span aria-hidden="true">1</span><div><h3>Install BRAT</h3><p>BRAT installs and updates beta plugins in Obsidian. Find <a href="https://community.obsidian.md/plugins/obsidian42-brat">BRAT</a> in <b>Settings → Community plugins</b>. Install and enable it.</p><p class="install-help"><a href="https://tfthacker.com/brat-quick-guide">BRAT’s installation guide <span aria-hidden="true">↗</span></a></p></div></li>
+<li><span aria-hidden="true">2</span><div><h3>Add Crate</h3><p>In <b>Settings → BRAT</b>, select <b>Add beta plugin</b>. Paste this repository, choose the latest release, and add the plugin. Then enable <b>Crate</b> in <b>Community plugins</b>.</p><div class="repository-copy" data-copy-container><div class="copy-field"><code id="crate-repository">kaanbiryol/obsidian-crate</code><button type="button" class="copy-button" data-copy-target="crate-repository" aria-label="Copy repository name" hidden>Copy</button></div><p class="copy-feedback" data-copy-status role="status"></p></div></div></li>
+<li><span aria-hidden="true">3</span><div><h3>Connect your server</h3><p>Open <b>Settings → Crate → Connect with Cloudflare</b> to create or select a cloud server. For self-hosting, select <b>Connect to your server</b> and enter your server address and pairing code.</p></div></li>
+<li><span aria-hidden="true">4</span><div><h3>Connect your other devices</h3><p>Install Crate through BRAT on each Obsidian device and connect to the same server. Use the Crate web app for reading and reminders on your phone.</p></div></li>
+</ol>
+</section>
 
+<section class="section wrap faq-section" id="faq" aria-labelledby="faq-title">
+<header><p class="section-index">A few practical details</p><h2 id="faq-title">Before you get started.</h2><p class="faq-intro">What you need to know about cost, hosting, and your data.</p></header>
+<dl class="faq-list">
+<div><dt>Is Crate free?</dt><dd>Crate is free and open source. You cover the hosting: Cloudflare usage charges may apply, or you can run it on hardware you manage.</dd></div>
+<div><dt>Do I need a server?</dt><dd>For vault sync and the web app, yes. Desktop Obsidian can save and read articles locally without a server. Choose your own Cloudflare account or a Docker server for connected features. <a href="#hosting">Compare hosting options <span aria-hidden="true">↗</span></a></dd></div>
+<div><dt>What works offline?</dt><dd>Your local notes stay available in Obsidian. The web app caches opened article text for offline reading. Offline saves and changes to your reading library sync when you reconnect. You can also browse previously cached reminders.</dd></div>
+<div><dt>Are my notes end-to-end encrypted?</dt><dd>Crate offers <a href="#end-to-end-encryption">optional end-to-end encryption</a> on Cloudflare and self-hosted servers. Enable it in Crate settings and save your recovery key. Without it, your server can read synced content. File paths, sizes, and notification times remain visible either way. <a href="/docs/features/encryption/">Read the encryption guide <span aria-hidden="true">↗</span></a></dd></div>
+</dl>
+</section>
 
+<section class="closing-section wrap" aria-labelledby="closing-title">
+<h2 id="closing-title">Bring your notes together.</h2>
+<div class="actions"><a class="button" href="#setup">Install beta <svg class="icon" aria-hidden="true"><use href="/assets/study-icons.svg#arrow"></use></svg></a><a class="closing-source" href="https://github.com/kaanbiryol/obsidian-crate">View source <span aria-hidden="true">↗</span></a></div>
+</section>
 
-		<section class="content-rail mx-auto w-[min(100%-2rem,76rem)] py-22 sm:w-[min(100%-3rem,76rem)] sm:py-28" id="reminders" aria-labelledby="reminders-title">
-			<div class="grid gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-				<h2 id="reminders-title" class="section-heading text-balance max-w-2xl font-medium">Reminders on your phone</h2>
-				<p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Create, complete, and organize reminders from the companion app. Every change is written back to Markdown in your vault.</p>
-			</div>
+</main><footer class="site-footer wrap"><a class="wordmark" href="#main"><span class="brand-tile"><img src="/assets/logo.png" width="25" height="25" alt=""></span>Crate</a><span>Sync, reminders and reading for Obsidian.</span><nav aria-label="Footer"><a href="/docs/">Docs</a><a href="/privacy/">Privacy</a><a href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav></footer>
 
-			<ol class="mobile-reminder-flow mt-10 grid gap-3 md:hidden" aria-label="How a Crate reminder works">
-				<li><span>01</span><div><b>Write in Markdown</b><code>- [ ] Review launch notes @today 18:00</code></div></li>
-				<li><span>02</span><div><b>Crate finds it</b><small>The reminder stays linked to its note.</small></div></li>
-				<li><span>03</span><div><b>Get notified</b><small>The companion PWA sends a push when it is due.</small></div></li>
-			</ol>
+<dialog class="media-viewer" id="media-viewer" aria-labelledby="media-viewer-title" aria-describedby="media-viewer-caption">
+  <div class="media-viewer-layout">
+    <header class="media-viewer-header">
+      <div><p class="media-viewer-group" id="media-viewer-group"></p><h2 id="media-viewer-title"></h2></div>
+      <span class="media-viewer-count" id="media-viewer-count" aria-live="polite" aria-atomic="true"></span>
+      <button class="media-viewer-control" type="button" data-gallery-close aria-label="Close gallery" autofocus><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"></path></svg></button>
+    </header>
+    <div class="media-viewer-stage">
+      <button class="media-viewer-control media-viewer-previous" type="button" data-gallery-previous aria-label="Previous preview"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"></path></svg></button>
+      <div class="media-viewer-content" id="media-viewer-content"></div>
+      <button class="media-viewer-control media-viewer-next" type="button" data-gallery-next aria-label="Next preview"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"></path></svg></button>
+    </div>
+    <p class="media-viewer-caption" id="media-viewer-caption"></p>
+    <nav class="media-viewer-thumbnails" aria-label="Related previews"></nav>
+  </div>
+</dialog>
 
-			<ol class="relative z-10 mt-12 hidden items-stretch md:grid md:grid-cols-[1fr_2.75rem_1fr_2.75rem_1fr]" aria-label="Detailed reminder flow">
-				<li class="stage-surface flex min-h-56 flex-col overflow-hidden rounded-[16px] border border-white/10 bg-[#0b0c10] shadow-[0_18px_50px_rgb(0_0_0/0.22)]">
-					<div class="flex items-center justify-between border-b border-white/7 px-4 py-3"><span class="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-zinc-300"><i class="grid size-5 place-items-center rounded-full border border-white/10 bg-white/[0.04] not-italic text-[10px] text-crate-300">01</i> WRITE</span><span class="size-1.5 rounded-full bg-zinc-700" aria-hidden="true"></span></div>
-					<div class="m-3 flex flex-1 flex-col overflow-hidden rounded-[11px] border border-white/8 bg-[#111216]"><div class="flex h-9 items-center justify-between border-b border-white/7 px-3 text-[10px] text-zinc-400"><span class="inline-flex items-center gap-2"><i class="size-1.5 rounded-sm bg-crate-400/75"></i> Project Crate.md</span><span aria-hidden="true">•••</span></div><code class="grid flex-1 content-center gap-2.5 px-3 py-4 text-[10px] leading-5 text-zinc-200"><span><i class="mr-3 not-italic text-zinc-700">12</i><b class="font-normal text-zinc-400">- [ ]</b> Review launch notes</span><span><i class="mr-3 not-italic text-zinc-700">13</i><mark class="rounded bg-crate-400/10 px-1.5 py-0.5 text-crate-300">@today 18:00</mark></span><span class="text-zinc-700"><i class="mr-3 not-italic">14</i>Start final proofread…</span></code></div>
-					<p class="flex items-center gap-2 px-4 pb-3 text-[10px] text-zinc-400"><i class="size-1.5 rounded-full bg-zinc-700"></i> Inside your note</p>
-				</li>
-				<li class="flex items-center justify-center" aria-hidden="true"><span class="flex items-center text-crate-400"><i class="h-px w-4 bg-gradient-to-r from-white/5 to-crate-400/45"></i><b class="grid size-5 place-items-center rounded-full border border-crate-400/20 bg-[#171823] text-[10px] font-normal shadow-[0_0_18px_rgb(139_92_246/0.18)]">›</b><i class="h-px w-4 bg-gradient-to-r from-crate-400/45 to-white/5"></i></span></li>
-				<li class="stage-surface flex min-h-56 flex-col overflow-hidden rounded-[16px] border border-white/11 bg-[#171920] shadow-[0_20px_55px_rgb(0_0_0/0.28)]">
-					<div class="flex items-center justify-between border-b border-white/7 px-4 py-3"><span class="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-zinc-300"><i class="grid size-5 place-items-center rounded-full border border-crate-400/20 bg-crate-400/[0.08] not-italic text-[10px] text-crate-300">02</i> SEE</span><span class="text-[10px] font-medium text-zinc-400">CRATE</span></div>
-					<div class="flex flex-1 flex-col p-4"><div class="flex items-end justify-between"><span><small class="block text-[10px] font-bold tracking-[0.12em] text-zinc-400">TUESDAY</small><b class="mt-1 block text-sm tracking-[-0.025em] text-zinc-100">Today</b></span><span class="text-[10px] text-zinc-400">1 reminder</span></div><div class="mt-4 flex gap-3 rounded-[12px] border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.025] p-3 shadow-[inset_2px_0_0_rgb(248_113_113/0.8),0_14px_30px_rgb(0_0_0/0.22)]"><i class="mt-0.5 size-4 shrink-0 rounded-full border-2 border-white/25"></i><span class="min-w-0 flex-1"><b class="block truncate text-[10px] font-semibold text-zinc-100">Review launch notes</b><small class="mt-1 block text-[10px] text-zinc-400">Check the final copy before sharing.</small><span class="mt-3 flex gap-1.5"><em class="rounded-md border border-white/8 bg-black/15 px-2 py-1 text-[10px] not-italic text-zinc-400">18:00</em><em class="rounded-md border border-crate-400/20 bg-crate-400/[0.08] px-2 py-1 text-[10px] not-italic text-crate-300">Crate</em></span></span></div></div>
-					<p class="flex items-center gap-2 px-4 pb-3 text-[10px] text-zinc-400"><i class="size-1.5 rounded-full bg-crate-400"></i> Ready on every device</p>
-				</li>
-				<li class="flex items-center justify-center" aria-hidden="true"><span class="flex items-center text-crate-400"><i class="h-px w-4 bg-gradient-to-r from-white/5 to-crate-400/45"></i><b class="grid size-5 place-items-center rounded-full border border-crate-400/20 bg-[#171823] text-[10px] font-normal shadow-[0_0_18px_rgb(139_92_246/0.18)]">›</b><i class="h-px w-4 bg-gradient-to-r from-crate-400/45 to-white/5"></i></span></li>
-				<li class="stage-surface relative flex min-h-56 flex-col overflow-hidden rounded-[16px] border border-crate-400/25 bg-[#1d1f29] shadow-[0_24px_65px_rgb(0_0_0/0.35),0_12px_40px_rgb(117_86_232/0.10),inset_0_1px_0_rgb(255_255_255/0.07)]">
-					<div class="pointer-events-none absolute -right-10 top-6 size-28 rounded-full bg-crate-400/15 blur-3xl" aria-hidden="true"></div><div class="relative flex items-center justify-between border-b border-white/7 px-4 py-3"><span class="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-zinc-200"><i class="grid size-5 place-items-center rounded-full border border-crate-300/25 bg-crate-400/15 not-italic text-[10px] text-crate-200">03</i> GET NOTIFIED</span><span class="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.6)]" aria-hidden="true"></span></div>
-					<div class="relative flex flex-1 items-center p-4"><div class="w-full rounded-[14px] border border-white/12 bg-[#292b35]/95 p-3.5 shadow-[0_18px_38px_rgb(0_0_0/0.32),inset_0_1px_0_rgb(255_255_255/0.07)] backdrop-blur"><div class="flex items-start gap-3"><span class="brand-tile brand-tile--notification" aria-hidden="true"><img class="brand-tile__mark" src="/assets/logo.png" alt=""></span><span class="min-w-0 flex-1"><span class="flex items-center justify-between"><small class="text-[10px] font-bold tracking-[0.08em] text-zinc-400">CRATE</small><small class="text-[10px] text-zinc-400">now</small></span><b class="mt-2 block truncate text-[10px] font-semibold text-white">Review launch notes</b><em class="mt-1 block text-[10px] not-italic text-zinc-300">Due today at 18:00</em></span></div></div></div>
-					<p class="relative flex items-center gap-2 px-4 pb-3 text-[10px] text-zinc-400"><i class="size-1.5 rounded-full bg-emerald-400"></i> Notification when it is due</p>
-				</li>
-			</ol>
-		</section>
-
-		<section class="content-rail mx-auto grid w-[min(100%-2rem,76rem)] gap-4 py-22 sm:w-[min(100%-3rem,76rem)] sm:py-28 lg:grid-cols-12" id="sync" aria-label="Vault sync and conflict handling">
-			<article class="product-panel panel-sheen relative overflow-hidden border bg-ink-850 p-6 sm:p-8 lg:col-span-7">
-				<div class="relative z-10 max-w-md"><h2 class="text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">Vault sync</h2><p class="mt-4 text-sm leading-6 text-zinc-400">Crate transfers notes and attachments, and it applies renames and deletes on every connected Obsidian device.</p></div>
-				<div class="relative mt-9 overflow-hidden rounded-xl border border-white/8 bg-[#0d0e12] shadow-[0_20px_55px_rgb(0_0_0/0.3)]"><div class="flex h-11 items-center justify-between border-b border-white/7 px-4"><b class="text-[11px] font-semibold text-zinc-300">Recent sync</b><span class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400"><i class="size-1.5 rounded-full bg-emerald-400"></i> LIVE</span></div><div class="divide-y divide-white/7 px-4"><p class="grid grid-cols-[1.5rem_1fr_auto] items-center gap-3 py-4"><i class="grid size-6 place-items-center rounded-md bg-crate-400/10 text-[10px] not-italic text-crate-300">M</i><span><b class="block truncate text-[10px] font-medium">Project Crate.md</b><small class="mt-1 block text-[10px] text-zinc-400">MacBook → iPhone</small></span><em class="text-[10px] not-italic text-zinc-400">Now</em></p><p class="grid grid-cols-[1.5rem_1fr_auto] items-center gap-3 py-4"><i class="grid size-6 place-items-center rounded-md bg-blue-400/10 text-[10px] not-italic text-blue-300">J</i><span><b class="block truncate text-[10px] font-medium">ideas/sketch.jpg</b><small class="mt-1 block text-[10px] text-zinc-400">iPhone → iPad</small></span><em class="text-[10px] not-italic text-zinc-400">2m</em></p><p class="grid grid-cols-[1.5rem_1fr_auto] items-center gap-3 py-4"><i class="grid size-6 place-items-center rounded-md bg-amber-400/10 text-[10px] not-italic text-amber-300">M</i><span><b class="block truncate text-[10px] font-medium">Morning pages.md</b><small class="mt-1 block text-[10px] text-zinc-400">iPad → MacBook</small></span><em class="text-[10px] not-italic text-zinc-400">8m</em></p></div></div>
-			</article>
-			<article class="product-panel panel-sheen flex flex-col border bg-ink-850 p-6 sm:p-8 lg:col-span-5">
-				<div><h2 class="text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">Conflict handling</h2><p class="mt-4 text-sm leading-6 text-zinc-400">If two devices change the same note, Crate saves one as the current note and preserves the other as a conflict copy.</p></div>
-				<div class="mt-9 grid gap-2"><div class="rounded-xl border border-white/8 bg-black/20 p-4"><small class="text-[10px] font-bold tracking-[0.08em] text-zinc-400">MACBOOK · 18:42</small><b class="mt-3 block text-xs font-semibold">Your edit</b><p class="mt-1 text-[10px] text-zinc-400">Saved as the current note</p></div><span class="justify-self-center rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1 text-[10px] font-bold text-emerald-300">BOTH KEPT</span><div class="rounded-xl border border-white/8 bg-black/20 p-4"><small class="text-[10px] font-bold tracking-[0.08em] text-zinc-400">IPHONE · 18:41</small><b class="mt-3 block text-xs font-semibold">Other edit</b><p class="mt-1 text-[10px] text-zinc-400">Saved as a conflict copy</p></div></div>
-			</article>
-		</section>
-
-		<section class="border-y border-white/8 bg-white/[0.018]" id="features" aria-labelledby="features-title">
-			<div class="content-rail mx-auto w-[min(100%-2rem,76rem)] py-20 sm:w-[min(100%-3rem,76rem)] sm:py-24">
-				<div class="grid gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-					<h2 id="features-title" class="section-heading text-balance font-medium">Reminder features</h2>
-					<p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Schedule and organize reminders in Crate. Dates, projects, details, and task order remain in Markdown.</p>
-				</div>
-
-				<div class="feature-stories mt-14 sm:mt-18">
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">01</span><h3>Natural dates</h3><p>Write “tomorrow at 18:00” or “next Friday.” Crate recognizes the date while the task stays readable in Markdown.</p></div>
-						<div class="feature-demo feature-demo--dates" aria-hidden="true">
-							<div class="date-demo demo-shell">
-								<div class="demo-toolbar"><span>New reminder</span><i>CRATE</i></div>
-								<div class="date-demo__input"><span>Review launch notes</span><mark>tomorrow at 18:00</mark></div>
-								<div class="date-demo__result"><span><small>Due</small><b>Tomorrow</b></span><span><small>Time</small><b>18:00</b></span></div>
-								<p class="demo-status"><i></i> Date recognized from text</p>
-							</div>
-						</div>
-					</article>
-
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">02</span><h3>Projects</h3><p>Group reminders with <code>#Work</code> or move them from the app. Each project is stored as a Markdown file in your reminders folder.</p></div>
-						<div class="feature-demo feature-demo--projects" aria-hidden="true">
-							<div class="project-demo demo-shell">
-								<aside><b>Projects</b><ul><li><span>Inbox</span><small>4</small></li><li class="is-active"><span>Product launch</span><small>6</small></li><li><span>Personal</span><small>3</small></li></ul></aside>
-								<div class="project-demo__main"><p>Reminders / Product launch.md</p><h4>Product launch</h4><ul><li><i></i><span>Review release notes<small>Tomorrow · 18:00</small></span></li><li><i></i><span>Prepare screenshots<small>Friday</small></span></li><li><i></i><span>Publish announcement<small>Next Monday</small></span></li></ul></div>
-							</div>
-						</div>
-					</article>
-
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">03</span><h3>Recurring tasks</h3><p>Use phrases such as “every Friday at 09:00.” When you complete the task, Crate schedules the next occurrence.</p></div>
-						<div class="feature-demo feature-demo--repeat" aria-hidden="true">
-							<div class="repeat-demo demo-shell">
-								<div class="demo-toolbar"><span>Recurring reminder</span><i>↻</i></div>
-								<code>Prepare weekly notes <mark>every Friday 09:00</mark></code>
-								<div class="repeat-demo__timeline"><span class="is-current"><small>This Friday</small><b>09:00</b></span><i></i><span><small>Next Friday</small><b>09:00</b></span><i></i><span><small>+ 1 week</small><b>09:00</b></span></div>
-								<p class="demo-status"><i></i> Repeats after completion</p>
-							</div>
-						</div>
-					</article>
-
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">04</span><h3>Today &amp; upcoming</h3><p>Review what is due in Crate, or embed the same lists inside any note with a reminders code block.</p></div>
-						<div class="feature-demo feature-demo--views" aria-hidden="true">
-							<div class="views-demo demo-shell">
-								<nav><span class="is-active">Today</span><span>Upcoming</span><span>Browse</span></nav>
-								<div class="views-demo__heading"><span><small>Tuesday</small><b>Today</b></span><em>2 reminders</em></div>
-								<ul><li><i></i><span>Review launch notes<small>Product launch</small></span><time>18:00</time></li><li><i></i><span>Water the plants<small>Personal</small></span><time>20:30</time></li></ul>
-								<code>```reminders-today```</code>
-							</div>
-						</div>
-					</article>
-
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">05</span><h3>Priority &amp; notes</h3><p>Add <code>!</code> to flag an important task, then include extra context in a description. Crate keeps both with the reminder in Markdown.</p></div>
-						<div class="feature-demo feature-demo--priority" aria-hidden="true">
-							<div class="priority-demo demo-shell">
-								<div class="demo-toolbar"><span>Reminder details</span><i>IMPORTANT</i></div>
-								<div class="priority-demo__task"><i></i><span><code>Review security checklist <mark>!</mark></code><p>Confirm token scopes and recovery steps before release.</p></span></div>
-								<div class="priority-demo__meta"><span><i>!</i> Priority</span><span>2 lines of detail</span></div>
-								<p class="demo-status"><i></i> Saved with the Markdown task</p>
-							</div>
-						</div>
-					</article>
-
-					<article class="feature-story">
-						<div class="feature-story__copy"><span class="feature-number">06</span><h3>Drag to reorder</h3><p>Drag tasks into place in Obsidian, or long-press them on your phone. Crate saves the new order to the project file.</p></div>
-						<div class="feature-demo feature-demo--reorder" aria-hidden="true">
-							<div class="reorder-demo demo-shell">
-								<div class="demo-toolbar"><span>Product launch</span><i>3 TASKS</i></div>
-								<ol><li><b>⋮⋮</b><i></i><span>Review release notes<small>Tomorrow · 18:00</small></span><em>01</em></li><li class="is-moving"><b>⋮⋮</b><i></i><span>Prepare screenshots<small>Friday</small></span><em>02</em></li><li><b>⋮⋮</b><i></i><span>Publish announcement<small>Next Monday</small></span><em>03</em></li></ol>
-								<p class="demo-status"><i></i> Order saved to Product launch.md</p>
-							</div>
-						</div>
-					</article>
-				</div>
-			</div>
-		</section>
-
-
-
-		<section class="border-y border-white/8 bg-white/[0.018]" id="how-it-works" aria-labelledby="architecture-title">
-			<div class="content-rail mx-auto w-[min(100%-2rem,76rem)] py-20 sm:w-[min(100%-3rem,76rem)] sm:py-24">
-				<div class="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-					<h2 id="architecture-title" class="section-heading text-balance font-medium">How Crate works</h2>
-					<p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Crate connects Obsidian to infrastructure deployed in your Cloudflare account, then sends due reminders to the companion app.</p>
-				</div>
-
-				<figure class="architecture-panel product-panel panel-sheen mt-12 border bg-ink-850 p-5 sm:p-8">
-					<div class="architecture-flow">
-						<div class="architecture-node"><span class="architecture-kicker">Your devices</span><b>Obsidian</b><small>Desktop + mobile</small></div>
-						<span class="architecture-arrow" aria-hidden="true"><i></i><b>›</b><i></i></span>
-						<div class="architecture-node architecture-node--crate"><span class="architecture-kicker">Plugin layer</span><b>Crate</b><small>Sync + reminders</small></div>
-						<span class="architecture-arrow" aria-hidden="true"><i></i><b>›</b><i></i></span>
-						<div class="architecture-node architecture-node--cloud"><span class="architecture-kicker">Your account</span><b>Cloudflare</b><small>Worker · R2 · D1 · Durable Objects</small></div>
-					</div>
-					<div class="architecture-lower">
-						<figcaption class="architecture-note"><span class="architecture-kicker">Reminder-only access</span><b>Your vault stays in Obsidian.</b><p>The phone app receives reminder data, but its token cannot access vault sync.</p></figcaption>
-						<div class="architecture-pwa-path"><span class="architecture-route">Reminder data + push <i aria-hidden="true">↓</i></span><div class="architecture-pwa"><span class="brand-tile brand-tile--notification" aria-hidden="true"><img class="brand-tile__mark" src="/assets/logo.png" alt=""></span><span><span class="architecture-kicker">On your phone</span><b>Reminders web app</b><small>Reminder list + notifications</small></span></div></div>
-					</div>
-				</figure>
-			</div>
-		</section>
-
-		<section class="border-y border-white/8 bg-white/[0.018]" id="setup" aria-labelledby="setup-title">
-			<div class="content-rail mx-auto w-[min(100%-2rem,76rem)] py-20 sm:w-[min(100%-3rem,76rem)] sm:py-24">
-				<div class="grid gap-6 lg:grid-cols-2 lg:items-end"><h2 id="setup-title" class="section-heading text-balance font-medium">Setup</h2><p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Connect your Cloudflare account once. Crate prepares the storage and services it needs automatically.</p></div>
-				<ol class="mt-12 grid divide-y divide-white/8 border-y border-white/8 md:grid-cols-3 md:divide-x md:divide-y-0">
-					<li class="py-6 md:px-7 md:first:pl-0"><span class="text-[10px] font-bold text-zinc-400">01</span><div class="mt-10 grid size-9 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-sm text-crate-300">↓</div><h3 class="mt-5 text-lg font-semibold tracking-[-0.035em]">Install Crate</h3><p class="mt-2 max-w-xs text-xs leading-5 text-zinc-400">Add the plugin to Obsidian and open its settings.</p></li>
-					<li class="py-6 md:px-7"><span class="text-[10px] font-bold text-zinc-400">02</span><div class="mt-10 grid size-9 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-xs font-bold text-crate-300">C</div><h3 class="mt-5 text-lg font-semibold tracking-[-0.035em]">Connect Cloudflare</h3><p class="mt-2 max-w-xs text-xs leading-5 text-zinc-400">Sign in, choose an account, and review the requested permissions.</p></li>
-					<li class="py-6 md:px-7 md:last:pr-0"><span class="text-[10px] font-bold text-zinc-400">03</span><div class="mt-10 grid size-9 place-items-center rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] text-sm text-emerald-300">✓</div><h3 class="mt-5 text-lg font-semibold tracking-[-0.035em]">Start syncing</h3><p class="mt-2 max-w-xs text-xs leading-5 text-zinc-400">Connect another device and keep working in Obsidian as usual.</p></li>
-				</ol>
-			</div>
-		</section>
-
-		<section class="content-rail mx-auto w-[min(100%-2rem,76rem)] py-24 sm:w-[min(100%-3rem,76rem)] sm:py-28" id="privacy" aria-labelledby="privacy-title">
-			<div class="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-				<div><h2 id="privacy-title" class="section-heading text-balance font-medium">Privacy and security</h2><a class="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300 transition-colors hover:text-white" href="/privacy/">Read how data is handled <span class="text-zinc-400" aria-hidden="true">↗</span></a></div>
-				<p class="max-w-xl text-sm leading-7 text-zinc-400 lg:justify-self-end">There is no Crate account or hidden telemetry. These boundaries show where data lives and what the phone app can reach.</p>
-			</div>
-			<div class="privacy-principles mt-14 sm:mt-16">
-				<article class="privacy-principle">
-					<div class="privacy-principle__visual" aria-hidden="true"><div class="principle-markdown"><span class="principle-file"><i></i><b>Project.md</b><small>- [ ] Review notes</small></span><em></em><span class="principle-node">Crate</span></div></div>
-					<span class="privacy-principle__index">01</span><h3>Markdown source</h3><p>Reminders stay readable and editable as Markdown files in your vault.</p>
-				</article>
-				<article class="privacy-principle">
-					<div class="privacy-principle__visual" aria-hidden="true"><div class="principle-cloud"><small>Your account</small><div><span>Worker</span><span>R2</span><span>D1</span></div></div></div>
-					<span class="privacy-principle__index">02</span><h3>Your Cloudflare account</h3><p>R2 stores vault files. D1 stores sync metadata and device records in the Cloudflare account you connect.</p>
-				</article>
-				<article class="privacy-principle">
-					<div class="privacy-principle__visual" aria-hidden="true"><div class="principle-access"><span class="principle-phone">Phone</span><i></i><span class="principle-reminders">Reminders</span><em><b>×</b></em><span class="principle-vault">Vault sync</span></div></div>
-					<span class="privacy-principle__index">03</span><h3>Scoped phone access</h3><p>The companion app receives a reminder-only token. It cannot call vault sync or device-management APIs.</p>
-				</article>
-			</div>
-			<aside class="privacy-disclosure"><span>Encryption boundary</span><p><strong>End-to-end encryption is optional.</strong> Enable it in Crate settings to protect synced content. Paths, sizes and notification times remain visible to your server.</p></aside>
-		</section>
-
-        <section class="faq-section content-rail mx-auto w-[min(100%-2rem,76rem)] sm:w-[min(100%-3rem,76rem)]" id="faq" aria-labelledby="faq-title">
-            <div><p class="hero-demo-kicker">BEFORE YOU START</p><h2 class="section-heading" id="faq-title">A few useful answers.</h2></div>
-            <div class="faq-list">
-                <details><summary>Do I need a Cloudflare account?</summary><p>Yes. Crate creates its sync backend in your own Cloudflare account. You sign in, choose an account, and review permissions during setup. There is no separate Crate account.</p></details>
-                <details><summary>What does it cost?</summary><p>Crate is open source. Cloudflare usage is billed separately to your account; costs depend on your storage and activity. Review your Cloudflare plan and usage before connecting a vault.</p></details>
-                <details><summary>How does it work on my phone?</summary><p>Install the plugin in Obsidian mobile to sync your vault. The companion web app is for reminders and notifications; it does not browse or sync your notes. Phone notifications require setup and permission.</p></details>
-                <details><summary>How do I install it?</summary><p>Crate is an early release and is not in the community plugin catalog yet. Follow the <a href="/docs/getting-started/installation/">installation guide</a> to install it with BRAT or release files. Start with a non-critical vault.</p></details>
-                <details><summary>Are my notes end-to-end encrypted?</summary><p>Crate offers optional end-to-end encryption on Cloudflare and self-hosted servers. Save your recovery key and <a href="/docs/features/encryption/">enable it in Crate settings</a>. Without it, your server operator can read synced contents. <a href="/privacy/">Read the privacy policy</a> for the full data handling details.</p></details>
-            </div>
-        </section>
-
-		<section class="release-panel relative mx-auto mb-16 flex w-[min(100%-2rem,76rem)] flex-col items-start justify-between gap-8 overflow-hidden rounded-[10px] border border-white/12 bg-gradient-to-br from-[#181a26] via-[#12131a] to-[#0d0e12] p-7 shadow-panel sm:w-[min(100%-3rem,76rem)] sm:p-10 lg:flex-row lg:items-end lg:p-14" aria-labelledby="release-title">
-			<div class="pointer-events-none absolute -right-24 -top-40 size-[28rem] rounded-full bg-crate-500/[0.12] blur-3xl" aria-hidden="true"></div>
-			<div class="relative z-10"><span class="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-zinc-300 uppercase"><i class="size-1.5 rounded-full bg-crate-400"></i> Early release</span><h2 id="release-title" class="mt-5 text-3xl font-medium tracking-[-0.055em] sm:text-5xl">Install Crate</h2><p class="mt-4 max-w-2xl text-sm leading-6 text-zinc-300">Crate is not yet available in the Obsidian community plugin catalog. Use a non-critical vault while testing it.</p></div>
-			<a class="relative z-10 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-bold text-ink-950 shadow-[0_12px_32px_rgb(0_0_0/0.24),0_1px_0_rgb(255_255_255/0.65)_inset] transition-all hover:-translate-y-0.5 hover:bg-zinc-100" href="/docs/getting-started/installation/">Open installation guide <span aria-hidden="true">↗</span></a>
-		</section>
-	</main>
-
-	<footer class="content-rail mx-auto grid w-[min(100%-2rem,76rem)] gap-8 border-t border-white/8 py-8 text-[11px] text-zinc-400 sm:w-[min(100%-3rem,76rem)] md:grid-cols-[1fr_auto_auto] md:items-start md:gap-12">
-		<div><a class="inline-flex items-center gap-2.5 text-zinc-300" href="/"><span class="brand-tile brand-tile--compact" aria-hidden="true"><img class="brand-tile__mark" src="/assets/logo.png" alt=""></span><b>Crate</b></a></div>
-		<nav class="flex flex-wrap gap-x-5 gap-y-3" aria-label="Site links"><a class="hover:text-zinc-300" href="/privacy/">Privacy</a><a class="hover:text-zinc-300" href="/docs/">Documentation</a><a class="hover:text-zinc-300" href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav>
-		<small class="text-[10px]">Built by Kaan Biryol.</small>
-	</footer>
-</body>
-</html>
+</body></html>

@@ -24,8 +24,10 @@ npm run build:site
 python3 -m http.server 8080 --bind 127.0.0.1 --directory site
 ```
 
-Open `http://localhost:8080/docs/`. The Canvas concept remains at
-`http://localhost:8080/website-options/canvas/`.
+Open `http://localhost:8080/docs/`. The Canvas design is the main website at
+`http://localhost:8080/`. Its former `/website-options/canvas/` URL redirects to
+the homepage. Edit `site/index.html` for landing-page content; its styles remain
+in `site/website-options/canvas/` and `site/website-options/studies.css`.
 
 ## Write user guides
 
