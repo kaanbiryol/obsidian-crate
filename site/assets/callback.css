@@ -139,10 +139,10 @@ h1 {
 	margin-top: 1.35rem;
 	padding: 0.75rem 1rem;
 	border: 1px solid rgb(255 255 255 / 10%);
-	border-radius: 6px;
-	background: #1d1d22;
+	border-radius: 8px;
+	background: #e9e4f4;
 	box-shadow: none;
-	color: white;
+	color: #211c2a;
 	font: inherit;
 	font-size: 0.82rem;
 	font-weight: 500;
@@ -151,8 +151,8 @@ h1 {
 }
 
 .button:hover {
-	background: #27272e;
-	border-color: rgb(255 255 255 / 22%);
+	background: #d3c5f1;
+	border-color: transparent;
 }
 
 .helper {
