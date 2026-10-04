@@ -17,7 +17,8 @@ density. Both Obsidian and the PWA receive these tokens.
 | Content / text stack gap | 12px / 4px | Leading icons or accents / title and metadata |
 | Row gap | 0px flat, 8px cards | All four list types, including reminder animation and embedded lists |
 | Nested row padding / indent | 8px vertically / 16px | Subprojects; highlight groups share the indent |
-| Expanded group / section gap | 16px / 24px | Project and highlight groups / Reading and Upcoming sections |
+| Expanded group gap | 8px projects, 16px highlights | Space after expanded groups |
+| Section gap | 16px Reading, 24px Upcoming | Space between sections |
 | Passage padding | 16px vertically, standard row inset horizontally | Highlight passages and notes |
 
 `_list-item.scss` supplies `primary-spacing`, `nested-spacing`, and
@@ -27,6 +28,8 @@ surfaces and exterior gaps, not basic row padding. Keep nested rows together and
 leave a larger gap after expanded groups. Settings and dialogs use the same
 scale through their own semantic roles; navigation, safe areas, and editor
 geometry remain component-specific.
+
+Reading date headings use 4px bottom padding before the first article row.
 
 `src/ui/shared/styles/_app-density.scss` supplies the same screen scale to the
 plugin and PWA: 24px headings, 16px list titles, 13–14px metadata, 44px search
@@ -966,11 +969,12 @@ expanding menu follow that geometry; bottom safe areas are still applied once.
 
 ### Sync indicator appearance
 
-The shared indicator uses each host’s semantic success/warning colors so light
-and dark themes retain readable status colors. Success remains a solid dot with
-a centered completion ripple; pending uses pause bars, offline a dash, and cached
-an outlined circle. Accessible labels continue to provide the full status.
-Forced-colors mode uses `CanvasText` for these shapes and hides decorative halos
-and ripples. The dot and ripple define their own border-box sizing.
+The shared indicator uses fixed green (`#22c55e`) and orange (`#f59e0b`)
+for success and syncing across themes. Every state retains a solid circular dot, with
+a centered completion ripple on success. Accessible labels continue to provide
+the full status.
+Forced-colors mode uses `CanvasText` for the dot and hides decorative halos
+and ripples. The dot, glow, halo, and ripple share one SVG center; animation changes their
+radii without independently scaling rasterized layers.
 `scripts/pwa-sync-indicator-test.mjs` checks both PWA palettes, centered state
 geometry, motion interruption, reduced motion, and Chromium forced colors.

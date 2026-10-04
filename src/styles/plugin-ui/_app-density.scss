@@ -7,17 +7,18 @@
     @include app-density.dock;
 
     :is(.reminders-view.is-primary, .crate-reading) .view-header {
+      --crate-header-top-gap: 20px;
       --crate-header-meta-gap: 2px;
     }
 
     // PWA phone spacing follows the viewport; Obsidian follows its pane.
     @container (max-width: 759px) {
       :is(.reminders-view.is-primary, .crate-reading) .view-header {
-        --crate-header-top-gap: 4px;
+        --crate-header-top-gap: 12px;
         --crate-header-bottom-gap: 8px;
         --crate-header-meta-height: max(20px, calc(var(--reminder-font-xs) * 1.4));
       }
-      .reminders-view.is-primary .reminders-view-scroll { padding-top: 16px; padding-inline: 16px; }
+      .reminders-view.is-primary .reminders-view-scroll { padding-top: var(--crate-space-8); padding-inline: 16px; }
     }
     @container (max-width: 360px) {
       .pwa-dock { padding-inline: 16px; }

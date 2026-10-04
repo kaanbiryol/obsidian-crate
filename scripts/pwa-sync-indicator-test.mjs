@@ -94,6 +94,24 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(await indicator.locator('.crate-sync-indicator__ripple').evaluate(el => getComputedStyle(el).animationName), 'pwa-sync-ripple');
 		assert.equal(await visual.evaluate(el => getComputedStyle(el).getPropertyValue('--sync-indicator-color').trim()), '#22c55e');
 		assert.equal(await indicator.locator('.crate-sync-indicator__ripple').evaluate(el => getComputedStyle(el).animationDelay), '0s', 'The success wave starts with the green transition');
+		for (const time of [70, 140, 280, 420, 700, 1100]) {
+			const centers = await visual.evaluate((el, time) => {
+				el.getAnimations({ subtree: true }).forEach(animation => {
+					animation.pause();
+					animation.currentTime = time;
+				});
+				return [...el.querySelectorAll('circle')].map(circle => {
+					const bounds = circle.getBoundingClientRect();
+					return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2,
+						transform: getComputedStyle(circle).transform };
+				});
+			}, time);
+			for (const center of centers) {
+				assert.ok(Math.abs(center.x - centers[0].x) < .01 && Math.abs(center.y - centers[0].y) < .01,
+					`Completion circles must stay concentric at ${time}ms`);
+				assert.equal(center.transform, 'none', 'Circles must share vector coordinates without separate layer scaling');
+			}
+		}
 		await page.clock.runFor(1450);
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 
@@ -126,14 +144,14 @@ for (const browserType of [chromium, webkit]) {
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 		await setState({ refreshing: true });
 		await expect(visual).toHaveAttribute('data-visual-state', 'syncing');
-		assert.equal(await indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName), 'none');
+		assert.equal(await indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el).animationName), 'none');
 		await setState({});
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 		await page.evaluate(() => window.root.unmount());
 		await page.clock.runFor(1600);
 		// Exercise the real PWA palettes and the shared geometry without host resets.
 		const states = ['synced', 'syncing', 'pending', 'offline', 'cached', 'error'];
-		const fixtures = states.map(state => `<span class="crate-sync-indicator" data-visual-state="${state}"><span class="crate-sync-indicator__halo"></span><span class="crate-sync-indicator__dot"></span><span class="crate-sync-indicator__ripple"></span></span>`).join('');
+		const fixtures = states.map(state => `<svg class="crate-sync-indicator" viewBox="0 0 16 16" data-visual-state="${state}"><circle class="crate-sync-indicator__halo" cx="8" cy="8" r="8"/><circle class="crate-sync-indicator__glow" cx="8" cy="8" r="7"/><circle class="crate-sync-indicator__dot" cx="8" cy="8" r="4"/><circle class="crate-sync-indicator__ripple" cx="8" cy="8" r="5.5"/></svg>`).join('');
 		await page.setContent(`<style>${css}
 			#root { display:flex; gap:24px; padding:24px; background:var(--background-primary-alt); --text-muted:inherit; --text-normal:inherit; }
 		</style><div id="root">${fixtures}</div>`);
@@ -145,10 +163,14 @@ for (const browserType of [chromium, webkit]) {
 				const fixture = page.locator(`[data-visual-state="${state}"]`);
 				const dot = fixture.locator('.crate-sync-indicator__dot');
 				const background = await dot.evaluate(el => getComputedStyle(el.parentElement.parentElement).backgroundColor);
-				// Resolve the semantic color through a painted property (rings use borders).
-				const foreground = await dot.evaluate(el => getComputedStyle(el)[['pending', 'cached'].includes(el.parentElement.dataset.visualState) ? 'borderLeftColor' : 'backgroundColor']);
-				const values = [luminance(foreground), luminance(background)].sort((a,b) => b-a);
-				assert.ok((values[0]+.05)/(values[1]+.05) >= 3, `${state} must remain legible in ${light ? 'light' : 'dark'} mode`);
+				// Verify fixed sync colors across themes; other states follow the host palette.
+				const foreground = await dot.evaluate(el => getComputedStyle(el).fill);
+				if (state === 'synced' || state === 'syncing') {
+					assert.equal(foreground, state === 'synced' ? 'rgb(34, 197, 94)' : 'rgb(245, 158, 11)');
+				} else {
+					const values = [luminance(foreground), luminance(background)].sort((a,b) => b-a);
+					assert.ok((values[0]+.05)/(values[1]+.05) >= 3, `${state} must remain legible in ${light ? 'light' : 'dark'} mode`);
+				}
 				const frame = await fixture.boundingBox();
 				const bounds = await dot.boundingBox();
 				assert.ok(Math.abs(bounds.x+bounds.width/2-frame.x-frame.width/2) < .01);
@@ -156,23 +178,26 @@ for (const browserType of [chromium, webkit]) {
 			}
 			await page.screenshot({path:`/tmp/crate-sync-states-${browserType.name()}-${light ? 'light' : 'dark'}.png`});
 		}
-		await expect(page.locator('[data-visual-state="pending"] .crate-sync-indicator__dot')).toHaveCSS('border-left-width', '2px');
-		await expect(page.locator('[data-visual-state="offline"] .crate-sync-indicator__dot')).toHaveCSS('height', '2px');
-		await expect(page.locator('[data-visual-state="cached"] .crate-sync-indicator__dot')).toHaveCSS('border-top-width', '2px');
-		await expect(page.locator('[data-visual-state="synced"] .crate-sync-indicator__ripple')).toHaveCSS('box-sizing', 'border-box');
+		for (const state of states) {
+			const dot = page.locator(`[data-visual-state="${state}"] .crate-sync-indicator__dot`);
+			await expect(dot).toHaveCSS('r', '4px');
+			await expect(dot).toHaveAttribute('cx', '8');
+			await expect(dot).toHaveAttribute('cy', '8');
+		}
+
 		if (browserType === chromium) {
 			await page.emulateMedia({ forcedColors: 'active' });
 			for (const state of states) {
 				const fixture = page.locator(`[data-visual-state="${state}"]`);
 				const colors = await fixture.locator('.crate-sync-indicator__dot').evaluate(el => ({
-					foreground: getComputedStyle(el)[['pending','cached'].includes(el.parentElement.dataset.visualState) ? 'borderLeftColor' : 'backgroundColor'],
+					foreground: getComputedStyle(el).fill,
 					background: getComputedStyle(document.body).backgroundColor,
 				}));
 				assert.notEqual(colors.foreground, colors.background, `${state} must remain visible in forced colors`);
 				await expect(fixture.locator('.crate-sync-indicator__halo')).toBeHidden();
 			}
 		}
-		console.log(`${browserType.name()}: sync motion, interruptions, reduced motion, palette contrast, and state geometry passed`);
+		console.log(`${browserType.name()}: sync motion, interruptions, reduced motion, fixed sync colors, host palette contrast, and state geometry passed`);
 	} finally {
 		await browser.close();
 	}

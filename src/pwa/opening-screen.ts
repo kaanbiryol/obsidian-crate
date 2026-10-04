@@ -7,7 +7,7 @@ const loadingIndicator = (label: string) => `<div class="crate-content-loading" 
 
 const settings = openingIconSvg('settings', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>');
 const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" data-variant="ghost" aria-hidden="true">${icon}</span>`;
-const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="pwa-sync-indicator__button"><span class="crate-sync-indicator" data-sync-state="syncing" data-visual-state="syncing"><span class="crate-sync-indicator__halo"></span><span class="crate-sync-indicator__dot"></span><span class="crate-sync-indicator__ripple"></span></span></span></span>`;
+const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="pwa-sync-indicator__button"><svg class="crate-sync-indicator" viewBox="0 0 16 16" data-sync-state="syncing" data-visual-state="syncing" aria-hidden="true" focusable="false"><circle class="crate-sync-indicator__halo" cx="8" cy="8" r="8"/><circle class="crate-sync-indicator__glow" cx="8" cy="8" r="7"/><circle class="crate-sync-indicator__dot" cx="8" cy="8" r="4"/><circle class="crate-sync-indicator__ripple" cx="8" cy="8" r="5.5"/></svg></span></span>`;
 
 function header(reading = false) {
 	return `<div class="view-header${reading ? ' crate-reading__header pwa-reading-opening__header' : ''}">

@@ -1,148 +1,97 @@
 @mixin styles($selector) {
 	#{$selector} {
-		display: grid;
-		place-items: center;
-		position: relative;
+		display: block;
 		flex: 0 0 16px;
 		width: 16px;
 		height: 16px;
+		overflow: visible;
 		--sync-indicator-color: var(--text-muted);
 		--sync-indicator-color-duration: 300ms;
 		color: var(--sync-indicator-color);
 
-		// Follow each host’s light/dark semantic palette.
 		&[data-visual-state="synced"],
 		&[data-visual-state="settling"] {
-			--sync-indicator-color: var(--text-success, #22c55e);
+			--sync-indicator-color: #22c55e;
 		}
-		&[data-visual-state="syncing"] { --sync-indicator-color: var(--text-warning, #f59e0b); }
+		&[data-visual-state="syncing"] { --sync-indicator-color: #f59e0b; }
 		&[data-visual-state="error"] { --sync-indicator-color: var(--text-error); }
 	}
 
+	// One SVG coordinate system keeps painted circles concentric at every radius.
+	// Animate geometry rather than separately rasterizing and scaling tiny layers.
 	#{$selector}__dot {
-		box-sizing: border-box;
-		grid-area: 1 / 1;
-		// Even dimensions keep the resting dot on whole pixels in the 16px frame.
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--sync-indicator-color);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
-		transform: scale(1);
-		// Animate the painted dot and glow directly, rather than inherited color.
-		transition: background-color var(--sync-indicator-color-duration) ease-in-out, box-shadow var(--sync-indicator-color-duration) ease-in-out, transform 600ms cubic-bezier(.22, 1, .36, 1);
+		r: 4px;
+		fill: var(--sync-indicator-color);
+		transition: fill var(--sync-indicator-color-duration) ease-in-out, r 600ms cubic-bezier(.22, 1, .36, 1);
 	}
 
-
-	// Quiet states remain recognizable without relying on color or motion.
-	#{$selector}[data-visual-state="pending"] #{$selector}__dot {
-		background: transparent;
-		border-inline: 2px solid var(--sync-indicator-color);
-		border-radius: 0;
-		box-shadow: none;
-	}
-	#{$selector}[data-visual-state="offline"] #{$selector}__dot {
-		height: 2px;
-		border-radius: 1px;
-		box-shadow: none;
-	}
-	#{$selector}[data-visual-state="cached"] #{$selector}__dot {
-		background: transparent;
-		border: 2px solid var(--sync-indicator-color);
-		box-shadow: none;
+	#{$selector}__glow {
+		r: 7px;
+		fill: color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
+		transition: fill var(--sync-indicator-color-duration) ease-in-out;
 	}
 
 	#{$selector}__halo {
-		grid-area: 1 / 1;
-		width: 16px;
-		height: 16px;
+		fill: color-mix(in srgb, var(--sync-indicator-color) 14%, transparent);
 		opacity: 0;
-		pointer-events: none;
-		transition: opacity 600ms ease;
-
-		&::before {
-			content: '';
-			display: block;
-			width: 100%;
-			height: 100%;
-			border-radius: 50%;
-			background: color-mix(in srgb, var(--sync-indicator-color) 14%, transparent);
-			transition: background-color var(--sync-indicator-color-duration) ease-in-out;
-			animation: pwa-sync-breathe 1.8s ease-in-out infinite;
-			animation-play-state: paused;
-		}
+		transition: opacity 600ms ease, fill var(--sync-indicator-color-duration) ease-in-out;
+		animation: pwa-sync-breathe 1.8s ease-in-out infinite;
+		animation-play-state: paused;
 	}
 
 	#{$selector}[data-visual-state="syncing"] {
-		#{$selector}__dot { transform: scale(.92); }
-		#{$selector}__halo {
-			opacity: 1;
-			&::before { animation-play-state: running; }
-		}
+		#{$selector}__dot { r: 3.68px; }
+		#{$selector}__halo { opacity: 1; animation-play-state: running; }
 	}
 
 	#{$selector}__ripple {
-		box-sizing: border-box;
-		grid-area: 1 / 1;
-		width: 12px;
-		height: 12px;
-		border: 1px solid var(--sync-indicator-color);
-		border-radius: 50%;
+		fill: none;
+		stroke: var(--sync-indicator-color);
+		stroke-width: 1px;
 		opacity: 0;
-		pointer-events: none;
-		transition: border-color var(--sync-indicator-color-duration) ease-in-out;
+		transition: stroke var(--sync-indicator-color-duration) ease-in-out;
 	}
 
 	#{$selector}[data-visual-state="settling"] {
 		#{$selector}__dot { animation: pwa-sync-settle 600ms cubic-bezier(.22, 1, .36, 1); }
+		#{$selector}__glow { animation: pwa-sync-glow 600ms cubic-bezier(.22, 1, .36, 1); }
 		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms cubic-bezier(.22, 1, .36, 1) both; }
 	}
 
 	@keyframes pwa-sync-settle {
-		0% { transform: scale(.92); }
-		100% {
-			transform: scale(1);
-			box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
-		}
-		35% {
-			transform: scale(1.14);
-			box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--sync-indicator-color) 15%, transparent), 0 0 5px color-mix(in srgb, var(--sync-indicator-color) 18%, transparent);
-		}
+		0% { r: 3.68px; }
+		35% { r: 4.56px; }
+		100% { r: 4px; }
+	}
+
+	@keyframes pwa-sync-glow {
+		0%, 100% { r: 7px; }
+		35% { r: 8.55px; }
 	}
 
 	@keyframes pwa-sync-ripple {
-		0% { transform: scale(.7); opacity: 0; }
+		0% { r: 3.85px; opacity: 0; }
 		20% { opacity: .32; }
-		100% { transform: scale(1.55); opacity: 0; }
+		100% { r: 8.525px; opacity: 0; }
 	}
 
 	@keyframes pwa-sync-breathe {
-		0%, 100% { transform: scale(.82); }
-		50% { transform: scale(1); }
+		0%, 100% { r: 6.56px; }
+		50% { r: 8px; }
 	}
-
 
 	@media (forced-colors: active) {
 		#{$selector}[data-visual-state] {
-			// Use the user's system palette while preserving hollow/bar shapes.
 			forced-color-adjust: none;
 			--sync-indicator-color: CanvasText;
 		}
-		#{$selector} #{$selector}__dot { box-shadow: none; animation: none; }
-		#{$selector}__halo, #{$selector}__ripple { display: none; }
+		#{$selector} #{$selector}__dot { animation: none; }
+		#{$selector}__halo, #{$selector}__glow, #{$selector}__ripple { display: none; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		#{$selector},
-		#{$selector}__dot,
-		#{$selector}__halo,
-		#{$selector}__halo::before,
-		#{$selector}__ripple,
-		#{$selector}__button { transition: none; }
-		#{$selector}__button[data-press-active] { transform: none; }
-		#{$selector} #{$selector}__dot { transform: none; }
-		#{$selector}__halo::before,
-		#{$selector}[data-visual-state] #{$selector}__dot,
-		#{$selector}[data-visual-state] #{$selector}__ripple { animation: none; }
+		#{$selector}, #{$selector} circle { transition: none; }
+		#{$selector}[data-visual-state] circle { animation: none; }
+		#{$selector}[data-visual-state] #{$selector}__dot { r: 4px; }
 	}
 }

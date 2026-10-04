@@ -17,12 +17,20 @@
       text-align: center;
     }
 
-    // Every header control shares one surface, including secondary and danger actions.
+    // Keep secondary delete icons quiet beside the title and primary action.
     .reminder-modal-header-side > button {
-      @include rounded-sheet-control.surface;
+      &:not(.reminder-header-delete) {
+        @include rounded-sheet-control.surface;
+      }
       min-height: 44px;
 
       &:not(:disabled)[data-press-active] { opacity: .5; }
+    }
+
+    .reminder-header-delete {
+      border-color: transparent !important;
+      background: transparent !important;
+      box-shadow: none !important;
     }
 
     .reminder-modal-header-close {

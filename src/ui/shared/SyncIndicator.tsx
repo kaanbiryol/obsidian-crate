@@ -6,9 +6,10 @@ export type SyncIndicatorState = 'syncing' | 'synced' | 'error' | 'offline' | 'p
 /** Shared visual indicator; each host supplies its status label and interaction. */
 export function SyncIndicator({ state }: { state: SyncIndicatorState }) {
 	const visualState = useSyncIndicatorMotion(state);
-	return <span className="crate-sync-indicator" data-sync-state={state} data-visual-state={visualState} aria-hidden="true">
-		<span className="crate-sync-indicator__halo" />
-		<span className="crate-sync-indicator__dot" />
-		<span className="crate-sync-indicator__ripple" />
-	</span>;
+	return <svg className="crate-sync-indicator" viewBox="0 0 16 16" data-sync-state={state} data-visual-state={visualState} aria-hidden="true" focusable="false">
+		<circle className="crate-sync-indicator__halo" cx="8" cy="8" r="8" />
+		<circle className="crate-sync-indicator__glow" cx="8" cy="8" r="7" />
+		<circle className="crate-sync-indicator__dot" cx="8" cy="8" r="4" />
+		<circle className="crate-sync-indicator__ripple" cx="8" cy="8" r="5.5" />
+	</svg>;
 }

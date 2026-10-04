@@ -140,26 +140,26 @@ for (const browserType of [chromium, webkit]) {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(status).toBeFocused();
   const indicator = status.locator('.crate-sync-indicator');
-  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('width', '8px');
+  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('r', '4px');
   await page.evaluate(() => window.setSyncState({status:'syncing', work:{phase:'applying'}}));
   await expect(indicator).toHaveAttribute('data-visual-state','syncing');
   await expect(status).toHaveText('');
   await expect(status).toHaveAttribute('aria-label', /Syncing…/);
   const dot = indicator.locator('.crate-sync-indicator__dot');
-  await expect(dot).toHaveCSS('background-color','rgb(245, 158, 11)');
+  await expect(dot).toHaveCSS('fill','rgb(245, 158, 11)');
   const colors = await dot.evaluate(async el => {
     window.setSyncState({lastSync:new Date().toISOString()});
     let transition;
     for (let frame = 0; frame < 120 && !transition; frame++) {
       await new Promise(requestAnimationFrame);
-      transition = el.getAnimations().find(animation => animation.transitionProperty === 'background-color');
+      transition = el.getAnimations().find(animation => animation.transitionProperty === 'fill');
     }
     if (!transition) throw new Error('Expected a dot color transition');
     transition.pause();
     transition.currentTime = Number(transition.effect.getTiming().duration) / 2;
-    const middle = getComputedStyle(el).backgroundColor;
+    const middle = getComputedStyle(el).fill;
     transition.finish();
-    return { middle, end: getComputedStyle(el).backgroundColor };
+    return { middle, end: getComputedStyle(el).fill };
   });
   assert.notEqual(colors.middle, 'rgb(245, 158, 11)');
   assert.notEqual(colors.middle, colors.end);

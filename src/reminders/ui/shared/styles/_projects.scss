@@ -349,7 +349,7 @@
         }
 
         .premium-projects-list > .premium-project-tree > .premium-project-group[data-open]:not(:last-child) {
-            margin-bottom: var(--crate-list-group-gap);
+            margin-bottom: var(--crate-space-8);
         }
 
         .premium-project-children > .premium-project-tree > li { border-top: 0; }

@@ -60,8 +60,9 @@
 @include sync-indicator.styles(".crate-sync-indicator");
 
 body.reduce-motion .crate-sync-indicator {
-	&, *, .crate-sync-indicator__halo::before { transition: none; }
-	.crate-sync-indicator__halo::before,
+	&, * { transition: none; }
+	.crate-sync-indicator__halo,
+	.crate-sync-indicator__glow,
 	.crate-sync-indicator__dot,
 	.crate-sync-indicator__ripple { animation: none; }
 }
