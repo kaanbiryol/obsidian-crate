@@ -20,6 +20,7 @@ on:
       - "scripts/reading-shortcut-template.mjs"
       - "scripts/reading-shortcut-fixture.mjs"
       - "scripts/build-shortcut-support.mjs"
+      - "scripts/build-site-images.mjs"
       - "src/reading/shortcut-contract.json"
       - "src/cloudflare/worker/reading/save-page.ts"
       - "src/cloudflare/worker/reading/save-client.ts"

@@ -34,6 +34,7 @@ crate-backup*.tgz
 *.gen.ts
 .generated
 site/assets/site.generated.css
+site/assets/screenshots/lossless/
 site/website-options/crate-ui/crate-ui.generated.css
 /site/docs/
 /docs-site/.astro/

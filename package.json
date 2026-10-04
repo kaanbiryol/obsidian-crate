@@ -17,7 +17,8 @@
 		"node": "^26.8.2"
 	},
 	"scripts": {
-		"build:site": "npm run build:site:main && npm run build:site:crate-ui && npm run build:site:docs",
+		"build:site": "npm run build:site:images && npm run build:site:main && npm run build:site:crate-ui && npm run build:site:docs",
+		"build:site:images": "node scripts/build-site-images.mjs",
 		"build:site:docs": "npm --prefix docs-site run build",
 		"check:docs": "npm --prefix docs-site run check",
 		"dev:docs": "npm --prefix docs-site run dev",
@@ -129,6 +130,7 @@
 		"obsidian": "1.13.1",
 		"postcss": "^8.5.28",
 		"sass": "^1.105.0",
+		"sharp": "0.35.5",
 		"tailwindcss": "^4.3.3",
 		"tslib": "2.8.1",
 		"typescript": "^6.0.3",
