@@ -2,7 +2,7 @@
 
 A slow weekend: good coffee, a little design, plenty of walking.
 
-## Leave room for
+## Weekend plans
 
 - Morning walk.
 - Bookshops and small galleries.
