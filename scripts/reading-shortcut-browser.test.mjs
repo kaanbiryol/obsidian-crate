@@ -79,13 +79,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const sheetContext = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const sheet = await sheetContext.newPage(); sheet.on('pageerror', error => errors.push(error.message));
     await sheet.goto(saved.launchUrl);
-    await expect(sheet.getByRole('heading', { name: 'Saved to Crate ✓', exact: true })).toBeVisible();
+    await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(new URL(sheet.url()).hash, '');
     const openReading = sheet.getByRole('link', { name: 'Open Reading', exact: true });
     const itemId = new URL(await openReading.getAttribute('href'), origin).searchParams.get('item');
     assert.ok(itemId);
     await sheet.reload();
-    await expect(sheet.getByRole('heading', { name: 'Saved to Crate ✓', exact: true })).toBeVisible();
+    await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     const library = await runtime.mf.dispatchFetch(`${origin}/reading/list`, { headers: { Authorization: captureRequest.headers.Authorization } });
     assert.equal(library.status, 403, 'The shortcut credential cannot read the library');
     const enrolledLibrary = await page.evaluate(async () => {
@@ -174,10 +174,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
-    const diagnostic = async () => JSON.parse(await page.getByLabel('Diagnostics', { exact: true }).inputValue());
+    const expandDiagnostics = async () => {
+      if (!await page.locator('#support').evaluate(el => el.open)) await page.locator('#support > summary').click();
+    };
+    const diagnostic = async () => {
+      await expandDiagnostics();
+      return JSON.parse(await page.getByLabel('Diagnostics', { exact: true }).inputValue());
+    };
     const noSuccess = async () => {
       await expect(page.getByRole('link', { name: 'Open Reading', exact: true })).toBeHidden();
-      assert.ok(!await page.getByRole('heading', { name: /^(?:Saved to Crate|Already saved)/ }).count());
+      assert.ok(!await page.getByRole('heading', { name: /^(?:Saved|Already saved)/ }).count());
       assert.equal(new URL(page.url()).hash, '');
     };
 
@@ -186,6 +192,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(expiredReply.launchUrl);
     await expect(page.getByRole('heading', { name: 'Reconnect your shortcut', exact: true })).toBeVisible();
     await noSuccess(); assert.equal(handoffs, 0);
+    await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeHidden();
     const report = await diagnostic();
     assert.equal(report.status, 401); assert.equal(report.stage, 'prepare');
     assert.equal(report.requestId, expired.headers.get('X-Crate-Request-Id'));
@@ -231,9 +238,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     }))]) {
       await page.evaluate(() => sessionStorage.setItem('crate-reading-handoff-v1', JSON.stringify({ token: 'e'.repeat(64), until: Date.now() + 300000 })));
       await page.goto(`${origin}/notifications/save-reading#${fragment}`);
-      await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible(); await noSuccess();
+      await expandDiagnostics(); await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible(); await noSuccess();
       assert.ok(!JSON.stringify(await diagnostic()).includes('private'));
-      await page.reload(); await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible(); await noSuccess();
+      await page.reload(); await expandDiagnostics(); await expect(page.getByRole('button', { name: 'Copy diagnostics', exact: true })).toBeVisible(); await noSuccess();
       assert.equal(handoffs, 0);
     }
     const staticError = { stage: 'prepare', code: 'invalid_response', shortcutRevision: contract.revision, shortcutContract: contract.version };
@@ -263,30 +270,34 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.goto(pending.launchUrl);
     await expect(page.getByRole('heading', { name: 'Save not confirmed', exact: true })).toBeVisible(); await noSuccess();
     await page.getByRole('button', { name: 'Retry save', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Saved to Crate ✓', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(attempts.length, 2); assert.deepEqual(attempts[0], attempts[1]); assert.equal(attempts[0].body, '{}');
     const savedId = new URL(await page.getByRole('link', { name: 'Open Reading', exact: true }).getAttribute('href'), origin).searchParams.get('item');
     assert.equal(savedId, firstReceipt.id); assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 1);
     await expect(page.getByRole('heading', { name: 'A newer shortcut is available', exact: true })).toBeHidden();
+
+    await expect(page.locator('#message')).toHaveText('You can close this window.');
+    await expect(page.locator('#status-label')).toHaveCount(0);
+    await expect(page.locator('#support')).toBeHidden();
 
     mode = 'malformed'; attempts = [];
     const malformed = await prepare(); await page.goto(malformed.launchUrl);
     await expect(page.getByRole('heading', { name: 'Save not confirmed', exact: true })).toBeVisible(); await noSuccess();
     assert.equal((await diagnostic()).code, 'invalid_response'); assert.ok(!JSON.stringify(await diagnostic()).includes('private upstream'));
     await page.getByRole('button', { name: 'Retry save', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Already saved ✓', exact: true })).toBeVisible(); assert.deepEqual(attempts[0], attempts[1]);
+    await expect(page.getByRole('heading', { name: 'Already saved', exact: true })).toBeVisible(); assert.deepEqual(attempts[0], attempts[1]);
 
     mode = 'protocol'; attempts = [];
     const changed = await prepare(); await page.goto(changed.launchUrl);
     await expect(page.getByRole('heading', { name: 'Reload this save page', exact: true })).toBeVisible(); await noSuccess();
     await page.getByRole('button', { name: 'Reload save page', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Already saved ✓', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Already saved', exact: true })).toBeVisible();
     assert.deepEqual(attempts[0], attempts[1]);
 
     await page.unroute('**/reading/handoff');
     const legacyResponse = await post('/reading/prepare', { url: articleUrl }, authorization);
     const legacy = await legacyResponse.json(); await page.goto(legacy.launchUrl);
-    await expect(page.getByRole('heading', { name: 'Already saved ✓', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Already saved', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'A newer shortcut is available', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download shortcut', exact: true })).toHaveAttribute('href', contract.downloadUrl);
     assert.deepEqual(errors, []);

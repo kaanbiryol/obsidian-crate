@@ -13,7 +13,7 @@ h2 { font-size:clamp(2rem,3.6vw,2.75rem); }
 .nav-links a[aria-current] { color:var(--text); }
 .nav-links a[aria-current]::after { opacity:1; transform:scaleX(1); }
 .nav-links .nav-github { display:none; }
-.header-action { background:#eeeaf6; color:#17141e; font-weight:600; border:0; white-space:nowrap; }
+.header-action { background:#1d1d22; color:#ededf0; font-weight:500; border:1px solid #ffffff24; white-space:nowrap; }
 .header-action .icon { color:inherit; }
 .menu-toggle { display:none; }
 .hero-band { overflow:hidden; background:radial-gradient(ellipse at 50% 72%,#8b5cf618,transparent 64%); border-bottom:1px solid var(--line); }
@@ -27,8 +27,8 @@ h1 span + span { color:#c3bed5; }
 .hero-copy .body-copy { max-width:620px; margin-inline:auto; font-size:17px; line-height:1.75; }
 .hero-copy .actions { justify-content:center; }
 .actions { gap:20px; }
-.button { background:#e9e4f4; color:#211c2a; border-radius:8px; }
-.button:hover { background:#d3c5f1; }
+.button { background:#1d1d22; color:#ededf0; border:1px solid #ffffff24; border-radius:6px; font-weight:500; }
+@media(hover:hover) { .button:hover,.header-action:hover { background:#27272e; border-color:#ffffff38; transform:none; } }
 .release-note { margin:14px auto 0; font-size:13px; }
 .hero-facts { padding:0; margin:28px 0 0; list-style:none; display:flex; flex-wrap:wrap; gap:16px; font:10px/1.6 ui-monospace,monospace; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
 .hero-visual { min-width:0; width:100%; }

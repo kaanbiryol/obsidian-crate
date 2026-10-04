@@ -97,12 +97,12 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     retry.hidden = !token || clean.stage !== 'handoff' || [400, 401, 403, 409, 410, 413, 423, 426].includes(Number(status));
     reload.hidden = status !== 428;
     title.textContent = 'Save not confirmed';
-    message.textContent = token ? 'The connection was interrupted. Retry to check and finish this same save.' : 'Dismiss this page and share the link again. If it keeps failing, copy the diagnostics below.';
+    message.textContent = token ? 'The connection was interrupted. Retry to finish.' : 'Share the link again. If it keeps failing, check the diagnostics.';
     if (status === 401 || status === 403 && code === 'shortcut_access_required') {
       title.textContent = 'Reconnect your shortcut';
-      message.textContent = 'Your shortcut access expired or was revoked. In the enrolled Crate app, open Reading settings → Set up iPhone shortcut and create a new pairing code.';
+      message.textContent = 'In the Crate app, open Reading settings → Set up iPhone shortcut to create a new pairing code.';
     } else if (clean.stage !== 'pair' && (status === 410 || code === 'save_link_expired' || code === 'missing_save_link')) {
-      title.textContent = 'Share this link again'; message.textContent = 'This save link is missing or expired. Share the article to Crate again to start a fresh save.';
+      title.textContent = 'Share this link again'; message.textContent = 'This link has expired or is missing. Share the article to Crate again.';
     } else if (status === 423) {
       title.textContent = 'Reading is paused'; message.textContent = 'Enable Reading in Crate settings, then share the article again.';
     } else if (code === 'server_update_required') {
@@ -110,9 +110,9 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     } else if (code === 'shortcut_update_required') {
       title.textContent = 'Update your shortcut'; message.textContent = 'Install the latest Save to Crate shortcut and reconnect it to your library.';
     } else if (status === 428) {
-      title.textContent = 'Reload this save page'; message.textContent = 'The server changed while this page was open. Reload to finish the same save with the current version.';
+      title.textContent = 'Reload this save page'; message.textContent = 'Your server was updated. Reload to finish this save.';
     } else if (status === 429) {
-      message.textContent = 'Crate is receiving too many requests. Wait before trying again. This save has not been confirmed.';
+      message.textContent = 'Too many requests. Wait a moment, then retry.';
     } else if (status === 403) {
       message.textContent = 'Reading is not available for this connection. Check the Reading folder and access in Obsidian’s Crate settings.';
     } else if (config.supportOnly) {
@@ -121,7 +121,6 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
     } else if (clean.stage === 'pair') {
       title.textContent = 'Pairing did not finish'; message.textContent = 'Create a fresh pairing code in the Crate app and run shortcut setup again. Your previous connection has not been replaced.';
     }
-    element('close-hint').textContent = 'A shortcut completion checkmark does not confirm a saved article.';
     updateAvailable(code === 'shortcut_update_required');
     record(clean);
   };
@@ -142,7 +141,8 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
   async function save(): Promise<void> {
     if (busy) return;
     busy = true; retry.disabled = true; retry.hidden = true; progress.hidden = false;
-    title.textContent = 'Saving to Crate…'; support.hidden = true; open.hidden = true;
+    message.textContent = 'Keep this window open.';
+    title.textContent = 'Saving…'; support.hidden = true; open.hidden = true;
     let status: number | null = null, requestId: string | null = null;
     try {
       const response = await fetch('/reading/handoff', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(20000),
@@ -155,10 +155,9 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
       if (!data?.saved || typeof data.id !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(data.id)) {
         failure({ stage: 'handoff', status, requestId, code: 'invalid_response' }); return;
       }
-      title.textContent = data.alreadySaved ? 'Already saved ✓' : 'Saved to Crate ✓';
-      message.textContent = 'Your link is safely saved in Reading.';
+      title.textContent = data.alreadySaved ? 'Already saved' : 'Saved';
+      message.textContent = 'You can close this window.';
       open.href = '/notifications?section=reading&item=' + encodeURIComponent(data.id); open.hidden = false;
-      element('close-hint').textContent = 'You can close this page now.';
       updateAvailable();
     } catch { failure({ stage: 'handoff', status, requestId, code: 'network_error' }); }
     finally { busy = false; retry.disabled = false; progress.hidden = true; }

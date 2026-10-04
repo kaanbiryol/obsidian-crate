@@ -8,13 +8,14 @@
 	<script>window.__crateOAuthCallback = window.location.search; history.replaceState(null, '', '/oauth/callback/');</script>
 	<title>Return to Crate</title>
 	<link rel="icon" href="/assets/logo.png?v=20260826" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/callback.css?v=20260826">
+	<link rel="stylesheet" href="/assets/status.css">
 	<script src="/assets/callback.js?v=20260826" defer></script>
 </head>
 <body>
 	<main>
-		<section class="card" aria-labelledby="callback-title">
-			<div class="brand-mark" aria-hidden="true"><img class="logo" src="/assets/logo.png?v=20260826" alt=""></div>
+		<section aria-labelledby="callback-title">
+			<div class="brand-lockup"><img src="/assets/logo.png" alt="Crate"></div>
+
 			<h1 id="callback-title">Return to Crate</h1>
 			<p class="status-copy" data-callback-status>Continue in Obsidian to finish setting up Crate.</p>
 			<a class="button" data-callback-fallback href="obsidian://crate-cloudflare-oauth" hidden>Open Obsidian <span aria-hidden="true">↗</span></a>

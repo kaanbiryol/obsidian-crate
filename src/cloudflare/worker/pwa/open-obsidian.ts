@@ -1,3 +1,4 @@
+import statusStyles from '../../../../site/assets/status.css?raw-css';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 
 export const OPEN_OBSIDIAN_JS = `(()=>{
@@ -13,30 +14,18 @@ export const OPEN_OBSIDIAN_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark">
 <title>Opening Obsidian...</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f10;color:#f4f4f5;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
-.card{background:#181818;border-radius:20px;padding:32px;max-width:420px;width:100%;text-align:center;box-shadow:0 18px 48px rgba(0,0,0,.4)}
-h1{font-size:1.3rem;margin-bottom:16px;color:#fff}
-.btn{display:inline-block;padding:14px 28px;border:none;border-radius:14px;font-size:1rem;font-weight:600;cursor:pointer;background:#7c3aed;color:#fff;text-decoration:none;margin-top:8px}
-p{color:#a1a1aa;font-size:.9rem;margin-top:16px;line-height:1.5}
-@media (prefers-color-scheme:light){
-body{background:#f7f7f8;color:#18181b}
-.card{background:#fff;border:1px solid rgba(24,24,27,.11);box-shadow:0 18px 48px rgba(24,24,27,.12)}
-h1{color:#18181b}
-.btn{background:#6d28d9;color:#fff}
-p{color:#52525b}
-}
-</style>
+<style>${statusStyles}</style>
 </head>
 <body>
-<div class="card">
-<h1>Opening Obsidian...</h1>
-<a id="open-link" href="obsidian://open" class="btn">Open Obsidian</a>
-<p>If Obsidian didn't open automatically, tap the button above.</p>
-</div>
+<main>
+<div class="brand-lockup"><img src="/notifications/crate-mark-256.png" alt="Crate"></div>
+
+<h1>Back to your vault.</h1>
+<a id="open-link" href="obsidian://open" class="button">Open Obsidian</a>
+<p class="helper">If Obsidian doesn’t open, select the button above.</p>
+</main>
 <script src="/notifications/open-obsidian.js?v=${PWA_ASSET_VERSION}"></script>
 </body>
 </html>`;

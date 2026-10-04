@@ -7,25 +7,52 @@
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
 	<title>Crate privacy</title>
 	<link rel="icon" href="/assets/logo.png?v=20260826" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/callback.css?v=20260826">
+	<meta name="color-scheme" content="dark">
+	<link rel="stylesheet" href="/assets/status.css?v=dark-buttons-1">
+	<link rel="stylesheet" href="/assets/privacy.css">
 </head>
-<body>
+<body class="privacy-page">
 	<main>
-		<a class="brand-lockup" href="/" aria-label="Crate home"><img src="/assets/logo.png?v=20260826" alt=""><span>Crate</span></a>
-		<article class="card" aria-labelledby="privacy-title">
-			<div class="brand-mark" aria-hidden="true"><img class="logo" src="/assets/logo.png?v=20260826" alt=""></div>
-			<p class="eyebrow">Data handling</p>
+		<a class="brand-lockup" href="/" aria-label="Crate home"><img src="/assets/logo.png?v=20260826" alt=""></a>
+		<article aria-labelledby="privacy-title">
 			<h1 id="privacy-title">Privacy</h1>
-			<p class="privacy-copy">This site is static. It has no analytics, cookies, forms, or third-party scripts. The OAuth callback passes Cloudflare's short-lived response directly to the Crate plugin and immediately removes it from the browser address bar.</p>
-			<p class="privacy-copy">Crate uses Cloudflare OAuth to provision your resources. After successful setup, it saves the login in Obsidian secret storage for usage access. It does not send credentials to a Crate-operated service.</p>
-			<p class="privacy-copy">After you connect Crate and start syncing, vault files and attachments are stored in your Cloudflare R2 bucket. By default, Crate syncs on startup, when Obsidian resumes, and every five minutes; you can change those options in Crate settings. Sync metadata, device credential hashes, reminder indexes, and web or push subscriptions are stored in your Cloudflare D1 database. Scheduled reminder state is stored in your Cloudflare Durable Objects.</p>
-			<p class="privacy-copy">Crate saves OAuth access and refresh tokens with server management and analytics permissions in Obsidian secret storage. Selecting Refresh renews access if needed and sends the access token and account ID directly to Cloudflare Analytics to retrieve account-wide usage. It sends no vault contents or filenames and does not poll in the background. The latest usage snapshot is saved in plugin settings for display when you reopen the panel. You can revoke Crate’s authorization in Cloudflare. Previously pasted API tokens must be revoked separately in Cloudflare.</p>
-			<p class="privacy-copy">Push notifications are optional. When enabled, your Worker sends encrypted notification payloads containing reminder text and project names through the push service used by your browser or operating system. The push provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.</p>
-			<p class="privacy-copy">Crate offers optional end-to-end encryption for synced notes, attachments, history, shared settings and reminder text on Cloudflare and self-hosted servers. Enable it in Crate settings and keep the recovery key outside your vault. Paths, sizes and notification scheduling metadata remain visible. Without this option, your server operator can read synced content. Device credentials are kept in Obsidian's secret storage. The reminders web app keeps its scoped session in that browser's local storage for up to 90 days and caches reminder and project content in IndexedDB for offline use. Encrypted enrollments protect private browser cache, pending changes and drafts, and remember folder keys for offline access and notification decryption. A folder key grants access to whole notes in the enrolled reminders folder. Signing out clears the session, private browser data and keys. Pasted links retain their URL labels when end-to-end encryption disables server title lookup.</p>
-			<p class="privacy-copy">The Crate developer does not operate an intermediary sync service and does not receive your vault data. Cloudflare processes data according to the account and resources you control.</p>
-			<p class="privacy-copy">Creating a Crate server provisions Worker, R2, D1, and Durable Object resources in your Cloudflare account. Cloudflare plan limits and possible usage charges apply.</p>
-			<p class="privacy-copy">Disconnecting a device removes its local credential but does not delete remote data. To erase the remote copy, delete the Crate Worker, R2 bucket, D1 database, and Durable Object resources in Cloudflare. Clear the Crate site's browser data to remove a local reminders web session.</p>
-			<div class="links"><a href="/">Back to Crate <span aria-hidden="true">↗</span></a></div>
+			<section>
+				<h2>This website</h2>
+				<p class="privacy-copy">This site is static. It has no analytics, cookies, forms, or third-party scripts. The OAuth callback passes Cloudflare's short-lived response directly to the Crate plugin and immediately removes it from the browser address bar.</p>
+			</section>
+			<section>
+				<h2>Connecting Cloudflare</h2>
+				<p class="privacy-copy">Crate uses Cloudflare OAuth to provision your resources. After successful setup, it saves the login in Obsidian secret storage for usage access. It does not send credentials to a Crate-operated service.</p>
+			</section>
+			<section>
+				<h2>Where your data lives</h2>
+				<p class="privacy-copy">After you connect Crate and start syncing, vault files and attachments are stored in your Cloudflare R2 bucket. By default, Crate syncs on startup, when Obsidian resumes, and every five minutes; you can change those options in Crate settings. Sync metadata, device credential hashes, reminder indexes, and web or push subscriptions are stored in your Cloudflare D1 database. Scheduled reminder state is stored in your Cloudflare Durable Objects.</p>
+			</section>
+			<section>
+				<h2>Account usage</h2>
+				<p class="privacy-copy">Crate saves OAuth access and refresh tokens with server management and analytics permissions in Obsidian secret storage. Selecting Refresh renews access if needed and sends the access token and account ID directly to Cloudflare Analytics to retrieve account-wide usage. It sends no vault contents or filenames and does not poll in the background. The latest usage snapshot is saved in plugin settings for display when you reopen the panel. You can revoke Crate’s authorization in Cloudflare. Previously pasted API tokens must be revoked separately in Cloudflare.</p>
+			</section>
+			<section>
+				<h2>Notifications</h2>
+				<p class="privacy-copy">Push notifications are optional. When enabled, your Worker sends encrypted notification payloads containing reminder text and project names through the push service used by your browser or operating system. The push provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.</p>
+			</section>
+			<section>
+				<h2>Encryption and browser storage</h2>
+				<p class="privacy-copy">Crate offers optional end-to-end encryption for synced notes, attachments, history, shared settings and reminder text on Cloudflare and self-hosted servers. Enable it in Crate settings and keep the recovery key outside your vault. Paths, sizes and notification scheduling metadata remain visible. Without this option, your server operator can read synced content. Device credentials are kept in Obsidian's secret storage. The reminders web app keeps its scoped session in that browser's local storage for up to 90 days and caches reminder and project content in IndexedDB for offline use. Encrypted enrollments protect private browser cache, pending changes and drafts, and remember folder keys for offline access and notification decryption. A folder key grants access to whole notes in the enrolled reminders folder. Signing out clears the session, private browser data and keys. Pasted links retain their URL labels when end-to-end encryption disables server title lookup.</p>
+			</section>
+			<section>
+				<h2>Who receives your data</h2>
+				<p class="privacy-copy">The Crate developer does not operate an intermediary sync service and does not receive your vault data. Cloudflare processes data according to the account and resources you control.</p>
+			</section>
+			<section>
+				<h2>Cloudflare resources</h2>
+				<p class="privacy-copy">Creating a Crate server provisions Worker, R2, D1, and Durable Object resources in your Cloudflare account. Cloudflare plan limits and possible usage charges apply.</p>
+			</section>
+			<section>
+				<h2>Removing your data</h2>
+				<p class="privacy-copy">Disconnecting a device removes its local credential but does not delete remote data. To erase the remote copy, delete the Crate Worker, R2 bucket, D1 database, and Durable Object resources in Cloudflare. Clear the Crate site's browser data to remove a local reminders web session.</p>
+			</section>
+			<footer><a class="button" href="/">Back to Crate</a></footer>
 		</article>
 	</main>
 </body>
