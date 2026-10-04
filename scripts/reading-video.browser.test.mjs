@@ -195,6 +195,9 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       const textWidth=(await body.boundingBox()).width;
       await resize.press('End');
       await expect(resize).toHaveAttribute('aria-valuenow','100');
+      // The viewport and pinned width settle through ResizeObserver after
+      // the keyboard handler has already updated the accessible value.
+      await expect.poll(async()=>Math.abs((await video.boundingBox()).width-await page.locator('.crate-reading-reader').evaluate(node=>node.clientWidth))).toBeLessThan(2);
       const full=await video.boundingBox(), readerBounds=await page.locator('.crate-reading-reader').boundingBox();
       const available=await page.locator('.crate-reading-reader').evaluate(node=>node.clientWidth);
       assert(Math.abs(full.width-available)<2,'Video can fill the reader width');
