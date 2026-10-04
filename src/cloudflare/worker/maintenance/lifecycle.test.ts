@@ -9,8 +9,8 @@ function fixture(advancing: boolean) {
   const values = new Map<string, unknown>();
   const storage = { get: async (key: string) => values.get(key),
     put: async (key: string, value: unknown) => { values.set(key, value); }, setAlarm: vi.fn() };
-  const DB = { prepare: (sql: string) => ({ bind: () => ({ first: async () => null }), first: async () => sql.includes('orphan_sweep_cursor')
-    ? { value: advancing ? String(cursor++) : 'unchanged' } : null }) };
+  const DB = { prepare: (sql: string) => ({ bind: () => ({ first: async () => null }), first: async () => sql.includes('object_cleanup_queue')
+    ? { storage_key: advancing ? String(cursor++) : 'unchanged' } : null }) };
   return { state: { storage } as never, env: { DB } as never, storage };
 }
 it('continues an advancing backlog but stops after ten passes', async () => {

@@ -13,7 +13,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 	apiFetch: ApiFetch;
 	isCurrent: () => boolean;
 	beginMutation: () => () => void;
-	commit: (change: PendingReminderChange, result: ReminderChangeResult) => Promise<PendingReminderChange | void>;
+	commit: (change: PendingReminderChange, result: ReminderChangeResult) => Promise<void>;
 	onChange: (changes: PendingReminderChange[]) => void;
 	onError: (message: string) => void;
 	onSettled: () => void;
@@ -86,10 +86,8 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 					try {
 						const result = await submitReminderChange(apiFetch, change);
 						if (!hasCurrentAttempt(change)) continue;
-						const followUp = await commit(change, result);
+						await commit(change, result);
 						if (!hasCurrentAttempt(change)) continue;
-						// Keep the successor durable before removing the original receipt check.
-						if (followUp && !storage.load().some(item => item.operationId === followUp.operationId)) storage.put(followUp);
 						const fingerprint = await requestFingerprint(change);
 						settledRequests.set(change.operationId, fingerprint);
 						if (settledRequests.size > 64) settledRequests.delete(settledRequests.keys().next().value!);

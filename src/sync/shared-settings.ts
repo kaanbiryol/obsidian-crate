@@ -48,8 +48,7 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 		typeof value.syncOnStartup !== 'boolean' ||
 		typeof value.syncOnResume !== 'boolean' ||
 		typeof value.pushEnabled !== 'boolean' ||
-		syncInterval === null ||
-		typeof value.showStatusBar !== 'boolean'
+		syncInterval === null
 	) {
 		return null;
 	}
@@ -59,7 +58,6 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 		syncOnStartup: value.syncOnStartup,
 		syncOnResume: value.syncOnResume,
 		syncInterval,
-		showStatusBar: value.showStatusBar,
 		pushEnabled: value.pushEnabled,
 	};
 }

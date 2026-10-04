@@ -256,7 +256,6 @@ export function normalizeCrateSettings(
 		syncOnStartup: normalizeBoolean(value?.syncOnStartup, DEFAULT_SETTINGS.syncOnStartup),
 		syncOnResume: normalizeBoolean(value?.syncOnResume, DEFAULT_SETTINGS.syncOnResume),
 		syncInterval: normalizeNonNegativeInteger(value?.syncInterval, DEFAULT_SETTINGS.syncInterval),
-		showStatusBar: normalizeBoolean(value?.showStatusBar, DEFAULT_SETTINGS.showStatusBar),
 		syncHistory: normalizeSyncHistory(value?.syncHistory),
 		pushEnabled: normalizeBoolean(value?.pushEnabled, DEFAULT_SETTINGS.pushEnabled),
 		debugLogging: normalizeBoolean(value?.debugLogging, DEFAULT_SETTINGS.debugLogging),

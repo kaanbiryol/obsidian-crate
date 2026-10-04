@@ -43,13 +43,7 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
       [shortcutTemplate.WFWorkflowActions[3].WFWorkflowActionParameters.UUID]: sharedUrl,
     };
     const saveRequest = shortcutRequest(prepareAction, outputs);
-    // Already installed 0.4.1 shortcuts recover through the narrow legacy adapter.
-    const legacy = await dispatch({ ...saveRequest, url: `${origin}/reading/prepare`,
-      headers: { Authorization: exchange.body.authorization, 'Content-Type': 'application/json', 'X-Crate-Protocol': '11' } });
-    assert.equal(legacy.status, 200, JSON.stringify(legacy));
-    assert.ok(legacy.body.launchUrl.includes('/notifications/save-reading#'));
-    assert.equal(legacy.body.shortcut.updateAvailable, true);
-    // It does not restore retired protocols for vault or unrelated writes.
+    // Retired protocols cannot bypass the wire gate.
     const rejected = await api('/reading/prepare', { url: sharedUrl }, { 'X-Crate-Protocol': '11' });
     assert.equal(rejected.status, 428);
     const unrelated = await dispatch({ ...saveRequest, url: `${origin}/reading/capture`, headers: { ...saveRequest.headers, 'X-Crate-Protocol': '11' } });
@@ -71,9 +65,6 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
     assert.equal(list.items[0].crate_reading_id, saved.body.id);
     assert.equal(list.items[0].source_url, sharedUrl);
     assert.ok(list.items[0].path.startsWith('Reading/'));
-    const legacySave = await api('/reading/handoff', {}, { 'X-Crate-Capture': new URL(legacy.body.launchUrl).hash.slice(1) });
-    assert.equal(legacySave.status, 200);
-    assert.equal(legacySave.body.id, saved.body.id);
     const duplicate = await dispatch(saveRequest);
     assert.equal(duplicate.status, 200);
     const replay = await api('/reading/handoff', {}, { 'X-Crate-Capture': new URL(duplicate.body.launchUrl).hash.slice(1) });
@@ -116,7 +107,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     const remindersPair = await request('/reading/shortcut-pairing', 'reminders-browser');
     assert.equal(remindersPair.status, 200);
     const remindersGrant = { token: new URL(remindersPair.body.pairingCode).hash.slice(1) };
-    const remindersCapture = await request('/reading/shortcut-exchange', '', remindersGrant);
+    const remindersCapture = await request(contract.exchangePath, '', remindersGrant);
     assert.equal(remindersCapture.status, 200);
     const remindersCredential = await runtime.db.prepare('SELECT expires_at FROM auth_tokens WHERE token_hash=?')
       .bind(hash(remindersCapture.body.authorization.slice('Bearer '.length))).first();
@@ -135,11 +126,11 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.ok(saved); assert.ok(!JSON.stringify(saved).includes(grant.token));
     assert.equal((await request('/reading/exchange', '', grant)).status, 401);
     assert.equal((await request('/reading/access', session.token, { kind: 'reading' })).status, 403);
-    const exchanges = await Promise.all([request('/reading/shortcut-exchange', '', grant), request('/reading/shortcut-exchange', '', grant)]);
+    const exchanges = await Promise.all([request(contract.exchangePath, '', grant), request(contract.exchangePath, '', grant)]);
     assert.deepEqual(exchanges.map(result => result.status).sort(), [200, 410]);
     const capture = exchanges.find(result => result.status === 200);
     assert.equal(capture.cache, 'no-store');
-    assert.equal(capture.body.endpoint, 'https://crate.example/reading/prepare');
+    assert.equal(capture.body.endpoint, `https://crate.example${contract.preparePath}`);
     const token = capture.body.authorization.slice('Bearer '.length);
     const credential = await runtime.db.prepare('SELECT * FROM auth_tokens WHERE token_hash=?').bind(hash(token)).first();
     assert.equal(credential.scope, 'reading_capture'); assert.equal(credential.folder_path, 'Reading'); assert.equal(credential.reading_generation, session.generation);
@@ -148,26 +139,26 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.equal((await request('/reading/access', token, { kind: 'reading' })).status, 403);
     assert.equal((await request('/reading/prepare', token, { url: 'https://example.invalid/test' })).status, 200);
     const replaced = await pair(), current = await pair();
-    assert.equal((await request('/reading/shortcut-exchange', '', replaced)).status, 410);
+    assert.equal((await request(contract.exchangePath, '', replaced)).status, 410);
     await runtime.db.prepare('UPDATE reading_enrollments SET expires_at=0 WHERE token_hash=?').bind(hash(current.token)).run();
-    assert.equal((await request('/reading/shortcut-exchange', '', current)).status, 410);
+    assert.equal((await request(contract.exchangePath, '', current)).status, 410);
     const revoked = await pair();
     await runtime.db.prepare('DELETE FROM auth_tokens WHERE id=?').bind(session.id).run();
-    assert.equal((await request('/reading/shortcut-exchange', '', revoked)).status, 410);
+    assert.equal((await request(contract.exchangePath, '', revoked)).status, 410);
     const second = await browser(), expiredIssuer = await pair(second);
     await runtime.db.prepare('UPDATE auth_tokens SET expires_at=0 WHERE id=?').bind(second.id).run();
-    assert.equal((await request('/reading/shortcut-exchange', '', expiredIssuer)).status, 410);
+    assert.equal((await request(contract.exchangePath, '', expiredIssuer)).status, 410);
     await runtime.db.prepare('UPDATE auth_tokens SET expires_at=? WHERE id=?').bind(second.expiresAt, second.id).run();
     // Fetching consent does not revoke permission to pair and save bookmarks.
     const disabled = await pair(second);
     await runtime.db.prepare('UPDATE reading_policy SET enabled=0').run();
-    assert.equal((await request('/reading/shortcut-exchange', '', disabled)).status, 200);
+    assert.equal((await request(contract.exchangePath, '', disabled)).status, 200);
     await runtime.db.prepare('UPDATE reading_policy SET enabled=1').run();
     const changed = await pair(second);
     await runtime.db.prepare("UPDATE reading_policy SET generation='changed'").run();
-    assert.equal((await request('/reading/shortcut-exchange', '', changed)).status, 410);
+    assert.equal((await request(contract.exchangePath, '', changed)).status, 410);
     assert.equal((await request('/reading/shortcut-pairing', second.token)).status, 401);
-    assert.equal((await request('/reading/shortcut-exchange', '', { token: 'bad' })).status, 410);
+    assert.equal((await request(contract.exchangePath, '', { token: 'bad' })).status, 410);
     // Pairing does not save files or leak into an article handoff.
     assert.equal((await request('/reading/handoff', grant.token)).status, 401);
     assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 0);

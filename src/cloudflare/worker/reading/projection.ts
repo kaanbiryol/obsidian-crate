@@ -7,10 +7,6 @@ import { ReadingError, readSource, type ReadingPolicy } from './common';
 import { sha256Hex } from '../auth';
 import type { Env } from '../types';
 
-// Older servers persisted this for both invalid notes and temporary R2 errors.
-// Revisit those rows once; only a verified invalid source may become permanent.
-const LEGACY_SOURCE_ERROR = 'This note could not be read as a Reading note. Open it in Obsidian to check its properties.';
-
 /** Rebuildable projection: all responses still verify the current immutable file revision. */
 export async function projectReading(env: Env, current: ReadingPolicy): Promise<'complete' | 'pending' | 'unavailable'> {
   if (await readEncryptionState(env.DB)) return 'complete';
@@ -19,10 +15,10 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
     (SELECT 1 FROM files WHERE path = reading_sources.path)`).bind(current.generation).run();
   const { results } = await db.prepare(`SELECT f.path, f.storage_key AS revision FROM files f LEFT JOIN reading_sources s ON s.path = f.path
     WHERE substr(f.path, 1, ?) = ? AND lower(substr(f.path, -3)) = '.md'
-    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NULL AND s.error = ?) OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 4) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
+    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 4) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
       AND json_extract(s.metadata_json, '$.capture_method')='url' AND NOT EXISTS(SELECT 1 FROM reading_jobs j WHERE j.path=f.path)
       AND (SELECT count(*) FROM reading_jobs)<1000)) ORDER BY f.path LIMIT 25`)
-    .bind(current.folder_path.length + 1, `${current.folder_path}/`, current.generation, LEGACY_SOURCE_ERROR, current.enabled).all<{ path: string; revision: string }>();
+    .bind(current.folder_path.length + 1, `${current.folder_path}/`, current.generation, current.enabled).all<{ path: string; revision: string }>();
   let complete = results.length < 25;
   let unavailable = false;
   for (const row of results) {

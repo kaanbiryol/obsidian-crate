@@ -67,7 +67,7 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
     // Derive the destination from the validated code, never from remote content.
     endpoint = add('text.replace', { WFReplaceTextFind: '$', WFReplaceTextReplace: contract.preparePath, WFReplaceTextRegularExpression: true, WFInput: text(serverUrl) });
   } else {
-    endpoint = ask('Paste the endpoint from Crate → Reading → Set up shortcut. Crate will remember it in this shortcut.', '^https://[^\\s?#]+/reading/(?:prepare|shortcut/v1/prepare)$', 'Paste the full HTTPS capture endpoint from Crate, then run setup again.');
+    endpoint = ask('Paste the endpoint from Crate → Reading → Set up shortcut. Crate will remember it in this shortcut.', '^https://[^\\s?#]+/reading/shortcut/v1/prepare$', 'Paste the full HTTPS capture endpoint from Crate, then run setup again.');
     authorization = ask('Paste the complete Authorization header from Crate, including Bearer. It will be saved in this shortcut.', '^Bearer [A-Za-z0-9._~+/-]+=*$', 'Paste the complete Bearer header from Crate, then run setup again.');
   }
   const values = add('dictionary', { WFItems: {
@@ -84,16 +84,15 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
   end(needsSetup);
 
   const configuredWithoutLink = whenEmpty(incoming);
-  alert('Crate setup saved', 'In Safari or another app, share a link and choose Save to Crate (iOS 27). Run this shortcut from your library to change your setup.');
+  alert('Crate setup saved', 'In Safari or another app, share a link and choose Save to Crate. Run this shortcut from your library to change your setup.');
   add('exit');
   end(configuredWithoutLink);
 
   for (const [index, key] of ['endpoint', 'authorization'].entries()) {
-    const stored = add('getvalueforkey', { WFInput: attachment(configuration), WFDictionaryKey: key, WFGetDictionaryValueType: 'Value' }, index === 0 ? randomUUID() : original[index].WFWorkflowActionParameters.UUID);
-    if (index === 0) add('text.replace', { WFReplaceTextFind: '/reading/(?:prepare|shortcut/v1/prepare)$', WFReplaceTextReplace: contract.preparePath, WFReplaceTextRegularExpression: true, WFInput: text(stored) }, original[0].WFWorkflowActionParameters.UUID);
+    add('getvalueforkey', { WFInput: attachment(configuration), WFDictionaryKey: key, WFGetDictionaryValueType: 'Value' }, original[index].WFWorkflowActionParameters.UUID);
   }
   actions.push(...original.slice(3));
-  workflow.WFWorkflowName = 'Save to Crate (iOS 27)';
+  workflow.WFWorkflowName = 'Save to Crate';
   workflow.WFWorkflowClientVersion = '5037.0.17';
   workflow.WFWorkflowMinimumClientVersion = 5000;
   workflow.WFWorkflowMinimumClientVersionString = '5000';

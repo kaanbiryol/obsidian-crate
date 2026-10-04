@@ -38,7 +38,7 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
       <li><SettingsSection title="1. Install the shortcut"><p>Download <strong>Save to Crate</strong>, then select <strong>Add Shortcut</strong>. If it opens in Files, find it in <strong>Downloads</strong>.</p>
         <a className="crate-action-button" data-variant="outline" data-size="touch" href={READING_SHORTCUT_URL} target="_blank" rel="noopener noreferrer">Download Save to Crate</a>
       </SettingsSection></li>
-      <li><SettingsSection title="2. Connect your library"><p>Create a pairing code. In <strong>Shortcuts → All Shortcuts</strong>, run <strong>Save to Crate (iOS 27)</strong> and paste the code when asked.</p>
+      <li><SettingsSection title="2. Connect your library"><p>Create a pairing code. In <strong>Shortcuts → All Shortcuts</strong>, run <strong>Save to Crate</strong> and paste the code when asked.</p>
         <Button size="touch" variant="outline" disabled={busy || !online} onClick={() => void create()}>{busy ? 'Creating code…' : pairing ? 'Create new pairing code' : 'Create pairing code'}</Button>
         {pairing && !expired && <div className="crate-reading-shortcut__code">
           <CopyableText key={pairing.pairingCode} value={pairing.pairingCode} label="Pairing code" copyLabel="Copy pairing code" alwaysShow
@@ -55,7 +55,7 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
         {!online && <p role="status">Connect to the internet to pair your shortcut.</p>}
         {error && <p role="alert">{error}</p>}
       </SettingsSection></li>
-      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate (iOS 27)</strong>. Crate opens with your link. Select <strong>Save</strong> to store it.</p></SettingsSection></li>
+      <li><SettingsSection title="3. Save your first article"><p>After <strong>Crate setup saved</strong> appears, open an article and select <strong>Share → Save to Crate</strong>. Crate opens with your link. Select <strong>Save</strong> to store it.</p></SettingsSection></li>
     </ol>
     <SettingsSection title="Privacy and access"><p>The shortcut opens your link in Crate using a private URL fragment. Unlock Reading in Safari if asked. Your browser encrypts the saved link before syncing it; the shortcut cannot read your library. Reinstall the current shortcut after enabling encryption.</p></SettingsSection>
     <SettingsSection title="Updates and troubleshooting"><p>Install the current shortcut, then return here to create a pairing code. If setup fails, use <strong>Copy diagnostics</strong> or <strong>Report on GitHub</strong> on the error page. Select <strong>Save</strong> in Reading to finish saving your link.</p></SettingsSection>

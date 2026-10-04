@@ -16,7 +16,6 @@ export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSet
 		syncOnStartup: false,
 		syncOnResume: true,
 		syncInterval: 0,
-		showStatusBar: true,
 		syncHistory: [],
 		pushEnabled: false,
 		debugLogging: false,

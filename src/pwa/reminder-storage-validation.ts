@@ -19,9 +19,9 @@ export function storedObject<T extends v.ObjectEntries>(entries: T) {
 	return v.pipe(v.custom<v.InferInput<typeof schema>>(value => value !== null && typeof value === 'object' && !Array.isArray(value)), schema);
 }
 
-/** Preserve legacy String(value) checks without coercing or rewriting saved data. */
+/** Validate enum strings without coercing stored values. */
 export function storedStringChoice<T extends string>(choices: readonly T[]) {
-	return v.custom<T>(value => choices.includes(String(value) as T));
+	return v.custom<T>(value => typeof value === 'string' && choices.includes(value as T));
 }
 
 export const reminderRecordSchema = v.object({
@@ -52,7 +52,7 @@ export const reminderDraftSchema = v.object({
 	dueTime: v.string(),
 	priority: prioritySchema,
 	// Retain the existing acceptance rule for drafts already saved on devices.
-	activePicker: v.custom<ModalPickerId | null>(value => value === null || ['date', 'project', 'recurrence'].includes(String(value))), // eslint-disable-line @typescript-eslint/no-base-to-string -- Preserve the legacy stored-draft acceptance rule.
+	activePicker: v.custom<ModalPickerId | null>(value => value === null || typeof value === 'string' && ['date', 'project', 'recurrence'].includes(value)),
 	deleteConfirm: v.boolean(),
 	originalDueDatetime: optionalString,
 	recurrence: recurrenceSchema,

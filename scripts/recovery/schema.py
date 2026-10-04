@@ -9,10 +9,12 @@ SOURCE = Path(__file__).parents[2] / 'src/cloudflare'
 
 def release_plan():
     release = json.loads((SOURCE / 'server-release.json').read_text())
-    current = 1
+    current = release['migrations'][0]['from'] if release['migrations'] else release['minimumSchemaVersion']
     seen = set()
     if type(release['minimumSchemaVersion']) is not int or not 1 <= release['minimumSchemaVersion'] <= release['schemaVersion']:
         raise ValueError('Invalid database release manifest')
+    if type(current) is not int or not 1 <= current <= release['minimumSchemaVersion']:
+        raise ValueError('Invalid database migration baseline')
     for step in release['migrations']:
         if (not re.fullmatch(r'[a-z0-9-]+', step['id']) or step['id'] in seen
                 or step['from'] != current or step['to'] != current + 1
@@ -31,7 +33,7 @@ def validate_schema(db):
     rows = db.execute('SELECT id, version, created_version FROM crate_schema').fetchall()
     if (len(rows) != 1 or rows[0][0] != 1 or type(rows[0][1]) is not int
             or type(rows[0][2]) is not int
-            or not 1 <= rows[0][2] <= rows[0][1]
+            or not (release['migrations'][0]['from'] if release['migrations'] else release['minimumSchemaVersion']) <= rows[0][2] <= rows[0][1]
             or not release['minimumSchemaVersion'] <= rows[0][1] <= release['schemaVersion']):
         raise ValueError('Unsupported Crate database schema')
     version = rows[0][1]

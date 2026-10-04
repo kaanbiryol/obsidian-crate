@@ -27,7 +27,8 @@ export function planDatabaseUpgrade(version: number | null, target: DatabaseRele
     || !Number.isSafeInteger(target.schemaVersion) || target.schemaVersion < target.minimumSchemaVersion) {
     throw new Error('Invalid server release manifest');
   }
-  let next = 1;
+  let next = target.migrations[0]?.from ?? target.minimumSchemaVersion;
+  if (!Number.isSafeInteger(next) || next < 1 || next > target.minimumSchemaVersion) throw new Error('Invalid database migration baseline');
   const ids = new Set<string>();
   for (const migration of target.migrations) {
     if (!/^[a-z0-9-]+$/.test(migration.id) || ids.has(migration.id)
@@ -48,7 +49,7 @@ export function planDatabaseUpgrade(version: number | null, target: DatabaseRele
 
 export function validateMigrationHistory(version: number, createdVersion: unknown, receipts: readonly Record<string, unknown>[], target: DatabaseRelease = SERVER_RELEASE): void {
   planDatabaseUpgrade(version, target);
-  if (!Number.isSafeInteger(createdVersion) || Number(createdVersion) < 1 || Number(createdVersion) > version) throw new Error('Unsupported database schema baseline');
+  if (!Number.isSafeInteger(createdVersion) || Number(createdVersion) < (target.migrations[0]?.from ?? target.minimumSchemaVersion) || Number(createdVersion) > version) throw new Error('Unsupported database schema baseline');
   const expected = target.migrations.filter(migration => migration.from >= Number(createdVersion) && migration.to <= version);
   if (receipts.length !== expected.length || expected.some(migration => !receipts.some(row => row.id === migration.id && row.checksum === migration.checksum))) {
     throw new Error('Database migration history does not match this build. Use its matching recovery tools.');

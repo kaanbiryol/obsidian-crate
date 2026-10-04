@@ -1,4 +1,4 @@
-import type { ModalState, ReminderMutationBody, ReminderRecord } from './types';
+import type { ModalState, ReminderRecord } from './types';
 
 export interface PendingReminderChange {
 	operationId: string;
@@ -18,7 +18,6 @@ export interface PendingReminderChange {
 	retryAt: number;
 	ambiguous?: boolean;
 	reviewRequired?: boolean;
-	followUp?: { operationId: string; input: ReminderMutationBody };
 }
 
 export interface ReminderChangeResult {

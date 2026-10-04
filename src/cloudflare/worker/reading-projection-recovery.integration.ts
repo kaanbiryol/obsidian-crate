@@ -74,14 +74,6 @@ it.each(['missing', 'wrong size', 'wrong hash'])('recovers from %s source bytes 
   expect((await getStoredFileRow(env.DB, path))?.storageKey).toBe(file.storageKey);
 });
 
-it('repairs durable legacy error rows rather than requiring a source edit or database reset', async () => {
-  const { id, file } = await seed();
-  await env.DB.prepare(`INSERT INTO reading_sources(path,revision,generation,error) VALUES (?,?,?,?)`)
-    .bind(path, file.storageKey, policy.generation, 'This note could not be read as a Reading note. Open it in Obsidian to check its properties.').run();
-  expect(await (await list()).json()).toMatchObject({ items: [{ crate_reading_id: id }], issues: [] });
-  expect(await (await capture()).json()).toMatchObject({ alreadySaved: true, id });
-});
-
 it('retains the previous verified identity and processes healthy neighbors during an outage', async () => {
   const { note, file } = await seed('Reading/A.md');
   await projectReading(env, policy);

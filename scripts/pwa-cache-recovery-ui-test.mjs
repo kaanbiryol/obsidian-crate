@@ -55,6 +55,15 @@ async function verify(browser) {
 		await oldTab.evaluate(() => window.oldCache.close());
 		const rebuild = cacheNotice(page).getByRole('button', { name: 'Rebuild offline copy', exact: true });
 		await rebuild.focus(); await page.keyboard.press('Enter');
+		await expect(cacheNotice(page)).toContainText('unsupported format');
+		await expect(cacheNotice(page).getByRole('button', { name: 'Rebuild offline copy', exact: true })).toHaveCount(0);
+		// Explicitly clearing the retired development cache permits a fresh baseline.
+		await page.evaluate(() => new Promise((resolve, reject) => {
+			const request = indexedDB.deleteDatabase('crate-reminders');
+			request.onsuccess = resolve; request.onerror = () => reject(request.error);
+		}));
+		await page.reload();
+		await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
 		await expect(cacheNotice(page)).toHaveCount(0);
 		const rawCache = () => page.evaluate(() => new Promise((resolve, reject) => {
 			const request = indexedDB.open('crate-reminders', 2);

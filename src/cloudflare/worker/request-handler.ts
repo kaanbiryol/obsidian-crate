@@ -1,5 +1,5 @@
 import { handleReadingRoute } from './reading/routes';
-import { shortcutCompatibility, shortcutLaunchResponse, shortcutMayBypassWireProtocol, shortcutTransport } from './reading/shortcut-transport';
+import { shortcutCompatibility, shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
@@ -67,7 +67,7 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		// One-use public Reading grants must be redeemed under the coordinator.
 		// Their bounded pre-auth admission runs above; ordinary routes authenticate
 		// and authorize before entering the coordinator below.
-		const readingGrant = method === 'POST' && (['/reading/exchange', '/reading/handoff', '/reading/shortcut-exchange'].includes(path) || shortcut?.kind === 'exchange');
+		const readingGrant = method === 'POST' && (['/reading/exchange', '/reading/handoff'].includes(path) || shortcut?.kind === 'exchange');
 		if (readingGrant && !coordinatorState) {
  const forwarded = new Request(request); forwarded.headers.set('X-Crate-Internal-Mutation', '1');
  return withRequestId(await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded), requestId, started);
@@ -83,8 +83,8 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		if (authResult.response) {
 			return withRequestId(authResult.response, requestId, started);
 		}
-    if (shortcut?.kind === 'prepare' && !shortcutMayBypassWireProtocol(shortcut, authResult.principal.scope, request.headers.get(CRATE_PROTOCOL_HEADER))) {
-      return withRequestId(corsResponse({ error: 'This endpoint requires shortcut capture access.', code: 'shortcut_access_required' }, shortcut.legacy ? 428 : 403), requestId, started);
+    if (shortcut?.kind === 'prepare' && authResult.principal.scope !== 'reading_capture') {
+      return withRequestId(corsResponse({ error: 'This endpoint requires shortcut capture access.', code: 'shortcut_access_required' }, 403), requestId, started);
     }
 
     if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);

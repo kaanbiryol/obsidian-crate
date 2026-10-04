@@ -13,7 +13,6 @@ beforeEach(async () => {
   await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('device', ?, 'vault')")
     .bind(await sha256Hex('event-token')).run();
   // Ordinary scheduling tests start after the one-time legacy storage migration.
-  await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('legacy_orphan_sweep_done', '1')").run();
 });
 afterEach(async () => { await reset(); });
 
@@ -56,7 +55,7 @@ it('does not wake notifications for settings or binary uploads', async () => {
   const headers = { Authorization: 'Bearer event-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) };
   expect((await worker.fetch(new Request('https://event.test/settings', {
     method: 'PUT', headers, body: JSON.stringify({ expectedVersion: null, settings: {
-      ignorePatterns: [], syncOnStartup: true, syncOnResume: true, syncInterval: 60, showStatusBar: true, pushEnabled: false,
+      ignorePatterns: [], syncOnStartup: true, syncOnResume: true, syncInterval: 60, pushEnabled: false,
     } }),
   }), env)).status).toBe(200);
   expect((await worker.fetch(new Request('https://event.test/sync/upload?path=image.bin', {

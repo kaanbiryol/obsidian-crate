@@ -16,7 +16,6 @@ import {
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken, makeApiFetch } from '../api';
-import { scopeLegacyReminderDrafts } from '../reminder-drafts';
 import type { ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
@@ -64,7 +63,6 @@ export function usePwaBootstrap({
 				await preserveIncomingShare(() => !cancelled && sessionCurrent());
 				if (cancelled || !sessionCurrent()) return;
 				const storedConfig = loadStoredConfig();
-				scopeLegacyReminderDrafts(storedConfig.folderPath);
 				const applied = applyConfigFromUrl(storedConfig);
 				let nextToken = initialAuthToken;
 				// Existing credentials are folder-scoped. A cleaned-up old link

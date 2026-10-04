@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReminderOutbox } from './reminder-outbox';
-import { followUpReminderChange } from './save-reminder-command';
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ReminderRecord } from './types';
@@ -38,13 +37,6 @@ function save(): PendingReminderChange {
 			dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } } };
 }
 
-function saveWithFollowUp(): PendingReminderChange {
-	return { ...save(), ambiguous: true, followUp: { operationId: crypto.randomUUID(), input: {
-		folderPath: 'Reminders', content: 'My later correction', description: 'Preserved detail', project: 'Inbox',
-		priority: 4, dueDate: null, dueDatetime: null,
-	} } };
-}
-
 function memoryStorage() {
 	const entries = new Map<string, PendingReminderChange>();
 	const storage: ReminderOutboxStorage = {
@@ -64,7 +56,7 @@ function harness(storage = memoryStorage(), withLock?: (work: () => Promise<void
 		requests.push(request);
 		return request.promise;
 	});
-	const commit = vi.fn(async (_change: PendingReminderChange, _result: ReminderChangeResult): Promise<PendingReminderChange | void> => {});
+	const commit = vi.fn(async (_change: PendingReminderChange, _result: ReminderChangeResult): Promise<void> => {});
 	const finish = vi.fn();
 	const beginMutation = vi.fn(() => finish);
 	const onChange = vi.fn();
@@ -189,61 +181,6 @@ describe('optimistic reminder outbox', () => {
 		const retry = state.drain();
 		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
 		state.requests[1]!.resolve(confirmed());
-		await retry;
-		expect(state.storage.load()).toEqual([]);
-	});
-
-	it('persists and sends a later draft only after the original receipt supplies its revision', async () => {
-		const state = harness();
-		const original = saveWithFollowUp();
-		state.commit.mockImplementation(async (change, result) => result.reminder ? followUpReminderChange(change, result.reminder) : undefined);
-		state.enqueue(original);
-		const remove = state.storage.remove.bind(state.storage);
-		vi.spyOn(state.storage, 'remove').mockImplementation(id => {
-			if (id === original.operationId) expect(state.storage.load().some(change => change.operationId === original.followUp!.operationId)).toBe(true);
-			remove(id);
-		});
-		const draining = state.drain();
-		expect(state.requests).toHaveLength(1);
-		expect(state.requests[0]?.init?.body).toBe(original.body);
-		state.requests[0]!.resolve(confirmed());
-		await vi.waitFor(() => expect(state.requests).toHaveLength(2));
-		expect(state.requests[1]?.path).toBe('/reminders/update');
-		expect(JSON.parse(state.requests[1]?.init?.body as string)).toMatchObject({
-			id: original.recordId, operationId: original.followUp!.operationId,
-			expectedRevision: 'confirmed-revision', content: 'My later correction',
-		});
-		expect(state.storage.load()).toMatchObject([{ operationId: original.followUp!.operationId }]);
-		state.requests[1]!.resolve(confirmed());
-		await draining;
-		expect(state.storage.load()).toEqual([]);
-	});
-
-	it('retains original receipt and later intent when storing the successor fails', async () => {
-		const state = harness();
-		const original = saveWithFollowUp();
-		state.commit.mockImplementation(async (change, result) => result.reminder ? followUpReminderChange(change, result.reminder) : undefined);
-		state.enqueue(original);
-		const put = state.storage.put.bind(state.storage);
-		const blockedWrite = vi.spyOn(state.storage, 'put').mockImplementation(change => {
-			if (change.operationId === original.followUp!.operationId) throw new Error('Storage is full');
-			put(change);
-		});
-		const first = state.drain();
-		state.requests[0]!.resolve(confirmed());
-		await first;
-		expect(state.requests).toHaveLength(1);
-		expect(state.storage.load()).toMatchObject([{ operationId: original.operationId, body: original.body,
-			status: 'uncertain', ambiguous: true, followUp: original.followUp }]);
-		blockedWrite.mockRestore();
-		state.retry(original.operationId);
-		const retry = state.drain();
-		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
-		state.requests[1]!.resolve(confirmed());
-		await vi.waitFor(() => expect(state.requests).toHaveLength(3));
-		expect(JSON.parse(state.requests[2]?.init?.body as string)).toMatchObject({ operationId: original.followUp!.operationId,
-			expectedRevision: 'confirmed-revision', content: 'My later correction' });
-		state.requests[2]!.resolve(confirmed());
 		await retry;
 		expect(state.storage.load()).toEqual([]);
 	});

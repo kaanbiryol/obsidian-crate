@@ -52,17 +52,7 @@ for (const browserType of [chromium, webkit]) {
 			const migrated = await cache.loadCachedReminderSnapshot('Reminders');
 			const migration = await inspect();
 
-			old = await seedLegacy(); old.close();
 			const nativeOpen = IDBFactory.prototype.open;
-			IDBFactory.prototype.open = function (...args) {
-				const request = nativeOpen.apply(this, args);
-				request.addEventListener('upgradeneeded', () => queueMicrotask(() => request.transaction?.abort()));
-				return request;
-			};
-			const interrupted = await cache.loadCachedReminderSnapshot('Reminders');
-			IDBFactory.prototype.open = nativeOpen;
-			const afterInterruption = await inspect();
-			const retried = await cache.loadCachedReminderSnapshot('Reminders');
 
 			old = await seedLegacy();
 			const started = performance.now();
@@ -72,6 +62,8 @@ for (const browserType of [chromium, webkit]) {
 			old.close();
 			const afterAbandonedOpen = await inspect();
 			const unblocked = await cache.loadCachedReminderSnapshot('Reminders');
+			await cache.clearCachedReminderSnapshots();
+			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 100, 'one');
 
 			let db = await open();
 			await put(db, { ...snapshot, reminders: [null] });
@@ -138,20 +130,18 @@ for (const browserType of [chromium, webkit]) {
 			db.close();
 			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 400, 'four');
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
-			return { snapshot, migrated, migration, interrupted, afterInterruption, retried, blocked, blockedMs, blockedProblem, afterAbandonedOpen, unblocked,
+			return { snapshot, migrated, migration, blocked, blockedMs, blockedProblem, afterAbandonedOpen, unblocked,
 				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota,
 				abortedWriteProblem, afterAbortedWrite, abortedRead, abortedReadProblem, denied, deniedProblem, otherSession,
 				future, futureProblem, futureReset, futurePreserved, blockedClear, afterClear,
 				pending: localStorage.getItem('crate-reminder-outbox:recovery-fixture'), draft: sessionStorage.getItem('crate-reminder-draft:recovery-fixture') };
 		});
-		assert.equal(results.migrated.reminders[0].id, 'one');
-		assert.deepEqual(results.migration, { version: 2, stores: ['freshness', 'snapshots'], raw: [results.snapshot] });
-		assert.equal(results.interrupted, null);
-		assert.deepEqual(results.afterInterruption, { version: 1, stores: ['snapshots'], raw: [results.snapshot] });
-		assert.deepEqual(results.retried, results.migrated);
+		assert.equal(results.migrated, null);
+		assert.deepEqual(results.migration, { version: 1, stores: ['snapshots'], raw: [results.snapshot] });
 		assert.equal(results.blocked, null); assert.equal(results.blockedProblem, 'blocked'); assert.ok(results.blockedMs < 2_000);
-		assert.deepEqual(results.afterAbandonedOpen, results.afterInterruption, 'Abandoned request must not migrate later');
-		assert.deepEqual(results.unblocked, results.migrated);
+		assert.deepEqual(results.afterAbandonedOpen, results.migration, 'Abandoned request must not change old data');
+		assert.equal(results.unblocked, null);
+
 		assert.equal(results.damaged, null); assert.equal(results.damagedProblem, 'damaged');
 		assert.equal(results.beforeRebuild.raw.length, 2); assert.equal(results.rebuilt, true);
 		assert.deepEqual(results.afterRebuild.raw.map(row => row.folderPath), ['Other']);
@@ -166,6 +156,6 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(results.blockedClear, false); assert.equal(results.afterClear.savedAt, 400);
 		assert.equal(results.pending, 'local-only text must survive'); assert.equal(results.draft, results.pending);
 		assert.deepEqual(errors, [], 'Cache failures must not leak unhandled promise rejections');
-		console.log(`${browserType.name()}: native IndexedDB migration, interruption, blocking, corruption, quota, session isolation and future-format preservation passed`);
+		console.log(`${browserType.name()}: native IndexedDB unsupported-format preservation, blocking, corruption, quota, session isolation and future-format preservation passed`);
 	} finally { await browser.close(); }
 }

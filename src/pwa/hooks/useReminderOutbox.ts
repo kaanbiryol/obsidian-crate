@@ -76,10 +76,6 @@ export function useReminderOutbox(options: {
 					await current.commitReminderState(reminders, projects);
 					if (isCurrent()) settlement.publish(change, result);
 					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
-					if (isCurrent() && result.reminder && change.followUp) {
-						const { followUpReminderChange } = await import('../save-reminder-command');
-						return followUpReminderChange(change, result.reminder);
-					}
 					if (isCurrent() && change.kind === 'save' && !result.notificationWarning) {
 						current.showToast('success', change.path === '/reminders/create' ? 'Reminder created' : 'Reminder updated');
 					}

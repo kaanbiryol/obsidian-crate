@@ -115,7 +115,6 @@ describe('normalizeCrateSettings', () => {
 			syncOnStartup: 'yes' as never,
 			syncOnResume: 'yes' as never,
 			syncInterval: -30,
-			showStatusBar: false,
 			syncHistory: [
 				{
 					timestamp: ' 2026-01-01T00:00:00.000Z ',
@@ -141,7 +140,6 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.syncOnStartup).toBe(DEFAULT_SETTINGS.syncOnStartup);
 		expect(settings.syncOnResume).toBe(DEFAULT_SETTINGS.syncOnResume);
 		expect(settings.syncInterval).toBe(DEFAULT_SETTINGS.syncInterval);
-		expect(settings.showStatusBar).toBe(false);
 		expect(settings.syncHistory).toEqual([
 			{
 				timestamp: '2026-01-01T00:00:00.000Z',

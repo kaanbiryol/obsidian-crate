@@ -5,7 +5,7 @@ import { admitLocally, authenticatedAdmissionKey } from './admission-state';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const actions = new Map([
-  ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut-exchange', 10],
+  ['POST /reading/shortcut-pairing', 5], ['POST /reading/shortcut/v1/exchange', 10],
   ['POST /notifications/share/reading', 30],
   ['POST /reading/exchange', 10], ['POST /reading/handoff', 30],
   ['POST /reading/prepare', 30], ['POST /reading/capture', 30],
@@ -19,7 +19,7 @@ const actions = new Map([
 	['POST /notifications/retry', 10],
 ]);
 const denied = () => corsResponse({ error: 'Too many requests. Try again in a minute.' }, 429, { 'Retry-After': '60' });
-const shortcutActionPath = (path: string) => path === '/reading/shortcut/v1/prepare' ? '/reading/prepare' : path === '/reading/shortcut/v1/exchange' ? '/reading/shortcut-exchange' : path;
+const shortcutActionPath = (path: string) => path === '/reading/shortcut/v1/prepare' ? '/reading/prepare' : path;
 
 export async function limitNotificationRequest(request: Request, db: D1Database, limiter?: NotificationRateLimiter): Promise<Response | null> {
 	const url = new URL(request.url);

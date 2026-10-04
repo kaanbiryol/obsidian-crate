@@ -272,7 +272,6 @@ describe('SyncApiClient', () => {
 			syncOnStartup: true,
 			syncOnResume: true,
 			syncInterval: 30,
-			showStatusBar: true,
 			pushEnabled: false,
 		};
 		const transport = mockTransport(

@@ -253,12 +253,11 @@ it('preserves queued schema-2 captures and their policy across a restore', async
   expect(f.databases.get(destination)!.prepare('SELECT generation FROM reading_policy').get()).toEqual({ generation: 'generation' });
 });
 
-it('restores a schema-1 archive into schema 2 with an empty capture queue', async () => {
+it('rejects a retired schema-1 archive before allocating destination resources', async () => {
   const f = await fixture();
   await f.rewriteSQL(sql => sql.replace(`VALUES (1,${SERVER_RELEASE.schemaVersion},${SERVER_RELEASE.schemaVersion})`, 'VALUES (1,1,1)'));
-  await f.run();
-  expect(f.databases.get(destination)!.prepare('SELECT * FROM reading_captures').all()).toEqual([]);
-  expect(f.databases.get(destination)!.prepare('SELECT version FROM crate_schema').get()).toEqual({ version: 2 });
+  await expect(f.run()).rejects.toThrow('Unsupported database schema');
+  expect(f.api.createD1Database).not.toHaveBeenCalled();
 });
 
 it('rejects a future restore target before allocating destination resources', async () => {

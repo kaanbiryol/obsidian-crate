@@ -20,8 +20,6 @@ export interface CrateSettings {
 	syncOnStartup: boolean;
 	syncOnResume: boolean;
 	syncInterval: number;
-	/** Legacy compatibility field; sync status is always shown. */
-	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
 	pushEnabled: boolean;
 	debugLogging: boolean;
@@ -33,8 +31,6 @@ export interface SharedSettings {
 	syncOnStartup: boolean;
 	syncOnResume: boolean;
 	syncInterval: number;
-	/** Legacy compatibility field; sync status is always shown. */
-	showStatusBar: boolean;
 	pushEnabled: boolean;
 }
 
@@ -51,7 +47,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	syncOnStartup: true,
 	syncOnResume: true,
 	syncInterval: 300,
-	showStatusBar: true,
 	syncHistory: [],
 	pushEnabled: false,
 	debugLogging: false,

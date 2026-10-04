@@ -38,7 +38,6 @@ export function readingShortcutTemplate(template) {
   workflow.WFWorkflowImportQuestions[0].DefaultValue = actions[0].WFWorkflowActionParameters.WFTextActionText;
   const request = actions.find(action => action.WFWorkflowActionIdentifier === 'is.workflow.actions.downloadurl');
   // Private captures open the PWA with a fragment and have no capture request.
-  // Retain the legacy adapter for fixtures of already distributed v1 shortcuts.
   if (!request) return workflow;
   request.WFWorkflowActionParameters.WFHTTPHeaders.Value.WFDictionaryFieldValueItems = [
     request.WFWorkflowActionParameters.WFHTTPHeaders.Value.WFDictionaryFieldValueItems[0],

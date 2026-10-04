@@ -1,5 +1,5 @@
 {
-  "baselineCommit": "e220ae615a7c3727b98564fa3603bc4c28709a4c",
-  "reason": "Revision 1 was deployed during development after the pre-launch reset. The first public candidate uses revision 2 so those stable installations can upgrade. Older prereleases belong to the retired numbering sequence.",
-  "initialRevision": 2
+  "baselineCommit": "69ecf85de0fbe3055e92ec433a3968005826d01b",
+  "reason": "Pre-launch compatibility cleanup retires development migrations. Schema 2 is the fresh baseline; earlier development releases and installations are not upgrade sources. Preserve the current candidate revision.",
+  "initialRevision": 8
 }

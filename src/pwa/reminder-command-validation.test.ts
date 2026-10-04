@@ -11,7 +11,7 @@ const body = { operationId, folderPath, id: 'one', content: 'Task', project: 'In
 const input = { folderPath, content: 'Task', project: 'Inbox', priority: 4, description: null, dueDate: null, dueDatetime: null };
 const save = { operationId, kind: 'save', recordId: 'one', status: 'pending', attempts: 0, retryAt: 0,
 	method: 'POST', path: '/reminders/create', body: JSON.stringify(body) };
-const modal = { mode: 'create', draft, pendingSave: { path: '/reminders/create', body: JSON.stringify(body), input, draftKey: 'key' } };
+const modal = { mode: 'create', draft };
 const validChange = (value: unknown) => isStoredReminderChange(value, operationId, folderPath);
 const validModal = (value: unknown) => isStoredReminderModal(value, folderPath);
 
@@ -42,19 +42,16 @@ describe('stored command schema compatibility', () => {
 		expect(validChange({ ...save, ...patch })).toBe(false);
 	});
 
-	it('retains legacy acceptance, extra fields, request formatting, and recurrence metadata', () => {
+	it('preserves extra fields, request bytes and recurrence metadata', () => {
 		const recurrence = { frequency: 'weekly', daysOfWeek: [5, 1, 5], extra: 'keep' };
-		const value = { ...save, status: ['pending'], path: ['/reminders/create'], extra: { keep: true },
-			body: JSON.stringify(body, null, 2), optimistic: { ...record, recurrence },
-			modal: { mode: ['create'], draft, pendingSave: { legacy: 'unvalidated by outbox' } },
-			// Outbox follow-ups historically require only these three input fields.
-			followUp: { operationId: 'another_123456789', input: { folderPath, content: 'Later edit', project: 'Inbox' } } };
+		const value = { ...save, extra: { keep: true }, body: JSON.stringify(body, null, 2),
+			optimistic: { ...record, recurrence }, modal };
 		const before = structuredClone(value);
 		expect(validChange(value)).toBe(true);
 		expect(value).toEqual(before);
-		expect(value.optimistic.recurrence).toBe(recurrence);
-		expect(validChange({ ...save, reviewRequired: true, status: 'failed', ambiguous: true })).toBe(true);
-		expect(validChange({ ...save, reviewRequired: true, status: ['failed'], ambiguous: true })).toBe(false);
+		for (const patch of [{ status: ['pending'] }, { path: ['/reminders/create'] }, { modal: { ...modal, mode: ['create'] } }]) {
+			expect(validChange({ ...save, ...patch })).toBe(false);
+		}
 	});
 
 	it('checks reorder agreement and excludes follow-ups from other commands', () => {
@@ -67,31 +64,15 @@ describe('stored command schema compatibility', () => {
 		expect(validChange({ ...reorder, followUp: { operationId: 'another_123456789', input } })).toBe(false);
 	});
 
-	it('preserves retained modal attempts without normalizing or rewriting them', () => {
-		for (const recurrence of [undefined, null, { frequency: 'weekly', daysOfWeek: [5, 1, 5] }]) {
-			const value = { ...modal, mode: ['create'], extra: 'keep', pendingSave: { ...modal.pendingSave,
-				path: ['/reminders/create'], body: JSON.stringify(body, null, 2), input: { ...input, recurrence } } };
-			const before = structuredClone(value);
-			expect(validModal(value)).toBe(true);
-			expect(value).toEqual(before);
-		}
-	});
-
-	it.each([
-		{ path: '/other' }, { body: '{broken' }, { draftKey: null }, { input: { ...input, priority: 2 } },
-		{ input: { ...input, dueDate: undefined } }, { input: { ...input, folderPath: 'Private' } },
-		{ input: { ...input, recurrence: { frequency: 'invalid' } } },
-		{ body: JSON.stringify({ ...body, filePath: 'Reminders/../Private.md' }) },
-		{ body: JSON.stringify({ ...body, folderPath: 'Private' }) }, { body: JSON.stringify({ ...body, id: '' }) },
-	])('rejects damaged retained attempts (%j)', patch => {
-		expect(validModal({ ...modal, pendingSave: { ...modal.pendingSave, ...patch } })).toBe(false);
+	it('rejects obsolete retained attempts instead of resending them', () => {
+		expect(validModal({ ...modal, pendingSave: { path: '/reminders/create', body: JSON.stringify(body), input, draftKey: 'key' } })).toBe(false);
+		expect(validModal({ ...modal, mode: ['create'] })).toBe(false);
+		expect(validModal(modal)).toBe(true);
 	});
 
 	it('rejects arrays masquerading as commands, modals or nested objects', () => {
 		expect(validChange(Object.assign([], save))).toBe(false);
 		expect(validModal(Object.assign([], modal))).toBe(false);
-		expect(validModal({ ...modal, pendingSave: Object.assign([], modal.pendingSave) })).toBe(false);
-		expect(validModal({ ...modal, pendingSave: { ...modal.pendingSave, input: Object.assign([], input) } })).toBe(false);
 		expect(validChange({ ...save, modal: Object.assign([], { mode: 'create', draft }) })).toBe(false);
 	});
 });

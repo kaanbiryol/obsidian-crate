@@ -3,11 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-export const shortcutName = 'Save to Crate (iOS 27).shortcut';
+export const shortcutName = 'Save to Crate.shortcut';
 export const assetName = 'save-to-crate-ios-27-v2.shortcut';
-export const legacyAssetName = 'save-to-crate-ios-27.shortcut';
 export const metadataName = 'reading-shortcut-v2.json';
-export const legacyMetadataName = 'reading-shortcut.json';
 const sources = ['docs/shortcuts/save-to-crate.plist', 'src/reading/shortcut-contract.json', 'scripts/reading-shortcut-template.mjs', 'scripts/reading-shortcut-first-run.mjs', 'scripts/sign-reading-shortcut.mjs'];
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');

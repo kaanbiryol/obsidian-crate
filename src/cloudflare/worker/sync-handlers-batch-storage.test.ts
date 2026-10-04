@@ -171,7 +171,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				ignorePatterns: ['.git/'],
 				syncOnStartup: true,
 				syncInterval: 30,
-				showStatusBar: true,
 			})).buffer,
 		);
 		const incompleteGetResponse = await handleGetSettings(bucket);
@@ -191,7 +190,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 						syncOnStartup: 'yes',
 						syncOnResume: true,
 						syncInterval: 30,
-						showStatusBar: true,
 						pushEnabled: false,
 					},
 				}),
@@ -211,7 +209,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 						syncOnStartup: true,
 						syncOnResume: true,
 						syncInterval: 30,
-						showStatusBar: true,
 						pushEnabled: false,
 					},
 				}),
@@ -229,7 +226,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			syncOnStartup: true,
 			syncOnResume: true,
 			syncInterval: 30,
-			showStatusBar: true,
 			pushEnabled: false,
 		};
 		const firstWrite = await bucket.put('__crate__/settings.json', JSON.stringify(firstSettings));

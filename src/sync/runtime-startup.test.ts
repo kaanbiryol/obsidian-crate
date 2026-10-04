@@ -93,7 +93,7 @@ describe('SyncRuntime startup event handling', () => {
 		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
 		plugin.app.workspace.layoutReady = false;
 		await runtime.initialize();
-		expect(plugin.addStatusBarItem).toHaveBeenCalledOnce(); // Legacy showStatusBar=false no longer hides status.
+		expect(plugin.addStatusBarItem).toHaveBeenCalledOnce();
 		expect(sync).not.toHaveBeenCalled();
 		runtime.onFileChange({ path: 'existing.md' } as never);
 		runtime.onFileDelete({ path: 'removed.md' } as never);

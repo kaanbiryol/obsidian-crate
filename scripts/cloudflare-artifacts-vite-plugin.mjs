@@ -31,7 +31,8 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
         || !Number.isSafeInteger(serverRelease.schemaVersion) || serverRelease.schemaVersion < 1
         || !Number.isSafeInteger(serverRelease.minimumSchemaVersion) || serverRelease.minimumSchemaVersion < 1
         || serverRelease.minimumSchemaVersion > serverRelease.schemaVersion || !Array.isArray(serverRelease.migrations)) throw new Error('Invalid server release manifest');
-      let schemaVersion = 1;
+      let schemaVersion = serverRelease.migrations[0]?.from ?? serverRelease.minimumSchemaVersion;
+      if (!Number.isSafeInteger(schemaVersion) || schemaVersion < 1 || schemaVersion > serverRelease.minimumSchemaVersion) throw new Error('Invalid database migration baseline');
       const migrationIds = new Set();
       for (const migration of serverRelease.migrations) {
         if (!/^[a-z0-9-]+$/.test(migration.id) || migrationIds.has(migration.id) || migration.from !== schemaVersion || migration.to !== schemaVersion + 1

@@ -6,7 +6,6 @@ import { pruneChangelog } from './db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/index';
 import type { Env } from './types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
-import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { pruneReminderOccurrences, pruneReminderOperations } from './maintenance/reminder-history';
 import { pruneEncryptedReceiptChunks } from './encrypted-receipt-storage';
@@ -37,7 +36,6 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, env.DB); }],
 		['prune expired encrypted response chunks', () => pruneEncryptedReceiptChunks(env.DB)],
 		['prune unused encryption metadata', () => pruneEncryptionMetadata(env.DB)],
-		['scan legacy orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
 	];
 	for (const [name, task] of tasks) {
 		try {

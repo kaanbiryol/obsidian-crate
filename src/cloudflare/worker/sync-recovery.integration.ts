@@ -7,7 +7,6 @@ import schemaSql from '../schema.sql?raw';
 import { sha256HexBytes } from './auth';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-version-handlers';
-import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './sync-storage';
 import type { Env } from './types';
 
@@ -86,37 +85,4 @@ describe('sync recovery', () => {
 		expect(await (await bucket.get(live!.storage_key))!.text()).toBe('restored');
 	});
 
-	it('sweeps full pages within D1 binding limits and preserves both kinds of references', async () => {
-		const keys = Array.from({ length: 101 }, (_, index) => `__crate__/files/${String(index).padStart(3, '0')}`);
-		await Promise.all(keys.map(key => bucket.put(key, 'data')));
-		await db.prepare(`INSERT INTO files (path, portable_path, hash, size, storage_key)
-			VALUES ('active.md', 'active.md', 'hash', 4, ?)`).bind(keys[0]).run();
-		await db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-			VALUES (?, 'retained.md', 'hash', 4, 'deleted', ?)`).bind(keys[99], Date.now() + 300_000).run();
-		const prepare = db.prepare.bind(db);
-		const bindingCounts: number[] = [];
-		vi.spyOn(db, 'prepare').mockImplementation(sql => {
-			const statement = prepare(sql);
-			if (sql.includes('UNION SELECT storage_key')) {
-				const bind = statement.bind.bind(statement);
-				vi.spyOn(statement, 'bind').mockImplementation((...args) => {
-					bindingCounts.push(args.length);
-					if (args.length > 100) throw new Error('D1 binding limit exceeded');
-					return bind(...args);
-				});
-			}
-			return statement;
-		});
-		const now = Date.now() + 2 * 24 * 60 * 60 * 1000;
-		await db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('legacy_orphan_sweep_cutoff', ?)").bind(String(now - 86400_000)).run();
-		expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(98);
-		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).not.toBeNull();
-		expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(1);
-		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).toBeNull();
-		expect(bindingCounts).toEqual([1, 1]);
-    const listing = vi.spyOn(bucket, 'list');
-    expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(0);
-    expect(listing).not.toHaveBeenCalled();
-		expect((await bucket.list()).objects.map(object => object.key)).toEqual([keys[0], keys[99]]);
-	});
 });

@@ -1,31 +1,22 @@
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, type CrateProtocolRange } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import release from '../../server-release.json';
 import { PWA_ASSET_VERSION } from '../pwa-version';
 import { ReadingError } from './common';
 
-export interface ShortcutTransport { kind: 'prepare' | 'exchange'; version: number; revision: number; legacy: boolean }
+export interface ShortcutTransport { kind: 'prepare' | 'exchange'; version: number; revision: number }
 const revision = (value: string | null) => value && /^[1-9]\d{0,5}$/.test(value) ? Number(value) : 1;
 export function shortcutTransport(request: Request): ShortcutTransport | null {
   if (request.method !== 'POST') return null;
   const path = new URL(request.url).pathname;
   const current = /^\/reading\/shortcut\/v(0|[1-9]\d{0,2})\/(prepare|exchange)$/.exec(path);
-  if (current) return { kind: current[2] as ShortcutTransport['kind'], version: Number(current[1]), revision: revision(request.headers.get(contract.revisionHeader)), legacy: false };
-  // These exact released requests have the same small capture contract. Do not
-  // extend this exception to general API writes or other retired protocols.
-  const wire = request.headers.get(CRATE_PROTOCOL_HEADER);
-  if (path === '/reading/prepare' && ['1', '11'].includes(wire ?? '')) return { kind: 'prepare', version: 1, revision: 1, legacy: true };
-  if (path === '/reading/shortcut-exchange' && wire === '1') return { kind: 'exchange', version: 1, revision: 1, legacy: true };
+  if (current) return { kind: current[2] as ShortcutTransport['kind'], version: Number(current[1]), revision: revision(request.headers.get(contract.revisionHeader)) };
   return null;
 }
 export function shortcutCompatibility(transport: ShortcutTransport): ReadingError | null {
   if (transport.version > contract.version) return new ReadingError('Update Crate in Obsidian and its server in Crate settings, then share the link again.', 426, 'server_update_required');
   if (transport.version !== contract.version || transport.revision < contract.minimumRevision) return new ReadingError('Install the latest Save to Crate shortcut, then reconnect it in Reading settings.', 426, 'shortcut_update_required');
   return null;
-}
-export function shortcutMayBypassWireProtocol(transport: ShortcutTransport, scope: string, wire: string | null, range: CrateProtocolRange = CRATE_PLUGIN_PROTOCOL): boolean {
-  if (!transport.legacy) return scope === 'reading_capture';
-  return scope === 'reading_capture' || Number(wire) >= range.oldestCompatible && Number(wire) <= range.current;
 }
 export function validateShortcutBody(body: Record<string, unknown>, kind: ShortcutTransport['kind']): void {
   const keys = kind === 'prepare' ? ['url', 'title'] : ['token'];
@@ -50,7 +41,7 @@ export async function shortcutLaunchResponse(request: Request, response: Respons
       pwaVersion: PWA_ASSET_VERSION, wireProtocol: CRATE_PLUGIN_PROTOCOL.current,
       shortcutContract: transport.version, shortcutRevision: transport.revision };
     data.launchUrl = `${new URL(request.url).origin}/notifications/save-reading#error=${encodeURIComponent(JSON.stringify(diagnostic))}`;
-  } else if (transport.kind === 'prepare' && !transport.legacy && typeof data.launchUrl === 'string') {
+  } else if (transport.kind === 'prepare' && typeof data.launchUrl === 'string') {
     const launch = new URL(data.launchUrl);
     launch.searchParams.set('shortcut', String(transport.revision));
     launch.searchParams.set('contract', String(transport.version));

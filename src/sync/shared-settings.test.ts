@@ -7,7 +7,6 @@ describe('shared-settings helpers', () => {
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
 			syncInterval: 30,
-			showStatusBar: true,
 		})).toBeNull();
 	});
 
@@ -17,7 +16,6 @@ describe('shared-settings helpers', () => {
 			syncOnStartup: false,
 			syncOnResume: false,
 			syncInterval: 10,
-			showStatusBar: false,
 			pushEnabled: false,
 		};
 
@@ -26,7 +24,6 @@ describe('shared-settings helpers', () => {
 			syncOnStartup: true,
 			syncOnResume: true,
 			syncInterval: 300,
-			showStatusBar: true,
 			pushEnabled: true,
 		});
 
@@ -35,7 +32,6 @@ describe('shared-settings helpers', () => {
 			syncOnStartup: true,
 			syncOnResume: true,
 			syncInterval: 300,
-			showStatusBar: false,
 			pushEnabled: true,
 		});
 	});

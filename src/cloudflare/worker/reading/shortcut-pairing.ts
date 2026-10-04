@@ -49,6 +49,6 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
     db.prepare('DELETE FROM reading_enrollments WHERE token_hash=?').bind(hash),
   ]);
   if (changedRows(results[0]) !== 1) throw invalidPairing();
-  const endpoint = new URL(request.url).pathname === contract.exchangePath ? contract.preparePath : '/reading/prepare';
+  const endpoint = contract.preparePath;
   return readingResponse({ endpoint: `${new URL(request.url).origin}${endpoint}`, authorization: `Bearer ${token}` });
 }

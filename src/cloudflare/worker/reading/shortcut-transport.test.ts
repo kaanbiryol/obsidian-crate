@@ -1,27 +1,19 @@
 import { expect, it } from 'vitest';
-import { shortcutCompatibility, shortcutLaunchResponse, shortcutMayBypassWireProtocol, shortcutTransport, validateShortcutBody } from './shortcut-transport';
+import { shortcutCompatibility, shortcutLaunchResponse, shortcutTransport, validateShortcutBody } from './shortcut-transport';
 
 it('keeps native capture independent of a future general wire protocol', () => {
   const native = shortcutTransport(new Request('https://crate.example/reading/shortcut/v1/prepare', { method: 'POST', headers: { 'X-Crate-Shortcut-Revision': '2' } }))!;
   expect(shortcutCompatibility(native)).toBeNull();
-  expect(shortcutMayBypassWireProtocol(native, 'reading_capture', null, { current: 25, oldestCompatible: 24 })).toBe(true);
-  for (const scope of ['vault', 'reading', 'reminders']) expect(shortcutMayBypassWireProtocol(native, scope, '24', { current: 25, oldestCompatible: 24 })).toBe(false);
 });
-it('retains only the exact released legacy capture requests across future wire bumps', () => {
-  for (const wire of ['1', '11']) {
-    const legacy = shortcutTransport(new Request('https://crate.example/reading/prepare', { method: 'POST', headers: { 'X-Crate-Protocol': wire } }))!;
-    expect(legacy.legacy).toBe(true);
-    expect(shortcutMayBypassWireProtocol(legacy, 'reading_capture', wire, { current: 25, oldestCompatible: 24 })).toBe(true);
-    expect(shortcutMayBypassWireProtocol(legacy, 'vault', wire, { current: 25, oldestCompatible: 24 })).toBe(false);
-  }
+it('does not treat unversioned requests as shortcut transport', () => {
   for (const path of ['/reading/capture', '/sync/upload', '/reading/prepare']) {
     expect(shortcutTransport(new Request(`https://crate.example${path}`, { method: 'POST', headers: { 'X-Crate-Protocol': '12' } }))).toBeNull();
   }
   expect(shortcutTransport(new Request('https://crate.example/reading/shortcut/v01/exchange', { method: 'POST' }))).toBeNull();
 });
 it('requires an explicit server or shortcut update for unsupported capture contracts', () => {
-  expect(shortcutCompatibility({ kind: 'prepare', version: 2, revision: 2, legacy: false })?.code).toBe('server_update_required');
-  expect(shortcutCompatibility({ kind: 'prepare', version: 0, revision: 1, legacy: false })?.code).toBe('shortcut_update_required');
+  expect(shortcutCompatibility({ kind: 'prepare', version: 2, revision: 2 })?.code).toBe('server_update_required');
+  expect(shortcutCompatibility({ kind: 'prepare', version: 0, revision: 1 })?.code).toBe('shortcut_update_required');
 });
 it('limits version-one capture payloads to their original semantics', () => {
   expect(() => validateShortcutBody({ url: 'https://example.com', title: 'Example' }, 'prepare')).not.toThrow();

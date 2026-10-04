@@ -73,11 +73,11 @@ it('selects a pinned Reading subview in the cached shell', () => {
 	expect(style.getPropertyValue('--pwa-dock-favorites-active-order')).toBe('2');
 });
 
-it.each(['today', 'upcoming'])('migrates date-view slots and selects Reminders for %s in the cached shell', tab => {
+it.each(['today', 'upcoming'])('selects Reminders for %s in the cached shell', tab => {
 	const { document } = parseHTML('<html><body></body></html>');
 	new Script(PWA_OPENING_DOCK_INIT_JS).runInNewContext({
 		document, URLSearchParams, location: { search: `?tab=${tab}` },
-		localStorage: { getItem: () => JSON.stringify({ dockTabs: ['upcoming', 'today-view', 'inbox', 'reading'] }) },
+		localStorage: { getItem: () => JSON.stringify({ dockTabs: ['today', 'browse', 'inbox', 'reading'] }) },
 	});
 	expect(document.documentElement.dataset.pwaOpeningDockTab).toBe('today');
 	expect(document.documentElement.style.getPropertyValue('--pwa-dock-today-active-order')).toBe('0');

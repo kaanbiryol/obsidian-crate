@@ -26,7 +26,7 @@ const api = new Set([
 	'GET /reminders/list', 'DELETE /reminders/delete',
 	...['create', 'update', 'set-completed', 'reorder'].map(name => `POST /reminders/${name}`),
 	...['GET', 'POST', 'PUT'].map(method => `${method} /reminders/notification-policy`),
-	...['exchange', 'handoff', 'shortcut-exchange', 'shortcut-pairing', 'access', 'prepare', 'capture', 'update', 'retry', 'fetching', 'policy'].map(name => `POST /reading/${name}`),
+	...['exchange', 'handoff', 'shortcut-pairing', 'access', 'prepare', 'capture', 'update', 'retry', 'fetching', 'policy'].map(name => `POST /reading/${name}`),
 	...['policy', 'fetching', 'session', 'list', 'item'].map(name => `GET /reading/${name}`),
 ]);
 

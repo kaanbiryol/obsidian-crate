@@ -135,20 +135,6 @@ describe('durable reminder outbox storage', () => {
 		expect(outbox.load()).toMatchObject([{ ambiguous: true, status: 'pending', body: original.body }]);
 	});
 
-	it('preserves the attempted body and later draft as separate durable commands across reload', async () => {
-		const original: PendingReminderChange = { ...change(), kind: 'save', path: '/reminders/create', ambiguous: true,
-			followUp: { operationId: crypto.randomUUID(), input: { folderPath: 'Reminders', content: 'My later correction',
-				description: 'Keep these details', project: 'Inbox', priority: 4, dueDate: null, dueDatetime: null } } };
-		original.body = JSON.stringify({ operationId: original.operationId, folderPath: 'Reminders', id: original.recordId,
-			content: 'Earlier attempt', project: 'Inbox' });
-		const outbox = await createReminderOutboxStorage('one', 'Reminders');
-		outbox.put(original);
-		expect((await createReminderOutboxStorage('one', 'Reminders')).load()).toEqual([original]);
-		expect(() => outbox.put({ ...original, followUp: { ...original.followUp!, operationId: original.operationId } })).toThrow('could not be read');
-		expect(() => outbox.put({ ...original, followUp: { ...original.followUp!, input: { ...original.followUp!.input, folderPath: 'Private' } } })).toThrow('could not be read');
-		expect(outbox.load()).toEqual([original]);
-	});
-
 	it.each(['broken-json', 'wrong-folder', 'wrong-operation', 'wrong-endpoint', 'invalid-ambiguity'])('reports %s without overwriting the stored command', async defect => {
 		const outbox = await createReminderOutboxStorage('one', 'Reminders');
 		const original = change();

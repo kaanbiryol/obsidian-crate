@@ -19,11 +19,11 @@ export function reportCacheProblem(next: CacheProblem): void {
 	for (const listener of listeners) listener();
 }
 
-function supportedStores(database: IDBDatabase, transaction: IDBTransaction, version: number): boolean {
+function supportedStores(database: IDBDatabase, transaction: IDBTransaction): boolean {
 	const names = Array.from(database.objectStoreNames);
 	return names.includes(CACHE_STORE_NAME) && names.every(name => name === CACHE_STORE_NAME || name === FRESHNESS_STORE_NAME)
 		&& names.every(name => transaction.objectStore(name).keyPath === 'folderPath' && !transaction.objectStore(name).autoIncrement)
-		&& (version === 1 || names.includes(FRESHNESS_STORE_NAME));
+		&& names.includes(FRESHNESS_STORE_NAME);
 }
 
 /** A blocked/failed upgrade must not hold bootstrap or a confirmed mutation open. */
@@ -49,10 +49,6 @@ export function openCacheDatabase(): Promise<IDBPDatabase> {
 				if (event.oldVersion === 0) {
 					database.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
 					database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
-				} else if (event.oldVersion === 1 && request.transaction && supportedStores(database, request.transaction, 1)) {
-					// Add only disposable freshness metadata. Existing snapshots and
-					// their bytes survive an interrupted migration transaction.
-					if (!database.objectStoreNames.contains(FRESHNESS_STORE_NAME)) database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
 				} else {
 					fail('unsupported');
 					request.transaction?.abort();
@@ -66,7 +62,7 @@ export function openCacheDatabase(): Promise<IDBPDatabase> {
 			const database = request.result;
 			if (abandoned) { database.close(); return; }
 			try {
-				if (!supportedStores(database, database.transaction(Array.from(database.objectStoreNames), 'readonly'), database.version)) {
+				if (!supportedStores(database, database.transaction(Array.from(database.objectStoreNames), 'readonly'))) {
 					database.close(); fail('unsupported'); return;
 				}
 			} catch (error) { database.close(); fail('unsupported', error); return; }

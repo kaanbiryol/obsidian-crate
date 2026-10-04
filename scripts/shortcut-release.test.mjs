@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assetName, metadataName, shortcutName, legacyAssetName, legacyMetadataName, selectRelease, sha256, validateTag, verifyShortcut } from './shortcut-release.mjs';
+import { assetName, metadataName, shortcutName, selectRelease, sha256, validateTag, verifyShortcut } from './shortcut-release.mjs';
 import { downloadShortcut } from './download-release-shortcut.mjs';
 
 const release = (tag, published, overrides = {}) => ({ tag_name: tag, published_at: published, draft: false, assets: [{ name: assetName }, { name: metadataName }], ...overrides });
@@ -22,14 +22,7 @@ test('an incomplete newer shortcut release fails instead of silently serving an 
   assert.throws(() => selectRelease([release('0.4.0', '2026-09-28', { assets: [{ name: metadataName }] })]), /missing/);
   assert.throws(() => selectRelease([]), /No release/);
 });
-test('v2 and legacy downloads select and verify their own release assets', () => {
-  const legacy = release('0.3.1', '2026-09-20', { assets: [{ name: legacyAssetName }, { name: legacyMetadataName }] });
-  const current = release('0.4.0', '2026-09-29');
-  assert.equal(selectRelease([legacy, current]), current);
-  assert.equal(selectRelease([legacy, current], undefined, { assetName: legacyAssetName, metadataName: legacyMetadataName }), legacy);
-  assert.throws(() => verifyShortcut({ ...metadata(), file: legacyAssetName }, bytes, '0.4.0'), /metadata/);
-  verifyShortcut({ ...metadata(), file: legacyAssetName }, bytes, '0.4.0', undefined, legacyAssetName);
-});
+
 test('release verification selects only the requested draft tag', () => {
   const draft = release('0.4.0', null, { draft: true });
   assert.equal(selectRelease([release('0.3.0', '2026-09-20'), draft], '0.4.0'), draft);
@@ -74,7 +67,7 @@ async function downloadFixture(t, items, overrides = {}) {
 }
 
 test('Pages serves an unavailable page without reusing the legacy shortcut or a stale local file', async t => {
-  const legacy = release('0.3.0', '2026-09-20', { assets: [{ name: legacyAssetName }, { name: legacyMetadataName }] });
+  const legacy = release('0.3.0', '2026-09-20', { assets: [{ name: 'save-to-crate-ios-27.shortcut' }, { name: 'reading-shortcut.json' }] });
   const f = await downloadFixture(t, [legacy], { downloadRelease: () => assert.fail('No v2 asset should be downloaded') });
   await writeFile(join(f.destination, shortcutName), 'stale artifact');
   await f.run();

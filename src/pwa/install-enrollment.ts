@@ -55,19 +55,13 @@ export function rememberRedeemedEnrollment(fingerprint: string, installed = fals
 	if (installed && !localStorage.getItem(INSTALLED_KEY)) localStorage.setItem(INSTALLED_KEY, fingerprint);
 	const previous = redeemedEnrollments();
 	if (previous.includes(fingerprint)) return;
-	// Also retain the earliest identity for upgrades from the legacy format,
-	// whose fingerprint does not distinguish a browser from an installed app.
-	const recent = previous.length >= MAX_REDEEMED_ENROLLMENTS
-		? [previous[0]!, ...previous.slice(-(MAX_REDEEMED_ENROLLMENTS - 2))]
-		: previous;
+	const recent = previous.slice(-(MAX_REDEEMED_ENROLLMENTS - 1));
 	localStorage.setItem(REDEEMED_KEY, JSON.stringify([...recent, fingerprint]));
 }
 
 function redeemedEnrollments(): string[] {
 	const raw = localStorage.getItem(REDEEMED_KEY);
 	if (!raw) return [];
-	// Migrate the single fingerprint stored by earlier releases.
-	if (/^[a-f0-9]{64}$/.test(raw)) return [raw];
 	try {
 		const parsed: unknown = JSON.parse(raw);
 		return Array.isArray(parsed)

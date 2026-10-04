@@ -9,8 +9,7 @@ function discardMaintenanceKey(key: string): boolean {
 const record = (row: BackupRow): Record<string, Cell> => Object.fromEntries(row.columns.map((column, index) => [column, row.values[index]!]));
 const RESET = new Set(['crate_schema', 'crate_release', 'crate_migrations', ...policy.resetTables]);
 export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentSchema: string, restoredAt: number): BackupRow[] {
-  // Schema 2 only adds reading_captures. Preserve its queued intent with the
-  // Reading policy; schema-1 archives start with an empty capture queue.
+  // Preserve queued captures and Reading policy from the launch schema.
   // Future schema changes require an explicit recovery adapter.
   if (SERVER_RELEASE.schemaVersion > 2) throw new Error('This schema needs a newer in-app restore adapter');
   const allowed = new Set([...currentSchema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]));

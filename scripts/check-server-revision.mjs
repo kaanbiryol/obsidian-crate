@@ -24,7 +24,7 @@ export function revisionBase(root, env = process.env, explicit) {
   const releases = env.CRATE_PUBLISHED_RELEASES !== undefined ? JSON.parse(env.CRATE_PUBLISHED_RELEASES)
     : JSON.parse(execFileSync('gh', ['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
   const published = new Set(releases.filter(release => !release.isDraft).map(release => release.tagName));
-  const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag) && (!baseline || git(root, 'merge-base', baseline, commit(root, tag)) === baseline));
+  const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag) && (!baseline || commit(root, tag) !== baseline && git(root, 'merge-base', baseline, commit(root, tag)) === baseline));
   const previous = tags.find(tag => /^\d+\.\d+\.\d+$/.test(tag) && (!releaseRun || commit(root, tag) !== head));
   if (previous) return commit(root, previous);
   if (baseline) return baseline;
@@ -84,11 +84,7 @@ export function checkServerRevision(root, base, inputs) {
     before.revision = initialRevision - 1;
   }
 	if (current.revision < before.revision) throw new Error('Server revision cannot decrease.');
-	const launchReset = before.baselineSchemaVersion === 4 && before.schemaVersion === 4
-		&& before.minimumSchemaVersion === 4 && before.migrations.length === 0
-		&& current.baselineSchemaVersion === undefined && current.schemaVersion === 1
-		&& current.minimumSchemaVersion === 1 && current.migrations.length === 0 && current.revision > before.revision;
-	if (!launchReset && current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
+	if (initialRevision === undefined && current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
 	const algorithm = git(root, 'rev-parse', '--show-object-format');
 	const changed = path => {
 		let contents;
@@ -97,10 +93,10 @@ export function checkServerRevision(root, base, inputs) {
 		const hash = createHash(algorithm).update(`blob ${contents.length}\0`).update(contents).digest('hex');
 		return hash !== previousFiles.get(path);
 	};
-	if (!launchReset && changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
+	if (initialRevision === undefined && changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
 	}
-	for (const migration of before.migrations) {
+	for (const migration of initialRevision === undefined ? before.migrations : []) {
 		if (JSON.stringify(migration) !== JSON.stringify(current.migrations.find(step => step.id === migration.id)) || changed(`src/cloudflare/migrations/${migration.file}`)) {
 			throw new Error(`Released migration ${migration.id} cannot be edited or removed.`);
 		}

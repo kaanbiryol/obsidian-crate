@@ -13,6 +13,7 @@ const common = {
 	ambiguous: v.optional(v.boolean()),
 	reviewRequired: v.optional(v.boolean()),
 	body: v.string(),
+	followUp: v.optional(v.never()),
 	error: v.optional(v.string()),
 };
 const recordFields = {
@@ -22,20 +23,16 @@ const recordFields = {
 		mode: storedStringChoice(['create', 'edit']),
 	})),
 };
-const noFollowUp = v.optional(v.never());
 const changeSchema = v.variant('kind', [
 	v.object({ ...common, ...recordFields, kind: v.literal('save'), method: v.literal('POST'),
 		path: storedStringChoice(['/reminders/create', '/reminders/update']),
-		followUp: v.optional(storedObject({ operationId: operationIdSchema,
-			input: storedObject({ folderPath: v.string(), content: v.string(), project: v.string() }),
-		})),
 	}),
 	v.object({ ...common, ...recordFields, kind: v.literal('complete'), method: v.literal('POST'),
-		path: v.literal('/reminders/set-completed'), followUp: noFollowUp }),
+		path: v.literal('/reminders/set-completed') }),
 	v.object({ ...common, ...recordFields, kind: v.literal('delete'), method: v.literal('DELETE'),
-		path: v.literal('/reminders/delete'), followUp: noFollowUp }),
+		path: v.literal('/reminders/delete') }),
 	v.object({ ...common, kind: v.literal('reorder'), method: v.literal('POST'),
-		path: v.literal('/reminders/reorder'), project: v.string(), orderedIds: v.array(v.string()), followUp: noFollowUp }),
+		path: v.literal('/reminders/reorder'), project: v.string(), orderedIds: v.array(v.string()) }),
 ]);
 const bodySchema = storedObject({ operationId: v.string(), folderPath: v.string() });
 const saveBodySchema = storedObject({ content: v.string(), project: v.string() });
@@ -51,7 +48,6 @@ export function isStoredReminderChange(value: unknown, operationId: string, fold
 	let body: unknown;
 	try { body = JSON.parse(value.body); } catch { return false; }
 	if (!v.is(bodySchema, body) || body.operationId !== operationId || body.folderPath !== folderPath) return false;
-	if (value.followUp !== undefined && (value.followUp.operationId === operationId || value.followUp.input.folderPath !== folderPath)) return false;
 	// Use the original object, not a parsed schema output that could strip unknown fields.
 	const change = value as PendingReminderChange;
 	const request = body as Record<string, unknown>;

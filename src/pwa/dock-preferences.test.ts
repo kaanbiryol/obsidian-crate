@@ -25,9 +25,9 @@ describe('dock destinations', () => {
 			expect(dockDestinationIndex(['inbox', 'favorites', 'reading', 'browse'], 'reminders', tab)).toBe(-1);
 		}
 	});
-	it('migrates old date-view slots to Reminders and fills duplicate slots', () => {
-		expect(normalizeDockTabs(['archive', 'upcoming', 'favorites', 'highlights'])).toEqual(['archive', 'today', 'favorites', 'highlights']);
-		expect(normalizeDockTabs(['upcoming', 'today-view', 'inbox', 'reading'])).toEqual(['today', 'inbox', 'reading', 'browse']);
+	it('drops unknown slots and fills duplicate slots', () => {
+		expect(normalizeDockTabs(['archive', 'upcoming', 'favorites', 'highlights'])).toEqual(['archive', 'favorites', 'highlights', 'inbox']);
+		expect(normalizeDockTabs(['upcoming', 'today-view', 'inbox', 'reading'])).toEqual(['inbox', 'reading', 'today', 'browse']);
 		expect(normalizeDockTabs(['today-view', 'today', 'upcoming', 'reading'])).toEqual(['today', 'reading', 'inbox', 'browse']);
 	});
 });

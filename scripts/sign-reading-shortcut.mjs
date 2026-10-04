@@ -10,7 +10,7 @@ const manualSetup = process.argv.includes('--manual-setup');
 const pairing = process.argv.includes('--pairing');
 const firstRunSetup = pairing || process.argv.includes('--first-run-setup');
 if (manualSetup && firstRunSetup) throw new Error('Choose one setup variant.');
-const name = firstRunSetup ? 'Save to Crate (iOS 27)' : manualSetup ? 'Save to Crate (manual setup)' : 'Save to Crate';
+const name = manualSetup ? 'Save to Crate (manual setup)' : 'Save to Crate';
 const temporary = await mkdtemp(join(tmpdir(), 'crate-shortcut-'));
 try {
   const input = join(temporary, `${name}.shortcut`);

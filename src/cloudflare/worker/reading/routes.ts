@@ -44,9 +44,8 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' ? 262_144 : 24_576);
     if (!parsed.ok) return parsed.response;
     const body = parsed.value;
-    if (shortcut && (!shortcut.legacy || shortcut.kind === 'exchange' || principal?.scope === 'reading_capture')) validateShortcutBody(body, shortcut.kind);
+    if (shortcut) validateShortcutBody(body, shortcut.kind);
     if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
-    if (path === '/reading/shortcut-exchange' && request.method === 'POST') return await exchangeShortcutPairing(env.DB, body, request);
     if (path === '/reading/exchange' && request.method === 'POST') return await exchangeReadingAccess(env.DB, body, request);
     if (path === '/reading/handoff' && request.method === 'POST') {
       const handoff = await handoffAuthority(env.DB, request);

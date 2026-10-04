@@ -101,7 +101,6 @@ it('pauses missing keys after eight attempts and includes them in diagnostics', 
 
 it('schedules maintenance at the next batch expiration', async () => {
   const id = await batch(['waiting']);
-  await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('legacy_orphan_sweep_done', '1')").run();
   const lease = await env.DB.prepare('SELECT expires_at FROM staged_upload_batches WHERE id = ?').bind(id).first<{ expires_at: number }>();
   const setAlarm = vi.fn();
   await runMaintenanceEpisode({ storage: { get: async () => 0, put: async () => {}, setAlarm } } as never, env);

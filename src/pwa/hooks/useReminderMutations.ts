@@ -138,7 +138,6 @@ export function useReminderMutations(options: {
 		modal.expectedRevision = current?.revision;
 		modal.filePath = current?.filePath;
 		modal.recovery = true;
-		delete modal.pendingSave;
 		return modal;
 	};
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);

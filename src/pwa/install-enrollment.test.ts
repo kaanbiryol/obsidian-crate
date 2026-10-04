@@ -77,25 +77,15 @@ it('recognizes a spent icon grant without storing its secret or blocking a fresh
 
 it('retains the installed icon identity and recent renewals with bounded storage', async () => {
 	const fingerprints = await Promise.all(Array.from({ length: 40 }, (_, index) => enrollmentFingerprint(`grant-${index}`)));
-	for (const fingerprint of fingerprints) rememberRedeemedEnrollment(fingerprint);
+	for (const fingerprint of fingerprints) rememberRedeemedEnrollment(fingerprint, fingerprint === fingerprints[0]);
 	expect(wasEnrollmentRedeemed(fingerprints[0]!)).toBe(true);
 	expect(wasEnrollmentRedeemed(fingerprints[1]!)).toBe(false);
 	expect(wasEnrollmentRedeemed(fingerprints[38]!)).toBe(true);
 	expect(wasEnrollmentRedeemed(fingerprints[39]!)).toBe(true);
 	const history: unknown = JSON.parse(localStorage.getItem('crate-reminders-redeemed-enrollment')!);
 	expect(history).toHaveLength(32);
-	rememberRedeemedEnrollment(fingerprints[0]!);
+	rememberRedeemedEnrollment(fingerprints[39]!);
 	expect(JSON.parse(localStorage.getItem('crate-reminders-redeemed-enrollment')!)).toEqual(history);
-});
-
-it('migrates the previous single fingerprint without losing the original icon', async () => {
-	const original = await enrollmentFingerprint('original-install');
-	const renewal = await enrollmentFingerprint('renewal');
-	localStorage.setItem('crate-reminders-redeemed-enrollment', original);
-	expect(wasEnrollmentRedeemed(original)).toBe(true);
-	rememberRedeemedEnrollment(renewal);
-	expect(wasEnrollmentRedeemed(original)).toBe(true);
-	expect(wasEnrollmentRedeemed(renewal)).toBe(true);
 });
 
 it('pins the actual installed grant when browser and Home Screen share storage', async () => {

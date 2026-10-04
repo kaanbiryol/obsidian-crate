@@ -1,5 +1,4 @@
 import type { ModalState } from './types';
-import { isStoredReminderDraft } from './reminder-storage-validation';
 import { isStoredReminderModal } from './reminder-draft-validation';
 import { privateStorage } from './private-storage';
 
@@ -8,31 +7,6 @@ const draftStorage = () => privateStorage(sessionStorage);
 const PREFIX = 'crate-reminder-draft:';
 function key(modal: ModalState, folderPath: string): string {
 	return `${PREFIX}${encodeURIComponent(folderPath)}:${modal.reminderId ?? 'new'}`;
-}
-
-/** Bind existing editor drafts before an enrollment link can change folders. */
-export function scopeLegacyReminderDrafts(folderPath: string): void {
-	for (const entry of Object.keys(sessionStorage)) {
-		if (!entry.startsWith(PREFIX)) continue;
-		const raw = draftStorage().getItem(entry);
-		let saved: (ModalState & { legacyFolderPath?: unknown }) | null;
-		try { saved = JSON.parse(raw ?? 'null') as typeof saved; } catch { continue; }
-		if (!saved || entry !== PREFIX + (saved.reminderId ?? 'new') || !isStoredReminderDraft(saved.draft)
-			|| (saved.legacyFolderPath !== undefined && saved.legacyFolderPath !== folderPath)
-			|| (saved.filePath != null && (typeof saved.filePath !== 'string' || !saved.filePath.startsWith(`${folderPath}/`)))
-			|| (saved.pendingSave && saved.pendingSave.input?.folderPath !== folderPath)) continue;
-		const destination = key(saved, folderPath);
-		const existing = draftStorage().getItem(destination);
-		if (existing !== null) {
-			if (existing === raw) sessionStorage.removeItem(entry);
-			// Retain both drafts on collision without letting a later folder
-			// enrollment claim the older, otherwise unscoped create draft.
-			else draftStorage().setItem(entry, JSON.stringify({ ...saved, legacyFolderPath: folderPath }));
-			continue;
-		}
-		draftStorage().setItem(destination, raw!);
-		sessionStorage.removeItem(entry);
-	}
 }
 
 export function saveReminderDraft(modal: ModalState, folderPath: string): void {

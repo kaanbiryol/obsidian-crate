@@ -265,7 +265,6 @@ describe('SyncRuntime operation wrappers', () => {
 			syncOnStartup: false,
 			syncOnResume: false,
 			syncInterval: 15,
-			showStatusBar: true,
 			pushEnabled: true,
 		});
 		const putSharedSettings = vi.fn(async () => {});
@@ -281,7 +280,6 @@ describe('SyncRuntime operation wrappers', () => {
 			syncOnStartup: false,
 			syncOnResume: false,
 			syncInterval: 15,
-			showStatusBar: true,
 			pushEnabled: true,
 		});
 	});

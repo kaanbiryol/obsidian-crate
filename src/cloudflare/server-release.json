@@ -1,14 +1,6 @@
 {
   "revision": 8,
   "schemaVersion": 2,
-  "minimumSchemaVersion": 1,
-  "migrations": [
-    {
-      "id": "002-reading-captures",
-      "from": 1,
-      "to": 2,
-      "file": "002-reading-captures.sql",
-      "checksum": "109c30d80006f0008de62080eaa4b7ef87a70fe8caeacd517bbef1eac52228cc"
-    }
-  ]
+  "minimumSchemaVersion": 2,
+  "migrations": []
 }

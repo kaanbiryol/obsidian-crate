@@ -137,18 +137,13 @@ test('collects transitive deployment/build imports plus runtime graph and raw Sa
 	assert.ok(!inputs.some(path => path.startsWith('node_modules/') || path.startsWith('<')));
 });
 
-test('allows only the marked pre-launch baseline to reset to schema one', () => {
+test('does not retain the retired schema-reset exception', () => {
 	const h = fixture();
 	h.release({ revision: 2, schemaVersion: 4, minimumSchemaVersion: 4, baselineSchemaVersion: 4 });
 	const base = h.commit();
 	h.release({ revision: 3, schemaVersion: 1, minimumSchemaVersion: 1 });
-	assert.doesNotThrow(() => checkServerRevision(h.root, base, h.inputs));
-	h.release({ revision: 2, schemaVersion: 1, minimumSchemaVersion: 1 });
-	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
-	h.release({ revision: 3, schemaVersion: 2, minimumSchemaVersion: 1 });
 	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
 });
-
 
 test('keeps one public revision across development commits and rejects skipped release numbers', () => {
   const h = fixture();
@@ -227,4 +222,22 @@ test('reserves deployed pre-launch revisions before the first public candidate',
   assert.throws(() => checkServerRevision(h.root, published, h.inputs), /without increasing revision/);
   h.release({ revision: 3 });
   assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
+});
+
+
+test('retires development migration history only at the explicit unpublished baseline', () => {
+  const h = fixture();
+  const step = { id: 'development-step', from: 1, to: 2, file: 'development-step.sql', checksum: 'a'.repeat(64) };
+  h.release({ revision: 8, schemaVersion: 2, migrations: [step] });
+  h.write('src/cloudflare/migrations/development-step.sql', 'CREATE TABLE development(id TEXT);');
+  const baseline = h.commit();
+  h.git('tag', '0.5.0');
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 8 });
+  h.release({ revision: 8, schemaVersion: 2, minimumSchemaVersion: 2 });
+  assert.equal(h.ci('push', {}), baseline);
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  const published = h.commit();
+  h.write('src/cloudflare/schema.sql', 'CREATE TABLE changed(id TEXT);');
+  h.release({ revision: 9, schemaVersion: 2, minimumSchemaVersion: 2 });
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /schemaVersion increase/);
 });

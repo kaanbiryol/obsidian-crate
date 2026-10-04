@@ -35,8 +35,7 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Download batch bytes | ${limits.BATCH_DOWNLOAD_MAX_BYTES} |
 | Largest file | ${limits.MAX_FILE_SIZE_BYTES} bytes |
 
-Schema-1 databases in the current migration chain upgrade through the registered
-migration. Databases from the retired pre-reset development sequence require
+Schema 2 is the pre-launch baseline with no registered migrations. Databases from the retired pre-reset development sequence require
 their matching old build and recovery instructions; matching numbers alone do
 not establish compatibility. See [server upgrades](server-upgrades.md),
 [compatibility](compatibility.md), and [recovery](recovery.md).

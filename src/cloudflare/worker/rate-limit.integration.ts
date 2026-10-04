@@ -106,7 +106,6 @@ it('authenticates ordinary Reading routes before invoking the coordinator', asyn
 
 it.each([
 	['/reading/prepare', '/reading/shortcut/v1/prepare', 30],
-	['/reading/shortcut-exchange', '/reading/shortcut/v1/exchange', 10],
 ] as const)('shares the action budget between %s and %s', async (legacy, current, limit) => {
 	const attempt = (path: string) => new Request(`https://test${path}`, { method: 'POST' });
 	for (let index = 0; index < limit; index++) expect(await limitNotificationAction(attempt(index % 2 ? current : legacy), env.DB, 'shortcut-actor')).toBeNull();

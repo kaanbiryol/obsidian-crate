@@ -1,5 +1,4 @@
 export const DEFAULT_DOCK_TABS = ['inbox', 'today', 'browse', 'reading'] as const;
-// Keep the existing 'today' preference for the parent Reminders tab.
 export const DOCK_TABS = [
 	{ id: 'inbox', label: 'Inbox', iconName: 'inbox' },
 	{ id: 'today', label: 'Reminders', iconName: 'calendar' },
@@ -16,9 +15,7 @@ export function normalizeDockTabs(value: unknown): DockTab[] {
 	const defaults: DockTab[] = ['inbox', 'today', 'browse', 'reading'];
 	const allowed = ['inbox', 'today', 'browse', 'reading', 'favorites', 'archive', 'highlights'];
 	if (!Array.isArray(value)) return defaults;
-	// Migrate former date-view slots to their parent before deduplicating.
-	const migrated = value.map((tab: unknown) => tab === 'today-view' || tab === 'upcoming' ? 'today' : tab);
-	const tabs = [...new Set(migrated.filter((tab): tab is DockTab => allowed.includes(tab as string)))].slice(0, 4);
+	const tabs = [...new Set(value.filter((tab): tab is DockTab => allowed.includes(tab as string)))].slice(0, 4);
 	return [...tabs, ...defaults.filter(tab => !tabs.includes(tab))].slice(0, 4);
 }
 

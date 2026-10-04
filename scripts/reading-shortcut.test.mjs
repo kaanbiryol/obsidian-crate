@@ -124,12 +124,11 @@ test('PWA pairing sends a one-use code only in JSON and saves access after valid
   assert.ok(actions.slice(validation, store).some(action => identifier(action) === 'showwebpage'));
   assert.ok(actions.slice(validation, store).some(action => identifier(action) === 'exit'));
 });
-test('stored legacy endpoints are upgraded locally without another pairing request', () => {
+test('reads the configured endpoint directly without rewriting it', () => {
   const actions = readingShortcutWithFirstRunSetup(shortcutSource, { pairing: true }).WFWorkflowActions;
   const endpoint = actions.find(action => action.WFWorkflowActionParameters.UUID === shortcutSource.WFWorkflowActions[0].WFWorkflowActionParameters.UUID);
-  assert.equal(identifier(endpoint), 'text.replace');
-  const p = endpoint.WFWorkflowActionParameters;
-  for (const path of ['/reading/prepare', contract.preparePath]) assert.equal(`https://crate.example${path}`.replace(new RegExp(p.WFReplaceTextFind), p.WFReplaceTextReplace), `https://crate.example${contract.preparePath}`);
+  assert.equal(identifier(endpoint), 'getvalueforkey');
+  assert.equal(endpoint.WFWorkflowActionParameters.WFDictionaryKey, 'endpoint');
 });
 
 

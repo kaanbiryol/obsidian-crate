@@ -15,7 +15,7 @@ import { handlePutSettings } from './sync-metadata-handlers';
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { await reset(); });
 
-const preferences = () => ({ ignorePatterns: ['秘密/'], syncOnStartup: true, syncOnResume: true, syncInterval: 30, showStatusBar: true, pushEnabled: false });
+const preferences = () => ({ ignorePatterns: ['秘密/'], syncOnStartup: true, syncOnResume: true, syncInterval: 30, pushEnabled: false });
 async function fixture() {
 	const bundle = createVaultKeyBundle();
 	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));

@@ -40,8 +40,8 @@ describe('stored reminder schema compatibility', () => {
 		expect(isStoredReminderDraft({ ...draft, ...patch })).toBe(false);
 	});
 
-	it('retains the previous picker acceptance rule for already stored drafts', () => {
-		expect(isStoredReminderDraft({ ...draft, activePicker: ['date'] })).toBe(true);
+	it('rejects non-string picker values', () => {
+		expect(isStoredReminderDraft({ ...draft, activePicker: ['date'] })).toBe(false);
 	});
 
 	it('rejects arrays even when they carry otherwise valid object fields', () => {
