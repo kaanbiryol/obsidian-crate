@@ -1,0 +1,59 @@
+/* Homepage: one demonstration and a small set of previews per feature. */
+.feature-label { color:var(--accent-text); font:12px ui-monospace,monospace; letter-spacing:.08em; }
+.sync-intro figcaption,.reading-intro { grid-template-columns:minmax(0,1fr); gap:16px; }
+.sync-intro figcaption { max-width:none; }
+.sync-intro figcaption p,.reading-intro p { max-width:560px; }
+.sync-intro figcaption .feature-label,.reading-intro .feature-label,.reminder-recording figcaption .feature-label { margin:0 0 6px; color:var(--accent-text); font:12px ui-monospace,monospace; }
+#sync > .reminder-recording,#reminders > .reminder-recording { margin-top:0; }
+#reminders > .reminder-recording h2 { margin-bottom:18px; }
+.overview-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:36px; --gallery-media-height:220px; }
+.feature-links { display:flex; align-items:center; flex-wrap:wrap; gap:12px 28px; margin-top:28px; font-size:14px; color:var(--muted); }
+.feature-links a,.section-guide { display:inline-flex; align-items:center; min-height:44px; color:var(--accent-text); font-size:14px; }
+.reminders-mobile { margin-block:40px; }
+.mobile-gallery { display:flex; flex-wrap:wrap; justify-content:center; gap:32px 24px; --gallery-media-height:280px; }
+.mobile-gallery > .feature-preview { flex:0 1 calc((100% - 72px)/4); max-width:230px; }
+.mobile-gallery + .mobile-gallery { margin-top:40px; }
+.mobile-gallery figcaption,.reading-previews figcaption { text-align:center; }
+.reminder-extras { display:grid; grid-template-columns:1fr; gap:40px; align-items:stretch; }
+.reminder-extras .embedded-reminders { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr); align-items:center; gap:32px; width:100%; max-width:1040px; margin:0 auto; padding:28px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+.reminder-extras .notification-story { width:100%; }
+.reminder-extras .embed-heading { min-width:0; margin:0; }
+.reminder-extras .embed-heading p { margin:16px 0 12px; }
+.reminder-extras .section-guide { gap:6px; }
+.reminder-extras .embedded-reminders h3 { font-size:24px; margin:0; }
+.reminder-extras .embed-demo { display:block; min-width:0; }
+/* Frame the note’s “Before we go” list; the gallery opens the full screenshot. */
+.reminder-extras .embedded-note-image {
+ --embed-x:880; --embed-y:1030; --embed-width:1680; --embed-height:1040;
+ display:block; position:relative; aspect-ratio:var(--embed-width) / var(--embed-height);
+ overflow:hidden; border:1px solid var(--line); border-radius:10px;
+}
+.reminder-extras .embedded-note-image img {
+ position:absolute; width:calc(100% * 3714 / var(--embed-width)); max-width:none; height:auto;
+ left:calc(-100% * var(--embed-x) / var(--embed-width));
+ top:calc(-100% * var(--embed-y) / var(--embed-height));
+}
+.hosting-option p { margin-bottom:18px; }
+.hosting-option .hosting-guide { padding-top:10px; }
+.hosting-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:48px; align-items:center; }
+.hosting-overview .sync-map { padding:0; }
+@media(max-width:700px) { .hosting-overview { grid-template-columns:1fr; gap:28px; } }
+.faq-accordion details { border-bottom:1px solid var(--line); }
+.faq-accordion summary { cursor:pointer; padding:20px 28px 20px 0; font-size:15px; line-height:1.5; }
+.faq-accordion p { padding:0 0 24px; color:var(--muted); font-size:14px; line-height:1.8; }
+.faq-accordion a { color:var(--accent-text); }
+@media(max-width:850px) {
+ .mobile-gallery > .feature-preview { flex-basis:calc((100% - 24px)/2); }
+ .overview-grid { --gallery-media-height:170px; }
+ .reminder-extras { gap:16px; }
+ .reminder-extras .embedded-reminders { padding:22px; }
+}
+@media(max-width:600px) {
+ .overview-grid { grid-template-columns:1fr; --gallery-media-height:240px; }
+ .mobile-gallery { --gallery-media-height:260px; gap:28px 16px; }
+ .mobile-gallery > .feature-preview { flex-basis:calc((100% - 16px)/2); }
+ .reading-previews { grid-template-columns:1fr; --gallery-media-height:340px; gap:32px; }
+ .reminder-extras { grid-template-columns:1fr; }
+ .reminder-extras .embedded-reminders { grid-template-columns:1fr; gap:20px; padding:20px; }
+ .feature-links { gap:8px 20px; }
+}

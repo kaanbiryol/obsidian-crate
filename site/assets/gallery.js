@@ -3,6 +3,17 @@
   const dialog = document.querySelector('#media-viewer');
   if (!dialog || typeof dialog.showModal !== 'function') return;
 
+  // Dialog autofocus and focus restoration can inherit a keyboard focus ring
+  // even after a pointer interaction. Keep focus, but track the input method.
+  document.addEventListener('pointerdown', () => {
+    document.documentElement.dataset.galleryInput = 'pointer';
+  }, true);
+  document.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey || ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+    document.documentElement.dataset.galleryInput = dialog.open && ['ArrowLeft', 'ArrowRight'].includes(event.key)
+      ? 'arrows' : 'keyboard';
+  }, true);
+
   const content = dialog.querySelector('#media-viewer-content');
   const title = dialog.querySelector('#media-viewer-title');
   const caption = dialog.querySelector('#media-viewer-caption');
