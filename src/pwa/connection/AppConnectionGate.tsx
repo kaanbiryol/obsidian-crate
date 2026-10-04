@@ -25,7 +25,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
     if (previousSection.current !== section) returnButton.current?.focus({ preventScroll: true });
     previousSection.current = section;
   }, [section]);
-  const [contentMounted, setContentMounted] = useState(false);
+  const [contentSection, setContentSection] = useState<typeof section | null>(null);
   const [exportError, setExportError] = useState('');
   const [browserSetup, setBrowserSetup] = useState(needsBrowserSetup);
   const shell = (content: ReactNode) => <div className="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-ui-host="pwa">{content}</div>;
@@ -70,10 +70,11 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
     return null;
   };
   const screen = connectionScreen();
-  const keepContent = !screen || Boolean(contentMounted && app.bootstrapped && !browserSetup && otherReady);
-  useLayoutEffect(() => { setContentMounted(keepContent); }, [keepContent]);
+  const keepContent = !screen || Boolean(contentSection === other && app.bootstrapped && !browserSetup && otherReady);
+  const nextContentSection = !screen ? section : keepContent ? contentSection : null;
+  useLayoutEffect(() => { setContentSection(nextContentSection); }, [nextContentSection]);
   // Keep the connected feature's UI state while another feature needs setup.
-  // No feature remains mounted after both sessions are lost or during setup.
+  // Losing the displayed session clears its private UI, even if the other is connected.
   return <>
     <div hidden={!!screen} inert={!!screen} style={{ display: screen ? 'none' : 'contents' }}>
       {keepContent && children}
