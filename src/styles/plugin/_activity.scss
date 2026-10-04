@@ -63,29 +63,6 @@
 
 .crate-activity-modal > .crate-modal-header-host { flex-shrink: 0; }
 
-.crate-reminders-ui .crate-activity-modal .reminder-modal-header {
-    border-bottom: 0;
-    padding: 12px 10px 0;
-
-    .reminder-modal-header-side.is-right {
-        min-width: 0;
-        gap: 16px;
-    }
-}
-
-// Keep the close control quiet, including when the host theme styles buttons.
-.crate-reminders-ui .crate-activity-modal .reminder-modal-header-close {
-    background: transparent !important;
-    border-color: transparent !important;
-    box-shadow: none !important;
-
-    &:hover { color: var(--text-normal); }
-    &:focus-visible {
-        outline: 2px solid var(--crate-activity-focus-ring);
-        outline-offset: 1px;
-    }
-}
-
 .crate-activity-subtitle {
     display: flex;
     align-items: center;
