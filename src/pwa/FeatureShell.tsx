@@ -152,7 +152,13 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		restoreFocus.current = true;
 		showSection(next);
 	};
-	const navigate = (next: DockDestination) => { setDestination(next); switchSection(next.section); };
+	const navigate = (next: DockDestination) => {
+		// The loading header, dock and first library render share this selection.
+		// Set it before entering, rather than waiting for the loaded dock's effect.
+		if (next.section === 'reading') rememberReadingTab(next.tab);
+		setDestination(next);
+		switchSection(next.section);
+	};
 	const toggle = () => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); };
 	const panelStyle = (panel: CrateSection) => ({
 		zIndex: panel === frontSection ? 2 : 1,

@@ -1,4 +1,4 @@
-import { checkColdReminderTabs } from './pwa-cold-tab-checks.mjs';
+import { checkColdReadingTabs, checkColdReminderTabs, checkWarmTabDestinations } from './pwa-cold-tab-checks.mjs';
 import { switchFeature, featureNavigationTarget, installFeatureNavigation } from './pwa-feature-navigation.mjs';
 import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
@@ -26,7 +26,9 @@ try {
   for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     const browser = await engine.launch({headless:true});
     try {
+      await checkColdReadingTabs(browser, origin);
       await checkColdReminderTabs(browser, origin);
+      await checkWarmTabDestinations(browser, origin);
       for (const theme of ['light','dark']) {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme:theme, reducedMotion:'reduce', hasTouch:true });
         const page = await context.newPage(); await installFeatureNavigation(page); const errors=[]; page.on('pageerror',error=>errors.push(error.message));
