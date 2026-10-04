@@ -205,11 +205,6 @@ export class HistoryBrowser {
         this.footer.createSpan({ text: `${describeHistory(this.selected)} · ${historyTime(this.selected)}`, cls: 'crate-history-hint' });
         const actions = this.footer.createDiv({ cls: 'crate-history-browser-actions' });
         const entry = this.selected;
-        if ((entry.sharedCheckpoint || entry.historyCheckpoint) && this.deps.load) {
-            const refresh = actions.createEl('button', { text: 'Refresh comparison', cls: 'crate-activity-action', attr: { type: 'button' } });
-            refresh.disabled = !this.comparison;
-            refresh.addEventListener('click', () => { void this.select(entry, false, this.selectedPath); });
-        }
         const path = this.selectedPath;
         if (path && this.deps.openFile) {
             const file = actions.createEl('button', { text: 'File history', cls: 'crate-activity-action', attr: { type: 'button' } });

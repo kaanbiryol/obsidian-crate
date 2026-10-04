@@ -224,11 +224,11 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
 }
 
 .crate-browser-action-status { order: 3; flex-basis: 100%; color: var(--text-error); font-size: 12px; line-height: 1.4; &:empty { display: none; } }
-.crate-pending-discard-modal {
+.modal.crate-pending-discard-modal {
     .crate-modal-body {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--crate-space-12);
 
         > p { margin: 0; line-height: 1.5; }
         > [role="status"]:empty { display: none; }

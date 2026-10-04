@@ -17,14 +17,21 @@ interface PendingVerificationContext {
 /** Settle local file events by content, without contacting the server. */
 export async function verifyUnchangedPendingPaths(context: PendingVerificationContext, keys: string[]): Promise<string[]> {
 	const { adapter, manifest, isCurrent } = context;
+	const absent: Array<{ key: string; path: string }> = [];
 	const matches: Array<{ key: string; baseline: FileEntry; modified: string }> = [];
 	// Read sequentially to keep memory bounded even for large attachments.
 	for (const key of keys) {
-		if (key.startsWith('delete:') || !isCurrent(key)) continue;
-		const baseline = manifest.getEntry(key);
-		if (!baseline) continue;
+		if (!isCurrent(key)) continue;
+		const path = key.startsWith('delete:') ? key.slice(7) : key;
+		const baseline = manifest.getEntry(path);
 		try {
-			assertLocalSyncPath(key);
+			assertLocalSyncPath(path);
+			if (!baseline) {
+				// A file created and removed before its first upload has no change to send.
+				if (await adapter.stat(path) === null && isCurrent(key)) absent.push({ key, path });
+				continue;
+			}
+			if (key.startsWith('delete:')) continue;
 			const before = await adapter.stat(key);
 			if (!before || before.type !== 'file' || before.size > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
 			const bytes = await adapter.readBinary(key);
@@ -50,5 +57,5 @@ export async function verifyUnchangedPendingPaths(context: PendingVerificationCo
 		settled.push(key);
 	}
 	if (updated) await manifest.save();
-	return settled.filter(isCurrent);
+	return [...settled, ...absent.filter(({ key, path }) => isCurrent(key) && !manifest.getEntry(path)).map(({ key }) => key)].filter(isCurrent);
 }

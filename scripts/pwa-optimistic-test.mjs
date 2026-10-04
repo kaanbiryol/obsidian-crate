@@ -116,7 +116,6 @@ async function verifyImmediateUpdates(page) {
 		await save(page).click();
 		await create.wait();
 		await expectEditorClosed(page);
-		await expect(page.locator('.toast.is-success')).toHaveText('Reminder created');
 		await expect(card(page, 'Optimistic creation')).toBeVisible();
 		await expect(page.locator('.view-header .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'syncing');
 		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
@@ -125,6 +124,7 @@ async function verifyImmediateUpdates(page) {
 		await openReminder(page, 'Check this article');
 		create.finish();
 		await expectSynced(page);
+		await expect(page.locator('.toast.is-success')).toHaveText('Reminder created');
 		await expect(title(page)).toHaveText('Check this article');
 		await expect(save(page)).toBeEnabled();
 	} finally { create.finish(); }
@@ -174,9 +174,7 @@ async function verifyProjectSyncIndicator(page) {
 	await expectSynced(page, indicator);
 	await indicator.getByRole('button').click();
 	const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-	await expect(settings).toBeVisible();
-	await expect(settings.getByRole('region', { name: 'Sync and device', exact: true })).toContainText('All changes synced');
-	await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
+	await expect(page.locator('.toast.has-sync-indicator')).toHaveText('All changes synced');
 	await expect(settings).toHaveCount(0);
 	const originalTop = (await scroll.boundingBox()).y;
 	const mutation = await holdNextMutation(page, '/reminders/update');

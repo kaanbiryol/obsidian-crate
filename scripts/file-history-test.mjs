@@ -328,13 +328,14 @@ for(const browserType of [chromium,webkit]) {
    await expect(historyRoot.getByRole('region')).toContainText('# Current vault Today.md');
    await expect(historyRoot.getByRole('button',{name:'Retry loading',exact:true})).toHaveCount(0);
    await page.evaluate(()=>{window.historyMatches=true;});
-   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await selectPoint('abcdef12');
    await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Differences · 0');
    await expect(historyRoot.locator('.crate-history-event-files')).toContainText('Your current vault matches this saved state.');
    await expect(historyRoot.locator('.crate-history-preview-pane')).toContainText('Your current vault matches this saved state.');
    await expect(historyRoot.locator('.crate-history-syncs [aria-current="true"]')).toContainText(':18:07');
    await page.evaluate(()=>{window.historyMatches=false;});
-   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await selectPoint('abcdef12');
+   await historyRoot.getByRole('button',{name:'View Today.md',exact:true}).click();
    await expect(historyRoot.getByRole('region')).toContainText('# Earliest Today.md');
    await page.evaluate(()=>{window.historyDelay=true;});
    await selectPoint('12345678');
@@ -368,7 +369,7 @@ for(const browserType of [chromium,webkit]) {
    await page.evaluate(()=>{window.historyPreviewError=false;});
    await historyRoot.getByRole('button',{name:'Retry preview',exact:true}).click();
    await expect(historyRoot.getByRole('region')).toContainText('# Selected Upcoming.md');
-   await historyRoot.getByRole('button',{name:'Refresh comparison',exact:true}).click();
+   await expect(historyRoot.getByRole('button',{name:'Refresh comparison',exact:true})).toHaveCount(0);
    await expect(historyRoot.getByRole('region')).toContainText('# Selected Upcoming.md');
    const loadsBeforeSync=await page.evaluate(()=>window.historyLoads.length);
    await page.evaluate(()=>window.completeHistorySync());

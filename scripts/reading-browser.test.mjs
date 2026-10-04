@@ -371,8 +371,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const target = await readingSync.getByRole('button').boundingBox();
     assert.equal(target.width,44); assert.equal(target.height,44);
     await readingSync.getByRole('button').click();
-    await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Close settings', exact: true }).click();
+    await expect(page.locator('.toast.has-sync-indicator')).toHaveText(await readingSync.getAttribute('title'));
+    await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
     assert.equal(await page.locator('.crate-feature-nav').count(), 0);
     await page.getByRole('searchbox',{name:'Search reading'}).fill('kept while switching');
     await switchFeature(page, 'Reminders');

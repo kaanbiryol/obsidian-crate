@@ -1,3 +1,4 @@
+import { TFolder } from 'obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	clearSyncedPendingPaths,
@@ -684,4 +685,13 @@ describe('queued deletion revalidation', () => {
 		expect(harness.pendingPaths.has('delete:note.md')).toBe(true);
 		expect(harness.state.lastError).toContain('adapter unavailable');
 	});
+});
+
+
+it('does not queue deleted folders as files', () => {
+ const h = createEventContext();
+ const folder = Object.assign(new TFolder(), { path: 'Fake conflicts' });
+ onFileDelete(h.context, folder);
+ expect(h.pendingPaths.size).toBe(0);
+ expect(h.triggerDebouncedSync).not.toHaveBeenCalled();
 });

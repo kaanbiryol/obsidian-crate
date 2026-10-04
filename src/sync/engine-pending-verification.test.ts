@@ -220,3 +220,42 @@ it('discards an old verification across a manual sync and retries locally afterw
 	await verify();
 	expect(h.engine.getPendingPaths()).toEqual([]);
 });
+
+
+it('clears files created and deleted before their first sync without transfers', async () => {
+ touch('temporary.md');
+ h.vault.adapter.stat.mockResolvedValue(null);
+ h.engine.onFileDelete({ path: 'temporary.md' } as never);
+ await verify();
+ expect(h.engine.getPendingPaths()).toEqual([]);
+ expect(h.localManifest.save).not.toHaveBeenCalled();
+ expectNoTransfers();
+});
+
+it('keeps deletion of a synced file pending', async () => {
+ h.vault.adapter.stat.mockResolvedValue(null);
+ h.engine.onFileDelete({ path } as never);
+ await verify();
+ expect(h.engine.getPendingPaths()).toEqual([`delete:${path}`]);
+ expectNoTransfers();
+});
+
+it('preserves a file recreated during absent-file verification', async () => {
+ h.vault.adapter.stat.mockImplementationOnce(async () => {
+  touch('temporary.md');
+  return null;
+ });
+ h.engine.onFileDelete({ path: 'temporary.md' } as never);
+ await verify();
+ expect(h.engine.getPendingPaths()).toEqual(['temporary.md']);
+ expectNoTransfers();
+});
+
+it('keeps an untracked deletion when an upload receipt needs recovery', async () => {
+ vi.spyOn(h.localManifest.uploadJournal, 'pending').mockReturnValue([{ path: 'temporary.md' }]);
+ h.vault.adapter.stat.mockResolvedValue(null);
+ h.engine.onFileDelete({ path: 'temporary.md' } as never);
+ await verify();
+ expect(h.engine.getPendingPaths()).toEqual(['delete:temporary.md']);
+ expectNoTransfers();
+});

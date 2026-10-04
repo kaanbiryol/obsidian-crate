@@ -46,7 +46,7 @@ export function onFileChange(context: QueueEventContext, file: Pick<TAbstractFil
 }
 
 export function onFileDelete(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
-	if (!context.shouldIgnore(file.path)) {
+	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
 		addPendingPath(context, `delete:${file.path}`);
 		context.triggerDebouncedSync();
 	}

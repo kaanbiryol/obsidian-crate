@@ -50,6 +50,18 @@ const pendingReading = page => page.evaluate(async () => {
 });
 const reminderCount = page => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).length);
 const indicator = page => page.locator('.crate-feature-panel[data-active="true"] .pwa-sync-indicator');
+async function expectStatusToast(page, state, label) {
+	const before = page.url();
+	await indicator(page).getByRole('button').tap();
+	const toast = page.locator('.toast.has-sync-indicator');
+	await expect(toast).toBeVisible();
+	await expect(toast).toHaveText(label);
+	await expect(toast).toHaveAttribute('role', state === 'error' ? 'alert' : 'status');
+	await expect(toast.locator('.crate-sync-indicator')).toHaveAttribute('data-sync-state', state);
+	await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
+	expect(page.url()).toBe(before);
+}
+
 
 try {
 	for (const engine of [chromium, webkit]) {
@@ -89,15 +101,17 @@ try {
 				await expect.poll(() => captures).toBe(1);
 				await expect(page.locator('.crate-reading-web')).toHaveCount(0);
 				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'syncing');
-				await indicator(page).getByRole('button').click();
-				const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-				await expect(settings.getByText('Syncing 1 change', { exact: true })).toBeVisible();
+				await expectStatusToast(page, 'syncing', 'Syncing 1 change');
 				await expect(page.locator('.crate-reading-web')).toHaveCount(0);
 				release(); await expect.poll(async () => (await pendingReading(page)).length).toBe(0);
-				await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
 				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');
+				await expectStatusToast(page, 'synced', 'All changes synced');
 				await switchFeature(page, 'Reading');
 				await expect(indicator(page)).toHaveAttribute('title', 'All changes synced');
+				await expectStatusToast(page, 'synced', 'All changes synced');
+				await context.setOffline(true);
+				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'offline');
+				await expectStatusToast(page, 'offline', 'Offline: showing saved data');
 				expect(errors).toEqual([]); await context.close();
 			}
 			{
@@ -107,6 +121,7 @@ try {
 				await expect.poll(() => reminderCount(page)).toBe(0);
 				await expect(page.locator('.pwa-reminders-view')).toHaveCount(0);
 				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'error');
+				await expectStatusToast(page, 'error', await indicator(page).getAttribute('title'));
 				await switchFeature(page, 'Reminders');
 				await expect(indicator(page)).toHaveAttribute('title', /Reading:/);
 				expect(errors).toEqual([]); await context.close();
@@ -117,7 +132,7 @@ try {
 				await page.route('**/reading/capture', route => { captures++; return route.fulfill({ json: {} }); });
 				await page.goto(origin + (paused === 'reading' ? '/notifications?tab=inbox' : '/notifications?section=reading'));
 				await expect(indicator(page)).toHaveAttribute('title', /Paused: 1 change saved on this device/);
-				await indicator(page).getByRole('button').click();
+				await page.getByRole('button', { name: 'Open settings', exact: true }).click();
 				const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
 				await expect(settings.getByRole('button', { name: 'Refresh all', exact: true })).toBeEnabled();
 				await expect(settings.getByRole('button', { name: 'Log out', exact: true })).toBeEnabled();
@@ -155,7 +170,7 @@ try {
 				await page.route('**/auth/session', async route => { await cleanup; await route.fulfill({ status: 503, json: { error: 'Unavailable' } }); });
 				await page.goto(origin + '/notifications?section=reading');
 				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');
-				await indicator(page).getByRole('button').click();
+				await page.getByRole('button', { name: 'Open settings', exact: true }).click();
 				await page.getByRole('button', { name: 'Log out', exact: true }).click();
 				await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();
 				await expect(page.getByRole('heading', { name: 'Connect to Crate' })).toBeVisible();
