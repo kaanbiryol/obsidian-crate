@@ -175,6 +175,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
     const expandDiagnostics = async () => {
+      // A fragment-only navigation triggers a reload in the save page. Wait
+      // until that new document consumes the fragment before opening details.
+      await expect(page).toHaveURL(url => url.hash === '');
       if (!await page.locator('#support').evaluate(el => el.open)) await page.locator('#support > summary').click();
     };
     const diagnostic = async () => {
