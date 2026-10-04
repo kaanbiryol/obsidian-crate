@@ -40,7 +40,11 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 		const sessionCurrent = capturePwaSession();
 		const isCurrent = () => operation === sequence.current && sessionCurrent();
 		const update = (push: PushState) => { if (isCurrent()) setState(previous => ({ authToken, push, initialCheckComplete: push.phase !== 'checking' || (previous.authToken === authToken && previous.initialCheckComplete) })); };
-		update(CHECKING);
+		// Keep settled notification UI in place during passive foreground checks.
+		// Hiding and restoring the enable prompt shifts the reminders list.
+		if (isCurrent()) setState(previous => !enable && previous.authToken === authToken && previous.initialCheckComplete
+			? previous
+			: { authToken, push: CHECKING, initialCheckComplete: previous.authToken === authToken && previous.initialCheckComplete });
 		const promise = (async () => {
 			try {
 				if (!isStandaloneApp() && isIosOrIpados()) {

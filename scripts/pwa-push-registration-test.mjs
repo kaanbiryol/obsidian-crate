@@ -21,14 +21,15 @@ const resume = page => page.evaluate(() => window.dispatchEvent(new Event('pages
 const on = page => page.locator('.settings-status.is-success');
 const retry = page => page.getByRole('button', { name: 'Retry', exact: true });
 
-async function harness(browser, existing = false) {
-  const context = await browser.newContext({ serviceWorkers: 'block' });
+async function harness(browser, existing = false, standalone = false) {
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
   const sessions = new Set([previewAuthToken]);
   const rows = new Map();
   const attempts = [];
   const held = [];
   const control = { mode: 'ok', holdToken: null, notificationsEnabled: true };
-  await context.addInitScript(({ authKey, providerKey, token, existing, firstEndpoint }) => {
+  await context.addInitScript(({ authKey, providerKey, token, existing, firstEndpoint, standalone }) => {
+    if (standalone) Object.defineProperty(navigator, 'standalone', { value: true });
     if (!localStorage.getItem(providerKey)) {
       localStorage.setItem(authKey, token);
       localStorage.setItem(providerKey, JSON.stringify({ permission: existing ? 'granted' : 'default', endpoint: existing ? firstEndpoint : null, subscribes: 0, unsubscribes: 0 }));
@@ -47,11 +48,11 @@ async function harness(browser, existing = false) {
       static get permission() { return read().permission; }
     } });
     Object.defineProperty(window, 'pushManager', { configurable: true, value: {
-      getSubscription: async () => { const value = read(); if (value.readFailure) throw new Error('Provider unavailable'); return value.endpoint ? subscription(value.endpoint) : null; },
+      getSubscription: async () => { window.pushReads = (window.pushReads || 0) + 1; await window.heldPushRead; const value = read(); if (value.readFailure) throw new Error('Provider unavailable'); return value.endpoint ? subscription(value.endpoint) : null; },
       subscribe: async () => { const value = read(); const endpoint = value.endpoint || firstEndpoint; write({ ...value, permission: 'granted', endpoint, subscribes: value.subscribes + 1 }); return subscription(endpoint); },
       permissionState: async () => read().permission,
     } });
-  }, { authKey, providerKey, token: previewAuthToken, existing, firstEndpoint });
+  }, { authKey, providerKey, token: previewAuthToken, existing, firstEndpoint, standalone });
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
   await context.route('**/notifications/vapid-public-key', route => route.fulfill({ contentType: 'application/json', body: '{"publicKey":"AQID"}' }));
   await context.route('**/notifications/reminders-exchange', async route => {
@@ -244,10 +245,44 @@ async function pausedVault(browser) {
   } finally { await state.close(); }
 }
 
+async function stableListOnResume(browser) {
+  const state = await harness(browser, false, true);
+  const { page } = state;
+  try {
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    const prompt = page.locator('.pwa-notification-prompt');
+    await expect(prompt).toBeVisible();
+    const list = page.locator('.reminders-view-scroll').filter({ visible: true }).first();
+    await expect(list).toBeVisible();
+    const before = await list.boundingBox();
+    await page.evaluate(() => {
+      window.heldPushRead = new Promise(resolve => { window.releasePushRead = resolve; });
+      window.pushReads = 0;
+      window.resumePositions = [];
+      window.sampleResume = true;
+      const sample = () => {
+        const list = [...document.querySelectorAll('.reminders-view-scroll')].find(el => el.getBoundingClientRect().height > 0);
+        window.resumePositions.push(list.getBoundingClientRect().top);
+        if (window.sampleResume) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+      window.dispatchEvent(new Event('pageshow'));
+    });
+    await expect.poll(() => page.evaluate(() => window.pushReads)).toBe(1);
+    await expect(prompt).toBeVisible();
+    await page.evaluate(() => window.releasePushRead());
+    await expect(prompt).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.resumePositions.length)).toBeGreaterThan(10);
+    const positions = await page.evaluate(() => { window.sampleResume = false; return window.resumePositions; });
+    expect(positions.every(top => Math.abs(top - before.y) < 1), `List shifted on resume: ${positions}`).toBe(true);
+  } finally { await state.close(); }
+}
+
 try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
     try {
+      await stableListOnResume(browser);
       for (const failure of ['before', 'after']) await registrationFailure(browser, failure);
       await renewalAndProviderChanges(browser);
       await logoutDuringConfirmation(browser);
