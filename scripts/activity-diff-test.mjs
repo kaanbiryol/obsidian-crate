@@ -97,6 +97,7 @@ const { outputFiles } = await build({
                 open() { document.body.append(this.modalEl); this.onOpen(); }
                 close() { this.onClose(); this.modalEl.remove(); }
             }
+            export class Setting {}
             export class Notice { constructor(message) { window.notice = message; } }
             export function setIcon(el, name) {
                 const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

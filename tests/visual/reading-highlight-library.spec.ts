@@ -28,6 +28,7 @@ for (const engine of [chromium, webkit]) for (const host of ['plugin', 'pwa']) {
 			await expect(dialog).toBeVisible();
 			if (host === 'plugin') {
 				const pane = (await page.locator('.crate-reading-workspace').boundingBox())!;
+				await expect.poll(async () => Math.abs((await dialog.boundingBox())!.y - pane.y - 20)).toBeLessThanOrEqual(1);
 				const sheet = (await dialog.boundingBox())!;
 				expect(pane.width).toBe(340);
 				expect(pane.x).toBeGreaterThan(500);

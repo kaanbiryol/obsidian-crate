@@ -91,7 +91,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     await runtime.db.prepare('DELETE FROM auth_tokens WHERE id=?').bind(capture.body.id).run();
     assert.equal((await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) })).status, 410);
     const page = await runtime.mf.dispatchFetch('http://localhost:8787/notifications/save-reading');
-    assert.equal(page.headers.get('Cache-Control'), 'no-store'); assert.match(await page.text(), /Saving to Crate/);
+    assert.equal(page.headers.get('Cache-Control'), 'no-store'); assert.match(await page.text(), /<title>Save to Crate<\/title>/);
     const manifest = await (await runtime.mf.dispatchFetch('http://localhost:8787/notifications/manifest.json')).json();
     assert.equal(manifest.id, '/notifications'); assert.equal(manifest.share_target.action, '/notifications/share/reading');
     assert.equal((await runtime.db.prepare('SELECT (SELECT count(*) FROM files)+(SELECT count(*) FROM reading_captures) AS count').first()).count, 2);

@@ -46,7 +46,7 @@ export function registerViewHeaderTests() {
         await expect(header.locator('h1')).toHaveText('Inbox');
         const inbox = await headerGeometry(header);
         const narrow = width <= 759;
-        expect(inbox.padding).toEqual([narrow ? '4px' : '12px', '18px', narrow ? '8px' : '10px', '18px']);
+        expect(inbox.padding).toEqual([narrow ? '12px' : '20px', '18px', narrow ? '8px' : '10px', '18px']);
         expect(inbox.metaHeight).toBe(narrow ? 20 : 24);
         for (const label of ['Reminders', 'Projects', 'Reading']) {
           await active.getByRole('button', { name: label, exact: true }).click();

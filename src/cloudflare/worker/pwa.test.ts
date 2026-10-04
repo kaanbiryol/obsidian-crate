@@ -227,12 +227,11 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--text-normal);');
 	});
 
-	it('keeps the Obsidian handoff page readable in light mode', () => {
-		expect(OPEN_OBSIDIAN_HTML).toContain('<meta name="color-scheme" content="light dark">');
-		expect(OPEN_OBSIDIAN_HTML).toContain('@media (prefers-color-scheme:light)');
-		expect(OPEN_OBSIDIAN_HTML).toContain('body{background:#f7f7f8;color:#18181b}');
-		expect(OPEN_OBSIDIAN_HTML).toContain('.btn{background:#6d28d9;color:#fff}');
-		expect(OPEN_OBSIDIAN_HTML).toContain('p{color:#52525b}');
+	it('uses the shared dark status theme for the Obsidian handoff', () => {
+		expect(OPEN_OBSIDIAN_HTML).toContain('<meta name="color-scheme" content="dark">');
+		expect(OPEN_OBSIDIAN_HTML).toContain('background:#0c0c0f;color:#f3f3f5');
+		expect(OPEN_OBSIDIAN_HTML).toContain('background:#e9e4f4;color:#211c2a');
+		expect(OPEN_OBSIDIAN_HTML).toContain('color:var(--muted)');
 		expect(OPEN_OBSIDIAN_HTML).toContain('<script src="/notifications/open-obsidian.js?v=');
 		expect(OPEN_OBSIDIAN_HTML).not.toContain('<script>');
 		expect(OPEN_OBSIDIAN_JS).toContain("var project = params.get('project')");

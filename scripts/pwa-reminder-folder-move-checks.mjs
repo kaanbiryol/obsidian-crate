@@ -47,6 +47,7 @@ export async function verifyReminderFolderMove({ admin, page, origin, owner, set
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).length), { timeout: 30000 }).toBe(0);
   assert.equal(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token')), token);
   await page.locator('[data-action="toggle-settings"]').click();
+  await page.getByText('Encryption details', { exact: true }).click();
   await expect(page.getByText('Work/Tasks', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close settings', exact: true }).click();
   await page.locator('[data-action="open-create-modal"]').click();

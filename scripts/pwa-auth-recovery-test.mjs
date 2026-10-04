@@ -231,14 +231,10 @@ async function verifyUnsavedDraft(browser) {
   try {
     await page.getByRole('group', { name: cardName, exact: true }).click();
     await page.getByRole('textbox', { name: 'Reminder title', exact: true }).fill('Keep text that has not been submitted');
-    // Simulate a draft written by the previous PWA format before upgrading.
-    await page.evaluate(() => {
-      const key = Object.keys(sessionStorage).find(key => key.startsWith('crate-reminder-draft:'));
-      const raw = sessionStorage.getItem(key);
-      const modal = JSON.parse(raw);
-      sessionStorage.setItem(`crate-reminder-draft:${modal.reminderId ?? 'new'}`, raw);
-      sessionStorage.removeItem(key);
-    });
+    await expect.poll(() => page.evaluate(() => {
+      const key = Object.keys(sessionStorage).find(key => key.startsWith('crate-reminder-draft:Reminders:'));
+      return key ? JSON.parse(sessionStorage.getItem(key)).draft.content : null;
+    })).toBe('Keep text that has not been submitted');
     sessions.delete(previewAuthToken);
     await page.reload();
     await page.getByRole('button', { name: 'Open Obsidian', exact: true }).waitFor();

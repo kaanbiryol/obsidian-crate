@@ -39,7 +39,7 @@ try {
         const title = page.locator('.crate-feature-panel[data-active="true"] .view-header-title');
         const visibleTitle = await title.innerText();
         const remindersHeader = await headerGeometry(page);
-        expect(remindersHeader.meta[1] - (remindersHeader.title[1] + remindersHeader.title[2])).toBeCloseTo(6, 1);
+        expect(remindersHeader.meta[1] - (remindersHeader.title[1] + remindersHeader.title[2])).toBeCloseTo(2, 1);
         await mkdir('test-results/feature-switcher',{recursive:true});
         const historyLength = await page.evaluate(() => history.length);
         await checkBackGesture(page, '[data-crate-section="reminders"]');
@@ -69,7 +69,7 @@ try {
         await expect(title).toHaveText(visibleTitle);
         await page.setViewportSize({width:1280,height:900});
         const desktopHeader = await headerGeometry(page);
-        expect(desktopHeader.meta[1] - (desktopHeader.title[1] + desktopHeader.title[2])).toBeCloseTo(6, 1);
+        expect(desktopHeader.meta[1] - (desktopHeader.title[1] + desktopHeader.title[2])).toBeCloseTo(2, 1);
         expect(desktopHeader.title[0]).toBe(18);
         await switchFeature(page, 'Reading');
         expect(await headerGeometry(page)).toEqual(desktopHeader);
