@@ -22,16 +22,13 @@
 .reminder-extras .section-guide { gap:6px; }
 .reminder-extras .embedded-reminders h3 { font-size:24px; margin:0; }
 .reminder-extras .embed-demo { display:block; min-width:0; }
-/* Frame the note’s “Before we go” list; the gallery opens the full screenshot. */
+/* Fit the complete note screenshot inside the existing preview frame. */
 .reminder-extras .embedded-note-image {
- --embed-x:880; --embed-y:1030; --embed-width:1680; --embed-height:1040;
- display:block; position:relative; aspect-ratio:var(--embed-width) / var(--embed-height);
- overflow:hidden; border:1px solid var(--line); border-radius:10px;
+ display:block; position:relative; aspect-ratio:1680 / 1040;
+ overflow:hidden; border:0; border-radius:10px;
 }
 .reminder-extras .embedded-note-image img {
- position:absolute; width:calc(100% * 3714 / var(--embed-width)); max-width:none; height:auto;
- left:calc(-100% * var(--embed-x) / var(--embed-width));
- top:calc(-100% * var(--embed-y) / var(--embed-height));
+ position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
 }
 .hosting-option p { margin-bottom:18px; }
 .hosting-option .hosting-guide { padding-top:10px; }
