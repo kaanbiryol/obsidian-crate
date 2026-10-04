@@ -3,6 +3,7 @@ import { checkTabSettings } from './pwa-tab-settings-checks.mjs';
 import { checkCompoundFocus, checkSettingsFocus } from './pwa-compound-focus-checks.mjs';
 import { checkSettingsMotion } from './pwa-settings-motion-checks.mjs';
 import { checkSettingsNavigation } from './pwa-settings-navigation-checks.mjs';
+import { checkInstallSettings } from './pwa-settings-install-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -24,6 +25,7 @@ try {
 	for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
 		const browser = await engine.launch();
 		try {
+			await checkInstallSettings(browser, origin, name);
 			await checkSettingsMotion(browser, origin);
 			const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce', serviceWorkers: 'block' });
 			const page = await context.newPage();
@@ -119,7 +121,7 @@ try {
 			await page.emulateMedia({ colorScheme: 'dark' });
 			await expectTheme(page, 'dark', 'system');
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
-			await sheet.getByRole('combobox', { name: 'Default tab' }).selectOption('favorites');
+			await sheet.getByRole('combobox', { name: 'Open app to' }).selectOption('favorites');
 			await checkSettingsFocus(page, sheet);
 			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'], reminderListStyle: 'flat' });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
@@ -268,7 +270,7 @@ try {
 			await logout.getByRole('button', { name: 'Cancel', exact: true }).click();
 			await expect(sheet.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 			await page.setViewportSize({ width: 320, height: 568 });
-			await expect(sheet.getByRole('combobox', { name: 'Default tab' })).toBeVisible();
+			await expect(sheet.getByRole('combobox', { name: 'Open app to' })).toBeVisible();
 			expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 			await page.screenshot({ path: 'test-results/settings/' + name + '-compact.png' });
 			await page.setViewportSize({ width: 1280, height: 900 });

@@ -41,7 +41,7 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const [destination, setDestination] = useState<DockDestination | null>(() => launch.tab === 'reading' ? { section: 'reading', tab: launch.readingTab } : null);
 	const [settingsOpen] = useSettingsOpen();
 	const settings = useSettingsStore();
-	const [settingsNavigation] = useState(() => createPushedScreenHistory(['shortcut', 'logout'] as const));
+	const [settingsNavigation] = useState(() => createPushedScreenHistory(['shortcut', 'logout', 'install'] as const));
 	useEffect(() => { if (!settingsOpen) settingsNavigation.reset(); }, [settingsOpen, settingsNavigation]);
 	const [shortcutLaunch] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
 	const openedShortcut = useRef(false);

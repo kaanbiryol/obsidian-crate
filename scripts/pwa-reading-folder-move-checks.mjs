@@ -43,13 +43,15 @@ export async function verifyReadingFolderMove({ t, page, origin, owner, bundle, 
     // The same open PWA follows the rename on refresh, without another link/key.
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
+    await page.getByText('Encryption details', { exact: true }).click();
     await expect(page.getByText('Articles', { exact: true })).toBeVisible({ timeout: 30000 });
     await page.getByRole('button', { name: 'Close settings', exact: true }).click();
     await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 });
     await page.reload();
     await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 });
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-    await expect(page.getByText('Active · this Reading folder is unlocked.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reading', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
+    await page.getByText('Encryption details', { exact: true }).click();
     await expect(page.getByText('Articles', { exact: true })).toBeVisible();
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1'))), oldSession);
   } finally {

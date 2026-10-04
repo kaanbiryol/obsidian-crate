@@ -23,20 +23,28 @@
 }
 
 .pwa-settings-root {
+	&.crate-reminders-ui {
+		--reminder-font-base: var(--pwa-font-body);
+		--reminder-font-sm: var(--pwa-font-detail);
+		--reminder-font-weight-medium: 400;
+	}
 	position: absolute;
 	inset: 0;
 	z-index: 4;
 	pointer-events: none;
 
-	.settings-panel { gap: 0; padding: 8px 18px calc(24px + env(safe-area-inset-bottom)); }
+	.settings-panel { gap: 0; padding: 0 var(--crate-space-16) calc(var(--crate-space-24) + env(safe-area-inset-bottom)); scroll-padding-block: var(--crate-space-16); }
 	.settings-shortcut-body { flex: 1; min-height: 0; overflow-y: auto; }
 	.settings-page-stack { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 	.settings-panel[inert] { pointer-events: none; }
 	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; border-bottom: 0; }
 	.settings-feedback { margin: 0; padding: var(--crate-space-12) var(--crate-space-20); }
 	.settings-navigation-row, .settings-action-row, .settings-row--diagnostics .settings-action-row {
-		display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
-		width: 100%; min-height: 52px; gap: var(--crate-settings-row-gap); padding: var(--crate-settings-row-padding) 0;
+		position: relative; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
+		// Extend the hit target and feedback through the card inset, keeping copy aligned.
+		width: calc(100% + 2 * var(--crate-space-16)); max-width: none; min-height: 52px;
+		margin-inline: calc(-1 * var(--crate-space-16)); gap: var(--crate-settings-row-gap);
+		padding: var(--crate-settings-row-padding) var(--crate-space-16);
 		border: 0; border-radius: 0; background: transparent; box-shadow: none;
 		color: var(--text-normal); font: inherit; font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium);
 		line-height: 1.4; text-align: left; white-space: normal; cursor: pointer;
@@ -46,7 +54,7 @@
 	.settings-action-row[data-tone="danger"] { color: var(--crate-danger); }
 	.settings-action-row:disabled { opacity: .45; cursor: default; }
 	.settings-navigation-row:focus-visible, .settings-action-row:focus-visible {
-		outline: 2px solid var(--crate-focus-ring); outline-offset: 2px; border-radius: var(--crate-radius-control);
+		outline: 2px solid var(--crate-focus-ring); outline-offset: -2px;
 	}
 	.settings-navigation-row[data-press-active], .settings-action-row[data-press-active] {
 		background: var(--crate-control-active-bg);
@@ -56,8 +64,23 @@
 			background: var(--crate-control-hover-bg);
 		}
 	}
-	.settings-group > .settings-action-row, .settings-action-row + .settings-action-row {
-		border-top: 1px solid var(--crate-divider);
+	.settings-group > .settings-action-row:not(:first-child)::before, .settings-action-row + .settings-action-row::before {
+		content: ''; position: absolute; top: 0; inset-inline: var(--crate-space-16);
+		border-top: 1px solid var(--crate-divider); pointer-events: none;
+	}
+	:is(.settings-group, .settings-account, .settings-recovery-actions) > :is(.settings-navigation-row, .settings-action-row) {
+		&:first-child {
+			border-start-start-radius: calc(var(--crate-radius-card) - 1px);
+			border-start-end-radius: calc(var(--crate-radius-card) - 1px);
+		}
+		&:last-child {
+			border-end-start-radius: calc(var(--crate-radius-card) - 1px);
+			border-end-end-radius: calc(var(--crate-radius-card) - 1px);
+		}
+	}
+	.settings-row--diagnostics:last-child .crate-copyable-text:has(> .crate-field__description:empty) > .settings-action-row {
+		border-end-start-radius: calc(var(--crate-radius-card) - 1px);
+		border-end-end-radius: calc(var(--crate-radius-card) - 1px);
 	}
 	.settings-row.settings-row--diagnostics { padding: 0; min-height: 0; }
 	.settings-action-row + .settings-row { border-top: 1px solid var(--crate-divider); }
@@ -65,12 +88,13 @@
 	.settings-row--diagnostics .crate-field__description:empty { display: none; }
 	.settings-account, .settings-recovery-actions {
 		@include list-item.surface;
-		margin-top: 24px; padding-inline: 12px;
+		margin-top: var(--crate-space-24); padding-inline: var(--crate-space-16);
 	}
 	.settings-inline-action { --crate-action-text: var(--crate-accent-text); padding-inline: 8px; }
 	.settings-navigation-row svg { color: var(--text-faint); }
+	.settings-row__copy { gap: var(--crate-space-4); }
 	.settings-row__copy > strong { @include list-item.title; }
-	.settings-row__copy > span { color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
+	.settings-row__copy > span { color: var(--text-muted); font-size: var(--pwa-font-detail); line-height: 1.45; }
 	.settings-theme-picker {
 		width: 100%; gap: 4px; padding: 4px; box-sizing: border-box;
 		border: 1px solid var(--crate-divider); border-radius: var(--crate-radius-card);
@@ -108,17 +132,34 @@
 	.settings-help { margin: 0 0 8px; }
 	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 12px; }
 	.settings-main { display: flex; flex-direction: column; }
-	.settings-panel__section { flex-shrink: 0; padding: var(--crate-space-20) 0 0; border-bottom: 0; }
-	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; min-height: 28px; margin-bottom: 6px; padding-inline: 2px; }
-	.settings-panel__title { margin: 0; color: var(--text-normal); font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-semibold); letter-spacing: normal; }
+	.settings-panel__section { flex-shrink: 0; padding: var(--crate-space-24) 0 0; border-bottom: 0; }
+	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--crate-space-8); min-height: 20px; margin-bottom: var(--crate-space-8); padding-inline: var(--crate-space-16); }
+	.settings-panel__title { margin: 0; color: var(--text-muted); font-size: var(--pwa-font-detail); font-weight: var(--reminder-font-weight-semibold); line-height: 1.4; letter-spacing: normal; }
 	.settings-group { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 	.settings-panel__section > .settings-group {
 		@include list-item.surface;
-		padding-inline: var(--crate-settings-row-padding);
+		padding-inline: var(--crate-space-16);
 	}
-	.settings-row { box-sizing: border-box; padding: var(--crate-settings-row-padding) 0; min-height: 56px; gap: var(--crate-settings-row-gap); }
+	.settings-panel__section > .settings-group.pwa-home-screen-instructions, .settings-install-instructions {
+		padding-block: var(--crate-space-16);
+		font-size: var(--pwa-font-detail);
+		line-height: 1.5;
+		ol { margin-block: var(--crate-space-12); padding-left: var(--crate-space-20); }
+		ol:only-child { margin: 0; }
+		li { padding-left: var(--crate-space-4); }
+		li + li { margin-top: var(--crate-space-12); }
+		strong { font-weight: var(--reminder-font-weight-semibold); }
+	}
+	.settings-install-instructions {
+		@include list-item.surface;
+		flex-shrink: 0; margin-top: var(--crate-space-24); padding-inline: var(--crate-space-16);
+	}
+	.settings-row { box-sizing: border-box; padding: var(--crate-settings-row-padding) 0; min-height: 52px; gap: var(--crate-settings-row-gap); }
+	.settings-row--value { font-size: var(--reminder-font-base); }
 	.settings-row--value, .settings-row--value > strong { color: var(--text-normal); font-weight: 400; }
-	.settings-row--value > strong { color: var(--text-muted); }
+	.settings-row--value > strong { color: var(--text-muted); font-size: var(--pwa-font-detail); }
+	.settings-row--version { min-height: 48px; font-size: var(--pwa-font-detail); }
+	.settings-row--version > strong { font-size: var(--pwa-font-caption); white-space: normal; overflow-wrap: anywhere; }
 	.settings-row + .settings-row { border-top: 1px solid var(--crate-divider); }
 
 	.settings-row--theme { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -128,22 +169,26 @@
 	.settings-navigation-row { font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium); }
 	.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
 	.settings-actions > button { max-width: 100%; white-space: normal; }
-	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-caption); line-height: 1.45; overflow-wrap: anywhere; }
+	.settings-feedback, .settings-attention, .settings-help { font-size: var(--pwa-font-detail); line-height: 1.45; overflow-wrap: anywhere; }
 	.settings-feedback { color: var(--crate-danger); }
 	.settings-attention { color: var(--text-muted); }
 	.settings-attention p { margin: 8px 0; }
-	.settings-help { color: var(--text-faint); }
+	.settings-help { color: var(--text-muted); }
+	.settings-tabs-help { padding-top: var(--crate-space-12); }
+	.settings-encryption-details {
+		border-top: 1px solid var(--crate-divider);
+		summary { min-height: 44px; padding-block: var(--crate-space-12); color: var(--text-muted); font-size: var(--pwa-font-detail); cursor: pointer; }
+	}
 	.settings-subpage { min-width: 0; }
 	// Embedded Reading content uses the enclosing Settings sheet surface.
 	.settings-subpage.crate-reading { background: transparent; }
 
 	@media (max-width: 360px) {
-		.settings-panel { padding-inline: 16px; }
 		.settings-theme-option { padding-inline: 6px; }
 		.settings-preference-control--select { flex-basis: 140px; width: 140px; }
 	}
 
-	.settings-section-description { margin: 0; padding: 0 2px 10px; color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
+	.settings-section-description { margin: 0; padding: 0 var(--crate-space-16) var(--crate-space-12); color: var(--text-muted); font-size: var(--pwa-font-caption); line-height: 1.45; }
 	.settings-tab-list { margin: 0; padding: 0; list-style: none; }
 	.settings-row + .settings-tab-list { border-top: 1px solid var(--crate-divider); }
 	.settings-tab-row { position: relative; display: flex; align-items: center; min-height: 48px; gap: 12px; }
@@ -153,7 +198,8 @@
 	.settings-tab-row .settings-tab-handle { color: var(--text-faint); touch-action: none; cursor: grab; }
 	.settings-tab-row .settings-tab-handle[data-press-active] { cursor: grabbing; }
 	.settings-tab-choice { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; }
-	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: transparent; color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
+	// Give the native picker an opaque snapshot surface when it opens on iOS.
+	.settings-tab-choice select { appearance: none; width: 100%; min-height: 48px; padding: 8px 22px 8px 0; border: 0; background: var(--crate-reminder-card-bg); color: var(--text-normal); font: inherit; font-size: 16px; font-weight: var(--reminder-font-weight-medium); box-shadow: none; }
 	.settings-tab-choice > svg { position: absolute; right: 0; pointer-events: none; color: var(--text-muted); }
 	.settings-tabs-reset { --crate-action-text: var(--crate-accent-text); --crate-action-font-size: var(--pwa-font-caption); min-height: 44px; margin-block: -8px; margin-right: -8px; padding-inline: 8px; color: var(--crate-accent-text); font-size: var(--pwa-font-caption); font-weight: 400; }
 }

@@ -32,8 +32,8 @@ export function VersionSettings() {
 		return () => { active = false; controller.abort(); window.clearTimeout(timer); };
 	}, []);
 	return <>
-		<SettingsRow className="settings-row--value"><span>Web app</span><strong title={PWA_ASSET_VERSION}>Revision {release.revision} · {PWA_ASSET_VERSION.slice(0, 8)}</strong></SettingsRow>
-		<SettingsRow className="settings-row--value"><span>Server</span><strong title={asset ?? undefined}>{checking ? 'Checking…' : server?.serverRevision ? `Revision ${server.serverRevision}${asset ? ` · ${asset.slice(0, 8)}` : ''}` : 'Version unavailable'}</strong></SettingsRow>
+		<SettingsRow className="settings-row--value settings-row--version"><span>Web app</span><strong title={PWA_ASSET_VERSION}>Revision {release.revision} · {PWA_ASSET_VERSION.slice(0, 8)}</strong></SettingsRow>
+		<SettingsRow className="settings-row--value settings-row--version"><span>Server</span><strong title={asset ?? undefined}>{checking ? 'Checking…' : server?.serverRevision ? `Revision ${server.serverRevision}${asset ? ` · ${asset.slice(0, 8)}` : ''}` : 'Version unavailable'}</strong></SettingsRow>
 		<SettingsRow className="settings-row--diagnostics">
 			<CopyableText value={diagnostics} label="Version diagnostics" copyLabel="Copy diagnostics"
 				successMessage="Version details copied."

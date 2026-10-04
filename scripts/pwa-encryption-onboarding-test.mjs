@@ -79,6 +79,7 @@ try {
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toHaveCount(0);
         await page.getByRole('button', { name: 'Open settings', exact: true }).click();
         await expect(page.locator('.pwa-home-screen-prompt')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Add to home screen', exact: true }).click();
         await expect(page.getByText('Compare the codes and confirm on both devices.', { exact: false })).toBeVisible();
         await expect(page.getByText('Connect with Obsidian', { exact: true })).toBeVisible();
         installCookies = await safari.cookies();

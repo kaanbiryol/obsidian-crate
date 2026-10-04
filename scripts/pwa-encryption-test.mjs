@@ -88,7 +88,7 @@ async function verify(type) {
 		const oldCreateReceipt = await oldCreate.json();
 		// Valid plaintext settings larger than the former encrypted envelope limit
 		// must convert, resume and remain editable through the production client.
-		const seedSettings = { ignorePatterns: Array.from({ length: 2000 }, (_, index) => `Excluded/project-${String(index).padStart(4, '0')}/archive/`), syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true, pushEnabled: false };
+		const seedSettings = { ignorePatterns: Array.from({ length: 2000 }, (_, index) => `Excluded/project-${String(index).padStart(4, '0')}/archive/`), syncOnStartup: true, syncOnResume: true, syncInterval: 300, pushEnabled: false };
 		const initialSettings = type.name() === 'chromium' ? null : seedSettings;
 		if (initialSettings) {
 			const settings = await fetch(`${origin}/settings`, { method: 'PUT', headers, body: JSON.stringify({ settings: initialSettings, expectedVersion: null }) });
@@ -200,7 +200,8 @@ async function verify(type) {
 		}
 		assert.ok(!page.url().includes('crateKey'));
 		await page.locator('[data-action="toggle-settings"]').click();
-		await expect(page.getByText('Active · conversion complete. This device is unlocked.', { exact: true })).toBeVisible();
+		await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reminders', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
+		await page.getByText('Encryption details', { exact: true }).click();
 		await expect(page.getByText('Notification keys ready', { exact: true })).toBeVisible();
 		await mkdir('.generated/browser-encryption', { recursive: true });
 		await page.screenshot({ path: `.generated/browser-encryption/${type.name()}-status.png`, fullPage: true });

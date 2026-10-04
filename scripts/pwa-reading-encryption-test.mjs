@@ -148,7 +148,7 @@ try {
   assert.ok(!external.some(url => url.includes('tracker.example')));
   assert.ok(!commits.some(body => body.includes('article-private') || body.includes('Private browser extraction')));
   await page.getByRole('button', { name: 'Open settings', exact: true }).click();
-  await expect(page.getByText('Active · this Reading folder is unlocked.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reading', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
   await expect(page.getByText('Connect Reminders to check this device.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await page.getByRole('button', { name: 'Log out and clear device data', exact: true }).click();

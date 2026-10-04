@@ -13,8 +13,8 @@ export async function checkSettingsNavigation(page) {
 	const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
 	const open = settings.getByRole('button', { name: 'Set up iPhone shortcut', exact: true });
 	const main = page.locator('.settings-main');
-	await expect(settings.getByRole('region', { name: 'Tabs', exact: true }).getByRole('combobox', { name: 'Default tab' })).toBeVisible();
-	for (const section of ['Sync and device', 'About']) {
+	await expect(settings.getByRole('region', { name: 'Tabs', exact: true }).getByRole('combobox', { name: 'Open app to' })).toBeVisible();
+	for (const section of ['Sync', 'Device storage', 'About']) {
 		await expect(settings.getByRole('region', { name: section, exact: true })).toBeVisible();
 		await expect(settings.getByRole('button', { name: section, exact: true })).toHaveCount(0);
 	}

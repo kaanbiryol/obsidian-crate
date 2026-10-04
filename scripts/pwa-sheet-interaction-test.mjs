@@ -190,7 +190,7 @@ try {
 			await expectNoTouchRing(days);
 			await expect(days).toHaveCSS('border-width', '0px');
 			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
-			const select = settings.getByRole('combobox', { name: 'Default tab', exact: true });
+			const select = settings.getByRole('combobox', { name: 'Open app to', exact: true });
 			await select.tap();
 			await expectNoTouchRing(select);
 			await select.selectOption('inbox');

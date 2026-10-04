@@ -1,5 +1,6 @@
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from '../sync/state';
 import { EncryptionSettings } from './EncryptionSettings';
+import { ChevronRight } from 'lucide-react';
 import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
 
 import { TabSettings } from './TabSettings';
@@ -9,7 +10,7 @@ import { ShortcutSettingsSheet } from './ShortcutSettingsSheet';
 import type { PushedScreenHistory } from '../pushed-screen-history';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { PwaModalSheet } from './PwaModalSheet';
-import { PwaButton as Button } from './PwaButton';
+import { Button } from '@/ui/shared/Button';
 import { SettingsRow } from './SettingsRow';
 import { SettingsAction } from './SettingsAction';
 import { SettingsSection } from './SettingsSection';
@@ -18,7 +19,7 @@ import { DeviceStorageSettings } from './DeviceStorageSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { ReminderSettings } from './ReminderSettings';
 import { ReadingSettings } from '../reading/ReadingSettings';
-import { HomeScreenInstallInstructions } from './HomeScreenInstall';
+import { HomeScreenInstallSteps } from './HomeScreenInstall';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
@@ -29,7 +30,7 @@ import type { PwaPreferences } from '../preferences';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'logout';
 
-export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { navigation: PushedScreenHistory<'shortcut' | 'logout'>; onReviewReminders: () => void; onOpenEnd: () => void }) {
+export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { navigation: PushedScreenHistory<'shortcut' | 'logout' | 'install'>; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
 	const appUpdate = useAppUpdate();
 	const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -49,7 +50,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 	const panelRef = useRef<HTMLDivElement>(null);
 	const { ready, unsynced } = pwaSyncState(snapshot);
 	const attention = [reminders?.connected && reminders.attention ? 'Reminders: ' + reminders.attention : null, reading?.attention ? 'Reading: ' + reading.attention : null].filter(Boolean);
-	const navigate = (next: 'settings' | 'shortcut' | 'logout') => {
+	const navigate = (next: 'settings' | 'shortcut' | 'logout' | 'install') => {
 		setMessage(null);
 		if (next === 'settings') navigation.back();
 		else navigation.push(next);
@@ -76,7 +77,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 		transition.requestClose();
 		return true;
 	};
-	const pageTitle = (screen: typeof page) => screen === 'shortcut' ? 'Set up iPhone shortcut' : screen === 'logout' ? 'Log out of Crate?' : 'Settings';
+	const pageTitle = (screen: typeof page) => ({ settings: 'Settings', shortcut: 'Set up iPhone shortcut', logout: 'Log out of Crate?', install: 'Add to home screen' })[screen];
 	const title = pageTitle(page === 'shortcut' ? 'settings' : page);
 	const header = (screen: typeof page) => <>
 		<ModalHeader title={pageTitle(screen)} navigation={screen === 'settings' ? 'dismiss' : 'back'} closeLabel={screen === 'settings' ? 'Close settings' : 'Back to settings'}
@@ -87,17 +88,21 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 		onOpenEnd={() => { onOpenEnd(); if (store.getSnapshot().syncRequested) panelRef.current?.querySelector('[data-settings-sync]')?.scrollIntoView({ block: 'start' }); }} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing}>
 		<aside data-pwa-back={!!detailPage && !exclusive && !closing} className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<div className="settings-page-stack" inert={detailPage === 'shortcut'} aria-hidden={detailPage === 'shortcut'}>
-			<PwaPushStack page={detailPage === 'logout' ? detailPage : null} entryId={detailPage === 'logout' ? entryId : null} immediate={immediate} onBackComplete={navigation.finishBack} rootRef={panelRef}
+			<PwaPushStack page={detailPage === 'shortcut' ? null : detailPage} entryId={detailPage === 'shortcut' ? null : entryId} immediate={immediate} onBackComplete={navigation.finishBack} rootRef={panelRef}
 				rootHeader={header('settings')} renderHeader={header}
 				rootClassName="settings-panel settings-main" detailClassName="settings-panel settings-detail" renderPage={subpage => <>
+				{subpage === 'install' && <div className="settings-install-instructions pwa-home-screen-instructions">
+					{homeScreen.platform ? <HomeScreenInstallSteps platform={homeScreen.platform} encrypted={encryption.status === 'ready' || reading?.encryption?.status === 'ready'} />
+						: <p>Crate is already installed on this device.</p>}
+				</div>}
 				{subpage === 'logout' && <div className="settings-subpage">
 					<p>This logs out of Reading and Reminders and clears their offline data and drafts from this device. Your synced data stays on the server.</p>
 					{unsynced && <p className="settings-attention">There are unsynced or unverified changes on this device. Sync or review them before logging out.</p>}
 					{(reminderExport || readingExport) && <div className="settings-recovery-actions">{reminderExport}{readingExport}</div>}
 					{reminders?.recovery}
 					<div className="settings-actions">
-						<Button size="touch" disabled={exclusive} onClick={() => navigate('settings')}>Cancel</Button>
-						<Button size="touch" tone="danger" disabled={exclusive || !ready} aria-disabled={busy || !ready} onClick={() => void run('logout', async () => {
+						<Button variant="outline" size="touch" disabled={exclusive} onClick={() => navigate('settings')}>Cancel</Button>
+						<Button variant="outline" size="touch" tone="danger" disabled={exclusive || !ready} aria-disabled={busy || !ready} onClick={() => void run('logout', async () => {
 							await logoutPwaSync(store.getSnapshot());
 						})}>{pending.has('logout') ? 'Logging out…' : 'Log out and clear device data'}</Button>
 					</div>
@@ -113,20 +118,24 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 					<TabSettings preferences={preferences} onChange={changePreferences} />
 					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} onPreferencesChange={changePreferences} />
 					<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
-					<div data-settings-sync=""><SettingsSection title="Sync and device">
+					<div data-settings-sync=""><SettingsSection title="Sync">
 						<SettingsRow title="Reminders"><span className="settings-value">{!reminders?.ready ? 'Checking…' : reminders.enabled === false ? reminders.status.label : reminders.connected ? reminders.status.label : 'Not connected'}</span></SettingsRow>
 						<SettingsRow title="Reading" description={reading?.unavailable}><span className="settings-value">{!reading?.ready ? 'Checking…' : reading.enabled === false ? reading.status.label : reading.connected ? reading.status.label : 'Not connected'}</span></SettingsRow>
+						{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
 						{reading?.issues}
 						{readingExport}
 						<SettingsAction disabled={exclusive || pending.has('refresh') || !ready} aria-busy={pending.has('refresh')} onClick={() => void run('refresh', refreshAll)}>Refresh all</SettingsAction>
 						{reminders?.attention && <SettingsAction onClick={() => { finish(); onReviewReminders(); }}>Review reminders</SettingsAction>}
 						{reminders?.recovery}
-						<DeviceStorageSettings />
-						{reminders?.connected && <SettingsRow className="settings-row--value"><span>Reminders folder</span><strong title={reminders.config.folderPath}>{reminders.config.folderPath}</strong></SettingsRow>}
 						{reminderExport}
 					</SettingsSection></div>
+					<DeviceStorageSettings />
 					<EncryptionSettings reading={reading} remindersConnected={Boolean(reminders?.connected)} />
-					{homeScreen.platform && <HomeScreenInstallInstructions platform={homeScreen.platform} encrypted={encryption.status === 'ready' || reading?.encryption?.status === 'ready'} />}
+					{homeScreen.platform && <SettingsSection title="Web app">
+						<Button className="settings-navigation-row" onClick={() => navigate('install')}>
+							<span>Add to home screen</span><ChevronRight size={16} aria-hidden="true" />
+						</Button>
+					</SettingsSection>}
 					<SettingsSection title="About">
 						<VersionSettings />
 					</SettingsSection>

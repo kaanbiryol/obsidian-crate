@@ -81,7 +81,7 @@ export async function checkTabSettings(page, name) {
 	await expect(sheet.locator('.settings-tab-list option[value="today-view"], .settings-tab-list option[value="upcoming"]')).toHaveCount(0);
 	// Date views remain launch preferences inside the single Reminders tab.
 	for (const [value, label] of [['upcoming', 'Upcoming'], ['today', 'Today']]) {
-		await sheet.getByRole('combobox', { name: 'Default tab', exact: true }).selectOption({ label });
+		await sheet.getByRole('combobox', { name: 'Open app to', exact: true }).selectOption({ label });
 		await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await expect(sheet).toHaveCount(0);
 		await page.waitForLoadState('networkidle');

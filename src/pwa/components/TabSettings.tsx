@@ -19,7 +19,7 @@ function TabRow({ tab, tabs, onChange, description }: {
 		className="settings-tab-row" data-settings-tab={tab}>
 		<ThemeIcon id={item.iconName} size="m" aria-hidden="true" />
 		<span className="settings-tab-choice">
-			<select aria-label={`Tab ${tabs.indexOf(tab) + 1}`} value={tab}
+			<select aria-label={`Tab ${tabs.indexOf(tab) + 1}`} aria-describedby={description} value={tab}
 				onChange={event => onChange(tabs.map(value => value === tab ? event.currentTarget.value as DockTab : value))}>
 				{DOCK_TABS.filter(item => item.id === tab || !tabs.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
 			</select>
@@ -46,9 +46,9 @@ export function TabSettings({ preferences, onChange }: {
 	const customized = tabs.some((tab, index) => tab !== DEFAULT_DOCK_TABS[index]);
 	const changeTabs = (dockTabs: DockTab[]) => onChange({ dockTabs });
 	return <SettingsSection title="Tabs" action={customized && <Button variant="ghost" size="touch" className="settings-tabs-reset" onClick={() => changeTabs([...DEFAULT_DOCK_TABS])}>Reset tabs</Button>}>
-		<SettingsRow as="label" className="settings-row--preference" title="Default tab">
+		<SettingsRow as="label" className="settings-row--preference" title="Open app to">
 			<span className="settings-preference-control settings-preference-control--select">
-				<select aria-label="Default tab" className="settings-preference-input" value={preferences.defaultScreen}
+				<select aria-label="Open app to" className="settings-preference-input" value={preferences.defaultScreen}
 					onChange={event => onChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] })}>
 					<option value="today">Today</option>
 					<option value="inbox">Inbox</option>
@@ -61,9 +61,9 @@ export function TabSettings({ preferences, onChange }: {
 				<ChevronDown size={14} aria-hidden="true" />
 			</span>
 		</SettingsRow>
-		<span id={description} className="pwa-dock__sr">Drag to reorder, or use the Up and Down arrow keys.</span>
 		<Reorder.Group axis="y" values={tabs} onReorder={changeTabs} className="settings-tab-list" aria-label="Your tabs">
 			{tabs.map(tab => <TabRow key={tab} tab={tab} tabs={tabs} onChange={changeTabs} description={description} />)}
 		</Reorder.Group>
+		<p id={description} className="settings-help settings-tabs-help">Select a tab to replace it. Drag to reorder.<span className="pwa-dock__sr"> You can also reorder with the Up and Down arrow keys.</span></p>
 	</SettingsSection>;
 }
