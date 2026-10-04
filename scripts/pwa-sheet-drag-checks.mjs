@@ -10,7 +10,9 @@ export async function checkSheetDragPosition(page, sheet, { recedeCanvas = true 
 		const travel = () => Number.parseFloat(getComputedStyle(popup).getPropertyValue('--pwa-sheet-travel')) || popup.offsetHeight;
 		const samples = [];
 		let time = performance.now();
-		const frame = () => new Promise(requestAnimationFrame);
+		// Observe after every animation-frame callback has run. Resolving in an
+		// earlier callback can sample before the presentation mirror is created.
+		const frame = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
 		const sample = () => {
 			// The compositor can advance between separate style reads. Compare the
 			// sheet and canvas at one native timeline instant, preserving each
