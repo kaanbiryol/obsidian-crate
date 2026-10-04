@@ -1,6 +1,7 @@
 @use "tailwindcss/theme.css";
 @use "crate";
 @use "plugin-ui/theme" as plugin-theme;
+@use "plugin-ui/app-density";
 @use "plugin-ui/reminder-editor";
 @use "plugin-ui/modal";
 @use "plugin-ui/recovery";
@@ -17,6 +18,7 @@
   @include reminder-editor.styles;
   @include modal.styles;
   @include recovery.styles;
+  @include app-density.styles;
 }
 
 @include settings-alignment.styles;

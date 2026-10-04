@@ -4,8 +4,8 @@
   --pwa-header-control-surface: var(--background-primary-alt);
   --pwa-detail-heading-gap: 28px;
   :is(.view-header, .project-detail-header) {
-    --crate-view-title-size: 32px;
-    --crate-view-title-spacing: -.035em;
+    --crate-view-title-size: 24px;
+    --crate-view-title-spacing: -.025em;
   }
   .view-header { align-items: flex-start; gap: 10px; border-bottom: 0; }
   .project-detail-title { font-size: var(--crate-view-title-size); letter-spacing: var(--crate-view-title-spacing); }
@@ -19,7 +19,7 @@
     backdrop-filter: blur(24px) saturate(1.35);
     -webkit-backdrop-filter: blur(24px) saturate(1.35);
   }
-  :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions { padding: 2px; gap: 2px; }
+  :is(.view-header, .project-detail-header, .project-detail-navigation) .crate-view-header-actions { padding: 0; gap: 0; }
   .crate-back-button { justify-self: start; }
   .crate-detail-navigation { min-height: 64px; padding: 8px 20px; border-bottom: 0; }
   @media (max-width: 719px) {

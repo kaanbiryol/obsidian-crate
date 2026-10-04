@@ -28,6 +28,14 @@ leave a larger gap after expanded groups. Settings and dialogs use the same
 scale through their own semantic roles; navigation, safe areas, and editor
 geometry remain component-specific.
 
+`src/ui/shared/styles/_app-density.scss` supplies the same screen scale to the
+plugin and PWA: 24px headings, 16px list titles, 13–14px metadata, 44px search
+fields and header actions, 20px Reading source icons, and a 56px dock. Rows use
+12px vertical padding and completion targets remain 44px. The plugin adapter in
+`src/styles/plugin-ui/_app-density.scss` handles pane-width breakpoints; the PWA
+uses its viewport. Each host retains its own colors and safe-area ownership.
+Dock morphs use the shared collapsed height.
+
 ## Ownership
 
 - `src/ui/shared/styles/_tokens.scss` defines the semantic Crate tokens for
@@ -156,9 +164,8 @@ geometry remain component-specific.
   rows to reminder screens and Reading in both hosts. Count text has an explicit
   shared line height. Titles use their natural line height; compact count rows
   fit overdue badges without changing header height and grow with theme text.
-  Obsidian retains theme-sized titles; `foundation.scss`
-  supplies PWA typography and loading-screen geometry, with a 6px title-to-count
-  gap for its larger headings. Both features retain the
+  Both hosts use the typography from `_app-density.scss` and a 2px title-to-count
+  gap; `foundation.scss` also supplies PWA loading-screen geometry. Both features retain the
   shared header inset on desktop. Plugin and PWA headers reserve the count row
   while loading; PWA loading screens also reserve the floating dock's space
   throughout startup. Feature adapters retain their safe-area ownership.
@@ -728,8 +735,8 @@ the spinner still. Reading uses it when the library has no cached
 data; Reminders uses it while a cached empty list is being checked. Neither
 shows a zero count until that empty result is confirmed, and background refreshes
 keep existing items visible.
-Phone screen headers use a 32px title, a 44px title row, and a compact 20px count
-row. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
+Phone screen headers use a 24px title at its natural line height and a compact
+20px count row separated by 2px. The top gap is 4px beyond the status-bar safe area; bottom padding is 8px.
 Loaded and opening headers share these PWA spacing tokens so hydration does not
 move the title or content. Sync and settings retain 44px touch targets.
 On identified iOS/iPadOS 27 Home Screen apps, the head bootstrap selects `default`
@@ -859,7 +866,7 @@ article URL and scroll offset; the viewport portal is removed on dismissal.
 
 PWA screen headers share the article reader's rounded chrome: sync and Settings
 sit in a capsule to the right of the title and count. Inbox, Reminders, Projects,
-and all Reading library views use the same 32px heading. Project details use the
+and all Reading library views use the same 24px heading. Project details use the
 same action surface and the article reader’s shared icon-only `BackButton`. Their
 navigation rows share 64px geometry and a 28px gap before the heading content.
 `src/pwa/styles/_header-chrome.scss`
@@ -946,3 +953,13 @@ uses one selectable, tabular comparison code, short instructions and existing
 buttons; it does not expose key text fields. The Obsidian approval uses
 `SharedModal` and native `Setting` buttons. Keep the code hidden until both peers
 have completed the handshake and make approval an explicit action.
+
+### PWA sizing
+
+PWA list screens use 24px semibold headings, 16px regular list titles, and
+13–14px metadata. Reading source icons are 20px; search fields are 44px tall
+and retain 16px input text. Header capsules keep their 44px touch targets with
+less exterior padding. Loading headers and search placeholders use the same
+geometry as loaded screens. The dock and add button are 56px tall, with 46px
+tab targets and 28px side insets (16px below 361px). Its scroll reserve and
+expanding menu follow that geometry; bottom safe areas are still applied once.

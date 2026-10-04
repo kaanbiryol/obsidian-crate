@@ -8,6 +8,7 @@ const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
 
 async function checkNavigation(page, inset, height = page.viewportSize().height) {
+	await expect(page.locator('.view-header-title').first()).toHaveCSS('font-size', '24px');
 	const geometry = await page.evaluate(() => {
 		const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
 		return {
@@ -29,7 +30,7 @@ async function checkNavigation(page, inset, height = page.viewportSize().height)
 	assert.ok(Math.abs(geometry.app.bottom - height) < 1, 'app fills the visible viewport');
 	assert.ok(Math.abs(geometry.bar.bottom - height) < 1, 'bar background fills the bottom edge');
 	const bottomGap = Math.max(10, inset);
-	assert.ok(Math.abs(geometry.bar.height - 70 - bottomGap) < 1, `safe area is reserved exactly once: expected ${bottomGap}px, got ${geometry.bar.height - 70}px`);
+	assert.ok(Math.abs(geometry.bar.height - 66 - bottomGap) < 1, `safe area is reserved exactly once: expected ${bottomGap}px, got ${geometry.bar.height - 66}px`);
 	assert.ok(Math.abs(geometry.items.bottom - (height - bottomGap)) < 1, `dock sits above the ${inset}px safe area without extra padding`);
 	for (const button of geometry.buttons) {
 		assert.ok(button.bottom <= height - inset + 1, 'entire tab touch target stays outside the safe area');

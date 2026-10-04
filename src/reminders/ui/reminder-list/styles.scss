@@ -63,15 +63,6 @@
         font-weight: var(--reminder-font-weight-medium);
       }
 
-      .reminders-count-overdue {
-        border: 1px solid color-mix(in srgb, var(--text-error) 18%, transparent);
-        background: color-mix(in srgb, var(--text-error) 9%, transparent);
-        color: color-mix(in srgb, var(--text-error) 60%, var(--text-normal));
-        padding: 2px 8px;
-        border-radius: var(--crate-radius-button);
-        font-size: var(--reminder-font-sm); // Apple HIG 14pt minimum for labels
-        font-weight: var(--reminder-font-weight-semibold);
-      }
     }
 
     .reminders-header-actions {

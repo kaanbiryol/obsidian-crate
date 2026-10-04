@@ -91,7 +91,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const closed = async () => {
       await expect(views).toHaveCount(0);
       await expect(dock().locator('[data-dock-group]')).toHaveCSS('opacity', '1');
-      await expect(dock().locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
+      await expect(dock().locator('.pwa-dock__surface')).toHaveCSS('height', '56px');
       await page.waitForFunction(() => !document.querySelector('[data-leaving="true"]'));
     };
     const openViews = async () => {
@@ -115,6 +115,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const direct = async label => { await dock().getByRole('button', { name: label, exact: true }).tap(); await closed(); await active(label); };
     await page.goto(`${origin}/notifications?browserToken=${enrollment.browserToken}`);
     await expect(dock()).toBeVisible();
+    await expect(dock().locator('.pwa-dock__bar')).toHaveCSS('height', '56px');
+    await expect(dock().locator('.pwa-dock__add')).toHaveCSS('height', '56px');
+    await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveCSS('font-size', '24px');
     await expect(dock().locator('nav > button')).toHaveCount(4);
     assert.deepEqual(await dock().locator('nav > button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))), ['Inbox', 'Reminders', 'Projects', 'Reading']);
     await direct('Projects');
@@ -243,7 +246,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.ok(interrupted.reveals.every(frame => Math.abs(frame.edge - frame.surface) < 1), 'Choices reveal inside the moving surface');
     assert.ok(interrupted.reveals.every(frame => frame.top === interrupted.reveals[0].top && frame.height === interrupted.reveals[0].height), 'Held-finger targets must stay stationary');
     assert.ok(interrupted.reveals.some(frame => frame.opacity > 0 && frame.opacity < 1), 'Content should reveal with the spring');
-    assert.ok(interrupted.samples.every((height, i, values) => height >= 60 && (!i || height >= values[i - 1] - .1)), 'Opening must grow without a staged shrink');
+    assert.ok(interrupted.samples.every((height, i, values) => height >= 56 && (!i || height >= values[i - 1] - .1)), 'Opening must grow without a staged shrink');
     assert.ok(Math.abs(interrupted.before - interrupted.after) < 20, 'Reversing must not jump');
     await closed();
     // Reopen while dismissal is still settling; retain the same surface and
@@ -407,6 +410,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(views.locator('[data-icon="check"]')).toHaveCount(0);
     await page.mouse.click(8, 140); await closed(); await active('Archive');
     await selectView('Reading');
+    const search = page.getByRole('searchbox', { name: 'Search reading' });
+    await expect(search).toHaveCSS('font-size', '16px');
+    const searchControl = search.locator('..');
+    await expect(searchControl).toHaveCSS('height', '44px');
+    await search.fill('density');
+    await expect(searchControl).toHaveCSS('height', '44px');
+    await page.getByRole('button', { name: 'Clear search' }).click();
+    await expect(searchControl).toHaveCSS('height', '44px');
     await dock().getByRole('button', { name: 'Save a link', exact: true }).click();
     await expect(page.getByLabel('Link', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Close/ }).click(); await closed();

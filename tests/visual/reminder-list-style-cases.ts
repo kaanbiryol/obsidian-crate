@@ -1,6 +1,28 @@
 import { test, expect } from '@playwright/test';
 
 export function reminderListStyleCases() {
+  for (const width of [390, 1280]) {
+    test(`plugin and PWA list sizing agree at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1100 });
+      const measurements = [];
+      for (const host of ['pwa', 'plugin']) {
+        await page.goto(`/?host=${host}&theme=dark&scene=list-style`);
+        await expect(page.locator('.premium-reminder-title').first()).toBeVisible();
+        const sizes = [];
+        for (const selector of ['.premium-reminder-title', '.premium-reminder-description', '.premium-pill', '.premium-checkbox-visual', '.crate-reading__open strong', '.crate-reading__meta', '.crate-reading__source-icon', '.crate-reading__search .crate-field__control']) {
+          sizes.push(await page.locator(selector).first().evaluate(el => {
+            const css = getComputedStyle(el);
+            const geometry = el.classList.contains('premium-checkbox-visual') || el.classList.contains('crate-reading__source-icon') || el.classList.contains('crate-field__control');
+            return geometry ? { height: css.height, padding: css.padding }
+              : { fontSize: css.fontSize, lineHeight: css.lineHeight, fontWeight: css.fontWeight };
+          }));
+        }
+        measurements.push(sizes);
+      }
+      expect(measurements[1]).toEqual(measurements[0]);
+    });
+  }
+
   for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for (const width of [390, 1280]) {
     test(`${host} ${theme} ${width} reminder styles`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1100 });

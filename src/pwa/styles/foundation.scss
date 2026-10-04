@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/app-density";
 @use "../../ui/shared/styles/loading-indicator";
 @use "../../ui/shared/styles/fields";
 @use "../../ui/shared/styles/view-header";
@@ -17,18 +18,11 @@
 // Shared PWA theme and controls. Feature styles only own their content/layout.
 .crate-reminders-ui {
 	@include tokens.styles;
-	--crate-view-title-size: 30px;
-	--crate-view-title-weight: 700;
-	--crate-view-title-spacing: -.04em;
-	--crate-view-title-leading: 1.12;
+	@include app-density.typography;
 	@include view-header.screen-spacing-tokens;
 	// Standalone safe-area and launch-shell styles consume these host aliases.
 	--pwa-header-top-gap: var(--crate-header-top-gap);
 	--pwa-header-bottom-gap: var(--crate-header-bottom-gap);
-	@media (max-width: 759px) {
-		--crate-view-title-size: 26px;
-		--crate-view-title-spacing: -.03em;
-	}
 	@include controls.styles;
 	@include fields.styles;
 	@include notice.styles;
@@ -50,9 +44,8 @@
 // The host selector takes precedence over shared .reminders-view.is-primary
 // geometry even when a feature stylesheet is loaded after this foundation.
 .crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) :is(.pwa-reminders-view.is-primary, .pwa-opening-screen, .crate-reading-web) .view-header {
-	// The standalone app uses a larger title than Obsidian. Give its count row
-	// a clear gap at every width, including the cached and React launch shells.
-	--crate-header-meta-gap: 6px;
+	// Keep the compact title/count stack identical in cached and live screens.
+	--crate-header-meta-gap: 2px;
 	@include view-header.screen-spacing;
 	.view-header-title {
 		font-size: var(--crate-view-title-size);
@@ -60,4 +53,10 @@
 		letter-spacing: var(--crate-view-title-spacing);
 		line-height: var(--crate-view-title-leading);
 	}
+}
+
+// The live app and cached search placeholder share the same dimensions.
+.crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) {
+	@include app-density.lists;
+	.pwa-reading-opening__search { height: 44px; margin-block: 12px; border-radius: 12px; }
 }

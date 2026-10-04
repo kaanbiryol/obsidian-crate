@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/app-density";
 @use '../../ui/shared/styles/app-dock';
 
 // Navigation paints immediately, with the same icons and geometry while data
@@ -23,4 +24,8 @@
   }
   :root[data-pwa-opening-dock-tab="#{$tab}"] .pwa-opening-dock:not([data-opening-tab]) [data-opening-destination="#{$tab}"],
   .pwa-opening-dock[data-opening-selection="#{$tab}"] [data-opening-destination="#{$tab}"] { color: var(--text-normal); }
+}
+
+.crate-reminders-ui:is(.pwa-shadow-root, .pwa-reading-root) {
+  @include app-density.dock;
 }

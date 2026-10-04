@@ -1,6 +1,40 @@
 import { test, expect } from '@playwright/test';
 
 export function registerPluginNavigationTests() {
+    for (const mobile of [false, true]) {
+      test(`plugin ${mobile ? 'mobile' : 'desktop sidebar'} density matches the PWA`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width: 390, height: 850 });
+        await page.goto(`/?host=plugin&scene=navigation&theme=dark${mobile ? '&mobile' : ''}`);
+        const active = page.locator('.plugin-workspace-panel[data-active="true"]');
+        await expect(active.locator('.pwa-dock__bar')).toHaveCSS('height', '56px');
+        await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '56px');
+        await expect(active.locator('.pwa-dock__add')).toHaveCSS('height', '56px');
+        const row = active.locator('.premium-reminder-content').first();
+        await expect(row).toHaveCSS('padding-top', '12px');
+        await expect(row.locator('.premium-checkbox')).toHaveCSS('height', '44px');
+        const titleSize = '16px';
+        await expect(row.locator('.premium-reminder-title')).toHaveCSS('font-size', titleSize);
+        await expect(row.locator('.premium-reminder-title')).toHaveCSS('font-weight', '400');
+        await expect(row.locator('.premium-checkbox-visual')).toHaveCSS('width', '18px');
+        const headingSize = await active.locator('.view-header-title').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+        expect(headingSize).toBeCloseTo(parseFloat(titleSize) * 1.5, 1);
+        await page.screenshot({ path: testInfo.outputPath('density.png') });
+        await active.getByRole('button', { name: 'Reading', exact: true }).click();
+        const search = active.getByRole('searchbox', { name: 'Search reading' });
+        await expect(search).toBeVisible();
+        await expect(active.locator('.crate-reading__source-icon').first()).toHaveCSS('width', '20px');
+        const searchHeight = await search.locator('..').evaluate(el => el.getBoundingClientRect().height);
+        expect(searchHeight).toBeCloseTo(44, 0);
+        await expect(active.locator('.crate-reading__open strong').first()).toHaveCSS('font-size', titleSize);
+        await expect(active.locator('.crate-reading__meta').first()).toHaveCSS('font-size', '14px');
+        await search.fill('test');
+        // The clear action must fit without enlarging the search field.
+        expect(await search.locator('..').evaluate(el => el.getBoundingClientRect().height)).toBeCloseTo(searchHeight, 0);
+        await active.getByRole('button', { name: 'Clear search' }).click();
+        await page.screenshot({ path: testInfo.outputPath('reading-density.png') });
+      });
+    }
+
     for (const width of [320, 1280]) {
       test(`plugin icon emphasis follows the moving highlight at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
@@ -100,7 +134,7 @@ export function registerPluginNavigationTests() {
           expect(frames.frames.some(frame => frame.docks.every(dock => dock.height > 65))).toBe(true);
           await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText(label);
           await expect(active.locator('[data-dock-group]')).toBeFocused();
-          await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
+          await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '56px');
         }
         // Reopening during the shrink uses the updated destinations immediately.
         await active.locator('[data-dock-group]').press('ArrowDown');
@@ -110,7 +144,7 @@ export function registerPluginNavigationTests() {
         await expect(reopened.getByRole('button')).toHaveText(['Favorites', 'Archive', 'Highlights']);
         await reopened.getByRole('button', { name: 'Highlights', exact: true }).click();
         await expect(active.locator('.pwa-tab-panel:not([data-leaving])').getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
-        await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '60px');
+        await expect(active.locator('.pwa-dock__surface')).toHaveCSS('height', '56px');
         await active.getByRole('button', { name: 'Inbox', exact: true }).click();
         await page.emulateMedia({ reducedMotion: 'reduce' });
         // Applying reduced motion can complete the feature switch and restore
@@ -121,7 +155,7 @@ export function registerPluginNavigationTests() {
         await page.getByRole('dialog', { name: 'More views' }).getByRole('button', { name: 'Favorites', exact: true }).click();
         await expect(active.locator('.pwa-tab-panel:not([data-leaving]) .view-header-title')).toHaveText('Favorites');
         await expect(page.getByRole('dialog', { name: 'More views' })).toHaveCount(0);
-        for (const surface of await workspace.locator('.pwa-dock__surface').all()) await expect(surface).toHaveCSS('height', '60px');
+        for (const surface of await workspace.locator('.pwa-dock__surface').all()) await expect(surface).toHaveCSS('height', '56px');
       });
       test(`plugin dock highlight takes one continuous path at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });

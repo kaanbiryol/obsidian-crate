@@ -137,7 +137,10 @@ const ActiveRemindersList: React.FC<Props> = ({
           {showUpcoming && <span className="reminders-count-title">Upcoming · </span>}
           <span className="reminders-count-active">{presentation.activeCount} active</span>
           {presentation.overdueCount > 0 && (
-            <span className="reminders-count-overdue">{presentation.overdueCount} overdue</span>
+            <>
+              <span aria-hidden="true">&middot;</span>
+              <span className="view-header-overdue">{presentation.overdueCount} overdue</span>
+            </>
           )}
           {presentation.completedCount > 0 && (
             <span className="reminders-count-completed"> · {presentation.completedCount} completed</span>

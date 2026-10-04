@@ -16,6 +16,7 @@ export const DockMorphContext = createContext<ReturnType<typeof useDockMorphStat
 /** One damped spring preserves both shape and velocity when the target changes. */
 export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) {
   const surface = useRef<HTMLSpanElement>(null);
+  const collapsedHeight = useRef(60);
   const reduceMotion = useReducedMotion();
   const local = useDockMorphState();
   const { height, expandedHeight, owner } = useContext(DockMorphContext) ?? local;
@@ -24,13 +25,17 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
     if (!element) return;
     const menuSize = expandedHeight.get();
     const progress = Math.max(0, Math.min(1, (value - 60) / Math.max(1, menuSize - 60)));
-    element.style.height = `${value}px`;
-    element.style.borderRadius = `${32 - progress * 4}px`;
+    // The shared spring keeps a canonical 60px resting point across retained
+    // docks; map its travel to the host's actual collapsed control size.
+    const paintedHeight = value - (60 - collapsedHeight.current) * (1 - progress);
+    const radius = collapsedHeight.current / 2 + 2;
+    element.style.height = `${paintedHeight}px`;
+    element.style.borderRadius = `${radius + progress * (28 - radius)}px`;
     // The popup lives in a portal beside the bar. Share the painted edge with
     // it so text never floats beyond the expanding material. Only the reveal
     // moves; the choices keep their final hit targets during a held gesture.
     const dock = element.closest<HTMLElement>('.pwa-dock');
-    dock?.style.setProperty('--dock-menu-inset', `${Math.max(0, menuSize - value)}px`);
+    dock?.style.setProperty('--dock-menu-inset', `${Math.max(0, menuSize - paintedHeight)}px`);
     dock?.style.setProperty('--dock-menu-opacity', `${Math.max(0, Math.min(1, (progress - 0.1) / 0.55))}`);
     dock?.style.setProperty('--dock-tabs-opacity', `${Math.max(0, 1 - progress * 5)}`);
   }, [expandedHeight]);
@@ -48,6 +53,7 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
   }, [height, expandedHeight, owner, open, menuHeight, inert, reduceMotion]);
   return useCallback((element: HTMLSpanElement | null) => {
     surface.current = element;
+    if (element) collapsedHeight.current = parseFloat(getComputedStyle(element).getPropertyValue('--pwa-dock-control-height')) || 60;
     paint(height.get());
   }, [height, paint]);
 }

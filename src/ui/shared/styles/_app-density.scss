@@ -1,0 +1,48 @@
+// Identical screen typography, list controls and dock geometry in both hosts.
+// Host adapters retain colors, safe-area ownership and viewport/container rules.
+@mixin typography {
+  --crate-view-title-size: 24px;
+  --crate-view-title-weight: 600;
+  --crate-view-title-spacing: -.025em;
+  --crate-view-title-leading: 1.2;
+}
+
+@mixin lists {
+	.reminders-view.is-primary, .pwa-opening-screen, .crate-reading, .reminders-list-container {
+		--reminder-font-base: 16px;
+		--reminder-font-sm: 15px;
+		--reminder-font-xs: 14px;
+		--reminder-font-xxs: 13px;
+		--checkbox-size: 16px;
+	}
+	:is(.reminders-view.is-primary, .reminders-list-container) .premium-reminder-title,
+	.crate-reading .crate-reading__open strong,
+	.reminders-browse-view .premium-project-name,
+	.crate-highlight-group__header .crate-highlight-group__copy strong { font-weight: 400; }
+	.crate-reading .crate-reading__source-icon { width: 20px; height: 20px; flex-basis: 20px; border-radius: 5px; }
+	.crate-reading .crate-reading__search {
+		--crate-field-height: 44px;
+		--crate-radius-field-rounded: 12px;
+		margin-block: 12px;
+		// A clear button fits inside the field's border without growing the row.
+		.crate-text-input { min-height: 42px; }
+		.crate-icon-button { margin-block: -1px; }
+		.crate-field__icon svg { width: 18px; height: 18px; }
+	}
+}
+
+@mixin dock {
+  --pwa-dock-control-height: 56px;
+  --pwa-dock-height: calc(66px + var(--pwa-dock-bottom-inset));
+  .pwa-dock { max-width: 600px; padding-inline: 28px; gap: 8px; }
+  .pwa-dock__bar, .pwa-dock__surface { height: 56px; border-radius: 30px; }
+  .pwa-dock__tab, .pwa-dock__indicator { height: 46px; border-radius: 24px; }
+  .pwa-dock__tab > svg:first-child { width: 22px; height: 22px; }
+  .pwa-dock__add { flex-basis: 56px; height: 56px; }
+  .pwa-dock__add > svg { width: 24px; height: 24px; }
+  .pwa-dock__menu { left: 28px; right: 92px; }
+  @media (max-width: 360px) {
+    .pwa-dock { padding-inline: 16px; }
+    .pwa-dock__menu { left: 16px; right: 80px; }
+  }
+}

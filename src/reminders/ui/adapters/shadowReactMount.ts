@@ -34,6 +34,7 @@ export function createShadowRootMount(
   mountPoint.className = options.mountClassName ?? "reminders-shadow-root";
   mountPoint.classList.add("crate-reminders-ui");
   mountPoint.dataset.uiHost = "plugin";
+  mountPoint.classList.toggle("is-mobile", host.doc.body.classList.contains("is-mobile"));
   mountPoint.classList.add(host.doc.body.classList.contains("theme-dark") ? "dark" : "light");
   options.configureMountPoint?.(mountPoint);
   return { shadowRoot, mountPoint };
