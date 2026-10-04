@@ -963,3 +963,14 @@ less exterior padding. Loading headers and search placeholders use the same
 geometry as loaded screens. The dock and add button are 56px tall, with 46px
 tab targets and 28px side insets (16px below 361px). Its scroll reserve and
 expanding menu follow that geometry; bottom safe areas are still applied once.
+
+### Sync indicator appearance
+
+The shared indicator uses each host’s semantic success/warning colors so light
+and dark themes retain readable status colors. Success remains a solid dot with
+a centered completion ripple; pending uses pause bars, offline a dash, and cached
+an outlined circle. Accessible labels continue to provide the full status.
+Forced-colors mode uses `CanvasText` for these shapes and hides decorative halos
+and ripples. The dot and ripple define their own border-box sizing.
+`scripts/pwa-sync-indicator-test.mjs` checks both PWA palettes, centered state
+geometry, motion interruption, reduced motion, and Chromium forced colors.

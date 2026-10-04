@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
@@ -39,6 +40,13 @@ const css = compileString(`
 		@include shell.styles; @include view-header.styles; @include project-detail.styles; @include indicator.styles;
 	}
 `, { loadPaths: [process.cwd()] }).css;
+
+const palettes = await Promise.all(['palette', 'theme-light'].map(name =>
+	readFile(`src/cloudflare/worker/pwa/styles/${name}.css`, 'utf8')));
+const luminance = rgb => rgb.match(/[\d.]+/g).slice(0, 3)
+	.map(value => Number(value) / 255)
+	.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+	.reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
 
 for (const browserType of [chromium, webkit]) {
 	const browser = await browserType.launch();
@@ -123,7 +131,48 @@ for (const browserType of [chromium, webkit]) {
 		await expect(visual).toHaveAttribute('data-visual-state', 'synced');
 		await page.evaluate(() => window.root.unmount());
 		await page.clock.runFor(1600);
-		console.log(`${browserType.name()}: sync motion, interruptions, and reduced motion passed`);
+		// Exercise the real PWA palettes and the shared geometry without host resets.
+		const states = ['synced', 'syncing', 'pending', 'offline', 'cached', 'error'];
+		const fixtures = states.map(state => `<span class="crate-sync-indicator" data-visual-state="${state}"><span class="crate-sync-indicator__halo"></span><span class="crate-sync-indicator__dot"></span><span class="crate-sync-indicator__ripple"></span></span>`).join('');
+		await page.setContent(`<style>${css}
+			#root { display:flex; gap:24px; padding:24px; background:var(--background-primary-alt); --text-muted:inherit; --text-normal:inherit; }
+		</style><div id="root">${fixtures}</div>`);
+		await page.addStyleTag({ content: palettes[0] });
+		const theme = await page.addStyleTag({ content: '/* theme */' });
+		for (const light of [false, true]) {
+			await theme.evaluate((el, content) => el.textContent = content, light ? palettes[1] : '');
+			for (const state of states) {
+				const fixture = page.locator(`[data-visual-state="${state}"]`);
+				const dot = fixture.locator('.crate-sync-indicator__dot');
+				const background = await dot.evaluate(el => getComputedStyle(el.parentElement.parentElement).backgroundColor);
+				// Resolve the semantic color through a painted property (rings use borders).
+				const foreground = await dot.evaluate(el => getComputedStyle(el)[['pending', 'cached'].includes(el.parentElement.dataset.visualState) ? 'borderLeftColor' : 'backgroundColor']);
+				const values = [luminance(foreground), luminance(background)].sort((a,b) => b-a);
+				assert.ok((values[0]+.05)/(values[1]+.05) >= 3, `${state} must remain legible in ${light ? 'light' : 'dark'} mode`);
+				const frame = await fixture.boundingBox();
+				const bounds = await dot.boundingBox();
+				assert.ok(Math.abs(bounds.x+bounds.width/2-frame.x-frame.width/2) < .01);
+				assert.ok(Math.abs(bounds.y+bounds.height/2-frame.y-frame.height/2) < .01);
+			}
+			await page.screenshot({path:`/tmp/crate-sync-states-${browserType.name()}-${light ? 'light' : 'dark'}.png`});
+		}
+		await expect(page.locator('[data-visual-state="pending"] .crate-sync-indicator__dot')).toHaveCSS('border-left-width', '2px');
+		await expect(page.locator('[data-visual-state="offline"] .crate-sync-indicator__dot')).toHaveCSS('height', '2px');
+		await expect(page.locator('[data-visual-state="cached"] .crate-sync-indicator__dot')).toHaveCSS('border-top-width', '2px');
+		await expect(page.locator('[data-visual-state="synced"] .crate-sync-indicator__ripple')).toHaveCSS('box-sizing', 'border-box');
+		if (browserType === chromium) {
+			await page.emulateMedia({ forcedColors: 'active' });
+			for (const state of states) {
+				const fixture = page.locator(`[data-visual-state="${state}"]`);
+				const colors = await fixture.locator('.crate-sync-indicator__dot').evaluate(el => ({
+					foreground: getComputedStyle(el)[['pending','cached'].includes(el.parentElement.dataset.visualState) ? 'borderLeftColor' : 'backgroundColor'],
+					background: getComputedStyle(document.body).backgroundColor,
+				}));
+				assert.notEqual(colors.foreground, colors.background, `${state} must remain visible in forced colors`);
+				await expect(fixture.locator('.crate-sync-indicator__halo')).toBeHidden();
+			}
+		}
+		console.log(`${browserType.name()}: sync motion, interruptions, reduced motion, palette contrast, and state geometry passed`);
 	} finally {
 		await browser.close();
 	}

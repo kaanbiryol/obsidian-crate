@@ -140,7 +140,7 @@ for (const browserType of [chromium, webkit]) {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(status).toBeFocused();
   const indicator = status.locator('.crate-sync-indicator');
-  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('width', '7px');
+  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('width', '8px');
   await page.evaluate(() => window.setSyncState({status:'syncing', work:{phase:'applying'}}));
   await expect(indicator).toHaveAttribute('data-visual-state','syncing');
   await expect(status).toHaveText('');

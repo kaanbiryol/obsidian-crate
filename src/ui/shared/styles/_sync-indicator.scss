@@ -10,25 +10,46 @@
 		--sync-indicator-color-duration: 300ms;
 		color: var(--sync-indicator-color);
 
-		// Keep sync colors consistent across Obsidian themes and the PWA.
+		// Follow each host’s light/dark semantic palette.
 		&[data-visual-state="synced"],
 		&[data-visual-state="settling"] {
-			--sync-indicator-color: #22c55e;
+			--sync-indicator-color: var(--text-success, #22c55e);
 		}
-		&[data-visual-state="syncing"] { --sync-indicator-color: #f59e0b; }
+		&[data-visual-state="syncing"] { --sync-indicator-color: var(--text-warning, #f59e0b); }
 		&[data-visual-state="error"] { --sync-indicator-color: var(--text-error); }
 	}
 
 	#{$selector}__dot {
+		box-sizing: border-box;
 		grid-area: 1 / 1;
-		width: 7px;
-		height: 7px;
+		// Even dimensions keep the resting dot on whole pixels in the 16px frame.
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
 		background: var(--sync-indicator-color);
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
 		transform: scale(1);
 		// Animate the painted dot and glow directly, rather than inherited color.
 		transition: background-color var(--sync-indicator-color-duration) ease-in-out, box-shadow var(--sync-indicator-color-duration) ease-in-out, transform 600ms cubic-bezier(.22, 1, .36, 1);
+	}
+
+
+	// Quiet states remain recognizable without relying on color or motion.
+	#{$selector}[data-visual-state="pending"] #{$selector}__dot {
+		background: transparent;
+		border-inline: 2px solid var(--sync-indicator-color);
+		border-radius: 0;
+		box-shadow: none;
+	}
+	#{$selector}[data-visual-state="offline"] #{$selector}__dot {
+		height: 2px;
+		border-radius: 1px;
+		box-shadow: none;
+	}
+	#{$selector}[data-visual-state="cached"] #{$selector}__dot {
+		background: transparent;
+		border: 2px solid var(--sync-indicator-color);
+		box-shadow: none;
 	}
 
 	#{$selector}__halo {
@@ -61,6 +82,7 @@
 	}
 
 	#{$selector}__ripple {
+		box-sizing: border-box;
 		grid-area: 1 / 1;
 		width: 12px;
 		height: 12px;
@@ -97,6 +119,17 @@
 	@keyframes pwa-sync-breathe {
 		0%, 100% { transform: scale(.82); }
 		50% { transform: scale(1); }
+	}
+
+
+	@media (forced-colors: active) {
+		#{$selector}[data-visual-state] {
+			// Use the user's system palette while preserving hollow/bar shapes.
+			forced-color-adjust: none;
+			--sync-indicator-color: CanvasText;
+		}
+		#{$selector} #{$selector}__dot { box-shadow: none; animation: none; }
+		#{$selector}__halo, #{$selector}__ripple { display: none; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
