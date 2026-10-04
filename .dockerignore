@@ -10,6 +10,9 @@
 !scripts/**
 !src/
 !src/**
+!site/
+!site/assets/
+!site/assets/status.css
 !packages/
 !packages/server/
 !packages/server/**

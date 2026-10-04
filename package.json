@@ -177,6 +177,9 @@
 		},
 		"obsidian": {
 			"moment": "2.31.0"
+		},
+		"@tailwindcss/cli": {
+			"@parcel/watcher": "2.5.6"
 		}
 	}
 }

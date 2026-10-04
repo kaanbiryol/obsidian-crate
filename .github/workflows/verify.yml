@@ -269,6 +269,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run build
       - name: Run browser group
         run: npm run test:pwa-browser -- --platform=linux --shard=${{ matrix.shard }}/4
       - name: Upload browser failure diagnostics
@@ -335,7 +336,7 @@ jobs:
         run: node --test scripts/reading-shortcut.test.mjs
       - name: Install native browser test runtimes
         run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
-      - run: npm run build:worker
+      - run: npm run build
       - run: npm run test:reading-browser
       - name: Upload Reading browser diagnostics
         if: always()
