@@ -35,6 +35,10 @@ crate-backup*.tgz
 .generated
 site/assets/site.generated.css
 site/website-options/crate-ui/crate-ui.generated.css
+/site/docs/
+/docs-site/.astro/
+/docs-site/public/logo.png
+/docs-site/src/content/docs/reference/
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

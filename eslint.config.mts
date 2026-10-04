@@ -204,6 +204,9 @@ export default tseslint.config(
 		".generated/**",
 		"site/assets/*.generated.js",
 		"site/shortcuts/help/**",
+		// Starlight is a separate project, validated by npm run check:docs.
+		"docs-site/**",
+		"site/docs/**",
 		"test-vault",
 		"test-vault/**",
 		"test-results/**",

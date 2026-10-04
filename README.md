@@ -6,6 +6,11 @@ Crate is an Obsidian plugin for people who want to own the infrastructure behind
 
 Crate is not a hosted service and does not require a Crate account.
 
+**New to Crate?** Start with the [documentation](https://crate.kaanbiryol.com/docs/):
+[install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/),
+[choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/),
+then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/).
+
 [Deployment and OAuth setup](docs/deployment.md)
 
 [Run on your own computer](docs/self-hosting.md) — local setup, remote access, device tokens, backups, and updates.

@@ -1,0 +1,62 @@
+:root {
+  --sl-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sl-color-accent-low: #211b35;
+  --sl-color-accent: #8d70d4;
+  --sl-color-accent-high: #d3c3ff;
+  --sl-color-white: #f4f4f6;
+  --sl-color-gray-1: #e5e5e9;
+  --sl-color-gray-2: #bbb9c4;
+  --sl-color-gray-3: #8c8a96;
+  --sl-color-gray-4: #53515d;
+  --sl-color-gray-5: #28272f;
+  --sl-color-gray-6: #141418;
+  --sl-color-black: #0b0b0e;
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+  --sl-content-width: 48rem;
+  --sl-sidebar-width: 17.5rem;
+  --sl-text-h1: 2.5rem;
+  --sl-text-h2: 1.65rem;
+  --sl-text-h3: 1.2rem;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #f0eafa;
+  --sl-color-accent: #7253b7;
+  --sl-color-accent-high: #493276;
+  --sl-color-white: #19171e;
+  --sl-color-gray-1: #302c39;
+  --sl-color-gray-2: #484351;
+  --sl-color-gray-3: #6f6979;
+  --sl-color-gray-4: #aaa4b4;
+  --sl-color-gray-5: #dfdbe5;
+  --sl-color-gray-6: #f6f5f8;
+  --sl-color-gray-7: #faf9fc;
+  --sl-color-black: #fff;
+}
+
+/* Keep the previous page painted until the next document is ready. Native
+   navigation preserves Starlight's search, sidebar, and browser history. */
+@view-transition { navigation: auto; }
+
+/* An instant handoff avoids a page-wide crossfade, including for reduced motion. */
+::view-transition-group(root),
+::view-transition-new(root) { animation: none; }
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { mix-blend-mode: normal; }
+
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.035em; }
+h1 { line-height: 1.14; }
+.sl-markdown-content { line-height: 1.75; }
+.sl-markdown-content > p:first-child { color: var(--sl-color-gray-2); font-size: 1.1rem; }
+.sl-markdown-content :is(h2, h3):not(:first-child) { margin-top: 2.25rem; }
+.sidebar-content a { border-radius: 5px; }
+.sidebar-content a[aria-current="page"] { background: var(--sl-color-accent-low); color: var(--sl-color-accent-high); }
+.sl-link-card { border-radius: 10px; box-shadow: none; background: var(--sl-color-gray-6); }
+.sl-link-card:hover { border-color: var(--sl-color-gray-3); box-shadow: none; }
+.starlight-aside { border-radius: 0 8px 8px 0; }
+.pagination-links a { border-radius: 9px; box-shadow: none; }
+
+@media (max-width: 50rem) {
+  :root { --sl-text-h1: 2rem; --sl-text-h2: 1.45rem; }
+}

@@ -5,6 +5,8 @@ on:
     branches: [master]
     paths:
       - "site/**"
+      - "docs-site/**"
+      - "docs/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
@@ -48,11 +50,18 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            docs-site/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix docs-site ci
       - name: Check dependencies and source for security findings
         run: npm run security:check
-      - name: Build site styles
+      - name: Check documentation
+        run: npm run check:docs
+      - name: Build static site and documentation
         run: npm run build:site
       - name: Verify shortcut template
         run: node --test scripts/reading-shortcut.test.mjs

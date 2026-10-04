@@ -3,7 +3,10 @@ const header = document.querySelector('.canvas-header');
 const menuButton = document.querySelector('.menu-toggle');
 const navigation = document.querySelector('#main-navigation');
 const navLinks = Array.from(navigation?.querySelectorAll('a') ?? []);
-const sections = navLinks.map((link) => document.querySelector(link.getAttribute('href')));
+const sections = navLinks.map((link) => {
+  const href = link.getAttribute('href');
+  return href?.startsWith('#') ? document.getElementById(href.slice(1)) : null;
+});
 
 function closeMenu() {
   menuButton?.setAttribute('aria-expanded', 'false');
@@ -27,8 +30,11 @@ document.addEventListener('click', (event) => {
   if (event.target instanceof Node && !header?.contains(event.target)) closeMenu();
 });
 
-navLinks.forEach((link) => link.addEventListener('click', closeMenu));
-window.matchMedia('(min-width: 851px)').addEventListener('change', closeMenu);
+header?.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
+header?.addEventListener('focusout', (event) => {
+  if (!(event.relatedTarget instanceof Node) || !header.contains(event.relatedTarget)) closeMenu();
+});
+window.matchMedia('(min-width: 1001px)').addEventListener('change', closeMenu);
 
 let scrollPending = false;
 function updateNavigation() {
@@ -55,6 +61,7 @@ updateNavigation();
 // Hold the last frame, then fade through each replay instead of jumping to zero.
 document.querySelectorAll('.reminder-recording video').forEach((recording) => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const isGalleryPreview = Boolean(recording.closest('a[data-gallery-video]'));
   const replayDelay = Number(recording.dataset.replayDelay) || 3000;
   let visible = false;
   let replayTimer;
@@ -62,7 +69,7 @@ document.querySelectorAll('.reminder-recording video').forEach((recording) => {
   recording.muted = true;
   recording.loop = false;
 
-  const canAutoplay = () => visible && !document.hidden && !reducedMotion.matches;
+  const canAutoplay = () => visible && !document.hidden && !reducedMotion.matches && !document.querySelector('#media-viewer[open]');
   function cancelReplay() {
     window.clearTimeout(replayTimer);
     replayTimer = undefined;
@@ -72,11 +79,12 @@ document.querySelectorAll('.reminder-recording video').forEach((recording) => {
   function play() {
     recording.play().catch(() => {
       cancelReplay();
-      recording.controls = true;
+      recording.controls = !isGalleryPreview;
     });
   }
   function updatePlayback() {
-    recording.controls = reducedMotion.matches;
+    // Gallery previews open the player; playback controls belong to that player.
+    recording.controls = !isGalleryPreview && reducedMotion.matches;
     if (!canAutoplay()) {
       cancelReplay();
       recording.pause();
@@ -113,6 +121,7 @@ document.querySelectorAll('.reminder-recording video').forEach((recording) => {
     updatePlayback();
   }).observe(recording);
   document.addEventListener('visibilitychange', updatePlayback);
+  document.addEventListener('crate:gallerychange', updatePlayback);
   reducedMotion.addEventListener('change', updatePlayback);
   updatePlayback();
 });

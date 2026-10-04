@@ -43,6 +43,7 @@
 				<a class="site-nav__link" href="#reminders">Reminders</a>
 				<a class="site-nav__link" href="#sync">Sync</a>
 				<a class="site-nav__link" href="#setup">Setup</a>
+				<a class="site-nav__link" href="/docs/">Docs</a>
 			</nav>
 			<a class="header-action inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span class="text-zinc-400" aria-hidden="true">↗</span></a>
 		</header>
@@ -55,7 +56,7 @@
 				<h1 id="hero-title" class="hero-heading text-balance leading-[0.96] font-medium tracking-[-0.06em] text-white">Own your Obsidian sync.</h1>
 				<p class="text-pretty mt-7 max-w-[38rem] text-base leading-7 text-zinc-300">Sync your Obsidian notes across devices. Turn Markdown tasks into reminders on your phone. All through your own Cloudflare account.</p>
 				<div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-					<a class="primary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-bold text-ink-950" href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">View installation guide <span aria-hidden="true">↗</span></a>
+					<a class="primary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-bold text-ink-950" href="/docs/getting-started/installation/">View installation guide <span aria-hidden="true">↗</span></a>
 					<a class="secondary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-semibold text-zinc-300" href="#reminders">See how it works <span aria-hidden="true">↓</span></a>
 				</div>
 				<p class="hero-release">Early release <span aria-hidden="true">·</span> Manual installation</p>
@@ -270,21 +271,21 @@
                 <details><summary>Do I need a Cloudflare account?</summary><p>Yes. Crate creates its sync backend in your own Cloudflare account. You sign in, choose an account, and review permissions during setup. There is no separate Crate account.</p></details>
                 <details><summary>What does it cost?</summary><p>Crate is open source. Cloudflare usage is billed separately to your account; costs depend on your storage and activity. Review your Cloudflare plan and usage before connecting a vault.</p></details>
                 <details><summary>How does it work on my phone?</summary><p>Install the plugin in Obsidian mobile to sync your vault. The companion web app is for reminders and notifications; it does not browse or sync your notes. Phone notifications require setup and permission.</p></details>
-                <details><summary>How do I install it?</summary><p>Crate is an early release and is not in the community plugin catalog yet. Follow the <a href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">installation guide</a> to build and install it manually. Start with a non-critical vault.</p></details>
-                <details><summary>Are my notes end-to-end encrypted?</summary><p>Crate offers optional end-to-end encryption on Cloudflare and self-hosted servers. Save your recovery key and enable it in Crate settings. Without it, your server operator can read synced contents. <a href="/privacy/">Read the privacy policy</a> for the full data handling details.</p></details>
+                <details><summary>How do I install it?</summary><p>Crate is an early release and is not in the community plugin catalog yet. Follow the <a href="/docs/getting-started/installation/">installation guide</a> to install it with BRAT or release files. Start with a non-critical vault.</p></details>
+                <details><summary>Are my notes end-to-end encrypted?</summary><p>Crate offers optional end-to-end encryption on Cloudflare and self-hosted servers. Save your recovery key and <a href="/docs/features/encryption/">enable it in Crate settings</a>. Without it, your server operator can read synced contents. <a href="/privacy/">Read the privacy policy</a> for the full data handling details.</p></details>
             </div>
         </section>
 
 		<section class="release-panel relative mx-auto mb-16 flex w-[min(100%-2rem,76rem)] flex-col items-start justify-between gap-8 overflow-hidden rounded-[10px] border border-white/12 bg-gradient-to-br from-[#181a26] via-[#12131a] to-[#0d0e12] p-7 shadow-panel sm:w-[min(100%-3rem,76rem)] sm:p-10 lg:flex-row lg:items-end lg:p-14" aria-labelledby="release-title">
 			<div class="pointer-events-none absolute -right-24 -top-40 size-[28rem] rounded-full bg-crate-500/[0.12] blur-3xl" aria-hidden="true"></div>
 			<div class="relative z-10"><span class="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] text-zinc-300 uppercase"><i class="size-1.5 rounded-full bg-crate-400"></i> Early release</span><h2 id="release-title" class="mt-5 text-3xl font-medium tracking-[-0.055em] sm:text-5xl">Install Crate</h2><p class="mt-4 max-w-2xl text-sm leading-6 text-zinc-300">Crate is not yet available in the Obsidian community plugin catalog. Use a non-critical vault while testing it.</p></div>
-			<a class="relative z-10 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-bold text-ink-950 shadow-[0_12px_32px_rgb(0_0_0/0.24),0_1px_0_rgb(255_255_255/0.65)_inset] transition-all hover:-translate-y-0.5 hover:bg-zinc-100" href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">Open installation guide <span aria-hidden="true">↗</span></a>
+			<a class="relative z-10 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-bold text-ink-950 shadow-[0_12px_32px_rgb(0_0_0/0.24),0_1px_0_rgb(255_255_255/0.65)_inset] transition-all hover:-translate-y-0.5 hover:bg-zinc-100" href="/docs/getting-started/installation/">Open installation guide <span aria-hidden="true">↗</span></a>
 		</section>
 	</main>
 
 	<footer class="content-rail mx-auto grid w-[min(100%-2rem,76rem)] gap-8 border-t border-white/8 py-8 text-[11px] text-zinc-400 sm:w-[min(100%-3rem,76rem)] md:grid-cols-[1fr_auto_auto] md:items-start md:gap-12">
 		<div><a class="inline-flex items-center gap-2.5 text-zinc-300" href="/"><span class="brand-tile brand-tile--compact" aria-hidden="true"><img class="brand-tile__mark" src="/assets/logo.png" alt=""></span><b>Crate</b></a></div>
-		<nav class="flex flex-wrap gap-x-5 gap-y-3" aria-label="Site links"><a class="hover:text-zinc-300" href="/privacy/">Privacy</a><a class="hover:text-zinc-300" href="https://github.com/kaanbiryol/obsidian-crate/tree/master/docs">Documentation</a><a class="hover:text-zinc-300" href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav>
+		<nav class="flex flex-wrap gap-x-5 gap-y-3" aria-label="Site links"><a class="hover:text-zinc-300" href="/privacy/">Privacy</a><a class="hover:text-zinc-300" href="/docs/">Documentation</a><a class="hover:text-zinc-300" href="https://github.com/kaanbiryol/obsidian-crate">GitHub</a></nav>
 		<small class="text-[10px]">Built by Kaan Biryol.</small>
 	</footer>
 </body>

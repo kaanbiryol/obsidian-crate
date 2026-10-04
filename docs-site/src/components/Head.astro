@@ -1,0 +1,11 @@
+---
+import StarlightHead from '@astrojs/starlight/components/Head.astro';
+---
+
+<StarlightHead />
+
+<!-- Paint the document canvas in the selected theme before external CSS loads. -->
+<style is:inline>
+  html { background: #0b0b0e; color-scheme: dark; }
+  html[data-theme="light"] { background: #fff; color-scheme: light; }
+</style>

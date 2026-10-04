@@ -1,0 +1,18 @@
+<div class="docs-brand">
+  <a class="docs-brand-home" href="/" aria-label="Crate home">
+    <img src={`${import.meta.env.BASE_URL}logo.png`} width="26" height="26" alt="" />
+    <span>Crate</span>
+  </a>
+  <span class="docs-brand-divider" aria-hidden="true">/</span>
+  <a class="docs-brand-label" href={import.meta.env.BASE_URL}>Docs</a>
+</div>
+
+<style>
+  .docs-brand { display: flex; align-items: center; gap: 0.85rem; font-size: 1rem; white-space: nowrap; }
+  .docs-brand a { text-decoration: none; color: var(--sl-color-white); }
+  .docs-brand-home { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; letter-spacing: -0.025em; }
+  .docs-brand img { border-radius: 6px; background: #131316; }
+  .docs-brand-divider { color: var(--sl-color-gray-4); }
+  .docs-brand .docs-brand-label { color: var(--sl-color-gray-2); font-size: 0.9rem; }
+  .docs-brand a:hover { color: var(--sl-color-text-accent); }
+</style>
