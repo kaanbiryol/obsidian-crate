@@ -122,6 +122,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     const dragHandle = async (edge, offset) => {
       const handle = page.getByRole('button', { name: `Adjust highlight ${edge}`, exact: true });
+      await expect(handle).toBeEnabled();
+      await expect.poll(() => handle.evaluate((element, edge) => {
+        const body = document.querySelector('.crate-reading-reader__body');
+        const marks = body.querySelectorAll('.crate-reading-reader__highlight');
+        const mark = edge === 'start' ? marks[0] : marks[marks.length - 1];
+        const a = element.getBoundingClientRect(), b = mark.getBoundingClientRect();
+        return Math.abs(a.y + a.height / 2 - b.y - b.height / 2);
+      }, edge)).toBeLessThan(1);
       const box = await handle.boundingBox(), target = await textPoint(offset);
       if (name === 'chromium') {
         const input = await context.newCDPSession(page);

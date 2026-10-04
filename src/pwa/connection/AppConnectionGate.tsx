@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useAppConnection } from './AppConnection';
 import { EncryptionUnlockCard } from '../components/EncryptionUnlockCard';
 import { EmptyAuthState, ErrorState } from '../components/AuthStates';
@@ -19,11 +19,16 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
 }) {
   const app = useAppConnection();
   const features = useSharedFeatures();
+  const previousSection = useRef(section);
+  const returnButton = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (previousSection.current !== section) returnButton.current?.focus({ preventScroll: true });
+    previousSection.current = section;
+  }, [section]);
+  const [contentMounted, setContentMounted] = useState(false);
   const [exportError, setExportError] = useState('');
   const [browserSetup, setBrowserSetup] = useState(needsBrowserSetup);
   const shell = (content: ReactNode) => <div className="crate-reminders-ui reminders-shadow-root pwa-shadow-root" data-ui-host="pwa">{content}</div>;
-  if (browserSetup) return shell(<BrowserSetup onContinue={() => setBrowserSetup(false)} />);
-  if (!app.bootstrapped) return <PwaLaunchSplash />;
   const reading = app.reading;
   const remindersLocked = app.authToken && app.encryption.status === 'locked' ? app.encryption : null;
   const readingLocked = reading.lockedSession;
@@ -37,27 +42,42 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
   const other = section === 'reading' ? 'reminders' : 'reading';
   const otherReady = features[other] && (other === 'reminders'
     ? app.authToken && ['ready', 'legacy'].includes(app.encryption.status) : reading.session);
-  const switchFeature = otherReady && <Button onClick={() => onOpenFeature(other)}>Open {other === 'reading' ? 'Reading' : 'Reminders'}</Button>;
-  if (locked) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption conversion in progress' : 'Unlock Crate'}
-    message={locked.message} setupRequired={locked.setupRequired} action="Unlock Crate" onUnlock={locked.converting ? undefined : locked.unlock}
-    pairing={locked.converting ? undefined : <AppPairing key={section} feature={section} />}>
-    {busy => <>
-      {locked.converting && <p>In Obsidian, open <strong>Crate settings → Sync → Manage encryption</strong> and resume setup.</p>}
-      {exportError && <p role="alert">{exportError}</p>}
-      <Button disabled={busy} onClick={() => location.reload()}>Retry connection</Button>
-      {switchFeature}
-      {readingLocked && <Button disabled={busy} onClick={() => { void exportReadingData().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : String(cause))); }}>Export saved changes</Button>}
-      <p>Logging out removes this app’s saved content and unsynced changes from this device.</p>
-      <Button disabled={busy || app.loggingOut} onClick={() => { void app.logOut(); }}>Log out</Button>
-    </>}
-  </EncryptionUnlockCard>);
-  if (section === 'reading' && !reading.ready) return <PwaLaunchSplash />;
-  if (!app.authToken && (section === 'reminders' || !reading.session && !reading.lockedSession && !reading.connecting)) {
-    // Expiry removes credentials, but preserved encryption data still needs a
-    // recovery/logout action after reload. It must not look like a fresh install.
-    const error = app.error ?? reading.error ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null, undefined) ? SESSION_RECOVERY_MESSAGE : null);
-    return shell(<>{error ? <ErrorState error={error} onRetry={() => location.reload()} onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />
-      : <EmptyAuthState />}{switchFeature}</>);
-  }
-  return children;
+  const switchFeature = otherReady && <Button ref={returnButton} data-feature-recovery-switch onClick={() => onOpenFeature(other)}>Open {other === 'reading' ? 'Reading' : 'Reminders'}</Button>;
+  const connectionScreen = () => {
+    if (browserSetup) return shell(<BrowserSetup onContinue={() => setBrowserSetup(false)} />);
+    if (!app.bootstrapped) return <PwaLaunchSplash />;
+    if (locked) return shell(<EncryptionUnlockCard title={locked.converting ? 'Encryption conversion in progress' : 'Unlock Crate'}
+      message={locked.message} setupRequired={locked.setupRequired} action="Unlock Crate" onUnlock={locked.converting ? undefined : locked.unlock}
+      pairing={locked.converting ? undefined : <AppPairing key={section} feature={section} />}>
+      {busy => <>
+        {locked.converting && <p>In Obsidian, open <strong>Crate settings → Sync → Manage encryption</strong> and resume setup.</p>}
+        {exportError && <p role="alert">{exportError}</p>}
+        <Button disabled={busy} onClick={() => location.reload()}>Retry connection</Button>
+        {switchFeature}
+        {readingLocked && <Button disabled={busy} onClick={() => { void exportReadingData().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : String(cause))); }}>Export saved changes</Button>}
+        <p>Logging out removes this app’s saved content and unsynced changes from this device.</p>
+        <Button disabled={busy || app.loggingOut} onClick={() => { void app.logOut(); }}>Log out</Button>
+      </>}
+    </EncryptionUnlockCard>);
+    if (section === 'reading' && !reading.ready) return <PwaLaunchSplash />;
+    if (!app.authToken && (section === 'reminders' || !reading.session && !reading.lockedSession && !reading.connecting)) {
+      // Expiry removes credentials, but preserved encryption data still needs a
+      // recovery/logout action after reload. It must not look like a fresh install.
+      const error = app.error ?? reading.error ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null, undefined) ? SESSION_RECOVERY_MESSAGE : null);
+      return shell(<>{error ? <ErrorState error={error} onRetry={() => location.reload()} onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />
+        : <EmptyAuthState />}{switchFeature}</>);
+    }
+    return null;
+  };
+  const screen = connectionScreen();
+  const keepContent = !screen || Boolean(contentMounted && app.bootstrapped && !browserSetup && otherReady);
+  useLayoutEffect(() => { setContentMounted(keepContent); }, [keepContent]);
+  // Keep the connected feature's UI state while another feature needs setup.
+  // No feature remains mounted after both sessions are lost or during setup.
+  return <>
+    <div hidden={!!screen} inert={!!screen} style={{ display: screen ? 'none' : 'contents' }}>
+      {keepContent && children}
+    </div>
+    {screen}
+  </>;
 }

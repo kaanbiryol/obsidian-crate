@@ -226,6 +226,12 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			else settle();
 		};
 		const relayout = () => { setLayout(value => value + 1); };
+		// Status and content updates can move the passage without a scroll event.
+		const resize = new ResizeObserver(relayout);
+		resize.observe(reader);
+		resize.observe(text);
+		const page = reader.querySelector('.crate-reading-reader__page');
+		if (page) resize.observe(page);
 		const scroll = (event: Event) => {
 			if (event.target !== document && event.target !== document.scrollingElement && !reader.contains(eventTarget(event))) return;
 			// Handle auto-scroll is part of resizing, not a request to dismiss it.
@@ -241,7 +247,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		text.addEventListener('click', activate); text.addEventListener('keydown', activate);
 		document.addEventListener('scroll', scroll, true); window.addEventListener('resize', relayout); window.addEventListener('blur', blur);
 		return () => {
-			alive = false; window.clearTimeout(timer); window.cancelAnimationFrame(frame);
+			alive = false; resize.disconnect(); window.clearTimeout(timer); window.cancelAnimationFrame(frame);
 			document.removeEventListener('selectionchange', selectionChanged);
 			document.removeEventListener('pointerdown', down); document.removeEventListener('pointermove', move);
 			document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel);

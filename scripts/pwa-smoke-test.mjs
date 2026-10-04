@@ -38,7 +38,7 @@ try {
 	const pageHtml = await pageResponse.text();
 	const { startupAssets, assets: clientAssets } = JSON.parse(await readFile('.generated/cloudflare/pwa-client.json', 'utf-8'));
 	for (const name of Object.keys(clientAssets).filter(name => name !== 'app.js')) {
-		const preload = `<link rel="modulepreload" href="/notifications/assets/${name}">`;
+		const preload = `rel="modulepreload" href="/notifications/assets/${name}"`;
 		if (pageHtml.includes(preload) !== startupAssets.includes(name)) {
 			throw new Error(`Incorrect startup preload for ${name}`);
 		}

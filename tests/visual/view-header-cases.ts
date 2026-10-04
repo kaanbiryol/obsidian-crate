@@ -30,7 +30,7 @@ export function registerViewHeaderTests() {
       await page.clock.setFixedTime(new Date('2026-10-03T12:00:00Z'));
       await page.goto(`/?host=plugin&scene=navigation&theme=${theme}&loading`);
       const active = page.locator('.plugin-workspace-panel[data-active="true"]');
-      const header = active.locator('.view-header');
+      const header = active.locator('.view-header:not([data-leaving] .view-header)');
       await expect(active.getByRole('status', { name: 'Loading reminders' })).toBeVisible();
       await expect(header.locator('.view-header-meta')).toHaveClass(/is-reserved/);
       const opening = await headerGeometry(header);

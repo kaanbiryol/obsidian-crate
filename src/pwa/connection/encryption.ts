@@ -3,6 +3,8 @@ import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { hasEncryptedSessionEvidence, parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption-scope';
 import type { StoredReminderKeys } from '../encryption-keys';
 
+export class EncryptionVerificationUnavailableError extends Error {}
+
 /** Common verification policy for every feature; offline never downgrades known encryption. */
 export async function loadEncryptionState({ token, purpose, fragment, request, current }: {
   token: string; purpose: 'reading' | 'reminders'; fragment?: string;
@@ -13,7 +15,9 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
   const remembered = localStorage.getItem(marker);
   let expected: ScopedEncryptionState | null;
   try {
-    const response = await request();
+    const response = await request().catch((cause: unknown) => {
+      throw new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.', { cause });
+    });
     if (response.status === 401 && current()) reportExpiredConnection(token);
     const oldServer = purpose === 'reminders' && response.status === 404;
     if (!response.ok && !oldServer) throw new Error('Could not verify encryption. Check your connection and retry.');
