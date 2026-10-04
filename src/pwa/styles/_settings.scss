@@ -33,10 +33,10 @@
 	.settings-page-stack { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 	.settings-panel[inert] { pointer-events: none; }
 	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; border-bottom: 0; }
-	.settings-feedback { margin: 0; padding: 12px 20px; }
+	.settings-feedback { margin: 0; padding: var(--crate-space-12) var(--crate-space-20); }
 	.settings-navigation-row, .settings-action-row, .settings-row--diagnostics .settings-action-row {
 		display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
-		width: 100%; min-height: 52px; gap: 12px; padding: 12px 0;
+		width: 100%; min-height: 52px; gap: var(--crate-settings-row-gap); padding: var(--crate-settings-row-padding) 0;
 		border: 0; border-radius: 0; background: transparent; box-shadow: none;
 		color: var(--text-normal); font: inherit; font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-medium);
 		line-height: 1.4; text-align: left; white-space: normal; cursor: pointer;
@@ -108,15 +108,15 @@
 	.settings-help { margin: 0 0 8px; }
 	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 12px; }
 	.settings-main { display: flex; flex-direction: column; }
-	.settings-panel__section { flex-shrink: 0; padding: 20px 0 0; border-bottom: 0; }
+	.settings-panel__section { flex-shrink: 0; padding: var(--crate-space-20) 0 0; border-bottom: 0; }
 	.settings-panel__heading { display: flex; align-items: center; justify-content: space-between; min-height: 28px; margin-bottom: 6px; padding-inline: 2px; }
 	.settings-panel__title { margin: 0; color: var(--text-normal); font-size: var(--reminder-font-base); font-weight: var(--reminder-font-weight-semibold); letter-spacing: normal; }
 	.settings-group { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 	.settings-panel__section > .settings-group {
 		@include list-item.surface;
-		padding-inline: 12px;
+		padding-inline: var(--crate-settings-row-padding);
 	}
-	.settings-row { box-sizing: border-box; padding: 11px 0; min-height: 56px; gap: 12px; }
+	.settings-row { box-sizing: border-box; padding: var(--crate-settings-row-padding) 0; min-height: 56px; gap: var(--crate-settings-row-gap); }
 	.settings-row--value, .settings-row--value > strong { color: var(--text-normal); font-weight: 400; }
 	.settings-row--value > strong { color: var(--text-muted); }
 	.settings-row + .settings-row { border-top: 1px solid var(--crate-divider); }

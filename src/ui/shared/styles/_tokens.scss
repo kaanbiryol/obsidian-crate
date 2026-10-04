@@ -27,11 +27,35 @@
   --crate-warning: var(--text-warning);
   --crate-success: var(--text-success);
   --crate-on-accent: var(--text-on-accent);
+
+  // One spacing scale for both hosts. Geometry such as icons and safe areas
+  // stays with its component; list density uses the semantic roles below.
+  --crate-space-4: 4px;
+  --crate-space-6: 6px;
+  --crate-space-8: 8px;
+  --crate-space-12: 12px;
+  --crate-space-16: 16px;
+  --crate-space-20: 20px;
+  --crate-space-24: 24px;
+  --crate-touch-target-min: 44px;
+  --crate-list-row-padding-block: var(--crate-space-12);
+  --crate-list-row-padding-inline: var(--crate-space-12);
+  --crate-list-content-gap: var(--crate-space-12);
+  --crate-list-copy-gap: var(--crate-space-4);
+  --crate-list-row-gap: var(--crate-space-8);
+  --crate-list-flat-row-gap: 0px;
+  --crate-list-nested-padding-block: var(--crate-space-8);
+  --crate-list-indent: var(--crate-space-16);
+  --crate-list-group-gap: var(--crate-space-16);
+  --crate-list-section-gap: var(--crate-space-24);
+  --crate-list-passage-padding-block: var(--crate-space-16);
+  --crate-reminder-row-gap: var(--crate-list-row-gap);
+
   --crate-radius-card: var(--radius-m, 10px);
   --crate-radius-control: var(--input-radius, var(--radius-s, 4px));
   --crate-radius-field-rounded: 16px;
   --crate-field-height: 48px;
-  --crate-field-padding-inline: 16px;
+  --crate-field-padding-inline: var(--crate-space-16);
   --crate-radius-button: var(--button-radius, var(--crate-radius-control));
   --crate-radius-sheet: var(--modal-radius, var(--radius-l, 12px));
   --crate-radius-icon: var(--clickable-icon-radius, var(--crate-radius-control));
@@ -53,11 +77,11 @@
   --crate-modal-backdrop-filter: var(--blur-l, none);
 
   /* Dialog content and native Setting rows share one spacing and typography scale. */
-  --crate-dialog-padding: 16px;
-  --crate-dialog-gap: 16px;
-  --crate-dialog-footer-padding: 12px;
-  --crate-settings-row-padding: 12px;
-  --crate-settings-row-gap: 12px;
+  --crate-dialog-padding: var(--crate-space-16);
+  --crate-dialog-gap: var(--crate-space-16);
+  --crate-dialog-footer-padding: var(--crate-space-12);
+  --crate-settings-row-padding: var(--crate-space-12);
+  --crate-settings-row-gap: var(--crate-space-12);
   --crate-settings-label-size: var(--font-ui-small, 14px);
   --crate-settings-description-size: var(--font-ui-smaller, 12px);
 

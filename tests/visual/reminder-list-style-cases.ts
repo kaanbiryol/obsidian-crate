@@ -107,6 +107,34 @@ export function reminderListStyleCases() {
       expect(await readingRows.first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       await page.getByRole('searchbox', { name: 'Search reading' }).fill('');
       const highlights = page.locator('.crate-reading-highlights__card');
+      // Every host/presentation shares the same row rhythm, including embedded
+      // and reorderable reminders. Hierarchy and passage reading are exceptions.
+      const checkSpacing = async () => {
+        const standardRows = [first, projectSurface, readingRows.first().locator('.crate-reading__open'),
+          page.getByTestId('embedded-list').locator('.premium-reminder-content').first(),
+          page.getByTestId('reorderable-list').locator('.premium-reminder-content').first()];
+        const padding = await first.evaluate(el => getComputedStyle(el).padding);
+        for (const row of standardRows) {
+          await expect(row).toHaveCSS('padding', padding);
+          expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        }
+        const parentPadding = await projectSurface.evaluate(el => parseFloat(getComputedStyle(el).paddingTop));
+        const child = financeRow.locator('.premium-project-content');
+        expect(await child.evaluate(el => parseFloat(getComputedStyle(el).paddingTop))).toBeLessThan(parentPadding);
+        expect((await child.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        expect(await highlights.first().evaluate(el => parseFloat(getComputedStyle(el).paddingTop))).toBeGreaterThan(parentPadding);
+        for (const row of await page.locator('.premium-reminder-content').all()) {
+          const bounds = await row.evaluate(el => {
+            const content = el.getBoundingClientRect();
+            const checkbox = el.querySelector('.premium-checkbox')!.getBoundingClientRect();
+            return { top: checkbox.top - content.top, bottom: content.bottom - checkbox.bottom, height: checkbox.height };
+          });
+          expect(bounds.top).toBeGreaterThanOrEqual(0);
+          expect(bounds.bottom).toBeGreaterThanOrEqual(0);
+          expect(bounds.height).toBeGreaterThanOrEqual(44);
+        }
+      };
+      await checkSpacing();
       await expect(highlights.first()).toHaveCSS('border-top-width', '0px');
       expect(await highlights.first().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
       expect(await highlights.last().evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
@@ -115,6 +143,7 @@ export function reminderListStyleCases() {
       await expect(page.locator('.reorderable-reminder-item').first()).toHaveCSS('margin-bottom', '0px');
       expect(await first.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath('flat.png'), fullPage: true });
+      await projects.screenshot({ path: testInfo.outputPath('projects-flat.png') });
 
       await picker.selectOption('cards');
       await page.mouse.move(0, 0);
@@ -127,6 +156,7 @@ export function reminderListStyleCases() {
       await expect(readingRows.first()).toHaveCSS('border-top-width', '1px');
       await expect(highlights.first()).toHaveCSS('border-top-width', '1px');
       await expect(readingRows.first()).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await checkSpacing();
       await page.reload();
       await expect(picker).toHaveValue('cards');
       await expect(first).toHaveCSS('border-top-width', '1px');

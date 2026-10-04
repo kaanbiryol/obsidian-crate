@@ -213,7 +213,8 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       animationsEnabled={!prefersReducedMotion}
     />
   );
-  const add = !loadingContent && !suppressFab ? handleAdd : undefined;
+  const initializing = !isInitialLoadComplete || Boolean(loadingContent);
+  const add = initializing || !suppressFab ? handleAdd : undefined;
   return <MotionConfig reducedMotion={prefersReducedMotion ? 'always' : 'user'}>
     <div ref={shell} data-list-style={listStyle} className={[
       'reminders-view is-primary plugin-reminders-navigation',
@@ -237,9 +238,9 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
           </div>
         </TabTransition>
       </div>
-      {!hideTabBar && (renderNavigation?.(viewMode, handleViewModeChange, add, rootCovered)
+      {!hideTabBar && (renderNavigation?.(viewMode, handleViewModeChange, add, initializing || rootCovered)
         ?? <AppDock section="reminders" tabs={['inbox', 'today', 'browse']} destinations={DOCK_TABS.filter(item => ['inbox', 'today', 'browse'].includes(item.id))}
-          activeTab={primaryTab} onSelect={tab => handleViewModeChange(tab as TabId)} onPin={tab => handleViewModeChange(tab as TabId)} onAdd={add} inert={rootCovered} />)}
+          activeTab={primaryTab} onSelect={tab => handleViewModeChange(tab as TabId)} onPin={tab => handleViewModeChange(tab as TabId)} onAdd={add} inert={initializing || rootCovered} />)}
       <div className="pwa-project-layer" data-project-open={rootCovered}>
         <AnimatePresence initial={false} custom={{ direction, reduceMotion: prefersReducedMotion }} onExitComplete={finishProjectClose}>
           {selectedProject && <NavigationScreen key={selectedProject} motion={{ direction, reduceMotion: prefersReducedMotion }} isProjectDetail>
@@ -252,7 +253,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
                 hasFab={showFab && !suppressFab} onReorder={handleReorder} onReorderDragActiveChange={onReorderDragActiveChange}
                 colorScheme={isDarkMode ? 'dark' : 'light'} reorderInteraction={reorderInteraction} />
             </div>
-            {add && <div className="pwa-dock pwa-project-dock"><DockAddButton section="reminders" onClick={add} /></div>}
+            {add && <div className="pwa-dock pwa-project-dock" inert={initializing}><DockAddButton section="reminders" onClick={add} /></div>}
           </NavigationScreen>}
         </AnimatePresence>
       </div>

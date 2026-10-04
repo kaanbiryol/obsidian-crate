@@ -22,7 +22,7 @@
     }
 
     :is(.reorderable-reminder-item, .reminder-render-item) {
-        margin-bottom: 8px;
+        margin-bottom: var(--crate-reminder-row-gap);
     }
 
     .premium-reminder-card {
@@ -31,7 +31,6 @@
     }
 
     .premium-reminder-content {
-        @include list-item.primary-spacing;
         @include list-item.surface;
     }
 
@@ -63,7 +62,7 @@
     }
 
     .premium-reminder-pills {
-        gap: 6px;
+        gap: var(--crate-space-6);
     }
 
     .premium-pill {
@@ -89,11 +88,11 @@
 
 .reminders-view .reminders-upcoming-view {
     .space-y-6 > :not([hidden]) ~ :not([hidden]) {
-        margin-top: 18px;
+        margin-top: var(--crate-list-section-gap);
     }
 
     .upcoming-date-header {
-        margin: 2px 0 8px;
+        margin: 2px 0 var(--crate-space-8);
         padding-left: 2px;
         color: var(--text-faint);
         font-size: var(--reminder-font-xs);
@@ -104,13 +103,7 @@
 }
 
 .reminders-browse-view {
-    .premium-projects-list {
-        gap: 8px;
-    }
-
     .premium-project-content {
-        gap: 10px;
-        padding: 11px 12px;
         border-radius: var(--crate-radius-card);
         background: var(--crate-project-card-bg, var(--crate-reminder-card-bg, var(--crate-panel-bg)));
         border-color: var(--crate-project-card-border, var(--crate-reminder-card-border, var(--crate-divider)));
@@ -121,17 +114,9 @@
         @include list-item.active;
     }
 
-    .premium-project-left {
-        gap: 10px;
-    }
-
     .premium-project-accent {
         width: 2px;
         height: 28px;
-    }
-
-    .premium-project-info {
-        gap: 3px;
     }
 
     .premium-project-name {
@@ -141,20 +126,12 @@
     }
 
     .premium-project-stats {
-        gap: 8px;
+        gap: var(--crate-space-8);
     }
 
     :is(.premium-project-stat, .premium-project-stat-empty, .premium-project-stat-complete) {
         font-size: var(--reminder-font-xxs);
         font-weight: var(--font-normal, 400);
-    }
-
-    .premium-project-right {
-        gap: 10px;
-    }
-
-    .premium-project-progress {
-        gap: 8px;
     }
 
     .premium-project-percentage {

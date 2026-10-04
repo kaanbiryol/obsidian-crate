@@ -10,7 +10,7 @@
 .premium-projects-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--crate-list-row-gap);
 }
 
 .premium-project-tree {
@@ -19,7 +19,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--crate-list-row-gap);
 }
 
 .premium-project-tree-row {
@@ -52,13 +52,13 @@
 
 .premium-project-group-name {
     flex: 1;
-    padding: 12px;
+    @include list-item.primary-spacing;
     font-weight: var(--reminder-font-weight-medium);
 }
 
 .premium-project-children {
     margin: 0;
-    padding: 0 12px 0 16px;
+    padding: 0 var(--crate-list-row-padding-inline) 0 var(--crate-list-indent);
     height: var(--collapsible-panel-height);
     opacity: 1;
     overflow: hidden;
@@ -74,6 +74,11 @@
 
     > .premium-project-tree {
         gap: 0;
+    }
+
+    .premium-project-content,
+    .premium-project-group-name {
+        @include list-item.nested-spacing;
     }
 }
 
@@ -150,8 +155,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 14px 16px;
+    @include list-item.primary-spacing;
     border-radius: var(--crate-radius-card);
 
     background: var(--crate-panel-bg);
@@ -183,7 +187,7 @@
 .premium-project-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--crate-list-content-gap);
     flex: 1;
     min-width: 0;
 }
@@ -204,7 +208,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--crate-list-copy-gap);
 }
 
 .premium-project-name {
@@ -267,7 +271,7 @@
     margin-inline-end: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--crate-list-content-gap);
     flex-shrink: 0;
 }
 
@@ -277,7 +281,7 @@
     flex-direction: row;
     align-items: center;
     flex-shrink: 0;
-    gap: 8px;
+    gap: var(--crate-space-8);
 
     .crate-progress-meter { height: 3px; }
 }
@@ -333,7 +337,7 @@
 // Apply after host density and interaction rules, just like flat reminders.
 @mixin flat-styles {
     .reminders-view[data-list-style="flat"] .reminders-browse-view {
-        .premium-project-tree { gap: 0; }
+        .premium-project-tree { gap: var(--crate-list-flat-row-gap); }
 
         .premium-project-group,
         .premium-project-content {
@@ -341,16 +345,11 @@
         }
 
         .premium-project-content {
-            padding-block: 14px;
             border-radius: 8px;
         }
 
-        .premium-project-children .premium-project-content {
-            padding-block: 10px;
-        }
-
         .premium-projects-list > .premium-project-tree > .premium-project-group[data-open]:not(:last-child) {
-            margin-bottom: 8px;
+            margin-bottom: var(--crate-list-group-gap);
         }
 
         .premium-project-children > .premium-project-tree > li { border-top: 0; }

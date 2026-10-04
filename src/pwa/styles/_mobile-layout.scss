@@ -1,4 +1,4 @@
-// Touch density belongs to the standalone host, not the shared plugin UI.
+// Standalone typography and viewport chrome; list spacing is shared by both hosts.
 @mixin styles {
   @media (max-width: 759px) {
     .modal-card.pwa-reminder-editor {
@@ -42,23 +42,7 @@
         padding-left: 16px;
       }
 
-      .premium-reminder-content,
-      .premium-project-content {
-        padding: 15px 16px;
-        gap: 12px;
-      }
-
-      .reorderable-reminder-item,
-      .reminder-render-item {
-        margin-bottom: 10px;
-      }
-
-      .premium-projects-list {
-        gap: 10px;
-      }
-
       .premium-reminder-description {
-        margin-top: 3px;
         font-size: 15px;
       }
 

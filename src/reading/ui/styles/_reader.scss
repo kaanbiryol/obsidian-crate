@@ -55,7 +55,7 @@
 	&__byline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--text-muted); font-size: 12px; }
 	&__byline > * + *::before { content: '·'; margin-right: 10px; color: var(--text-faint, var(--text-muted)); }
 	&__tools { display: flex; align-items: center; gap: 0; border-top: 1px solid var(--crate-divider); border-bottom: 1px solid var(--crate-divider); margin-top: 26px; min-height: 52px; }
-	&__availability { flex: 1; color: var(--text-muted); font-size: 10px; }
+	&__availability { display: flex; align-items: center; flex: 1; color: var(--text-muted); font-size: 10px; }
 	&__availability span { display: inline-flex; align-items: center; gap: 4px; }
 	&__tags { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; color: var(--text-muted); padding-top: 14px; }
 	&__body { font-family: var(--font-text, var(--font-interface, system-ui, sans-serif)); font-size: var(--reading-font-size, 19px); line-height: 1.85; overflow-wrap: anywhere; color: var(--text-normal); }

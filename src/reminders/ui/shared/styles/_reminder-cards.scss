@@ -12,7 +12,7 @@
     --crate-card-project-border: var(--background-modifier-border);
 
     position: relative;
-    margin-bottom: 10px;
+    margin-bottom: var(--crate-list-row-gap);
 }
 
 // Card text is a tap/hold surface; editor text lives outside these cards.
@@ -27,10 +27,8 @@
 .premium-reminder-content {
     position: relative;
     display: flex;
-    min-height: 44px;
     align-items: flex-start;
-    gap: 12px;
-    padding: 14px 16px;
+    @include list-item.primary-spacing;
     cursor: pointer;
     @include list-item.surface;
 }
@@ -196,7 +194,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--crate-list-copy-gap);
 }
 
 .premium-reminder-title-row {
@@ -353,13 +351,6 @@
         .premium-reminder-content {
             @include list-item.flat-surface;
             border-radius: 8px;
-            gap: 12px;
-            // Keep the top inset for the 44px completion target and separate adjacent rows.
-            padding: 11px 12px 7px;
-
-            &:has(.premium-reminder-description) {
-                padding-bottom: 9px;
-            }
         }
 
         .premium-checkbox {
@@ -368,7 +359,7 @@
 
         .premium-reminder-description { margin-top: 0; }
 
-        .premium-reminder-pills { gap: 4px 12px; }
+        .premium-reminder-pills { gap: var(--crate-space-4) var(--crate-list-content-gap); }
 
         .premium-pill {
             padding: 0;
@@ -395,11 +386,11 @@
     }
 
     :is(.reminder-render-item, .reorderable-reminder-item):has([data-reminder-list-style="flat"]) {
-        --crate-reminder-row-gap: 0px;
-        margin-bottom: 0;
+        --crate-reminder-row-gap: var(--crate-list-flat-row-gap);
+        margin-bottom: var(--crate-reminder-row-gap);
     }
 
     .reminders-list-container .reminders-list:has([data-reminder-list-style="flat"]) {
-        gap: 0;
+        gap: var(--crate-list-flat-row-gap);
     }
 }

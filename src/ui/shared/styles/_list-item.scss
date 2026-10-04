@@ -28,8 +28,17 @@
 }
 
 @mixin primary-spacing {
-    gap: 10px;
-    padding: 11px 12px;
+    gap: var(--crate-list-content-gap);
+    padding: var(--crate-list-row-padding-block) var(--crate-list-row-padding-inline);
+    min-height: var(--crate-touch-target-min);
+}
+
+@mixin nested-spacing {
+    padding-block: var(--crate-list-nested-padding-block);
+}
+
+@mixin passage-spacing {
+    padding: var(--crate-list-passage-padding-block) var(--crate-list-row-padding-inline);
 }
 
 @mixin title {

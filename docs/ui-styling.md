@@ -4,6 +4,30 @@ The plugin and PWA compile the same reminder components and Sass. Keep changes t
 card structure, editor fields, controls, typography, badges, and states in the shared files so they reach
 both hosts together.
 
+## Shared spacing
+
+`src/ui/shared/styles/_tokens.scss` owns the shared 4, 6, 8, 12, 16, 20, and
+24px spacing scale. Use `--crate-space-*` for small layout gaps and semantic
+`--crate-list-*`, `--crate-dialog-*`, or `--crate-settings-*` roles for component
+density. Both Obsidian and the PWA receive these tokens.
+
+| Role | Default | Consumers |
+| --- | --- | --- |
+| Row padding | 12px vertically and horizontally | Reminders, projects, Reading articles, highlight article headers and picker options |
+| Content / text stack gap | 12px / 4px | Leading icons or accents / title and metadata |
+| Row gap | 0px flat, 8px cards | All four list types, including reminder animation and embedded lists |
+| Nested row padding / indent | 8px vertically / 16px | Subprojects; highlight groups share the indent |
+| Expanded group / section gap | 16px / 24px | Project and highlight groups / Reading and Upcoming sections |
+| Passage padding | 16px vertically, standard row inset horizontally | Highlight passages and notes |
+
+`_list-item.scss` supplies `primary-spacing`, `nested-spacing`, and
+`passage-spacing`. Let content determine row height, retaining at least 44px
+for interactive rows and completion/disclosure targets. Flat and Cards change
+surfaces and exterior gaps, not basic row padding. Keep nested rows together and
+leave a larger gap after expanded groups. Settings and dialogs use the same
+scale through their own semantic roles; navigation, safe areas, and editor
+geometry remain component-specific.
+
 ## Ownership
 
 - `src/ui/shared/styles/_tokens.scss` defines the semantic Crate tokens for
@@ -68,8 +92,8 @@ both hosts together.
   rows share the reminders’ rounded hover/press fills; expanded parent rows have
   no persistent background. Subproject rows use tighter vertical padding, with
   extra space after an expanded top-level group to distinguish the next project.
-  Flat reminder rows keep compact internal spacing with more separation after
-  description rows, slightly smaller metadata icons, and slightly larger checkbox
+  Flat reminder rows share the common row padding and text spacing, with
+  slightly smaller metadata icons and slightly larger checkbox
   circles. They retain 44px completion targets and softly rounded hover/press fills;
   row motion reads `--crate-reminder-row-gap` so it preserves the selected style.
   Today shows overdue reminders and those due today in one continuous list,

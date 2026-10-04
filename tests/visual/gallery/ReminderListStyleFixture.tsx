@@ -53,7 +53,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
     <div className="reminders-view is-primary" data-testid="reorderable-list">
       <ReorderableReminderList reminders={reminders} onReorder={setReminders} onReorderCommit={() => {}} renderCard={render} animationsEnabled={false} />
     </div>
-    <div className="reminders-view is-primary" data-list-style={preferences.reminderListStyle} data-testid="projects-list" style={{ height: 600 }}>
+    <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`} data-list-style={preferences.reminderListStyle} data-testid="projects-list" style={{ height: 600 }}>
       <BrowseView projects={['Product launch', 'Personal', 'Personal/Finance', 'Personal/Health/Visits', 'Work']}
         reminders={[...reminders, { id: 'project-done', content: 'Completed launch task', completed: true, priority: 4, project: 'Product launch' }]} onProjectSelect={setOpenedProject} animationConfig={{ enabled: false }} />
     </div>

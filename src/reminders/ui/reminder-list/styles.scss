@@ -141,7 +141,7 @@
   .reminders-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--crate-list-row-gap);
     // Simple opacity transition for loading states only
     transition: opacity var(--crate-motion-duration-fast) var(--crate-motion-easing);
 

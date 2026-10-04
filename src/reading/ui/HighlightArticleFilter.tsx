@@ -14,7 +14,7 @@ export function HighlightArticleFilter({ items, value, onChange }: { items: Read
 	const selected = articles.find(item => item.crate_reading_id === value);
 	const matches = articles.filter(item => `${readingTitle(item)} ${item.author ?? ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
 	return <div className="crate-highlight-filter">
-		<Button variant="ghost" className="crate-highlight-filter__trigger" data-filtered={Boolean(selected) || undefined} aria-label={`Filter by article: ${selected ? readingTitle(selected) : 'All articles'}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setQuery(''); setOpen(true); }}><span>{selected ? readingTitle(selected) : 'All articles'}</span><ThemeIcon id="chevron-down" size="xs" aria-hidden="true" /></Button>
+		<Button variant="outline" className="crate-highlight-filter__trigger" data-filtered={Boolean(selected) || undefined} aria-label={`Filter by article: ${selected ? readingTitle(selected) : 'All articles'}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setQuery(''); setOpen(true); }}><span>{selected ? readingTitle(selected) : 'All articles'}</span><ThemeIcon id="chevron-down" size="xs" aria-hidden="true" /></Button>
 		{value && <IconButton icon="x" label="Clear article filter" onClick={() => onChange('')} />}
 		{open && <ReadingDialog fullHeight title="Filter by article" onClose={() => setOpen(false)}>{close => <div className="crate-highlight-picker">
 			<TextField label="Search articles" hideLabel type="search" placeholder="Search articles" value={query} onChange={event => setQuery(event.target.value)} />
