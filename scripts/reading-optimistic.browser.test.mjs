@@ -208,11 +208,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByLabel('Your note').fill('Latest note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(toast).toHaveText('Note saved');
     await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
     await expect(page.locator('.crate-reading-highlights__note')).toHaveText('Latest note');
     await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(toast).toHaveText('Note saved');
     const work = await pending(page);
     assert.equal(work.length, 2); assert.equal(work[0].body, firstBody); assert.equal(work[1].body, undefined);
     update.release();
