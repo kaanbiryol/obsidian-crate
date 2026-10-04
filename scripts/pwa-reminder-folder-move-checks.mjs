@@ -42,6 +42,10 @@ export async function verifyReminderFolderMove({ admin, page, origin, owner, set
     window.encryptedTestKeys = bundle;
   }, { origin, token: owner.token });
   await setOffline(false);
+  // Reconnecting starts background discovery and encrypted-file refreshes.
+  // Let them settle before testing durable reload recovery: canceling them
+  // mid-navigation makes WebKit report spurious access-control page errors.
+  await page.waitForLoadState('networkidle');
   await page.reload();
   await expect(page.getByText('Accepted before the folder moved', { exact: true })).toBeVisible({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).length), { timeout: 30000 }).toBe(0);
