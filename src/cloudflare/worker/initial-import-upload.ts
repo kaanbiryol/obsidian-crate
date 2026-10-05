@@ -92,7 +92,10 @@ async function commitImportFiles(token: string, files: ImportFile[], bucket: R2B
   if (staged.length) {
     const json = JSON.stringify(staged.map(file => ({ path: file.path, portable: portablePathKey(file.path), key: file.objectKey, old: previous.get(file.path)?.storageKey ?? null })));
     await db.batch([
-      ...staged.map(file => uploadMutation(db, file.path, file.hash, file.size, file.objectKey, file.expectedHash, undefined, undefined, stagingBatchId, token)),
+      ...staged.map(file => uploadMutation(db, {
+        path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
+        expectedHash: file.expectedHash, stagingBatchId, importToken: token,
+      })),
       db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
         SELECT json_extract(i.value, '$.old'), json_extract(i.value, '$.path') FROM json_each(?) i JOIN files f
         ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')

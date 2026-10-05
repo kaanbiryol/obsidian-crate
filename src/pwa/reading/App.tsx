@@ -3,9 +3,7 @@ import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { readingKeys } from './encryption-session';
 
 import type { ReadingHighlight } from '@/reading/core/highlights';
-import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
-import type { ReadingChanges, ReadingItem } from '@/reading/core/model';
-import { readingUrl, readingUrlIdentity, validateReadingMetadata } from '@/reading/core/model';
+import { readingUrl } from '@/reading/core/model';
 import { ReadingReader } from '@/reading/ui/Reader';
 import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
@@ -27,7 +25,7 @@ import { ReadingOpening } from './ReadingOpening';
 import { useReadingRuntime } from './ReadingRuntime';
 import { useReadingAppearance } from './appearance';
 import { presentReadingItems } from './pending-view';
-import { assertReadingSession, exportReadingData, writeValue } from './storage';
+import { exportReadingData } from './storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
 
@@ -41,59 +39,22 @@ function ReadingAppContent() {
   const captureFormId = useId();
   const featureNavigation = useContext(FeatureNavigationContext);
   const active = featureNavigation?.active !== false;
-  const { connection, sync, showToast, saving, setSaving, savingRef, queueChange } = useReadingRuntime();
-  const { session, ready, connecting, cache, pending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
-  const { refresh, refreshManually, isOffline } = sync;
-  const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, alive, setError, run });
+  const { connection, sync, showToast, saving, saveLink, updateItem, retryArticle } = useReadingRuntime();
+  const { session, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, share, run, connect,
+    isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
+  const { refreshManually, isOffline } = sync;
+  const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
   const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
   const [settingsOpen, setSettingsOpen] = useSettingsOpen();
   useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
-  const update = async (item: ReadingItem, changes: ReadingChanges) => {
-    if (!session) return;
-    // The first edit also migrates native/legacy highlights on the server.
-    // Prepare their stable metadata here so follow-up annotations can use it
-    // without waiting for that first request to return.
-    if (!item.highlight_format && item.highlights?.length && changes.highlights === undefined
-      && reader?.item.crate_reading_id === item.crate_reading_id && reader.markdown !== null
-      && !pending.some(op => op.action !== 'capture' && op.intent.id === item.crate_reading_id)) {
-      changes = { ...changes, highlights: writeMarkdownHighlights(reader.markdown, item.highlights).highlights };
-    }
-    validateReadingMetadata({ ...item, ...changes });
-    const before = Object.fromEntries(Object.keys(changes).map(key => [key, item[key as keyof ReadingChanges]]));
-    await queueChange({ action: 'update', intent: { id: item.crate_reading_id, changes, before } });
-    assertReadingSession(session);
-    void run(() => refresh(session));
-  };
   const canSaveLink = (() => {
     try { readingUrl(url); return !saving; } catch { return false; }
   })();
-  const save = async () => {
-    if (!session || savingRef.current) return;
-    // Keep input validation beside the form, without a second alert toast.
-    const link = readingUrl(url);
-    savingRef.current = true; setSaving(true); setError(null);
-    try {
-      const matches = visibleItems.filter(item => item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(link));
-      if (matches.length > 1) throw new Error('Several notes save this link. Review duplicates in Reading.');
-      if (matches[0]) {
-        await open(matches[0]); assertReadingSession(session);
-        if (share) await writeValue(`share:${share}`, null, session);
-        setUrl(''); setShare(null); showToast('info', 'Opened your saved link'); return;
-      }
-      const fetchArticle = true;
-      await queueChange({ action: 'capture', intent: { url: link, fetchArticle } });
-      assertReadingSession(session);
-      if (share) await writeValue(`share:${share}`, null, session);
-      setUrl(''); setShare(null);
-      showToast('success', navigator.onLine ? 'Link saved' : 'Link saved on this device');
-      void run(() => refresh(session));
-    } finally { savingRef.current = false; setSaving(false); }
-  };
   const visibleItems = useMemo(() => presentReadingItems(cache?.items ?? [], pending), [cache, pending]);
   const openCapture = () => {
     if (!session) { showToast('info', 'Choose a Reading folder in Obsidian’s Crate settings to save a link.'); return; }
     // Mount and focus within the tap so iOS can open its software keyboard.
-    flushSync(() => { setError(null); setAdding(true); });
+    flushSync(openCaptureForm);
   };
   const visibleReader = useMemo(() => reader && presentReadingItems([reader.item], pending)[0], [reader, pending]);
   // Ordinary edits remain usable while sending. New links need their server ID,
@@ -124,8 +85,8 @@ function ReadingAppContent() {
         </EmptyState> : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
         headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { await queueChange({ action: 'retry', intent: { id: reader.item.crate_reading_id } }); assertReadingSession(session); showToast('info', youtubeVideoId(reader.item.source_url) ? 'Video details requested.' : 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
-      {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} captureOnDevice={Boolean(readingKeys())} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
+        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => updateItem(visibleReader, changes, reader)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={() => retryArticle(reader.item)} />} />
+      {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={closeCapture}>{close => <SaveLinkForm id={captureFormId} captureOnDevice={Boolean(readingKeys())} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { if (await saveLink(open)) close(); })} />}</ReadingDialog>}
 
     </>}
   </main>;

@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
-import { listenLocalServer } from './local-server-http.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
+import { listenLocalServer } from '../packages/server/src/local-server-http.mjs';
 import { verifyReadingFolderMove } from './pwa-reading-folder-move-checks.mjs';
 import { verifyReadingPlaintextTransition } from './pwa-reading-plaintext-transition-checks.mjs';
 

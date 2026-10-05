@@ -152,6 +152,9 @@ Quick Tunnel tests also cover hostname discovery, startup failure, timeout clean
 and rejection of downloads with an invalid checksum. `npm run test:server-package`
 installs a packed artifact through npx in an isolated cache and exercises real
 HTTP and storage across changing public URLs, using a fake connector.
+Production launcher modules live in `packages/server/src/`; these tests cover
+both repository execution through the thin script entry and the complete package
+copied into the installed `scripts/` directory.
 Pairing tests cover expiry, concurrent redemption, and hash-only credential
 storage. Readiness tests reject stale instance identities and retry DNS failures.
 Backup tests restore R2 data, device credentials, and a real scheduled Durable
@@ -514,6 +517,14 @@ const context = {
 ## Portable visual baselines
 
 `npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.
+
+`node scripts/visual-test-run.mjs tests/visual/project-interactions.spec.ts tests/visual/project-interactions-webkit.spec.ts --workers=2`
+checks project pickers and autocomplete using the compiled host styles in plugin
+Shadow DOM and the PWA document. It covers selected-row centering, wheel scroll
+containment, synthetic touch-event propagation, keyboard navigation, dropdown
+placement, and selection/focus restoration through the real plugin editor overlay.
+The unit style test retains theme-token assertions; interaction coverage does not
+depend on component source text. Physical touch scrolling still requires a device.
 
 ## File history browser checks
 

@@ -17,8 +17,8 @@ function isAuthorized(req) {
 	return req.headers.authorization === `Bearer ${previewAuthToken}`;
 }
 
-export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] }) {
-	let state = createInitialState();
+export function createPwaPreviewServer({ assets, origin, failMutationPaths = [], folderPath = 'Reminders' }) {
+	let state = createInitialState(folderPath);
 	const receipts = new Map();
 	let forcePreviewUpdate = false;
 	let previewLoadingUntil = 0;
@@ -50,13 +50,13 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 		}
 
 		if (method === 'GET' && path === '/') {
-			const location = `/notifications?token=${previewEnrollmentToken}&folder=Reminders&upcomingDays=7`;
+			const location = `/notifications?token=${previewEnrollmentToken}&folder=${encodeURIComponent(folderPath)}&upcomingDays=7`;
 			send(res, 302, '', { Location: location });
 			return;
 		}
 
 		if (method === 'POST' && path === '/preview/reset') {
-			state = createInitialState();
+			state = createInitialState(folderPath);
 			receipts.clear();
 			sendJson(res, 200, { success: true });
 			return;
@@ -228,7 +228,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 
 			if (method === 'GET' && path === '/reminders/list') {
 				sendJson(res, 200, {
-					reminders: sortForList(state.reminders),
+					reminders: sortForList(state.reminders, folderPath),
 					projects: projectNames(state.reminders),
 				});
 				return;
@@ -250,7 +250,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 
 			if (method === 'POST' && path === '/reminders/create') {
 				const body = mutationBody;
-				const reminder = parseMutationReminder(body);
+				const reminder = parseMutationReminder(body, folderPath);
 				state.reminders.push(reminder);
 				acknowledge({ success: true, reminder });
 				return;
@@ -269,7 +269,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 					...body,
 					id: current.id,
 					completed: current.completed,
-				}));
+				}, folderPath));
 
 				acknowledge({ success: true, reminder: current });
 				return;

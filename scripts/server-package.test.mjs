@@ -21,6 +21,7 @@ test('packed npx installation starts without repository files and preserves data
 	const [packed] = JSON.parse(packOutput);
 	const paths = packed.files.map(file => file.path);
 	assert.ok(paths.includes('assets/worker.mjs'));
+	assert.ok(paths.includes('scripts/assets.mjs'));
 	assert.ok(paths.includes('vendor/miniflare/LICENSE'));
 	assert.ok(!paths.some(path => /node_modules\/.*(workerd|sharp)/.test(path)));
 	assert.ok(paths.includes('npm-shrinkwrap.json'));

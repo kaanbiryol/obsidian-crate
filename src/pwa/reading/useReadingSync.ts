@@ -6,20 +6,25 @@ import { assertReadingSession, pendingReading, readingLock, readingSession, read
 import type { useReadingSession } from './useReadingSession';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
-export function useReadingSync({ session, ready, pending, setCache, setPending, setError, alive, run, resetSession }: Pick<ReturnType<typeof useReadingSession>,
-  'session' | 'ready' | 'pending' | 'setCache' | 'setPending' | 'setError' | 'alive' | 'run' | 'resetSession'>, enabled = true) {
+export function useReadingSync({ session, ready, pending, publishSyncResult, isCurrentSession, run, resetSession }: Pick<ReturnType<typeof useReadingSession>,
+  'session' | 'ready' | 'pending' | 'publishSyncResult' | 'isCurrentSession' | 'run' | 'resetSession'>, enabled = true) {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
   const refreshing = useRef(false), refreshQueued = useRef<{ session: ReadingSession; mode: ReadingRetryMode } | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   useEffect(() => {
     const changed = () => { setIsOffline(!navigator.onLine); setSyncedSession(null); };
     window.addEventListener('online', changed); window.addEventListener('offline', changed);
     return () => { window.removeEventListener('online', changed); window.removeEventListener('offline', changed); };
   }, []);
   const refresh = useCallback(async (current = session, mode: ReadingRetryMode = 'automatic') => {
-    if (!current || !enabledRef.current) return;
+    if (!current || !enabledRef.current || !isCurrentSession(current)) return;
     if (refreshing.current) {
       const queued = refreshQueued.current;
       const sameSession = queued?.session.id === current.id && queued.session.token === current.token && queued.session.generation === current.generation;
@@ -40,26 +45,18 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
         await readingLock(async () => {
           const work = await pendingReading(current);
           assertReadingSession(current);
-          if (!alive.current) return;
-          if (data) {
-            setCache(data);
-          }
-          setPending(work);
-          if (completed) setError(null);
+          if (!publishSyncResult(current, { pending: work, cache: data, completed })) return;
           if (completed && enabledRef.current && navigator.onLine && data) setSyncedSession(current);
         });
       }
     } finally {
       refreshing.current = false;
-      if (alive.current) setSyncing(false);
+      if (mounted.current) setSyncing(false);
       const queued = refreshQueued.current;
       refreshQueued.current = null;
-      if (queued && alive.current) {
-        const latest = readingSession();
-        if (latest?.id === queued.session.id && latest.token === queued.session.token && latest.generation === queued.session.generation) void run(() => refresh(queued.session, queued.mode));
-      }
+      if (queued && isCurrentSession(queued.session)) void run(() => refresh(queued.session, queued.mode));
     }
-  }, [session, run, alive, setCache, setPending, setError]);
+  }, [session, run, isCurrentSession, publishSyncResult]);
   const retryAt = Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity));
   useEffect(() => {
     if (!enabled || !session || !ready || isOffline || !Number.isFinite(retryAt)) return;
@@ -84,8 +81,7 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
     const changed = () => {
       let current: ReadingSession | null;
       try { current = readingSession(); } catch (cause) {
-        resetSession();
-        setError(cause instanceof Error ? cause.message : 'Reading sign-in could not be read. Reconnect from Obsidian settings.');
+        resetSession(cause instanceof Error ? cause.message : 'Reading sign-in could not be read. Reconnect from Obsidian settings.');
         return;
       }
       if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) resetSession();
@@ -95,7 +91,7 @@ export function useReadingSync({ session, ready, pending, setCache, setPending, 
     const timer = window.setInterval(reload, 30_000);
     window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
     return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
-  }, [enabled, session, ready, refresh, run, resetSession, setError]);
+  }, [enabled, session, ready, refresh, run, resetSession]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };
 }

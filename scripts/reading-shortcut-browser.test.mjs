@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 import { shortcutTemplate, shortcutIdentifier, shortcutRequest } from './reading-shortcut-fixture.mjs';
 import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 

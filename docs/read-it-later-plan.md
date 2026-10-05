@@ -40,7 +40,7 @@ The iPhone experience uses a branded web page: **Share → Save to Crate → Cra
 | --- | --- |
 | `src/cloudflare/server-release.json` has schema 1 and an empty migration registry | Reading introduces a real upgrade; do not reuse the old experimental schema assumptions. Allocate the next available schema and server revision at implementation time. |
 | `provisioner.ts` exposes `beforeDatabaseUpgrade`, but upgrades require an integrated verified checkpoint | Cloud migration/backup integration is a prerequisite for release, not a final documentation task. |
-| `scripts/local-server-runtime.mjs` checks exact schema/runtime compatibility | Add an explicit safe migration path for populated local/Docker data. Changing `server.json` is not a migration. |
+| `packages/server/src/local-server-runtime.mjs` checks exact schema/runtime compatibility | Add an explicit safe migration path for populated local/Docker data. Changing `server.json` is not a migration. |
 | `auth_tokens.scope` is constrained to `vault` and `reminders`; router and authentication code assume those two cases | Add Reading scope checks and a tested token-table migration together. Existing reminder grants keep exactly their present access. |
 | `src/pwa/main.tsx` and config are reminder-specific, with one stored reminder token | Introduce a small host shell and independent feature sessions. Avoid granting Reading through an old reminders token. |
 | Manifest identity, scope, assets and service worker use `/notifications` | Keep those installed-app contracts. Add Reading deep links and an in-scope Android POST share handler. |

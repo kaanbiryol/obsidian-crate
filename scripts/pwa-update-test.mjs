@@ -29,7 +29,7 @@ async function testUpdate(browser, launchMode) {
   const installToken = `install-update-${launchMode}`;
   const browserToken = `browser-update-${launchMode}`;
   const availableTokens = new Set([installToken, browserToken]);
-  const handlers = new Map([before, delayedAfter].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
+  const handlers = new Map([before, delayedAfter].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1', folderPath: 'Tasks' })]));
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://127.0.0.1').pathname;
     if (path === '/notifications/preview-session.js') {

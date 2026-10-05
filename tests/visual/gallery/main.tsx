@@ -27,6 +27,7 @@ import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styl
 import pluginStyles from '@plugin-build/styles.css?raw';
 import fixtureStyles from './fixture.css?raw';
 import { SourceNoticeFixture } from './SourceNoticeFixture';
+import { ProjectInteractionFixture } from './ProjectInteractionFixture';
 
 import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
 import { ReadingDialogHost } from '@/reading/ui/ReadingDialog';
@@ -65,6 +66,11 @@ function Gallery() {
   const [recurrence, setRecurrence] = useState<RecurrencePickerState>({ frequency: scene === 'monthly' ? 'monthly' as const : 'weekly' as const, interval: 2, daysOfWeek: [1, 3], dayOfMonth: 15, hour: 9, minute: 30 });
   const titleRef = useRef<HTMLDivElement>(null);
   const richRef = useRef<RichTextInputHandle>(null);
+  if (scene === 'project-interactions') return <ThemeIconProvider renderer={GalleryIcon}>
+    <div data-ui-host={host} className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}>
+      <ProjectInteractionFixture host={host} isDark={isDark} />
+    </div>
+  </ThemeIconProvider>;
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><AppDock section="reminders" tabs={['inbox', 'today', 'browse']} activeTab={activeTab === 'upcoming' ? 'today' : activeTab} onSelect={tab => setActiveTab(tab as TabId)} onPin={tab => setActiveTab(tab as TabId)} /></div>;
@@ -93,7 +99,7 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
+const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'project-interactions' || scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

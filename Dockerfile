@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build:server \
     && npm ci --prefix dist/server --omit=dev --no-audit --no-fund
 # Reuse the CLI's pinned release and checksum verification at image build time.
-RUN node --input-type=module -e "import { installCloudflared } from './scripts/local-server-cloudflared.mjs'; import { copyFile } from 'node:fs/promises'; await copyFile(await installCloudflared(), '/tmp/cloudflared');"
+RUN node --input-type=module -e "import { installCloudflared } from './packages/server/src/local-server-cloudflared.mjs'; import { copyFile } from 'node:fs/promises'; await copyFile(await installCloudflared(), '/tmp/cloudflared');"
 
 FROM node:26.10.0-bookworm-slim AS runtime
 RUN apt-get update \

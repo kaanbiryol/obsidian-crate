@@ -69,7 +69,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 it('rejects an in-flight plaintext publication whose SQL was prepared before encryption began', async () => {
 	const hash = 'a'.repeat(64), path = 'late.md', key = createManagedObjectKey(hash);
 	await trackStagedUpload(env.DB, key, path);
-	const pending = uploadMutation(env.DB, path, hash, 5, key, null);
+	const pending = uploadMutation(env.DB, { path, hash, size: 5, objectKey: key, expectedHash: null });
 	await configure();
 	await pending.run();
 	expect(await getStoredFileRow(env.DB, path)).toBeNull();

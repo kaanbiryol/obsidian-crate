@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 
 for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()}`, { timeout: 60000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-ios27-'));

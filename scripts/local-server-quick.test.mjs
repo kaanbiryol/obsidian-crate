@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { quickTunnelOrigin, startQuickTunnel } from './local-server-quick.mjs';
-import { cloudflaredVersion, installCloudflared } from './local-server-cloudflared.mjs';
+import { quickTunnelOrigin, startQuickTunnel } from '../packages/server/src/local-server-quick.mjs';
+import { cloudflaredVersion, installCloudflared } from '../packages/server/src/local-server-cloudflared.mjs';
 
 test('Quick Tunnel discovery accepts only complete HTTPS trycloudflare origins', () => {
 	assert.equal(quickTunnelOrigin('Visit https://clear-blue-sky.trycloudflare.com\n'), 'https://clear-blue-sky.trycloudflare.com');

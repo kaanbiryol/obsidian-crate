@@ -3,6 +3,12 @@ import type { ReadingConnection } from './useReadingConnection';
 import type { PendingReading } from './outbox';
 import { assertReadingSession, hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, writeValue, type ReadingCache, type ReadingSession } from './storage';
 
+interface ReadingSyncPublication {
+  pending: PendingReading[];
+  cache?: ReadingCache;
+  completed: boolean;
+}
+
 /** Feature-owned durable hydration. Authentication and unlocking belong to the app. */
 export function useReadingSession(connection: ReadingConnection) {
   const [session, setSession] = useState<ReadingSession | null>(null);
@@ -12,6 +18,34 @@ export function useReadingSession(connection: ReadingConnection) {
   const [recovery, setRecovery] = useState(false), [draftReady, setDraftReady] = useState(false);
   const [adding, setAdding] = useState(false), [url, setUrl] = useState(''), [share, setShare] = useState<string | null>(null);
   const alive = useRef(true), generation = useRef(0);
+  const authority = useRef<ReadingSession | null>(null);
+  const isCurrentSession = useCallback((expected: ReadingSession) => {
+    const current = authority.current;
+    if (!alive.current || current?.id !== expected.id || current.token !== expected.token || current.generation !== expected.generation) return false;
+    try { assertReadingSession(expected); return true; } catch { return false; }
+  }, []);
+  const publishPending = useCallback((expected: ReadingSession, next: PendingReading[]) => {
+    if (!isCurrentSession(expected)) return false;
+    setPending(next);
+    return true;
+  }, [isCurrentSession]);
+  const publishSyncResult = useCallback((expected: ReadingSession, result: ReadingSyncPublication) => {
+    if (!isCurrentSession(expected)) return false;
+    if (result.cache) setCache(result.cache);
+    setPending(result.pending);
+    if (result.completed) setError(null);
+    return true;
+  }, [isCurrentSession]);
+  const reportSessionError = useCallback((expected: ReadingSession, message: string | null) => {
+    if (isCurrentSession(expected)) setError(message);
+  }, [isCurrentSession]);
+  const finishCapture = useCallback((expected: ReadingSession) => {
+    if (!isCurrentSession(expected)) return false;
+    setUrl(''); setShare(null);
+    return true;
+  }, [isCurrentSession]);
+  const openCapture = useCallback(() => { setError(null); setAdding(true); }, []);
+  const closeCapture = useCallback(() => setAdding(false), []);
   const run = useCallback(async (action: () => Promise<void>) => {
     const revision = generation.current;
     try { await action(); } catch (cause) {
@@ -19,10 +53,11 @@ export function useReadingSession(connection: ReadingConnection) {
     }
   }, []);
   const resetConnection = connection.resetSession;
-  const resetSession = useCallback(() => {
-    generation.current++; resetConnection();
+  const resetSession = useCallback((message?: string) => {
+    generation.current++; authority.current = null; resetConnection();
     setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
     setUrl(''); setAdding(false); setShare(null);
+    if (message) setError(message);
   }, [resetConnection]);
   useEffect(() => {
     // A null session during unlock is not a disconnected session. Scanning here
@@ -32,6 +67,7 @@ export function useReadingSession(connection: ReadingConnection) {
     const lifetime = generation;
     const revision = ++lifetime.current;
     const current = connection.session;
+    authority.current = current;
     setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
     setUrl(''); setAdding(false); setShare(null); setError(null);
     const currentRequest = () => {
@@ -75,12 +111,13 @@ export function useReadingSession(connection: ReadingConnection) {
         if (currentRequest() && draft) { setUrl(draft.url); setAdding(true); setShare(shareId); }
       }
     });
-    return () => { alive.current = false; lifetime.current++; };
+    return () => { alive.current = false; authority.current = null; lifetime.current++; };
   }, [connection.session, connection.ready, connection.connecting, connection.lockedSession, run]);
   const ready = connection.ready && (!connection.session || hydrated === connection.session || Boolean(error));
   useEffect(() => {
     if (session && ready && draftReady) void run(() => writeValue(`draft:${session.id}`, { url }, session));
   }, [session, ready, draftReady, url, run]);
-  return { ...connection, session, ready, resetSession, cache, setCache, pending, setPending,
-    error: storageError ?? error ?? connection.error, setError, recovery, adding, setAdding, url, setUrl, share, setShare, alive, run };
+  return { ...connection, session, ready, resetSession, cache, pending,
+    error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, share, run,
+    isCurrentSession, publishPending, publishSyncResult, reportSessionError, finishCapture, openCapture, closeCapture };
 }

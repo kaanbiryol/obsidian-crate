@@ -1,4 +1,4 @@
-import { act, useEffect, useRef, useState } from 'react';
+import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { PWA_AUTH_CHANGED_EVENT } from '../config';
@@ -6,31 +6,34 @@ import { ReadingApiError, loadReading, readingRequest } from './api';
 import type { ReadingCache, ReadingSession } from './storage';
 import type { PendingReading } from './outbox';
 import { useReadingSync } from './useReadingSync';
+import { useReadingSession } from './useReadingSession';
+import type { ReadingConnection } from './useReadingConnection';
 
 const stored = vi.hoisted(() => ({ queue: [] as PendingReading[], session: null as ReadingSession | null, sessionError: null as Error | null }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), readingRequest: vi.fn(), loadReading: vi.fn(), connectReadingFromReminders: vi.fn(),
 }));
-vi.mock('./storage', () => ({
+vi.mock('./storage', async importOriginal => ({
+  ...await importOriginal<typeof import('./storage')>(),
   assertReadingSession: (session: ReadingSession) => { if (stored.session !== session) throw new Error('Session changed'); },
   readingSession: () => { if (stored.sessionError) throw stored.sessionError; return stored.session; },
   readingLock: async <T>(action: () => Promise<T>) => action(),
   readingDrainLock: async <T>(action: () => Promise<T>) => action(),
   pendingReading: async () => structuredClone(stored.queue),
   readReadingCache: async () => cache,
-  writeValue: async (_key: string, value: PendingReading[]) => { stored.queue = structuredClone(value); },
+  readReadingDraft: async () => undefined,
+  hasEarlierReadingChanges: async () => false,
+  writeValue: async (key: string, value: PendingReading[]) => { if (key.startsWith('pending:')) stored.queue = structuredClone(value); },
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'one', folderPath: 'Reading', expiresAt: 1 };
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
 const resetSession = vi.fn();
+const connection: ReadingConnection = { session, ready: true, lockedSession: null, encryptionSetupRequired: false,
+  converting: false, expire: vi.fn(), connecting: false, connect: vi.fn(), resetSession, issue: null, error: null, connectionState: 'available' };
 function renderSync(enabled = () => true) {
   return renderHook(() => {
-    const [pending, setPending] = useState(stored.queue);
-    const [, setCache] = useState<ReadingCache | null>(null), [error, setError] = useState<string | null>(null);
-    const alive = useRef(true);
-    useEffect(() => () => { alive.current = false; }, []);
-    const run = useRef(async (action: () => Promise<void>) => { try { await action(); } catch (cause) { setError(String(cause)); } }).current;
-    return { ...useReadingSync({ session, ready: true, pending, setPending, setCache, setError, alive, run, resetSession }, enabled()), pending, error };
+    const state = useReadingSession(connection);
+    return { ...useReadingSync(state, enabled()), pending: state.pending, error: state.error };
   }, () => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }));
 }
 beforeEach(() => {
@@ -39,6 +42,7 @@ beforeEach(() => {
   stored.sessionError = null;
   stored.queue = [{ id: 'operation', sessionId: session.id, action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } }];
   vi.stubGlobal('navigator', { onLine: true });
+  vi.stubGlobal('location', { href: 'https://example.test/notifications' });
   vi.mocked(loadReading).mockResolvedValue(cache);
   vi.mocked(readingRequest).mockImplementation(async path => {
     if (path === '/reading/session') return { generation: session.generation, day: 20_000 };

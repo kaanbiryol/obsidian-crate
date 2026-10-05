@@ -10,7 +10,7 @@ function daysFromNow(days, hour = 9, minute = 0) {
 	return next.toISOString();
 }
 
-export function createInitialState() {
+export function createInitialState(folderPath = 'Reminders') {
 	return {
 		reminders: [
 			{
@@ -79,7 +79,7 @@ export function createInitialState() {
 				project: 'Work',
 				filePath: 'Reminders/Work.md',
 			},
-		].map(reminder => ({ ...reminder, revision: randomUUID() })),
+		].map(reminder => ({ ...applyProjectFilePath(reminder, folderPath), revision: randomUUID() })),
 	};
 }
 
@@ -88,16 +88,16 @@ export function normalizeProject(project) {
 	return trimmed || 'Inbox';
 }
 
-export function applyProjectFilePath(reminder) {
+export function applyProjectFilePath(reminder, folderPath = 'Reminders') {
 	return {
 		...reminder,
 		project: normalizeProject(reminder.project),
-		filePath: `Reminders/${normalizeProject(reminder.project)}.md`,
+		filePath: `${folderPath}/${normalizeProject(reminder.project)}.md`,
 	};
 }
 
-export function sortForList(reminders) {
-	return reminders.map(applyProjectFilePath);
+export function sortForList(reminders, folderPath = 'Reminders') {
+	return reminders.map(reminder => applyProjectFilePath(reminder, folderPath));
 }
 
 export function projectNames(reminders) {
@@ -108,7 +108,7 @@ export function findReminder(state, id) {
 	return state.reminders.find((reminder) => reminder.id === id);
 }
 
-export function parseMutationReminder(body) {
+export function parseMutationReminder(body, folderPath = 'Reminders') {
 	const project = normalizeProject(body.project);
 	return applyProjectFilePath({
 		id: body.id || randomUUID(),
@@ -121,6 +121,5 @@ export function parseMutationReminder(body) {
 		priority: Number.parseInt(String(body.priority || '4'), 10) === 1 ? 1 : 4,
 		completed: Boolean(body.completed),
 		project,
-		filePath: `Reminders/${project}.md`,
-	});
+	}, folderPath);
 }

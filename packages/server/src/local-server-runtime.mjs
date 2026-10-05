@@ -1,13 +1,11 @@
 import { migrateLocalDatabase } from './local-server-migrations.mjs';
+import { packaged, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-const packageInfo = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const { Miniflare, convertV4MiniflareOptions } = await import(packageInfo.crateServerAssets
+import { join, resolve } from 'node:path';
+const { Miniflare, convertV4MiniflareOptions } = await import(packaged
 	? '../vendor/miniflare/dist/src/index.js' : 'miniflare');
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const digest = value => createHash('sha256').update(value).digest('hex');
 
 // Miniflare's default outbound service permits private networks even when the
@@ -24,12 +22,11 @@ export function localNetworkOptions() {
 }
 
 export async function localBuildInfo() {
-	const packaged = packageInfo.crateServerAssets === true;
 	const [schema, release] = await Promise.all([
-		readFile(join(root, packaged ? 'assets/schema.sql' : 'src/cloudflare/schema.sql'), 'utf8'),
-		readFile(join(root, packaged ? 'assets/server-release.json' : 'src/cloudflare/server-release.json'), 'utf8'),
+		readFile(serverAssetPath('schema.sql'), 'utf8'),
+		readFile(serverAssetPath('server-release.json'), 'utf8'),
 	]);
-	return { runtimeVersion: packageInfo.crateServerRuntime ?? packageInfo.devDependencies.miniflare,
+	return { runtimeVersion,
 		schemaHash: digest(schema), serverRevision: JSON.parse(release).revision, previousSchemas: JSON.parse(release).previousSchemas ?? [] };
 }
 
@@ -70,17 +67,14 @@ export async function lockLocalData(dataDir) {
 export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup }) {
 	dataDir = resolve(dataDir);
 	origin = normalizeLocalOrigin(origin);
-	const packageInfo = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
-	const packaged = packageInfo.crateServerAssets === true;
 	const [schema, releaseText, worker] = await Promise.all([
-		readFile(join(root, packaged ? 'assets/schema.sql' : 'src/cloudflare/schema.sql'), 'utf8'),
-		readFile(join(root, packaged ? 'assets/server-release.json' : 'src/cloudflare/server-release.json'), 'utf8'),
-		readFile(join(root, packaged ? 'assets/worker.mjs' : '.generated/cloudflare/worker.mjs'), 'utf8').catch(() => {
+		readFile(serverAssetPath('schema.sql'), 'utf8'),
+		readFile(serverAssetPath('server-release.json'), 'utf8'),
+		readFile(workerPath, 'utf8').catch(() => {
 			throw new Error('Build the server first with npm run build:worker.');
 		}),
 	]);
 	const release = JSON.parse(releaseText);
-	const runtimeVersion = packageInfo.crateServerRuntime ?? packageInfo.devDependencies.miniflare;
 	const unlock = await lockLocalData(dataDir);
 	let mf;
 	const createRuntime = options => {
@@ -149,7 +143,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		} else {
 			if (!tables.some(table => table.name === 'crate_schema')) throw new Error('Refusing to initialize a non-empty, unrecognized database.');
 			const marker = await db.prepare('SELECT version FROM crate_schema WHERE id = 1').first();
-			if (upgradeBackup) await migrateLocalDatabase(db, root, packaged, release);
+			if (upgradeBackup) await migrateLocalDatabase(db, release);
  else if (marker?.version !== release.schemaVersion) throw new Error('Unsupported local database schema. Run the stopped-server upgrade command with a new backup directory.');
 		}
 		await writePrivateJson(metadataPath, metadata);

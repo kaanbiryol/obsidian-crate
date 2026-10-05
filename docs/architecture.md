@@ -39,7 +39,12 @@ handling are tested there as well as in the PWA's document.
 
 ## Infrastructure Stack
 
-The same Worker can run locally through `scripts/local-server.mjs`. Miniflare
+The same Worker can run locally through `scripts/local-server.mjs`, a thin entry
+point into `packages/server/src/`. That directory owns the standalone CLI, HTTP
+gateway, tunnels, pairing, backups, and runtime asset resolution. The packager
+copies the complete source directory into the published package's `scripts/`
+directory and marks its manifest to select shipped assets. Source execution
+uses repository assets; installed execution uses only the package. Miniflare
 provides D1, R2, and Durable Objects backed by a persistent data directory. A
 Node HTTP listener forwards only application requests; Miniflare's own listener
 stays on loopback. Schema and runtime compatibility are checked before Durable
@@ -167,11 +172,14 @@ Reminder command preparation publishes readiness changes and supplies a synchron
 guard before React commits. Activation and reload recheck that guard after
 asynchronous storage reads, covering the interval before a command reaches its outbox.
 
-Reading's PWA adapter composes three hooks: `useReadingSession` owns enrollment,
-session invalidation and durable hydration; `useReadingSync` owns refresh serialization,
-retry scheduling and foreground/cross-tab refresh; `useReadingArticle` owns article loading,
-browser history and stale navigation guards. The runtime provider owns feature composition and settings publication; the
-application component owns article presentation and navigation. Durable Reading records are validated at the storage boundary
+Reading's PWA adapter separates durable state from its screen. `useReadingSession`
+owns durable hydration and session-checked publication methods; app connection
+hooks own enrollment and unlocking. `useReadingSync` owns refresh serialization,
+retry scheduling and foreground/cross-tab refresh. `useReadingMutations` owns capture,
+metadata edits, extraction retries and synchronous update guards in the mounted
+runtime, while `useReadingArticle` owns article loading, browser history and stale
+navigation guards. The runtime provider composes these owners and publishes settings;
+the application component owns presentation and invokes commands. Durable Reading records are validated at the storage boundary
 before the hooks publish them or the queue dispatches them. `reading/outbox.ts` owns
 typed commands, exact dispatch bytes, dependent-edit ordering and retry eligibility;
 automatic refreshes honor the persisted deadline and three-attempt budget, while an

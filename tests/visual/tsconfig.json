@@ -11,7 +11,8 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "../../src/cloudflare/worker/pwa/raw-css.d.ts"
+    "../../src/cloudflare/worker/pwa/raw-css.d.ts",
+    "../../src/cloudflare/virtual-cloudflare-artifacts.d.ts"
   ],
   "exclude": []
 }

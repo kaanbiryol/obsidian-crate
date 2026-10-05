@@ -51,6 +51,26 @@ function start() {
 }
 
 describe('Reading enrollment authority', () => {
+  it.each(['replacement', 'reset', 'unmount'] as const)('rejects stale state publications after %s', async change => {
+    const h = start();
+    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    const publisher = h.rendered.current;
+    expect(publisher.isCurrentSession(session)).toBe(true);
+    await act(async () => {
+      if (change === 'replacement') localStorage.setItem(READING_SESSION_KEY, JSON.stringify(replacement));
+      if (change === 'reset') publisher.resetSession();
+    });
+    if (change === 'unmount') h.rendered.unmount();
+    const before = h.rendered.current;
+    await act(async () => {
+      expect(publisher.publishPending(session, [{ id: 'stale', sessionId: session.id, action: 'retry', intent: { id: 'article' } }])).toBe(false);
+      expect(publisher.publishSyncResult(session, { pending: [], cache: { items: [], issues: [], savedAt: 99 }, completed: true })).toBe(false);
+      expect(publisher.finishCapture(session)).toBe(false);
+      publisher.reportSessionError(session, 'A stale failure');
+    });
+    expect(h.rendered.current).toMatchObject({ cache: before.cache, pending: before.pending, error: before.error, url: before.url });
+  });
+
   it('persists enrollment, hydrates a saved draft, and saves edits after rerender', async () => {
     vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/article' });
     const h = start();

@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from '../packages/server/src/local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
 test('Reading recovers an unavailable source across server restart without duplicate capture', { timeout: 60000 }, async () => {

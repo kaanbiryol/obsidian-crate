@@ -6,8 +6,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
-import { listenLocalServer } from './local-server-http.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
+import { listenLocalServer } from '../packages/server/src/local-server-http.mjs';
 
 if (process.env.CRATE_PWA_PREBUILT !== '1') {
 	const result = spawnSync(process.execPath, ['scripts/build-worker.mjs'], { stdio: 'inherit' });

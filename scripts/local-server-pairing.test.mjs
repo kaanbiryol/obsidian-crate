@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createPairing } from './local-server-pairing.mjs';
-import { monitorPublicReadiness } from './local-server-readiness.mjs';
+import { createPairing } from '../packages/server/src/local-server-pairing.mjs';
+import { monitorPublicReadiness } from '../packages/server/src/local-server-readiness.mjs';
 
 test('pairing codes expire, are claimed once under concurrent requests, and store only token hashes', async () => {
 	let time = 100;

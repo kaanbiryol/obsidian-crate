@@ -23,20 +23,24 @@ import {
 	type FileStorageRow,
 } from './sync-storage';
 
-export function uploadMutation(
-	db: D1Database,
-	path: string,
-	hash: string,
-	size: number,
-	objectKey: string,
-	expectedHash: ExpectedFileHash,
-	operation?: UploadOperation,
-	expectedRevision?: string,
-	stagingBatchId?: string,
-	importToken?: string,
-	encryptionState: EncryptionServerState | null = null,
-	resetGeneration?: string | null,
-): D1PreparedStatement {
+interface UploadMutationInput {
+	path: string;
+	hash: string;
+	size: number;
+	objectKey: string;
+	expectedHash: ExpectedFileHash;
+	operation?: UploadOperation;
+	expectedRevision?: string;
+	stagingBatchId?: string;
+	importToken?: string;
+	encryptionState?: EncryptionServerState | null;
+	resetGeneration?: string | null;
+}
+
+export function uploadMutation(db: D1Database, {
+	path, hash, size, objectKey, expectedHash, operation, expectedRevision,
+	stagingBatchId, importToken, encryptionState = null, resetGeneration,
+}: UploadMutationInput): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
 	const encryption = encryptionWriteGuard(encryptionState);
 	namespace.sql += ` AND ${encryption.sql}`;
@@ -99,20 +103,11 @@ export async function commitStagedFile(
 ): Promise<CommitResult> {
 	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState);
 	const cleanupKeys = collectCleanupKeys(params.previousFile, params.objectKey);
-	const mutation = uploadMutation(
-		db,
-		params.path,
-		params.hash,
-		params.size,
-		params.objectKey,
-		params.expectedHash,
-		params.operation,
-		params.expectedRevision,
-		undefined,
-		undefined,
-		encryption.state,
-		params.resetGeneration,
-	);
+	const mutation = uploadMutation(db, {
+		path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
+		expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
+		operation: params.operation, encryptionState: encryption.state, resetGeneration: params.resetGeneration,
+	});
 	const results: unknown[] = await db.batch([
 		mutation,
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),

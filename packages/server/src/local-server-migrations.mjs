@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-export async function migrateLocalDatabase(db, root, packaged, release) {
+import { serverAssetPath } from './assets.mjs';
+export async function migrateLocalDatabase(db, release) {
   const marker = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();
   if (!marker || !Number.isSafeInteger(marker.version) || marker.version < release.minimumSchemaVersion || marker.version > release.schemaVersion) throw new Error('Unsupported local schema. Restore using the matching server build.');
   const verify = async () => {
@@ -15,7 +15,7 @@ export async function migrateLocalDatabase(db, root, packaged, release) {
   const before = await db.prepare('SELECT (SELECT count(*) FROM auth_tokens) AS tokens, (SELECT count(*) FROM files) AS files, (SELECT count(*) FROM file_versions) AS versions').first();
   for (const step of release.migrations.filter(step => step.from >= marker.version)) {
     if (step.to !== step.from + 1 || step.file !== `${step.id}.sql` || !/^[a-z0-9-]+$/.test(step.id)) throw new Error('Invalid local migration manifest');
-    const sql = await readFile(join(root, packaged ? 'assets/migrations' : 'src/cloudflare/migrations', step.file), 'utf8');
+    const sql = await readFile(serverAssetPath(`migrations/${step.file}`), 'utf8');
     if (createHash('sha256').update(sql).digest('hex') !== step.checksum) throw new Error('Local migration checksum failed');
     await db.batch([
       db.prepare('INSERT INTO crate_schema(id,version,created_version) SELECT 2,0,1 WHERE NOT EXISTS (SELECT 1 FROM crate_schema WHERE id=1 AND version=?)').bind(step.from),

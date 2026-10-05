@@ -17,6 +17,7 @@
 		"src/**/*.{ts,tsx}!",
 		"scripts/*.mjs",
 		"*.{js,mjs,mts,ts}",
+		"packages/server/src/**/*.mjs",
 		"!src/**/*-test-harness.ts!",
 		"!src/test/**!",
 		"tests/reading-extraction/*.ts"

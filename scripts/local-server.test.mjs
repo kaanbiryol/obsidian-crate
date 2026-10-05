@@ -9,8 +9,8 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin } from './local-server-runtime.mjs';
-import { listenLocalServer } from './local-server-http.mjs';
+import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin } from '../packages/server/src/local-server-runtime.mjs';
+import { listenLocalServer } from '../packages/server/src/local-server-http.mjs';
 
 test('local origin requires HTTPS except on the server computer', () => {
 	assert.equal(normalizeLocalOrigin('http://localhost:8787/'), 'http://localhost:8787');

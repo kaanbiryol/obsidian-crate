@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 
 // A dedicated loopback sandbox. Never point this at a real Crate data directory.
 const port = 8877, origin = `http://localhost:${port}`;

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from './local-server-backup.mjs';
-import { issueLocalDevice, openLocalRuntime } from './local-server-runtime.mjs';
+import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../packages/server/src/local-server-backup.mjs';
+import { issueLocalDevice, openLocalRuntime } from '../packages/server/src/local-server-runtime.mjs';
 
 test('verified backup restores files, credentials and durable alarm storage into a fresh server', { timeout: 60_000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'crate-backup-test-'));

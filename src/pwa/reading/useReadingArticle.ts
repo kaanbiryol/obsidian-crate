@@ -1,22 +1,23 @@
 import type { PendingReading } from './outbox';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
 import { readingRequest } from './api';
-import { assertReadingSession, readingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
+import { assertReadingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
 import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './article-history';
 
 interface OpenReadingArticle { item: ReadingItem; markdown: string | null; availableOffline: boolean; error?: string; sourceHighlights?: string; sourceExtractionStatus?: ReadingItem['extraction_status'] }
 interface ReadingArticleOptions {
   session: ReadingSession | null; cache: ReadingCache | null; pending: PendingReading[];
-  alive: RefObject<boolean>; setError: (error: string | null) => void;
+  isCurrentSession: (session: ReadingSession) => boolean;
+  reportSessionError: (session: ReadingSession, error: string | null) => void;
   run: (action: () => Promise<void>) => Promise<void>;
 }
 
 /** Article navigation and stale-request guards share one lifetime. */
-export function useReadingArticle({ session, cache, pending, alive, setError, run }: ReadingArticleOptions) {
+export function useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run }: ReadingArticleOptions) {
   const [reader, setReader] = useState<OpenReadingArticle | null>(null);
   const [readerClosing, setReaderClosing] = useState(false);
   const [readerMotion, setReaderMotion] = useState<'slide' | 'none'>('none');
@@ -38,7 +39,7 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
   }, [cache]);
   const open = useCallback(async (item: ReadingItem, animate = true, section: ReadingSection = 'inbox') => {
     if (!session || appBack.current) return;
-    const current = () => alive.current && readingSession()?.id === session.id && readingSession()?.token === session.token && readingSession()?.generation === session.generation
+    const current = () => isCurrentSession(session)
       && request === navigation.current && new URL(location.href).searchParams.get('item') === item.crate_reading_id;
     const stack = await openReadingArticleHistory(item.crate_reading_id, section);
     if (!stack) return;
@@ -47,10 +48,10 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
     articleStack.current = stack;
     setReaderMotion(animate ? 'slide' : 'none');
     if (!item.path) {
-      setReader({ item, markdown: '', availableOffline: false }); setError(null);
+      setReader({ item, markdown: '', availableOffline: false }); reportSessionError(session, null);
       return;
     }
-    setReader({ item, markdown: null, availableOffline: false }); setError(null);
+    setReader({ item, markdown: null, availableOffline: false }); reportSessionError(session, null);
     void (async () => {
       let cached = false;
       try {
@@ -74,16 +75,16 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
           await cacheReadingArticle(session, article.item, article.markdown);
           if (current()) setReader(opened => opened?.item.crate_reading_id === item.crate_reading_id ? { ...opened, availableOffline: true } : opened);
         } catch {
-          if (current() && !cached) setError('Offline copy could not be saved.');
+          if (current() && !cached) reportSessionError(session, 'Offline copy could not be saved.');
         }
       } catch (cause) {
         if (!current()) return;
         const message = cause instanceof Error ? cause.message : 'This article could not be opened.';
-        if (cached) setError(`Showing saved copy. ${message}`);
+        if (cached) reportSessionError(session, `Showing saved copy. ${message}`);
         else setReader({ item, markdown: null, availableOffline: false, error: message });
       }
     })();
-  }, [session, alive, setError]);
+  }, [session, isCurrentSession, reportSessionError]);
   useEffect(() => {
     if (!session || !reader || reader.markdown === null || reader.sourceHighlights === undefined || !navigator.onLine
       || (reader.sourceHighlights === JSON.stringify(reader.item.highlights ?? []) && reader.sourceExtractionStatus === reader.item.extraction_status)) return;
@@ -100,11 +101,11 @@ export function useReadingArticle({ session, cache, pending, alive, setError, ru
         assertReadingSession(session);
         if (!active || request !== navigation.current) return;
         setReader(current => current?.item.crate_reading_id === article.item.crate_reading_id ? { ...current, ...article, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status } : current);
-        if (!cached) setError('Offline copy could not be updated.');
-      } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Reopen this article to refresh its saved text and highlights.'); }
+        if (!cached) reportSessionError(session, 'Offline copy could not be updated.');
+      } catch (cause) { if (active) reportSessionError(session, cause instanceof Error ? cause.message : 'Reopen this article to refresh its saved text and highlights.'); }
     })();
     return () => { active = false; };
-  }, [reader, session, setError]);
+  }, [reader, session, reportSessionError]);
   useEffect(() => {
     const item = presentReadingItems(cache?.items ?? [], pending).find(item => item.crate_reading_id === requestedItem);
     if (!session || !item) return; setRequestedItem(null);

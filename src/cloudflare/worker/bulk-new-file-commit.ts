@@ -19,7 +19,11 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
   if (!files.length) return [];
   const json = JSON.stringify(files.map(file => ({ path: file.path, portable: portablePathKey(file.path), hash: file.hash, size: file.size, key: file.objectKey })));
   await db.batch([
-    ...files.map(file => uploadMutation(db, file.path, file.hash, file.size, file.objectKey, null, file.operation, undefined, file.stagingBatchId, undefined, null, file.resetGeneration)),
+    ...files.map(file => uploadMutation(db, {
+      path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
+      expectedHash: null, operation: file.operation, stagingBatchId: file.stagingBatchId,
+      encryptionState: null, resetGeneration: file.resetGeneration,
+    })),
     db.prepare(`INSERT INTO changelog(path, action, hash, size, revision)
       SELECT f.path, 'put', f.hash, f.size, f.storage_key FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')`).bind(json),

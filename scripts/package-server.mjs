@@ -1,5 +1,5 @@
 import { readBuiltIdentity } from './development-build.mjs';
-import { chmod, copyFile, cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
@@ -30,15 +30,13 @@ await mkdir(vendor, { recursive: true });
 await cp(join(miniflareRoot, 'dist'), join(vendor, 'dist'), { recursive: true });
 await copyFile(join(miniflareRoot, 'package.json'), join(vendor, 'package.json'));
 await copyFile(join(root, 'packages/server/MINIFLARE_LICENSE'), join(vendor, 'LICENSE'));
-for (const file of ['package.json', 'npm-shrinkwrap.json', 'README.md']) {
+await writeFile(join(destination, 'package.json'), JSON.stringify({ ...packageInfo, crateServerAssets: true }, null, 2) + '\n');
+for (const file of ['npm-shrinkwrap.json', 'README.md']) {
 	await copyFile(join(root, 'packages/server', file), join(destination, file));
 }
 for (const file of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) await copyFile(join(root, file), join(destination, file));
-for (const file of await readdir(join(root, 'scripts'))) {
-	if ((file.startsWith('local-server') && file.endsWith('.mjs') && !file.endsWith('.test.mjs')) || file === 'crate-server.mjs') {
-		await copyFile(join(root, 'scripts', file), join(destination, 'scripts', file));
-	}
-}
+// The source directory is the package boundary; filenames do not select runtime code.
+await cp(join(root, 'packages/server/src'), join(destination, 'scripts'), { recursive: true });
 await chmod(join(destination, 'scripts/crate-server.mjs'), 0o755);
 await copyFile(join(root, '.generated/cloudflare/worker.mjs'), join(destination, 'assets/worker.mjs'));
 await copyFile(join(root, 'src/cloudflare/schema.sql'), join(destination, 'assets/schema.sql'));

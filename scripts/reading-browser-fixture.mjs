@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 
 /** Real Worker, storage and browser HTTP bridge; scenarios own their fault injection. */
 export async function openReadingBrowserFixture({ deviceName = 'Reading browser test', handleRequest } = {}) {

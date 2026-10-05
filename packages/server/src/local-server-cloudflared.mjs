@@ -17,7 +17,7 @@ const assets = {
 };
 const hash = data => createHash('sha256').update(data).digest('hex');
 
-export function extractCloudflared(archive) {
+function extractCloudflared(archive) {
 	const tar = gunzipSync(archive, { maxOutputLength: 100 * 1024 * 1024 });
 	for (let offset = 0; offset + 512 <= tar.length;) {
 		const name = tar.subarray(offset, offset + 100).toString().replace(/\0.*$/s, '');

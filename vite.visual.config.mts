@@ -7,6 +7,6 @@ export default defineConfig({
   root: resolve('tests/visual/gallery'),
   plugins: [rawCssPlugin(), react()],
   css: { postcss: { plugins: [] } },
-  resolve: { alias: { '@': resolve('src'), '@plugin-build': resolve('dist') } },
+  resolve: { alias: { '@': resolve('src'), '@plugin-build': resolve('dist'), obsidian: resolve('src/test/mocks/obsidian.ts') } },
   server: { host: '127.0.0.1', port: 8790, strictPort: true, fs: { allow: [process.cwd()] } },
 });

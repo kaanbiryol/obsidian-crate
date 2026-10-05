@@ -5,7 +5,7 @@ import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { captureDockSpring } from './pwa-dock-motion-checks.mjs';
