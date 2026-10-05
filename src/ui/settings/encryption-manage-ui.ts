@@ -1,4 +1,4 @@
-import { createSettingsDisclosure } from '../shared/settings-disclosure';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { Setting } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 

@@ -10,7 +10,7 @@ const { outputFiles } = await build({
     import { renderEncryptionLoading, renderEncryptionSetup } from './src/ui/settings/encryption-setup-ui';
     import { renderEncryptionManagement } from './src/ui/settings/encryption-manage-ui';
     import { verifyRecoveryCode } from './src/encryption/recovery-verification';
-    import { mountModalHeader } from './src/ui/shared/mountModalHeader';
+    import { mountModalHeader } from './src/ui/plugin/mountModalHeader';
     import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';
     ${obsidianDomHelpers}
     window.mount = async (resuming = false, delayed = false) => {

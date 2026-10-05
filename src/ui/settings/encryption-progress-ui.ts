@@ -1,4 +1,4 @@
-import { createModalActions, createModalFooter } from '../shared/modal-elements';
+import { createModalActions, createModalFooter } from '../plugin/modal-elements';
 import type { EncryptionProgress } from '../../sync/encryption-conversion';
 
 /** A dedicated conversion view keeps recovery controls out of the running operation. */

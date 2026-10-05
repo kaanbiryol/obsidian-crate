@@ -1,4 +1,4 @@
-import { BaseUiModal } from '../../../ui/shared/BaseUiModal';
+import { BaseUiModal } from '../../../ui/plugin/BaseUiModal';
 import { useRemindersSettingsStore } from "../../settings";
 import { Platform } from "obsidian";
 import type { ReactElement } from "react";
@@ -8,7 +8,7 @@ import { createLogger } from "@/reminders/utils/logger";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { ReminderModal } from "./createReminderModal";
 import { ModalContext, PluginContext } from "../reminders-context";
-import { hideNativeModalCloseButton } from "./modalShell";
+import { hideNativeModalCloseButton } from "../../../ui/plugin/modalShell";
 
 const log = createLogger("ReminderEditModal");
 

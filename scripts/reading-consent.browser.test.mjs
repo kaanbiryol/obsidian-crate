@@ -1,41 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { mkdir } from 'node:fs/promises';
+import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
   test(`Reading ${name}: full article saves without a separate fetching switch`, { timeout: 60000 }, async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'crate-consent-'));
-    let runtime, server, browser;
+    let fixture, browser;
     try {
-      runtime = await openLocalRuntime({ dataDir: dir });
-      const vault = await issueLocalDevice(runtime.db, 'Consent test');
-      server = createServer(async (req, res) => {
-        try {
-          const chunks = []; for await (const chunk of req) chunks.push(chunk);
-          const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, {
-            method: req.method, headers: req.headers,
-            ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }),
-          });
-          res.writeHead(response.status, Object.fromEntries(response.headers));
-          res.end(Buffer.from(await response.arrayBuffer()));
-        } catch { res.writeHead(500); res.end(); }
-      });
-      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-      const origin = `http://localhost:${server.address().port}`;
-      const api = async (path, body) => {
-        const response = await runtime.mf.dispatchFetch(`${origin}${path}`, {
-          method: body ? 'POST' : 'GET',
-          headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
-          ...(body ? { body: JSON.stringify(body) } : {}),
-        });
-        assert.equal(response.status, 200, await response.clone().text());
-        return response.json();
-      };
+      fixture = await openReadingBrowserFixture({ deviceName: 'Consent test' });
+      const { api } = fixture;
       await api('/reading/policy', { enabled: false, folderPath: 'Reading', revision: null });
       const enrollment = await api('/reading/access', { kind: 'reading' });
       browser = await engine.launch({ headless: true });
@@ -82,9 +56,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
 
     } finally {
       await browser?.close();
-      if (server) await new Promise(resolve => server.close(resolve));
-      await runtime?.close();
-      await rm(dir, { recursive: true, force: true });
+      await fixture?.close();
     }
   });
 }

@@ -1,5 +1,5 @@
-import { createSettingsDisclosure } from '../shared/settings-disclosure';
-import { createModalActions, createModalFooter } from '../shared/modal-elements';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
+import { createModalActions, createModalFooter } from '../plugin/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 import type { EncryptionProgress } from '../../sync/encryption-conversion';

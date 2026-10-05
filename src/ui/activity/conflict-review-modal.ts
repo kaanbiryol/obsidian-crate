@@ -3,8 +3,8 @@ import type { ConflictRecord } from '../../sync/types';
 import type { ConflictChoice, ConflictReview } from '../../sync/conflict-review';
 import { buildConflictDiff, renderConflictDiffLine } from './conflict-diff';
 import { getPendingFileActions } from './file-actions';
-import { createModalFooter } from '../shared/modal-elements';
-import { SharedModal } from '../shared/SharedModal';
+import { createModalFooter } from '../plugin/modal-elements';
+import { SharedModal } from '../plugin/SharedModal';
 
 export class ConflictReviewModal extends SharedModal {
     private active = true;

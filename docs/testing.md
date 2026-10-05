@@ -30,6 +30,12 @@ The tests use the built PWA, native IndexedDB/Web Locks, and the real local Work
 Chromium also verifies offline reload; WebKit verifies offline use in the current
 document. Physical installed-app acceptance remains a device check.
 
+The library, consent, optimistic-action and highlight browser suites share
+`scripts/reading-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
+authenticated setup requests and cleanup. Request gates and lost replies stay in
+their individual scenarios through `handleRequest`; normal requests still reach
+the real Worker and its storage bindings.
+
 Reading persists changes locally before updating the UI and sends them in the
 background, like Reminders. Unsent edits combine while preserving their original
 preconditions; edits made during a request queue behind its immutable request body.

@@ -1,40 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
+import { mkdir } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import { swipe } from './browser-touch-swipe.mjs';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
 
 // This end-to-end case performs many syncs and reloads; individual expectations
 // retain their own deadlines while the complete journey allows slower CI I/O.
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading highlights ${name}: select, remove, persist offline and sync`, { timeout: 180000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-highlights-'));
-  let runtime, server, browser, page;
+  let fixture, browser, page;
   const codeExample = 'let greeting = "hello <world> & friends"\nText(greeting)\n';
   let articleMarkdown = 'A useful **article excerpt**.\n\nAnother paragraph to read.\n\n```swift\n' + codeExample + '```\n\n```unknown-language\nunchanged <example>\n```';
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'Highlight test');
-    server = createServer(async (req, res) => {
-      try {
-        const chunks = []; for await (const chunk of req) chunks.push(chunk);
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method: req.method, headers: req.headers,
-          ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
-        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
-      } catch { res.writeHead(500); res.end(); }
-    });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const origin = `http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: body ? 'POST' : 'GET',
-        headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
-        ...(body ? { body: JSON.stringify(body) } : {}) });
-      assert.equal(response.status, 200, await response.clone().text()); return response.json();
-    };
+    fixture = await openReadingBrowserFixture({ deviceName: 'Highlight test' });
+    const { runtime, vault, origin, api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const operationId = `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
     const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Highlight article', fetchArticle: false, operationId });
@@ -549,7 +529,6 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     }
     throw error;
   } finally {
-    await browser?.close(); if (server) await new Promise(resolve => server.close(resolve));
-    await runtime?.close(); await rm(dir, { recursive: true, force: true });
+    await browser?.close(); await fixture?.close();
   }
 });

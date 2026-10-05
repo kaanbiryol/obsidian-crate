@@ -9,7 +9,7 @@ import {
   createShadowReactRoot,
   createShadowRootMount,
   type ShadowRootMount,
-} from "@/reminders/ui/adapters/shadowReactMount";
+} from "@/ui/plugin/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";

@@ -1,15 +1,12 @@
 import type { ApiFetch, ReminderRecord } from './types';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
+import { isReminderRecord } from './reminder-storage-validation';
 
 export class RejectedReminderChange extends Error {}
 export class ExpiredReminderChange extends Error {}
 
 export function isConfirmedReminder(value: unknown, id: string | undefined): value is ReminderRecord {
-	if (!value || typeof value !== 'object') return false;
-	const record = value as Partial<ReminderRecord>;
-	return record.id === id && typeof record.content === 'string' && typeof record.completed === 'boolean'
-		&& typeof record.project === 'string' && typeof record.filePath === 'string'
-		&& typeof record.revision === 'string' && (record.priority === 1 || record.priority === 4);
+	return isReminderRecord(value) && value.id === id && typeof value.revision === 'string';
 }
 
 export async function submitReminderChange(apiFetch: ApiFetch, change: PendingReminderChange): Promise<ReminderChangeResult> {

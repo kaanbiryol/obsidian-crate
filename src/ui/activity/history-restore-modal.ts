@@ -1,7 +1,7 @@
-import { createModalActions, createModalFooter } from '../shared/modal-elements';
+import { createModalActions, createModalFooter } from '../plugin/modal-elements';
 import { Notice, type App } from 'obsidian';
 import type { HistoryRestoreReview } from '../../sync/history-restore';
-import { SharedModal } from '../shared/SharedModal';
+import { SharedModal } from '../plugin/SharedModal';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { historyPointLabel } from './history-point';
 

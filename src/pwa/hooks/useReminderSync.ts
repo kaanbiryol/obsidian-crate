@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { fetchReadyReminderList } from '../reminder-api';
+import { fetchReadyReminderList, parseReminderListResponse } from '../reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
-import { parseReminderSourceIssues } from '../reminder-source-issues';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
 
 export interface ConfirmedReminderSnapshot {
@@ -154,16 +153,19 @@ export function useReminderSync({
 					return;
 				}
 				if (!response.ok) throw new Error(await response.text());
-				const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[]; issues?: unknown };
-				const nextIssues = parseReminderSourceIssues(result.issues);
-				if (!nextIssues) throw new Error('The server returned invalid reminder source details. Refresh reminders.');
-				const nextReminders = Array.isArray(result.reminders) ? result.reminders : [];
-				const nextProjects = Array.isArray(result.projects) ? result.projects : [];
+				const result = parseReminderListResponse(await response.json().catch(() => null), config.folderPath);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!result) {
+					// A contract failure cannot replace a valid revision or its ETag,
+					// including with an older disk snapshot after a recent acknowledgement.
+					setError('The server returned invalid reminder data. Refresh reminders.');
+					if (lastCheckedAtRef.current === null) setDataMode('error');
+					return;
+				}
 				setError(null);
-				issuesRef.current = nextIssues;
-				setIssues(nextIssues);
-				void commitConfirmedSnapshot(nextReminders, nextProjects, response.headers.get('ETag') ?? undefined);
+				issuesRef.current = result.issues;
+				setIssues(result.issues);
+				void commitConfirmedSnapshot(result.reminders, result.projects, response.headers.get('ETag') ?? undefined);
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);

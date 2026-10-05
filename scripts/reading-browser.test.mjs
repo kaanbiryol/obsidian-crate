@@ -6,13 +6,10 @@ import { checkBackGesture } from './pwa-back-gesture-checks.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
+import { mkdir } from 'node:fs/promises';
 import { swipe } from './browser-touch-swipe.mjs';
 import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
 
 async function checkReaderNavigation(page) {
   const reader = page.locator('.crate-reading-reader');
@@ -278,22 +275,20 @@ async function sheetAppearance(page) {
 // This journey covers enrollment, cross-feature history, offline sync and sharing.
 // Keep individual assertions bounded while allowing the full native-browser flow.
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enroll, save, cached reader, offline change, phone confirmation and logout`, { timeout: 180000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-browser-')); let runtime, browser, server, loseCaptureReply = false, holdArticle, holdUpdate, holdList; const sent = [], heldResponses = [];
+  let fixture, browser, loseCaptureReply = false, holdArticle, holdUpdate, holdList; const sent = [], heldResponses = [];
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'Browser test');
-    server = createServer(async (req, res) => {
-      try {
-        if (req.url === '/notifications/test-share') { res.writeHead(200, {'Content-Type':'text/html'}); res.end('<!doctype html><title>Share fixture</title><body>Share fixture</body>'); return; }
-        const chunks=[]; for await (const chunk of req) chunks.push(chunk);
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method:req.method, headers:req.headers, ...(['GET','HEAD'].includes(req.method) ? {} : { body:Buffer.concat(chunks) }) });
+    fixture = await openReadingBrowserFixture({
+      deviceName: 'Browser test',
+      handleRequest: async ({ request: req, body, dispatch }) => {
+        if (req.url === '/notifications/test-share') return new Response('<!doctype html><title>Share fixture</title><body>Share fixture</body>', { headers: { 'Content-Type': 'text/html' } });
+        const response = await dispatch();
         if (req.url.startsWith('/reading/item?') && holdArticle) { const held = holdArticle; holdArticle = null; held.started(); await held.release; }
         if (req.url === '/reading/update' && !response.ok) console.log('Reading update failed:', response.status, await response.clone().text());
         if (req.url === '/reading/update' && holdUpdate) { const held = holdUpdate; holdUpdate = null; held.started(); await held.release; }
         if (req.url === '/reading/list' && holdList) { const held = holdList; holdList = null; held.started(); await held.release; }
         // Complete this reader fixture through the real publication endpoint;
         // invalid-domain retries otherwise delay the deferred capture for minutes.
-        if (req.url === '/reading/capture' && response.ok && JSON.parse(Buffer.concat(chunks).toString()).url === 'https://browser.example.invalid/browser') {
+        if (req.url === '/reading/capture' && response.ok && JSON.parse(body.toString()).url === 'https://browser.example.invalid/browser') {
           const queued = await runtime.db.prepare('SELECT id,generation FROM reading_captures WHERE url_identity=?').bind('https://browser.example.invalid/browser').first();
           if (queued) {
             const { REMINDER_ALARMS } = await runtime.mf.getBindings();
@@ -303,15 +298,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
             assert.equal(published.status, 204);
           }
         }
-        if (req.url === '/reading/capture') { sent.push(Buffer.concat(chunks).toString()); if (loseCaptureReply) { loseCaptureReply = false; res.writeHead(503, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:"Save acknowledgement interrupted"})); return; } }
-        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
-      } catch (error) { if (res.headersSent) res.destroy(error); else { res.writeHead(500); res.end('Test server failed'); } }
+        if (req.url === '/reading/capture') { sent.push(body.toString()); if (loseCaptureReply) { loseCaptureReply = false; return Response.json({ error: 'Save acknowledgement interrupted' }, { status: 503 }); } }
+        return response;
+      },
     });
-    await new Promise(resolve => server.listen(0,'127.0.0.1',resolve)); const origin=`http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response=await runtime.mf.dispatchFetch(`${origin}${path}`, {method:'POST',headers:{Authorization:`Bearer ${vault.token}`,'X-Crate-Protocol':'1','Content-Type':'application/json'},body:JSON.stringify(body)});
-      assert.equal(response.status,200,await response.clone().text());return response.json();
-    };
+    const { runtime, origin, api } = fixture;
     await api('/reading/policy',{enabled:true,folderPath:'Reading',revision:null});
     const enrollment=await api('/reading/access',{kind:'reading'});
     browser=await engine.launch({headless:true});
@@ -829,36 +820,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // Private views clear immediately; remote revocation completes independently.
     await expect.poll(async () => (await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${linked.reminders}` } })).status).toBe(401);
     assert.deepEqual(errors,[]);
-  } catch (error) { console.error('Reading failure assertion:', error); await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); if(server) await new Promise(resolve=>server.close(resolve)); await runtime?.close(); await rm(dir,{recursive:true,force:true}); }
+  } catch (error) { console.error('Reading failure assertion:', error); await mkdir('test-results/reading',{recursive:true}); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) { console.log('Reading failure page:',page.url(),(await page.locator('body').innerText().catch(()=>''))); await page.screenshot({path:`test-results/reading/${name}-failure.png`}).catch(()=>{}); } throw error; } finally { heldResponses.forEach(release => release()); await browser?.close(); await fixture?.close(); }
 });
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: single-screen layout at every width`, { timeout: 60000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-layout-'));
-  let runtime, browser, server;
+  let fixture, browser;
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'Layout test');
-    server = createServer(async (req, res) => {
-      try {
-        const chunks = [];
-        for await (const chunk of req) chunks.push(chunk);
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, {
-          method: req.method, headers: req.headers,
-          ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }),
-        });
-        res.writeHead(response.status, Object.fromEntries(response.headers));
-        res.end(Buffer.from(await response.arrayBuffer()));
-      } catch { res.writeHead(500); res.end(); }
-    });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const origin = `http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, {
-        method: 'POST', headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      assert.equal(response.status, 200, await response.clone().text());
-      return response.json();
-    };
+    fixture = await openReadingBrowserFixture({ deviceName: 'Layout test' });
+    const { api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const enrollment = await api('/reading/access', { kind: 'reading' });
     browser = await engine.launch({ headless: true });
@@ -892,9 +861,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.screenshot({ path: `test-results/reading/${name}-desktop-single-screen.png` });
   } finally {
     await browser?.close();
-    if (server) await new Promise(resolve => server.close(resolve));
-    await runtime?.close();
-    await rm(dir, { recursive: true, force: true });
+    await fixture?.close();
   }
 });
 

@@ -11,8 +11,8 @@ const { outputFiles } = await build({
     import { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
     import { DeleteConfirmationModal } from './src/reminders/components/DeleteConfirmationModal';
-    import { SharedModal } from './src/ui/shared/SharedModal';
-    import { createSettingsDisclosure } from './src/ui/shared/settings-disclosure';
+    import { SharedModal } from './src/ui/plugin/SharedModal';
+    import { createSettingsDisclosure } from './src/ui/plugin/settings-disclosure';
     import { openConfirmationModal } from './src/ui/confirmation-modal';
     import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
     import { SyncDiagnosticsModal } from './src/ui/sync-diagnostics-modal';

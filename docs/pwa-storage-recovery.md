@@ -10,6 +10,12 @@ Opening the cache stops waiting when IndexedDB reports a blocked upgrade, or aft
 
 Snapshots require complete envelope and reminder validation, unique identities, valid explicit dates and recurrence, scoped file paths, and source-issue metadata. Damaged snapshots retain their bytes until a successful replacement or explicit rebuild. Their ETags are not reused. Older snapshots without completeness or session metadata also require a full refresh. The entire snapshot is rejected rather than presenting a silently shortened list. Without a valid offline copy or server response, the app shows its load error instead of rendering damaged records.
 
+Live list responses use the same reminder validation before replacing the UI or
+offline copy. Malformed lists preserve the current confirmed reminders and ETag,
+and show a refresh error. Mutation acknowledgements also validate the complete
+record before confirming a pending command; an invalid acknowledgement retains
+the command for reconciliation with its original operation identity.
+
 Each snapshot includes a SHA-256 digest of the session credential. The credential itself is not stored in IndexedDB. A replacement session cannot hydrate its predecessor's snapshot, including when an older tab blocks deletion. Successful refreshes recreate the offline copy under the current session. Failed writes preserve the previous committed snapshot and show that offline storage is unavailable.
 
 Explicit logout still deletes the whole private cache and clears pending commands/drafts. A blocked delete remains queued by the browser; the app promptly reports that it could not confirm erasure and directs the user to close other tabs and clear site data. It does not report a blocked deletion as successful. Session and cache generations prevent delayed writes from recreating the signed-out snapshot.

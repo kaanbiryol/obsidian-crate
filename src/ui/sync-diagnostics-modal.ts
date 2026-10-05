@@ -1,6 +1,6 @@
 import { Notice, type App } from 'obsidian';
-import { SharedModal } from './shared/SharedModal';
-import { createModalActions, createModalFooter } from './shared/modal-elements';
+import { SharedModal } from './plugin/SharedModal';
+import { createModalActions, createModalFooter } from './plugin/modal-elements';
 
 export class SyncDiagnosticsModal extends SharedModal {
 	private events = new AbortController();

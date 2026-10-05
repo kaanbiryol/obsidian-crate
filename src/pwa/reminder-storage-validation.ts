@@ -59,8 +59,17 @@ export const reminderDraftSchema = v.object({
 });
 
 /** Check only: preserve unknown fields and original objects in cache/outbox/drafts. */
+export function isReminderRecord(value: unknown): value is ReminderRecord {
+	return !Array.isArray(value) && v.is(reminderRecordSchema, value);
+}
+
 export function isStoredReminderRecord(value: unknown, folderPath: string): value is ReminderRecord {
-	return !Array.isArray(value) && v.is(reminderRecordSchema, value) && value.filePath.startsWith(`${folderPath}/`);
+	return isReminderRecord(value) && value.filePath.startsWith(`${folderPath}/`);
+}
+
+export function isReminderList(value: unknown, folderPath: string): value is ReminderRecord[] {
+	return Array.isArray(value) && value.every(record => isStoredReminderRecord(record, folderPath))
+		&& new Set(value.map(record => record.id)).size === value.length;
 }
 
 export function isStoredReminderDraft(value: unknown): value is ModalDraft {

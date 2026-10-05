@@ -5,7 +5,8 @@ import { createReminderOutboxStorage, createReminderRecoveryStorage, type Quaran
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
-import { applyReminderSettlement, createReminderSettlementChannel } from '../reminder-settlement';
+import { createReminderSettlementChannel } from '../reminder-settlement';
+import { subscribeReminderOutboxEvents } from '../reminder-outbox-events';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
@@ -123,43 +124,10 @@ export function useReminderOutbox(options: {
 					resume();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
-			const visible = () => { if (document.visibilityState === 'visible') resume(); };
-			const storageChanged = (event: StorageEvent) => {
-				if (!isCurrent()) return;
-				if (event.key === settlement.key && event.newValue) {
-					const confirmed = settlement.read(event);
-					const current = optionsRef.current;
-					const finish = current.beginLocalMutation();
-					void (async () => {
-						try {
-							const snapshot = current.getSnapshot();
-							const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(snapshot.reminders, snapshot.projects, confirmed) : null;
-							if (next) await current.commitReminderState(next.reminders, next.projects);
-						} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
-						finally { finish(); if (isCurrent()) void optionsRef.current.loadReminders({ silent: true }); }
-					})();
-					return;
-				}
-				if (!recovery.acceptsKey(event.key)) return;
-				try {
-					// Also revalidate if a confirmation was missed, or another tab discarded a rejection.
-					if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
-						const finish = optionsRef.current.beginLocalMutation();
-						finish();
-						void optionsRef.current.loadReminders({ silent: true });
-					}
-					setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain();
-				}
-				catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
-			};
-			window.addEventListener('online', resume);
-			document.addEventListener('visibilitychange', visible);
-			window.addEventListener('storage', storageChanged);
-			cleanup = () => {
-				window.removeEventListener('online', resume);
-				document.removeEventListener('visibilitychange', visible);
-				window.removeEventListener('storage', storageChanged);
-			};
+			cleanup = subscribeReminderOutboxEvents({
+				storage, recovery, settlement, outbox, isCurrent, resume, setRecoveryChanges,
+				current: () => optionsRef.current,
+			});
 			resume();
 		}).catch((error: unknown) => {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);

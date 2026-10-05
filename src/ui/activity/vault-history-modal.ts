@@ -1,6 +1,6 @@
 import { Platform, type App } from 'obsidian';
 import type { SyncHistoryEntry } from '../../sync/types';
-import { SharedModal } from '../shared/SharedModal';
+import { SharedModal } from '../plugin/SharedModal';
 import { HistoryBrowser, type HistoryBrowserDeps } from './history-browser';
 
 /** A native dialog above Sync activity preserves its list, scroll and focus. */

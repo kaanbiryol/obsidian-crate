@@ -1,7 +1,7 @@
 import type { SharedCheckpoint } from '../protocol/history-checkpoints';
 import { mergeSharedHistory } from './activity/shared-history';
 import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
-import { BaseUiModal } from './shared/BaseUiModal';
+import { BaseUiModal } from './plugin/BaseUiModal';
 import { getPendingFileActions } from './activity/file-actions';
 import type { PendingDiscardReview } from '../sync/pending-discard';
 import { PendingDiscardModal } from './activity/pending-discard-modal';
@@ -14,7 +14,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './activity/ActivitySheet';
 import { ActivityTabs } from './activity/ActivityTabs';
 import { StatusBarIndicator } from './StatusBarIndicator';
-import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
+import { hideNativeModalCloseButton } from './plugin/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
 import { ActivityHistory } from './activity/activity-history';

@@ -4,6 +4,11 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 import { globalIgnores } from "eslint/config";
 
+const pluginAdapterImports = {
+	regex: '^(?:@/ui/plugin|(?:\\.\\./)+(?:ui/)?plugin)(?:/|$)',
+	message: 'Obsidian adapters belong to the plugin host; use portable components from ui/shared.',
+};
+
 export default tseslint.config(
 	{
 		languageOptions: {
@@ -138,10 +143,20 @@ export default tseslint.config(
 					name: '@base-ui/react/button',
 					message: 'Use ui/shared/Button or PwaButton so PWA actions share control behavior and styling.',
 				}],
+				patterns: [pluginAdapterImports],
 			}],
 			'obsidianmd/platform': 'off',
 			'@typescript-eslint/no-deprecated': 'off',
 			'@typescript-eslint/no-misused-promises': 'off',
+		},
+	},
+	{
+		files: ['src/ui/shared/**/*.{ts,tsx}'],
+		rules: {
+			'@typescript-eslint/no-restricted-imports': ['error', {
+				paths: [{ name: 'obsidian', message: 'Shared UI must work in both the plugin and PWA; keep Obsidian APIs in ui/plugin.' }],
+				patterns: [pluginAdapterImports],
+			}],
 		},
 	},
 	{

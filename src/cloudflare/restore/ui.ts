@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { SharedModal } from '../../ui/shared/SharedModal';
+import { SharedModal } from '../../ui/plugin/SharedModal';
 import { openConfirmationModal } from '../../ui/confirmation-modal';
 import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../../ui/cloudflare-deployment-modal';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';

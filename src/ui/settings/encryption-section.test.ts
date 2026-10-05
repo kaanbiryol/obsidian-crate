@@ -25,7 +25,7 @@ beforeEach(() => {
 	folders.mockReset().mockImplementation(async () => ({ folders: ['Reminders'] }));
 	state = null; titles = []; values = new Map([[SECRET_KEYS.AUTH_TOKEN, 'token']]);
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../shared/SharedModal', () => ({ SharedModal: class {
+	vi.doMock('../plugin/SharedModal', () => ({ SharedModal: class {
 		modalEl = new FakeElement('div');
 		contentEl = new FakeElement('div');
 		bodyEl = body = this.contentEl.createDiv();
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../shared/SharedModal', '../../sync/worker-api/http', '../../sync/encryption-conversion']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../plugin/SharedModal', '../../sync/worker-api/http', '../../sync/encryption-conversion']) vi.doUnmock(name);
 });
 
 async function renderRow() {

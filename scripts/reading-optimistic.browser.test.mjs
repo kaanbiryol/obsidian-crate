@@ -1,12 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
+import { mkdir } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { openLocalRuntime, issueLocalDevice } from './local-server-runtime.mjs';
+import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
 
 const operationId = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
 async function pending(page) {
@@ -24,8 +21,7 @@ async function pending(page) {
 }
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading optimistic actions ${name}`, { timeout: 120000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-optimistic-'));
-  let runtime, server, browser, held, loseCaptureReply = false, loseUpdateReplies = false, listResponses = 0;
+  let fixture, browser, held, loseCaptureReply = false, loseUpdateReplies = false, listResponses = 0;
   const releases = [], requests = [];
   const hold = path => {
     const started = Promise.withResolvers(), release = Promise.withResolvers();
@@ -34,35 +30,24 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     return { started: started.promise, release: release.resolve };
   };
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'Optimistic Reading test');
-    server = createServer(async (req, res) => {
-      try {
-        const chunks = []; for await (const chunk of req) chunks.push(chunk);
-        const body = Buffer.concat(chunks);
+    fixture = await openReadingBrowserFixture({
+      deviceName: 'Optimistic Reading test',
+      handleRequest: async ({ request: req, body, dispatch }) => {
         if (req.method === 'POST' && ['/reading/update', '/reading/capture'].includes(req.url)) requests.push({ path: req.url, body: body.toString() });
         if (held?.path === req.url) { const gate = held; held = null; gate.started(); await gate.release; }
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method: req.method, headers: req.headers,
-          ...(['GET', 'HEAD'].includes(req.method) ? {} : { body }) });
+        const response = await dispatch();
         if (req.url === '/reading/capture' && loseCaptureReply) {
           loseCaptureReply = false;
-          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Save acknowledgement interrupted' })); return;
+          return Response.json({ error: 'Save acknowledgement interrupted' }, { status: 503 });
         }
         if (req.url === '/reading/update' && loseUpdateReplies) {
-          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Update acknowledgement interrupted' })); return;
+          return Response.json({ error: 'Update acknowledgement interrupted' }, { status: 503 });
         }
         if (req.url.startsWith('/reading/list')) listResponses++;
-        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
-      } catch { if (!res.headersSent) res.writeHead(500); res.end(); }
+        return response;
+      },
     });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const origin = `http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: body ? 'POST' : 'GET',
-        headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
-        ...(body ? { body: JSON.stringify(body) } : {}) });
-      assert.equal(response.status, 200, await response.clone().text()); return response.json();
-    };
+    const { runtime, vault, origin, api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const saved = await api('/reading/capture', { url: 'https://example.invalid/article', title: 'Optimistic article', fetchArticle: false, operationId: operationId() });
     const path = `Reading/Optimistic article - ${saved.id.slice(0, 8)}.md`;
@@ -343,7 +328,6 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     throw error;
   } finally {
     releases.forEach(release => release());
-    await browser?.close(); if (server) await new Promise(resolve => server.close(resolve));
-    await runtime?.close(); await rm(dir, { recursive: true, force: true });
+    await browser?.close(); await fixture?.close();
   }
 });

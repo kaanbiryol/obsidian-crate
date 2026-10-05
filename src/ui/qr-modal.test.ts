@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
 
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('./shared/SharedModal', () => ({ SharedModal: class {
+vi.mock('./plugin/SharedModal', () => ({ SharedModal: class {
 	contentEl = new FakeElement('div');
 	bodyEl = this.contentEl.createDiv();
 	modalEl = new FakeElement('div');

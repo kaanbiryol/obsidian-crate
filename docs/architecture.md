@@ -271,6 +271,13 @@ dock with direct section switching through a Reading navigation adapter and its 
 feature switching and per-section state retention stay in the PWA feature shell. Reading owns its
 article layout and typography, while common controls use the same host tokens.
 
+`src/ui/plugin/` owns Obsidian modal shells, native modal controls and React
+mounting into plugin Shadow DOM. Shared controls and PWA modules cannot import
+these adapters. Reading highlight controls keep saving and copy/share feedback in
+`ReadingHighlightActions`; `reading-highlight-interaction.ts` owns selection,
+gesture listeners and cleanup, while `reading-highlight-geometry.ts` places the
+overlay from measured rectangles.
+
 Shared icons and reduced-motion preferences live in `src/ui/shared/`; the Obsidian
 icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
 these implementations for existing feature consumers.
@@ -287,6 +294,11 @@ connectivity and timer wakeups honor the stored deadline and attempt budget.
 Explicit retry and earlier-session recovery reset that budget while retaining the
 operation identity and request bytes.
 
+`pwa/reminder-outbox-events.ts` groups browser wakeups and cross-tab confirmation
+listeners under one subscription lifetime. `useReminderOutbox` retains queue
+initialization, recovery and session ownership; delayed work from a disposed
+subscription cannot trigger a new refresh or error toast.
+
 Plugin feature requests use `src/plugin/server-request.ts` for validated server
 metadata and lifecycle/connection guards before dispatch and after responses.
 Reading adds its own capability requirements; shared feature settings require
@@ -296,6 +308,11 @@ only their own capability.
 lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
+
+`sync-batch/upload-validation.ts` decodes and validates upload candidates and
+request budgets before storage work. `sync-batch/upload.ts` retains receipt
+checks, encryption validation, staging and the bulk/conditional commit paths.
+Per-file validation errors retain the batch response's partial-success behavior.
 
 `cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
 notification coordination requirements once. Admission, scope authorization and

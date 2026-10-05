@@ -1,6 +1,6 @@
-import { createModalActions, createModalFooter } from './shared/modal-elements';
+import { createModalActions, createModalFooter } from './plugin/modal-elements';
 import { Setting, type App } from 'obsidian';
-import { SharedModal } from './shared/SharedModal';
+import { SharedModal } from './plugin/SharedModal';
 
 export interface ConfirmationModalOptions {
 	title: string;

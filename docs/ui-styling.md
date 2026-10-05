@@ -119,6 +119,9 @@ Dock morphs use the shared collapsed height.
   header Save action, with no footer actions. Flat Reading rows use the same 8px
   hover/press corners as reminder rows.
 - `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
+  Obsidian modal shells, native modal controls and stylesheet/React mounting
+  helpers live in `src/ui/plugin/`. Shared controls remain independent of these
+  host APIs; ESLint enforces the import boundary for shared UI and the PWA.
   `usePressFeedback` owns momentary interaction state for buttons, reminder cards,
   and native picker rows. Style it with `data-press-active`; never use CSS
   `:active` or Base UI's persistent toggle `data-pressed` for that feedback.
@@ -910,7 +913,7 @@ file history, conflict review and editor/picker sheets retain their workspace si
 Reminder deletion also uses `ModalLayout`, including its disabled close control
 while deletion is pending. Diagnostics uses `SharedModal` and the shared text field.
 
-`SettingsDisclosure.tsx` and `settings-disclosure.ts` provide React and native
+`ui/shared/SettingsDisclosure.tsx` and `ui/plugin/settings-disclosure.ts` provide React and native
 disclosure adapters, including an
 inline variant for dialog sections. `_native-settings.scss` owns native `Setting`
 row spacing, labels, descriptions and buttons inside shared native dialogs.

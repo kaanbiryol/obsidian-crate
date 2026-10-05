@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type CratePlugin from "@/main";
-import { attachPluginStylesheet } from "../shadowStyles";
+import { attachPluginStylesheet } from "./shadowStyles";
 
 export interface ShadowRootMount {
   shadowRoot: ShadowRoot;

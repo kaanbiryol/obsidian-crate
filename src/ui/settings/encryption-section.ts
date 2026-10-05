@@ -1,8 +1,8 @@
-import { createSettingsDisclosure } from '../shared/settings-disclosure';
-import { createModalActions } from '../shared/modal-elements';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
+import { createModalActions } from '../plugin/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
-import { SharedModal } from '../shared/SharedModal';
+import { SharedModal } from '../plugin/SharedModal';
 import { SECRET_KEYS } from '../../plugin/settings-types';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../../plugin/encryption-storage';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';

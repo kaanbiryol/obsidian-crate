@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { ModalHeader } from './ModalHeader';
-import { ThemeIconProvider } from './ThemeIcon';
+import { ModalHeader } from '../shared/ModalHeader';
+import { ThemeIconProvider } from '../shared/ThemeIcon';
 import { ObsidianIcon } from '../obsidian-icon';
 
 /** Shared React header for dialogs whose body uses Obsidian's DOM controls. */

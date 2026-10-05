@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import { SharedModal } from './shared/SharedModal';
+import { SharedModal } from './plugin/SharedModal';
 
 interface ExternalBrowserLinkOptions {
 	title: string;

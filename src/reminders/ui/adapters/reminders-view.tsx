@@ -1,7 +1,7 @@
 import { ItemView, Platform, WorkspaceLeaf, type ViewStateResult } from 'obsidian';
 import type CratePlugin from '@/main';
 import { PluginContext } from '@/reminders/ui/reminders-context';
-import { createShadowReactMount, type ShadowReactMount } from './shadowReactMount';
+import { createShadowReactMount, type ShadowReactMount } from '../../../ui/plugin/shadowReactMount';
 import { CRATE_ICON_ID } from '@/ui/crate-icon';
 import { PluginWorkspace } from '@/ui/plugin/PluginWorkspace';
 export const VIEW_TYPE_REMINDERS = "reminders-view";

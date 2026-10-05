@@ -1,4 +1,18 @@
-import type { ApiFetch } from './types';
+import type { ApiFetch, ReminderRecord, ReminderSourceIssue } from './types';
+import { isReminderList } from './reminder-storage-validation';
+import { parseReminderSourceIssues } from './reminder-source-issues';
+
+/** Validate the complete revision before either the UI or its cache accepts it. */
+export function parseReminderListResponse(value: unknown, folderPath: string): {
+	reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[];
+} | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const result = value as Record<string, unknown>;
+	const issues = parseReminderSourceIssues(result.issues);
+	if (!issues || !isReminderList(result.reminders, folderPath)
+		|| !Array.isArray(result.projects) || !result.projects.every(project => typeof project === 'string')) return null;
+	return { reminders: result.reminders, projects: result.projects, issues };
+}
 
 const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 1000;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;

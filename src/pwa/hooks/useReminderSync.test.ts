@@ -43,6 +43,47 @@ function harness() {
 }
 
 describe('PWA reminder refresh around local writes', () => {
+	it.each([
+		{}, { reminders: [] }, { projects: [] },
+		{ reminders: [null], projects: ['Inbox'] },
+		{ reminders: [reminder('one'), reminder('one')], projects: ['Inbox'] },
+		{ reminders: [reminder('one', { filePath: 'Private/Inbox.md' })], projects: ['Inbox'] },
+		{ reminders: [reminder('one', { dueDate: '2099-02-30' })], projects: ['Inbox'] },
+		{ reminders: [reminder('one')], projects: [null] },
+		{ reminders: [], projects: [], issues: 'invalid' },
+	])('preserves the confirmed snapshot and ETag after an invalid list: %j', async invalid => {
+		const { rendered, original, options, load, settle } = harness();
+		await settle(0, response([original]), load());
+		vi.mocked(saveCachedReminderSnapshot).mockClear();
+		await settle(1, new Response(JSON.stringify(invalid), { headers: { ETag: 'invalid-list' } }), load());
+		expect(rendered.current.getSnapshot()).toEqual({ reminders: [original], projects: ['Inbox'] });
+		expect(rendered.current.error).toContain('invalid reminder data');
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+		expect(loadCachedReminderSnapshot).not.toHaveBeenCalled();
+		const next = load();
+		expect(new Headers(options.apiFetch.mock.calls.at(-1)?.[1]?.headers).get('If-None-Match')).toBe('latest-list');
+		await settle(2, response([], []), next);
+		expect(rendered.current.getSnapshot()).toEqual({ reminders: [], projects: [] });
+		expect(rendered.current.error).toBeNull();
+	});
+
+	it('keeps malformed JSON out of a confirmed snapshot', async () => {
+		const { rendered, original, load, settle } = harness();
+		await settle(0, new Response('{'), load());
+		expect(rendered.current.reminders).toEqual([original]);
+		expect(rendered.current.error).toContain('invalid reminder data');
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+	});
+
+	it('reports unavailable data when the first response is invalid', async () => {
+		const { rendered, load, settle } = harness();
+		act(() => rendered.current.resetReminderState());
+		await settle(0, new Response('{}'), load());
+		expect(rendered.current.dataMode).toBe('error');
+		expect(rendered.current.lastUpdatedAt).toBeNull();
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+	});
+
 	it('retains source issues through acknowledgements and 304 until a complete read repairs them', async () => {
 		const { rendered, original, load, settle, commit } = harness();
 		const issues = [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }];

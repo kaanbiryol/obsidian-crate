@@ -1,9 +1,9 @@
-import { BaseUiModal } from './shared/BaseUiModal';
+import { BaseUiModal } from './plugin/BaseUiModal';
 import { Platform, Setting, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ExclusionSheet } from './ExclusionSheet';
-import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
+import { hideNativeModalCloseButton } from './plugin/modalShell';
 
 export class ExclusionPreviewModal extends BaseUiModal {
 	private root?: Root;

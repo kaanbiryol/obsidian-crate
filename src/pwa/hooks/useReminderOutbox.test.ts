@@ -6,16 +6,16 @@ import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, ReminderRecord } from '../types';
 import { useReminderOutbox } from './useReminderOutbox';
 
-const stored = vi.hoisted(() => ({ changes: [] as PendingReminderChange[] }));
+const stored = vi.hoisted(() => ({ changes: [] as PendingReminderChange[], initializing: undefined as Promise<void> | undefined }));
 vi.mock('../reminder-outbox-storage', () => ({
-	createReminderOutboxStorage: async () => ({
+	createReminderOutboxStorage: async () => { await stored.initializing; return {
 		load: () => structuredClone(stored.changes),
 		put: (change: PendingReminderChange) => {
 			stored.changes = [...stored.changes.filter(item => item.operationId !== change.operationId), structuredClone(change)];
 		},
 		remove: (id: string) => { stored.changes = stored.changes.filter(item => item.operationId !== id); },
 		quarantined: () => [], acceptsKey: () => false,
-	}),
+	}; },
 	createReminderRecoveryStorage: async () => ({ load: () => [], quarantined: () => [], acceptsKey: () => false }),
 }));
 vi.mock('../reminder-settlement', () => ({ createReminderSettlementChannel: async () => ({ publish: vi.fn() }) }));
@@ -33,7 +33,30 @@ function confirmed(notificationWarning?: string) {
 }
 beforeEach(() => {
 	stored.changes = [];
+	stored.initializing = undefined;
 	vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: string, work: () => Promise<void>) => work() } });
+});
+
+it('does not replace a new folder outbox when the old initialization finishes', async () => {
+	const old = deferred<void>();
+	stored.initializing = old.promise;
+	const options = {
+		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch: vi.fn<ApiFetch>(), showToast: vi.fn(),
+		beginLocalMutation: () => () => {}, commitReminderState: async () => {},
+		getSnapshot: () => ({ reminders: [], projects: [] }), loadReminders: vi.fn(),
+	};
+	const rendered = renderHook(() => useReminderOutbox(options));
+	expect(rendered.current.ready).toBe(false);
+	stored.initializing = undefined;
+	options.folderPath = 'New folder';
+	rendered.rerender();
+	await act(async () => {});
+	const current = rendered.current.outboxRef.current;
+	expect(rendered.current.ready).toBe(true);
+	await act(async () => old.resolve());
+	expect(rendered.current.outboxRef.current).toBe(current);
+	rendered.unmount();
+	expect(options.apiFetch).not.toHaveBeenCalled();
 });
 afterEach(() => vi.useRealTimers());
 async function harness(path = '/reminders/create', online = true) {
