@@ -473,6 +473,12 @@ Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extracti
 
 `encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract and exact setting destinations; `encryption-folder-moves.ts` runs conversion and recovery through `SyncRuntime`'s existing configuration serialization.
 
+`sync/encryption-conversion.ts` owns conversion sequencing, progress, server
+acknowledgments and activation. `encryption-conversion-content.ts` authenticates
+original or interrupted file bytes and prepares encrypted receipts with their
+existing folder audience. These transformations run without network or storage
+access, so integrity failures and receipt isolation can be tested directly.
+
 Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
 
 App key approval separates the cryptographic state machine (`encryption/pairing/`)
