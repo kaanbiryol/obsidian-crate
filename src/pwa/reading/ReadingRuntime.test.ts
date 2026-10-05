@@ -6,7 +6,7 @@ import { createSettingsStore } from '../settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
 import { READING_SESSION_KEY, readReadingCache, readReadingDraft, readingLock, writeValue, type ReadingSession } from './storage';
-import type { ReadingCommand } from './outbox';
+import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
 
 vi.mock('../shared-features', () => ({ useSharedFeatures: () => ({ reading: true }) }));
@@ -62,6 +62,25 @@ const commands: ReadingCommand[] = [
   { action: 'update', intent: { id: 'article', before: { favorite: false }, changes: { favorite: true } } },
   { action: 'retry', intent: { id: 'article' } },
 ];
+it.each([
+  { reason: 'the retry budget is exhausted', attempts: 3 },
+  { reason: 'the change needs review', review: true, error: undefined },
+  { reason: 'automatic retry is unavailable', retryAt: undefined },
+])('announces a failed change only when $reason', async ({ reason: _reason, ...terminal }) => {
+  const h = await harness();
+  const retryable: PendingReading = { ...commands[0]!, id: 'change', sessionId: session.id,
+    error: 'Temporarily unavailable', attempts: 1, retryAt: Date.now() + 2_000 };
+  act(() => { h.hook.current.connection.publishPending(session, [retryable]); });
+  expect(showToast).not.toHaveBeenCalled();
+  expect(h.store.getSnapshot().reading).toMatchObject({ retryAt: retryable.retryAt, status: { state: 'error' } });
+
+  act(() => { h.hook.current.connection.publishPending(session, [{ ...retryable, ...terminal }]); });
+  expect(h.store.getSnapshot().reading?.retryAt).toBe(Infinity);
+  expect(showToast).toHaveBeenCalledExactlyOnceWith('error', 'Reading changes need attention. Review them in settings.');
+  h.hook.rerender();
+  expect(showToast).toHaveBeenCalledOnce();
+});
+
 it.each(commands)('blocks reload while a $action command waits for storage and then publishes its durable queue', async command => {
   const h = await harness();
   let pending!: ReturnType<typeof h.hook.current.queueChange>;

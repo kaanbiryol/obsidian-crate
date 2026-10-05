@@ -18,10 +18,18 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function change(kind: PendingReminderChange['kind'], update: Partial<PendingReminderChange> = {}): PendingReminderChange {
-	return { kind, operationId: crypto.randomUUID(), recordId: before.id, previous: before,
-		path: '/reminders/update', method: 'POST', body: JSON.stringify({ expectedRevision: before.revision }),
-		status: 'pending', attempts: 0, retryAt: 0, ...update };
+function change(kind: PendingReminderChange['kind'],
+	update: Partial<Pick<PendingReminderChange, 'body' | 'previous' | 'project' | 'orderedIds'>> = {}): PendingReminderChange {
+	const { project = 'Inbox', orderedIds = ['two', 'one'], ...overrides } = update;
+	const state = { operationId: crypto.randomUUID(), previous: before,
+		body: JSON.stringify({ expectedRevision: before.revision }),
+		status: 'pending' as const, attempts: 0, retryAt: 0, ...overrides };
+	switch (kind) {
+		case 'save': return { ...state, kind, recordId: before.id, method: 'POST', path: '/reminders/update' };
+		case 'complete': return { ...state, kind, recordId: before.id, method: 'POST', path: '/reminders/set-completed' };
+		case 'delete': return { ...state, kind, recordId: before.id, method: 'DELETE', path: '/reminders/delete' };
+		case 'reorder': return { ...state, kind, project, orderedIds, method: 'POST', path: '/reminders/reorder' };
+	}
 }
 
 describe('confirmed reminder changes between tabs', () => {

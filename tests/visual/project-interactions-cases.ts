@@ -41,9 +41,9 @@ export function registerProjectInteractionTests() {
       await expect(page.getByRole('status', { name: 'Selected project' })).toHaveText('Project 36');
     });
 
-    for (const placement of ['top', 'bottom']) test(`${host}: autocomplete ${placement} stays inside its boundary and scrolls only suggestions`, async ({ page }) => {
+    for (const theme of ['light', 'dark']) for (const placement of ['top', 'bottom']) test(`${host} ${theme}: autocomplete ${placement} stays inside its boundary and scrolls only suggestions`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 640 });
-      await page.goto(`/?host=${host}&scene=project-interactions&mode=autocomplete&placement=${placement}`);
+      await page.goto(`/?host=${host}&theme=${theme}&scene=project-interactions&mode=autocomplete&placement=${placement}`);
       const input = page.getByRole('textbox', { name: 'Reminder title', exact: true });
       await expect(input).toBeVisible();
       await page.getByTestId('picker-ancestor').evaluate(el => { el.scrollTop = 96; });
@@ -62,6 +62,9 @@ export function registerProjectInteractionTests() {
       for (let i = 0; i < 9; i++) await input.press('ArrowDown');
       const last = suggestions.getByRole('option').last();
       await expect(last).toHaveAttribute('aria-selected', 'true');
+      await expect(last).toHaveCSS('box-shadow', 'none');
+      expect(await last.evaluate(el => getComputedStyle(el).backgroundColor))
+        .not.toBe(await suggestions.getByRole('option').first().evaluate(el => getComputedStyle(el).backgroundColor));
       await expectOptionVisible(last, suggestions);
       expect(await suggestions.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
       expect(await scrollPosition(page)).toEqual(before);
@@ -76,16 +79,46 @@ export function registerProjectInteractionTests() {
     });
   }
 
-  test('plugin: a foreground project picker protects the retained editor and restores it after selection', async ({ page }) => {
-    await page.setViewportSize({ width: 960, height: 800 });
+  test('plugin: the title takes focus on the opening frames of an animated editor', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/?host=plugin&scene=project-interactions&mode=overlay&closed=1&motion=1');
+    const opener = page.getByRole('button', { name: 'Open reminder editor', exact: true });
+    await opener.focus();
+    const focused = await opener.evaluate(async button => {
+      const root = button.getRootNode() as ShadowRoot;
+      (button as HTMLElement).click();
+      // React mounts the portal before the editor's next-paint focus request.
+      for (let frame = 0; frame < 6; frame++) {
+        await new Promise(requestAnimationFrame);
+        const title = root.querySelector('[role="textbox"][aria-label="Reminder title"]');
+        if (title) {
+          await new Promise(requestAnimationFrame);
+          return root.activeElement === title;
+        }
+      }
+      return false;
+    });
+    expect(focused).toBe(true);
+    await page.getByRole('button', { name: 'Close reminder editor' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
+  for (const width of [320, 960]) test(`plugin ${width}: a foreground project picker protects the retained editor and restores it after selection`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
     await page.goto('/?host=plugin&scene=project-interactions&mode=overlay');
     const input = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+    await expect(input).toBeFocused();
     await input.click();
     await input.pressSequentially('Keep this reminder');
     await expect(input).toHaveText('Keep this reminder');
     await page.getByRole('button', { name: /Project 18/ }).click();
     const selected = page.getByRole('option', { name: 'Project 18', exact: true });
     await expect(selected).toBeVisible();
+    const picker = (await page.getByRole('dialog', { name: 'Select project', exact: true }).boundingBox())!;
+    expect(picker.width).toBeLessThanOrEqual(380);
+    expect(picker.x).toBeGreaterThanOrEqual(20);
+    expect(picker.x + picker.width).toBeLessThanOrEqual(width - 20);
     await selected.focus();
     await expect(selected).toBeFocused();
     await page.keyboard.press('ArrowDown');

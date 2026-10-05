@@ -9,25 +9,23 @@ import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
-import { loadEncryptionKeys, saveEncryptionKeys } from '../plugin/encryption-storage';
+import { loadEncryptionKeys } from '../plugin/encryption-storage';
 import { runEncryptionReset } from './runtime-encryption-reset-workflow';
 import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './runtime-address-workflow';
+import { changeServerConnection, disconnectServerConnection } from './runtime-connection-workflow';
 import type { EncryptionServerState } from '../encryption/server-state';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
-import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from './worker-url';
 import { buildDiagnosticExport } from './diagnostic-export';
 import {
-	applyInfrastructureConfigState,
 	buildSharedSettings,
-	clearSyncConfigurationState,
 	deleteManifestFile,
 	type ApplyInfrastructureConfigInput,
 } from './runtime-config';
-import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
+import { recordSyncHistory } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
 import { RuntimeServerStatus } from './runtime-server-status';
@@ -497,56 +495,22 @@ export class SyncRuntime {
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal, expected?: ApplyInfrastructureConfigInput): Promise<void> {
-		return this.changeConfiguration(async () => {
-			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before changing this device’s connection.');
-			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this device’s connection.');
-			signal?.throwIfAborted();
-			if (expected && (this.settings.workerUrl !== expected.workerUrl || this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken)) {
-				throw new Error('The server connection changed. Reopen settings and try again.');
-			}
-			const workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
-			if (!config.authToken.trim()) throw new Error('Auth token is required');
-			const changingServer = workerUrl !== normalizeWorkerUrl(this.settings.workerUrl);
-			this.destroy();
-			const revision = this.initializationRevision;
-			await this.stoppingWork;
-			this.assertTransitionActive(revision, signal);
-			if (changingServer) await deleteManifestFile(this.plugin, signal);
-			this.assertTransitionActive(revision, signal);
-			applyInfrastructureConfigState(this.settings, this.secretStorage, { ...config, workerUrl });
-			if (config.encryption) saveEncryptionKeys(this.secretStorage, config.encryption.bundle, config.encryption.recovery);
-			if (changingServer) resetStoredSyncState(this.settings);
-			await this.persistSettings();
-			this.assertTransitionActive(revision, signal);
-			await this.initialize({ skipStartupSync: true });
-		});
+		const context = this.connectionWorkflowContext(signal);
+		return this.changeConfiguration(() => changeServerConnection(context, config, expected));
 	}
 
 	async clearSyncConfiguration(signal?: AbortSignal): Promise<void> {
-		return this.changeConfiguration(async () => {
-			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before disconnecting this device.');
-			if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before disconnecting this device.');
-			signal?.throwIfAborted();
-			const api = this.apiClient;
-			this.destroy();
-			const revision = this.initializationRevision;
-			await this.stoppingWork;
-			this.assertTransitionActive(revision, signal);
-			try {
-				// The stopped engine aborted this client. Revocation is a separate,
-				// explicitly requested operation after all old work has settled.
-				api?.setAbortSignal(signal ?? new AbortController().signal);
-				await api?.revokeCurrentToken();
-			} catch (error) {
-				logger.warn('Failed to revoke the current device credential:', error);
-			}
-			this.assertTransitionActive(revision, signal);
-			await deleteManifestFile(this.plugin, signal);
-			this.assertTransitionActive(revision, signal);
-			resetStoredSyncState(this.settings);
-			clearSyncConfigurationState(this.settings, this.secretStorage);
-			await this.persistSettings();
-		});
+		const context = this.connectionWorkflowContext(signal);
+		return this.changeConfiguration(() => disconnectServerConnection(context, signal));
+	}
+
+	private connectionWorkflowContext(signal?: AbortSignal) {
+		// Capture authority before queuing, including callers without a signal.
+		return {
+			settings: this.settings, secretStorage: this.secretStorage, api: this.apiClient,
+			transition: this.configurationTransition(signal), persistSettings: this.persistSettings,
+			clearLocalState: () => deleteManifestFile(this.plugin, signal),
+		};
 	}
 
 	updateSyncSettings(): void {

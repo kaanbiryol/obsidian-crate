@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import { ReminderSyncNotice } from './ReminderSyncNotice';
 
-function change(patch: Partial<PendingReminderChange> = {}): PendingReminderChange {
+type SaveChange = Extract<PendingReminderChange, { kind: 'save' }>;
+function change(patch: Partial<SaveChange> = {}): SaveChange {
 	return {
-		operationId: 'operation', kind: 'save', status: 'failed', path: '/reminders/create',
+		operationId: 'operation', recordId: 'reminder', kind: 'save', status: 'failed', path: '/reminders/create',
 		method: 'POST', body: '{}', attempts: 1, retryAt: 0,
 		optimistic: { id: 'reminder', content: 'Buy milk', description: 'Two cartons', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md' },
 		...patch,
@@ -37,7 +38,7 @@ describe('PWA reminder sync recovery notice', () => {
 	});
 
 	it('offers retry and dismissal for a reverted deletion', () => {
-		const markup = render([change({ kind: 'delete' })]);
+		const markup = render([{ ...change(), kind: 'delete', method: 'DELETE', path: '/reminders/delete' }]);
 		expect(markup).toContain('Couldn’t delete reminder: Buy milk');
 		expect(markup).toContain('aria-label="Dismiss: Buy milk"');
 		expect(markup).not.toContain('>Discard</button>');

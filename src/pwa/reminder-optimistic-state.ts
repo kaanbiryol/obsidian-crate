@@ -42,7 +42,7 @@ export function applyReminderChanges(reminders: ReminderRecord[], projects: stri
 		if (change.reviewRequired) continue;
 		if (change.status === 'failed' && change.kind !== 'save') continue;
 		if (change.kind === 'delete') visibleReminders = visibleReminders.filter(item => item.id !== change.recordId);
-		else if (change.kind === 'reorder') visibleReminders = reorderProjectReminders(visibleReminders, change.project!, change.orderedIds!);
+		else if (change.kind === 'reorder') visibleReminders = reorderProjectReminders(visibleReminders, change.project, change.orderedIds);
 		else if (change.optimistic) {
 			visibleReminders = mergeReminderRecord(visibleReminders, change.optimistic);
 			visibleProjects = mergeProject(visibleProjects, change.optimistic.project);

@@ -16,7 +16,7 @@ function reminder(id = 'one'): ReminderRecord {
 		filePath: 'Reminders/Inbox.md', priority: 4, completed: false };
 }
 
-function completion(id = 'one'): PendingReminderChange {
+function completion(id = 'one'): Extract<PendingReminderChange, { kind: 'complete' }> {
 	const previous = reminder(id);
 	const operationId = crypto.randomUUID();
 	return { operationId, kind: 'complete', recordId: id, previous,
@@ -26,7 +26,7 @@ function completion(id = 'one'): PendingReminderChange {
 			expectedRevision: previous.revision, completed: true }) };
 }
 
-function save(): PendingReminderChange {
+function save(): Extract<PendingReminderChange, { kind: 'save' }> {
 	const change = completion();
 	return { ...change, kind: 'save', path: '/reminders/create', previous: undefined,
 		optimistic: { ...reminder(), content: 'My draft', description: 'Preserve these details' },

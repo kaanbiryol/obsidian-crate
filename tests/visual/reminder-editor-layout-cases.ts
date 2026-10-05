@@ -17,6 +17,46 @@ async function replaceText(page: Page, field: Locator, text: string) {
 export function registerReminderEditorLayoutTests() {
   for (const host of ['plugin', 'pwa']) {
     for (const theme of ['light', 'dark']) {
+      test(`${host} ${theme}: selecting and pressing a chip changes color without scaling its surface`, async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.goto(`/?host=${host}&theme=${theme}&scene=editor&shadow=1`);
+        const priority = page.locator('[data-action="toggle-priority"]');
+        await priority.click();
+        await page.mouse.move(0, 0);
+        await expect(priority).toHaveAttribute('aria-pressed', 'false');
+        const neutral = await page.locator('[data-picker="date"]').evaluate(el => getComputedStyle(el).color);
+        await expect(priority).toHaveCSS('color', neutral);
+        const before = (await priority.boundingBox())!;
+        const samples = await priority.evaluate(async element => {
+          (element as HTMLElement).click();
+          const samples = [];
+          for (let frame = 0; frame < 15; frame++) {
+            await new Promise(requestAnimationFrame);
+            const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+            const box = element.getBoundingClientRect();
+            samples.push({ scaleX: transform.a, scaleY: transform.d, width: box.width, height: box.height });
+          }
+          return samples;
+        });
+        await expect(priority).toHaveAttribute('aria-pressed', 'true');
+        await expect(priority).not.toHaveCSS('color', neutral);
+        for (const sample of samples) {
+          expect(sample.scaleX).toBe(1);
+          expect(sample.scaleY).toBe(1);
+          expect(Math.abs(sample.width - before.width)).toBeLessThan(1);
+          expect(Math.abs(sample.height - before.height)).toBeLessThan(1);
+        }
+        const selectedColor = await priority.evaluate(el => getComputedStyle(el).color);
+        await priority.hover();
+        await expect(priority).toHaveCSS('color', selectedColor);
+        await page.mouse.down();
+        await expect(priority).toHaveCSS('transform', 'none');
+        await page.mouse.up();
+        await page.mouse.move(0, 0);
+        await expect(priority).toHaveAttribute('aria-pressed', 'false');
+        await expect(priority).toHaveCSS('color', neutral);
+      });
+
       for (const width of [320, 390, 960]) {
         test(`${host} ${theme} ${width}: editor stays aligned and contains long fields`, async ({ page }) => {
           await page.setViewportSize({ width, height: 844 });

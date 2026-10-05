@@ -227,7 +227,7 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.lastSeq).toBe(0);
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
-		expect(initialize).toHaveBeenCalledWith({ skipStartupSync: true });
+		expect(initialize).toHaveBeenCalledWith({ skipStartupSync: true, resumeEncryptionReset: false });
 	});
 
 	it('clears sync state when clearing configuration', async () => {

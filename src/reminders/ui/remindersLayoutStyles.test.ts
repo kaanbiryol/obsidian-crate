@@ -97,30 +97,6 @@ describe('plugin reminder layout styles', () => {
     expect(cardStyles).not.toContain('min-height: 80px');
   });
 
-  it('isolates drag lift from row layout and completion motion', async () => {
-    const primaryStyles = await readFile(
-      new URL('./shared/styles/_primary-screen.scss', import.meta.url),
-      'utf8',
-    );
-    const reorderableComponent = await readFile(
-      new URL('../components/ReorderableReminderList.tsx', import.meta.url),
-      'utf8',
-    );
-
-    expect(reorderableComponent).toContain('dragMomentum={false}');
-    expect(reorderableComponent).toContain('className="reminder-drag-surface"');
-    expect(reorderableComponent).toContain('REMINDER_DRAG_SCALE');
-    const row = reorderableComponent.match(/<Reorder.Item([\s\S]*?)>/)?.[1];
-    expect(row).not.toContain('scale:');
-    expect(reorderableComponent).not.toContain('layoutId=');
-    expect(primaryStyles).toContain(
-      '.reorderable-reminder-item[data-reorder-interaction="drag"]',
-    );
-    expect(primaryStyles).toContain(
-      '.premium-reminder-card[data-press-active] .premium-reminder-content {\n        transform: none;',
-    );
-  });
-
   it('uses restrained Linear-style highlight and selection states for plugin cards', async () => {
     const interactionStyles = await readFile(
       new URL('./reminders-view/_card-interactions.scss', import.meta.url),

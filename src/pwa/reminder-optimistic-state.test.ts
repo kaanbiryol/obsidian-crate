@@ -8,9 +8,15 @@ function reminder(id: string, overrides: Partial<ReminderRecord> = {}): Reminder
 		filePath: 'Reminders/Inbox.md', revision: `revision-${id}`, ...overrides };
 }
 
-function change(kind: PendingReminderChange['kind'], recordId: string, overrides: Partial<PendingReminderChange> = {}): PendingReminderChange {
-	return { operationId: crypto.randomUUID(), kind, recordId, status: 'pending', path: '/reminders/update',
-		method: 'POST', body: '{}', attempts: 0, retryAt: 0, ...overrides };
+function change(kind: 'save' | 'complete' | 'delete', recordId: string,
+	overrides: Partial<Pick<PendingReminderChange, 'status' | 'optimistic' | 'previous' | 'ambiguous' | 'reviewRequired'>> = {}): PendingReminderChange {
+	const state = { operationId: crypto.randomUUID(), recordId, status: 'pending' as const,
+		body: '{}', attempts: 0, retryAt: 0, ...overrides };
+	switch (kind) {
+		case 'save': return { ...state, kind, method: 'POST', path: '/reminders/update' };
+		case 'complete': return { ...state, kind, method: 'POST', path: '/reminders/set-completed' };
+		case 'delete': return { ...state, kind, method: 'DELETE', path: '/reminders/delete' };
+	}
 }
 
 describe('optimistic reminder projection', () => {

@@ -1,5 +1,4 @@
 import React from 'react';
-import { readFile } from 'node:fs/promises';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
@@ -84,24 +83,6 @@ describe('reminder editor chrome', () => {
         }
     });
 
-    it('focuses the title on the next paint instead of waiting for the opening animation', async () => {
-        const presentation = await readFile(
-            new URL('./useReminderModalPresentation.ts', import.meta.url),
-            'utf8',
-        );
-        const modal = await readFile(
-            new URL('./AddReminderModal.tsx', import.meta.url),
-            'utf8',
-        );
-
-        expect(modal).toContain('const focusDelayMs = 0');
-        expect(presentation).toContain("currentView !== 'main'");
-        expect(presentation).toContain('window.requestAnimationFrame');
-        expect(presentation).toContain('isObsidianOverlayActive(element)');
-        expect(presentation).toContain('input.focus()');
-        expect(presentation).toContain('window.cancelAnimationFrame(frame)');
-    });
-
     it('uses sentence case and an explicit save action', () => {
         const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
             isEditing: true,
@@ -155,28 +136,6 @@ describe('reminder editor chrome', () => {
         expect(markup.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
         expect(markup).toContain('aria-pressed="false"');
         expect(markup).not.toContain('data-icon="chevron-down"');
-    });
-
-    it('uses a single CSS transition when an action chip becomes selected', async () => {
-        const component = await readFile(
-            new URL('./ReminderActionChips.tsx', import.meta.url),
-            'utf8',
-        );
-        const styles = await readFile(
-            new URL('../shared/styles/_editor-actions.scss', import.meta.url),
-            'utf8',
-        );
-        const actionChipStyles = styles.match(
-            /^\.reminder-action-chip \{([\s\S]*?)^\}/m,
-        )?.[1];
-
-        expect(component).not.toContain('motion.');
-        expect(component).not.toContain('ShadowDOMMotionButton');
-        expect(component).not.toContain('dueDateChanged');
-        expect(component).not.toContain('projectChanged');
-        expect(actionChipStyles).toBeDefined();
-        expect(actionChipStyles).toContain('&:hover:not(.is-active)');
-        expect(actionChipStyles).not.toContain('transform: scale(0.97)');
     });
 
     it('offers removal actions for an existing schedule and recurrence', () => {

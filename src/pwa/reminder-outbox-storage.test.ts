@@ -5,7 +5,7 @@ import type { PendingReminderChange } from './reminder-outbox-types';
 let values: Map<string, string>;
 let storage: Storage;
 
-function change(operationId = crypto.randomUUID(), folderPath = 'Reminders'): PendingReminderChange {
+function change(operationId = crypto.randomUUID(), folderPath = 'Reminders'): Extract<PendingReminderChange, { kind: 'complete' }> {
 	return {
 		operationId, kind: 'complete', recordId: 'reminder', status: 'uncertain',
 		path: '/reminders/set-completed', method: 'POST', attempts: 1, retryAt: 1000,
@@ -119,7 +119,7 @@ describe('durable reminder outbox storage', () => {
 		original.body = JSON.stringify({ operationId: original.operationId, folderPath: 'Reminders', id: original.recordId,
 			content: 'Keep my draft', project: 'Inbox' });
 		outbox.put(original);
-		const restored = { ...original, path: '/reminders/create', recordId: original.operationId,
+		const restored: PendingReminderChange = { ...original, path: '/reminders/create', recordId: original.operationId,
 			status: 'pending' as const, body: original.body.replace('"id":"reminder"', `"id":"${original.operationId}"`) };
 		outbox.put(restored);
 		expect(outbox.load()).toEqual([restored]);

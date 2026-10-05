@@ -142,13 +142,16 @@ ordered provisioning workflow. `cloudflare/plugin-integration.ts` coordinates
 the operation and device connection; `ui/cloudflare-operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
 
+`sync/runtime-connection-workflow.ts` owns connecting and disconnecting, including
+validation, credential revocation, local state cleanup and settings persistence.
 `sync/runtime-encryption-reset-workflow.ts` owns the durable remote reset, local
 invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verified
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
-Encryption setup captures that authority before entering the configuration queue
-and checks it after draining and conversion, so shutdown cannot restart sync.
+Connection changes and encryption setup capture that authority before entering
+the configuration queue and check it after asynchronous work. Shutdown invalidates
+queued operations even when the caller supplies no cancellation signal.
 `sync/engine-contexts.ts` binds planners and transfers directly to their dependencies.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
@@ -211,6 +214,9 @@ before the hooks publish them or the queue dispatches them. `reading/outbox.ts` 
 typed commands, exact dispatch bytes, dependent-edit ordering and retry eligibility;
 automatic refreshes honor the persisted deadline and three-attempt budget, while an
 explicit refresh can retry uncertain commands. Rejected commands remain for review.
+Settings deadlines and failure announcements use the same outbox policy: transient
+errors remain visible, while toasts wait until automatic recovery stops or review
+is required.
 The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
 
@@ -338,6 +344,9 @@ cannot import plugin or sync implementation modules; ESLint enforces this bounda
 connectivity and timer wakeups honor the stored deadline and attempt budget.
 Explicit retry and earlier-session recovery reset that budget while retaining the
 operation identity and request bytes.
+`PendingReminderChange` ties each command kind to its required fields, HTTP method
+and endpoint. Storage validation remains the boundary for persisted records; the
+type does not reconstruct saved commands or change their request bytes.
 
 `pwa/reminder-outbox-events.ts` groups browser wakeups and cross-tab confirmation
 listeners under one subscription lifetime. `useReminderOutbox` retains queue

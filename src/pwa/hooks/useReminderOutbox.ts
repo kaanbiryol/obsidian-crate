@@ -73,7 +73,7 @@ export function useReminderOutbox(options: {
 						reminders = mergeReminderRecord(reminders, result.reminder);
 						projects = mergeProject(projects, result.reminder.project);
 					} else if (change.kind === 'delete') reminders = reminders.filter(item => item.id !== change.recordId);
-					else if (change.kind === 'reorder') reminders = reorderProjectReminders(reminders, change.project!, change.orderedIds!);
+					else if (change.kind === 'reorder') reminders = reorderProjectReminders(reminders, change.project, change.orderedIds);
 					await current.commitReminderState(reminders, projects);
 					if (isCurrent()) settlement.publish(change, result);
 					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);

@@ -77,7 +77,7 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	const outbox = await createReminderOutboxStorage('new-session', 'Reminders');
 	const operationId = crypto.randomUUID();
 	const change = { operationId, kind: 'complete' as const, recordId: 'reminder', status: 'pending' as const,
-		path: '/reminders/set-completed', method: 'POST' as const, attempts: 0, retryAt: 0,
+		path: '/reminders/set-completed' as const, method: 'POST' as const, attempts: 0, retryAt: 0,
 		body: JSON.stringify({ operationId, folderPath: 'Reminders', id: 'reminder', completed: true }) };
 	outbox.put(change);
 	expect(outbox.load()).toEqual([change]);

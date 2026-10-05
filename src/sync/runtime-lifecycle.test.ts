@@ -15,6 +15,52 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime teardown and reinitialization', () => {
+	it.each(['connect', 'disconnect'] as const)('rejects %s after destruction before its queued work starts, without a caller signal', async action => {
+		const { runtime, settings, secretStorage, persistSettings, plugin } = createRuntimeHarness({ lastSeq: 42 });
+		const initialize = vi.spyOn(runtime, 'initialize');
+		const pending = action === 'connect'
+			? runtime.applyInfrastructureConfig({ workerUrl: 'https://new.example', authToken: 'new-token' })
+			: runtime.clearSyncConfiguration();
+		runtime.destroy();
+
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+		expect(settings.workerUrl).toBe('https://worker.example');
+		expect(settings.lastSeq).toBe(42);
+		expect(secretStorage.set).not.toHaveBeenCalled();
+		expect(secretStorage.delete).not.toHaveBeenCalled();
+		expect(plugin.app.vault.adapter.remove).not.toHaveBeenCalled();
+		expect(persistSettings).not.toHaveBeenCalled();
+		expect(initialize).not.toHaveBeenCalled();
+	});
+
+	it.each(['connect', 'disconnect'] as const)('rejects %s waiting behind a cancelled configuration operation', async action => {
+		const { runtime, settings, secretStorage, persistSettings } = createRuntimeHarness({ lastSeq: 42 });
+		const converted = createDeferred<void>();
+		const operation = vi.fn(() => converted.promise);
+		const setup = runtime.runEncryptionSetup(operation);
+		await vi.waitFor(() => expect(operation).toHaveBeenCalledOnce());
+		const pending = action === 'connect'
+			? runtime.applyInfrastructureConfig({ workerUrl: 'https://new.example', authToken: 'new-token' })
+			: runtime.clearSyncConfiguration();
+		const settled = Promise.allSettled([setup, pending]);
+		runtime.destroy();
+		converted.resolve();
+
+		for (const result of await settled) {
+			expect(result.status).toBe('rejected');
+			if (result.status === 'rejected') expect(result.reason).toMatchObject({ name: 'AbortError' });
+		}
+		expect(settings.workerUrl).toBe('https://worker.example');
+		expect(settings.lastSeq).toBe(42);
+		expect(secretStorage.set).not.toHaveBeenCalled();
+		expect(secretStorage.delete).not.toHaveBeenCalled();
+		expect(persistSettings).not.toHaveBeenCalled();
+
+		await runtime.applyInfrastructureConfig({ workerUrl: 'https://next.example', authToken: 'next-token' });
+		expect(settings.workerUrl).toBe('https://next.example');
+		expect(runtime.isInitialized()).toBe(true);
+	});
+
 	it('rejects a stale address update before stopping or changing a newer connection', async () => {
 		const { runtime, settings, persistSettings } = createRuntimeHarness({ lastSeq: 42 });
 		const destroy = vi.spyOn(runtime, 'destroy');

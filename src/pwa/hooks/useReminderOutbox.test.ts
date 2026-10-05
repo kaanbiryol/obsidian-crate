@@ -59,7 +59,7 @@ it('does not replace a new folder outbox when the old initialization finishes', 
 	expect(options.apiFetch).not.toHaveBeenCalled();
 });
 afterEach(() => vi.useRealTimers());
-async function harness(path = '/reminders/create', online = true) {
+async function harness(path: Extract<PendingReminderChange, { kind: 'save' }>['path'] = '/reminders/create', online = true) {
 	Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
 	const response = deferred<Response>();
 	const apiFetch = vi.fn<ApiFetch>(() => response.promise);
@@ -80,7 +80,7 @@ async function harness(path = '/reminders/create', online = true) {
 	return { rendered, response, apiFetch, showToast, commitReminderState, draining };
 }
 
-it.each([['/reminders/create', 'Reminder created'], ['/reminders/update', 'Reminder updated']])(
+it.each([['/reminders/create', 'Reminder created'], ['/reminders/update', 'Reminder updated']] as const)(
 	'waits for server confirmation and local commit for %s', async (path, message) => {
 		const state = await harness(path);
 		expect(state.apiFetch).toHaveBeenCalledOnce();

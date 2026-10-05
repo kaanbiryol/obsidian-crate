@@ -533,8 +533,9 @@ checks project pickers and autocomplete using the compiled host styles in plugin
 Shadow DOM and the PWA document. It covers selected-row centering, wheel scroll
 containment, synthetic touch-event propagation, keyboard navigation, dropdown
 placement, and selection/focus restoration through the real plugin editor overlay.
-The unit style test retains theme-token assertions; interaction coverage does not
-depend on component source text. Physical touch scrolling still requires a device.
+It also checks title focus during opening, picker width at 320px and desktop sizes,
+and applied autocomplete selection colors in both themes. Interaction coverage does
+not depend on component source text. Physical touch scrolling still requires a device.
 
 After building the plugin styles, run
 `node scripts/visual-test-run.mjs tests/visual/reminder-editor-layout.spec.ts tests/visual/reminder-editor-layout-webkit.spec.ts --workers=2`
@@ -542,11 +543,18 @@ for editor geometry in both hosts. Chromium and WebKit check header alignment,
 title/description hierarchy, compact spacing and long-field scrolling at 320px,
 390px and desktop widths in light and dark themes. They also check placeholders,
 disabled submission, inline marker geometry, property colors, and the delete
-action's hover and keyboard states using the production reminder header. Picker
+action's hover and keyboard states using the production reminder header. Chip
+selection and pressing must change color without scaling the surface. Picker
 checks cover native date/time inputs, selected rows and keyboard focus at narrow
 and desktop widths.
 These replace the corresponding SCSS text checks; token and scoping conventions
 remain covered by source assertions.
+
+`node scripts/visual-test-run.mjs tests/visual/reminder-list-style.spec.ts tests/visual/reminder-list-style-webkit.spec.ts --workers=2`
+checks the shared list presentation and animated mouse reordering in both hosts.
+The drag surface lifts while row geometry stays unchanged, releasing commits the
+order without opening a reminder, and the next click still opens it. This replaces
+source checks for Motion props and drag wrappers.
 
 `node scripts/activity-empty-layout-test.mjs` mounts the production activity and
 conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check

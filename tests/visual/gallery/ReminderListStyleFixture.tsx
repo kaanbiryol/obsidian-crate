@@ -31,6 +31,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
   const [reminders, setReminders] = useState(sampleReminders);
   const [edited, setEdited] = useState('');
   const [openedProject, setOpenedProject] = useState('');
+  const [committedOrder, setCommittedOrder] = useState<string[]>([]);
   const render = (reminder: Reminder, index: number) => <WebReminderCard reminder={reminder} index={index} hideProject={false}
     listStyle={preferences.reminderListStyle} onEdit={setEdited}
     onToggleComplete={id => setReminders(items => items.map(item => item.id === id ? { ...item, completed: !item.completed } : item))} />;
@@ -38,6 +39,7 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
     <ListStyleSetting preferences={preferences} onPreferencesChange={updatePreferences} />
     <output aria-label="Edited reminder">{edited}</output>
     <output aria-label="Opened project">{openedProject}</output>
+    <output aria-label="Committed order">{committedOrder.join(',')}</output>
     <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}>
       <TodayView reminders={reminders} renderCard={render} animationConfig={{ enabled: false }} hasFab={false} />
     </div>
@@ -51,7 +53,8 @@ export function ReminderListStyleFixture({ host }: { host: 'plugin' | 'pwa' }) {
       </section>)}
     </div>
     <div className="reminders-view is-primary" data-testid="reorderable-list">
-      <ReorderableReminderList reminders={reminders} onReorder={setReminders} onReorderCommit={() => {}} renderCard={render} animationsEnabled={false} />
+      <ReorderableReminderList reminders={reminders} onReorder={setReminders} onReorderCommit={setCommittedOrder} renderCard={render}
+        animationsEnabled={new URLSearchParams(location.search).has('motion')} />
     </div>
     <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`} data-list-style={preferences.reminderListStyle} data-testid="projects-list" style={{ height: 600 }}>
       <BrowseView projects={['Product launch', 'Personal', 'Personal/Finance', 'Personal/Health/Visits', 'Work']}

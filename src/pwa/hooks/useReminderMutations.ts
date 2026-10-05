@@ -67,14 +67,15 @@ export function useReminderMutations(options: {
 		const previous = getSnapshot().reminders.find(item => item.id === id);
 		if (!previous) throw new Error('Refresh reminders before changing this reminder.');
 		const operationId = await newReminderOperationId();
-		return {
-			operationId, recordId: id, kind, previous, optimistic,
-			path: kind === 'delete' ? '/reminders/delete' : '/reminders/set-completed',
-			method: kind === 'delete' ? 'DELETE' : 'POST',
+		const change = {
+			operationId, recordId: id, previous, optimistic,
 			body: JSON.stringify({ folderPath: config.folderPath, id, operationId,
 				filePath: filePath ?? previous.filePath, expectedRevision: expectedRevision ?? previous.revision, ...extra }),
-			status: 'pending', attempts: 0, retryAt: 0,
+			status: 'pending' as const, attempts: 0, retryAt: 0,
 		};
+		return kind === 'delete'
+			? { ...change, kind, path: '/reminders/delete', method: 'DELETE' }
+			: { ...change, kind, path: '/reminders/set-completed', method: 'POST' };
 	};
 	const toggleReminderCompleted = async (id: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;

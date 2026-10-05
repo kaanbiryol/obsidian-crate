@@ -13,6 +13,7 @@ import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
 import { useReadingMutations } from './useReadingMutations';
 import { readingKeys } from './encryption-session';
+import { readingNeedsAttention, readingRetryAt } from './outbox';
 
 
 const ShortcutSetup = lazy(() => import('./ShortcutSetup').then(module => ({ default: module.ShortcutSetup })));
@@ -36,7 +37,7 @@ function useReadingController() {
   useSyncFailureToast({
     scope: session ? JSON.stringify([session.id, session.token, session.generation]) : null,
     ready,
-    operationIds: pending.filter(op => op.sessionId === session?.id && (op.review || op.error && (op.retryAt === undefined || (op.attempts ?? 0) >= 3))).map(op => op.id),
+    operationIds: pending.filter(op => op.sessionId === session?.id && readingNeedsAttention(op)).map(op => op.id),
     feature: 'Reading', showToast,
     isCurrent: () => { if (!session) return false; try { assertReadingSession(session); return true; } catch { return false; } },
   });
@@ -47,7 +48,7 @@ function useReadingController() {
     ready: ready && !connecting, connected: Boolean(session), enabled, pendingCount: pending.length,
     encryption: lockedSession ? { status: 'locked', folderPath: lockedSession.folderPath }
       : session ? { status: readingKeys() ? 'ready' : 'legacy', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
-    retryAt: Math.min(...pending.flatMap(op => op.retryAt !== undefined && !op.review && (op.attempts ?? 0) < 3 ? [op.retryAt] : [])),
+    retryAt: Math.min(...pending.map(readingRetryAt).filter(deadline => deadline !== undefined)),
     status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
     ...readingUpdateReadiness({ ready, connecting, enabled, connected: Boolean(session), hasCache: Boolean(cache),
       hasError: Boolean(error), adding, saving, preparingChange, syncing, isOffline }),

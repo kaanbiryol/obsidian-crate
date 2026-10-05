@@ -6,7 +6,7 @@ import { PwaSyncStatusIndicator } from './PwaSyncStatusIndicator';
 import { reminderSyncStatus } from '../sync/reminder-status';
 
 const pending: PendingReminderChange = {
-	operationId: 'operation', kind: 'save', status: 'pending', path: '/reminders/create',
+	operationId: 'operation', recordId: 'reminder', kind: 'save', status: 'pending', path: '/reminders/create',
 	method: 'POST', body: '{}', attempts: 1, retryAt: 0,
 };
 

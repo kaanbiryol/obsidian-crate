@@ -21,6 +21,9 @@ export type ReadingRetryMode = 'automatic' | 'manual';
 export function readingRetryAt(op: PendingReading): number | undefined {
   return op.error !== undefined && !op.review && (op.attempts ?? 0) < 3 ? op.retryAt : undefined;
 }
+export function readingNeedsAttention(op: PendingReading): boolean {
+  return Boolean(op.review || op.error && readingRetryAt(op) === undefined);
+}
 function canDispatch(op: PendingReading, mode: ReadingRetryMode): boolean {
   if (op.review) return false;
   if (op.error === undefined || mode === 'manual') return true;

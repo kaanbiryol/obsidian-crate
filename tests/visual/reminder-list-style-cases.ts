@@ -1,6 +1,50 @@
 import { test, expect } from '@playwright/test';
 
 export function reminderListStyleCases() {
+  for (const host of ['plugin', 'pwa']) test(`${host}: drag lift preserves row geometry and releases without opening the reminder`, async ({ page }) => {
+    await page.setViewportSize({ width: 960, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto(`/?host=${host}&scene=list-style&motion=1`);
+    const list = page.getByTestId('reorderable-list');
+    const row = list.locator('[data-reminder-id="1"]');
+    const second = list.locator('[data-reminder-id="2"]');
+    const surface = row.locator('.reminder-drag-surface');
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toHaveCSS('overflow', 'visible');
+    const start = (await row.boundingBox())!, target = (await second.boundingBox())!;
+    const x = start.x + start.width * .65, y = start.y + start.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await expect.poll(() => surface.evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)).toBeGreaterThan(1);
+    const geometry = await row.evaluate(el => {
+      const row = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      const content = new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.premium-reminder-content')!).transform);
+      return { rowX: row.a, rowY: row.d, contentX: content.a, contentY: content.d, height: el.getBoundingClientRect().height };
+    });
+    expect(geometry).toMatchObject({ rowX: 1, rowY: 1, contentX: 1, contentY: 1 });
+    expect(Math.abs(geometry.height - start.height)).toBeLessThan(1);
+    await page.mouse.move(x, target.y + target.height / 2 + 12, { steps: 12 });
+    await expect.poll(() => list.locator('.reorderable-reminder-item').evaluateAll(rows =>
+      rows.slice(0, 2).map(row => row.getAttribute('data-reminder-id')))).toEqual(['2', '1']);
+    await expect(row).toHaveClass(/is-reordering/);
+    for (const layer of [row, row.locator('.premium-reminder-content')]) {
+      expect(await layer.evaluate(el => {
+        const transform = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+        return [transform.a, transform.d];
+      })).toEqual([1, 1]);
+    }
+    await page.mouse.up();
+    await expect(page.getByRole('status', { name: 'Committed order' })).toHaveText('2,1,3,4,5');
+    await expect(row).not.toHaveClass(/is-reordering/);
+    await expect.poll(() => surface.evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)).toBe(1);
+    await expect.poll(() => row.evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).f)).toBe(0);
+    expect(await list.locator('.reorderable-reminder-item').evaluateAll(rows =>
+      rows.map(row => row.getAttribute('data-reminder-id')))).toEqual(['2', '1', '3', '4', '5']);
+    await expect(page.getByRole('status', { name: 'Edited reminder' })).toBeEmpty();
+    await row.locator('.premium-reminder-title').click();
+    await expect(page.getByRole('status', { name: 'Edited reminder' })).toHaveText('1');
+  });
+
   for (const width of [390, 1280]) {
     test(`plugin and PWA list sizing agree at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1100 });
