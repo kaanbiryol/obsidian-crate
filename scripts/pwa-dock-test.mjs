@@ -1,42 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
-import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
+import { mkdir } from 'node:fs/promises';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { captureDockSpring } from './pwa-dock-motion-checks.mjs';
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`PWA dock ${name}: direct switching, motion, capture and compact layouts`, { timeout: 90000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-dock-'));
-  let runtime, browser, server, page;
+  let fixture, browser, page;
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'Dock test');
     const reminderFixture = { projects: ['Inbox'], reminders: Array.from({ length: 32 }, (_, index) => ({
       id: `dock-reminder-${index}`, content: `Dock scroll sample ${index + 1}`, project: 'Inbox',
       dueDatetime: new Date().toISOString(), priority: 4, completed: false, filePath: 'Reminders/Inbox.md', lineNumber: index + 1,
     })) };
-    server = createServer(async (req, res) => {
-      try {
+    fixture = await openWorkerBrowserFixture({
+      deviceName: 'Dock test',
+      handleRequest: ({ request, dispatch }) => {
         // Serve fixtures behind the service worker too; page.route does not intercept its requests.
-        if (new URL(req.url, 'http://localhost').pathname === '/reminders/list') {
-          res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(reminderFixture)); return;
+        if (new URL(request.url, 'http://localhost').pathname === '/reminders/list') {
+          return Response.json(reminderFixture);
         }
-        const chunks = []; for await (const chunk of req) chunks.push(chunk);
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
-        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
-      } catch { res.writeHead(500); res.end('Test server failed'); }
+        return dispatch();
+      },
     });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const origin = `http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      assert.equal(response.status, 200, await response.clone().text()); return response.json();
-    };
+    const { origin, api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const enrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
     browser = await engine.launch({ headless: true });
@@ -465,8 +453,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     if (page) { await mkdir('test-results/dock', { recursive: true }); await page.screenshot({ path: `test-results/dock/${name}-failure.png` }); console.log(await page.locator('body').innerText()); }
     throw error;
   } finally {
-    await browser?.close(); if (server) await new Promise(resolve => server.close(resolve));
-    await runtime?.close(); await rm(dir, { recursive: true, force: true });
+    await browser?.close();
+    await fixture?.close();
   }
 });
 

@@ -3,7 +3,6 @@ import { createDeferred } from './runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import {
 	createHarness,
-	spyOnIncrementalSync,
 	toArrayBuffer,
 } from './engine-test-harness';
 
@@ -67,7 +66,7 @@ describe('SyncEngine full sync safeguards', () => {
 
 	it('does not advance lastSeq when full sync has non-fatal errors', async () => {
 		const harness = createHarness({ lastSeq: 5 });
-		spyOnIncrementalSync(harness.engine, null);
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 5, hasMore: false, cursorExpired: true });
 		harness.api.getManifest.mockResolvedValue({
 			version: 1,
 			files: {

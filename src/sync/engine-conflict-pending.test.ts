@@ -22,7 +22,7 @@ async function setup(lastSeq = 0) {
 	h.vault.adapter.list.mockImplementation(async path => path === ''
 		? { files: [], folders: ['.vault-config'] }
 		: { files: [...files.keys()].filter(file => file.startsWith(`${path}/`)), folders: [] });
-	h.vault.adapter.readBinary.mockImplementation((path: string) => {
+	h.vault.adapter.readBinary.mockImplementation(async (path: string) => {
 		const content = files.get(path);
 		if (!content) throw new Error(`Missing file: ${path}`);
 		return content;

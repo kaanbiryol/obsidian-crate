@@ -29,7 +29,7 @@ afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 function request(route: string, init: RequestInit = {}) {
 	return fetchWorkerRequest(new Request(`https://parse.test${route}`, {
 		...init, headers: { Authorization: 'Bearer parse-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), ...init.headers },
-	}), env, controlledCoordinator);
+	}), env, { kind: 'coordinator', state: controlledCoordinator });
 }
 function upload(path: string, content: string, expectedHash = 'absent', operationId = createReminderOperationId(Math.floor(Date.now() / 86400000))) {
 	return request(`/sync/upload?path=${encodeURIComponent(path)}`, {

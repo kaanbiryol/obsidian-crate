@@ -23,7 +23,7 @@ export async function handleCoordinatorRequest(
     // Reauthenticate inside the transfer queue so reset/revocation fences waiting writers.
     const target = new URL(request.url);
     target.pathname = path === '/sync-upload' ? '/sync/upload' : '/sync/batch-upload';
-    return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, undefined, true));
+    return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, { kind: 'transfer' }));
   }
   if (path === '/commit-new-files' && request.method === 'POST') {
     const prepared = await prepareCoordinatedNewFiles(request, env);
@@ -68,7 +68,7 @@ async function handleLockedCoordinatorRequest(request: Request, state: DurableOb
 		if (!response.ok) throw new Error('Unable to schedule server cleanup');
 		const original = new Request(request);
 		original.headers.delete('X-Crate-Internal-Mutation');
-		return fetchWorkerRequest(original, env, state);
+		return fetchWorkerRequest(original, env, { kind: 'coordinator', state });
 	}
 	if (new URL(request.url).pathname === '/maintain' && request.method === 'POST') {
 		await state.storage.put('maintenanceCoordinator', true);

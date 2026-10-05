@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
-import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
   test(`Reading ${name}: full article saves without a separate fetching switch`, { timeout: 60000 }, async () => {
     let fixture, browser;
     try {
-      fixture = await openReadingBrowserFixture({ deviceName: 'Consent test' });
+      fixture = await openWorkerBrowserFixture({ deviceName: 'Consent test' });
       const { api } = fixture;
       await api('/reading/policy', { enabled: false, folderPath: 'Reading', revision: null });
       const enrollment = await api('/reading/access', { kind: 'reading' });

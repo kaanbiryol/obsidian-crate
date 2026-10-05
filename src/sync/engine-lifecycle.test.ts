@@ -3,8 +3,6 @@ import {
 	createHarness,
 	createNamedAbortError,
 	spyOnConflictRecovery,
-	spyOnIncrementalSync,
-	spyOnPrepareUploadsFromVaultFiles,
 	toArrayBuffer,
 } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
@@ -59,9 +57,8 @@ describe('SyncEngine abort-on-destroy', () => {
 		harness.localManifest.setEntry.mockClear();
 		harness.vault.getFiles.mockReturnValue([{ path: 'note.md', extension: 'md', stat: { size: content.byteLength, mtime: 2000 } }]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 43, hasMore: false });
+		harness.api.getChanges.mockResolvedValue({ changes: [], lastSeq: 43, hasMore: false, cursorExpired: mode === 'full' });
 		harness.api.getManifest.mockResolvedValue({ version: 1, files: { 'note.md': baseline } });
-		if (mode === 'full') spyOnIncrementalSync(harness.engine, null);
 		const read = createDeferred<ArrayBuffer>();
 		harness.vault.adapter.readBinary.mockReturnValue(read.promise);
 		const syncing = harness.engine.sync();
@@ -168,8 +165,6 @@ describe('SyncEngine abort-on-destroy', () => {
 
 	it('aborts in-flight sync when destroyed and does not set error state', async () => {
 		const harness = createHarness({ lastSeq: 0 });
-		// Make incremental sync fall through to full sync
-		spyOnIncrementalSync(harness.engine, null);
 		// getManifest will hang until we signal it
 		let rejectManifest!: (error: Error) => void;
 		const manifestCalled = new Promise<void>(resolve => {
@@ -203,35 +198,34 @@ describe('SyncEngine abort-on-destroy', () => {
 		};
 		harness.vault.getFiles.mockReturnValue([file]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
-
-		// Destroy during prepare phase
-		spyOnPrepareUploadsFromVaultFiles(harness.engine, async () => {
+		harness.vault.adapter.readBinary.mockImplementation(async () => {
 			harness.engine.destroy();
-			return [{ path: 'notes/a.md', content: toArrayBuffer('A'), hash: 'h', size: 1 }];
+			return toArrayBuffer('A');
 		});
 
 		const result = await harness.engine.initialSync();
 
-		// Should not have set error state
+		expect(harness.vault.adapter.readBinary).toHaveBeenCalled();
+		expect(harness.api.batchUpload).not.toHaveBeenCalled();
 		expect(result.errors).toHaveLength(0);
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 
-	it('forceFullSync aborts cleanly when destroyed after prepare', async () => {
+	it('forceFullSync aborts cleanly when destroyed during upload preparation', async () => {
 		const harness = createHarness();
 		harness.api.getManifest.mockResolvedValue({ version: 1, files: {} });
-		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.getFiles.mockReturnValue([{ path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } }]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 
-		// Destroy after prepareUploadsFromVaultFiles
-		spyOnPrepareUploadsFromVaultFiles(harness.engine, async () => {
+		harness.vault.adapter.readBinary.mockImplementation(async () => {
 			harness.engine.destroy();
-			return [];
+			return toArrayBuffer('A');
 		});
 
 		const result = await harness.engine.forceFullSync();
 
+		expect(harness.vault.adapter.readBinary).toHaveBeenCalled();
+		expect(harness.api.batchUpload).not.toHaveBeenCalled();
 		expect(result.errors).toHaveLength(0);
 		expect(harness.engine.getState().status).not.toBe('error');
 	});

@@ -1,34 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createServer } from 'node:http';
-import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 
 for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()}`, { timeout: 60000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-ios27-'));
-  let runtime, browser, server;
+  let fixture, browser;
   try {
-    runtime = await openLocalRuntime({ dataDir: dir });
-    const vault = await issueLocalDevice(runtime.db, 'iOS 27 header test');
-    server = createServer(async (req, res) => {
-      try {
-        const chunks = []; for await (const chunk of req) chunks.push(chunk);
-        const response = await runtime.mf.dispatchFetch(`${origin}${req.url}`, { method: req.method, headers: req.headers,
-          ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: Buffer.concat(chunks) }) });
-        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
-      } catch { res.writeHead(500); res.end('Test server failed'); }
-    });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const origin = `http://localhost:${server.address().port}`;
-    const api = async (path, body) => {
-      const response = await runtime.mf.dispatchFetch(`${origin}${path}`, { method: 'POST', headers: {
-        Authorization: `Bearer ${vault.token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json',
-      }, body: JSON.stringify(body) });
-      assert.equal(response.status, 200, await response.clone().text()); return response.json();
-    };
+    fixture = await openWorkerBrowserFixture({ deviceName: 'iOS 27 header test' });
+    const { origin, api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const enrollment = await api('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
     browser = await engine.launch();
@@ -68,8 +47,6 @@ for (const engine of [chromium, webkit]) test(`iOS 27 headers in ${engine.name()
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();
-    if (server) await new Promise(resolve => server.close(resolve));
-    await runtime?.close();
-    await rm(dir, { recursive: true, force: true });
+    await fixture?.close();
   }
 });

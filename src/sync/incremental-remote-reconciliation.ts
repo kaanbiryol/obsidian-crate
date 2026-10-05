@@ -8,7 +8,8 @@ import type { ChangelogEntry } from '../protocol/sync-types';
 import type { FileDiff, SyncResult } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
-export interface IncrementalRemotePlan {
+export interface IncrementalRemoteReconciliation {
+	discoveredLocalChanges: Array<{ path: string; hash: string }>;
 	resurrectPaths: Set<string>;
 	restoreDeletedPaths: Set<string>;
 	remoteUnchangedLocalDeletes: Set<string>;
@@ -17,13 +18,17 @@ export interface IncrementalRemotePlan {
 	conflicts: FileDiff[];
 }
 
-export async function planIncrementalRemoteChanges(
+/** Reconciles remote changes against current bytes, applying guarded local deletes
+ * and updating the acknowledged manifest. Newly found local edits are returned
+ * separately so the caller owns its local-change inventory. */
+export async function reconcileIncrementalRemoteChanges(
 	context: IncrementalSyncPlannerContext,
 	changesByPath: ReadonlyMap<string, ChangelogEntry>,
-	localChanges: Array<{ path: string; hash: string }>,
-	localDeletes: string[],
+	localChanges: ReadonlyArray<{ path: string; hash: string }>,
+	localDeletes: readonly string[],
 	result: SyncResult,
-): Promise<IncrementalRemotePlan> {
+): Promise<IncrementalRemoteReconciliation> {
+	const discoveredLocalChanges: Array<{ path: string; hash: string }> = [];
 	const localChangedPaths = new Set(localChanges.map((file) => file.path));
 	const localChangeByPath = new Map(localChanges.map((file) => [file.path, file] as const));
 	const localDeletedPaths = new Set(localDeletes);
@@ -61,7 +66,7 @@ export async function planIncrementalRemoteChanges(
 					resurrectPaths.add(path);
 					localChangedPaths.add(path);
 					const localChange = { path, hash: localDelete.hash };
-					localChanges.push(localChange);
+					discoveredLocalChanges.push(localChange);
 					localChangeByPath.set(path, localChange);
 					continue;
 				}
@@ -126,7 +131,7 @@ export async function planIncrementalRemoteChanges(
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);
 					const localChange = { path, hash: localEntry.hash };
-					localChanges.push(localChange);
+					discoveredLocalChanges.push(localChange);
 					localChangeByPath.set(path, localChange);
 				}
 				if (decision.cause === 'local-edited') reclassifiedPaths.add(path);
@@ -146,6 +151,7 @@ export async function planIncrementalRemoteChanges(
 	}
 
 	return {
+		discoveredLocalChanges,
 		resurrectPaths,
 		restoreDeletedPaths,
 		remoteUnchangedLocalDeletes,

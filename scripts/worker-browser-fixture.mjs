@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { openLocalRuntime, issueLocalDevice } from '../packages/server/src/local-server-runtime.mjs';
 
 /** Real Worker, storage and browser HTTP bridge; scenarios own their fault injection. */
-export async function openReadingBrowserFixture({ deviceName = 'Reading browser test', handleRequest } = {}) {
-  const dir = await mkdtemp(join(tmpdir(), 'crate-reading-browser-'));
+export async function openWorkerBrowserFixture({ deviceName = 'Browser test', handleRequest } = {}) {
+  const dir = await mkdtemp(join(tmpdir(), 'crate-browser-'));
   let runtime, server;
   const close = async () => {
     try {

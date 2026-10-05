@@ -21,13 +21,14 @@ import { ModalLayout } from '@/ui/shared/ModalLayout';
 import { StatusContent } from '@/ui/shared/StatusContent';
 import { Button } from '@/ui/shared/Button';
 import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmationModal';
-import { ModalHeader } from '@/ui/shared/ModalHeader';
+import { AddReminderModalHeader } from '@/reminders/ui/reminder-modal/AddReminderModalHeader';
 import { ReminderCard } from '@/reminders/components/ReminderCard';
 import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styles';
 import pluginStyles from '@plugin-build/styles.css?raw';
 import fixtureStyles from './fixture.css?raw';
 import { SourceNoticeFixture } from './SourceNoticeFixture';
 import { ProjectInteractionFixture } from './ProjectInteractionFixture';
+import { usePwaInputModality } from '@/pwa/hooks/usePwaInputModality';
 
 import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
 import { ReadingDialogHost } from '@/reading/ui/ReadingDialog';
@@ -57,9 +58,11 @@ function GalleryIcon(props: ThemeIconProps) {
 }
 
 function Gallery() {
+  usePwaInputModality();
   const [result, setResult] = useState('Ready');
   const [activeTab, setActiveTab] = useState<TabId>('today');
   const [project, setProject] = useState('Work');
+  const [priority, setPriority] = useState(1);
   const [title, setTitle] = useState('Review the shared reminder controls');
   const [description, setDescription] = useState('A longer description that wraps on a narrow screen. Check typography, spacing, and the circular completion controls.');
   const [date, setDate] = useState('2026-09-06');
@@ -91,7 +94,7 @@ function Gallery() {
     <input aria-label="Date label" value={date} onChange={event => setDate(event.target.value)} />
     <ReminderActionChips dueDate={null} dueDateLabel={date} project={project} defaultProject="Inbox" priority={4} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={noop} />
   </>;
-  else if (scene === 'editor') content = <><ModalHeader title="New reminder" closeLabel="Close reminder editor" onClose={noop} action={{ label: 'Add', onClick: () => setResult('Saved') }} /><div className="reminder-modal-body"><ReminderEditorFields content={title} onContentChange={setTitle} description={description} onDescriptionChange={setDescription} allowAutoFocus={false} projects={projects} textareaRef={titleRef} richTextInputRef={richRef} /><ReminderActionChips dueDate={null} project={project} defaultProject="Inbox" priority={1} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={noop} /></div></>;
+  else if (scene === 'editor') content = <><AddReminderModalHeader isEditing={params.has('edit')} canSubmit={!!title.trim()} onClose={noop} onDelete={() => setResult('Deleted')} onSubmit={() => setResult('Saved')} /><div className="reminder-modal-body"><ReminderEditorFields content={title} onContentChange={setTitle} description={description} onDescriptionChange={setDescription} allowAutoFocus={false} projects={projects} textareaRef={titleRef} richTextInputRef={richRef} /><ReminderActionChips dueDate={null} project={project} defaultProject="Inbox" priority={priority} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={() => setPriority(value => value === 1 ? 4 : 1)} /></div></>;
   else if (scene === 'cards') content = <div className="reminders-view is-primary"><ReminderCard listStyle="cards" reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard listStyle="cards" reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
   else content = <DatePickerContent currentDate={date ? new Date(`${date}T09:30:00`) : null} hasTime isDark={isDark} commitDateOnChange={host === 'pwa'} onClose={noop} onSelectPreset={preset => setResult(preset)} onDateChange={value => { setDate(value); setResult(value); }} onTimeChange={(hour, minute) => setResult(`${hour}:${minute}`)} onTimeClear={() => setResult('Cleared time')} onRemove={() => setResult('Removed')} />;
   if (scene === 'loading' || scene === 'loading-block') content = <RemindersLoading compact={scene === 'loading-block'} />;
@@ -99,7 +102,7 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'project-interactions' || scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && (params.has('titles') || params.has('shadow')))));
+const useShadow = (host === 'plugin' && params.has('shadow')) || scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'project-interactions' || scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && (params.has('titles') || params.has('shadow')))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

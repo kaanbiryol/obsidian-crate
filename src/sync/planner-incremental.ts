@@ -5,12 +5,12 @@ import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
-import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/sync-types';
+import type { FileEntry } from '../protocol/sync-types';
 import type { SyncResult } from './types';
-import { deleteFilesInBatches } from './delete-batches';
-import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
+import { applyIncrementalLocalDeletes } from './incremental-local-deletes';
+import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../protocol/path-record';
-import { assertLocalFileAbsent } from './local-absence';
+import { readIncrementalChangelog } from './incremental-changelog';
 
 const logger = createLogger("SyncPlanner");
 
@@ -27,36 +27,12 @@ export async function runIncrementalSync(
 
   try {
     context.reportWork?.('server');
-    const changesByPath = new Map<string, ChangelogEntry>();
-    let changeCount = 0;
-    let since = context.settings.lastSeq;
-    let latestSeq = since;
-
-    while (true) {
-      context.throwIfDestroyed?.();
-      const response = await context.api.getChanges(since);
-
-      if (response.cursorExpired) {
-        logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
-        return null;
-      }
-
-      for (const entry of response.changes) changesByPath.set(entry.path, entry);
-      changeCount += response.changes.length;
-      latestSeq = response.lastSeq;
-
-      if (!response.hasMore || response.changes.length === 0) {
-        break;
-      }
-
-      const lastChange = response.changes[response.changes.length - 1];
-      if (!lastChange) {
-        break;
-      }
-
-      if (lastChange.seq <= since) throw new Error('Changelog cursor did not advance');
-      since = lastChange.seq;
+    const changelog = await readIncrementalChangelog(context.api, context.settings.lastSeq, () => context.throwIfDestroyed?.());
+    if (!changelog) {
+      logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
+      return null;
     }
+    const { changesByPath, changeCount, latestSeq } = changelog;
 
     logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
@@ -78,15 +54,16 @@ export async function runIncrementalSync(
 
 
     const {
+      discoveredLocalChanges,
       resurrectPaths,
       restoreDeletedPaths,
       remoteUnchangedLocalDeletes,
       reclassifiedPaths,
       downloadRequests,
       conflicts,
-    } = await planIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
+    } = await reconcileIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
 
-    const localOnlyChanges = localChanges.filter(
+    const localOnlyChanges = [...localChanges, ...discoveredLocalChanges].filter(
       (file) =>
         (!changesByPath.has(file.path) || resurrectPaths.has(file.path) || reclassifiedPaths.has(file.path))
         && !context.shouldIgnore(file.path),
@@ -186,61 +163,7 @@ export async function runIncrementalSync(
 
     if (localOnlyDeletes.length > 0) {
       context.reportWork?.('applying');
-      try {
-        if (result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
-        const deleteFiles = localOnlyDeletes.flatMap((path) => {
-          const expectedHash = context.localManifest.getEntry(path)?.hash;
-          return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
-        });
-        const missingExpectedPaths = localOnlyDeletes.filter(
-          (path) => !context.localManifest.getEntry(path)?.hash,
-        );
-        for (const path of missingExpectedPaths) {
-          recordSyncError(result, `Missing remote version for delete`, path);
-        }
-        const deleteResult = deleteFiles.length > 0
-          ? await deleteFilesInBatches(context.api, deleteFiles, path => assertLocalFileAbsent(context.vault, path))
-          : { success: true, deleted: [], errors: [] };
-        for (const path of deleteResult.deleted) {
-          context.localManifest.removeEntry(path);
-          result.deleted++;
-          result.deletedPaths.push(path);
-        }
-
-        if (!deleteResult.success) {
-          const deletedSet = new Set(deleteResult.deleted);
-          const failures: MutationFailure[] = deleteResult.errors && deleteResult.errors.length > 0
-            ? deleteResult.errors
-            : localOnlyDeletes
-                .filter((path) => !deletedSet.has(path))
-                .map((path) => ({ path, error: "Batch delete failed" }));
-
-          const versionConflicts = failures.filter(
-            (failure) => failure.code === 'version_conflict' || failure.status === 409,
-          );
-          const otherFailures = failures.filter((failure) => !versionConflicts.includes(failure));
-          for (const failure of otherFailures) {
-            recordSyncError(result, `${failure.error}`, failure.path);
-          }
-          if (versionConflicts.length > 0) {
-            if (context.reconcileVersionConflicts) {
-              await context.reconcileVersionConflicts(
-                versionConflicts.map((failure) => `delete:${failure.path}`),
-                result,
-              );
-            } else {
-              for (const failure of versionConflicts) {
-                recordSyncError(result, `${failure.error}`, failure.path);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        const errMsg = errorMessage(error);
-        for (const path of localOnlyDeletes) {
-          recordSyncError(result, `${errMsg}`, path);
-        }
-      }
+      await applyIncrementalLocalDeletes(context, localOnlyDeletes, result);
 
       current += localOnlyDeletes.length;
       options.progressCallback?.(current, total);

@@ -101,3 +101,35 @@ it('applies consecutive requested scans without dropping the newer content', asy
   await index.rescanFile(file);
   expect(index.getById('one')?.content).toBe('Newer edit');
 });
+
+it('keeps all read views consistent through rename, a failed rescan and recovery', async () => {
+  const { index, file } = await harness();
+  const views = () => ({
+    all: index.getAll(), byId: index.getById('one'),
+    oldFile: index.getByFile(oldPath), newFile: index.getByFile(newPath),
+    oldProject: index.getByProject('Old'), newProject: index.getByProject('New'),
+    projects: index.getProjects(),
+  });
+  const published: ReturnType<typeof views>[] = [];
+  index.onIndexChange(() => published.push(views()));
+  file.path = newPath;
+  index.renameFile(oldPath, newPath);
+  const renamed = reminder(newPath);
+  const expected = { all: [renamed], byId: renamed, oldFile: [], newFile: [renamed],
+    oldProject: [], newProject: [renamed], projects: ['New'] };
+  expect(views()).toEqual(expected);
+  expect(published).toEqual([expected]);
+
+  vi.mocked(scanFile).mockResolvedValueOnce({ filePath: newPath, reminders: [], lineCount: 0, error: 'Unreadable source' });
+  await index.rescanFile(file);
+  expect(views()).toEqual(expected);
+  expect(index.sourceIssues).toEqual([{ path: newPath, reason: 'Unreadable source' }]);
+
+  const edited = { ...renamed, content: 'Recovered edit' };
+  vi.mocked(scanFile).mockResolvedValueOnce({ filePath: newPath, reminders: [edited], lineCount: 1 });
+  await index.rescanFile(file);
+  expect(views()).toEqual({ ...expected, all: [edited], byId: edited, newFile: [edited], newProject: [edited] });
+  expect(index.sourceIssues).toEqual([]);
+  index.removeFile(newPath);
+  expect(views()).toEqual({ all: [], byId: undefined, oldFile: [], newFile: [], oldProject: [], newProject: [], projects: [] });
+});

@@ -9,7 +9,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { swipe } from './browser-touch-swipe.mjs';
 import { checkPwaScreenGestures, checkPwaTextField } from './pwa-screen-interaction-checks.mjs';
-import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 
 async function checkReaderNavigation(page) {
   const reader = page.locator('.crate-reading-reader');
@@ -277,7 +277,7 @@ async function sheetAppearance(page) {
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enroll, save, cached reader, offline change, phone confirmation and logout`, { timeout: 180000 }, async () => {
   let fixture, browser, loseCaptureReply = false, holdArticle, holdUpdate, holdList; const sent = [], heldResponses = [];
   try {
-    fixture = await openReadingBrowserFixture({
+    fixture = await openWorkerBrowserFixture({
       deviceName: 'Browser test',
       handleRequest: async ({ request: req, body, dispatch }) => {
         if (req.url === '/notifications/test-share') return new Response('<!doctype html><title>Share fixture</title><body>Share fixture</body>', { headers: { 'Content-Type': 'text/html' } });
@@ -826,7 +826,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: single-screen layout at every width`, { timeout: 60000 }, async () => {
   let fixture, browser;
   try {
-    fixture = await openReadingBrowserFixture({ deviceName: 'Layout test' });
+    fixture = await openWorkerBrowserFixture({ deviceName: 'Layout test' });
     const { api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const enrollment = await api('/reading/access', { kind: 'reading' });

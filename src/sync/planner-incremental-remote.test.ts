@@ -23,7 +23,38 @@ vi.mock('./conflict', () => ({
 }));
 
 describe('runIncrementalSync', () => {
-it('returns fast success and advances cursor when nothing changed', async () => {
+  it.each(['put', 'delete'] as const)('uploads an edit discovered after the scan while reconciling a remote %s', async action => {
+    const path = 'notes/late-edit.md';
+    const content = new TextEncoder().encode('edited after scanning').buffer;
+    const hash = await computeHash(content);
+    const localChanges: Array<{ path: string; hash: string }> = [];
+    Object.freeze(localChanges);
+    const harness = createIncrementalHarness({
+      settings: { lastSeq: 10 }, lastSeq: 11, localChanges,
+      changes: [{ seq: 11, path, action, hash: 'base', size: 4, created_at: '2026-02-06T12:00:00Z' }],
+    });
+    harness.localManifest.getEntry.mockReturnValue({ hash: 'base', size: 4, modified: '2026-02-06T10:00:00Z' });
+    harness.vault.adapter.exists.mockResolvedValue(true);
+    harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: content.byteLength, mtime: 1 });
+    harness.vault.adapter.readBinary.mockResolvedValue(content);
+    const prepared: PreparedUpload = { path, content, hash, size: content.byteLength };
+    harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
+    harness.context.uploadPreparedFiles = vi.fn(async (uploads: PreparedUpload[], result: SyncResult) => {
+      result.uploaded += uploads.length;
+      result.uploadedPaths.push(...uploads.map(upload => upload.path));
+    });
+
+    const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+
+    expect(result?.success).toBe(true);
+    expect(result?.uploadedPaths).toEqual([path]);
+    expect(localChanges).toEqual([]);
+    expect(harness.vault.trash).not.toHaveBeenCalled();
+    expect(harness.settings.lastSeq).toBe(11);
+    if (action === 'delete') expect(prepared.expectedHash).toBeNull();
+  });
+
+	it('returns fast success and advances cursor when nothing changed', async () => {
 		const settings = createSettings({ lastSeq: 5 });
 		const localManifest = {
 			save: vi.fn(async () => {}),

@@ -335,7 +335,14 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       discoveredProjects.delete(oldProject);
       discoveredProjects.add(newProject);
 
-      lookupStore.renameFile(oldPath, newPath, newProject);
+      // The index owns records; lookup maps only track the published values.
+      // Remove the old keys before changing the records they reference.
+      const moved = lookupStore.removeFile(oldPath);
+      for (const reminder of moved) {
+        reminder.filePath = newPath;
+        reminder.project = newProject;
+      }
+      lookupStore.addReminders(moved);
       notifyListeners();
     },
 

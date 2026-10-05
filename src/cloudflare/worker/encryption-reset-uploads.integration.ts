@@ -126,7 +126,7 @@ it.each(uploadKinds)('rechecks the reset generation when publishing %s, even wit
 	} });
 	// Inject the delayed R2 put at the transfer executor, where uploads now run.
 	// The public-route cases above still exercise the real transfer boundary.
-	const pending = fetchWorkerRequest(stale.request, { ...env, BUCKET: bucket }, undefined, true);
+	const pending = fetchWorkerRequest(stale.request, { ...env, BUCKET: bucket }, { kind: 'transfer' });
 	try {
 		await Promise.race([ready, pending.then(() => { throw new Error('Upload finished before staging'); })]);
 		// Isolate the publication guard from reset's separate lease invalidation.

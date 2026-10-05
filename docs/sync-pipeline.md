@@ -15,7 +15,7 @@ changes and upload receipts reconcile on the next encrypted sync. Explicitly sav
 
 When `automaticSync` is enabled, every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
 
-Entry point: `engine.ts:periodicCheck()`
+Entry point: `engine-lifecycle.ts:periodicCheck()`
 
 ### 2. Foreground Sync
 
@@ -36,7 +36,12 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
 Returns `null` to signal fallback to full sync (on error or cursor expiry).
 
-Entry point: `planner.ts:runIncrementalSync()`
+Entry point: `planner-incremental.ts:runIncrementalSync()` (exported through `planner.ts`).
+The coordinator retains phase ordering, progress, manifest saves and cursor
+advancement. `incremental-changelog.ts` handles pagination and path deduplication;
+`incremental-remote-reconciliation.ts` keeps fresh local reads and guarded deletes
+together and returns edits discovered after the scan. `incremental-local-deletes.ts`
+propagates local deletions only after earlier uploads and reconciliation succeed.
 
 ### 4. Full Sync (Fallback)
 

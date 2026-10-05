@@ -24,7 +24,11 @@ async function setup() {
 	h.vault.adapter.list.mockResolvedValue({ files: ['.hidden.md'], folders: [] });
 	h.vault.adapter.stat.mockResolvedValue({ type: 'file', size: original.byteLength, mtime: 1000 });
 	h.vault.adapter.exists.mockImplementation((path: string) => files.has(path));
-	h.vault.adapter.readBinary.mockImplementation((path: string) => files.get(path));
+	h.vault.adapter.readBinary.mockImplementation(async (path: string) => {
+		const content = files.get(path);
+		if (!content) throw new Error(`Missing file: ${path}`);
+		return content;
+	});
 	spyOnConflictRecovery(h.engine).mockResolvedValue();
 	return h;
 }

@@ -5,7 +5,7 @@ import type { ConflictStore } from './conflict-store';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../protocol/sync-types';
-import type { PreparedUpload, SyncResult } from './types';
+import type { SyncResult } from './types';
 import type { InitialConfigPull } from './initial-config-pull';
 
 const CONFIG_DIR = '.vault-config';
@@ -21,7 +21,7 @@ type ManifestEntry = {
 type MockAdapter = {
 	read: ReturnType<typeof vi.fn>;
 	write: ReturnType<typeof vi.fn>;
-	readBinary: ReturnType<typeof vi.fn>;
+	readBinary: ReturnType<typeof vi.fn<(path: string) => Promise<ArrayBuffer>>>;
 	stat: ReturnType<typeof vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>>;
 	exists: ReturnType<typeof vi.fn>;
 	remove: ReturnType<typeof vi.fn>;
@@ -113,16 +113,6 @@ export function spyOnIncrementalSync(engine: SyncEngine, result: SyncResult | nu
 	).mockResolvedValue(result);
 }
 
-export function spyOnPrepareUploadsFromVaultFiles(
-	engine: SyncEngine,
-	implementation: () => Promise<PreparedUpload[]>,
-) {
-	return vi.spyOn(
-		(engine as unknown as { contexts: SyncEngineContexts }).contexts,
-		'prepareUploadsFromVaultFiles',
-	).mockImplementation(implementation);
-}
-
 function createSettings(): CrateSettings {
 	return {
 		reading: { enabled: false, folderPath: 'Reading' },
@@ -159,7 +149,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const adapter: MockAdapter = {
 		read: vi.fn(),
 		write: vi.fn(),
-		readBinary: vi.fn(),
+		readBinary: vi.fn<(path: string) => Promise<ArrayBuffer>>(),
 		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
 		exists: vi.fn(),
 		remove: vi.fn(),

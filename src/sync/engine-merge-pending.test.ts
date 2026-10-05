@@ -24,7 +24,7 @@ async function setup(lastSeq: number, initial = local) {
 	h.vault.getAbstractFileByPath.mockImplementation(candidate => candidate === path ? file : null);
 	h.vault.adapter.exists.mockImplementation(candidate => candidate === path);
 	h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-	h.vault.adapter.readBinary.mockImplementation(() => toArrayBuffer(text));
+	h.vault.adapter.readBinary.mockImplementation(async () => toArrayBuffer(text));
 	const edit = (value: string) => {
 		text = value;
 		file.stat = { size: toArrayBuffer(text).byteLength, mtime: file.stat.mtime + 1 };
@@ -92,7 +92,7 @@ describe('pending events from remote application', () => {
 		const h = await setup(1);
 		try {
 			h.localManifest.save.mockImplementationOnce(() => {
-				h.vault.adapter.readBinary.mockImplementationOnce(() => {
+				h.vault.adapter.readBinary.mockImplementationOnce(async () => {
 					const snapshot = toArrayBuffer(h.text());
 					h.edit(`${merged}new edit\n`);
 					return snapshot;

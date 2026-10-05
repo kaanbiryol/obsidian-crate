@@ -108,6 +108,26 @@ only attaches a completed checkpoint while its originating engine is still curre
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
+`sync/planner-incremental.ts` owns incremental phase ordering, progress, manifest
+saves and cursor advancement. `incremental-changelog.ts` reads a deduplicated
+snapshot without changing the saved cursor. `incremental-remote-reconciliation.ts`
+checks current local bytes and applies guarded local deletes together; it returns
+newly discovered local edits rather than mutating the scan inventory.
+`incremental-local-deletes.ts` applies remote deletes after the preceding phases
+succeed. These helpers do not own engine cancellation or runtime lifecycle state.
+
+`reminders/data/reminder-index/index.ts` owns reminder record changes, including
+file renames. Its `lookup-store.ts` maintains derived lookup maps: the owner removes
+old keys before changing records, then adds the updated records before notifying
+subscribers. Scan failure retains the last published records and lookups together.
+
+`cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
+transfer execution with a tagged argument. `request-guards.ts` owns stateless
+protocol and encryption checks; the handler retains their ordering around
+admission, authentication, scope authorization and route dispatch. Transfer
+requests authenticate again after entering the queue. Coordinator execution
+receives the Durable Object state and persists notification wakes before mutations.
+
 `sync/runtime-server-status.ts` owns version caching and delayed reachability
 probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
 guard, resets probes during lifecycle changes, and retains foreground sync policy.

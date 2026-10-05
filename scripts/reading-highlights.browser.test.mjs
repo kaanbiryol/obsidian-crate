@@ -4,7 +4,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import { swipe } from './browser-touch-swipe.mjs';
-import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 
 // This end-to-end case performs many syncs and reloads; individual expectations
 // retain their own deadlines while the complete journey allows slower CI I/O.
@@ -13,7 +13,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   const codeExample = 'let greeting = "hello <world> & friends"\nText(greeting)\n';
   let articleMarkdown = 'A useful **article excerpt**.\n\nAnother paragraph to read.\n\n```swift\n' + codeExample + '```\n\n```unknown-language\nunchanged <example>\n```';
   try {
-    fixture = await openReadingBrowserFixture({ deviceName: 'Highlight test' });
+    fixture = await openWorkerBrowserFixture({ deviceName: 'Highlight test' });
     const { runtime, vault, origin, api } = fixture;
     await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: null });
     const operationId = `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;

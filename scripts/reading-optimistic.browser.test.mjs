@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { openReadingBrowserFixture } from './reading-browser-fixture.mjs';
+import { openWorkerBrowserFixture } from './worker-browser-fixture.mjs';
 
 const operationId = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
 async function pending(page) {
@@ -30,7 +30,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     return { started: started.promise, release: release.resolve };
   };
   try {
-    fixture = await openReadingBrowserFixture({
+    fixture = await openWorkerBrowserFixture({
       deviceName: 'Optimistic Reading test',
       handleRequest: async ({ request: req, body, dispatch }) => {
         if (req.method === 'POST' && ['/reading/update', '/reading/capture'].includes(req.url)) requests.push({ path: req.url, body: body.toString() });

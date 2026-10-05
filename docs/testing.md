@@ -30,8 +30,9 @@ The tests use the built PWA, native IndexedDB/Web Locks, and the real local Work
 Chromium also verifies offline reload; WebKit verifies offline use in the current
 document. Physical installed-app acceptance remains a device check.
 
-The library, consent, optimistic-action and highlight browser suites share
-`scripts/reading-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
+The Reading library, consent, optimistic-action and highlight suites, plus the
+PWA header and dock suites, share
+`scripts/worker-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
 authenticated setup requests and cleanup. Request gates and lost replies stay in
 their individual scenarios through `handleRequest`; normal requests still reach
 the real Worker and its storage bindings.
@@ -518,6 +519,10 @@ const context = {
 
 - Uses the full Harness type with all dependencies mocked
 - Tests the orchestration logic (sync mode selection, state transitions, error handling)
+- Trigger fallback through an expired changelog response and cancellation through
+  pending adapter/API work, rather than replacing private engine contexts.
+- Test pagination directly with `incremental-changelog.test.ts`; incremental
+  reconciliation tests cover late local edits, guarded deletes and cursor retention.
 
 ## Portable visual baselines
 
@@ -535,8 +540,20 @@ After building the plugin styles, run
 `node scripts/visual-test-run.mjs tests/visual/reminder-editor-layout.spec.ts tests/visual/reminder-editor-layout-webkit.spec.ts --workers=2`
 for editor geometry in both hosts. Chromium and WebKit check header alignment,
 title/description hierarchy, compact spacing and long-field scrolling at 320px,
-390px and desktop widths in light and dark themes. These replace SCSS text checks
-for layout; source assertions remain for token and scoping conventions.
+390px and desktop widths in light and dark themes. They also check placeholders,
+disabled submission, inline marker geometry, property colors, and the delete
+action's hover and keyboard states using the production reminder header. Picker
+checks cover native date/time inputs, selected rows and keyboard focus at narrow
+and desktop widths.
+These replace the corresponding SCSS text checks; token and scoping conventions
+remain covered by source assertions.
+
+`node scripts/activity-empty-layout-test.mjs` mounts the production activity and
+conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check
+header alignment, viewport fit, centered empty states, disabled sync actions and
+matching primary controls in light/dark themes at desktop, mobile and short sizes.
+It is included in `npm run test:activity-browser`; native Obsidian window behavior
+still needs manual acceptance.
 
 ## File history browser checks
 

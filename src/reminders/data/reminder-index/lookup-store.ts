@@ -4,7 +4,6 @@ export interface ReminderLookupStore {
   rebuild(reminders: IndexedReminder[]): void;
   removeFile(filePath: string): IndexedReminder[];
   addReminders(reminders: IndexedReminder[]): void;
-  renameFile(oldPath: string, newPath: string, newProject: string): void;
   getById(id: string): IndexedReminder | undefined;
   getByFile(filePath: string): IndexedReminder[];
   getProjects(discoveredProjects: Set<string>): string[];
@@ -74,29 +73,6 @@ export function createReminderLookupStore(): ReminderLookupStore {
     addReminders(reminders: IndexedReminder[]) {
       for (const reminder of reminders) {
         addReminder(reminder);
-      }
-    },
-
-    renameFile(oldPath: string, newPath: string, newProject: string) {
-      const fileReminders = byFile.get(oldPath) || [];
-      byFile.delete(oldPath);
-
-      for (const reminder of fileReminders) {
-        reminder.filePath = newPath;
-
-        if (reminder.project === newProject) {
-          continue;
-        }
-
-        removeReminderFromProject(reminder);
-        reminder.project = newProject;
-        const newProjectReminders = byProject.get(newProject) || [];
-        newProjectReminders.push(reminder);
-        byProject.set(newProject, newProjectReminders);
-      }
-
-      if (fileReminders.length > 0) {
-        byFile.set(newPath, fileReminders);
       }
     },
 
