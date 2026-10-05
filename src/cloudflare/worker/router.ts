@@ -14,8 +14,7 @@ import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
 import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
-import { canPrepareReadingHandoff } from './reading/common';
-import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
+import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
 import { handleEncryptedReminders } from './encrypted-reminders';
 import { handleEncryptionReset } from './encryption-reset';
@@ -25,55 +24,15 @@ import type { EncryptionServerState } from '../../encryption/server-state';
 
 export { handlePublicRoute };
 
-const REMINDERS_SCOPE_ROUTES = new Set([
-	'GET /encryption',
-	'GET /reminders/encrypted-files',
-	'GET /reminders/encrypted-file',
-	'POST /reminders/encrypted-commit',
-	'GET /reminders/encrypted-receipt',
-	'GET /health',
-	'POST /links/title',
-	'GET /reminders/list',
-	'POST /reminders/create',
-	'POST /reminders/update',
-	'POST /reminders/set-completed',
-	'DELETE /reminders/delete',
-	'POST /reminders/reorder',
-	'POST /notifications/subscribe',
-	'DELETE /notifications/subscribe',
-	'DELETE /auth/session',
-]);
-
-const READING_LIBRARY_ROUTES = new Set([
-	'GET /reading/encryption', 'GET /reading/encrypted-receipt',
-	'GET /reading/encrypted-files',
-	'GET /reading/encrypted-file',
-	'POST /reading/encrypted-commit',
-	'POST /reading/shortcut-pairing',
-	'GET /reading/session',
-	'GET /reading/fetching',
-	'POST /reading/fetching',
-	'GET /reading/list',
-	'GET /reading/item',
-	'POST /reading/capture',
-	'POST /reading/update',
-	'POST /reading/retry',
-]);
-
 export function isAuthenticatedRouteAllowed(
 	principal: AuthPrincipal,
 	path: string,
 	method: RouteMethod,
 ): boolean {
-  if (path === shortcut.preparePath && method === 'POST') return principal.scope === 'reading_capture';
-	if (path === '/reading/prepare' && method === 'POST') return canPrepareReadingHandoff(principal.scope);
-	if (principal.scope === 'vault') return true;
-  if (path === '/encryption/pairing' && ['GET', 'POST'].includes(method) && ['reminders', 'reading'].includes(principal.scope)) return true;
-	if (path === '/features' && method === 'GET' && ['reading', 'reminders'].includes(principal.scope)) return true;
- if (principal.scope === 'reminders') return REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`) || READING_LIBRARY_ROUTES.has(`${method} ${path}`);
- if (principal.scope === 'reading_capture') return path === '/reading/capture' && method === 'POST';
- if (principal.scope === 'reading') return READING_LIBRARY_ROUTES.has(`${method} ${path}`) || `${method} ${path}` === 'DELETE /auth/session';
- return false;
+	const policy = apiRoutePolicy(path, method);
+	// Admission rejects unknown routes before authentication. Vault credentials
+	// retain their broad authority; scoped sessions only use declared routes.
+	return policy ? policy.scopes.includes(principal.scope) : principal.scope === 'vault';
 }
 
 export async function handleAuthenticatedRoute(

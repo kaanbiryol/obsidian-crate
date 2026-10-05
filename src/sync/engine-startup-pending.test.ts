@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import { createHarness, createSyncResult, flushPendingChanges, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
+import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
 import { normalizeCrateSettings } from '../plugin/settings';
 
@@ -40,16 +40,18 @@ describe('pending changes after restart with automatic sync off', () => {
 	it('keeps fresh-install files pending without transfers after discovery, edits, and periodic checks', async () => {
 		vi.useFakeTimers();
 		const h = createHarness(normalizeCrateSettings(undefined, '.vault-config'));
-		h.vault.getFiles.mockReturnValue([{ path: 'existing.md', extension: 'md', stat: { size: 8, mtime: 1000 } }]);
+		const files = [{ path: 'existing.md', extension: 'md', stat: { size: 8, mtime: 1000 } }];
+		h.vault.getFiles.mockImplementation(() => files);
+		h.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('modified'));
 		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 		const recovery = spyOnConflictRecovery(h.engine).mockResolvedValue();
 		try {
 			expect(h.settings.automaticSync).toBe(false);
 			await restore(h);
-			h.vault.getFiles.mockReturnValue(['existing.md', 'edited.md'].map(path => ({ path, extension: 'md', stat: { size: 8, mtime: 1000 } })));
+			files.push({ path: 'edited.md', extension: 'md', stat: { size: 8, mtime: 1000 } });
 			h.engine.onFileChange({ path: 'edited.md' } as never);
 			await vi.advanceTimersByTimeAsync(h.settings.syncInterval * 2 * 1000);
-			await flushPendingChanges(h.engine);
+			await h.engine.waitForIdle();
 			await runPeriodicCheck(h.engine);
 
 			expect(h.engine.getPendingPaths().sort()).toEqual(['edited.md', 'existing.md']);

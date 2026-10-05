@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createHarness, getPendingPaths, setSyncStatus, toArrayBuffer } from './engine-test-harness';
+import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { computeHash } from './hasher';
 import { formatSyncProgress } from '../ui/activity/progress-label';
 
@@ -10,7 +10,8 @@ async function harness() {
     h.vault.adapter.readBinary.mockResolvedValue(content);
     h.vault.getAbstractFileByPath.mockImplementation((path: string) => ({ path, extension: 'md', stat: { size: content.byteLength, mtime: 1 } }));
     const api = Object.assign(h.api, { getFileMetadata: vi.fn(async (paths: string[]) => ({ files: Object.fromEntries(paths.map(path => [path, { hash, revision: 'v1', size: content.byteLength, modified: 'now' }])) })) });
-    getPendingPaths(h.engine).add('a.md'); getPendingPaths(h.engine).add('b.md');
+    h.engine.onFileChange({ path: 'a.md' } as never);
+    h.engine.onFileChange({ path: 'b.md' } as never);
     return { ...h, api };
 }
 
@@ -72,7 +73,7 @@ describe('selected sync', () => {
         h.vault.getAbstractFileByPath.mockImplementation((path: string) => path === 'a.md' ? null
             : { path, extension: 'md', stat: { size: entry.size, mtime: 1 } });
         h.api.deleteFile.mockResolvedValue({ path: 'a.md', success: true });
-        getPendingPaths(h.engine).delete('a.md'); getPendingPaths(h.engine).add('delete:a.md');
+        h.engine.onFileDelete({ path: 'a.md' } as never);
         const result = await h.engine.syncSelected(['delete:a.md']);
         expect(result.success).toBe(true);
         expect(result.deletedPaths).toEqual(['a.md']);
@@ -106,9 +107,16 @@ describe('selected sync', () => {
         h.engine.destroy();
     });
     it('refuses to start while another sync is running', async () => {
-        const h = await harness(); setSyncStatus(h.engine, 'syncing');
+        const h = await harness();
+        let finish!: () => void;
+        const blocked = new Promise<void>(resolve => { finish = resolve; });
+        h.api.getFileMetadata.mockImplementation(async () => { await blocked; return { files: {} }; });
+        const running = h.engine.syncSelected(['b.md']);
+        await vi.waitFor(() => expect(h.api.getFileMetadata).toHaveBeenCalledWith(['b.md']));
         await expect(h.engine.syncSelected(['a.md'])).rejects.toThrow('current sync');
-        expect(h.api.getFileMetadata).not.toHaveBeenCalled();
+        expect(h.api.getFileMetadata).toHaveBeenCalledTimes(1);
+        finish();
+        expect((await running).success).toBe(true);
         h.engine.destroy();
     });
 });

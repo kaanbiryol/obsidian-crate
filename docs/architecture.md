@@ -100,6 +100,14 @@ The engine retains cancellation, exclusive-operation checks and active-work trac
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
+`sync/runtime-encryption-reset-workflow.ts` owns the durable remote reset, local
+invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verified
+encrypted connection and reset-address moves. `SyncRuntime` serializes these
+configuration changes and supplies stop, drain, initialize and cancellation checks;
+workflows do not calculate lifecycle generations or register events.
+`sync/engine-contexts.ts` wires engine dependencies. The ordered completion of the
+initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
+
 The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
 Reading and Reminders runtimes independently of their lazy screens, so pending work
 resumes without visiting either section. Feature adapters retain their existing
@@ -250,6 +258,11 @@ consumers cannot independently replace its refs or React state. `useReminderEdit
 owns editor presentation, synchronous tap opening, close transitions, recovered
 drafts, and session reset.
 
+`pwa/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
+connectivity and timer wakeups honor the stored deadline and attempt budget.
+Explicit retry and earlier-session recovery reset that budget while retaining the
+operation identity and request bytes.
+
 Plugin feature requests use `src/plugin/server-request.ts` for validated server
 metadata and lifecycle/connection guards before dispatch and after responses.
 Reading adds its own capability requirements; shared feature settings require
@@ -259,6 +272,13 @@ only their own capability.
 lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
+
+`cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
+notification coordination requirements once. Admission, scope authorization and
+notification wakeup checks consume that policy. Route handlers retain folder,
+feature and encryption guards, while public assets and Shortcut compatibility
+handling retain their existing admission behavior. Reading handoff redemption
+checks issuer scopes against the preparation route's policy.
 
 The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 2 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 

@@ -14,6 +14,7 @@ import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { prepareUploadFromPath } from './transfer-prepare';
 import { runInitialImport } from './initial-import';
+import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from './initial-config-pull';
 
 interface SyncEngineContextDependencies {
@@ -188,23 +189,14 @@ export class SyncEngineContexts {
 		};
 	}
 
-  async finishInitialSetup(): Promise<void> {
-    const { api, updateState, throwIfDestroyed, prepareReminderScope } = this.dependencies;
-    const manifest = this.dependencies.getLocalManifest();
-    const initialConfig = manifest.getInitialConfigPull();
-    if (initialConfig && (this.dependencies.getSettings().lastSeq > 0 || Object.keys(initialConfig.files).every(path => manifest.hasFile(path)))) {
-      manifest.setInitialConfigPull(undefined);
-      await manifest.save();
-      throwIfDestroyed();
-    }
-    if (!api.initialImport?.isPreparingReminders()) return;
-    updateState({ work: { phase: 'reminders' } });
-    await prepareReminderScope?.();
-    throwIfDestroyed();
-    await api.initialImport.finishReminderSetup(throwIfDestroyed, reminderSetup => {
-      updateState({ work: { phase: 'reminders', reminderSetup } });
-    });
-  }
+	finishInitialSetup(): Promise<void> {
+		const dependencies = this.dependencies;
+		return finishInitialSetup({
+			manifest: dependencies.getLocalManifest(), lastSeq: dependencies.getSettings().lastSeq,
+			initialImport: dependencies.api.initialImport, prepareReminderScope: dependencies.prepareReminderScope,
+			reportWork: work => dependencies.updateState({ work }), assertActive: dependencies.throwIfDestroyed,
+		});
+	}
 
   private tryInitialImport(result: import('./types').SyncResult, progress?: (current: number, total: number) => void) {
     const dependencies = this.dependencies;

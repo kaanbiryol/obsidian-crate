@@ -11,6 +11,7 @@ import {
 } from './pwa';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa/pwa-params';
+import statusStyles from '../../../site/assets/status.css?raw-css';
 
 describe('PWA activation metadata', () => {
 	it('uses the plain notifications route when no activation params are present', () => {
@@ -232,6 +233,8 @@ describe('PWA activation metadata', () => {
 		expect(OPEN_OBSIDIAN_HTML).toContain('background:#0c0c0f;color:#f3f3f5');
 		expect(OPEN_OBSIDIAN_HTML).toContain('background:#e9e4f4;color:#211c2a');
 		expect(OPEN_OBSIDIAN_HTML).toContain('color:var(--muted)');
+		expect(OPEN_OBSIDIAN_HTML).toContain(`<style>${statusStyles}</style>`);
+		expect(OPEN_OBSIDIAN_HTML).toContain('<a id="open-link" href="obsidian://open" class="button">Open Obsidian</a>');
 		expect(OPEN_OBSIDIAN_HTML).toContain('<script src="/notifications/open-obsidian.js?v=');
 		expect(OPEN_OBSIDIAN_HTML).not.toContain('<script>');
 		expect(OPEN_OBSIDIAN_JS).toContain("var project = params.get('project')");

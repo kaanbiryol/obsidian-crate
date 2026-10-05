@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSyncFailureToast } from './useSyncFailureToast';
-import { createReminderOutbox } from '../reminder-outbox';
+import { createReminderOutbox, reminderRetryAt } from '../reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
@@ -103,10 +103,7 @@ export function useReminderOutbox(options: {
 			const resume = () => {
 				if (!isCurrent()) return;
 				try {
-					// Resume durable attempts when the app is reopened or connectivity returns.
-					for (const change of outbox.refresh()) {
-						if (optionsRef.current.enabled !== false && change.status === 'uncertain') outbox.retry(change.operationId);
-					}
+					outbox.refresh();
 					void outbox.drain();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
@@ -115,9 +112,13 @@ export function useReminderOutbox(options: {
 				try {
 					await navigator.locks.request('crate-reminder-outbox', () => {
 						if (!isCurrent()) return;
+						const recovered = new Set(recovery.load().map(change => change.operationId));
 						recovery.adopt();
 						setRecoveryChanges(recovery.load());
-						outbox.refresh();
+						// Selecting recovery explicitly resumes these earlier-session attempts.
+						for (const change of outbox.refresh()) {
+							if (recovered.has(change.operationId) && change.status === 'uncertain') outbox.retry(change.operationId);
+						}
 					});
 					resume();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
@@ -172,7 +173,7 @@ export function useReminderOutbox(options: {
 
 	useEffect(() => {
 		if (!ready || options.enabled === false || !navigator.onLine) return;
-		const retryTimes = changes.filter(change => change.status === 'uncertain' && change.attempts < 3).map(change => change.retryAt);
+		const retryTimes = changes.flatMap(change => reminderRetryAt(change) ?? []);
 		if (retryTimes.length === 0) return;
 		const timer = window.setTimeout(() => { void outboxRef.current?.drain(); }, Math.max(0, Math.min(...retryTimes) - Date.now()));
 		return () => window.clearTimeout(timer);

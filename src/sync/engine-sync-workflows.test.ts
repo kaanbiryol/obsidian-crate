@@ -1,14 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createDeferred } from './runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import {
 	createHarness,
-	flushPendingChanges,
-	getPendingPaths,
-	setSyncStatus,
-	spyOnDebouncedSync,
 	spyOnIncrementalSync,
 	toArrayBuffer,
 } from './engine-test-harness';
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe('SyncEngine incremental sync cursor/state safeguards', () => {
 	it('sets state to error when incremental sync returns errors', async () => {
@@ -95,13 +94,24 @@ describe('SyncEngine full sync safeguards', () => {
 describe('SyncEngine slice 5 safeguards', () => {
 	it('rejects initial sync while another sync is in progress', async () => {
 		const harness = createHarness();
-		setSyncStatus(harness.engine, 'syncing');
+		const gate = createDeferred<void>();
+		harness.api.getManifest.mockImplementation(async () => {
+			await gate.promise;
+			return { version: 1, files: {}, lastSeq: 1 };
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		const running = harness.engine.sync();
+		await vi.waitFor(() => expect(harness.api.getManifest).toHaveBeenCalledOnce());
 
 		const result = await harness.engine.initialSync();
 
 		expect(result.success).toBe(false);
 		expect(result.errors).toEqual(['Sync already in progress']);
 		expect(harness.vault.getFiles).not.toHaveBeenCalled();
+		gate.resolve();
+		expect((await running).success).toBe(true);
+		harness.engine.destroy();
 	});
 
 	it('sets state to error when initial sync finishes with per-file errors', async () => {
@@ -211,6 +221,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 	});
 
 	it('does not reschedule debounced sync after destroy during a pending flush', async () => {
+		vi.useFakeTimers();
 		const harness = createHarness();
 		const content = toArrayBuffer('A');
 		let releaseUpload!: () => void;
@@ -235,21 +246,21 @@ describe('SyncEngine slice 5 safeguards', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.api.uploadFile.mockImplementation(async () => {
 			signalUploadStarted();
-			getPendingPaths(harness.engine).add('notes/b.md');
+			harness.engine.onFileChange({ path: 'notes/b.md' } as never);
 			await uploadGate;
 			return { success: true, path: 'notes/a.md' };
 		});
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
 
-		getPendingPaths(harness.engine).add('notes/a.md');
-		const processing = flushPendingChanges(harness.engine);
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
 		await uploadStarted;
 
 		harness.engine.destroy();
 		releaseUpload();
-		await processing;
+		await harness.engine.waitForIdle();
+		await vi.advanceTimersByTimeAsync(60_000);
 
-		expect(debouncedSync).not.toHaveBeenCalled();
-		expect(getPendingPaths(harness.engine).size).toBe(0);
+		expect(harness.api.uploadFile).toHaveBeenCalledOnce();
+		expect(harness.engine.getPendingPaths()).toEqual([]);
 	});
 });

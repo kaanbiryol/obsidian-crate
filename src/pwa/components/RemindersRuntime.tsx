@@ -23,6 +23,7 @@ import type {
 } from '../types';
 import { DeferredNotice } from './DeferredNotice';
 import { reminderSyncStatus } from '../sync/reminder-status';
+import { reminderRetryAt } from '../reminder-outbox';
 
 const ReminderRecoveryNotice = lazy(() => import('./ReminderRecoveryNotice')
 	.then(module => ({ default: module.ReminderRecoveryNotice })));
@@ -217,7 +218,7 @@ function useRemindersController() {
 	useFeatureSettings('reminders', {
 		ready: bootstrapped && (mutationsReady || Boolean(storageError) || !authToken),
 		enabled, pendingCount: changes.length,
-		retryAt: Math.min(...changes.filter(change => change.status === 'uncertain' && change.attempts < 3).map(change => change.retryAt)),
+		retryAt: Math.min(...changes.flatMap(change => reminderRetryAt(change) ?? [])),
 		connected: Boolean(authToken), config, push,
 		updateContentReady: !enabled || initialContentReady,
 		updateReady: bootstrapped && !modal && !saving && !loggingOut && !reorderDragging && !isPreparingMutation()

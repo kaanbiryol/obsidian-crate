@@ -102,6 +102,20 @@ it('does not resume initialization or local deletion after the runtime is stoppe
 	expect(h.values.has(SECRET_KEYS.ENCRYPTION_RESET)).toBe(true);
 });
 
+it('keeps the upload checkpoint when shutdown interrupts reset initialization', async () => {
+	const h = await setup(), initialized = createDeferred<void>();
+	vi.mocked(SyncEngine.prototype.initialize).mockReturnValueOnce(initialized.promise);
+	const running = h.run();
+	await vi.waitFor(() => expect(SyncEngine.prototype.initialize).toHaveBeenCalled());
+	h.runtime.destroy();
+	initialized.resolve();
+	await expect(running).rejects.toMatchObject({ name: 'AbortError' });
+	expect(SyncEngine.prototype.sync).not.toHaveBeenCalled();
+	expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
+	expect(h.settings.automaticSync).toBe(false);
+	expect(h.runtime.getApiClient()).toBeNull();
+});
+
 it('leaves sync and credentials intact when the server does not support reset', async () => {
 	const h = await setup();
 	vi.mocked(WorkerApiHttpClient.prototype.getServerInfo).mockResolvedValue({ service: 'crate', serverVersion: 'old', protocol: { current: 2, oldestCompatible: 2 }, capabilities: ['e2ee-v1'] });

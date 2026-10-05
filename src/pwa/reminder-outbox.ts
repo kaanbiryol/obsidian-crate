@@ -8,6 +8,11 @@ function requestFingerprint(change: PendingReminderChange): Promise<string> {
 	return stringDigest(JSON.stringify([change.method, change.path, change.body]));
 }
 
+/** Automatic wakeups share the saved deadline and budget; only user retries reset them. */
+export function reminderRetryAt(change: PendingReminderChange): number | undefined {
+	return change.status === 'uncertain' && !change.reviewRequired && change.attempts < 3 ? change.retryAt : undefined;
+}
+
 export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onError, onSettled, withLock = work => work(), canSend = () => true }: {
 	storage: ReminderOutboxStorage;
 	apiFetch: ApiFetch;
@@ -44,6 +49,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 		update(change);
 	};
 
+	// Explicit retry/recovery only. Foreground and reconnect events call drain().
 	const retry = (operationId: string) => {
 		const change = storage.load().find(item => item.operationId === operationId);
 		if (!change || change.reviewRequired || !isCurrent()) return;
@@ -72,7 +78,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 			await withLock(async () => {
 				while (isCurrent() && canSend() && (typeof navigator === 'undefined' || navigator.onLine)) {
 					const queued = storage.load().find(item => !item.reviewRequired && (item.status === 'pending'
-						|| (item.status === 'uncertain' && item.attempts < 3 && item.retryAt <= Date.now())));
+						|| (reminderRetryAt(item) ?? Infinity) <= Date.now()));
 					if (!queued) break;
 					if (settledRequests.has(queued.operationId)
 						&& settledRequests.get(queued.operationId) === await requestFingerprint(queued)) {

@@ -14,6 +14,14 @@ Each snapshot includes a SHA-256 digest of the session credential. The credentia
 
 Explicit logout still deletes the whole private cache and clears pending commands/drafts. A blocked delete remains queued by the browser; the app promptly reports that it could not confirm erasure and directs the user to close other tabs and clear site data. It does not report a blocked deletion as successful. Session and cache generations prevent delayed writes from recreating the signed-out snapshot.
 
+## Pending command retries
+
+Reminder commands retain their automatic retry deadline and attempt count through
+reloads, foreground changes and reconnection. After three uncertain attempts,
+automatic sending pauses. Explicit retry or **Resume saved changes** for an earlier
+session starts another attempt budget with the same operation ID and request body.
+Rejected commands remain available for review.
+
 ## Damaged pending commands
 
 A damaged or unsupported pending-command entry is quarantined in its original local-storage key. Reading the queue neither rewrites nor deletes it, and needs no additional storage space. Valid commands remain available and can sync with their original operation IDs and request bodies. Valid commands from an earlier session still require the existing same-folder review and resume action. A damaged destination never overwrites a valid earlier-session recovery source.
@@ -37,6 +45,10 @@ Removal verifies the enrolled folder, storage key and full exported string immed
 `pwa-cache-recovery-ui-test.mjs` exercises the built PWA against native IndexedDB: blocked startup retains the live reminder UI, the keyboard recovery action rejects the retired format until explicit cache clearing, damaged cached rows stay unrendered during network failure, and reconnection replaces them without using their ETag or losing drafts and pending commands. Cloudflare responses use the local preview server; these tests do not establish physical-device or hosted acceptance.
 
 `pwa-outbox-recovery-test.mjs` exercises two built-PWA tabs in Chromium and WebKit at a mobile viewport. Healthy current and earlier-session commands sync despite damaged neighbors; only valid operation bodies reach the preview server. Downloads preserve exact Unicode and malformed JSON strings, markup stays inert, and removal after a concurrent edit preserves changed and unexported entries. Unit tests also cover quota-free quarantine, invalid reminder presentation fields, conflicting recovery destinations and explicit logout cleanup.
+
+`pwa-optimistic-test.mjs` verifies that exhausted retries stay paused after reload,
+online and foreground events, and that explicit retry sends the same request bytes.
+Hook tests also check that automatic wakeups wait for the saved deadline.
 
 `pwa-draft-recovery-test.mjs` verifies the built editor in Chromium and WebKit: malformed fields stay unrendered, close/reload preserves exact strings, export includes full Unicode text without executing markup, and changed or failed storage removals cannot open an editor over the retained draft. Other folders remain private, and no reminder mutation is sent during recovery.
 

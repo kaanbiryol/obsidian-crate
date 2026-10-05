@@ -1,9 +1,12 @@
-import { expect, it, vi } from 'vitest';
-import { createHarness, getPendingPaths, toArrayBuffer } from './engine-test-harness';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { computeHash } from './hasher';
 
+beforeEach(() => { vi.useFakeTimers(); });
+afterEach(() => { vi.useRealTimers(); });
+
 async function setup(path = 'note.md') {
- const h = createHarness();
+ const h = createHarness({ automaticSync: false });
  const base = toArrayBuffer('before');
  const hash = await computeHash(base);
  const baseline = { hash, size: base.byteLength, modified: '' };
@@ -41,7 +44,7 @@ it.each(['note.md', '.obsidian/plugins/obsidian-minimal-settings/data.json'])('l
  h.remote.getFileMetadata.mockResolvedValue({ files: { [path]: h.baseline } });
  h.api.downloadFile.mockResolvedValue({ content: h.base });
  h.localManifest.setEntry.mockClear();
- getPendingPaths(h.engine).add(path);
+ h.engine.onFileChange({ path } as never);
  expect(await h.engine.loadPendingDiff(path, false)).toMatchObject({ before: 'before', after: 'after', kind: 'modified' });
  expect(h.remote.getFileMetadata).toHaveBeenCalledWith([path]);
  expect(h.api.downloadFile).toHaveBeenCalledWith(path);
@@ -82,12 +85,12 @@ it('rejects a preview if sync changes its baseline during a local read', async (
 });
 
 it('discards a local deletion offline and preserves the last-synced revision', async () => {
- const h = createHarness();
+ const h = createHarness({ automaticSync: false });
  const base = toArrayBuffer('last synced');
  const hash = await computeHash(base);
  const baseline = { hash, size: base.byteLength, modified: '', revision: 'last-synced-revision' };
  h.localManifest.setEntry('note.md', baseline);
- getPendingPaths(h.engine).add('delete:note.md');
+ h.engine.onFileDelete({ path: 'note.md' } as never);
  let restored = false;
  h.vault.adapter.exists.mockImplementation((path: string) => path !== 'note.md' || restored);
  h.vault.adapter.stat.mockImplementation(async (path: string) => path === 'note.md' && !restored ? null : { type: 'file', size: base.byteLength, mtime: 1 });

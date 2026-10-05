@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import { invalidatePwaSession } from '../session-generation';
 import type { PendingReminderChange } from '../reminder-outbox-types';
@@ -35,6 +35,7 @@ beforeEach(() => {
 	stored.changes = [];
 	vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: string, work: () => Promise<void>) => work() } });
 });
+afterEach(() => vi.useRealTimers());
 async function harness(path = '/reminders/create', online = true) {
 	Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
 	const response = deferred<Response>();
@@ -109,4 +110,50 @@ it('does not announce a delayed confirmation after logout', async () => {
 	invalidatePwaSession();
 	await act(async () => { state.response.resolve(confirmed()); await state.draining; });
 	expect(state.showToast).not.toHaveBeenCalled();
+});
+
+it.each([1, 3])('preserves a saved retry deadline and %i attempts across mounting and browser resume', async attempts => {
+	vi.useFakeTimers();
+	const change: PendingReminderChange = {
+		operationId: 'saved-operation', recordId: 'one', kind: 'save', path: '/reminders/create', method: 'POST',
+		body: '{"operationId":"saved-operation","content":"Keep these exact bytes"}',
+		status: 'uncertain', attempts, retryAt: Date.now() + 10_000, ambiguous: true,
+	};
+	stored.changes = [change];
+	const apiFetch = vi.fn<ApiFetch>(async () => new Response('Unavailable', { status: 503 }));
+	const mount = () => renderHook(() => useReminderOutbox({
+		authToken: 'token', folderPath: 'Reminders', bootstrapped: true, apiFetch, showToast: vi.fn(),
+		beginLocalMutation: () => () => {}, commitReminderState: async () => {},
+		getSnapshot: () => ({ reminders: [], projects: ['Inbox'] }), loadReminders: vi.fn(),
+	}));
+	const first = mount();
+	await act(async () => {});
+	expect(apiFetch).not.toHaveBeenCalled();
+	first.unmount();
+	const reopened = mount();
+	await act(async () => {});
+	Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+	await act(async () => {
+		window.dispatchEvent(new window.Event('online'));
+		document.dispatchEvent(new window.Event('visibilitychange'));
+		await vi.advanceTimersByTimeAsync(9_999);
+	});
+	expect(apiFetch).not.toHaveBeenCalled();
+	expect(stored.changes).toEqual([change]);
+	await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+	if (attempts === 1) {
+		expect(apiFetch).toHaveBeenCalledExactlyOnceWith(change.path, { method: change.method, body: change.body });
+		expect(stored.changes[0]).toMatchObject({ attempts: 2, status: 'uncertain', body: change.body });
+	} else {
+		await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+		expect(apiFetch).not.toHaveBeenCalled();
+		apiFetch.mockResolvedValue(confirmed());
+		await act(async () => {
+			reopened.current.outboxRef.current!.retry(change.operationId);
+			await reopened.current.outboxRef.current!.drain();
+		});
+		expect(apiFetch).toHaveBeenCalledExactlyOnceWith(change.path, { method: change.method, body: change.body });
+		expect(stored.changes).toEqual([]);
+	}
+	reopened.unmount();
 });

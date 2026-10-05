@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import { SyncEngine } from './engine';
 import type { ConflictStore } from './conflict-store';
-import type { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../protocol/sync-types';
@@ -91,28 +90,6 @@ export type Harness = {
 
 function setEngineLocalManifest(engine: SyncEngine, localManifest: Harness['localManifest']): void {
 	(engine as unknown as { localManifest: Harness['localManifest'] }).localManifest = localManifest;
-}
-
-function getQueueController(engine: SyncEngine): SyncQueueController {
-	return (engine as unknown as { queueController: SyncQueueController }).queueController;
-}
-
-export function getPendingPaths(engine: SyncEngine): Set<string> {
-	return (getQueueController(engine) as unknown as { pendingPaths: Set<string> }).pendingPaths;
-}
-
-export function spyOnDebouncedSync(engine: SyncEngine) {
-	return vi
-		.spyOn(getQueueController(engine) as unknown as { debouncedSync(): void }, 'debouncedSync')
-		.mockImplementation(() => {});
-}
-
-export async function flushPendingChanges(engine: SyncEngine): Promise<void> {
-	await (getQueueController(engine) as unknown as { processPendingChanges(): Promise<void> }).processPendingChanges();
-}
-
-export function setSyncStatus(engine: SyncEngine, status: 'idle' | 'syncing' | 'error'): void {
-	(engine as unknown as { state: { status: 'idle' | 'syncing' | 'error' } }).state.status = status;
 }
 
 export async function runPeriodicCheck(engine: SyncEngine): Promise<void> {

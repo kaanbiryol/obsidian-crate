@@ -1,11 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from './runtime-test-harness';
 import {
 	createHarness,
 	createSyncResult,
-	flushPendingChanges,
-	getPendingPaths,
-	spyOnDebouncedSync,
 	spyOnIncrementalSync,
 	toArrayBuffer,
 	type Harness,
@@ -15,45 +12,38 @@ describe('SyncEngine event queue behavior', () => {
 	let harness: Harness;
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		harness = createHarness();
 		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1700000000000 });
 	});
 
+	afterEach(() => {
+		harness.engine.destroy();
+		vi.useRealTimers();
+	});
+
 	it('does not flush queued edits after automatic sync is disabled', async () => {
-		vi.useFakeTimers();
-		try {
-			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
-			harness.engine.updateSettings({ ...harness.settings, automaticSync: false });
-			await vi.advanceTimersByTimeAsync(60_000);
-			await flushPendingChanges(harness.engine);
-			expect(harness.api.uploadFile).not.toHaveBeenCalled();
-			expect(harness.engine.getPendingPaths()).toContain('notes/a.md');
-		} finally {
-			harness.engine.destroy();
-			vi.useRealTimers();
-		}
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		harness.engine.updateSettings({ ...harness.settings, automaticSync: false });
+		await vi.advanceTimersByTimeAsync(60_000);
+		expect(harness.api.uploadFile).not.toHaveBeenCalled();
+		expect(harness.engine.getPendingPaths()).toContain('notes/a.md');
 	});
 
 	it('queues remote delete when renaming from syncable path into ignored path', () => {
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
-
 		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.has('delete:notes/note.md')).toBe(true);
-		expect(pendingPaths.has('.trash/note.md')).toBe(false);
-		expect(debouncedSync).toHaveBeenCalledTimes(1);
+		const pendingPaths = harness.engine.getPendingPaths();
+		expect(pendingPaths.includes('delete:notes/note.md')).toBe(true);
+		expect(pendingPaths.includes('.trash/note.md')).toBe(false);
 	});
 
 	it('queues upload when renaming from ignored path into syncable path', () => {
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
-
 		harness.engine.onFileRename({ path: 'notes/note.md' } as never, '.trash/note.md');
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.has('delete:.trash/note.md')).toBe(false);
-		expect(pendingPaths.has('notes/note.md')).toBe(true);
-		expect(debouncedSync).toHaveBeenCalledTimes(1);
+		const pendingPaths = harness.engine.getPendingPaths();
+		expect(pendingPaths.includes('delete:.trash/note.md')).toBe(false);
+		expect(pendingPaths.includes('notes/note.md')).toBe(true);
 	});
 
 	it('emits idle state after flush with no pending paths left', async () => {
@@ -73,8 +63,9 @@ describe('SyncEngine event queue behavior', () => {
 			}
 		});
 
-		getPendingPaths(harness.engine).add('notes/a.md');
-		await flushPendingChanges(harness.engine);
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
 
 		expect(idlePendingCounts.at(-1)).toBe(0);
 	});
@@ -94,8 +85,9 @@ describe('SyncEngine event queue behavior', () => {
 		const onQueueSyncResult = vi.fn(async () => {});
 		harness.engine.setAutomaticSyncResultCallback(onQueueSyncResult);
 
-		getPendingPaths(harness.engine).add('notes/a.md');
-		await flushPendingChanges(harness.engine);
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
 
 		expect(onQueueSyncResult).toHaveBeenCalledWith(expect.objectContaining({
 			success: true,
@@ -120,19 +112,18 @@ describe('SyncEngine event queue behavior', () => {
 			return null;
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
 		harness.api.uploadFile.mockImplementation(async () => {
-			getPendingPaths(harness.engine).add('notes/b.md');
+			harness.engine.onFileChange({ path: 'notes/b.md' } as never);
 			return { success: true, path: 'notes/a.md' };
 		});
 
-		getPendingPaths(harness.engine).add('notes/a.md');
-		await flushPendingChanges(harness.engine);
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.has('notes/a.md')).toBe(false);
-		expect(pendingPaths.has('notes/b.md')).toBe(true);
-		expect(debouncedSync).toHaveBeenCalledTimes(1);
+		const pendingPaths = harness.engine.getPendingPaths();
+		expect(pendingPaths.includes('notes/a.md')).toBe(false);
+		expect(pendingPaths.includes('notes/b.md')).toBe(true);
 	});
 
 	it('re-queues pending path when upload returns success false', async () => {
@@ -143,25 +134,25 @@ describe('SyncEngine event queue behavior', () => {
 			stat: { size: 1, mtime: 1700000000000 },
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		spyOnDebouncedSync(harness.engine);
 		harness.api.uploadFile.mockResolvedValue({
 			success: false,
 			path: 'notes/a.md',
 			error: 'quota exceeded',
 		});
 
-		getPendingPaths(harness.engine).add('notes/a.md');
-		await flushPendingChanges(harness.engine);
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.has('notes/a.md')).toBe(true);
+		const pendingPaths = harness.engine.getPendingPaths();
+		expect(pendingPaths.includes('notes/a.md')).toBe(true);
 		expect(harness.engine.getState().status).toBe('error');
 		expect(harness.engine.getState().lastError).toContain('quota exceeded');
 	});
 });
 describe('SyncEngine explicit sync queue reconciliation', () => {
 	it('clears queued paths that were handled by an explicit sync result', async () => {
-		const harness = createHarness();
+		const harness = createHarness({ automaticSync: false });
 		const result = createSyncResult();
 		result.uploaded = 1;
 		result.downloaded = 1;
@@ -171,36 +162,36 @@ describe('SyncEngine explicit sync queue reconciliation', () => {
 		result.deletedPaths.push('notes/deleted.md');
 		spyOnIncrementalSync(harness.engine, result);
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		pendingPaths.add('notes/uploaded.md');
-		pendingPaths.add('notes/downloaded.md');
-		pendingPaths.add('delete:notes/deleted.md');
-		pendingPaths.add('notes/still-pending.md');
+		harness.engine.onFileChange({ path: 'notes/uploaded.md' } as never);
+		harness.engine.onFileChange({ path: 'notes/downloaded.md' } as never);
+		harness.engine.onFileDelete({ path: 'notes/deleted.md' } as never);
+		harness.engine.onFileChange({ path: 'notes/still-pending.md' } as never);
 
 		const syncResult = await harness.engine.sync();
 
+		const pendingPaths = harness.engine.getPendingPaths();
 		expect(syncResult).toBe(result);
-		expect(pendingPaths.has('notes/uploaded.md')).toBe(false);
-		expect(pendingPaths.has('notes/downloaded.md')).toBe(false);
-		expect(pendingPaths.has('delete:notes/deleted.md')).toBe(false);
-		expect(pendingPaths.has('notes/still-pending.md')).toBe(true);
+		expect(pendingPaths.includes('notes/uploaded.md')).toBe(false);
+		expect(pendingPaths.includes('notes/downloaded.md')).toBe(false);
+		expect(pendingPaths.includes('delete:notes/deleted.md')).toBe(false);
+		expect(pendingPaths.includes('notes/still-pending.md')).toBe(true);
 		expect(harness.engine.getState().pendingChanges).toBe(1);
+		harness.engine.destroy();
 	});
 
 	it('clears pending state immediately when explicit sync handled all queued paths', async () => {
-		const harness = createHarness();
+		const harness = createHarness({ automaticSync: false });
 		const result = createSyncResult();
 		result.uploaded = 1;
 		result.uploadedPaths.push('notes/a.md');
 		spyOnIncrementalSync(harness.engine, result);
 
-		const pendingPaths = getPendingPaths(harness.engine);
-		pendingPaths.add('notes/a.md');
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 
 		await harness.engine.sync();
 
-		expect(pendingPaths.size).toBe(0);
 		expect(harness.engine.getPendingPaths()).toEqual([]);
 		expect(harness.engine.getState().pendingChanges).toBe(0);
+		harness.engine.destroy();
 	});
 });

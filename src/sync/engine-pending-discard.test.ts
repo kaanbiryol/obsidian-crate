@@ -1,19 +1,21 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../protocol/sync-types';
-import { createHarness, getPendingPaths, toArrayBuffer } from './engine-test-harness';
+import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { computeHash } from './hasher';
+
+beforeEach(() => { vi.useFakeTimers(); });
+afterEach(() => { vi.useRealTimers(); });
 
 const path = '.obsidian/plugins/obsidian-minimal-settings/data.json';
 
 async function setup(saved = '{"theme":"saved"}', local: string | null = '{"theme":"local"}') {
-    const h = createHarness();
+    const h = createHarness({ automaticSync: false });
     const base = toArrayBuffer(saved);
     const baseline = { hash: await computeHash(base), size: base.byteLength, modified: '', revision: 'last-synced-revision' };
     const key = local === null ? `delete:${path}` : path;
     const files = new Map<string, ArrayBuffer>(local === null ? [] : [[path, toArrayBuffer(local)]]);
     const folders = new Set<string>();
     h.localManifest.setEntry(path, baseline);
-    getPendingPaths(h.engine).add(key);
     h.vault.getAbstractFileByPath.mockReturnValue(null);
     h.vault.adapter.exists.mockImplementation((target: string) => files.has(target) || folders.has(target));
     h.vault.adapter.stat.mockImplementation(async target => files.has(target) ? { type: 'file', size: files.get(target)!.byteLength, mtime: 1 } : null);
@@ -40,6 +42,7 @@ async function setup(saved = '{"theme":"saved"}', local: string | null = '{"them
         downloadFile: vi.fn(async () => ({ content: base })),
     };
     Object.assign(h.api, remote);
+    await h.engine.onRawFileChange(path);
     h.localManifest.setEntry.mockClear();
     return { ...h, files, base, baseline, key, remote, process };
 }

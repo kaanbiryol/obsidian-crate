@@ -40,13 +40,13 @@ async function verify(browser) {
 		await page.goto(`${origin}/outbox-seed`);
 		const healthyKey = key(previewAuthToken, healthyId); const oldHealthyKey = key('expired-session', oldHealthyId);
 		const draft = await page.evaluate(({ badKey, oldBadKey, privateKey, badRaw, oldBadRaw, healthyKey, oldHealthyKey, healthyId, oldHealthyId }) => {
-			const queued = (operationId, content) => JSON.stringify({ version: 1, createdAt: 1, change: {
-				operationId, recordId: operationId, kind: 'save', path: '/reminders/create', method: 'POST', status: 'uncertain', attempts: 1, retryAt: 0,
+			const queued = (operationId, content, attempts = 1) => JSON.stringify({ version: 1, createdAt: 1, change: {
+				operationId, recordId: operationId, kind: 'save', path: '/reminders/create', method: 'POST', status: 'uncertain', attempts, retryAt: 0,
 				body: JSON.stringify({ operationId, id: operationId, folderPath: 'Reminders', content, project: 'Inbox', priority: 4 }),
 			} });
 			localStorage.setItem(badKey, badRaw); localStorage.setItem(oldBadKey, oldBadRaw); localStorage.setItem(privateKey, 'Never export another folder');
 			localStorage.setItem(healthyKey, queued(healthyId, 'Healthy pending creation'));
-			localStorage.setItem(oldHealthyKey, queued(oldHealthyId, 'Healthy recovered creation'));
+			localStorage.setItem(oldHealthyKey, queued(oldHealthyId, 'Healthy recovered creation', 3));
 			const draft = JSON.stringify({ mode: 'create', draft: { content: 'Keep independent draft', description: 'Full details', project: 'Inbox', defaultProject: 'Inbox',
 				priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } });
 			sessionStorage.setItem('crate-reminder-draft:Reminders:new', draft); return draft;

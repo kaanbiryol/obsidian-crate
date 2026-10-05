@@ -291,8 +291,12 @@ async function verifyLostAcknowledgement(page) {
 
 async function verifyExhaustedRetries(page) {
 	let attempts = 0;
+	let recover = false;
+	const bodies = [];
 	await page.route(`${origin}/reminders/create`, route => {
 		attempts++;
+		bodies.push(route.request().postData());
+		if (recover) return route.continue();
 		return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Service temporarily unavailable' }) });
 	});
 	await page.locator('[data-action="open-create-modal"]').click();
@@ -304,6 +308,20 @@ async function verifyExhaustedRetries(page) {
 	await expect.poll(() => attempts, { timeout: 12000 }).toBe(3);
 	await expect(page.locator('.toast.is-error')).toHaveText('Reminder changes need attention. Review them in settings.');
 	await expect(card(page, 'Saved locally while service is unavailable')).toBeVisible();
+	await page.reload();
+	const notice = page.getByRole('region', { name: 'Couldn’t sync: Saved locally while service is unavailable', exact: true });
+	await expect(notice).toBeVisible();
+	await page.evaluate(() => {
+		window.dispatchEvent(new Event('online'));
+		document.dispatchEvent(new Event('visibilitychange'));
+	});
+	await page.waitForTimeout(1_000);
+	expect(attempts).toBe(3);
+	recover = true;
+	await notice.getByRole('button', { name: 'Retry: Saved locally while service is unavailable', exact: true }).click();
+	await expectSynced(page);
+	expect(attempts).toBe(4);
+	expect(new Set(bodies).size).toBe(1);
 }
 
 async function serverRecordCount(page, content) {
