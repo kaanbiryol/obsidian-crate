@@ -28,6 +28,14 @@ const { outputFiles } = await build({
         currentText: 'Current note', savedText: 'Saved note', currentSize: 12, savedSize: 10,
         openVersion: async () => {}, resolve: async () => {},
       }), () => {}).open();
+      else if (scene === 'history-loading') new ActivityModal({}, {
+        syncHistory: [{ timestamp: '2026-01-01T00:00:00Z', type: 'sync', success: true, uploaded: 1,
+          downloaded: 0, deleted: 0, merged: 0, conflictCount: 0, errorCount: 0, uploadedPaths: ['note.md'] }],
+        workerUrl: 'https://crate.example',
+      }, { ...deps, listSharedCheckpoints: () => new Promise((resolve, reject) => {
+        window.resolveSharedHistory = () => resolve([]);
+        window.rejectSharedHistory = () => reject(new Error('Offline'));
+      }) }, 'history').open();
       else new ActivityModal({}, { syncHistory: [], workerUrl: 'https://crate.example' }, deps).open();
     };
     window.mount('activity');
@@ -101,6 +109,17 @@ for (const engine of [chromium, webkit]) {
       await page.getByRole('radio', { name: 'Keep current', exact: true }).check();
       await expect(resolve).toBeEnabled();
       assert.deepEqual(await resolve.evaluate(primaryStyle), actionStyle);
+      if (width === 1280 && theme === 'light') {
+        for (const outcome of ['resolveSharedHistory', 'rejectSharedHistory']) {
+          await page.evaluate(() => window.mount('history-loading'));
+          const panel = page.getByRole('tabpanel', { name: 'History', exact: true });
+          await expect(panel).toContainText('Loading history…');
+          await expect(panel.locator('.crate-history-entry')).toHaveCount(0);
+          await page.evaluate(outcome => window[outcome](), outcome);
+          await expect(panel.locator('.crate-history-entry')).toHaveCount(1);
+          await expect(panel).not.toContainText('Loading history…');
+        }
+      }
       assert.deepEqual(errors, []);
       await page.close();
     }

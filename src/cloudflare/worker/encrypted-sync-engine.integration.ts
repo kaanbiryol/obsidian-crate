@@ -90,8 +90,8 @@ it.each(['sync', 'selected', 'wire-fallback'])('reconciles encrypted edits made 
 			await editRemotely(); return upload.apply(this, args);
 		});
 	} else {
-		const upload = first.api.batchUpload.bind(first.api);
-		vi.spyOn(first.api, 'batchUpload').mockImplementationOnce(async files => {
+		const upload = first.files.batchUpload.bind(first.files);
+		vi.spyOn(first.files, 'batchUpload').mockImplementationOnce(async files => {
 			await editRemotely(); return upload(files);
 		});
 	}

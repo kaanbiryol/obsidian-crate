@@ -21,7 +21,7 @@ async function fixture() {
 	const context = {
 		vault: disk.vault,
 		get localManifest() { return manifest; },
-		shouldIgnore: (path: string) => path.startsWith(`${TEST_PLUGIN_DIR}/`) || path === TEST_PLUGIN_DIR,
+		throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith(`${TEST_PLUGIN_DIR}/`) || path === TEST_PLUGIN_DIR,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		initialConfigPull: {
 			firstSync: true,

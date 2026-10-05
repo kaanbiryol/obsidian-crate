@@ -101,8 +101,8 @@ export async function processPendingChanges(
 		const uploads: Array<{ path: string }> = [];
 		const deletes = paths.filter(path => path.startsWith('delete:')).flatMap(key => {
 			const path = key.substring(7);
-			const expectedHash = context.localManifest.getEntry?.(path)?.hash;
-			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry?.(path)?.revision }] : [];
+			const expectedHash = context.localManifest.getEntry(path)?.hash;
+			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
 		});
 		const chunks = prepareUploadChunks(paths.filter(path => !path.startsWith('delete:')), async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
@@ -154,7 +154,7 @@ export async function processPendingChanges(
 
 		context.inFlightPaths.clear();
 		const didWork = uploads.length > 0 || deletes.length > 0;
-		await context.finishInitialSetup?.();
+		await context.finishInitialSetup();
 		context.updateState({
 			status: 'idle',
 			...(didWork ? { lastSync: new Date().toISOString(), lastError: null } : {}),

@@ -22,6 +22,7 @@ function createContext(options: {
 	};
 	const spies = {
 		apiConfigured: vi.fn(() => true),
+		finishInitialSetup: vi.fn(async () => {}),
 		recoverUploads: vi.fn(async () => {}),
 		getStatus: vi.fn((): ReturnType<SyncWorkflowContext['getStatus']> => 'idle'),
 		updateState: vi.fn(),
@@ -51,6 +52,7 @@ function createContext(options: {
 	const context: SyncWorkflowContext = {
 		apiConfigured: spies.apiConfigured,
 		recoverUploads: spies.recoverUploads,
+		finishInitialSetup: spies.finishInitialSetup,
 		getStatus: spies.getStatus,
 		updateState: spies.updateState,
 		getManifest: spies.getManifest,

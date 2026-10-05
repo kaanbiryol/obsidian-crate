@@ -86,7 +86,7 @@ describe('runIncrementalSync', () => {
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
-			shouldIgnore: vi.fn(() => false),
+			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => []),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),

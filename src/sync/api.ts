@@ -1,15 +1,11 @@
+import { createEngineFileOperations } from './engine-file-operations';
 import type { ConnectionTestResult } from './types';
 import { SharedHistoryApi } from './worker-api/history-checkpoints';
 import type { RequestDiagnostics } from './request-diagnostics';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import { normalizeWorkerUrl } from './worker-url';
 import type { Vault } from 'obsidian';
-import { assertRenamePreserved } from './rename-dependencies';
-import { DurableUploads } from './durable-uploads';
-import { DurableRestores } from './durable-restores';
-import type { UploadApplyPhase } from './upload-diagnostics';
 import type { LocalManifest } from './manifest';
-import { arrayBufferToBase64 } from './encoding';
 import type { NotificationPolicy } from '../protocol/notification-policy';
 /**
  * Worker API client facade for sync, setup, and reminder endpoints.
@@ -64,13 +60,10 @@ export class SyncApiClient {
 		this.encryption = encryption;
 	}
   readonly initialImport: InitialImportApi;
-	private durableUploads?: DurableUploads;
-	private durableRestores?: DurableRestores;
-	private deletionGuard?: (path: string) => Promise<void>;
-	configureUploadJournal(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache): void {
-		this.durableUploads = new DurableUploads(manifest, this.syncApi, cache, this.http.getRequestDiagnostics().clientSession);
-		this.deletionGuard = path => assertRenamePreserved(manifest, vault, path);
-		this.durableRestores = new DurableRestores(manifest, this.syncApi);
+	private fileOperationAuthority?: string;
+	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
+		this.fileOperationAuthority = this.getWorkerUrl();
+		return createEngineFileOperations(this.syncApi, manifest, vault, cache, this.http.getRequestDiagnostics().clientSession);
 	}
 	private readonly http: WorkerApiHttpClient;
 	private readonly syncApi: SyncWorkerApi;
@@ -95,7 +88,7 @@ export class SyncApiClient {
 
 	updateCredentials(workerUrl: string, authToken: string): void {
 		if (this.encryption) throw new Error('Reinitialize encrypted sync before changing connection credentials');
-		if (this.durableUploads && normalizeWorkerUrl(workerUrl) !== normalizeWorkerUrl(this.getWorkerUrl())) throw new Error('Stop this sync engine and preserve its pending uploads before connecting another server');
+		if (this.fileOperationAuthority !== undefined && normalizeWorkerUrl(workerUrl) !== this.fileOperationAuthority) throw new Error('Stop this sync engine and preserve its pending uploads before connecting another server');
 		this.http.updateCredentials(workerUrl, authToken);
 	}
 
@@ -119,11 +112,7 @@ export class SyncApiClient {
 	resetRequestTimings(): void { this.http.resetRequestTimings(); }
 	getRequestTimings() { return this.http.getRequestTimings(); }
 	getRequestDiagnostics(): RequestDiagnostics {
-		return { ...this.http.getRequestDiagnostics(), uploads: this.durableUploads?.getDiagnostics() };
-	}
-
-	async recordMergeApplication(path: string, hash: string, phase: UploadApplyPhase): Promise<void> {
-		await this.durableUploads?.recordMergeApplication(path, hash, phase);
+		return this.http.getRequestDiagnostics();
 	}
 
 	async health(): Promise<HealthResponse> {
@@ -154,11 +143,6 @@ export class SyncApiClient {
 		return this.syncApi.getFileMetadata(paths);
 	}
 
-	/** Called by the owning sync workflow before discovery or planning. */
-	async recoverUploads(onProgress?: (current: number, total: number) => void): Promise<void> {
-		await this.durableUploads?.recover(onProgress);
-	}
-
 	async uploadFile(
 		path: string,
 		content: ArrayBuffer,
@@ -167,11 +151,8 @@ export class SyncApiClient {
 		contentType: string,
 		expectedHash: string | null,
 		operationId?: string,
-		mergePreimage?: ArrayBuffer,
 	): Promise<UploadResult> {
-		return this.durableUploads
-			? this.durableUploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage)
-			: this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash, operationId);
+		return this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash, operationId);
 	}
 
 	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
@@ -179,7 +160,6 @@ export class SyncApiClient {
 	}
 
 	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
-		await this.deletionGuard?.(path);
 		return this.syncApi.deleteFile(path, expectedHash, expectedRevision);
 	}
 
@@ -192,7 +172,7 @@ export class SyncApiClient {
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
-		return this.durableUploads ? this.durableUploads.batch(files) : this.syncApi.batchUpload(files);
+		return this.syncApi.batchUpload(files);
 	}
 
 	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
@@ -204,7 +184,6 @@ export class SyncApiClient {
 		expectedHashes?: Record<string, string>,
 		expectedRevisions?: Record<string, string>,
 	): Promise<BatchDeleteResponse> {
-		for (const path of paths) await this.deletionGuard?.(path);
 		return this.syncApi.batchDelete(paths, expectedHashes, expectedRevisions);
 	}
 
@@ -215,15 +194,6 @@ export class SyncApiClient {
 	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
 		return this.syncApi.listFileVersions(query);
 	}
-
-	async restoreFileVersion(version: RemoteFileVersion): Promise<void> {
-		if (!this.durableRestores) throw new Error('Initialize sync before restoring a file');
-		return this.durableRestores.restore(version);
-	}
-
-	getPendingRestores(): RemoteFileVersion[] { return this.durableRestores?.pending() ?? []; }
-
-	async finishRestore(storageKey: string): Promise<void> { await this.durableRestores?.finish(storageKey); }
 
 	async revokeToken(id: string): Promise<{ success: boolean }> {
 		return this.authApi.revokeToken(id);

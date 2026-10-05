@@ -33,7 +33,7 @@ async function fixture(count = 1, size = 4) {
 	const signal = new AbortController().signal;
 	const verify = () => verifier.verify(vault as never, manifest, files, signal);
 	const planner = {
-		vault: vault as never, localManifest: manifest, shouldIgnore: () => false,
+		vault: vault as never, localManifest: manifest, throwIfDestroyed: () => signal.throwIfAborted(), shouldIgnore: () => false,
 		runConcurrent: <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 	};
 	return { files, adapter, manifest, hash, verify, app, plugin, planner, verifier, signal, progress, disk };

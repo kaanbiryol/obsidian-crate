@@ -20,7 +20,7 @@ import {
 const logger = createLogger('SyncEngine');
 
 export interface InitialSyncWorkflowContext {
-  finishInitialSetup?(): Promise<void>;
+  finishInitialSetup(): Promise<void>;
   tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	vault: Vault;
 	apiConfigured(): boolean;
@@ -60,7 +60,7 @@ export async function runInitialSyncWorkflow(
 		context.throwIfDestroyed();
     const imported = await context.tryInitialImport?.(result, progressCallback);
     if (imported) {
-      if (!imported.errors.length) await context.finishInitialSetup?.();
+      if (!imported.errors.length) await context.finishInitialSetup();
       completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
       return imported;
     }
@@ -107,7 +107,7 @@ export async function runInitialSyncWorkflow(
 		await context.saveLocalManifest();
 
 		logger.info(`Initial sync completed: ${result.uploaded} uploaded`);
-		if (!result.errors.length) await context.finishInitialSetup?.();
+		if (!result.errors.length) await context.finishInitialSetup();
 		completeWorkflowResult(context, result, {
 			errorFallback: 'Initial sync completed with errors',
 		});

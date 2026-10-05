@@ -27,7 +27,7 @@ export async function runIncrementalSync(
 
   try {
     context.reportWork?.('server');
-    const changelog = await readIncrementalChangelog(context.api, context.settings.lastSeq, () => context.throwIfDestroyed?.());
+    const changelog = await readIncrementalChangelog(context.api, context.settings.lastSeq, () => context.throwIfDestroyed());
     if (!changelog) {
       logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
       return null;
@@ -111,7 +111,7 @@ export async function runIncrementalSync(
 
     if (localOnlyChanges.length) context.reportWork?.('preparing');
     const preparedChunks = pipelineUploadChunks(localOnlyChanges, async (file) => {
-      context.throwIfDestroyed?.();
+      context.throwIfDestroyed();
       try {
         const uploadFile = await context.prepareUploadFromPath(file.path);
         if (uploadFile) {
@@ -131,7 +131,7 @@ export async function runIncrementalSync(
 
     let uploadsProcessed = 0;
     for await (const chunk of preparedChunks) {
-      context.throwIfDestroyed?.();
+      context.throwIfDestroyed();
       let reported = 0;
       context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
       await context.uploadPreparedFiles(chunk, result, {

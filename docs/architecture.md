@@ -93,6 +93,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
   ├── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
         ├── SyncEngine (sync/engine.ts) - orchestrates sync operations
         │     uses: planner, transfer, queue, file-discovery, manifest
+        │     owns: engine-file-operations - journaled uploads/restores and guarded deletes
         └── SyncApiClient (sync/api.ts) - HTTP calls to worker
   ├── Reminder runtime (reminders/runtime.ts) - index/writer/repository/watcher setup
   ├── Reminder registrations (reminders/register-integrations.ts) - commands, code blocks, views
@@ -107,6 +108,13 @@ only attaches a completed checkpoint while its originating engine is still curre
 `sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
+
+`sync/engine-file-operations.ts` binds durable uploads, restores and rename deletion
+guards to one engine's manifest and Markdown cache. Planners, transfers and the queue
+receive this required handle. Creating it does not change the raw endpoint methods
+on `SyncApiClient`; the client retains HTTP, protocol and encryption concerns.
+Restore writes participate in engine shutdown draining, and the runtime only finishes
+a restore after successful reconciliation by the same engine.
 
 `sync/planner-incremental.ts` owns incremental phase ordering, progress, manifest
 saves and cursor advancement. `incremental-changelog.ts` reads a deduplicated
@@ -156,6 +164,18 @@ queued operations even when the caller supplies no cancellation signal.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
 The ordered completion of the initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
+Planner cancellation checks, transfer baseline reads and workflow setup completion
+are required context dependencies, including in test fixtures.
+
+`ui/activity-modal.ts` owns the Activity view's subscriptions and rendering.
+`ui/activity/shared-history-loader.ts` owns request coalescing and disposal for each
+open view, keeping available history on failure and ignoring late responses after
+close. `ui/activity/activity-status.ts` derives labels, indicators and button state
+without manipulating the DOM. Conflict panel rendering stays with the modal.
+
+`pwa/hooks/useFeatureNavigation.ts` owns feature and settings history, dock selection,
+interruptible section transitions and focus restoration as one lifecycle.
+`pwa/FeatureShell.tsx` composes providers and renders the retained feature panels.
 
 The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
 Reading and Reminders runtimes independently of their lazy screens, so pending work

@@ -34,7 +34,7 @@ const { outputFiles } = await build({
         window.mount();
     ` },
     plugins: [{ name: 'host-fixture', setup(builder) {
-        builder.onResolve({ filter: /^(obsidian|\.\.\/shared\/SharedModal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
+        builder.onResolve({ filter: /^(obsidian|\.\.\/plugin\/SharedModal|\.\/file-actions)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'obsidian' ? `
             export const Platform = { isMobile: innerWidth < 600, isDesktopApp: innerWidth >= 600 };
             export class Notice {}

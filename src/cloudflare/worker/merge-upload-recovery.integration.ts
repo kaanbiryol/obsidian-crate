@@ -48,7 +48,7 @@ it('preserves remote edits when restarting after the merge upload commits but be
 	const paused = b.pauseNextUploadResponse();
 	const pending = b.engine.sync();
 	await paused.committed;
-	const operationId = b.api.getRequestDiagnostics().uploads!.slice().reverse().find(row => row.kind === 'merge')!.operationId;
+	const operationId = b.engine.getRequestDiagnostics().uploads.slice().reverse().find(row => row.kind === 'merge')!.operationId;
 	expect(new TextDecoder().decode((await a.api.downloadFile('note.md')).content)).toBe(expected);
 	b.close(); await pending; await b.engine.waitForIdle();
 	paused.release();
@@ -56,8 +56,8 @@ it('preserves remote edits when restarting after the merge upload commits but be
 	await sync(b); await sync(a);
 	const observed = { a: a.disk.text('note.md'), b: b.disk.text('note.md'), remote: new TextDecoder().decode((await a.api.downloadFile('note.md')).content) };
 	expect(observed).toEqual({ a: expected, b: expected, remote: expected });
-	const diagnostics = b.api.getRequestDiagnostics();
-	const trace = diagnostics.uploads!.filter(row => row.operationId === operationId);
+	const diagnostics = b.engine.getRequestDiagnostics();
+	const trace = diagnostics.uploads.filter(row => row.operationId === operationId);
 	expect(trace.map(row => row.phase)).toEqual(expect.arrayContaining(['prepared', 'replaying', 'remote-committed', 'local-applied', 'checkpointed']));
 	expect(new Set(trace.map(row => row.clientSession)).size).toBe(2);
 	expect(diagnostics.requests.some(row => row.uploadOperationIds?.includes(operationId))).toBe(true);
@@ -129,7 +129,7 @@ it.each(['local-apply', 'base-cache', 'checkpoint-main', 'checkpoint-temp', 'jou
 	for (const spy of [processSpy, binarySpy, writeSpy, removeSpy]) spy.mockRestore();
 	await b.open(); await sync(b); await sync(a);
 	for (const device of devices) expect(device.disk.text('note.md')).toBe(expected);
-	const rows = b.api.getRequestDiagnostics().uploads ?? [];
+	const rows = b.engine.getRequestDiagnostics().uploads;
 	expect(rows.some(row => row.kind === 'merge' && row.phase === 'checkpointed')).toBe(true);
 	expect(JSON.stringify(rows)).not.toContain('note.md');
 	expect(JSON.stringify(rows)).not.toContain('Alpha from A');

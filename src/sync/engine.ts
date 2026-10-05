@@ -1,3 +1,5 @@
+import type { RemoteFileVersion } from '../protocol/sync-types';
+import type { EngineFileOperations } from './engine-file-operations';
 import { createEngineHistory } from './engine-history';
 import { getSyncIssues, recordSyncError, syncErrorIssues } from './issues';
 import { loadPendingDiff } from './pending-diff';
@@ -57,6 +59,7 @@ export class SyncEngine {
 	private plugin: Plugin;
 	private vault: Vault;
 	private api: SyncApiClient;
+	private readonly files: EngineFileOperations;
 	private localManifest: LocalManifest;
 	private markdownBaseCache: MarkdownBaseCache;
 	private conflictStore: ConflictStore;
@@ -95,7 +98,7 @@ export class SyncEngine {
 			authority: getCheckpointAuthority(settings) || 'unconfigured',
 		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
-		this.api.configureUploadJournal(this.localManifest, this.vault, this.markdownBaseCache);
+		this.files = this.api.createFileOperations(this.localManifest, this.vault, this.markdownBaseCache);
 		const latestAttempt = settings.syncHistory[0];
 		const lastError = latestAttempt && !latestAttempt.success
 			? latestAttempt.errors?.[0] || 'The last sync failed. Open sync activity for details, then retry.'
@@ -146,10 +149,14 @@ export class SyncEngine {
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
 				void this.retryReminderScope();
-				await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+				await this.files.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 				this.updateState({ work: { phase: 'applying' } });
 			},
-			api: this.api,
+			api: {
+				isConfigured: () => this.api.isConfigured(),
+				uploadFile: (...args) => this.files.uploadFile(...args),
+				batchDelete: (...args) => this.files.batchDelete(...args),
+			},
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
 			shouldIgnore: this.shouldIgnore.bind(this),
@@ -163,7 +170,7 @@ export class SyncEngine {
 					manifest: this.localManifest,
 					isCurrent: key => isCurrent(key) && revision === this.syncActivityRevision
 						&& this.localManifest.uploadJournal.pending().length === 0
-						&& this.api.getPendingRestores().length === 0,
+						&& this.files.getPendingRestores().length === 0,
 				}, keys);
 			},
 			prepareUploadFromPath: (path: string) => this.contexts.prepareUploadFromPath(path),
@@ -181,6 +188,7 @@ export class SyncEngine {
 			vault: this.vault,
 			fileManager: this.plugin.app.fileManager,
 			api: this.api,
+			files: this.files,
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
 			conflictStore: this.conflictStore,
@@ -197,6 +205,20 @@ export class SyncEngine {
 			isAbortError: this.isAbortError.bind(this),
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 		});
+	}
+
+	getRequestDiagnostics() {
+		return { ...this.api.getRequestDiagnostics(), uploads: this.files.getUploadDiagnostics() };
+	}
+
+	restoreFileVersion(version: RemoteFileVersion): Promise<void> {
+		return this.trackWork(() => this.files.restoreFileVersion(version));
+	}
+
+	getPendingRestores() { return this.files.getPendingRestores(); }
+
+	finishRestore(storageKey: string): Promise<void> {
+		return this.trackWork(() => this.files.finishRestore(storageKey));
 	}
 
 	async initialize(): Promise<void> {
@@ -277,7 +299,7 @@ export class SyncEngine {
             shouldIgnore: path => this.shouldIgnore(path),
             assertActive: () => this.lifecycle.throwIfDestroyed(),
             hasPendingMutations: () => Boolean(this.getActiveConflicts().length
-                || this.localManifest.uploadJournal.pending().length || this.api.getPendingRestores().length),
+                || this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
             canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
             runExclusive: operation => this.runExclusiveOperation(operation),
             applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
@@ -414,7 +436,7 @@ export class SyncEngine {
 			this.lifecycle.throwIfDestroyed();
 			const result = await deleteFilesInBatches({
 				batchDelete: (batchPaths, expectedHashes, expectedRevisions) =>
-					this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
+					this.retryWithBackoff(() => this.files.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
 			}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
 			for (const path of result.deleted) this.localManifest.removeEntry(path);
 			await this.localManifest.save();
@@ -693,7 +715,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true): Promise<SyncResult> {
-		if (recover) await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+		if (recover) await this.files.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
 			reportWork: work => this.updateState({ work }),

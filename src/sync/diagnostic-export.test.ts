@@ -1,3 +1,4 @@
+import { SyncWorkerApi } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildDiagnosticExport } from './diagnostic-export';
@@ -83,7 +84,7 @@ describe('periodic sync activity', () => {
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
 		await h.runtime.initialize({ skipStartupSync: true });
 		vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: true, lastSeq: 11 });
-		const changes = vi.spyOn(SyncApiClient.prototype, 'getChanges').mockResolvedValue({ changes: [], hasMore: false, lastSeq: 11 });
+		const changes = vi.spyOn(SyncWorkerApi.prototype, 'getChanges').mockResolvedValue({ changes: [], hasMore: false, lastSeq: 11 });
 		if (!success) changes.mockRejectedValue(new Error('temporary changelog failure'));
 		vi.spyOn(SyncApiClient.prototype, 'getManifest').mockRejectedValue(new Error('temporary manifest failure'));
 		const engine = (h.runtime as unknown as { syncEngine: SyncEngine }).syncEngine;

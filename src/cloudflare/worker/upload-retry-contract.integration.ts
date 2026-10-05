@@ -130,7 +130,7 @@ it('does not dispatch uploads when their journal cannot be saved', async () => {
 		await write(path, body);
 	});
 	const content = new TextEncoder().encode('Only local copy').buffer;
-	await expect(client.api.uploadFile('note.md', content, await sha256Hex('Only local copy'), content.byteLength, 'text/markdown', null)).rejects.toThrow('Disk full');
+	await expect(client.files.uploadFile('note.md', content, await sha256Hex('Only local copy'), content.byteLength, 'text/markdown', null)).rejects.toThrow('Disk full');
 	expect(client.requests).not.toContain('POST /sync/batch-upload');
 	expect(client.requests).not.toContain('PUT /sync/upload');
 	expect(await env.DB.prepare('SELECT * FROM files').first()).toBeNull();

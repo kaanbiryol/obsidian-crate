@@ -130,7 +130,7 @@ it.each([false, true])('preserves rename ordering with selected batched uploads 
 	device.disk.rename('old.md', 'new.md');
 	device.engine.onFileRename({ path: 'new.md' } as never, 'old.md');
 	device.requests.length = 0;
-	if (fail) vi.spyOn(device.api, 'batchUpload').mockRejectedValueOnce(new Error('Upload unavailable'));
+	if (fail) vi.spyOn(device.files, 'batchUpload').mockRejectedValueOnce(new Error('Upload unavailable'));
 	const result = await device.engine.syncSelected(['delete:old.md', 'new.md']);
 	expect(result.success).toBe(!fail);
 	if (fail) {

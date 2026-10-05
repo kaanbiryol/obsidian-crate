@@ -1,3 +1,5 @@
+import { SharedHistoryLoader } from './activity/shared-history-loader';
+import { describeActivityStatus } from './activity/activity-status';
 import type { SharedCheckpoint } from '../protocol/history-checkpoints';
 import { mergeSharedHistory } from './activity/shared-history';
 import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
@@ -53,12 +55,8 @@ export class ActivityModal extends BaseUiModal {
 	private readonly deps: ActivityModalDeps;
 	private tabsRoot: Root | undefined;
 	private currentTabIndex = 0;
-    private historyActive = false;
     private activityHistory?: ActivityHistory;
-    private sharedCheckpoints?: SharedCheckpoint[];
-    private sharedHistoryLoading = false;
-    private sharedHistoryReady = false;
-    private sharedHistoryReload = false;
+    private sharedHistory?: SharedHistoryLoader;
 	private subtitleEl!: HTMLSpanElement;
 	private subtitleLabelEl!: HTMLSpanElement;
 	private subtitleIndicatorRoot: Root | undefined;
@@ -81,11 +79,12 @@ export class ActivityModal extends BaseUiModal {
 		// Its completion progress event must refresh history as well as pending files.
 		if (this.deps.getState().status !== 'syncing' && !this.deps.getActivityProgress?.()) {
 			this.refresh();
-            if (this.currentTabIndex === 2) void this.loadSharedHistory();
+            if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
 			return;
 		}
 		this.updateSyncBtn();
 		this.updateSyncStatusText();
+        if (this.deps.getActiveConflicts().length === 0) this.renderConflicts();
 		this.renderPending();
 	};
 	private renderPending(): void {
@@ -105,7 +104,7 @@ export class ActivityModal extends BaseUiModal {
         this.pendingBrowserState.pauseChecks = undefined;
         this.pendingBrowserState.dispose = undefined;
         this.pendingPanel.empty();
-		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync(), state,
+		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.getActivityStatus().lastSyncLabel, state,
 			this.deps.loadPendingDiff ? (path, deleted) => this.deps.loadPendingDiff!(path, deleted) : undefined, this.pendingBrowserState,
             this.deps.syncSelected && this.deps.createPendingDiscard ? {
                 syncSelected: async keys => {
@@ -121,7 +120,7 @@ export class ActivityModal extends BaseUiModal {
 		if (this.deps.getState().status === 'syncing' && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
 		else {
             this.refresh();
-            if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.loadSharedHistory();
+            if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();
         }
 	};
 
@@ -132,7 +131,9 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	onOpen(): void {
-        this.historyActive = true;
+        if (this.deps.listSharedCheckpoints) {
+            this.sharedHistory = new SharedHistoryLoader(() => this.deps.listSharedCheckpoints!(), () => this.refresh());
+        }
 		this.modalEl.addClass('crate-reminder-editor-modal');
 		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
 		hideNativeModalCloseButton(this.modalEl);
@@ -209,32 +210,22 @@ export class ActivityModal extends BaseUiModal {
 		if (index === 0) this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
-        if (index === 2) { this.renderHistory(); void this.loadSharedHistory(); }
+        if (index === 2) { this.renderHistory(); void this.sharedHistory?.refresh(); }
         this.updateSyncBtn();
         this.updateSyncStatusText();
 	}
 
+    private getActivityStatus() {
+        return describeActivityStatus(this.deps.getState(), this.deps.getActivityProgress?.() ?? null,
+            this.deps.getPendingPaths().length, !!this.deps.stopSync, this.stoppingSync);
+    }
+
     private updateSyncStatusText(): void {
-        const label = this.formatLastSync();
-        const state = this.deps.getState();
-        const syncing = state.status === 'syncing' || !!this.deps.getActivityProgress?.();
-        const status = state.status;
-        const pending = this.deps.getPendingPaths().length;
-        const needsAttention = status === 'error' || status === 'offline';
-        const text = syncing
-            ? 'Syncing…'
-            : needsAttention ? label
-            : pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} pending` : label;
-        if (this.subtitleLabelEl.textContent !== text) this.subtitleLabelEl.setText(text);
-        this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, {
-            state: syncing ? { ...state, status: 'syncing' } : state,
-        }));
-        this.subtitleEl.setAttribute('title', text);
-        this.subtitleEl.setAttribute('data-state', syncing ? 'syncing' : needsAttention ? 'attention' : pending > 0 ? 'pending' : label.startsWith('Synced') ? 'synced' : 'idle');
-        if (this.deps.getActiveConflicts().length === 0) {
-            this.conflictsPanel.empty();
-            renderConflictsPanel(this.conflictsPanel, [], this.isCheckingConflicts());
-        }
+        const status = this.getActivityStatus();
+        if (this.subtitleLabelEl.textContent !== status.text) this.subtitleLabelEl.setText(status.text);
+        this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, { state: status.indicatorState }));
+        this.subtitleEl.setAttribute('title', status.text);
+        this.subtitleEl.setAttribute('data-state', status.subtitleState);
     }
 
 
@@ -252,23 +243,14 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
-    private isCheckingConflicts(): boolean {
-        const state = this.deps.getState();
-        return (state.status === 'syncing' || !!this.deps.getActivityProgress?.())
-            && !['saving', 'reminders'].includes(state.work?.phase ?? '');
-    }
-
 	private updateSyncBtn(): void {
-		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
-		const canStop = syncing && !!this.deps.stopSync;
-		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync vault';
-		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
+		const button = this.getActivityStatus().button;
+		this.syncBtn.disabled = button.disabled;
 		this.syncBtn.hidden = false;
-		this.syncBtn.setAttribute('aria-label', label);
-		this.syncBtn.setAttribute('title', label === 'Sync vault' ? 'Sync all local and remote changes, including unchecked files.' : label);
-		this.syncBtnLabel.setText(label);
-		this.syncBtn.toggleClass('is-enabled', !this.syncBtn.disabled);
-
+		this.syncBtn.setAttribute('aria-label', button.label);
+		this.syncBtn.setAttribute('title', button.title);
+		this.syncBtnLabel.setText(button.label);
+		this.syncBtn.toggleClass('is-enabled', !button.disabled);
 	}
 
 	private updateSyncErrorNotice(): void {
@@ -299,16 +281,20 @@ export class ActivityModal extends BaseUiModal {
 		this.updateSyncStatusText();
 		this.updateTabCounts();
 		this.renderPending();
+        this.renderConflicts();
+        if (this.currentTabIndex === 2) this.renderHistory();
+    }
+
+    private renderConflicts(): void {
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.isCheckingConflicts(), this.deps.createConflictReview ? conflict => {
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.getActivityStatus().checkingConflicts, this.deps.createConflictReview ? conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
 		} : undefined);
-        if (this.currentTabIndex === 2) this.renderHistory();
     }
 
     private renderHistory(): void {
         const deps = this.deps;
-        if (deps.listSharedCheckpoints && !this.sharedHistoryReady) {
+        if (this.sharedHistory && !this.sharedHistory.getSnapshot().ready) {
             if (!this.historyPanel.firstChild) {
                 renderLoadingState(this.historyPanel, 'Loading history…');
             }
@@ -329,48 +315,13 @@ export class ActivityModal extends BaseUiModal {
                 } : undefined,
             }, () => this.close());
         }
-        this.activityHistory.update(this.sharedCheckpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], this.sharedCheckpoints) : this.settings.syncHistory ?? []);
+        const checkpoints = this.sharedHistory?.getSnapshot().checkpoints;
+        this.activityHistory.update(checkpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], checkpoints) : this.settings.syncHistory ?? []);
     }
-
-    private async loadSharedHistory(): Promise<void> {
-        if (!this.historyActive || !this.historyPanel || !this.deps.listSharedCheckpoints) return;
-        if (this.sharedHistoryLoading) { this.sharedHistoryReload = true; return; }
-        this.sharedHistoryLoading = true;
-        try {
-            const entries = await this.deps.listSharedCheckpoints();
-            if (this.historyActive) this.sharedCheckpoints = entries;
-        } catch {
-            // Keep the available history when background loading fails; retry on the next refresh.
-        } finally {
-            this.sharedHistoryLoading = false;
-            if (this.historyActive) {
-                // Render the initial list once, after merging server and local history.
-                // A failed request still reveals local history and can retry later.
-                this.sharedHistoryReady = true;
-                this.refresh();
-                if (this.sharedHistoryReload) { this.sharedHistoryReload = false; void this.loadSharedHistory(); }
-            }
-        }
-    }
-
-	private formatLastSync(): string {
-		if (this.deps.getActivityProgress?.()?.type === 'initial') return 'Uploading vault…';
-		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.()) return 'Syncing…';
-		if (this.deps.getState().status === 'error') return 'Last sync had errors';
-		if (this.deps.getState().status === 'offline') return 'Server unavailable';
-		const lastSync = this.deps.getState().lastSync;
-		if (!lastSync) return 'Not synced yet';
-		const diffMs = Date.now() - new Date(lastSync).getTime();
-		const diffMin = Math.floor(diffMs / 60000);
-		if (diffMin < 1) return 'Synced just now';
-		if (diffMin < 60) return `Synced ${diffMin}m ago`;
-		const diffHr = Math.floor(diffMin / 60);
-		if (diffHr < 24) return `Synced ${diffHr}h ago`;
-		return `Synced ${Math.floor(diffHr / 24)}d ago`;
-	}
 
 	onClose(): void {
-        this.historyActive = false;
+        this.sharedHistory?.dispose();
+        this.sharedHistory = undefined;
         this.activityHistory?.dispose();
         this.activityHistory = undefined;
 		this.pendingBrowserState.dispose?.();

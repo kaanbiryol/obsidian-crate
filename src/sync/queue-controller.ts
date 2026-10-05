@@ -17,7 +17,7 @@ import {
 } from './queue-flush';
 
 export interface SyncQueueControllerContext {
-	finishInitialSetup?(): Promise<void>;
+	finishInitialSetup(): Promise<void>;
 	automaticSyncEnabled?(): boolean;
 	recoverUploads(): Promise<void>;
 	api: QueueFlushContext['api'];
@@ -146,7 +146,7 @@ export class SyncQueueController {
 	private getQueueFlushContext(): QueueFlushContext {
 		return {
 			recoverUploads: () => this.context.recoverUploads(),
-			finishInitialSetup: () => this.context.finishInitialSetup?.() ?? Promise.resolve(),
+			finishInitialSetup: () => this.context.finishInitialSetup(),
 			pendingPaths: this.pendingPaths,
 			inFlightPaths: this.inFlightPaths,
 			pendingRevisions: this.pendingRevisions,

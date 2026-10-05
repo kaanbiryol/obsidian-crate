@@ -28,7 +28,7 @@ describe('selected sync', () => {
             expect(labels.at(-1)).toBe('Uploading 0 of 2 files');
             return { success: true, results: files.map(file => ({ ...file, success: true })) };
         });
-        Object.assign(h.api, { batchUpload });
+        h.api.batchUpload.mockImplementation(batchUpload);
         h.localManifest.save.mockImplementation(() => {
             expect(labels.at(-1)).toBe('Saving sync progress…');
         });

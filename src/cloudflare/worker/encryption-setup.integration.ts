@@ -114,7 +114,7 @@ it.each([false, true])('recovers a pending plaintext upload after conversion wit
     if (committed) await original.apply(this, args);
     throw new Error('Connection lost');
   });
-  await expect(device.api.uploadFile('pending.md', content, await computeHash(content), content.byteLength, 'text/markdown', null)).rejects.toThrow('Connection lost');
+  await expect(device.files.uploadFile('pending.md', content, await computeHash(content), content.byteLength, 'text/markdown', null)).rejects.toThrow('Connection lost');
   const f = await fixture();
   await f.convert();
   device.close(); await device.engine.waitForIdle(); await device.open();

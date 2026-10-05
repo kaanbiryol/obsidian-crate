@@ -78,7 +78,7 @@ describe('createFullSyncPlan', () => {
 					}),
 					removeEntry,
 				} as never,
-				shouldIgnore: (path: string) => path.startsWith('ignored/'),
+				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('ignored/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			},
 			{
@@ -139,7 +139,7 @@ describe('createFullSyncPlan', () => {
 					getManifest: () => ({ version: 1, files: {} }),
 					removeEntry: vi.fn(),
 				} as never,
-				shouldIgnore: () => false,
+				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			},
 			{},

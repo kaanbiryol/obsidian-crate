@@ -27,7 +27,7 @@ import {
 const logger = createLogger('SyncEngine');
 
 export interface SyncWorkflowContext extends FullSyncUploadContext {
-  finishInitialSetup?(): Promise<void>;
+  finishInitialSetup(): Promise<void>;
   tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
@@ -73,7 +73,7 @@ export async function runSyncWorkflow(
     const imported = await context.tryInitialImport?.(result, progressCallback);
     if (imported) {
       result = imported;
-      if (!imported.errors.length) await context.finishInitialSetup?.();
+      if (!imported.errors.length) await context.finishInitialSetup();
       completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
       return imported;
     }
@@ -82,7 +82,7 @@ export async function runSyncWorkflow(
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
 			result = incrementalResult;
-			if (!result.errors.length) await context.finishInitialSetup?.();
+			if (!result.errors.length) await context.finishInitialSetup();
 			completeWorkflowResult(context, incrementalResult, {
 				errorFallback: 'Incremental sync completed with errors',
 			});
@@ -217,7 +217,7 @@ export async function runSyncWorkflow(
 		) {
 			context.setLastSeq(remoteManifest.lastSeq);
 		}
-		if (!result.errors.length) await context.finishInitialSetup?.();
+		if (!result.errors.length) await context.finishInitialSetup();
 		completeWorkflowResult(context, result, {
 			errorFallback: 'Full sync completed with errors',
 		});

@@ -79,7 +79,7 @@ export async function processDiff(
       }, result);
       if (outcome.status === "deferred") return outcome;
 
-      const manifestEntry = context.localManifest.getEntry?.(diff.path);
+      const manifestEntry = context.localManifest.getEntry(diff.path);
       if (manifestEntry) localFiles[diff.path] = manifestEntry;
       if (diff.cause === "local-deleted" && !hasUnresolvedConflict(result, diff.path)) {
         recordResolvedRace(result, diff.path, "kept-remote-edit");
@@ -111,7 +111,7 @@ export async function processDiff(
       }
 
       const localContent = await context.vault.adapter.readBinary(diff.path);
-      const baseHash = context.localManifest.getEntry?.(diff.path)?.hash;
+      const baseHash = context.localManifest.getEntry(diff.path)?.hash;
       const autoMergeOutcome = await tryAutoMergeMarkdownConflict(
         context,
         diff,
@@ -194,7 +194,7 @@ async function tryAutoMergeMarkdownConflict(
     return null;
   }
 
-  const manifestHash = context.localManifest.getEntry?.(diff.path)?.hash;
+  const manifestHash = context.localManifest.getEntry(diff.path)?.hash;
   if (!manifestHash) {
     return null;
   }

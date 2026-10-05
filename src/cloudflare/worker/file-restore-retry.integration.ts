@@ -81,11 +81,11 @@ it('binds the operation to its retained key and rejects expired uncommitted inte
 });
 it('resumes the local journal after restart without refreshing its original absent precondition', async () => {
 	const client = new SyncTestDevice('restore-client',env); clients.push(client); await client.authorize(); await client.open();
-	const version = await retained(); loseCommitResponse(); await expect(client.api.restoreFileVersion(version)).rejects.toThrow();
-	expect(client.api.getPendingRestores()).toHaveLength(1); await removeCurrent();
+	const version = await retained(); loseCommitResponse(); await expect(client.engine.restoreFileVersion(version)).rejects.toThrow();
+	expect(client.engine.getPendingRestores()).toHaveLength(1); await removeCurrent();
 	client.close(); await client.engine.waitForIdle(); await client.open();
-	await client.api.restoreFileVersion(version); expect(await live()).toBeNull();
-	await client.api.finishRestore(version.storage_key); expect(client.api.getPendingRestores()).toHaveLength(0);
+	await client.engine.restoreFileVersion(version); expect(await live()).toBeNull();
+	await client.engine.finishRestore(version.storage_key); expect(client.engine.getPendingRestores()).toHaveLength(0);
 });
 it('fences legacy restore calls while preserving read access', async () => {
 	expect((await request('/sync/restore-version',{ storageKey:'old',expectedHash:null })).status).toBe(428);
@@ -96,9 +96,9 @@ it('never dispatches restore before its local checkpoint is durable and retries 
  const client = new SyncTestDevice('restore-disk-failure', env); clients.push(client); await client.authorize(); await client.open();
  const version = await retained();
  vi.spyOn(client.disk.vault.adapter, 'write').mockRejectedValueOnce(new Error('Disk full'));
- await expect(client.api.restoreFileVersion(version)).rejects.toThrow('Disk full');
+ await expect(client.engine.restoreFileVersion(version)).rejects.toThrow('Disk full');
  expect(client.requests.some(path => path.includes('restore-version'))).toBe(false);
  expect(await live()).toBeNull();
- await client.api.restoreFileVersion(version); expect((await live())?.hash).toBe(version.hash);
+ await client.engine.restoreFileVersion(version); expect((await live())?.hash).toBe(version.hash);
  expect(await env.DB.prepare('SELECT count(*) AS n FROM upload_operations').first()).toEqual({ n: 1 });
 });

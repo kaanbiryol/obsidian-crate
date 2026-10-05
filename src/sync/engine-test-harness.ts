@@ -4,7 +4,7 @@ import { SyncEngine } from './engine';
 import type { ConflictStore } from './conflict-store';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { FileManifest, UploadResult } from '../protocol/sync-types';
+import type { BatchUploadFile, BatchUploadResponse, FileManifest, UploadResult } from '../protocol/sync-types';
 import type { SyncResult } from './types';
 import type { InitialConfigPull } from './initial-config-pull';
 
@@ -43,7 +43,7 @@ export type Harness = {
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
 		setAbortSignal: ReturnType<typeof vi.fn>;
-		configureUploadJournal: ReturnType<typeof vi.fn>;
+		createFileOperations: ReturnType<typeof vi.fn>;
 		recoverUploads: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
 		uploadFile: ReturnType<typeof vi.fn<(
@@ -58,7 +58,7 @@ export type Harness = {
 		getManifest: ReturnType<typeof vi.fn<() => Promise<FileManifest>>>;
 		getPendingRestores: ReturnType<typeof vi.fn>;
 		checkForChanges: ReturnType<typeof vi.fn>;
-		batchUpload: ReturnType<typeof vi.fn>;
+		batchUpload: ReturnType<typeof vi.fn<(files: BatchUploadFile[]) => Promise<BatchUploadResponse>>>;
 		batchDownload: ReturnType<typeof vi.fn>;
 		batchDelete: ReturnType<typeof vi.fn>;
 	};
@@ -179,7 +179,8 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
 		setAbortSignal: vi.fn(),
-		configureUploadJournal: vi.fn(),
+		createFileOperations: vi.fn(),
+		getRequestDiagnostics: vi.fn(() => ({ clientSession: 'test-session', requests: [] })),
 		recoverUploads: vi.fn(async () => {}),
 		getChanges: vi.fn(),
 		uploadFile: vi.fn<(
@@ -204,6 +205,14 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 			deleted: paths,
 		})),
 	};
+
+	api.createFileOperations.mockReturnValue({
+		...api,
+		getUploadDiagnostics: () => [],
+		recordMergeApplication: vi.fn(async () => {}),
+		restoreFileVersion: vi.fn(async () => {}),
+		finishRestore: vi.fn(async () => {}),
+	});
 
 	const fileManager = {
 		trashFile: vi.fn(),

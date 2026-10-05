@@ -35,7 +35,7 @@ interface PlannerApi {
 }
 
 export interface LocalDiffPlannerContext {
-  throwIfDestroyed?(): void;
+  throwIfDestroyed(): void;
   pendingPaths?: ReadonlySet<string>;
   plannedContent?: PlannedContent;
   vault: Vault;
@@ -47,7 +47,7 @@ export interface LocalDiffPlannerContext {
 
 export interface IncrementalSyncPlannerContext {
   reportWork?(phase: import('./types').SyncWork['phase'], current?: number, total?: number): void;
-  throwIfDestroyed?(): void;
+  throwIfDestroyed(): void;
   settings: CrateSettings;
   vault: Vault;
   fileManager: {
@@ -79,7 +79,7 @@ export interface FullSyncPlannerContext {
     get(): InitialConfigPull | undefined;
     save(state: InitialConfigPull): Promise<void>;
   };
-  throwIfDestroyed?(): void;
+  throwIfDestroyed(): void;
   plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;

@@ -74,8 +74,8 @@ it('pulls server settings without setup conflicts, then preserves real concurren
 
 it.each([false, true])('resumes a partial first pull after restart without overwriting a newer local edit: %s', async edited => {
 	const { second } = await setup();
-	const batchDownload = second.api.batchDownload.bind(second.api);
-	vi.spyOn(second.api, 'batchDownload').mockImplementationOnce(async requested => {
+	const batchDownload = second.files.batchDownload.bind(second.files);
+	vi.spyOn(second.files, 'batchDownload').mockImplementationOnce(async requested => {
 		const response = await batchDownload(requested);
 		return { files: response.files.map(file => file.path === appearance ? { ...file, error: 'interrupted download' } : file) };
 	});
@@ -98,8 +98,8 @@ it.each([false, true])('resumes a partial first pull after restart without overw
 
 it('defers an initial settings replacement when the user edits during download', async () => {
 	const { second } = await setup();
-	const batchDownload = second.api.batchDownload.bind(second.api);
-	vi.spyOn(second.api, 'batchDownload').mockImplementationOnce(async requested => {
+	const batchDownload = second.files.batchDownload.bind(second.files);
+	vi.spyOn(second.files, 'batchDownload').mockImplementationOnce(async requested => {
 		const response = await batchDownload(requested);
 		second.disk.write(appearance, '{"setting":"edited while downloading"}');
 		return response;

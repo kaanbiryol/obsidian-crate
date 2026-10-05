@@ -2,6 +2,7 @@ import type { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-types';
 import { SyncApiClient } from '../../sync/api';
 import { SyncEngine } from '../../sync/engine';
+import type { EngineFileOperations } from '../../sync/engine-file-operations';
 import type { ApiHttpTransport } from '../../sync/worker-api/http';
 import type { FileManifest } from '../../protocol/sync-types';
 import { sha256Hex } from './auth';
@@ -23,6 +24,7 @@ export class SyncTestDevice {
 	private pause: PausedResponse | null = null;
 	api!: SyncApiClient;
 	engine!: SyncEngine;
+	files!: EngineFileOperations;
 
 	constructor(readonly id: string, private readonly runtimeEnv: Env) {
 		this.settings = { ...structuredClone(DEFAULT_SETTINGS), deviceId: id, workerUrl: 'https://worker.test', syncInterval: 0 };
@@ -35,6 +37,9 @@ export class SyncTestDevice {
 
 	async open(): Promise<void> {
 		this.api = new SyncApiClient(this.settings.workerUrl, this.id, this.transport);
+		// Retain the real engine boundary for scenario fault injection, without private-field casts.
+		const createFiles = this.api.createFileOperations.bind(this.api);
+		this.api.createFileOperations = (...args) => (this.files = createFiles(...args));
 		this.engine = new SyncEngine({
 			manifest: { dir: TEST_PLUGIN_DIR },
 			app: { vault: this.disk.vault, fileManager: {}, workspace: { onLayoutReady: () => {} } },

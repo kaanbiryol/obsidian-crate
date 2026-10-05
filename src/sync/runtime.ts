@@ -82,15 +82,16 @@ export class SyncRuntime {
 	}
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
-		if (!this.apiClient) throw new Error('Sync is not configured');
-		const api = this.apiClient;
-		await api.restoreFileVersion(version);
-		if (api !== this.apiClient) throw new DOMException('Sync configuration changed during restore', 'AbortError');
+		const engine = this.syncEngine;
+		if (!engine) throw new Error('Sync is not configured');
+		await engine.restoreFileVersion(version);
+		if (engine !== this.syncEngine) throw new DOMException('Sync configuration changed during restore', 'AbortError');
 		const result = await this.sync();
-		if (result.success) await api.finishRestore(version.storage_key);
+		if (engine !== this.syncEngine) throw new DOMException('Sync configuration changed during restore', 'AbortError');
+		if (result.success) await engine.finishRestore(version.storage_key);
 		return result;
 	}
-	getPendingRestores(): RemoteFileVersion[] { return this.apiClient?.getPendingRestores() ?? []; }
+	getPendingRestores(): RemoteFileVersion[] { return this.syncEngine?.getPendingRestores() ?? []; }
 	private lastForegroundSyncAt: number | null = null;
 
 	constructor(
@@ -157,7 +158,7 @@ export class SyncRuntime {
 	}
 
 	exportDiagnostics(): string {
-		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics(), this.serverStatus.getDiagnosticVersionInfo());
+		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.syncEngine?.getRequestDiagnostics() ?? this.apiClient?.getRequestDiagnostics(), this.serverStatus.getDiagnosticVersionInfo());
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
@@ -578,7 +579,7 @@ export class SyncRuntime {
 		recordSyncHistory(this.settings, type, result);
 		const latest = this.settings.syncHistory[0];
 		if (latest) latest.timings = engine.getTimings();
-		if (latest && api) latest.requestDiagnostics = api.getRequestDiagnostics();
+		if (latest && api) latest.requestDiagnostics = engine.getRequestDiagnostics();
 		if (latest && result.success && !result.conflicts.length) {
 			try {
                 const shared = await engine.saveSharedHistoryCheckpoint();

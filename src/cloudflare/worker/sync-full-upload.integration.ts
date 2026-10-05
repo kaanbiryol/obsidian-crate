@@ -50,8 +50,8 @@ it('reconciles a stale member while committing healthy batch members across a co
 	client.settings.lastSeq = 0;
 	client.disk.write('shared.md', original.replace('Beta', 'Beta local'));
 	client.disk.write('healthy.md', 'Healthy local');
-	const batch = client.api.batchUpload.bind(client.api);
-	vi.spyOn(client.api, 'batchUpload').mockImplementationOnce(async files => {
+	const batch = client.files.batchUpload.bind(client.files);
+	vi.spyOn(client.files, 'batchUpload').mockImplementationOnce(async files => {
 		const content = new TextEncoder().encode(original.replace('Alpha', 'Alpha remote')).buffer;
 		await other.api.uploadFile('shared.md', content, await sha256HexBytes(content), content.byteLength, 'text/markdown', base.hash);
 		expect(files.find(file => file.path === 'shared.md')?.expectedHash).toBe(base.hash);

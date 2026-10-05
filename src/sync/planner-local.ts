@@ -13,14 +13,14 @@ export async function getLocalDeletes(
     .filter((path) => !context.shouldIgnore(path));
 
   const tasks = knownPaths.map((path) => async () => {
-    context.throwIfDestroyed?.();
+    context.throwIfDestroyed();
     const exists = await withSyncFileContext(path, () => context.vault.adapter.exists(path));
-    context.throwIfDestroyed?.();
+    context.throwIfDestroyed();
     return exists ? null : path;
   });
 
   const results = await context.runConcurrent(tasks, prepareConcurrency);
-  context.throwIfDestroyed?.();
+  context.throwIfDestroyed();
   return results.filter((path): path is string => path !== null);
 }
 
@@ -30,9 +30,9 @@ export async function getLocalChanges(
   onUnchanged?: (path: string) => void,
 ): Promise<Array<{ path: string; hash: string }>> {
   const changes: Array<{ path: string; hash: string }> = [];
-  const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed?.());
+  const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
   await context.verifyContent?.(allFiles);
-  context.throwIfDestroyed?.();
+  context.throwIfDestroyed();
 
   for (const file of allFiles) {
     if (file.size > MAX_FILE_SIZE_BYTES) changes.push({ path: file.path, hash: context.localManifest.getEntry(file.path)?.hash ?? "" });
@@ -51,11 +51,11 @@ export async function getLocalChanges(
   });
 
   const tasks = candidates.map((file) => async () => {
-    context.throwIfDestroyed?.();
+    context.throwIfDestroyed();
     const content = await withSyncFileContext(file.path, () => context.vault.adapter.readBinary(file.path));
-    context.throwIfDestroyed?.();
+    context.throwIfDestroyed();
     const hash = await computeHash(content);
-    context.throwIfDestroyed?.();
+    context.throwIfDestroyed();
       context.plannedContent?.remember(file.path, content, hash);
     const existing = context.localManifest.getEntry(file.path);
     if (!existing || existing.hash !== hash) {
@@ -72,7 +72,7 @@ export async function getLocalChanges(
   });
 
   const results = await context.runConcurrent(tasks, prepareConcurrency);
-  context.throwIfDestroyed?.();
+  context.throwIfDestroyed();
   for (const result of results) {
     if (result) {
       changes.push(result);

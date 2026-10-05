@@ -19,7 +19,7 @@ interface QueueApi {
 }
 
 interface QueueManifest {
-	getEntry?(path: string): { hash: string; size: number; modified: string; revision?: string } | undefined;
+	getEntry(path: string): { hash: string; size: number; modified: string; revision?: string } | undefined;
 	setEntry(path: string, entry: { hash: string; size: number; modified: string; revision?: string }): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
@@ -49,7 +49,7 @@ export interface QueueUploadFailure {
 }
 
 export interface QueueFlushContext {
-	finishInitialSetup?(): Promise<void>;
+	finishInitialSetup(): Promise<void>;
 	recoverUploads(): Promise<void>;
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;

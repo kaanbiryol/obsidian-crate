@@ -1,3 +1,4 @@
+import type { EngineFileOperations } from './engine-file-operations';
 import { PlannedContent } from './planned-content';
 import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from './api';
@@ -35,6 +36,7 @@ interface SyncEngineContextDependencies {
 	vault: Vault;
 	fileManager: FileManager;
 	api: SyncApiClient;
+	files: EngineFileOperations;
 	getLocalManifest: () => LocalManifest;
 	markdownBaseCache: MarkdownBaseCache;
 	conflictStore: ConflictStore;
@@ -123,7 +125,7 @@ export class SyncEngineContexts {
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
 			fileManager: dependencies.fileManager,
-			api: dependencies.api,
+			api: dependencies.files,
 			localManifest: dependencies.getLocalManifest(),
 			markdownBaseCache: dependencies.markdownBaseCache,
 			conflictStore: dependencies.conflictStore,
@@ -154,7 +156,7 @@ export class SyncEngineContexts {
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			fileManager: dependencies.fileManager,
-			api: dependencies.api,
+			api: dependencies.files,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
 			getLocalChanges: this.getLocalChanges.bind(this),
@@ -195,7 +197,7 @@ export class SyncEngineContexts {
       tryInitialImport: (result: import('./types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
+			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			getManifest: () => dependencies.api.getManifest(),
@@ -231,7 +233,7 @@ export class SyncEngineContexts {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
+			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
@@ -274,7 +276,7 @@ export class SyncEngineContexts {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
+			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
@@ -288,7 +290,7 @@ export class SyncEngineContexts {
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			deleteRemoteFile: async (path: string, expectedHash: string, expectedRevision?: string) => {
-				await dependencies.api.deleteFile(path, expectedHash, expectedRevision);
+				await dependencies.files.deleteFile(path, expectedHash, expectedRevision);
 			},
 			removeLocalManifestEntry: (path: string) => dependencies.getLocalManifest().removeEntry(path),
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),

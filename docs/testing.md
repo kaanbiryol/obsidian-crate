@@ -6,6 +6,14 @@
 through shutdown. `runtime-operations.test.ts` checks that late saves cannot update
 history, persist settings, or fall back through a replacement engine.
 
+`engine-file-operations.test.ts` checks that raw API calls retain their transport
+semantics while engine operations persist interrupted uploads and guard deletion.
+`runtime-file-restore.test.ts` checks restore completion against the originating
+engine; `file-restore-retry.integration.ts` exercises its durable retry against the
+Worker. `activity/shared-history-loader.test.ts` checks coalesced reloads, errors and
+disposal through the loader's public interface. `activity/activity-status.test.ts`
+covers completion progress after engine idle, stopping, conflicts and status labels.
+
 ## Structured merge and Reading recovery
 
 `markdown-merge-transitions.test.ts` protects newly added, moved and removed code

@@ -5,7 +5,7 @@ import type { RecordConflictInput } from './conflict-store';
 import type { UploadApplyPhase } from './upload-diagnostics';
 
 interface TransferManifest {
-  getEntry?(path: string): FileEntry | undefined;
+  getEntry(path: string): FileEntry | undefined;
   hashMatches(path: string, hash: string): boolean;
   setEntry(path: string, entry: FileEntry): void;
   removeEntry(path: string): void;

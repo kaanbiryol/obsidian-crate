@@ -35,7 +35,7 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
   const plugin = { dir: '.obsidian/plugins/crate' };
   const manifest = new LocalManifest(app as never, plugin as never);
   manifest.setEntry(path, { hash: await computeHash(base), size: base.byteLength, modified: new Date(1000).toISOString() });
-  const context = { ...h.context, localManifest: manifest, shouldIgnore: () => false,
+  const context = { ...h.context, localManifest: manifest, throwIfDestroyed: () => {}, shouldIgnore: () => false,
     markdownBaseCache: { readBase: async () => base, putBase: vi.fn(async () => {}) } };
   const remoteHash = await computeHash(remote);
   h.api.downloadFile.mockResolvedValue({ content: remote, hash: remoteHash, size: remote.byteLength, revision: 'remote-revision' });

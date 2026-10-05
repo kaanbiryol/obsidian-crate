@@ -38,7 +38,7 @@ describe('planner local diff helpers', () => {
 				localManifest: {
 					getAllPaths: () => ['notes/missing.md', '.trash/ignore.md'],
 				} as never,
-				shouldIgnore: (path: string) => path.startsWith('.trash/'),
+				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('.trash/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			},
 			5,
@@ -87,7 +87,7 @@ describe('planner local diff helpers', () => {
 						entries[path] = entry;
 					},
 				} as never,
-				shouldIgnore: () => false,
+				throwIfDestroyed: () => {}, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			},
 			5,
