@@ -30,7 +30,7 @@
   "dependencies": {
     "ws": "8.21.0",
     "sharp": "0.35.5",
-    "youch": "4.1.0-beta.10",
+    "youch": "4.1.1",
     "undici": "7.29.1",
     "workerd": "1.20260926.1",
     "@cspotcode/source-map-support": "0.8.1"
