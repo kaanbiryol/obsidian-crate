@@ -1,6 +1,8 @@
 /** Exercise the visible navigation in both connected and setup screens. */
-export const featureNavigationTarget = page => page.locator('.crate-feature-panel[data-active="true"] [data-dock-active="true"]:visible, .crate-feature-panel[data-active="true"] .pwa-feature-switch-button:visible');
+export const featureNavigationTarget = page => page.locator('.crate-feature-panel[data-active="true"] [data-dock-active="true"]:visible, .crate-feature-panel[data-active="true"] .pwa-feature-switch-button:visible, [data-feature-recovery-switch]:visible');
 export async function switchFeature(page, destination) {
+  const recovery = page.getByRole('button', { name: `Open ${destination}`, exact: true });
+  if (await recovery.isVisible()) { await recovery.click(); return; }
   const header = page.getByRole('button', { name: `Switch to ${destination}`, exact: true });
   if (await header.isVisible()) { await header.click(); return; }
   const dock = page.locator('.crate-feature-panel[data-active="true"] .pwa-dock');

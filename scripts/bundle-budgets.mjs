@@ -13,8 +13,10 @@ export const bundleBudgets = {
 		// Encrypted app approval adds the plugin dialog, relay and shared WebCrypto:
 		// measured 5.516 MB raw. YouTube metadata, browser lookup and video UI
 		// bring the total to 5.526 MB raw / 2.780 MB gzip; retain a small margin.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5530000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2785000', 10),
+		// 0.6.0 adds transcript playback, shared dialogs and native settings controls:
+		// measured 5.592 MB raw / 2.812 MB gzip, including the embedded app.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5600000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2820000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -22,8 +24,10 @@ export const bundleBudgets = {
 		// Shared list styles, current activity controls and encryption UI measure
 		// 308.2 KB raw / 40.1 KB gzip, including compact pairing states.
 		// YouTube thumbnails add 1.8 KB raw / 0.22 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '310500', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '40500', 10),
+		// 0.6.0 shared dialogs, controls and transcript player styles measure
+		// 384.3 KB raw / 46.8 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '390000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '47500', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -33,7 +37,9 @@ export const bundleBudgets = {
 		// Source-preserving highlights and the deferred review UI: about 3.57 MB / 1.30 MB.
 		// Full Reading E2EE includes deferred Defuddle and the inert DOM parser:
 		// measured 5.24 MB raw / 1.80 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5340000', 10),
+		// 0.6.0 playback and shared UI bring the embedded app to 5.389 MB raw;
+		// gzip remains within the existing 1.85 MB ceiling.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5400000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1850000', 10),
 	}],
 	pwa: [{
@@ -50,8 +56,9 @@ export const bundleBudgets = {
 		// App approval adds about 4 KB gzip; measured 387.1 KB including the
 		// shared connection gate. Retain a small, explicit growth margin.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1150000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '390000', 10),
+		// 0.6.0 settings and connection recovery: 1.157 MB raw / 392.7 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1165000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '397000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -62,7 +69,8 @@ export const bundleBudgets = {
 		// Expanded PWA article code highlighting: about 1.54 MB raw / 523 KB gzip.
 		// Full Reading E2EE adds client article extraction (deferred, inert DOM):
 		// measured 2.81 MB raw / 916.3 KB gzip across all assets.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '2880000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '940000', 10),
+		// 0.6.0 transcript playback and shared UI: 2.897 MB raw / 951.1 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '2910000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '960000', 10),
 	}],
 };

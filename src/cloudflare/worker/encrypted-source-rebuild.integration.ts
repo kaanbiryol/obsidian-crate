@@ -126,6 +126,9 @@ it('keeps coordinator passes within their query budget while rebuilding two dens
 	} }), env.BUCKET, env.DB);
 	expect(uploaded.status).toBe(200);
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0').run();
+	// Revalidation refreshes a job's timestamp. An older, still-unverified job
+	// can therefore run first; make that ordering independent of wall-clock seconds.
+	await env.DB.prepare("UPDATE notification_projection_jobs SET updated_at = '2000-01-01 00:00:00'").run();
 	// Dispatch and individual alarms have separate invocation budgets. Count only
 	// this coordinator's queries, leaving their real namespace binding untouched.
 	const prepare = vi.fn((sql: string) => env.DB.prepare(sql));
@@ -133,10 +136,14 @@ it('keeps coordinator passes within their query budget while rebuilding two dens
 	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
 	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE verified = 1').first()).toEqual({ count: 1 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 2000 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 0 });
 	prepare.mockClear();
 	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
 	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE verified = 1').first()).toEqual({ count: 2 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 2000 });
+	prepare.mockClear();
+	await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, { ...env, DB: measuredDb });
+	expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 4000 });
 });

@@ -74,9 +74,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         assert.ok(geometry.padding > geometry.clearance, 'End padding clears the dock');
         assert.equal(geometry.passesThrough, true, 'Space beside the dock passes pointer input to the list');
         await page.screenshot({ path: screenshot });
-        await scroller.evaluate(element => { element.scrollTop = element.scrollHeight; });
-        const last = await scroller.locator('[data-dock-scroll-fixture] > :last-child').boundingBox();
-        assert.ok(last.y + last.height <= geometry.barTop - 8, 'Last row scrolls fully above the dock');
+        // This checks end clearance, so bypass smooth scrolling and measure
+        // the row and dock together after layout has caught up.
+        await scroller.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }));
+        await expect.poll(() => scroller.evaluate(element => {
+          const last = element.querySelector('[data-dock-scroll-fixture] > :last-child').getBoundingClientRect();
+          const bar = element.closest('.crate-feature-panel').querySelector('.pwa-dock__bar').getBoundingClientRect();
+          return bar.top - last.bottom;
+        }), { message: 'Last row scrolls fully above the dock' }).toBeGreaterThanOrEqual(8);
       } finally {
         await scroller.evaluate(element => { element.querySelector('[data-dock-scroll-fixture]').remove(); element.scrollTop = 0; });
         await fixtureStyle.evaluate(element => element.remove());

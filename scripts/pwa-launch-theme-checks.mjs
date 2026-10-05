@@ -200,7 +200,9 @@ export async function checkEarlyLaunchTheme(browser, assets) {
   assert.ok(split >= boundary.length);
   const server = http.createServer(async (_req, response) => {
    response.writeHead(200, { 'Content-Type': 'text/html', 'Content-Security-Policy': "script-src 'self' 'nonce-launch-test'" });
-   response.write(html.slice(0, rootEnd));
+   // WebKit can buffer a tiny first chunk before committing the document.
+   // Padding keeps the staged root-only response observable without advancing HTML.
+   response.write(html.slice(0, rootEnd) + `<!--${' '.repeat(2048)}-->`);
    await head.promise;
    response.write(html.slice(rootEnd, split));
    await tail.promise;

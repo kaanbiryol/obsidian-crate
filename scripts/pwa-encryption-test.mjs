@@ -179,7 +179,7 @@ async function verify(type) {
 			if (type === chromium) await context.setOffline(value);
 			else { offlineApis = value; await page.evaluate(value => { sessionStorage.setItem('crate-test-offline', value ? '1' : '0'); window.dispatchEvent(new Event(value ? 'offline' : 'online')); }, value); }
 		};
-		const errors = []; page.on('pageerror', error => errors.push(error.message));
+		const errors = []; page.on('pageerror', error => { errors.push(error.message); if (process.env.CRATE_TEST_DEBUG === '1') console.log('PWA pageerror:', error.message, error.stack); });
 		if (process.env.CRATE_TEST_DEBUG === '1') {
 			page.on('framenavigated', frame => { if (frame === page.mainFrame()) console.log('PWA navigation:', new URL(frame.url()).pathname); });
 			page.on('crash', () => console.log('PWA page crashed'));

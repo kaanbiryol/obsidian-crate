@@ -148,7 +148,7 @@ try {
       await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('width', '44px');
       await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('border-radius', '999px');
       await expect(page.locator('.project-detail-navigation .crate-back-button')).toHaveCSS('background-image', /linear-gradient/);
-      await expect(page.locator('.project-detail-header')).toHaveCSS('margin-top', '28px');
+      await expect(page.locator('.project-detail-header')).toHaveCSS('margin-top', '8px');
       await expect(page.locator('.project-detail-navigation .pwa-sync-indicator')).toBeVisible();
       await expect(page.locator('.project-detail-header .pwa-sync-indicator')).toHaveCount(0);
       const captureStyle = element => {

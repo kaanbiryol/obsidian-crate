@@ -122,6 +122,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     const dragHandle = async (edge, offset) => {
       const handle = page.getByRole('button', { name: `Adjust highlight ${edge}`, exact: true });
+      await expect(handle).toBeEnabled();
+      await expect.poll(() => handle.evaluate((element, edge) => {
+        const body = document.querySelector('.crate-reading-reader__body');
+        const marks = body.querySelectorAll('.crate-reading-reader__highlight');
+        const mark = edge === 'start' ? marks[0] : marks[marks.length - 1];
+        const a = element.getBoundingClientRect(), b = mark.getBoundingClientRect();
+        return Math.abs(a.y + a.height / 2 - b.y - b.height / 2);
+      }, edge)).toBeLessThan(1);
       const box = await handle.boundingBox(), target = await textPoint(offset);
       if (name === 'chromium') {
         const input = await context.newCDPSession(page);
@@ -487,10 +495,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await expect(body).toContainText(marker);
       await expect(body).toContainText(excerpt);
       await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
-      const beforeText = await body.textContent();
-      await body.evaluate(element => element.scrollIntoView({ block: 'center' }));
-      const start = beforeText.indexOf(excerpt);
+      // Finish online hydration before selecting in the offline document. A
+      // late refresh can replace its text nodes and discard the native range.
+      await page.waitForLoadState('networkidle');
       await context.setOffline(true);
+      await expect(page.locator('[data-sync-state="offline"]').first()).toBeVisible();
+      await body.evaluate(async element => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const beforeText = await body.textContent();
+      const start = beforeText.indexOf(excerpt);
       // Use a native range here: desktop dragging an anchor starts link drag,
       // while these cases verify Markdown handling rather than pointer gestures.
       await body.evaluate((element, { start, excerpt }) => {

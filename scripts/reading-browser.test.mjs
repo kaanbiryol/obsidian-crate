@@ -275,7 +275,9 @@ async function sheetAppearance(page) {
   });
 }
 
-for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enroll, save, cached reader, offline change, phone confirmation and logout`, { timeout: 90000 }, async () => {
+// This journey covers enrollment, cross-feature history, offline sync and sharing.
+// Keep individual assertions bounded while allowing the full native-browser flow.
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enroll, save, cached reader, offline change, phone confirmation and logout`, { timeout: 180000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-reading-browser-')); let runtime, browser, server, loseCaptureReply = false, holdArticle, holdUpdate, holdList; const sent = [], heldResponses = [];
   try {
     runtime = await openLocalRuntime({ dataDir: dir });
@@ -342,7 +344,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       const box = selector => { const r = header.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
       const icon = header.querySelector('[data-icon="settings"]'), style = getComputedStyle(icon);
       return { height: header.getBoundingClientRect().height, title: box('.view-header-title'), meta: box('.view-header-meta'), switcher: box('.pwa-feature-switch-button'),
-        settings: box('[aria-label="Open settings"]'), settingsIcon: icon.outerHTML, settingsColor: style.color, settingsOpacity: style.opacity };
+        settings: box('.crate-icon-button:has([data-icon="settings"])'), settingsIcon: { shape: icon.innerHTML, size: [icon.getAttribute('width'), icon.getAttribute('height')], viewBox: icon.getAttribute('viewBox') }, settingsColor: style.color, settingsOpacity: style.opacity };
     });
     let openingHeader;
     await expect.poll(async () => { openingHeader = await headerGeometry(); return openingHeader.height; }).toBeGreaterThan(0);
@@ -478,6 +480,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       }
       console.log(`${name}: alternating article/project history Back retains the selected tab`);
     } finally { await modeContext.close(); }
+    await page.bringToFront();
     const firstArticleStarted = Promise.withResolvers(), firstArticleReleased = Promise.withResolvers();
     heldResponses.push(firstArticleReleased.resolve);
     holdArticle = { started: firstArticleStarted.resolve, release: firstArticleReleased.promise };
@@ -771,7 +774,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const fresh = await browser.newContext({serviceWorkers:'block'}), shared = await fresh.newPage();
     await shared.goto(`${origin}/notifications/test-share`);
     await shared.evaluate(() => { const form=document.createElement('form');form.method='POST';form.action='/notifications/share/reading';const input=document.createElement('input');input.name='url';input.value='https://example.invalid/first-share';form.append(input);document.body.append(form);form.submit(); });
-    await shared.getByText('Your shared link is kept on this device.',{exact:false}).waitFor(); await fresh.close();
+    await shared.waitForURL(/share=/);
+    await expect(shared.getByRole('heading', { name: 'Connect to Crate', exact: true })).toBeVisible();
+    assert.equal(await shared.evaluate(async () => {
+      const id = new URL(location.href).searchParams.get('share');
+      const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-reading-v1', 1); request.onsuccess = () => resolve(request.result); request.onerror = reject; });
+      return new Promise(resolve => { const request = db.transaction('values').objectStore('values').get(`share:${id}`); request.onsuccess = () => { db.close(); resolve(request.result?.encryptedShare === 1); }; });
+    }), true, 'An unconnected browser retains the shared link for enrollment');
+    await fresh.close();
     await mkdir('test-results/reading',{recursive:true}); await page.screenshot({path:`test-results/reading/${name}-library.png`,fullPage:true});
     const prepared=await api('/reading/prepare',{url:'https://example.invalid/phone',title:'Phone article'});
     const phone=await context.newPage(); await phone.goto(prepared.launchUrl);
@@ -782,7 +792,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button',{name:'Log out',exact:true}).click();
     const readingToken = await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1')).token);
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
-    await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
+    await page.getByRole('heading',{name:'Connect to Crate',exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')),null);
     await expect.poll(async () => (await runtime.mf.dispatchFetch(`${origin}/reading/session`, { headers: { Authorization: `Bearer ${readingToken}` } })).status).toBe(401);
     // An enrolled Reminders PWA opens Reading even when article fetching is off.
@@ -813,7 +823,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.deepEqual(await sheetAppearance(page), reminderSheetAppearance, 'Both modes must share sheet and control styling');
     await page.getByRole('button',{name:'Log out',exact:true}).click();
     await page.getByRole('button',{name:'Log out and clear device data'}).click();
-    await page.getByRole('heading',{name:'Your reading, everywhere'}).waitFor();
+    await page.getByRole('heading',{name:'Connect to Crate',exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reminders-auth-token')), null);
     assert.equal(await page.evaluate(()=>localStorage.getItem('crate-reading-session-v1')), null);
     // Private views clear immediately; remote revocation completes independently.

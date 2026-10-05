@@ -1,6 +1,9 @@
 import { expect } from '@playwright/test';
 
 export async function checkSettingsClose(sheet) {
+	// A reversed entrance has a shortened CSS transition. This check measures
+	// a full exit, so wait for the sheet's actual resting transform first.
+	await expect(sheet).toHaveCSS('transform', 'none');
 	const result = await sheet.getByRole('button', { name: 'Close settings', exact: true }).evaluate(button => {
 		const popup = button.closest('[role="dialog"]');
 		const background = document.querySelector('[data-crate-section="reminders"]');

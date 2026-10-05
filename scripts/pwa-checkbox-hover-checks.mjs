@@ -21,14 +21,14 @@ export async function checkCheckboxHoverAfterDismissal(browser, origin) {
 			});
 			try {
 				if (view === 'tab=inbox') {
-					const reminders = Array.from({ length: 16 }, (_, index) => ({
+					const reminders = Array.from({ length: 32 }, (_, index) => ({
 						id: `hover-${index}`, content: `Reminder ${index}`, project: 'Inbox',
 						completed: false, priority: 4, filePath: 'Reminders/Inbox.md', revision: 'hover-1',
 					}));
 					await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders, projects: ['Inbox'] } }));
 				}
 				await page.goto(`${origin}/notifications?folder=Reminders&${view}`);
-				const checkbox = page.locator('.premium-checkbox').nth(view === 'tab=inbox' ? 8 : 0);
+				const checkbox = page.locator('.premium-checkbox').nth(view === 'tab=inbox' ? 16 : 0);
 				const add = page.locator(view.startsWith('project=') ? '.pwa-project-fab' : '.pwa-dock__add');
 				await expect(checkbox).toBeVisible();
 				if (view === 'tab=inbox') {
@@ -58,14 +58,14 @@ export async function checkCheckboxHoverAfterDismissal(browser, origin) {
 							const closeBounds = await close.boundingBox();
 							const x = closeBounds.x + closeBounds.width / 2, y = closeBounds.y + closeBounds.height / 2;
 							assert.ok(x > bounds.x && x < bounds.x + bounds.width && y > bounds.y && y < bounds.y + bounds.height,
-								'The close button must sit over a checkbox for the regression');
+								`The close button must sit over a checkbox for the regression: ${JSON.stringify({ closeBounds, bounds })}`);
 						}
 						await close.tap();
 					} else {
 						// WebKit transfers hover to the checkbox under the removed backdrop.
 						// Keep the pointer here after dismissal to catch the lingering highlight.
 						// On the scrolled inbox use a higher row, above the sheet.
-						const backdropBounds = view === 'tab=inbox' ? await page.locator('.premium-checkbox').nth(4).boundingBox() : bounds;
+						const backdropBounds = view === 'tab=inbox' ? await page.locator('.premium-checkbox').nth(12).boundingBox() : bounds;
 						const point = { x: backdropBounds.x + backdropBounds.width / 2, y: backdropBounds.y + backdropBounds.height / 2 };
 						assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)
 							?.classList.contains('pwa-modal-sheet__backdrop'), point));

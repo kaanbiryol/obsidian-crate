@@ -176,13 +176,13 @@ describe('provisionCloudflareDeployment', () => {
 	});
 
 
-  it('rejects an upgraded database with missing migration receipts before upload', async () => {
+  it('rejects a retired development schema baseline before upload', async () => {
     const api = createApi();
     api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
     api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 1 }] }]);
     const metadata = createMetadata();
     await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
-      .rejects.toThrow('Database migration history does not match');
+      .rejects.toThrow('Unsupported database schema baseline');
     expect(api.uploadWorker).not.toHaveBeenCalled();
   });
 

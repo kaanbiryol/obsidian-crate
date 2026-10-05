@@ -1,7 +1,7 @@
 import { rememberEncryptionUnlock } from '../encryption-onboarding';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
-import { loadEncryptionState, loadScopeKeys, assertEncryptionActive } from '../connection/encryption';
+import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
 import type { ScopedEncryptionState } from '../encryption-scope';
 import { unlockLocalState, type StoredReminderKeys } from '../encryption-keys';
 import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption-fragments';
@@ -12,7 +12,8 @@ type ReadingEncryptionState = ScopedEncryptionState;
 let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } | undefined;
 let currentKeys: StoredReminderKeys | null = null;
 let expected: ReadingEncryptionState | null = null;
-onReadingEncryptionReset(() => { pending = undefined; currentKeys = null; expected = null; forgetReadingKey(); forgetReadingCapture(); lockReadingStorage(); });
+let verifiedIdentity: string | undefined;
+onReadingEncryptionReset(() => { pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined; forgetReadingKey(); forgetReadingCapture(); lockReadingStorage(); });
 export function readingEncryptionHeaders(): Record<string, string> {
   return expected ? { 'X-Crate-Encryption-Vault': expected.vaultId, 'X-Crate-Encryption-Generation': String(expected.generation) } : {};
 }
@@ -26,7 +27,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     const state = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
       request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${session.token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) } }) });
     expected = state;
-    if (!state) { currentKeys = null; lockReadingStorage(false); return null; }
+    if (!state) { verifiedIdentity = identity; currentKeys = null; lockReadingStorage(false); return null; }
     if (!currentKeys) lockReadingStorage();
     assertEncryptionActive(state);
     const keys = await loadScopeKeys(state, session.folderPath, current, pendingReadingKey());
@@ -50,9 +51,21 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     } catch (error) { try { tx.abort(); } catch { /* already aborted */ } await tx.done.catch(() => {}); throw error; }
     if (!current()) throw new Error('Reading sign-in changed.');
     rememberEncryptionUnlock(state.vaultId);
+    verifiedIdentity = identity;
     currentKeys = { ...keys, localFolderPath: session.folderPath };
     return currentKeys;
-  })().catch(error => { if (current()) { lockReadingStorage(true, error instanceof Error ? error.message : undefined); currentKeys = null; pending = undefined; } throw error; });
+  })().catch(error => {
+    if (current()) {
+      // Losing the network must not revoke this session's verified local access.
+      // The request still fails, so no unverified plaintext reaches the server.
+      if (!(error instanceof EncryptionVerificationUnavailableError) || verifiedIdentity !== identity) {
+        lockReadingStorage(true, error instanceof Error ? error.message : undefined);
+        currentKeys = null; verifiedIdentity = undefined;
+      }
+      pending = undefined;
+    }
+    throw error;
+  });
   pending = { identity, promise: work };
   // Plaintext is a current server state, not a permanent enrollment property.
   // Keep concurrent checks shared, but verify again before the next request.

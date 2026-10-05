@@ -97,6 +97,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
       await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
     };
+    const openHighlightNote = async label => {
+      await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
+      const highlights = page.getByRole('dialog', { name: 'Highlights', exact: true });
+      await expect(highlights).toHaveCSS('transform', 'none');
+      await highlights.getByRole('button', { name: label, exact: true }).click();
+      await expect(highlights).toHaveCount(0);
+      await expect(page.getByRole('dialog', { name: 'Highlight note', exact: true })).toBeVisible();
+    };
     const setTags = async (tags, offline = false) => {
       await page.getByRole('button', { name: 'Edit article tags' }).click();
       const dialog = page.getByRole('dialog', { name: 'Article tags' });
@@ -168,8 +176,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const opening = hold(`/reading/item?id=${saved.id}`);
     await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
     await opening.started;
-    await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-    await page.getByRole('button', { name: 'Add note', exact: true }).click();
+    await openHighlightNote('Add note');
     await page.getByLabel('Your note').fill('Keep this draft until the article opens');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('alert')).toHaveText('Open the article before saving highlights.');
@@ -192,22 +199,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true }).click();
     await page.getByRole('button', { name: 'Archive article', exact: true }).click();
     await page.getByRole('button', { name: 'Move to inbox', exact: true }).click();
-    await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-    await page.getByRole('button', { name: 'Add note', exact: true }).click();
+    await openHighlightNote('Add note');
     await page.getByLabel('Your note').fill('First note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(toast).toHaveText('Note saved');
-    await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
-    await page.getByRole('button', { name: 'Edit note', exact: true }).click();
+    await openHighlightNote('Edit note');
     await page.getByLabel('Your note').fill('Latest note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(toast).toHaveText('Note saved');
     await page.getByRole('button', { name: 'Highlights (1)', exact: true }).click();
     await expect(page.locator('.crate-reading-highlights__note')).toHaveText('Latest note');
     await page.getByRole('button', { name: 'Close highlights', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(toast).toHaveText('Note saved');
     const work = await pending(page);
     assert.equal(work.length, 2); assert.equal(work[0].body, firstBody); assert.equal(work[1].body, undefined);
     update.release();

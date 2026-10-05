@@ -30,7 +30,7 @@ export function registerViewHeaderTests() {
       await page.clock.setFixedTime(new Date('2026-10-03T12:00:00Z'));
       await page.goto(`/?host=plugin&scene=navigation&theme=${theme}&loading`);
       const active = page.locator('.plugin-workspace-panel[data-active="true"]');
-      const header = active.locator('.view-header');
+      const header = active.locator('.view-header:not([data-leaving] .view-header)');
       await expect(active.getByRole('status', { name: 'Loading reminders' })).toBeVisible();
       await expect(header.locator('.view-header-meta')).toHaveClass(/is-reserved/);
       const opening = await headerGeometry(header);
@@ -46,7 +46,7 @@ export function registerViewHeaderTests() {
         await expect(header.locator('h1')).toHaveText('Inbox');
         const inbox = await headerGeometry(header);
         const narrow = width <= 759;
-        expect(inbox.padding).toEqual([narrow ? '4px' : '12px', '18px', narrow ? '8px' : '10px', '18px']);
+        expect(inbox.padding).toEqual([narrow ? '12px' : '20px', '18px', narrow ? '8px' : '10px', '18px']);
         expect(inbox.metaHeight).toBe(narrow ? 20 : 24);
         for (const label of ['Reminders', 'Projects', 'Reading']) {
           await active.getByRole('button', { name: label, exact: true }).click();

@@ -46,6 +46,7 @@ describe('pending changes after restart with automatic sync off', () => {
 		try {
 			expect(h.settings.automaticSync).toBe(false);
 			await restore(h);
+			h.vault.getFiles.mockReturnValue(['existing.md', 'edited.md'].map(path => ({ path, extension: 'md', stat: { size: 8, mtime: 1000 } })));
 			h.engine.onFileChange({ path: 'edited.md' } as never);
 			await vi.advanceTimersByTimeAsync(h.settings.syncInterval * 2 * 1000);
 			await flushPendingChanges(h.engine);
