@@ -1,3 +1,4 @@
+import type { ConnectionTestResult } from './types';
 import { SharedHistoryApi } from './worker-api/history-checkpoints';
 import type { RequestDiagnostics } from './request-diagnostics';
 import type { MarkdownBaseCache } from './markdown-base-cache';
@@ -133,7 +134,7 @@ export class SyncApiClient {
 		return this.syncApi.getServerInfo();
 	}
 
-	async testConnection(): Promise<{ success: boolean; error?: string }> {
+	async testConnection(): Promise<ConnectionTestResult> {
 		return this.syncApi.testConnection();
 	}
 

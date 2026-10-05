@@ -1,3 +1,4 @@
+import { ResetBlockedError } from './reset-errors';
 import { createUpgradeCheckpoint, releaseUpgradeGuards } from './upgrade-checkpoint';
 import { readVaultName } from './vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './deployment-database';
@@ -32,11 +33,11 @@ async function ensureD1Database(
 		// so a lost creation response can resume by its stable resource name.
 		const worker = await api.getWorkerSettings(accountId, metadata.workerName);
 		if (worker.annotations?.['workers/message'] !== `Crate reset ${reset.id}`) {
-			throw new Error('Reset blocked: the Worker changed before rebuilding its database.');
+			throw new ResetBlockedError('the Worker changed before rebuilding its database.');
 		}
 		assertWorkerTarget(worker, metadata, true);
 		const bucket = await api.getR2Bucket(accountId, metadata.r2BucketName);
-		if (bucket?.creation_date === reset.bucketCreatedAt) throw new Error('Reset blocked: the old bucket still exists.');
+		if (bucket?.creation_date === reset.bucketCreatedAt) throw new ResetBlockedError('the old bucket still exists.');
 	}
 
 	const existingByName = await api.findD1Database(accountId, metadata.d1DatabaseName);

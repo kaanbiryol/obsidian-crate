@@ -7,7 +7,7 @@ import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ModalState, ReminderRecord } from '../types';
 
 vi.mock('../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
-vi.mock('react', () => ({ useMemo: (factory: () => unknown) => factory(), useRef: (current: unknown) => ({ current }) }));
+vi.mock('react', () => ({ useMemo: (factory: () => unknown) => factory(), useRef: (current: unknown) => ({ current }), useState: (current: unknown) => [current, () => {}] }));
 vi.mock('./useReminderOutbox', () => ({ useReminderOutbox: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -53,7 +53,7 @@ function harness() {
 function body(change: PendingReminderChange): Record<string, unknown> { return JSON.parse(change.body) as Record<string, unknown>; }
 
 describe('PWA optimistic mutations', () => {
-	it('blocks automatic reload while commands are being prepared before enqueue', async () => {
+	it('tracks commands being prepared before enqueue', async () => {
 		const { hook } = harness();
 		const complete = hook.toggleReminderCompleted('one', false);
 		const reorder = hook.persistReorder('Inbox', ['two', 'one']);

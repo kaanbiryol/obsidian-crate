@@ -1,3 +1,4 @@
+import type { ConnectionTestResult } from '../types';
 import { computeHash } from '../hasher';
 import type { EncryptedFiles } from '../encrypted-files';
 import type { JournalUpload } from '../upload-intent';
@@ -76,13 +77,14 @@ export class SyncWorkerApi {
 		return this.http.getServerInfo();
 	}
 
-	async testConnection(): Promise<{ success: boolean; error?: string }> {
+	async testConnection(): Promise<ConnectionTestResult> {
 		try {
 			const info = await this.getServerInfo();
 			if (!isCompatibleCrateServer(info)) {
 				return {
 					success: false,
 					error: `Incompatible Crate server protocol ${info.protocol.current}`,
+					code: 'incompatible_protocol',
 				};
 			}
 			const response = await this.health();

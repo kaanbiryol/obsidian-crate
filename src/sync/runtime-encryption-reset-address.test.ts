@@ -7,7 +7,6 @@ import { createEncryptionState } from '../encryption/server-state';
 import { WorkerApiHttpClient } from './worker-api/http';
 import { createRuntimeHarness } from './runtime-test-harness';
 
-vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 afterEach(() => vi.restoreAllMocks());
 const oldUrl = 'https://old.trycloudflare.com', newUrl = 'https://new.trycloudflare.com';
 async function setup(phase: EncryptionReset['phase'] = 'upload') {

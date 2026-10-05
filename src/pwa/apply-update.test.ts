@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hasUnsettledReminders } from './reminder-outbox-storage';
+import { hasUnsettledReading } from './reading/update-guard';
 import { fetchPwaAssetVersion } from './api';
 import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
 
@@ -22,6 +23,7 @@ describe('reliable PWA updates', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.mocked(hasUnsettledReminders).mockReturnValue(false);
+		vi.mocked(hasUnsettledReading).mockResolvedValue(false);
 		vi.mocked(fetchPwaAssetVersion).mockResolvedValue('new');
 		vi.stubGlobal('window', { location: { reload } });
 	});
@@ -116,6 +118,30 @@ describe('reliable PWA updates', () => {
 		await expect(applyPwaUpdate()).rejects.toThrow('not ready');
 		register.mockRejectedValueOnce(new Error('Offline'));
 		await expect(applyPwaUpdate()).rejects.toThrow('Offline');
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('rechecks transient work after the final asynchronous storage check', async () => {
+		vi.stubGlobal('navigator', {});
+		let safe = true;
+		const beforeNavigation = vi.fn(() => true);
+		const beforeReload = async () => {
+			vi.mocked(hasUnsettledReading).mockImplementationOnce(async () => { safe = false; return false; });
+		};
+		await expect(applyPwaUpdate(beforeReload, { canApply: () => safe, beforeNavigation })).resolves.toBe(false);
+		expect(beforeNavigation).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('does not activate if command preparation starts during the storage check', async () => {
+		const worker = new UpdateWorker();
+		worker.state = 'installed';
+		vi.stubGlobal('navigator', { serviceWorker: { register: vi.fn().mockResolvedValue({ waiting: worker }) } });
+		let safe = true;
+		vi.mocked(hasUnsettledReading).mockResolvedValueOnce(false)
+			.mockImplementationOnce(async () => { safe = false; return false; });
+		await expect(applyPwaUpdate(undefined, { canApply: () => safe })).resolves.toBe(false);
+		expect(worker.postMessage).not.toHaveBeenCalled();
 		expect(reload).not.toHaveBeenCalled();
 	});
 

@@ -1,4 +1,4 @@
-import { act, createElement } from 'react';
+import { act, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { parseHTML } from 'linkedom';
 import { afterEach, vi } from 'vitest';
@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 /** Real React effects and renders in a lightweight DOM; browser focus is tested separately. */
-export function renderHook<T>(useHook: () => T, setup?: () => void) {
+export function renderHook<T>(useHook: () => T, setup?: () => void, wrap?: (children: ReactNode) => ReactNode) {
 	const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
 	vi.stubGlobal('window', window);
 	vi.stubGlobal('document', document);
@@ -23,7 +23,10 @@ export function renderHook<T>(useHook: () => T, setup?: () => void) {
 		current = useHook();
 		return null;
 	}
-	const rerender = () => { act(() => root.render(createElement(Harness))); };
+	const rerender = () => { act(() => {
+		const element = createElement(Harness);
+		root.render(wrap ? wrap(element) : element);
+	}); };
 	const unmount = () => {
 		if (!mounted) return;
 		act(() => root.unmount());

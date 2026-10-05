@@ -1,3 +1,5 @@
+import { registerSyncStatus } from '../plugin/sync-status';
+import type { ConnectionTestResult } from './types';
 import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
@@ -24,7 +26,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
     () => ensureReminderNotificationPolicy(plugin, true),
 	);
-	plugin.syncRuntime.setStatusBarClickHandler(() => {
+	registerSyncStatus(plugin, plugin.syncRuntime, () => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 	});
 	let serverUnavailable = false;
@@ -177,7 +179,7 @@ export async function configureCloudflareAuthorizedDevice(
 	workerUrl: string,
 	authToken: string,
 	expected?: { workerUrl: string; authToken: string },
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ConnectionTestResult> {
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	const api = new SyncApiClient(workerUrl, authToken);

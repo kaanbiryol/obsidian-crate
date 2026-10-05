@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL, type CrateServerInfo } from '../protocol';
-import { createDeferred, createRuntimeHarness, setApiClient } from './runtime-test-harness';
+import { createDeferred, createRuntimeHarness, initializeRuntime, mockApiClient } from './runtime-test-harness';
 
 const info: CrateServerInfo = {
 	service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [],
@@ -15,7 +15,8 @@ it('reuses recent version details for display, expires them, and deduplicates pe
 	const api = client(), pending = createDeferred<CrateServerInfo>();
 	const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
 	api.getServerInfo.mockReturnValueOnce(pending.promise);
-	setApiClient(runtime, api);
+	await initializeRuntime(runtime);
+	mockApiClient(runtime, api);
 	const first = runtime.getVersionInfo(), second = runtime.getVersionInfo();
 	expect(api.getServerInfo).toHaveBeenCalledOnce();
 	expect(runtime.getCachedVersionInfo()).toBeUndefined();
@@ -29,10 +30,11 @@ it('reuses recent version details for display, expires them, and deduplicates pe
 
 it.each(['address', 'account', 'database', 'client'] as const)('does not reuse version information after changing the %s', async change => {
 	const { runtime, settings } = createRuntimeHarness();
-	setApiClient(runtime, client());
+	await initializeRuntime(runtime);
+	mockApiClient(runtime, client());
 	await runtime.getVersionInfo();
 	if (change === 'address') settings.workerUrl = 'https://another.example.com';
-	else if (change === 'client') setApiClient(runtime, client());
+	else if (change === 'client') { await initializeRuntime(runtime); mockApiClient(runtime, client()); }
 	else settings.cloudflareDeployment = { accountId: change === 'account' ? 'other' : undefined, d1DatabaseId: change === 'database' ? 'other' : undefined } as never;
 	expect(runtime.getCachedVersionInfo()).toBeUndefined();
 });
@@ -41,7 +43,8 @@ it('drops a delayed version result when the connection changes', async () => {
 	const { runtime, settings } = createRuntimeHarness();
 	const api = client(), pending = createDeferred<CrateServerInfo>();
 	api.getServerInfo.mockReturnValueOnce(pending.promise);
-	setApiClient(runtime, api);
+	await initializeRuntime(runtime);
+	mockApiClient(runtime, api);
 	const check = runtime.getVersionInfo();
 	settings.workerUrl = 'https://another.example.com';
 	pending.resolve(info);
@@ -52,7 +55,8 @@ it('drops a delayed version result when the connection changes', async () => {
 it('clears previous results after a failed refresh', async () => {
 	const { runtime } = createRuntimeHarness();
 	const api = client();
-	setApiClient(runtime, api);
+	await initializeRuntime(runtime);
+	mockApiClient(runtime, api);
 	await runtime.getVersionInfo();
 	api.getServerInfo.mockRejectedValueOnce(new Error('Offline'));
 	await expect(runtime.getVersionInfo()).rejects.toThrow('Offline');

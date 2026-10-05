@@ -1,11 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { TFolder } from 'obsidian';
 import type CratePlugin from './CratePlugin';
-import { createRuntimeHarness, setAcceptingEvents, setSyncEngine } from '../sync/runtime-test-harness';
+import { createRuntimeHarness } from '../sync/runtime-test-harness';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '../cloudflare/worker/sync-engine-vault-test-harness';
 import { LocalManifest } from '../sync/manifest';
-import { SyncEngine } from '../sync/engine';
-import { SyncApiClient } from '../sync/api';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertRenamePreserved } from '../sync/rename-dependencies';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
@@ -13,7 +11,6 @@ import { saveEncryptionKeys } from './encryption-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
 import { computeHash } from '../sync/hasher';
 
-vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 vi.mock('../sync/encryption-conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -41,9 +38,7 @@ it.each(['single', 'rapid', 'previous rename', 'paused rename'] as const)('prese
   const entry = { hash: await computeHash(disk.read('Reading/note.md')), size: 12, modified: '2026-01-01T00:00:00Z', revision: 'source' };
   const seed = new LocalManifest(plugin.app, plugin.manifest, h.settings.workerUrl);
   seed.setEntry('Reading/note.md', entry); await seed.save(); await seed.close();
-  const api = new SyncApiClient(h.settings.workerUrl, 'auth-token');
-  const engine = new SyncEngine(plugin, api, h.settings);
-  await engine.initialize(); setSyncEngine(h.runtime, engine); setAcceptingEvents(h.runtime, true);
+  await h.runtime.initialize({ skipStartupSync: true });
   let name = 'note.md';
   if (mode === 'previous rename') {
     disk.rename('Reading/note.md', 'Reading/renamed.md'); name = 'renamed.md';
@@ -62,7 +57,6 @@ it.each(['single', 'rapid', 'previous rename', 'paused rename'] as const)('prese
     expect(queueEncryptedFolderMove(plugin, 'Articles/note.md', 'Articles/renamed.md')).toBe(true);
   }
   if (second) renamed('Articles', 'Saved');
-  await engine.waitForIdle();
   await resumeEncryptedFolderMoves(plugin);
   h.runtime.destroy();
   await new Promise(resolve => setTimeout(resolve, 0));

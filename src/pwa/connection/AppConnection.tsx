@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { makeApiFetch, registerPwaServiceWorker } from '../api';
 import { onConnectionExpired } from './expiration';
+import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import { encryptionSnapshot, subscribeEncryption } from '../encryption-session';
@@ -22,7 +23,7 @@ function useConnection() {
   }, []);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [config, setConfig] = useState(loadStoredConfig);
-  const [error, reportError] = useState<string | null>(null);
+  const [error, reportError] = useState<ConnectionIssue | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const { preferences } = usePwaPreferences();
   const [startTab, setStartTab] = useState<StartTab>(() => ['today', 'inbox', 'upcoming', 'browse'].includes(preferences.defaultScreen) ? preferences.defaultScreen as StartTab : 'today');

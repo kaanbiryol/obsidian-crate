@@ -83,11 +83,12 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 CratePlugin (src/plugin/CratePlugin.ts)
   ├── SecretStorageService   - OS keychain wrapper
   ├── CrateSettingTab          - settings UI (delegates to section modules)
-  └── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
+  ├── Sync status (plugin/sync-status.ts) - subscribes to runtime state and progress
+  │     └── StatusBarManager (ui/status.ts) - status bar rendering
+  ├── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
         ├── SyncEngine (sync/engine.ts) - orchestrates sync operations
         │     uses: planner, transfer, queue, file-discovery, manifest
-        ├── SyncApiClient (sync/api.ts) - HTTP calls to worker
-        └── StatusBarManager (ui/status.ts) - status bar rendering
+        └── SyncApiClient (sync/api.ts) - HTTP calls to worker
   ├── Reminder runtime (reminders/runtime.ts) - index/writer/repository/watcher setup
   ├── Reminder registrations (reminders/register-integrations.ts) - commands, code blocks, views
   ├── ReminderIndex (reminders/data/reminder-index/) - in-memory reminder index
@@ -99,6 +100,12 @@ The engine retains cancellation, exclusive-operation checks and active-work trac
 `sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
+
+`cloudflare/deployment-types.ts` defines deployment intents and distinguishes a
+deleted server from a deployed server with a URL. The service owns authorization,
+target verification and provisioning. `cloudflare/plugin-integration.ts` coordinates
+the operation and device connection; `ui/cloudflare-operation-presentation.ts`
+owns modal copy and recovery actions supplied by that coordinator.
 
 `sync/runtime-encryption-reset-workflow.ts` owns the durable remote reset, local
 invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verified
@@ -124,6 +131,9 @@ verification and key-import policy through `connection/encryption.ts`, retaining
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts
 and pending changes, while explicit logout clears both features' local data.
+Connection boundaries publish typed issues from `connection/issues.ts`; recovery
+screens choose cleanup, reconnect or retry actions from the issue kind, independently
+of its display message.
 `reading/useReadingConnection.ts` handles Reading connection readiness, and
 `reading/useReadingSession.ts` hydrates its articles, drafts and pending changes.
 This shared lifecycle does not transfer browser storage into an installed iOS app.
@@ -142,6 +152,9 @@ refresh dispatches independently to enabled features, and logout clears both
 private views while credential revocation and storage cleanup finish. Sync feedback
 also lives above the feature screens, including remote logout warnings. The final
 update path also rechecks durable queues, independently of the status model.
+Reminder command preparation publishes readiness changes and supplies a synchronous
+guard before React commits. Activation and reload recheck that guard after
+asynchronous storage reads, covering the interval before a command reaches its outbox.
 
 Reading's PWA adapter composes three hooks: `useReadingSession` owns enrollment,
 session invalidation and durable hydration; `useReadingSync` owns refresh serialization,

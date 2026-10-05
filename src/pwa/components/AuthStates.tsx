@@ -4,6 +4,7 @@ import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
 import { FeatureSwitcherButton } from './FeatureSwitcherButton';
+import type { ConnectionIssue } from '../connection/issues';
 
 const brandMarkSrc = `/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}`;
 
@@ -59,9 +60,9 @@ export function EmptyAuthState(reset: SessionResetProps) {
 	);
 }
 
-export function ErrorState({ error, onRetry, ...reset }: { error: string; onRetry: () => void } & SessionResetProps) {
-	const needsCleanup = /clear this site[’']s data|remote cleanup could not finish/i.test(error);
-	const needsLink = /enrollment token|session expired|not authenticated|unauthorized|missing auth token/i.test(error);
+export function ErrorState({ issue, onRetry, ...reset }: { issue: ConnectionIssue; onRetry: () => void } & SessionResetProps) {
+	const needsCleanup = issue.kind === 'cleanup';
+	const needsLink = issue.kind === 'reconnect';
 	return (
 		<AuthLayout
 			title={needsCleanup ? 'Cleanup needs attention' : needsLink ? 'Reconnect to Crate' : 'Unable to connect'}
@@ -75,7 +76,7 @@ export function ErrorState({ error, onRetry, ...reset }: { error: string; onRetr
 					{needsCleanup ? <TriangleAlert size={20} aria-hidden="true" /> : needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
 					<div>
 						<strong>{needsCleanup ? 'Cleanup is incomplete' : needsLink ? 'A new app link is needed' : 'Crate couldn’t be reached'}</strong>
-						<p>{error}</p>
+						<p>{issue.message}</p>
 					</div>
 				</div>
 			}

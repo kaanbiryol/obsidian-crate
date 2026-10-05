@@ -1,3 +1,4 @@
+import { ResetBlockedError } from './reset-errors';
 import type { ResetApi } from './reset-ownership';
 
 // Include orphaned uploads with Crate's generated key format, retained versions,
@@ -15,10 +16,10 @@ export async function createObjectOwnershipCheck(api: ResetApi, accountId: strin
 			.flatMap(result => result.results ?? []).map(row => row.name);
 		if (columns.includes('storage_key')) sources.push({ table, column: 'storage_key' });
 		else if (table === 'files' && columns.includes('path')) sources.push({ table, column: 'path' });
-		else throw new Error('Reset blocked: could not verify Crate file references.');
+		else throw new ResetBlockedError('could not verify Crate file references.');
 	}
 	return async key => {
-		if (key.split('/').some(segment => segment === '.' || segment === '..')) throw new Error('Reset blocked: unsafe R2 object key.');
+		if (key.split('/').some(segment => segment === '.' || segment === '..')) throw new ResetBlockedError('unsafe R2 object key.');
 		if (MANAGED_OBJECT.test(key) || UPGRADE_BACKUP_OBJECT.test(key) || HISTORY_CHECKPOINT_OBJECT.test(key)
 			|| key === '__crate__/settings.json' || key === '__crate__/history/index.json') return;
 		for (const source of sources) {
@@ -26,7 +27,7 @@ export async function createObjectOwnershipCheck(api: ResetApi, accountId: strin
 				`SELECT 1 AS found FROM ${source.table} WHERE ${source.column} = ? LIMIT 1;`, [key]);
 			if (rows.some(result => result.results?.some(row => row.found === 1))) return;
 		}
-		throw new Error(`Reset blocked: the bucket contains an object not identified as Crate data: ${key}`);
+		throw new ResetBlockedError(`the bucket contains an object not identified as Crate data: ${key}`);
 	};
 }
 
@@ -44,7 +45,7 @@ export async function inspectBucketObjects(api: ResetApi, accountId: string, buc
 		}
 		onProgress?.(`Checking remote files: ${checked.toLocaleString()} checked…`);
 		cursor = page.cursor;
-		if (cursor && seen.has(cursor)) throw new Error('Reset blocked: R2 pagination did not advance.');
+		if (cursor && seen.has(cursor)) throw new ResetBlockedError('R2 pagination did not advance.');
 		if (cursor) seen.add(cursor);
 	} while (cursor);
 	return checked;

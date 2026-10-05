@@ -59,14 +59,17 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	// The user may have started editing or backgrounded the iPhone during download.
 	if (options.canApply && !options.canApply()) return false;
 	if (hasUnsettledReminders() || await hasUnsettledReading()) return false;
+	if (options.canApply && !options.canApply()) return false;
 	options.onStage?.('activating');
 	if (worker) await waitForWorkerActivation(worker);
 	if (options.canApply && !options.canApply()) return false;
 	await beforeReload?.();
 	// Recheck after the transition's async paint, including a suspended iOS timer.
 	if (options.canApply && !options.canApply()) return false;
-	if (options.beforeNavigation && !options.beforeNavigation()) return false;
 	if (hasUnsettledReminders() || await hasUnsettledReading()) return false;
+	// Reading storage can yield while a new command starts preparing its identity.
+	if (options.canApply && !options.canApply()) return false;
+	if (options.beforeNavigation && !options.beforeNavigation()) return false;
 	window.location.reload();
 	return true;
 }

@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('react-dom/client', () => ({
-	createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }),
-}));
 import { LocalManifest } from './manifest';
 import { deleteManifestFile } from './runtime-config';
 import { SyncEngine } from './engine';

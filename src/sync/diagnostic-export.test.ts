@@ -1,4 +1,3 @@
-vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 import { InitialImportApi } from './worker-api/initial-import';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildDiagnosticExport } from './diagnostic-export';

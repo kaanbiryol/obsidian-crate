@@ -1,5 +1,5 @@
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { newReminderOperationId } from '../reminder-operation-id';
@@ -34,6 +34,15 @@ export function useReminderMutations(options: {
 	const { closeModal, config, ensureCanMutate, projects, getSnapshot, selectedProject, refreshPresentation, setSaving, showToast } = options;
 	const preparingRef = useRef(false);
 	const pendingPreparations = useRef(0);
+	const [, setPreparationCount] = useState(0);
+	const beginPreparation = () => {
+		pendingPreparations.current += 1;
+		setPreparationCount(pendingPreparations.current);
+		return () => {
+			pendingPreparations.current -= 1;
+			setPreparationCount(pendingPreparations.current);
+		};
+	};
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
 	const enqueue = (change: PendingReminderChange) => {
 		if (!ready || !outboxRef.current) throw new Error('Pending changes are still loading. Reopen Crate if this continues.');
@@ -45,6 +54,7 @@ export function useReminderMutations(options: {
 		if (!ensureCanMutate() || preparingRef.current) return false;
 		const sessionCurrent = capturePwaSession();
 		preparingRef.current = true;
+		const finishPreparation = beginPreparation();
 		setSaving(true);
 		try {
 			const { createSaveReminderChange } = await import('../save-reminder-command');
@@ -57,7 +67,7 @@ export function useReminderMutations(options: {
 			closeModal();
 			return true;
 		} catch (error) { if (sessionCurrent()) report(error); return false; }
-		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }
+		finally { preparingRef.current = false; finishPreparation(); if (sessionCurrent()) setSaving(false); }
 	};
 
 	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
@@ -76,7 +86,7 @@ export function useReminderMutations(options: {
 	const toggleReminderCompleted = async (id: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;
 		const current = capturePwaSession();
-		pendingPreparations.current += 1;
+		const finishPreparation = beginPreparation();
 		try {
 			const previous = getSnapshot().reminders.find(item => item.id === id);
 			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
@@ -86,12 +96,12 @@ export function useReminderMutations(options: {
 				showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');
 			}
 		} catch (error) { if (current()) report(error); }
-		finally { pendingPreparations.current -= 1; }
+		finally { finishPreparation(); }
 	};
 	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string) => {
 		if (!ensureCanMutate()) return;
 		const current = capturePwaSession();
-		pendingPreparations.current += 1;
+		const finishPreparation = beginPreparation();
 		try {
 			const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
 			if (!current()) return;
@@ -99,12 +109,12 @@ export function useReminderMutations(options: {
 			closeModal();
 			showToast('success', 'Reminder deleted');
 		} catch (error) { if (current()) report(error); }
-		finally { pendingPreparations.current -= 1; }
+		finally { finishPreparation(); }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
 		if (!ensureCanMutate()) { refreshPresentation(); return; }
 		const current = capturePwaSession();
-		pendingPreparations.current += 1;
+		const finishPreparation = beginPreparation();
 		try {
 			const operationId = await newReminderOperationId();
 			if (!current()) return;
@@ -115,7 +125,7 @@ export function useReminderMutations(options: {
 				status: 'pending', attempts: 0, retryAt: 0,
 			});
 		} catch (error) { if (current()) { refreshPresentation(); report(error); } }
-		finally { pendingPreparations.current -= 1; }
+		finally { finishPreparation(); }
 	};
 	const retryChange = (operationId: string) => {
 		try { outboxRef.current?.retry(operationId); void outboxRef.current?.drain(); }

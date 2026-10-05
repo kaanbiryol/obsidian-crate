@@ -1,4 +1,4 @@
-import { SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
+import { SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
 import { clearReadingData, readingSession, READING_SESSION_KEY } from '../reading/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
@@ -63,7 +63,7 @@ export function usePwaSessionLifecycle({
 	handleUnauthorizedRef: MutableRefObject<() => void>;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
-	reportError: (message: string | null) => void;
+	reportError: (issue: ConnectionIssue | null) => void;
 	setSettingsOpen: Dispatch<SetStateAction<boolean>>;
 	showToast: ShowToast;
 }): {
@@ -138,7 +138,7 @@ export function usePwaSessionLifecycle({
 	useEffect(() => {
 		handleUnauthorizedRef.current = () => {
 			void suspendLocalSession();
-			reportError(SESSION_RECOVERY_MESSAGE);
+			reportError(SESSION_RECOVERY_ISSUE);
 		};
 	}, [suspendLocalSession, handleUnauthorizedRef, reportError]);
 
@@ -161,12 +161,12 @@ export function usePwaSessionLifecycle({
 					if (event.key !== null && event.newValue !== localStorage.getItem(AUTH_TOKEN_KEY)) return;
 					setConfig(loadStoredConfig());
 					void resetLocalSession(event.newValue, event.key === null);
-					reportError(event.key !== null && event.newValue === null && !explicitLogout ? SESSION_RECOVERY_MESSAGE : null);
+					reportError(event.key !== null && event.newValue === null && !explicitLogout ? SESSION_RECOVERY_ISSUE : null);
 					explicitLogout = false;
 				}
 			} catch {
 				void resetLocalSession(null, event.key === PWA_LOGOUT_KEY || event.key === null);
-				reportError('Browser storage is unavailable. Close other Crate tabs and clear this site’s data in browser settings.');
+				reportError({ kind: 'cleanup', message: 'Browser storage is unavailable. Close other Crate tabs and clear this site’s data in browser settings.' });
 			}
 		};
 		window.addEventListener('storage', onStorage);
@@ -188,7 +188,8 @@ export function usePwaSessionLifecycle({
 				disablePushNotifications,
 				revokeAppSession,
 			});
-			reportError([cleanupWarning.current, remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null].filter(Boolean).join(' ') || null);
+			const message = [cleanupWarning.current, remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null].filter(Boolean).join(' ');
+			reportError(message ? { kind: 'cleanup', message } : null);
 			showToast(
 				cleanupWarning.current ? 'error' : 'info',
 				cleanupWarning.current ?? (remoteCleanupFailed

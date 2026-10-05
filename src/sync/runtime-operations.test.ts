@@ -1,3 +1,4 @@
+import { SyncEngine } from './engine';
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../plugin/settings-types';
 import type { SyncResult } from './types';
@@ -8,9 +9,8 @@ import { formatSyncProgress } from '../ui/activity/progress-label';
 import {
 	createDeferred,
 	createRuntimeHarness,
-	setApiClient,
-	setStatusBar,
-	setSyncEngine,
+	mockApiClient,
+	initializeRuntime,
 } from './runtime-test-harness';
 
 describe('SyncRuntime operation wrappers', () => {
@@ -24,7 +24,7 @@ describe('SyncRuntime operation wrappers', () => {
 			getState: () => state, sync, initialSync: sync, forceFullSync: sync,
 			saveSharedHistoryCheckpoint: vi.fn(() => checkpoint.promise),
 		};
-		setSyncEngine(runtime, engine);
+		await initializeRuntime(runtime, engine);
 		persistSettings.mockImplementation(() => persistence.promise);
 		const labels: string[] = [];
 		runtime.addProgressListener(() => {
@@ -63,14 +63,8 @@ describe('SyncRuntime operation wrappers', () => {
 			expect(runtime.getActivityProgress()).toEqual({ type: historyType, current: 1, total: 2 });
 		});
 		const listener = vi.fn();
-		const clearSyncProgress = vi.fn();
-		const setSyncProgress = vi.fn();
 
-		setStatusBar(runtime, {
-			setSyncProgress,
-			clearSyncProgress,
-		});
-		setSyncEngine(runtime, {
+		await initializeRuntime(runtime, {
 			sync: vi.fn(async (callback: (current: number, total: number) => void) => {
 				callback(1, 2);
 				return result;
@@ -95,8 +89,7 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(runtime.getActivityProgress()).toBeNull();
 		expect(progressCallback).toHaveBeenCalledWith(1, 2);
 		expect(listener).toHaveBeenCalledWith(1, 2);
-		expect(setSyncProgress).toHaveBeenCalledWith(1, 2);
-		expect(clearSyncProgress).toHaveBeenCalledTimes(1);
+		expect(listener).toHaveBeenLastCalledWith(0, 0);
 		expect(persistSettings).toHaveBeenCalledTimes(1);
 		expect(settings.syncHistory[0]?.type).toBe(historyType);
 		expect(settings.syncHistory[0]?.uploaded).toBe(2);
@@ -108,7 +101,7 @@ describe('SyncRuntime operation wrappers', () => {
 		const { runtime, settings } = createRuntimeHarness();
 		const uploadedPaths = Array.from({ length: MAX_SYNC_HISTORY_PATHS + 5 }, (_, index) => `notes/${index}.md`);
 
-		setSyncEngine(runtime, {
+		await initializeRuntime(runtime, {
 			sync: vi.fn(async () => ({
 				...createEmptySyncResult(),
 				success: true,
@@ -146,12 +139,11 @@ describe('SyncRuntime operation wrappers', () => {
 			uploadedPaths: ['notes/automatic.md'],
 		};
 		const listener = vi.fn();
-		setSyncEngine(runtime, engine);
+		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
+		await initializeRuntime(runtime, engine);
 		runtime.addStateChangeListener(listener);
 
-		await (runtime as unknown as {
-			recordAutomaticSyncResult(currentEngine: unknown, syncResult: SyncResult): Promise<void>;
-		}).recordAutomaticSyncResult(engine, result);
+		await callback.mock.calls[0]![0](result);
 
 		expect(settings.lastSync).toBe(state.lastSync);
 		expect(settings.syncHistory[0]).toEqual(expect.objectContaining({
@@ -225,8 +217,9 @@ describe('SyncRuntime operation wrappers', () => {
 			],
 		});
 		const revokeCurrentToken = vi.fn(async () => ({ success: true }));
-		setApiClient(runtime, {
-			putSharedSettings: vi.fn(async () => {}),
+		await initializeRuntime(runtime);
+		mockApiClient(runtime, {
+			putSharedSettings: vi.fn(async () => ({ success: true, settingsVersion: 'test' })),
 			testConnection: vi.fn(async () => ({ success: true })),
 			revokeCurrentToken,
 		});
@@ -246,7 +239,7 @@ describe('SyncRuntime operation wrappers', () => {
 	it('caps stored sync history entries', async () => {
 		const { runtime, settings } = createRuntimeHarness();
 
-		setSyncEngine(runtime, {
+		await initializeRuntime(runtime, {
 			sync: vi.fn(async () => createEmptySyncResult()),
 			initialSync: vi.fn(async () => createEmptySyncResult()),
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
@@ -267,8 +260,9 @@ describe('SyncRuntime operation wrappers', () => {
 			syncInterval: 15,
 			pushEnabled: true,
 		});
-		const putSharedSettings = vi.fn(async () => {});
-		setApiClient(runtime, {
+		const putSharedSettings = vi.fn(async () => ({ success: true, settingsVersion: 'test' }));
+		await initializeRuntime(runtime);
+		mockApiClient(runtime, {
 			putSharedSettings,
 			testConnection: vi.fn(async () => ({ success: true })),
 		});
@@ -287,7 +281,8 @@ describe('SyncRuntime operation wrappers', () => {
 	it('reports shared settings push failures without rejecting', async () => {
 		const { runtime } = createRuntimeHarness();
 		const pushError = new Error('server unavailable');
-		setApiClient(runtime, {
+		await initializeRuntime(runtime);
+		mockApiClient(runtime, {
 			putSharedSettings: vi.fn(async () => {
 				throw pushError;
 			}),
@@ -307,8 +302,9 @@ describe('SyncRuntime operation wrappers', () => {
 	it('delegates connection tests to the API client when configured', async () => {
 		const { runtime } = createRuntimeHarness();
 		const testConnection = vi.fn(async () => ({ success: false, error: 'boom' }));
-		setApiClient(runtime, {
-			putSharedSettings: vi.fn(async () => {}),
+		await initializeRuntime(runtime);
+		mockApiClient(runtime, {
+			putSharedSettings: vi.fn(async () => ({ success: true, settingsVersion: 'test' })),
 			testConnection,
 		});
 

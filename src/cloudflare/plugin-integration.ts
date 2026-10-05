@@ -1,3 +1,7 @@
+import { CloudflareOperationPresentation } from '../ui/cloudflare-operation-presentation';
+import { ResetBlockedError } from './reset-errors';
+import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment-types';
+import type { ConnectionTestResult } from '../sync/types';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { SyncApiClient, HttpError } from '../sync/api';
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
@@ -71,7 +75,7 @@ function openCloudflareAuthorization(plugin: CratePlugin, url: string): void {
 	window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'reconnect' | 'switch' | 'create' | 'update' | 'reset' | 'delete'): Promise<void> {
+export async function startCloudflareDeployment(plugin: CratePlugin, intent?: Exclude<DeploymentIntent, 'connect'>): Promise<void> {
 	if (isSelfHostedConnectionPending(plugin)) {
 		new Notice('Wait for the connection to your server to finish.');
 		return;
@@ -85,8 +89,8 @@ export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'r
 	}
 	try {
 		const selectedIntent = intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect');
-		if (['reconnect', 'connect', 'update', 'reset', 'delete'].includes(selectedIntent) && plugin.settings.cloudflareDeployment?.accountId) {
-			await runCloudflareOperation(plugin, {}, selectedIntent as 'reconnect' | 'connect' | 'update' | 'reset' | 'delete');
+		if (supportsSavedAuthorization(selectedIntent) && plugin.settings.cloudflareDeployment?.accountId) {
+			await runCloudflareOperation(plugin, {}, selectedIntent);
 			return;
 		}
 		await plugin.cloudflareDeploymentService.startDeployment(selectedIntent);
@@ -120,7 +124,7 @@ export async function handleCloudflareOAuthProtocol(
 const runningOperations = new WeakSet<CratePlugin>();
 
 async function runCloudflareOperation(
-	plugin: CratePlugin, params: Record<string, string>, savedIntent?: 'reconnect' | 'connect' | 'update' | 'reset' | 'delete',
+	plugin: CratePlugin, params: Record<string, string>, savedIntent?: SavedDeploymentIntent,
 ): Promise<void> {
 	if (runningOperations.has(plugin)) return;
 	runningOperations.add(plugin);
@@ -129,7 +133,7 @@ async function runCloudflareOperation(
 }
 
 async function executeCloudflareOperation(
-	plugin: CratePlugin, params: Record<string, string>, savedIntent?: 'reconnect' | 'connect' | 'update' | 'reset' | 'delete',
+	plugin: CratePlugin, params: Record<string, string>, savedIntent?: SavedDeploymentIntent,
 ): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
@@ -153,14 +157,17 @@ async function executeCloudflareOperation(
 		plugin.getSettingsDocument(),
 		signal,
 	);
-	if (isDelete) progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
-	if (isReset) progress.setWorking('Rebuilding Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
+	const presentation = new CloudflareOperationPresentation(progress, {
+		intent, shouldConnectDevice, openSettings: () => plugin.openSettingsTab(),
+		recoverUpdate: () => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); },
+	});
+	presentation.start();
 	let deviceToken: string | null = null;
 	let existingToken: string | null = null;
 	let deployment;
 	try {
 		if (isReconnect) {
-			progress.setWorking('Reconnecting', 'Checking this device’s access…');
+			presentation.checkingAccess();
 			existingToken = originalToken;
 			if (existingToken) {
 				const api = new SyncApiClient(plugin.settings.workerUrl, existingToken);
@@ -182,7 +189,7 @@ async function executeCloudflareOperation(
 		if (signal.aborted) return;
 		if ((savedIntent || isReconnect) && originalDeployment !== JSON.stringify(plugin.settings.cloudflareDeployment)) throw new Error('Server settings changed. Confirm the operation again.');
 		const onProgress = (message: string) => {
-			if (!signal.aborted) progress.setWorking(isReconnect ? 'Reconnecting' : isReset ? 'Rebuilding Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
+			if (!signal.aborted) presentation.advance(message);
 		};
 		const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
 		deployment = savedIntent
@@ -196,80 +203,35 @@ async function executeCloudflareOperation(
 				await plugin.cloudflareDeploymentService.startDeployment(savedIntent);
 				if (!signal.aborted) progress.dismiss();
 			} catch (authorizationError) {
-				if (!signal.aborted) progress.fail('Could not connect to Cloudflare', deploymentErrorMessage(authorizationError), ['Try again from Crate settings.']);
+				if (!signal.aborted) presentation.authorizationFailed(deploymentErrorMessage(authorizationError));
 			}
 			return;
 		}
-        if (error instanceof DeploymentRecoveryRequiredError) {
-            plugin.refreshSettingsTab();
-            progress.fail(
-                'Server operation needs review',
-                'Crate couldn’t confirm whether Cloudflare finished the operation. Further server changes are blocked to prevent overlapping updates.',
-                [
-                    'If another device is updating this server, let it finish.',
-                    isDelete
-                        ? `Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'}. Crate will check the interrupted step before continuing. If it still needs review, keep the technical details for support.`
-                        : 'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
-                    'Closing this message does not clear the lock.',
-                ],
-                { technicalDetails: deploymentErrorMessage(error), action: isReset || isDelete
-                    ? { label: 'Open settings', onClick: () => plugin.openSettingsTab() }
-                    : { label: 'Check and recover update', onClick: () => { void checkAndRecoverUpdate(plugin, () => { void startCloudflareDeployment(plugin, 'update'); }); } } },
-            );
-            return;
-        }
-		if (isDelete) {
-			plugin.refreshSettingsTab();
-			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
-				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server and all data'} to check and continue.`],
-				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } });
-			return;
-		}
-		if (isReset) {
-			plugin.refreshSettingsTab();
-			progress.fail(
-				'Server rebuild failed',
-				'Crate couldn’t finish rebuilding your Cloudflare server.',
-				[deploymentErrorMessage(error).startsWith('Reset blocked:')
-					? 'Review the technical details below. The reported issue must be resolved before rebuilding this server.'
-					: 'This rebuild was started by an earlier Crate version. Complete recovery using that version before changing this connection. Keep this vault’s saved settings.'],
-				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
-			);
-			return;
-		}
-		progress.fail(
-			shouldConnectDevice
-				? isReconnect ? 'Could not reconnect' : 'Could not prepare your Cloudflare server'
-				: 'Could not update your Cloudflare server',
-			deploymentErrorMessage(error),
-			[shouldConnectDevice
-				? isReconnect ? 'Select “Reconnect” in Crate settings to try again.' : 'Select “Connect with Cloudflare” in Crate settings to start again.'
-				: 'Select “Update server” in Crate settings to try again.'],
-		);
+		const needsReview = error instanceof DeploymentRecoveryRequiredError;
+		if (needsReview || isDelete || isReset) plugin.refreshSettingsTab();
+		presentation.operationFailed(deploymentErrorMessage(error), {
+			needsReview,
+			canResumeDeletion: Boolean(plugin.settings.cloudflareDeployment?.deletion || plugin.settings.cloudflareDeployment?.reset?.deleteOnly),
+			resetBlocked: error instanceof ResetBlockedError,
+		});
 		return;
 	}
 	if (signal.aborted) return;
 
-	if (deployment.deleted) {
+	if (deployment.status === 'deleted') {
 		plugin.refreshSettingsTab();
-		progress.succeed('Crate server deleted', 'This server and its remote data have been removed. Your local vault files are kept. To sync again, select Connect with Cloudflare, create a new server, then select Crate: Sync - sync now.');
+		presentation.deleted();
 		return;
 	}
 
 	if (!shouldConnectDevice) {
 		plugin.refreshSettingsTab();
-		progress.succeed(
-			'Cloudflare server updated',
-			'Your Worker and Crate web app are now up to date.',
-		);
+		presentation.updated();
 		return;
 	}
 
-	progress.setWorking(
-		'Connecting this device',
-		isReconnect ? 'Verifying this device’s connection. Keep Obsidian open.' : 'Creating a private credential for this device. Keep Obsidian open.',
-	);
-	let connection: { success: boolean; error?: string };
+	presentation.connecting();
+	let connection: ConnectionTestResult;
 	try {
 		if (isReconnect && (plugin.settings.workerUrl !== originalWorkerUrl || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== originalToken)) throw new Error('The device connection changed. Select Reconnect again.');
 		const token = deviceToken ?? existingToken;
@@ -289,41 +251,13 @@ async function executeCloudflareOperation(
 	} catch (error) {
 		if (signal.aborted) return;
 		plugin.refreshSettingsTab();
-		progress.fail(
-			'Could not connect this device',
-			deploymentErrorMessage(error),
-			[isReconnect ? 'Select “Reconnect” in Crate settings to try again.' : 'Select “Connect with Cloudflare” in Crate settings to try again.'],
-		);
+		presentation.connectionFailed(deploymentErrorMessage(error));
 		return;
 	}
 	if (signal.aborted) return;
 
 	plugin.refreshSettingsTab();
-	if (!connection.success) {
-		if (/^Incompatible Crate server protocol \d+$/.test(connection.error ?? '')) {
-			progress.fail(
-				'Crate server is incompatible',
-				`Sync is unavailable: ${connection.error}.`,
-				[
-					'Reconnecting keeps the existing server version. To keep its remote data, use a matching plugin build and its recovery instructions.',
-					'For a fresh start, open Crate settings → Advanced server actions → Delete server and all data. After deletion, select Connect with Cloudflare and create a new server. Your local vault files are kept.',
-				],
-				{ action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
-			);
-			return;
-		}
-		progress.fail(
-			'Crate is connected with a warning',
-			`The connection test failed: ${connection.error ?? 'Unknown error'}`,
-			['Your device credentials were saved. You can retry the connection test from Crate settings.'],
-		);
-		return;
-	}
-
-	progress.succeed(
-		isReconnect ? 'Connection verified' : isReset ? 'Crate server rebuilt' : 'Crate is connected',
-		isReconnect ? 'Cloudflare and this device are connected. Select Sync now to retry syncing.' : isReset ? 'This device is connected. Open the command palette and select Crate: Sync - sync now to sync this vault with the server. Reconnect other devices and set up web push again.' : 'Connected. Open the command palette and select Crate: Sync - sync now to sync this vault with the server.',
-	);
+	presentation.connected(connection);
 }
 
 function deploymentErrorMessage(error: unknown): string {

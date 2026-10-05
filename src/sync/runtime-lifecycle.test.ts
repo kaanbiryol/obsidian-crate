@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('react-dom/client', () => ({
-	createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }),
-}));
 import { SyncEngine } from './engine';
 import { SyncApiClient } from './api';
 import { SyncQueueController } from './queue-controller';
@@ -12,8 +9,8 @@ import {
 	createDeferred,
 	createRuntimeHarness,
 	flushMicrotasks,
-	isAcceptingEvents,
-	setApiClient,
+	expectFileEventsAccepted,
+	mockApiClient,
 	type Deferred,
 } from './runtime-test-harness';
 
@@ -59,19 +56,19 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		await runtime.initialize();
 
 		expect(destroy).toHaveBeenCalledTimes(1);
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 
 		startupSyncs[0]?.resolve(createEmptySyncResult());
 		await flushMicrotasks();
 
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 
 		runtime.onFileChange({ path: 'notes/still-blocked.md' } as never);
 		expect(runtime.getPendingPaths()).toEqual([]);
 
 		startupSyncs[1]?.resolve(createEmptySyncResult());
 		await vi.waitFor(() => {
-			expect(isAcceptingEvents(runtime)).toBe(true);
+			expectFileEventsAccepted(runtime, true);
 		});
 
 		runtime.onFileChange({ path: 'notes/active.md' } as never);
@@ -84,12 +81,12 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		await runtime.initialize();
 		runtime.destroy();
 
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 
 		startupSyncs[0]?.resolve(createEmptySyncResult());
 		await flushMicrotasks();
 
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 		runtime.onFileChange({ path: 'notes/after-destroy.md' } as never);
 		expect(runtime.getPendingPaths()).toEqual([]);
 	});
@@ -106,7 +103,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		expect(runtime.stopSync()).toBe(stopping);
 		expect(oldSignal.aborted).toBe(true);
 		expect(settings.automaticSync).toBe(false);
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 		await flushMicrotasks();
 		expect(initialize).toHaveBeenCalledTimes(1);
 		expect(persistSettings).not.toHaveBeenCalled();
@@ -123,7 +120,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		expect(settings.workerUrl).toBe('https://worker.example');
 		expect(secretStorage.delete).not.toHaveBeenCalled();
 		expect(runtime.isConfigured()).toBe(true);
-		expect(isAcceptingEvents(runtime)).toBe(true);
+		expectFileEventsAccepted(runtime, true);
 		runtime.triggerForegroundSync('focus');
 		expect(vi.spyOn(SyncEngine.prototype, 'sync')).toHaveBeenCalledTimes(1);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(createEmptySyncResult());
@@ -169,7 +166,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		saved.resolve();
 		await rejected;
 		expect(vi.spyOn(SyncEngine.prototype, 'initialize')).toHaveBeenCalledTimes(1);
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 	});
 
 	it('keeps the engine stopped when saving the automatic sync preference fails', async () => {
@@ -197,17 +194,18 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		saved.resolve();
 		await rejected;
 		expect(initialize).not.toHaveBeenCalled();
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 	});
 
 	it('does not clear configuration after unloading while token revocation is pending', async () => {
 		const { runtime, persistSettings, settings, secretStorage } = createRuntimeHarness();
 		const revoked = createDeferred<{ success: boolean }>();
 		const lifetime = new AbortController();
-		setApiClient(runtime, {
+		await runtime.initialize({ skipStartupSync: true });
+		mockApiClient(runtime, {
 			revokeCurrentToken: () => revoked.promise,
 			testConnection: async () => ({ success: true }),
-			putSharedSettings: async () => {},
+			putSharedSettings: async () => ({ success: true, settingsVersion: 'test' }),
 		});
 		const running = runtime.clearSyncConfiguration(lifetime.signal);
 		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });

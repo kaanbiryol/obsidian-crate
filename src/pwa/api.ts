@@ -1,5 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol';
 import { capturePwaSession } from './session-generation';
+import { ConnectionError } from './connection/issues';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
@@ -19,11 +20,11 @@ export async function exchangeEnrollmentToken(token: string, previousAuthToken: 
 
 	if (!response.ok) {
 		const body = await response.text().catch(() => '');
-		throw new Error(body || response.statusText);
+		throw new ConnectionError(response.status === 401 ? 'reconnect' : 'unavailable', body || response.statusText);
 	}
 
 	const result = await response.json() as { authToken?: string };
-	if (!result.authToken) throw new Error('Missing auth token');
+	if (!result.authToken) throw new ConnectionError('reconnect', 'Missing auth token');
 	return result.authToken;
 }
 
@@ -34,8 +35,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	let encrypted: EncryptedReminderApi | null = null;
 	let preparing: Promise<void> | undefined;
 	async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
-		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
-		if (!authToken) throw new Error('Not authenticated');
+		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
+		if (!authToken) throw new ConnectionError('reconnect', 'Not authenticated');
 		// Capture authority at invocation. Only revocation may finish dispatching
 		// after logout clears local state; it can only revoke this captured token.
 		const revokingSession = init.method === 'DELETE' && path === '/auth/session';
@@ -50,7 +51,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		}
 		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));
 		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleServer()));
-		if (!sessionCurrent() && !revokingSession) throw new Error('Session changed. Open a fresh link from Crate.');
+		if (!sessionCurrent() && !revokingSession) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (keys) {
 			headers.set('X-Crate-Encryption-Vault', keys.vaultId);
@@ -60,11 +61,11 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 
 		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) });
 		if (!sessionCurrent() && !revokingSession) {
-			throw new Error('Session changed. Open a fresh link from Crate.');
+			throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		}
 		if (response.status === 401 && sessionCurrent()) {
 			onUnauthorized();
-			throw new Error('Session expired. Open a fresh link from Crate.');
+			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
 		if (keys && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
 		return response;
@@ -74,13 +75,13 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (refresh) preparing = undefined;
 		return preparing ??= preparePwaEncryption(authToken, rawFetch, refresh).then(async value => {
 			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;
-			if (!sessionCurrent()) throw new Error('Session changed before unlocking');
+			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
 			encrypted = keys && Constructor ? new Constructor(keys, rawFetch) : null;
 		}).finally(() => { if (!keys) preparing = undefined; });
 	}
 	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
+		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		if (path === '/encryption' || (path === '/auth/session' && init.method === 'DELETE')) return rawFetch(path, init);
 		for (let attempt = 0; ; attempt++) {
 			await ready(attempt > 0);

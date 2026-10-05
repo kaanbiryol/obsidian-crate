@@ -1,3 +1,14 @@
+export type DeploymentIntent = 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
+export type SavedDeploymentIntent = Exclude<DeploymentIntent, 'switch' | 'create'>;
+
+export function supportsSavedAuthorization(intent: DeploymentIntent): intent is SavedDeploymentIntent {
+	return intent !== 'switch' && intent !== 'create';
+}
+
+export type CloudflareDeploymentResult =
+	| { status: 'deployed'; workerUrl: string; accountName: string }
+	| { status: 'deleted'; accountName: string };
+
 /** Non-secret identifiers used to make deployment retries converge. */
 export interface CloudflareDeploymentMetadata {
 	deploymentId: string;

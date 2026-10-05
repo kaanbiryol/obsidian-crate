@@ -1,5 +1,5 @@
 import { preserveIncomingShare } from '../connection/incoming-share';
-import { SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
+import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
 import { capturePwaSession } from '../session-generation';
 import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { useEffect, useRef } from 'react';
@@ -35,7 +35,7 @@ export function usePwaBootstrap({
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
 	setBootstrapped: Dispatch<SetStateAction<boolean>>;
 	setConfig: Dispatch<SetStateAction<StoredConfig>>;
-	reportError: (message: string | null) => void;
+	reportError: (issue: ConnectionIssue | null) => void;
 	setLaunchReminderId: Dispatch<SetStateAction<string | null>>;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 	setStartTab: Dispatch<SetStateAction<StartTab>>;
@@ -126,7 +126,7 @@ export function usePwaBootstrap({
 				if (!enrollmentFailed) finishEnrollment();
 
 				if (!nextToken) return;
-				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_MESSAGE); }).ready();
+				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_ISSUE); }).ready();
 				if (cancelled || !sessionCurrent()) return;
 
 			} catch (bootstrapError) {
@@ -140,7 +140,7 @@ export function usePwaBootstrap({
 					sessionCurrent = capturePwaSession();
 					await clearing;
 					if (cancelled || !sessionCurrent()) return;
-					reportError(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
+					reportError(connectionIssue(bootstrapError));
 				}
 			} finally {
 				// Storage events adopt a replacement or logout from another tab.

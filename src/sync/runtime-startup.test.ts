@@ -2,9 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
 
-vi.mock('react-dom/client', () => ({
-	createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }),
-}));
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import { FOREGROUND_SYNC_DEBOUNCE_MS, SyncRuntime } from './runtime';
@@ -13,7 +10,7 @@ import {
 	createDeferred,
 	createRuntimeHarness as createUntrackedRuntimeHarness,
 	flushMicrotasks,
-	isAcceptingEvents,
+	expectFileEventsAccepted,
 	type Deferred,
 } from './runtime-test-harness';
 
@@ -84,7 +81,7 @@ describe('SyncRuntime startup event handling', () => {
 			await runtime.initialize();
 			expect(await runtime.waitForStartupSync()).toBe(false);
 			expect(sync).not.toHaveBeenCalled();
-			expect(isAcceptingEvents(runtime)).toBe(true);
+			expectFileEventsAccepted(runtime, true);
 		} finally { runtime.destroy(); }
 	});
 
@@ -93,7 +90,6 @@ describe('SyncRuntime startup event handling', () => {
 		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
 		plugin.app.workspace.layoutReady = false;
 		await runtime.initialize();
-		expect(plugin.addStatusBarItem).toHaveBeenCalledOnce();
 		expect(sync).not.toHaveBeenCalled();
 		runtime.onFileChange({ path: 'existing.md' } as never);
 		runtime.onFileDelete({ path: 'removed.md' } as never);
@@ -132,7 +128,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		await runtime.initialize();
 
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 
 		invoke(runtime);
 
@@ -144,7 +140,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		await runtime.initialize();
 
-		expect(isAcceptingEvents(runtime)).toBe(false);
+		expectFileEventsAccepted(runtime, false);
 		let startupWaitSettled = false;
 		void runtime.waitForStartupSync().then(() => {
 			startupWaitSettled = true;
@@ -155,7 +151,7 @@ describe('SyncRuntime startup event handling', () => {
 		startupSync.resolve(createEmptySyncResult());
 		expect(await runtime.waitForStartupSync()).toBe(true);
 		await vi.waitFor(() => {
-			expect(isAcceptingEvents(runtime)).toBe(true);
+			expectFileEventsAccepted(runtime, true);
 		});
 
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
@@ -187,6 +183,6 @@ describe('SyncRuntime startup event handling', () => {
 
 		await expect(runtime.waitForStartupSync()).resolves.toBe(true);
 		expect(sync).toHaveBeenCalledTimes(2);
-		expect(isAcceptingEvents(runtime)).toBe(true);
+		expectFileEventsAccepted(runtime, true);
 	});
 });

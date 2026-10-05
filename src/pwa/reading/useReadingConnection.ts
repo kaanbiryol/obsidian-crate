@@ -1,5 +1,5 @@
 import { EncryptionTransitionError } from '../connection/encryption';
-import { SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
+import { ConnectionError, connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
 import { EncryptionKeyRequiredError } from '../encryption-onboarding';
 import { resetReadingEncryption } from './encryption-lifecycle';
 import { prepareReadingEncryption } from './encryption-session';
@@ -19,20 +19,20 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
   const [encryptionSetupRequired, setEncryptionSetupRequired] = useState(false);
   const [lockedSession, setLockedSession] = useState<ReadingSession | null>(null);
   const [ready, setReady] = useState(false), [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [issue, setIssue] = useState<ConnectionIssue | null>(null);
   const [connectionState, setConnectionState] = useState<ReadingConnectionState>('available');
   const alive = useRef(true), connectingRef = useRef(false), generation = useRef(0);
   const run = useCallback(async (action: () => Promise<void>) => {
     const revision = generation.current;
     try { await action(); } catch (cause) {
-      if (alive.current && revision === generation.current) setError(cause instanceof Error ? cause.message : 'Reading is unavailable.');
+      if (alive.current && revision === generation.current) setIssue(connectionIssue(cause));
     }
   }, []);
   const resetSession = useCallback(() => {
     generation.current++; resetReadingEncryption();
     setSession(null); setLockedSession(null); setEncryptionSetupRequired(false); setConverting(false);
   }, []);
-  const expire = useCallback(() => { resetSession(); setError(SESSION_RECOVERY_MESSAGE); }, [resetSession]);
+  const expire = useCallback(() => { resetSession(); setIssue(SESSION_RECOVERY_ISSUE); }, [resetSession]);
   const hydrate = useCallback(async (current: ReadingSession) => {
     const revision = generation.current;
     const currentRequest = () => {
@@ -44,11 +44,11 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
       if (!currentRequest()) return;
       setConverting(cause instanceof EncryptionTransitionError);
       setEncryptionSetupRequired(cause instanceof EncryptionKeyRequiredError && cause.firstUnlock);
-      setLockedSession(current); setError(cause instanceof Error ? cause.message : String(cause)); return;
+      setLockedSession(current); setIssue(connectionIssue(cause)); return;
     }
     if (!currentRequest()) return;
     setLockedSession(null); setEncryptionSetupRequired(false); setConverting(false);
-    setSession(current); setError(null);
+    setSession(current); setIssue(null);
     return true;
   }, []);
   const connect = useCallback(async () => {
@@ -58,12 +58,12 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
     try {
       const next = await connectReadingFromReminders();
       if (!alive.current || revision !== generation.current || !next) return;
-      setError(null); setConnectionState('available');
+      setIssue(null); setConnectionState('available');
       await hydrate(next);
     } catch (cause) {
       if (alive.current && revision === generation.current) {
         setConnectionState(readingConnectionState(cause));
-        setError(cause instanceof Error ? cause.message : 'Reading is unavailable.');
+        setIssue(connectionIssue(cause));
       }
     } finally { connectingRef.current = false; if (alive.current) setConnecting(false); }
   }, [startupReady, enabled, hydrate]);
@@ -93,7 +93,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
           const shareId = new URL(location.href).searchParams.get('share');
           history.replaceState(null, '', '/notifications?section=reading' + (shareId ? '&share=' + encodeURIComponent(shareId) : ''));
           const { installToken, ...next } = await readingRequest<ReadingSession & { installToken?: string }>('/reading/exchange', null, JSON.stringify({ token: grant }));
-          if (!isReadingSession(next)) throw new Error('Reading sign-in could not be read. Reconnect from Obsidian settings.');
+          if (!isReadingSession(next)) throw new ConnectionError('reconnect', 'Reading sign-in could not be read. Reconnect from Obsidian settings.');
           if (!bootstrapCurrent()) {
             // Logout cannot revoke a credential whose exchange was still pending.
             // Discard and best-effort revoke only this unused response's token.
@@ -131,7 +131,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
       document.removeEventListener('visibilitychange', resume);
     };
   }, [startupReady, ready, session, lockedSession, connect]);
-  return { session, lockedSession, encryptionSetupRequired, converting, expire, ready, connecting, connect, resetSession, error, connectionState };
+  return { session, lockedSession, encryptionSetupRequired, converting, expire, ready, connecting, connect, resetSession, issue, error: issue?.message ?? null, connectionState };
 }
 
 export type ReadingConnection = ReturnType<typeof useReadingConnection>;

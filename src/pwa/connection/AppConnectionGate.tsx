@@ -11,7 +11,7 @@ import { useSharedFeatures } from '../shared-features';
 import { BrowserSetup, needsBrowserSetup } from './BrowserSetup';
 import { AppPairing } from './AppPairing';
 import { hasEncryptedSessionEvidence } from '../encryption-scope';
-import { SESSION_RECOVERY_MESSAGE } from './expiration';
+import { SESSION_RECOVERY_ISSUE } from './issues';
 
 /** One app-level setup/recovery surface, regardless of the initial destination. */
 export function AppConnectionGate({ section, onOpenFeature, children }: {
@@ -63,8 +63,8 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
     if (!app.authToken && (section === 'reminders' || !reading.session && !reading.lockedSession && !reading.connecting)) {
       // Expiry removes credentials, but preserved encryption data still needs a
       // recovery/logout action after reload. It must not look like a fresh install.
-      const error = app.error ?? reading.error ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null, undefined) ? SESSION_RECOVERY_MESSAGE : null);
-      return shell(<>{error ? <ErrorState error={error} onRetry={() => location.reload()} onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />
+      const issue = app.error ?? reading.issue ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null, undefined) ? SESSION_RECOVERY_ISSUE : null);
+      return shell(<>{issue ? <ErrorState issue={issue} onRetry={() => location.reload()} onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />
         : <EmptyAuthState />}{switchFeature}</>);
     }
     return null;

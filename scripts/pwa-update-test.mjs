@@ -351,6 +351,60 @@ async function testDeferredUpdate(browser) {
   }
 }
 
+async function testPreparingCommandUpdate(browser) {
+  let assets = before;
+  let holdClock = false, clockRequested = false, writes = 0;
+  let releaseClock;
+  const clockGate = new Promise(resolve => { releaseClock = resolve; });
+  const handlers = new Map([before, after].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
+  const server = http.createServer(async (req, res) => {
+    if (req.url === '/.well-known/crate' && holdClock) {
+      clockRequested = true;
+      await clockGate;
+    }
+    if (req.url === '/reminders/set-completed' && req.method === 'POST') writes++;
+    handlers.get(assets).emit('request', req, res);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: true }); });
+  try {
+    const page = await context.newPage();
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    const reminder = page.getByRole('group', { name: cardName, exact: true });
+    await reminder.waitFor();
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    assets = after;
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    const update = page.getByRole('button', { name: 'Update available', exact: true });
+    await expect(update).toBeEnabled();
+    let navigations = 0;
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+
+    // Completion has no open editor to block updates. Its command is not durable
+    // until the server clock supplies an operation identity.
+    holdClock = true;
+    await reminder.getByRole('checkbox').click();
+    await expect.poll(() => clockRequested).toBe(true);
+    await expect(update).toBeDisabled();
+    expect(writes).toBe(0);
+    expect(navigations).toBe(0);
+
+    holdClock = false;
+    releaseClock();
+    await expect.poll(() => writes).toBe(1);
+    await expect(update).toBeEnabled();
+    await update.click();
+    await expect.poll(() => navigations, { timeout: 15_000 }).toBe(1);
+    expect(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('v'))).toBe(afterVersion);
+  } finally {
+    releaseClock();
+    await context.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 async function testLaunchUpdate(browser, mode) {
   let assets = before;
   const handlers = new Map([before, after].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
@@ -470,5 +524,7 @@ for (const browserType of [chromium, webkit]) {
     }
     await testDeferredUpdate(browser);
     console.log(`${browserType.name()}: deferred update preserves editors, pending writes, reading and resume, and keeps other tabs intact`);
+    await testPreparingCommandUpdate(browser);
+    console.log(`${browserType.name()}: updates stay blocked while a completion command awaits its identity, then resume after sync`);
   } finally { await browser.close(); }
 }

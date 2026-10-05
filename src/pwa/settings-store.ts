@@ -14,6 +14,8 @@ interface FeatureSettings {
 	unsynced: boolean;
 	/** Feature hydration and transient work must settle before navigating for an update. */
 	updateReady?: boolean;
+	/** Check transient work again even before React publishes its next render. */
+	canApplyUpdate?: () => boolean;
 	updateContentReady?: boolean;
 	onRefresh: () => Promise<unknown>;
 	onLogout: () => Promise<void>;

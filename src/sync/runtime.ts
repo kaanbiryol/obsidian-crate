@@ -1,3 +1,4 @@
+import type { ConnectionTestResult } from './types';
 import { createRuntimeHistoryRestore, loadRuntimeHistoryComparison } from './runtime-history-workflow';
 import type { SharedCheckpoint } from '../protocol/history-checkpoints';
 import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history-preview';
@@ -14,7 +15,6 @@ import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './ru
 import type { EncryptionServerState } from '../encryption/server-state';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
-import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
@@ -51,7 +51,6 @@ export interface RuntimeConfigurationTransition {
 export class SyncRuntime {
 	private syncEngine: SyncEngine | null = null;
 	private apiClient: SyncApiClient | null = null;
-	private statusBar: StatusBarManager | null = null;
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
 	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
@@ -101,8 +100,6 @@ export class SyncRuntime {
 	getPendingRestores(): RemoteFileVersion[] { return this.apiClient?.getPendingRestores() ?? []; }
 	private lastForegroundSyncAt: number | null = null;
 
-	private onStatusBarClick: (() => void) | undefined;
-
 	constructor(
 		private plugin: Plugin,
 		private settings: CrateSettings,
@@ -111,8 +108,8 @@ export class SyncRuntime {
     private prepareReminderScope?: () => Promise<void>,
 	) {}
 
-	setStatusBarClickHandler(handler: () => void): void {
-		this.onStatusBarClick = handler;
+	isInitialized(): boolean {
+		return this.syncEngine !== null;
 	}
 
 	getState(): SyncState {
@@ -248,7 +245,8 @@ export class SyncRuntime {
 		this.lastServerCheckAt = null;
 
 		this.stopEngine();
-		this.statusBar?.destroy();
+		this.activityProgress = null;
+		this.emitCurrentState();
 
 		await this.stoppingWork;
 		if (this.initializationRevision !== initializationRevision) return;
@@ -276,7 +274,7 @@ export class SyncRuntime {
 			if (this.initializationRevision !== initializationRevision) return;
 			this.initializationError = errorMessage(error);
 			this.apiClient = null;
-			this.statusBar?.update(this.getState());
+			this.emitCurrentState();
 			throw error;
 		}
 		if (this.initializationRevision !== initializationRevision) return;
@@ -285,7 +283,7 @@ export class SyncRuntime {
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
 
-		this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
+		this.emitCurrentState();
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
 			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
@@ -300,13 +298,13 @@ export class SyncRuntime {
 			this.initializationError = errorMessage(error);
 			this.stopEngine();
 			this.apiClient = null;
-			this.statusBar?.update(this.getState());
+			this.emitCurrentState();
 			throw error;
 		}
 		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
 			return;
 		}
-		this.statusBar?.update(this.syncEngine.getState());
+		this.emitCurrentState();
 
 		if (this.settings.automaticSync && !options.skipStartupSync) {
 			this.startupSyncTask = this.sync()
@@ -352,10 +350,10 @@ export class SyncRuntime {
 		this.clearServerCheck();
 		this.connectionIssue = null;
 		this.stopEngine();
-		this.statusBar?.destroy();
-		this.syncEngine = null;
 		this.apiClient = null;
-		this.statusBar = null;
+		this.activityProgress = null;
+		this.initializationError = null;
+		this.emitCurrentState();
 	}
 
 	stopSync(): Promise<void> {
@@ -580,7 +578,7 @@ export class SyncRuntime {
 		}
 	}
 
-	async testConnection(): Promise<{ success: boolean; error?: string }> {
+	async testConnection(): Promise<ConnectionTestResult> {
 		if (!this.apiClient) {
 			return { success: false, error: 'Not configured' };
 		}
@@ -675,9 +673,7 @@ export class SyncRuntime {
 	}
 
 	private emitCurrentState(): void {
-		emitStateChange(this.stateChangeListeners, this.getState(), (nextState) => {
-			this.statusBar?.update(nextState);
-		});
+		emitStateChange(this.stateChangeListeners, this.getState());
 	}
 
 	private async recordAutomaticSyncResult(engine: SyncEngine, result: SyncResult): Promise<void> {
@@ -717,9 +713,6 @@ export class SyncRuntime {
 			if (this.syncEngine !== engine) return;
 			Object.assign(active, { current, total });
 			emitSyncProgress(this.progressListeners, current, total, {
-				onStatusBarProgress: (nextCurrent, nextTotal) => {
-					this.statusBar?.setSyncProgress(nextCurrent, nextTotal);
-				},
 				onExternalProgress: progressCallback,
 			});
 		};
@@ -740,7 +733,6 @@ export class SyncRuntime {
 			if (this.activityProgress === active) this.activityProgress = null;
 			if (this.syncEngine === engine) {
 				emitSyncProgress(this.progressListeners, 0, 0);
-				this.statusBar?.clearSyncProgress();
 			}
 		}
 	}

@@ -342,6 +342,7 @@ describe('SyncApiClient', () => {
 		await expect(client.testConnection()).resolves.toEqual({
 			success: false,
 			error: 'Incompatible Crate server protocol 99',
+			code: 'incompatible_protocol',
 		});
 		expect(transport).toHaveBeenCalledTimes(1);
 	});

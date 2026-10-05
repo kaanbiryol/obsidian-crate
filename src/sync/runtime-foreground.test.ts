@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FOREGROUND_SYNC_COOLDOWN_MS, FOREGROUND_SYNC_DEBOUNCE_MS } from './runtime';
 import { createEmptySyncResult } from './sync-result';
-import { createRuntimeHarness, setAcceptingEvents, setSyncEngine } from './runtime-test-harness';
+import { createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
 
 describe('SyncRuntime foreground sync', () => {
 	beforeEach(() => {
@@ -18,8 +18,7 @@ describe('SyncRuntime foreground sync', () => {
 		const { runtime, persistSettings } = createRuntimeHarness();
 		const sync = vi.fn(async () => createEmptySyncResult());
 
-		setAcceptingEvents(runtime, true);
-		setSyncEngine(runtime, {
+		await initializeRuntime(runtime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
 			initialSync: vi.fn(async () => createEmptySyncResult()),
@@ -41,8 +40,7 @@ describe('SyncRuntime foreground sync', () => {
 		const { runtime } = createRuntimeHarness();
 		const sync = vi.fn(async () => createEmptySyncResult());
 
-		setAcceptingEvents(runtime, true);
-		setSyncEngine(runtime, {
+		await initializeRuntime(runtime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
 			initialSync: vi.fn(async () => createEmptySyncResult()),
@@ -63,15 +61,10 @@ describe('SyncRuntime foreground sync', () => {
 		expect(sync).toHaveBeenCalledTimes(2);
 	});
 
-	it('does not foreground sync while startup events are paused or setting is disabled', async () => {
+	it('does not foreground sync before initialization or when automatic sync is disabled', async () => {
 		const { runtime: pausedRuntime } = createRuntimeHarness();
-		const pausedSync = vi.fn(async () => createEmptySyncResult());
-		setSyncEngine(pausedRuntime, {
-			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
-			sync: pausedSync,
-			initialSync: vi.fn(async () => createEmptySyncResult()),
-			forceFullSync: vi.fn(async () => createEmptySyncResult()),
-		});
+		const pausedSync = vi.spyOn(pausedRuntime, 'sync');
+
 
 		pausedRuntime.triggerForegroundSync('focus');
 		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
@@ -79,8 +72,7 @@ describe('SyncRuntime foreground sync', () => {
 
 		const { runtime: disabledRuntime } = createRuntimeHarness({ automaticSync: false });
 		const disabledSync = vi.fn(async () => createEmptySyncResult());
-		setAcceptingEvents(disabledRuntime, true);
-		setSyncEngine(disabledRuntime, {
+		await initializeRuntime(disabledRuntime, {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync: disabledSync,
 			initialSync: vi.fn(async () => createEmptySyncResult()),

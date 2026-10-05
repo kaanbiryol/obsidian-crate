@@ -91,12 +91,20 @@ behavior still require an installed-app check on an iPhone.
 
 ## App updates
 
+`useReminderMutations-lifecycle.test.ts` mounts the production hook and settings
+publication with real React. It covers delayed operation identity, overlapping
+preparations, rejection, durable handoff and logout/unmount. `apply-update.test.ts`
+also starts transient work during asynchronous storage checks before activation
+and reload.
+
 Run `node scripts/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
 version detection from a Reading-only launch, foreground polling, navigation,
 direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
 Screenshots are written to `test-results/update-notice/`.
 `node scripts/pwa-update-test.mjs` exercises real service-worker preparation,
 activation, failed/slow checks, launch updates, pending writes, and other tabs.
+It delays the server clock while preparing a completion command and checks that
+updates stay blocked before that command reaches the durable outbox.
 Both are included in `npm run test:pwa-browser`. Installed iPhone safe areas,
 app suspension, and VoiceOver announcements still require physical-device checks.
 

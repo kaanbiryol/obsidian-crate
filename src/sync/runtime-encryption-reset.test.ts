@@ -11,7 +11,6 @@ import { SECRET_KEYS } from '../plugin/settings-types';
 import type { EncryptionReset } from './encryption-reset';
 import { loadEncryptionReset, EncryptionResetRejectedError } from './encryption-reset';
 
-vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 const remote = vi.hoisted(() => vi.fn<(_reset: EncryptionReset) => Promise<void>>(async () => {}));
 vi.mock('./encryption-reset', async importOriginal => ({ ...await importOriginal<typeof import('./encryption-reset')>(), resetRemoteEncryption: remote }));
 beforeEach(() => {

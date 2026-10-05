@@ -21,49 +21,16 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	if (!path.startsWith('/encryption/conversion')) return null;
 	const state = await readEncryptionState(env.DB);
 	if (state?.mode === 'resetting') return corsResponse({ error: 'Resume the encryption reset before making other changes' }, 423);
-	if (path === '/encryption/conversion' && request.method === 'POST') {
-		const body = await parseJsonObject(request, 512 * 1024);
-		if (!body.ok) return body.response;
-		try { validateEncryptionState(body.value); } catch { return corsResponse({ error: 'Invalid encrypted vault configuration' }, 400); }
-		const configuration = body.value;
-		if (body.value.mode !== 'converting') return corsResponse({ error: 'Start with a conversion configuration' }, 400);
-		const extendingReading = state && isReadingScopeExtension(state, configuration);
-		const movingScopes = state && isEncryptionScopeMove(state, configuration);
-		if (state && !extendingReading && !movingScopes) return JSON.stringify(state) === JSON.stringify(body.value) ? corsResponse({ encryption: state }) : corsResponse({ error: 'This vault already has a different encryption configuration. Recover its keys first.' }, 409);
-		// Reject unsupported legacy data before freezing sync. All settings accepted
-		// by the plaintext API fit the encrypted envelope and request limits.
-		const settings = await env.BUCKET.head('__crate__/settings.json');
-		if (settings && settings.size > MAX_SHARED_SETTINGS_BYTES) return corsResponse({ error: 'Shared settings are too large to encrypt. Reduce exclusion patterns before enabling encryption.' }, 413);
-		if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
-		const folders = await env.DB.prepare(`SELECT folder_path FROM reading_policy UNION SELECT folder_path FROM notification_policy UNION SELECT folder_path FROM auth_tokens WHERE scope = 'reminders' AND (expires_at IS NULL OR expires_at > ?) UNION SELECT folder_path FROM web_enrollment_tokens WHERE expires_at > ?`).bind(Date.now(), Date.now()).all<{ folder_path: string | null }>();
-		if (!movingScopes && folders.results.some(row => row.folder_path && !configuration.scopes.some(scope => scope.folderPath === row.folder_path))) return corsResponse({ error: 'Include every enrolled reminders folder before enabling encryption' }, 409);
-		const added = extendingReading ? configuration.scopes.find(scope => !state.scopes.some(old => old.id === scope.id))! : null;
-    const affected = added ? [added.folderPath] : movingScopes ? state.scopes.flatMap(scope => {
-      const target = configuration.scopes.find(candidate => candidate.id === scope.id)!;
-      return target.folderPath === scope.folderPath ? [] : [scope.folderPath, target.folderPath];
-    }) : [];
-    const scopeVersions = `SELECT f.revision FROM (${CONVERSION_FILES}) f WHERE EXISTS
-      (SELECT 1 FROM json_each(?) WHERE f.path >= value || '/' AND f.path < value || '0')`;
-    await env.DB.batch([
-      ...(affected.length ? [
-        env.DB.prepare(`INSERT INTO maintenance_state(key,value) SELECT 'e2ee:prior-file:' || f.revision, m.value FROM (${CONVERSION_FILES}) f JOIN maintenance_state m ON m.key = ? || f.revision WHERE f.revision IN (${scopeVersions})`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
-        env.DB.prepare(`DELETE FROM maintenance_state WHERE key IN (SELECT ? || revision FROM (${scopeVersions}))`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
-        env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'"),
-      ] : []),
-			...(movingScopes ? prepareEncryptionScopeMove(env.DB, state, configuration) : []),
-			putValue(env, ENCRYPTION_STATE_KEY, body.value),
-			// Freeze alarms before any plaintext content is removed. The cancellation
-			// queue is drained explicitly before activation, including DO storage.
-			env.DB.prepare(`INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
-				SELECT reminder_id, lower(hex(randomblob(16))), 'cancel', 0 FROM scheduled_reminders WHERE 1
-				ON CONFLICT(reminder_id) DO UPDATE SET operation = 'cancel', job_token = excluded.job_token, payload_json = NULL, available_at = 0`),
-			env.DB.prepare("UPDATE notification_jobs SET operation = 'cancel', payload_json = NULL, available_at = 0"),
-		]);
-		return corsResponse({ encryption: body.value });
-	}
+	if (path === '/encryption/conversion' && request.method === 'POST') return beginConversion(request, env, state);
 	if (!state) return corsResponse({ error: 'Start encryption conversion first' }, 409);
-	if (request.headers.get('X-Crate-Encryption-Vault') !== state.vaultId || request.headers.get('X-Crate-Encryption-Generation') !== String(state.generation)) return corsResponse({ error: 'Recover the conversion keys before continuing' }, 428);
-	if (state.mode === 'active') return path === '/encryption/conversion/finish' ? corsResponse({ encryption: state }) : corsResponse({ error: 'Encryption conversion is already complete' }, 409);
+	if (request.headers.get('X-Crate-Encryption-Vault') !== state.vaultId
+		|| request.headers.get('X-Crate-Encryption-Generation') !== String(state.generation)) {
+		return corsResponse({ error: 'Recover the conversion keys before continuing' }, 428);
+	}
+	if (state.mode === 'active') {
+		if (path === '/encryption/conversion/finish') return corsResponse({ encryption: state });
+		return corsResponse({ error: 'Encryption conversion is already complete' }, 409);
+	}
 	if (path === '/encryption/conversion/reading-capture' && request.method === 'PUT') return convertReadingCapture(request, env, state);
 	if (path === '/encryption/conversion/file') return convertFile(request, env, state);
 	if (path === '/encryption/conversion' && request.method === 'GET') {
@@ -85,8 +52,13 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 			return corsResponse({ settings: object ? JSON.parse(await object.text()) as unknown : null });
 		}
 		if (request.method === 'PUT') {
-			const body = await parseJsonObject(request, MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES); if (!body.ok) return body.response;
-			try { validateEncryptedSettings(body.value); } catch { return corsResponse({ error: 'Encrypted shared settings required' }, 400); }
+			const body = await parseJsonObject(request, MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES);
+			if (!body.ok) return body.response;
+			try {
+				validateEncryptedSettings(body.value);
+			} catch {
+				return corsResponse({ error: 'Encrypted shared settings required' }, 400);
+			}
 			if (body.value.vaultId !== state.vaultId || body.value.keyId !== state.keyId) return corsResponse({ error: 'Settings use a different key' }, 409);
 			await env.DB.batch([putValue(env, ENCRYPTED_SETTINGS_KEY, { settings: body.value, settingsVersion: crypto.randomUUID() }), putValue(env, 'e2ee:settings-converted', true)]);
 			// Final cleanup also retries deletion after an interrupted response.
@@ -95,7 +67,8 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		}
 	}
 	if (path === '/encryption/conversion/receipt' && request.method === 'PUT') {
-		const body = await parseJsonObject(request, MAX_CONVERTED_RECEIPT_BYTES); if (!body.ok) return body.response;
+		const body = await parseJsonObject(request, MAX_CONVERTED_RECEIPT_BYTES);
+		if (!body.ok) return body.response;
 		const { operationId, vault, scopes, kind = 'reminder' } = body.value;
 		if (kind !== 'reminder' && kind !== 'upload' && kind !== 'reading') return corsResponse({ error: 'Invalid receipt kind' }, 400);
 		if (!isEncryptionId(operationId) || !isReceiptEnvelope(vault) || !Array.isArray(scopes) || scopes.length > state.scopes.length
@@ -113,7 +86,8 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		const listing = await env.BUCKET.list({ prefix: '__crate__/history/checkpoints/', limit: 20, ...(cursor ? { cursor } : {}) });
 		const documents = [];
 		for (const item of listing.objects) {
-			const object = await env.BUCKET.get(item.key); if (!object || object.size > 12 * 1024 * 1024) throw new Error('Checkpoint is unavailable');
+			const object = await env.BUCKET.get(item.key);
+			if (!object || object.size > 12 * 1024 * 1024) throw new Error('Checkpoint is unavailable');
 			const document: unknown = JSON.parse(await object.text());
 			if (!document || typeof document !== 'object') throw new Error('Checkpoint is invalid');
 			if (!('encrypted' in document)) documents.push({ key: item.key, document });
@@ -121,16 +95,79 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 		return corsResponse({ documents, cursor: listing.truncated ? listing.cursor : null });
 	}
 	if (path === '/encryption/conversion/checkpoint' && request.method === 'PUT') {
-		const body = await parseJsonObject(request, 12 * 1024 * 1024); if (!body.ok) return body.response;
+		const body = await parseJsonObject(request, 12 * 1024 * 1024);
+		if (!body.ok) return body.response;
 		const { key, encrypted } = body.value;
 		if (typeof key !== 'string' || !/^__crate__\/history\/checkpoints\/[a-f0-9-]{36}\.json$/.test(key) || typeof encrypted !== 'string' || encrypted.length > 12 * 1024 * 1024 || encrypted.split('.').length !== 5) return corsResponse({ error: 'Invalid encrypted checkpoint' }, 400);
-		const object = await env.BUCKET.get(key); if (!object) return corsResponse({ error: 'Checkpoint is unavailable' }, 404);
+		const object = await env.BUCKET.get(key);
+		if (!object) return corsResponse({ error: 'Checkpoint is unavailable' }, 404);
 		const previous = JSON.parse(await object.text()) as { checkpoint: unknown; encrypted?: string };
 		if (!previous.encrypted) await env.BUCKET.put(key, JSON.stringify({ version: 1, checkpoint: previous.checkpoint, encrypted }), { httpMetadata: { contentType: 'application/json' } });
 		return corsResponse({ success: true });
 	}
 	if (path === '/encryption/conversion/finish' && request.method === 'POST') return finishConversion(env, state);
 	return corsResponse({ error: 'Unknown encryption conversion operation' }, 404);
+}
+
+/** Validate the whole target before freezing sync and notification delivery together. */
+async function beginConversion(request: Request, env: Env, state: EncryptionServerState | null): Promise<Response> {
+	const body = await parseJsonObject(request, 512 * 1024);
+	if (!body.ok) return body.response;
+	try {
+		validateEncryptionState(body.value);
+	} catch {
+		return corsResponse({ error: 'Invalid encrypted vault configuration' }, 400);
+	}
+	const configuration = body.value;
+	if (configuration.mode !== 'converting') return corsResponse({ error: 'Start with a conversion configuration' }, 400);
+	const extendingReading = state && isReadingScopeExtension(state, configuration);
+	const movingScopes = state && isEncryptionScopeMove(state, configuration);
+	if (state && !extendingReading && !movingScopes) {
+		if (JSON.stringify(state) === JSON.stringify(configuration)) return corsResponse({ encryption: state });
+		return corsResponse({ error: 'This vault already has a different encryption configuration. Recover its keys first.' }, 409);
+	}
+	// Reject unsupported legacy data before freezing sync. All settings accepted
+	// by the plaintext API fit the encrypted envelope and request limits.
+	const settings = await env.BUCKET.head('__crate__/settings.json');
+	if (settings && settings.size > MAX_SHARED_SETTINGS_BYTES) {
+		return corsResponse({ error: 'Shared settings are too large to encrypt. Reduce exclusion patterns before enabling encryption.' }, 413);
+	}
+	if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) {
+		return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
+	}
+	const folders = await env.DB.prepare(`
+		SELECT folder_path FROM reading_policy
+		UNION SELECT folder_path FROM notification_policy
+		UNION SELECT folder_path FROM auth_tokens WHERE scope = 'reminders' AND (expires_at IS NULL OR expires_at > ?)
+		UNION SELECT folder_path FROM web_enrollment_tokens WHERE expires_at > ?`)
+		.bind(Date.now(), Date.now()).all<{ folder_path: string | null }>();
+	const missingFolder = folders.results.some(row => row.folder_path && !configuration.scopes.some(scope => scope.folderPath === row.folder_path));
+	if (!movingScopes && missingFolder) {
+		return corsResponse({ error: 'Include every enrolled reminders folder before enabling encryption' }, 409);
+	}
+	const added = extendingReading ? configuration.scopes.find(scope => !state.scopes.some(old => old.id === scope.id))! : null;
+	const affected = added ? [added.folderPath] : movingScopes ? state.scopes.flatMap(scope => {
+		const target = configuration.scopes.find(candidate => candidate.id === scope.id)!;
+		return target.folderPath === scope.folderPath ? [] : [scope.folderPath, target.folderPath];
+	}) : [];
+	const scopeVersions = `SELECT f.revision FROM (${CONVERSION_FILES}) f WHERE EXISTS
+		(SELECT 1 FROM json_each(?) WHERE f.path >= value || '/' AND f.path < value || '0')`;
+	await env.DB.batch([
+		...(affected.length ? [
+			env.DB.prepare(`INSERT INTO maintenance_state(key,value) SELECT 'e2ee:prior-file:' || f.revision, m.value FROM (${CONVERSION_FILES}) f JOIN maintenance_state m ON m.key = ? || f.revision WHERE f.revision IN (${scopeVersions})`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
+			env.DB.prepare(`DELETE FROM maintenance_state WHERE key IN (SELECT ? || revision FROM (${scopeVersions}))`).bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(affected)),
+			env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'"),
+		] : []),
+		...(movingScopes ? prepareEncryptionScopeMove(env.DB, state, configuration) : []),
+		putValue(env, ENCRYPTION_STATE_KEY, configuration),
+		// Freeze alarms before any plaintext content is removed. The cancellation
+		// queue is drained explicitly before activation, including DO storage.
+		env.DB.prepare(`INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
+			SELECT reminder_id, lower(hex(randomblob(16))), 'cancel', 0 FROM scheduled_reminders WHERE 1
+			ON CONFLICT(reminder_id) DO UPDATE SET operation = 'cancel', job_token = excluded.job_token, payload_json = NULL, available_at = 0`),
+		env.DB.prepare("UPDATE notification_jobs SET operation = 'cancel', payload_json = NULL, available_at = 0"),
+	]);
+	return corsResponse({ encryption: configuration });
 }
 
 async function finishConversion(env: Env, state: EncryptionServerState): Promise<Response> {
@@ -140,7 +177,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
     OR EXISTS (SELECT 1 FROM reminder_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL)
     OR EXISTS (SELECT 1 FROM upload_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL)
     OR NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = 'e2ee:settings-converted')`).bind(ENCRYPTION_FILE_PREFIX).first();
-  if (unfinished) return corsResponse({ error: 'Finish converting files, Reading captures, settings and saved responses first' }, 409);
+	if (unfinished) return corsResponse({ error: 'Finish converting files, Reading captures, settings and saved responses first' }, 409);
 	// The dispatch DO drains cancellation jobs in bounded batches. A lost reply is
 	// harmless: cancellation is token-checked and removes its private DO state.
 	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
@@ -169,7 +206,10 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 	}
 	const orphaned = managedKeys.filter(key => !referenced.has(key));
 	if (orphaned.length) await env.BUCKET.delete(orphaned);
-	if (listing.truncated) { await putValue(env, 'e2ee:cleanup-cursor', listing.cursor).run(); return corsResponse({ pending: true }); }
+	if (listing.truncated) {
+		await putValue(env, 'e2ee:cleanup-cursor', listing.cursor).run();
+		return corsResponse({ pending: true });
+	}
 	const active: EncryptionServerState = { ...state, mode: 'active' };
 	await env.DB.batch([
 		...['reading_sources', 'reading_jobs', 'reading_handoffs', 'reading_enrollments', 'reminder_file_cache', 'reminder_projections', 'reminder_sources', 'reminder_source_state', 'notification_projection_jobs', 'notification_file_retries', 'file_deletion_receipts'].map(table => env.DB.prepare(`DELETE FROM ${table}`)),

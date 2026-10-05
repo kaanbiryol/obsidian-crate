@@ -1,3 +1,9 @@
+export interface ConnectionTestResult {
+	success: boolean;
+	error?: string;
+	code?: 'incompatible_protocol';
+}
+
 type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
 export interface SyncIssue {

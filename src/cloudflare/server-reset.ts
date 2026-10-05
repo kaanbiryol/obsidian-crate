@@ -1,3 +1,4 @@
+import { ResetBlockedError } from './reset-errors';
 import { inspectResumableDeletion } from './server-delete-recovery';
 import { sha256Hex } from './deployment-artifacts';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
@@ -27,7 +28,7 @@ export async function resetCrateServer(input: {
 		|| !/^[a-f0-9]{16}$/.test(metadata.deploymentId)
 		|| metadata.workerName !== name || metadata.d1DatabaseName !== name || metadata.r2BucketName !== name
 		|| !databaseId || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(databaseId)) {
-		throw new Error('Reset blocked: this vault has no verified Crate server identity.');
+		throw new ResetBlockedError('this vault has no verified Crate server identity.');
 	}
 	// Never repeat destructive work after the old resources have been removed.
 	if (metadata.reset?.phase === 'rebuilding') {
@@ -36,10 +37,10 @@ export async function resetCrateServer(input: {
 		assertWorkerTarget(current, ownStub ? { ...metadata, d1DatabaseId: metadata.reset.databaseId } : metadata, ownStub);
 		if (!ownStub) assertDeploymentIsNotDowngrade(deployedArtifact(current).version, input.version);
 		if (await api.getD1Database(accountId, metadata.reset.databaseId)) {
-			throw new Error('Reset blocked: the old database still exists.');
+			throw new ResetBlockedError('the old database still exists.');
 		}
 		const bucket = await api.getR2Bucket(accountId, name);
-		if (bucket?.creation_date === metadata.reset.bucketCreatedAt) throw new Error('Reset blocked: the old bucket still exists.');
+		if (bucket?.creation_date === metadata.reset.bucketCreatedAt) throw new ResetBlockedError('the old bucket still exists.');
 		return;
 	}
 	const worker = await api.getWorkerSettings(accountId, name);
@@ -49,7 +50,7 @@ export async function resetCrateServer(input: {
 	const namespaceId = retired ? metadata.reset!.namespaceId
 		: worker.bindings!.find(binding => binding.type === 'durable_object_namespace')!.namespace_id!;
 	if (metadata.reset && (metadata.reset.databaseId !== databaseId || metadata.reset.namespaceId !== namespaceId)) {
-		throw new Error('Reset blocked: the saved reset target changed.');
+		throw new ResetBlockedError('the saved reset target changed.');
 	}
 	input.onProgress?.('Checking reminder storage ownership…');
 	await assertOwnedNamespace(api, accountId, name, namespaceId, retired);
@@ -58,21 +59,21 @@ export async function resetCrateServer(input: {
 	const database = await api.getD1Database(accountId, databaseId);
 	const bucket = await api.getR2Bucket(accountId, name);
 	if (database && (database.uuid !== databaseId || database.name !== name)) {
-		throw new Error('Reset blocked: the database identity changed.');
+		throw new ResetBlockedError('the database identity changed.');
 	}
 	if (bucket && (bucket.name !== name || !bucket.creation_date
 		|| (metadata.reset && bucket.creation_date !== metadata.reset.bucketCreatedAt))) {
-		throw new Error('Reset blocked: the bucket identity changed or could not be verified.');
+		throw new ResetBlockedError('the bucket identity changed or could not be verified.');
 	}
-	if ((!database || !bucket) && !retired) throw new Error('Reset blocked: a server resource is missing.');
-	if (!database && bucket) throw new Error('Reset blocked: the database needed to verify bucket objects is missing.');
+	if ((!database || !bucket) && !retired) throw new ResetBlockedError('a server resource is missing.');
+	if (!database && bucket) throw new ResetBlockedError('the database needed to verify bucket objects is missing.');
 	input.onProgress?.('Checking the database and remote file references…');
 	const check = database ? await createObjectOwnershipCheck(api, accountId, databaseId, await readCrateTables(api, accountId, databaseId)) : null;
 	const objectCount = bucket && check ? await inspectBucketObjects(api, accountId, name, check, input.onProgress) : 0;
 	const resetId = metadata.reset?.id ?? randomHex(16);
 	const cleanupToken = randomHex(32);
 	const subdomain = bucket ? await api.getWorkersSubdomain(accountId) : null;
-	if (bucket && (!subdomain || !/^[a-z0-9-]+$/.test(subdomain))) throw new Error('Reset blocked: could not verify the cleanup Worker address.');
+	if (bucket && (!subdomain || !/^[a-z0-9-]+$/.test(subdomain))) throw new ResetBlockedError('could not verify the cleanup Worker address.');
 	const origin = `https://${name}.${subdomain}.workers.dev`;
 
 	const removeVerifiedResources = async (fence?: DeploymentFence) => {
@@ -87,7 +88,7 @@ export async function resetCrateServer(input: {
 		assertWorkerTarget(latestWorker, metadata, retired);
 		if (!retired) assertDeploymentIsNotDowngrade(deployedArtifact(latestWorker).version, input.version);
 		if (!retired && latestWorker.bindings?.find(binding => binding.type === 'durable_object_namespace')?.namespace_id !== namespaceId) {
-			throw new Error('Reset blocked: the reminder namespace changed during verification.');
+			throw new ResetBlockedError('the reminder namespace changed during verification.');
 		}
 		if (!retired || bucket && !latestWorker.bindings?.some(binding => binding.name === 'CRATE_RESET_ID' && binding.text === checkpoint.id)) {
 			// Cloudflare refuses the deleted-class export if another Worker binds the
@@ -111,7 +112,7 @@ export async function resetCrateServer(input: {
 		input.onProgress?.('Checking that other Workers do not share this server’s resources…');
 		await assertUnsharedResources(api, metadata, namespaceId);
 		if (bucket && check) {
-			if (!fence) throw new Error('Reset blocked: missing deployment fence for file removal.');
+			if (!fence) throw new ResetBlockedError('missing deployment fence for file removal.');
 			if (!await api.verifyResetWorker(origin, checkpoint.id)) {
 				input.onProgress?.('Updating the cleanup Worker to remove recovery backups…');
 				// Keep the same reset identity and existing fence. The namespace is

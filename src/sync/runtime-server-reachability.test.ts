@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
-import { createRuntimeHarness, setAcceptingEvents, setSyncEngine } from './runtime-test-harness';
+import { createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
 import type { SyncState } from './types';
 
 const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v3'] };
@@ -20,8 +20,7 @@ describe('manual sync server status', () => {
 		const { runtime } = createRuntimeHarness({ automaticSync: false, workerUrl: 'https://old.trycloudflare.com' });
 		const state: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 		const sync = vi.fn();
-		setSyncEngine(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
-		setAcceptingEvents(runtime, true);
+		await initializeRuntime(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
 		const listener = vi.fn();
 		runtime.addStateChangeListener(listener);
 		vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
@@ -45,8 +44,7 @@ describe('manual sync server status', () => {
 		const { runtime } = createRuntimeHarness({ automaticSync: false });
 		const state: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 		const sync = vi.fn();
-		setSyncEngine(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
-		setAcceptingEvents(runtime, true);
+		await initializeRuntime(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
 		let rejectRequest!: (error: Error) => void;
 		vi.stubGlobal('fetch', vi.fn()
 			.mockImplementationOnce(() => new Promise<Response>((_resolve, reject) => { rejectRequest = reject; }))
@@ -65,8 +63,7 @@ describe('manual sync server status', () => {
 		const { runtime } = createRuntimeHarness({ automaticSync: false });
 		const state: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 		const sync = vi.fn();
-		setSyncEngine(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
-		setAcceptingEvents(runtime, true);
+		await initializeRuntime(runtime, { getState: () => state, sync, initialSync: sync, forceFullSync: sync });
 		vi.stubGlobal('fetch', vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
 			options.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
 		})));

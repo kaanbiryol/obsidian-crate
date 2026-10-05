@@ -1,8 +1,8 @@
-import { vi } from 'vitest';
-import { FakeElement } from '../test/fakes/obsidian-ui';
+import { afterEach, expect, vi } from 'vitest';
+import { SyncEngine } from './engine';
+import type { SyncApiClient } from './api';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { SyncResult, SyncState } from './types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -13,43 +13,39 @@ export type Deferred<T> = {
 	reject: (reason?: unknown) => void;
 };
 
-export type RuntimeSyncEngineStub = {
-	getState?: () => SyncState;
-	sync(callback: (current: number, total: number) => void): Promise<SyncResult>;
-	initialSync(callback: (current: number, total: number) => void): Promise<SyncResult>;
-	forceFullSync(callback: (current: number, total: number) => void): Promise<SyncResult>;
-};
-
-export type RuntimeStatusBarStub = {
-	setSyncProgress(current: number, total: number): void;
-	clearSyncProgress(): void;
-};
-
-export function isAcceptingEvents(runtime: SyncRuntime): boolean {
-	return (runtime as unknown as { acceptingEvents: boolean }).acceptingEvents;
+/** Exercise event gating through a public event, without changing the queue. */
+export function expectFileEventsAccepted(runtime: SyncRuntime, accepted: boolean): void {
+	const event = vi.spyOn(SyncEngine.prototype, 'onFileChange').mockImplementation(() => {});
+	try {
+		runtime.onFileChange({ path: 'notes/event-probe.md' } as never);
+		expect(event).toHaveBeenCalledTimes(accepted ? 1 : 0);
+	} finally { event.mockRestore(); }
 }
 
-export function setAcceptingEvents(runtime: SyncRuntime, acceptingEvents: boolean): void {
-	(runtime as unknown as { acceptingEvents: boolean }).acceptingEvents = acceptingEvents;
+/** Construct a real runtime session while substituting only the engine's I/O. */
+export async function initializeRuntime(runtime: SyncRuntime, overrides: Partial<SyncEngine> = {}): Promise<void> {
+	const initialize = vi.spyOn(SyncEngine.prototype, 'initialize').mockImplementationOnce(async function (this: SyncEngine) {
+		Object.assign(this, {
+			saveHistoryCheckpoint: vi.fn(async () => undefined),
+			saveSharedHistoryCheckpoint: vi.fn(async () => undefined),
+		}, overrides);
+	});
+	try { await runtime.initialize({ skipStartupSync: true }); }
+	finally { initialize.mockRestore(); }
+	if (!runtime.isInitialized()) throw new Error('Runtime did not construct a sync engine');
 }
 
-export function setStatusBar(runtime: SyncRuntime, statusBar: RuntimeStatusBarStub): void {
-	(runtime as unknown as { statusBar: RuntimeStatusBarStub | null }).statusBar = statusBar;
+export function mockApiClient(runtime: SyncRuntime, overrides: Partial<SyncApiClient>): void {
+	const api = runtime.getApiClient();
+	if (!api) throw new Error('Initialize the runtime before mocking its API');
+	Object.assign(api, overrides);
 }
 
-export function setSyncEngine(runtime: SyncRuntime, syncEngine: RuntimeSyncEngineStub): void {
-	(runtime as unknown as { syncEngine: RuntimeSyncEngineStub | null }).syncEngine = syncEngine;
-}
-
-export function setApiClient(runtime: SyncRuntime, apiClient: {
-	testConnection(): Promise<{ success: boolean; error?: string }>;
-	putSharedSettings(shared: unknown): Promise<void>;
-	revokeCurrentToken?(): Promise<{ success: boolean }>;
-} | null): void {
-	(runtime as unknown as { apiClient: unknown }).apiClient = apiClient === null ? null : {
-		setAbortSignal: () => {}, configureUploadJournal: () => {}, getRequestDiagnostics: () => ({ clientSession: crypto.randomUUID(), requests: [] }), ...apiClient,
-	};
-}
+const runtimes = new Set<SyncRuntime>();
+afterEach(() => {
+	for (const runtime of runtimes) runtime.destroy();
+	runtimes.clear();
+});
 
 export function createDeferred<T>(): Deferred<T> {
 	let resolve!: (value: T) => void;
@@ -85,7 +81,6 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}, prepareReminderScope?: () => Promise<void>) {
 	const settings = createSettings(settingsOverrides);
 	const plugin = {
-		addStatusBarItem: vi.fn(() => Object.assign(new FakeElement('div'), { toggleClass: vi.fn(), remove: vi.fn(), removeAttribute: vi.fn(), removeEventListener: vi.fn() })),
 		registerDomEvent: vi.fn(),
 		app: {
 			workspace: { layoutReady: true },
@@ -116,15 +111,12 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 	};
 	const persistSettings = vi.fn(async () => {});
 
+	const runtime = new SyncRuntime(plugin as never, settings, secretStorage as never, persistSettings, prepareReminderScope);
+	runtimes.add(runtime);
+
 	return {
 		plugin,
-		runtime: new SyncRuntime(
-			plugin as never,
-			settings,
-			secretStorage as never,
-			persistSettings,
-			prepareReminderScope,
-		),
+		runtime,
 		persistSettings,
 		secretStorage,
 		settings,

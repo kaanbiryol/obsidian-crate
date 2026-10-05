@@ -1,3 +1,4 @@
+import type { CloudflareDeploymentResult } from './deployment-types';
 import { HttpError } from '../sync/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,9 +56,10 @@ function createPlugin(configured = false) {
 		refreshSettingsTab: vi.fn(),
 		cloudflareDeploymentService: {
 			startDeployment: vi.fn(),
-			deployWithSavedAuthorization: vi.fn(async (..._args: unknown[]) => ({ workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account', deleted: false })),
+			deployWithSavedAuthorization: vi.fn(async (..._args: unknown[]): Promise<CloudflareDeploymentResult> => ({ status: 'deployed', workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account' })),
 			pendingIntent: null as null | 'reconnect' | 'switch' | 'create' | 'reset' | 'delete',
-			handleCallback: vi.fn(async () => ({
+			handleCallback: vi.fn(async (): Promise<CloudflareDeploymentResult> => ({
+				status: 'deployed',
 				accountName: 'Example account',
 				workerUrl: 'https://crate.example.workers.dev',
 			})),
@@ -239,7 +241,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 		const plugin = createPlugin(true);
 		plugin.cloudflareDeploymentService.pendingIntent = 'delete';
-		plugin.cloudflareDeploymentService.handleCallback.mockResolvedValue({ workerUrl: '', accountName: 'Personal', deleted: true } as never);
+		plugin.cloudflareDeploymentService.handleCallback.mockResolvedValue({ status: 'deleted', accountName: 'Personal' } as never);
 		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 		expect(generateSecureToken).not.toHaveBeenCalled();
 		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
@@ -255,7 +257,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		plugin.cloudflareDeploymentService.handleCallback.mockImplementation(async () => {
 			await new Promise<void>(resolve => { release = resolve; });
 			if (outcome === 'failure') throw new Error('Interrupted');
-			return { workerUrl: 'https://crate.example.workers.dev', accountName: 'Personal' };
+			return { status: 'deployed', workerUrl: 'https://crate.example.workers.dev', accountName: 'Personal' };
 		});
 		const running = handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
@@ -299,7 +301,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 it.each(['connect', 'update', 'reset', 'delete'] as const)('uses saved login for %s and connects devices only when needed', async intent => {
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const plugin = createPlugin(intent === 'update' || intent === 'delete');
-	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockResolvedValue({ workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account', deleted: intent === 'delete' });
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockResolvedValue(intent === 'delete' ? { status: 'deleted', accountName: 'Example account' } : { status: 'deployed', workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account' });
 	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 	await startCloudflareDeployment(plugin as never, intent === 'connect' ? undefined : intent);
 	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[0]).toBe(intent);
@@ -377,14 +379,14 @@ it('offers resume only when an interrupted deletion checkpoint is saved', async 
 	expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
 });
 
-it('explains the fresh-server recovery for a protocol-10 development server', async () => {
+it.each(['Incompatible Crate server protocol 10', 'This server requires a different plugin'])('uses protocol recovery independently of wording: %s', async message => {
 	const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 	const plugin = createPlugin();
-	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: false, error: 'Incompatible Crate server protocol 10' });
+	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: false, code: 'incompatible_protocol', error: message });
 	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 	expect(progress.succeed).not.toHaveBeenCalled();
 	expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
-	expect(progress.fail).toHaveBeenCalledWith('Crate server is incompatible', expect.stringContaining('protocol 10'),
+	expect(progress.fail).toHaveBeenCalledWith('Crate server is incompatible', expect.stringContaining(message),
 		expect.arrayContaining([expect.stringContaining('create a new server')]),
 		expect.any(Object));
 	expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', 'Open settings');

@@ -170,7 +170,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		});
 		const { service } = h.createService();
 		const result = await service.deployWithSavedAuthorization('delete', operation => operation({ accessToken: 'saved' }));
-		expect(result.deleted).toBe(true);
+		expect(result.status).toBe('deleted');
 		expect(h.settings.cloudflareDeployment).toBeNull();
 		expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
 		expect(h.mutations).not.toContain('create-database');
@@ -182,7 +182,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		const { service, authorize } = h.createService();
 		const result = authorization === 'oauth' ? await service.handleCallback(await authorize('reset'), device)
 			: await service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
-		expect(result.workerUrl).toContain('.workers.dev');
+		expect(result.status === 'deployed' && result.workerUrl).toContain('.workers.dev');
 		expect(h.settings.cloudflareDeployment).toMatchObject({ d1DatabaseId: h.replacementId, lastKnownRevision: SERVER_RELEASE.revision });
 		expect(h.settings.cloudflareDeployment!.reset).toBeUndefined();
 		expect(h.mutations.filter(value => value === 'create-database')).toHaveLength(1);
@@ -251,7 +251,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		if (intent === 'delete') {
 			const retry = h.createService();
 			const result = await retry.service.handleCallback(await retry.authorize('delete'));
-			expect(result.deleted).toBe(true);
+			expect(result.status).toBe('deleted');
 			expect(h.settings.cloudflareDeployment).toBeNull();
 			expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
 			expect(h.objects.size).toBe(0);
@@ -281,7 +281,7 @@ it('deletes with saved credentials through the real deletion path without openin
 		expect(h.settings.cloudflareDeployment?.accountId).toBe('a'.repeat(32));
 		return result;
 	});
-	expect(result.deleted).toBe(true);
+	expect(result.status).toBe('deleted');
 	expect(h.settings.cloudflareDeployment).toBeNull();
 	expect(h.remote).toMatchObject({ worker: false, database: false, bucket: false });
 	expect(h.transport.mock.calls.some(([url]) => url.includes('/oauth2/'))).toBe(false);
@@ -298,5 +298,5 @@ it('keeps cleanup capability rejection distinct from account OAuth and allows de
 	await expect(service.deployWithSavedAuthorization('delete', authorize)).rejects.toThrow('Remote file cleanup failed with HTTP 403');
 	expect(h.remote).toMatchObject({ worker: false, database: true, bucket: true });
 	rejectCleanup = false;
-	await expect(service.deployWithSavedAuthorization('delete', authorize)).resolves.toMatchObject({ deleted: true });
+	await expect(service.deployWithSavedAuthorization('delete', authorize)).resolves.toMatchObject({ status: 'deleted' });
 });

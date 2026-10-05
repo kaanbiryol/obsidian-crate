@@ -168,6 +168,8 @@ describe('CloudflareDeploymentService', () => {
 			state,
 		});
 
+		expect(result.status).toBe('deployed');
+		if (result.status !== 'deployed') throw new Error('Expected a deployed server');
 		expect(result.workerUrl).toContain('.workers.dev');
 		expect(provisionCloudflareDeployment).toHaveBeenCalledTimes(1);
 		expect(apiMocks.constructedWithTokens).toEqual(['temporary-access-token']);
@@ -459,7 +461,7 @@ describe('server reset authorization', () => {
 		const h = resetHarness();
 		await h.service.startDeployment('delete');
 		const result = await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
-		expect(result.deleted).toBe(true);
+		expect(result.status).toBe('deleted');
 		expect(deleteCrateServer).toHaveBeenCalledOnce();
 		expect(h.loadArtifacts).not.toHaveBeenCalled();
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();

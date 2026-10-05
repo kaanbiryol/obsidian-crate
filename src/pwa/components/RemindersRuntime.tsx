@@ -221,6 +221,7 @@ function useRemindersController() {
 		retryAt: Math.min(...changes.flatMap(change => reminderRetryAt(change) ?? [])),
 		connected: Boolean(authToken), config, push,
 		updateContentReady: !enabled || initialContentReady,
+		canApplyUpdate: () => !isPreparingMutation(),
 		updateReady: bootstrapped && !modal && !saving && !loggingOut && !reorderDragging && !isPreparingMutation()
 			&& (!authToken || (mutationsReady && (!enabled || (initialContentReady && !launchReminderId && !loading && !refreshing && !isOffline))
 				&& !storageError && changes.length === 0 && recoveryChanges.length === 0 && quarantinedChanges.length === 0)),

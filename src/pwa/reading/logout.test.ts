@@ -1,3 +1,4 @@
+import type { ConnectionIssue } from '../connection/issues';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test/react-hooks';
@@ -34,7 +35,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 function lifecycle() {
-  const reportError = vi.fn(), showToast = vi.fn();
+  const reportError = vi.fn<(issue: ConnectionIssue | null) => void>(), showToast = vi.fn();
   const noop = () => {};
   const apiFetch = vi.fn(async (path: string, init?: RequestInit) => fetch(path, { ...init, headers: { Authorization: 'Bearer valid-reminders-token' } }));
   const options = { apiFetch, resetView: vi.fn(), disablePushNotifications: async () => {}, handleUnauthorizedRef: { current: noop },
@@ -57,7 +58,8 @@ it.each(['malformed credentials', 'unavailable credential reads'])('app logout c
   expect(clearReminderOutbox).toHaveBeenCalledOnce();
   expect(clearCachedReminderSnapshots).toHaveBeenCalledOnce();
   expect(test.options.resetView).toHaveBeenCalledOnce();
-  expect(test.reportError).toHaveBeenLastCalledWith(expect.stringMatching(/could not|cannot/i));
+  expect(test.reportError.mock.lastCall?.[0]?.kind).toBe('cleanup');
+  expect(test.reportError.mock.lastCall?.[0]?.message).toMatch(/could not|cannot/i);
   if (failure === 'malformed credentials') {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
     const call = vi.mocked(fetch).mock.calls[0];
@@ -70,7 +72,8 @@ it('reports incomplete erasure when removing encryption keys fails', async () =>
   vi.mocked(clearPersistedEncryption).mockRejectedValueOnce(new Error('Blocked database'));
   const test = lifecycle();
   await act(async () => { await test.hook.current.logOut(); });
-  expect(test.reportError).toHaveBeenLastCalledWith(expect.stringContaining('could not be removed'));
+  expect(test.reportError.mock.lastCall?.[0]?.kind).toBe('cleanup');
+  expect(test.reportError.mock.lastCall?.[0]?.message).toContain('could not be removed');
   expect(clearReminderOutbox).toHaveBeenCalledOnce();
 });
 

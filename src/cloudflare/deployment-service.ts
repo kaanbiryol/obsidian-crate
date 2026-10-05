@@ -6,7 +6,7 @@ import { completePublishedDeployment } from './complete-published-deployment';
 import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CrateSettings } from '../plugin/settings';
-import type { CloudflareDeploymentMetadata } from './deployment-types';
+import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, SavedDeploymentIntent } from './deployment-types';
 import { CloudflareApiClient, type CloudflareAccount } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpTransport } from './http';
@@ -41,13 +41,7 @@ interface PendingOAuthSession {
 	metadata: CloudflareDeploymentMetadata;
 	discoverExisting: boolean;
 	originalMetadata: string;
-	intent: 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
-}
-
-export interface CloudflareDeploymentResult {
-	deleted?: true;
-	workerUrl: string;
-	accountName: string;
+	intent: DeploymentIntent;
 }
 
 export interface CloudflareDeploymentServiceOptions {
@@ -119,11 +113,11 @@ export class CloudflareDeploymentService {
 
 	get isBusy(): boolean { return this.handlingCallback; }
 
-	get pendingIntent(): PendingOAuthSession['intent'] | null {
+	get pendingIntent(): DeploymentIntent | null {
 		return this.pendingSession?.intent ?? null;
 	}
 
-	async startDeployment(intent: 'reconnect' | 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
+	async startDeployment(intent: DeploymentIntent = 'connect'): Promise<void> {
 		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
@@ -284,7 +278,7 @@ export class CloudflareDeploymentService {
 					persist: () => this.persistMetadata(metadata),
 				}));
 				if (!savedLogin) await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
-				return { workerUrl: '', accountName: account.name, deleted: true };
+				return { status: 'deleted', accountName: account.name };
 			}
 			const artifacts = pending.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
 			if (pending.intent === 'reset') {
@@ -329,7 +323,7 @@ export class CloudflareDeploymentService {
 				delete metadata.reset;
 				await this.persistMetadata(metadata);
 			}
-			result = { workerUrl, accountName: account.name };
+			result = { status: 'deployed', workerUrl, accountName: account.name };
 			this.lifetime.signal.throwIfAborted();
 			if (!savedLogin && this.options.onAuthorized) {
 				this.options.onAuthorized(account.id, tokens);
@@ -350,7 +344,7 @@ export class CloudflareDeploymentService {
 	}
 
 	async deployWithSavedAuthorization(
-		intent: 'reconnect' | 'connect' | 'update' | 'reset' | 'delete',
+		intent: SavedDeploymentIntent,
 		withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
@@ -375,7 +369,7 @@ export class CloudflareDeploymentService {
 				if (JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment) !== pending.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
 				return this.runAuthorizedDeployment(pending, tokens, device, onProgress, selectDeployment, true);
 			});
-			if (result.deleted) await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
+			if (result.status === 'deleted') await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 			return result;
 		} finally { this.handlingCallback = false; }
 	}
@@ -475,7 +469,7 @@ export class CloudflareDeploymentService {
 		}));
 	}
 
-	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: PendingOAuthSession['intent']): void {
+	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: DeploymentIntent): void {
 		const current = this.options.settingsOwner.settings.cloudflareDeployment;
 		if (current?.deletion && intent !== 'delete') throw new Error('Resume server deletion before continuing.');
 		if (current?.reset && intent !== 'delete' && intent !== (current.reset.deleteOnly ? 'delete' : 'reset')) throw new Error('Resume the server reset or deletion before continuing.');
