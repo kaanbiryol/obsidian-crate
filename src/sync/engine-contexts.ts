@@ -8,11 +8,24 @@ import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { VaultFile } from './file-discovery';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
-import { createFullSyncPlan } from './planner';
+import {
+	createFullSyncPlan,
+	getLocalChanges as planLocalChanges,
+	getLocalDeletes as planLocalDeletes,
+	runIncrementalSync,
+} from './planner';
+import {
+	prepareUploadFromPath as prepareTransferUploadFromPath,
+	parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles,
+	processDiff as transferProcessDiff,
+	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
+	uploadPreparedFiles as transferUploadPreparedFiles,
+} from './transfer';
+import { createByteBudgetedVaultFileChunks } from './transfer-budget';
+import { PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './engine-constants';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
-import { prepareUploadFromPath } from './transfer-prepare';
 import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from './initial-config-pull';
@@ -31,24 +44,9 @@ interface SyncEngineContextDependencies {
 	runConcurrent: <T>(tasks: (() => Promise<T>)[], concurrency: number) => Promise<T[]>;
 	retryWithBackoff: <T>(fn: () => Promise<T>) => Promise<T>;
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
-	getLocalChanges: (onUnchanged?: (path: string) => void) => Promise<{ path: string; hash: string }[]>;
+	getPendingPaths: () => string[];
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
-	getLocalDeletes: () => Promise<string[]>;
-	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
-	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void) => Promise<void>;
-	processDiff: (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult) => Promise<DiffApplyOutcome>;
-	prepareUploadFromPath: (path: string) => Promise<PreparedUpload | null>;
-	uploadPreparedFiles: (
-		prepared: PreparedUpload[],
-		result: SyncResult,
-		options: UploadPreparedFilesOptions,
-	) => Promise<void>;
 	reconcileVersionConflicts: (paths: string[], result: SyncResult) => Promise<void>;
-	prepareUploadsFromVaultFiles: (
-		files: VaultFile[],
-		onPrepared?: (completed: number) => void,
-	) => Promise<PreparedUpload[]>;
-	createVaultFileChunks: (files: VaultFile[]) => VaultFile[][];
 	updateState: (updates: Partial<SyncState>) => void;
 	isAbortError: (error: unknown) => boolean;
 	throwIfDestroyed: () => void;
@@ -59,7 +57,67 @@ export class SyncEngineContexts {
 	clearPlannedContent(): void { this.plannedContent.clear(); }
 	constructor(private dependencies: SyncEngineContextDependencies) {}
 
-	transfer() {
+	async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
+		return prepareTransferUploadFromPath(this.transfer(), path);
+	}
+
+	private async getLocalDeletes(): Promise<string[]> {
+		return planLocalDeletes(this.localDiffPlanner(), PREPARE_CONCURRENCY);
+	}
+
+	async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
+		return runIncrementalSync(this.incrementalPlanner(), {
+			uploadConcurrency: UPLOAD_CONCURRENCY,
+			progressCallback,
+		});
+	}
+
+	private async getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]> {
+		return planLocalChanges({
+			...this.localDiffPlanner(),
+			pendingPaths: new Set(this.dependencies.getPendingPaths()),
+		}, PREPARE_CONCURRENCY, onUnchanged);
+	}
+
+	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void> {
+		await transferParallelDownloadAndSaveFiles(
+			this.transfer(),
+			requests,
+			result,
+			DOWNLOAD_CONCURRENCY,
+			onProcessed,
+		);
+	}
+
+	async processDiff(
+		diff: FileDiff,
+		localFiles: Record<string, FileEntry>,
+		result: SyncResult
+	): Promise<DiffApplyOutcome> {
+		return transferProcessDiff(this.transfer(), diff, localFiles, result);
+	}
+
+	async prepareUploadsFromVaultFiles(
+		files: VaultFile[],
+		onPrepared?: (completed: number) => void,
+	): Promise<PreparedUpload[]> {
+		return transferPrepareUploadsFromVaultFiles(
+			this.transfer(),
+			files,
+			PREPARE_CONCURRENCY,
+			onPrepared,
+		);
+	}
+
+	async uploadPreparedFiles(
+		prepared: PreparedUpload[],
+		result: SyncResult,
+		options: UploadPreparedFilesOptions,
+	): Promise<void> {
+		await transferUploadPreparedFiles(this.transfer(), prepared, result, options);
+	}
+
+	private transfer() {
 		const dependencies = this.dependencies;
 		return {
 			vault: dependencies.vault,
@@ -75,7 +133,7 @@ export class SyncEngineContexts {
 		};
 	}
 
-	localDiffPlanner() {
+	private localDiffPlanner() {
 		const dependencies = this.dependencies;
 		return {
 			throwIfDestroyed: dependencies.throwIfDestroyed,
@@ -88,7 +146,7 @@ export class SyncEngineContexts {
 		};
 	}
 
-	incrementalPlanner() {
+	private incrementalPlanner() {
 		const dependencies = this.dependencies;
 		return {
 			settings: dependencies.getSettings(),
@@ -99,17 +157,17 @@ export class SyncEngineContexts {
 			api: dependencies.api,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
-			getLocalChanges: dependencies.getLocalChanges,
-			getLocalDeletes: dependencies.getLocalDeletes,
-			parallelDownloadAndSaveFiles: dependencies.parallelDownloadAndSaveFiles,
-			processDiff: dependencies.processDiff,
-			prepareUploadFromPath: dependencies.prepareUploadFromPath,
-			uploadPreparedFiles: dependencies.uploadPreparedFiles,
+			getLocalChanges: this.getLocalChanges.bind(this),
+			getLocalDeletes: this.getLocalDeletes.bind(this),
+			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles.bind(this),
+			processDiff: this.processDiff.bind(this),
+			prepareUploadFromPath: this.prepareUploadFromPath.bind(this),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			reconcileVersionConflicts: dependencies.reconcileVersionConflicts,
 		};
 	}
 
-	fullSyncPlanner() {
+	private fullSyncPlanner() {
 		const dependencies = this.dependencies;
 		return {
 			initialConfigPull: {
@@ -141,16 +199,16 @@ export class SyncEngineContexts {
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			getManifest: () => dependencies.api.getManifest(),
-			incrementalSync: dependencies.incrementalSync,
+			incrementalSync: this.incrementalSync.bind(this),
 			isAbortError: dependencies.isAbortError,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			createFullSyncPlan: (remoteFiles: Record<string, FileEntry>, concurrency: number) =>
 				createFullSyncPlan(this.fullSyncPlanner(), remoteFiles, concurrency),
-			processDiff: dependencies.processDiff,
-			prepareFullSyncUpload: (diff: UploadDiff) => prepareUploadFromPath(this.transfer(), diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
-			uploadPreparedFiles: dependencies.uploadPreparedFiles,
+			processDiff: this.processDiff.bind(this),
+			prepareFullSyncUpload: (diff: UploadDiff) => prepareTransferUploadFromPath(this.transfer(), diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			reconcileVersionConflicts: dependencies.reconcileVersionConflicts,
-			parallelDownloadAndSaveFiles: dependencies.parallelDownloadAndSaveFiles,
+			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles.bind(this),
 			getLocalManifestEntry: (path: string) => dependencies.getLocalManifest().getEntry(path),
 			setLocalManifestEntry: (path: string, entry: FileEntry) => {
 				dependencies.getLocalManifest().setEntry(path, entry);
@@ -178,9 +236,9 @@ export class SyncEngineContexts {
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
 			isAbortError: dependencies.isAbortError,
-			prepareUploadsFromVaultFiles: dependencies.prepareUploadsFromVaultFiles,
-			uploadPreparedFiles: dependencies.uploadPreparedFiles,
-			createVaultFileChunks: dependencies.createVaultFileChunks,
+			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
+			createVaultFileChunks: createByteBudgetedVaultFileChunks,
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			setLastSync: (value: string) => {
@@ -225,9 +283,9 @@ export class SyncEngineContexts {
 			snapshotLocalManifest: () => structuredClone(dependencies.getLocalManifest().getManifest()),
 			clearLocalManifest: () => dependencies.getLocalManifest().clear(),
 			replaceLocalManifest: (manifest: FileManifest) => dependencies.getLocalManifest().replaceManifest(manifest),
-			prepareUploadsFromVaultFiles: dependencies.prepareUploadsFromVaultFiles,
-			uploadPreparedFiles: dependencies.uploadPreparedFiles,
-			createVaultFileChunks: dependencies.createVaultFileChunks,
+			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
+			createVaultFileChunks: createByteBudgetedVaultFileChunks,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			deleteRemoteFile: async (path: string, expectedHash: string, expectedRevision?: string) => {
 				await dependencies.api.deleteFile(path, expectedHash, expectedRevision);

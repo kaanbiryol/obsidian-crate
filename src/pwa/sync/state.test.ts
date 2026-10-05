@@ -3,7 +3,7 @@ import type { SettingsSnapshot } from '../settings-store';
 import { pwaSyncState, refreshPwaSync, logoutPwaSync } from './state';
 
 function snapshot(): SettingsSnapshot {
-	const feature = { ready: true, connected: true, enabled: true, pendingCount: 0, status: { state: 'synced' as const, label: 'All changes synced' }, attention: null, unsynced: false, onRefresh: vi.fn(async () => {}), onLogout: vi.fn(async () => {}) };
+	const feature = { updateReady: true, updateContentReady: true, canApplyUpdate: () => true, ready: true, connected: true, enabled: true, pendingCount: 0, status: { state: 'synced' as const, label: 'All changes synced' }, attention: null, unsynced: false, onRefresh: vi.fn(async () => {}), onLogout: vi.fn(async () => {}) };
 	return { open: false, syncRequested: false,
 		reading: { ...feature, shortcut: null, issues: null },
 		reminders: { ...feature, onRefresh: vi.fn(async () => {}), config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, push: { phase: 'unsupported', status: null }, onEnablePush: vi.fn(async () => {}), recovery: null },
@@ -11,6 +11,11 @@ function snapshot(): SettingsSnapshot {
 }
 
 describe('application sync coordination', () => {
+	it.each(['updateReady', 'canApplyUpdate'])('requires explicit %s consent from every hydrated feature', field => {
+		const state = snapshot();
+		Reflect.deleteProperty(state.reading!, field);
+		expect(pwaSyncState(state).canUpdate).toBe(false);
+	});
 	it('never treats an uninitialized feature as synced or safe to update', () => {
 		const state = snapshot(); state.reading = null;
 		expect(pwaSyncState(state)).toMatchObject({ ready: false, unsynced: true, canUpdate: false, status: { state: 'syncing' } });

@@ -44,3 +44,11 @@ export interface CloudflareDeploymentMetadata {
 		namespaceId: string;
 	};
 }
+
+/** Authorization-independent intent and target captured when an operation starts. */
+export interface DeploymentRequest {
+	metadata: CloudflareDeploymentMetadata;
+	discoverExisting: boolean;
+	originalMetadata: string;
+	intent: DeploymentIntent;
+}

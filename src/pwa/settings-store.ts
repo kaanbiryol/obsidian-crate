@@ -13,10 +13,10 @@ interface FeatureSettings {
 	attention: string | null;
 	unsynced: boolean;
 	/** Feature hydration and transient work must settle before navigating for an update. */
-	updateReady?: boolean;
+	updateReady: boolean;
 	/** Check transient work again even before React publishes its next render. */
-	canApplyUpdate?: () => boolean;
-	updateContentReady?: boolean;
+	canApplyUpdate: () => boolean;
+	updateContentReady: boolean;
 	onRefresh: () => Promise<unknown>;
 	onLogout: () => Promise<void>;
 	clearView?: () => void;

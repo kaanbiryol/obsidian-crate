@@ -17,29 +17,15 @@ import { ConflictStore } from './conflict-store';
 import { isConflictFile } from './conflict';
 import { isHiddenPath, type VaultFile } from './file-discovery';
 import { assertLocalSyncPath } from './local-path-safety';
-import type { DownloadRequest } from './transfer-download';
 import { SyncQueueController } from './queue-controller';
 import { isAbortError as isSyncAbortError } from './abort';
-import {
-	getLocalChanges as planLocalChanges,
-	getLocalDeletes as planLocalDeletes,
-	runIncrementalSync,
-} from './planner';
-import {
-	prepareUploadFromPath as prepareTransferUploadFromPath,
-	parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles,
-	processDiff as transferProcessDiff,
-	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
-	uploadPreparedFiles as transferUploadPreparedFiles,
-} from './transfer';
-import { createByteBudgetedVaultFileChunks } from './transfer-budget';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { SyncState, SyncResult, FileDiff, PreparedUpload, ConflictRecord } from './types';
+import type { SyncState, SyncResult, ConflictRecord } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { createPathRecord } from '../protocol/path-record';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
-import { AUTH_ERROR_MESSAGE, isAuthError, DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
+import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import {
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
@@ -59,8 +45,6 @@ import { uploadFullSyncPlan } from './engine-full-sync-upload';
 import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
 import { createPendingDiscard } from './pending-discard';
 import { readLocalFileEntry } from './local-file-entry';
-import type { DiffApplyOutcome } from './transfer-types';
-import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { getCheckpointAuthority } from './worker-url';
@@ -182,7 +166,7 @@ export class SyncEngine {
 						&& this.api.getPendingRestores().length === 0,
 				}, keys);
 			},
-			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
+			prepareUploadFromPath: (path: string) => this.contexts.prepareUploadFromPath(path),
 			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
 			runConcurrent: this.runConcurrent.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
@@ -206,21 +190,9 @@ export class SyncEngine {
 			runConcurrent: this.runConcurrent.bind(this),
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
-			getLocalChanges: (onUnchanged) => this.getLocalChanges(onUnchanged),
+			getPendingPaths: () => this.queueController.getPendingPaths(),
 			verifyContent: files => this.verifyContent(files),
-			getLocalDeletes: () => this.getLocalDeletes(),
-			incrementalSync: (progressCallback) => this.incrementalSync(progressCallback),
-			parallelDownloadAndSaveFiles: (requests, result, onProcessed) =>
-				this.parallelDownloadAndSaveFiles(requests, result, onProcessed),
-			processDiff: (diff, localFiles, result) => this.processDiff(diff, localFiles, result),
-			prepareUploadFromPath: (path) => this.prepareUploadFromPath(path),
-			uploadPreparedFiles: (prepared, result, options) =>
-				this.uploadPreparedFiles(prepared, result, options),
-			reconcileVersionConflicts: (paths, result) =>
-				this.reconcileVersionConflicts(paths, result),
-			prepareUploadsFromVaultFiles: (files, onPrepared) =>
-				this.prepareUploadsFromVaultFiles(files, onPrepared),
-			createVaultFileChunks: files => this.createVaultFileChunks(files),
+			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
 			updateState: this.updateState.bind(this),
 			isAbortError: this.isAbortError.bind(this),
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
@@ -312,9 +284,9 @@ export class SyncEngine {
         });
     }
 
-    async saveSharedHistoryCheckpoint() { return this.history().saveShared(); }
+    async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
 
-    async saveHistoryCheckpoint(): Promise<string | undefined> { return this.history().saveLocal(); }
+    async saveHistoryCheckpoint(): Promise<string | undefined> { return this.trackWork(() => this.history().saveLocal()); }
 
     async loadHistoryComparison(checkpoint: string, shared = false) {
         return this.history().compare(checkpoint, shared);
@@ -606,10 +578,6 @@ export class SyncEngine {
 		this.queueController.onFileRename(file, oldPath);
 	}
 
-	private async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
-		return prepareTransferUploadFromPath(this.contexts.transfer(), path);
-	}
-
 	private async runConcurrent<T>(
 		tasks: (() => Promise<T>)[],
 		concurrency: number
@@ -628,34 +596,6 @@ export class SyncEngine {
 
 		const stat = await this.vault.adapter.stat(path);
 		return new Date(stat?.mtime ?? Date.now()).toISOString();
-	}
-
-	private async getLocalDeletes(): Promise<string[]> {
-		return planLocalDeletes(this.contexts.localDiffPlanner(), PREPARE_CONCURRENCY);
-	}
-
-	private async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
-		return runIncrementalSync(this.contexts.incrementalPlanner(), {
-			uploadConcurrency: UPLOAD_CONCURRENCY,
-			progressCallback,
-		});
-	}
-
-	private async getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]> {
-		return planLocalChanges({
-			...this.contexts.localDiffPlanner(),
-			pendingPaths: new Set(this.queueController.getPendingPaths()),
-		}, PREPARE_CONCURRENCY, onUnchanged);
-	}
-
-	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void> {
-		await transferParallelDownloadAndSaveFiles(
-			this.contexts.transfer(),
-			requests,
-			result,
-			DOWNLOAD_CONCURRENCY,
-			onProcessed,
-		);
 	}
 
 	private verifyContent(files: VaultFile[]): Promise<boolean> {
@@ -765,7 +705,7 @@ export class SyncEngine {
 				const retryPaths: string[] = [];
 				await uploadFullSyncPlan({
 					...this.contexts.syncWorkflow(),
-					uploadPreparedFiles: (prepared, syncResult, options) => this.uploadPreparedFiles(prepared, syncResult, {
+					uploadPreparedFiles: (prepared, syncResult, options) => this.contexts.uploadPreparedFiles(prepared, syncResult, {
 						...options,
 						onVersionConflicts: async paths => { retryPaths.push(...paths); },
 					}),
@@ -773,40 +713,8 @@ export class SyncEngine {
 				return retryPaths;
 			},
 			processDiff: (diff, localFiles, syncResult) =>
-				this.processDiff(diff, localFiles, syncResult),
+				this.contexts.processDiff(diff, localFiles, syncResult),
 		}, queueKeys);
-	}
-
-	private async processDiff(
-		diff: FileDiff,
-		localFiles: Record<string, FileEntry>,
-		result: SyncResult
-	): Promise<DiffApplyOutcome> {
-		return transferProcessDiff(this.contexts.transfer(), diff, localFiles, result);
-	}
-
-	private async prepareUploadsFromVaultFiles(
-		files: VaultFile[],
-		onPrepared?: (completed: number) => void,
-	): Promise<PreparedUpload[]> {
-		return transferPrepareUploadsFromVaultFiles(
-			this.contexts.transfer(),
-			files,
-			PREPARE_CONCURRENCY,
-			onPrepared,
-		);
-	}
-
-	private async uploadPreparedFiles(
-		prepared: PreparedUpload[],
-		result: SyncResult,
-		options: UploadPreparedFilesOptions,
-	): Promise<void> {
-		await transferUploadPreparedFiles(this.contexts.transfer(), prepared, result, options);
-	}
-
-	private createVaultFileChunks(files: VaultFile[]): VaultFile[][] {
-		return createByteBudgetedVaultFileChunks(files);
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {

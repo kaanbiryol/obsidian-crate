@@ -405,6 +405,76 @@ async function testPreparingCommandUpdate(browser) {
   }
 }
 
+async function testPreparingReadingUpdate(browser) {
+  let assets = before, writes = 0;
+  const item = { crate_reading_version: 1, crate_reading_id: '11111111-1111-4111-8111-111111111111',
+    title: 'Update safety article', path: 'Reading/Update safety article.md', source_url: 'https://example.com/article',
+    saved_at: '2026-01-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
+  const handlers = new Map([before, after].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
+  const server = http.createServer(async (req, res) => {
+    const path = new URL(req.url, 'http://127.0.0.1').pathname;
+    if (path === '/reading/session') sendJson(res, 200, { id: 'update-reading', folderPath: 'Reading', generation: 'one',
+      expiresAt: Date.now() + 86400000, day: Math.floor(Date.now() / 86400000) });
+    else if (path === '/reading/list') sendJson(res, 200, { items: [item], issues: [], cursor: null });
+    else if (path === '/reading/item') sendJson(res, 200, { item, markdown: 'An article to keep while updating.' });
+    else if (path === '/reading/update') {
+      const body = await readJson(req); Object.assign(item, body.changes); writes++;
+      sendJson(res, 200, { ok: true });
+    } else handlers.get(assets).emit('request', req, res);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: true }); });
+  try {
+    const page = await context.newPage();
+    await page.goto(`http://127.0.0.1:${server.address().port}/notifications?section=reading`);
+    const article = page.getByRole('button', { name: /example.com Update safety article/ });
+    await expect(article).toBeVisible();
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    assets = after;
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    const update = page.getByRole('button', { name: 'Update available', exact: true });
+    await expect(update).toBeEnabled();
+    await article.click();
+    const favorite = page.getByRole('button', { name: 'Favorite article', exact: true });
+    await expect(favorite).toBeEnabled();
+    // Hold the native mutation lock before the edit can create a durable record.
+    await page.evaluate(() => new Promise(resolve => {
+      void navigator.locks.request('crate-reading-mutations-v1', async () => {
+        resolve(); await new Promise(release => { window.__releaseReadingMutation = release; });
+      });
+    }));
+    await favorite.click();
+    await expect(favorite).toHaveAttribute('aria-disabled', 'true');
+    await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
+    await expect(article).toBeVisible();
+    await expect(update).toBeDisabled();
+    expect(writes).toBe(0);
+    expect(await page.evaluate(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('crate-reading-v1', 1);
+        request.onsuccess = () => resolve(request.result); request.onerror = reject;
+      });
+      const id = JSON.parse(localStorage.getItem('crate-reading-session-v1')).id;
+      return new Promise(resolve => {
+        const request = db.transaction('values').objectStore('values').get(`pending:${id}`);
+        request.onsuccess = () => { db.close(); resolve(request.result ?? []); };
+      });
+    })).toEqual([]);
+    await page.evaluate(() => window.__releaseReadingMutation());
+    await expect.poll(() => writes).toBe(1);
+    expect(item.favorite).toBe(true);
+    await expect(update).toBeEnabled();
+    await update.click();
+    await expect.poll(() => page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('v')),
+      { timeout: 15000 }).toBe(afterVersion);
+    await expect(article).toBeVisible();
+  } finally {
+    await context.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 async function testLaunchUpdate(browser, mode) {
   let assets = before;
   const handlers = new Map([before, after].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
@@ -524,6 +594,8 @@ for (const browserType of [chromium, webkit]) {
     }
     await testDeferredUpdate(browser);
     console.log(`${browserType.name()}: deferred update preserves editors, pending writes, reading and resume, and keeps other tabs intact`);
+    await testPreparingReadingUpdate(browser);
+    console.log(`${browserType.name()}: updates stay blocked while a Reading edit waits for the native storage lock`);
     await testPreparingCommandUpdate(browser);
     console.log(`${browserType.name()}: updates stay blocked while a completion command awaits its identity, then resume after sync`);
   } finally { await browser.close(); }

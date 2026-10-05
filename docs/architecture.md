@@ -96,14 +96,19 @@ CratePlugin (src/plugin/CratePlugin.ts)
 ```
 
 Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
-The engine retains cancellation, exclusive-operation checks and active-work tracking.
+The engine retains cancellation, exclusive-operation checks and active-work tracking,
+including local and shared checkpoint saves. Shutdown drains those writes; the runtime
+only attaches a completed checkpoint while its originating engine is still current.
 `sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
-`cloudflare/deployment-types.ts` defines deployment intents and distinguishes a
-deleted server from a deployed server with a URL. The service owns authorization,
-target verification and provisioning. `cloudflare/plugin-integration.ts` coordinates
+`cloudflare/deployment-types.ts` defines authorization-independent deployment requests
+and distinguishes a deleted server from a deployed server with a URL. OAuth sessions
+contain a request; saved authorization runs that request directly.
+`cloudflare/deployment-target.ts` owns account selection, discovery and server reuse
+policy. The service owns authorization, cancellation, target verification and the
+ordered provisioning workflow. `cloudflare/plugin-integration.ts` coordinates
 the operation and device connection; `ui/cloudflare-operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
 
@@ -112,8 +117,10 @@ invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verifi
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
-`sync/engine-contexts.ts` wires engine dependencies. The ordered completion of the
-initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
+`sync/engine-contexts.ts` binds planners and transfers directly to their dependencies.
+The engine supplies live state, pending paths, lifecycle guards and reconciliation;
+planner and transfer calls do not round-trip through engine forwarding methods.
+The ordered completion of the initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
 
 The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
 Reading and Reminders runtimes independently of their lazy screens, so pending work
@@ -145,7 +152,11 @@ Standalone launches bypass it. The preference contains no credentials
 and does not replace the installed app's encryption unlock.
 
 `pwa/sync/state.ts` derives the overall indicator and update readiness from both
-runtime registrations. An uninitialized feature is unverified, while a hydrated
+runtime registrations. Each feature explicitly publishes the policy from
+`pwa/sync/update-readiness.ts` and a synchronous guard for work awaiting durability.
+Reading queues commands in its runtime, so waiting for Web Locks or IndexedDB blocks
+updates before a pending record exists. Final update checks still reread durable
+queues and drafts. An uninitialized feature is unverified, while a hydrated
 paused feature remains ready for settings and logout. Paused or disconnected
 pending work still blocks updates. Both headers open the shared sync details;
 refresh dispatches independently to enabled features, and logout clears both

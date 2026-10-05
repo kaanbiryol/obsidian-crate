@@ -1,3 +1,5 @@
+import { readingUpdateReadiness } from '../sync/update-readiness';
+import { queueReading, type ReadingCommand } from './outbox';
 import { createContext, lazy, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { DeferredNotice } from '../components/DeferredNotice';
 import { SettingsRow } from '../components/SettingsRow';
@@ -26,6 +28,28 @@ function useReadingController() {
   const { refresh, refreshManually, syncing, syncedSession, isOffline } = useReadingSync(connection, enabled);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const preparingChanges = useRef(0);
+  const [preparationCount, setPreparationCount] = useState(0);
+  const queueChange = async (command: ReadingCommand) => {
+    if (!session) throw new Error('Connect Reading before saving changes.');
+    // Web Locks and IndexedDB can delay durability. Block reload synchronously.
+    preparingChanges.current++;
+    setPreparationCount(preparingChanges.current);
+    try {
+      const work = await queueReading(session, command);
+      assertReadingSession(session);
+      if (connection.alive.current) connection.setPending(work);
+      return work;
+    } catch (cause) {
+      // An old session's failure must not appear after reconnecting or signing out.
+      try { assertReadingSession(session); } catch { throw cause; }
+      if (connection.alive.current) showToast('error', cause instanceof Error ? cause.message : 'Could not save this change on your device.');
+      throw cause;
+    } finally {
+      preparingChanges.current--;
+      setPreparationCount(preparingChanges.current);
+    }
+  };
   const [, setSettingsOpen] = useSettingsOpen();
   const previousSession = useRef(session);
   useEffect(() => {
@@ -48,8 +72,9 @@ function useReadingController() {
       : session ? { status: readingKeys() ? 'ready' : 'legacy', folderPath: readingKeys()?.folderPath ?? session.folderPath } : undefined,
     retryAt: Math.min(...pending.flatMap(op => op.retryAt !== undefined && !op.review && (op.attempts ?? 0) < 3 ? [op.retryAt] : [])),
     status: enabled ? status : { state: recovery ? 'error' : 'cached', label: pending.length ? `Paused: ${pending.length} ${pending.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
-    updateContentReady: ready && !connecting && (!enabled || !session || Boolean(cache) || Boolean(error)),
-    updateReady: ready && !connecting && !adding && !saving && !syncing && !isOffline,
+    ...readingUpdateReadiness({ ready, connecting, enabled, connected: Boolean(session), hasCache: Boolean(cache),
+      hasError: Boolean(error), adding, saving, preparingChange: preparationCount > 0, syncing, isOffline }),
+    canApplyUpdate: () => preparingChanges.current === 0 && !savingRef.current,
     attention: status.state === 'error' && !readingDisabled ? error || status.label : null,
     unsynced: pending.length > 0 || recovery || Boolean(error && !readingDisabled),
     onRefresh: () => session ? refreshManually() : connect(),
@@ -63,7 +88,7 @@ function useReadingController() {
     </>,
   });
 
-  return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, saving, setSaving, savingRef };
+  return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, saving, setSaving, savingRef, queueChange };
 }
 const ReadingRuntimeContext = createContext<ReturnType<typeof useReadingController> | null>(null);
 export function ReadingRuntimeProvider({ children }: { children: ReactNode }) {

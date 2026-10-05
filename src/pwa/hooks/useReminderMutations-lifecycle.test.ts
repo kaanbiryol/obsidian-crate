@@ -37,7 +37,7 @@ function harness() {
 	const reminder: ReminderRecord = { id: 'one', content: 'My reminder', completed: false, priority: 4,
 		project: 'Inbox', filePath: 'Reminders/Inbox.md', revision: 'one' };
 	const config = { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 };
-	const feature = { ready: true, connected: true, status: { state: 'synced' as const, label: 'Synced' },
+	const feature = { updateReady: true, updateContentReady: true, canApplyUpdate: () => true, ready: true, connected: true, status: { state: 'synced' as const, label: 'Synced' },
 		attention: null, unsynced: false, onRefresh: vi.fn(async () => {}), onLogout: vi.fn(async () => {}) };
 	const store = createSettingsStore();
 	store.setFeature('reading', { ...feature, shortcut: null, issues: null });

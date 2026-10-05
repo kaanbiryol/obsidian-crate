@@ -13,7 +13,7 @@ vi.mock('react', async importOriginal => ({
 }));
 
 function reading(status?: 'legacy' | 'ready' | 'locked', ready = true): SettingsSnapshot['reading'] {
-	return { ready, connected: ready, status: { state: 'synced', label: 'Synced' }, attention: null, unsynced: false,
+	return { updateReady: true, updateContentReady: true, canApplyUpdate: () => true, ready, connected: ready, status: { state: 'synced', label: 'Synced' }, attention: null, unsynced: false,
 		onRefresh: async () => {}, onLogout: async () => {}, shortcut: null, issues: null,
 		encryption: status ? { status, folderPath: 'Reading' } : undefined };
 }

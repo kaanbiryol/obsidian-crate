@@ -1,3 +1,4 @@
+import type { SyncEngineContexts } from './engine-contexts';
 import { vi } from 'vitest';
 import { SyncEngine } from './engine';
 import type { ConflictStore } from './conflict-store';
@@ -107,7 +108,7 @@ export function createSyncResult(): SyncResult {
 
 export function spyOnIncrementalSync(engine: SyncEngine, result: SyncResult | null) {
 	return vi.spyOn(
-		engine as unknown as { incrementalSync(): Promise<SyncResult | null> },
+		(engine as unknown as { contexts: SyncEngineContexts }).contexts,
 		'incrementalSync',
 	).mockResolvedValue(result);
 }
@@ -117,7 +118,7 @@ export function spyOnPrepareUploadsFromVaultFiles(
 	implementation: () => Promise<PreparedUpload[]>,
 ) {
 	return vi.spyOn(
-		engine as unknown as { prepareUploadsFromVaultFiles(): Promise<PreparedUpload[]> },
+		(engine as unknown as { contexts: SyncEngineContexts }).contexts,
 		'prepareUploadsFromVaultFiles',
 	).mockImplementation(implementation);
 }

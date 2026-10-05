@@ -1,33 +1,29 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { act, createElement, type ContextType } from 'react';
+import { renderHook } from '../../test/react-hooks';
+import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { useSyncFailureToast } from './useSyncFailureToast';
 
-const hooks = vi.hoisted(() => ({
-	active: true,
-	ref: undefined as { current: unknown } | undefined,
-	cleanup: undefined as (() => void) | undefined,
-}));
-vi.mock('react', () => ({
-	useContext: () => ({ active: hooks.active }),
-	useRef: (initial: unknown) => hooks.ref ??= { current: initial },
-	useEffect: (effect: () => (() => void) | undefined) => { hooks.cleanup?.(); hooks.cleanup = effect(); },
-}));
-vi.mock('../components/FeatureSwitcherButton', () => ({ FeatureNavigationContext: {} }));
 const showToast = vi.fn();
 let visibility: 'visible' | 'hidden';
-let listeners: Set<() => void>;
+let active: boolean;
+let hook: ReturnType<typeof renderHook<void>> | undefined;
+let options: Parameters<typeof useSyncFailureToast>[0];
 beforeEach(() => {
-	hooks.active = true; hooks.ref = undefined; hooks.cleanup = undefined;
-	showToast.mockClear(); visibility = 'visible'; listeners = new Set();
-	vi.stubGlobal('document', {
-		get visibilityState() { return visibility; },
-		addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
-		removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
-	});
+	showToast.mockClear(); visibility = 'visible'; active = true; hook = undefined;
 });
-afterEach(() => { hooks.cleanup?.(); vi.unstubAllGlobals(); });
 function render(operationIds: string[], scope: string | null = 'session', ready = true, isCurrent?: () => boolean) {
-	// eslint-disable-next-line react-hooks/rules-of-hooks -- This harness runs mocked React effects and retains refs across renders.
-	useSyncFailureToast({ scope, ready, operationIds, feature: 'Reading', showToast, isCurrent });
+	options = { scope, ready, operationIds, feature: 'Reading', showToast, isCurrent };
+	if (hook) { hook.rerender(); return; }
+	hook = renderHook(() => useSyncFailureToast(options), () => {
+		Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+	}, children => createElement(FeatureNavigationContext.Provider, { value: {
+		section: 'reading', active, toggle: vi.fn(), destination: null, navigate: vi.fn(), dockIndex: null,
+		rememberReminderDockIndex: vi.fn(), readingTab: 'inbox', rememberReadingTab: vi.fn(),
+	} satisfies ContextType<typeof FeatureNavigationContext> }, children));
+}
+function visibilityChanged() {
+	act(() => { document.dispatchEvent(new window.Event('visibilitychange')); });
 }
 
 it('announces a batch once without repeating on refresh or retry', () => {
@@ -44,15 +40,15 @@ it('announces a batch once without repeating on refresh or retry', () => {
 });
 
 it('waits until the feature and document are visible', () => {
-	hooks.active = false;
+	active = false;
 	render(['failure']);
 	expect(showToast).not.toHaveBeenCalled();
-	hooks.active = true; visibility = 'hidden';
+	active = true; visibility = 'hidden';
 	render(['failure']);
 	expect(showToast).not.toHaveBeenCalled();
-	visibility = 'visible'; listeners.forEach(listener => listener());
+	visibility = 'visible'; visibilityChanged();
 	expect(showToast).toHaveBeenCalledTimes(1);
-	listeners.forEach(listener => listener());
+	visibilityChanged();
 	expect(showToast).toHaveBeenCalledTimes(1);
 });
 
@@ -72,6 +68,17 @@ it('does not announce an old session’s failure after returning to the tab', ()
 	visibility = 'hidden';
 	render(['failure'], 'old-session', true, () => current);
 	current = false; visibility = 'visible';
-	listeners.forEach(listener => listener());
+	visibilityChanged();
+	expect(showToast).not.toHaveBeenCalled();
+});
+
+it('removes visibility listeners when the feature hides or unmounts', () => {
+	visibility = 'hidden';
+	render(['failure']);
+	active = false; render(['failure']);
+	visibility = 'visible'; visibilityChanged();
+	expect(showToast).not.toHaveBeenCalled();
+	active = true; visibility = 'hidden'; render(['failure']);
+	hook!.unmount(); visibility = 'visible'; visibilityChanged();
 	expect(showToast).not.toHaveBeenCalled();
 });

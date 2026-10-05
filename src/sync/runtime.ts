@@ -657,18 +657,24 @@ export class SyncRuntime {
 		}
 	}
 
-	private async recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
+	private async recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
+		if (this.syncEngine !== engine) return;
+		const api = this.apiClient;
 		recordSyncHistory(this.settings, type, result);
 		const latest = this.settings.syncHistory[0];
-		if (latest && this.syncEngine) latest.timings = this.syncEngine.getTimings?.();
-		if (latest && this.apiClient) latest.requestDiagnostics = this.apiClient.getRequestDiagnostics();
-		if (latest && result.success && !result.conflicts.length && this.syncEngine) {
+		if (latest) latest.timings = engine.getTimings();
+		if (latest && api) latest.requestDiagnostics = api.getRequestDiagnostics();
+		if (latest && result.success && !result.conflicts.length) {
 			try {
-                const shared = await this.syncEngine.saveSharedHistoryCheckpoint?.();
+                const shared = await engine.saveSharedHistoryCheckpoint();
+                if (this.syncEngine !== engine) return;
                 if (shared) latest.sharedCheckpoint = shared.id;
-                else latest.historyCheckpoint = await this.syncEngine.saveHistoryCheckpoint?.();
+                else {
+                    const checkpoint = await engine.saveHistoryCheckpoint();
+                    if (this.syncEngine === engine) latest.historyCheckpoint = checkpoint;
+                }
             }
-			catch (error) { logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
+			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
 		}
 	}
 
@@ -682,7 +688,8 @@ export class SyncRuntime {
 		if (result.success && state.lastSync) {
 			this.settings.lastSync = state.lastSync;
 		}
-		await this.recordSyncResult('sync', result);
+		await this.recordSyncResult(engine, 'sync', result);
+		if (this.syncEngine !== engine) return;
 		this.emitCurrentState();
 		try {
 			await this.persistSettings();
@@ -726,7 +733,8 @@ export class SyncRuntime {
 			if (type === 'sync') {
 				this.lastForegroundSyncAt = Date.now();
 			}
-			await this.recordSyncResult(type, result);
+			await this.recordSyncResult(engine, type, result);
+			if (this.syncEngine !== engine) return result;
 			await this.persistSettings();
 			return result;
 		} finally {

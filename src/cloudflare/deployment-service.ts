@@ -6,8 +6,8 @@ import { completePublishedDeployment } from './complete-published-deployment';
 import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CrateSettings } from '../plugin/settings';
-import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, SavedDeploymentIntent } from './deployment-types';
-import { CloudflareApiClient, type CloudflareAccount } from './cloudflare-api';
+import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, DeploymentIntent, DeploymentRequest, SavedDeploymentIntent } from './deployment-types';
+import { CloudflareApiClient } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpTransport } from './http';
 import {
@@ -18,10 +18,7 @@ import {
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './oauth-client';
 import { constantTimeEqual, createPkcePair, randomBase64Url, randomHex } from './pkce';
 import { provisionCloudflareDeployment } from './provisioner';
-import {
-	discoverCloudflareDeployments,
-	type DiscoveredCloudflareDeployment,
-} from './deployment-discovery';
+import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './deployment-target';
 import {
 	registerCloudflareAuthorizedDevice,
 	type CloudflareAuthorizedDevice,
@@ -38,10 +35,7 @@ interface PendingOAuthSession {
 	state: string;
 	verifier: string;
 	createdAt: number;
-	metadata: CloudflareDeploymentMetadata;
-	discoverExisting: boolean;
-	originalMetadata: string;
-	intent: DeploymentIntent;
+	request: DeploymentRequest;
 }
 
 export interface CloudflareDeploymentServiceOptions {
@@ -51,51 +45,11 @@ export interface CloudflareDeploymentServiceOptions {
 	transport: HttpTransport;
 	loadArtifacts: () => Promise<CloudflareDeploymentArtifacts>;
 	openExternal: (url: string) => void;
-	selectDeployment: (
-		deployments: DiscoveredCloudflareDeployment[],
-		missingServer?: boolean,
-	) => Promise<DiscoveredCloudflareDeployment | 'create' | null>;
+	selectDeployment: SelectDeployment;
 	onAuthorized?: (accountId: string, tokens: CloudflareOAuthTokens) => void;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
 	now?: () => number;
-}
-
-function createCloudflareDeploymentMetadata(vaultName?: string): CloudflareDeploymentMetadata {
-	const deploymentId = randomHex(8);
-	const resourceName = `crate-${deploymentId}`;
-	return {
-		deploymentId,
-		...(normalizeVaultName(vaultName) ? { vaultName: normalizeVaultName(vaultName) } : {}),
-		accountId: null,
-		accountName: null,
-		workerName: resourceName,
-		d1DatabaseName: resourceName,
-		d1DatabaseId: null,
-		r2BucketName: resourceName,
-		workersSubdomain: null,
-		lastDeployedVersion: null,
-		lastDeployedFingerprint: null,
-	};
-}
-
-function selectAccount(
-	accounts: CloudflareAccount[],
-	metadata: CloudflareDeploymentMetadata,
-): CloudflareAccount {
-	if (metadata.accountId) {
-		const previousAccount = accounts.find(account => account.id === metadata.accountId);
-		if (previousAccount) return previousAccount;
-		throw new Error(`Authorize the Cloudflare account previously used by this vault${
-			metadata.accountName ? ` (${metadata.accountName})` : ''
-		}`);
-	}
-	const [onlyAccount] = accounts;
-	if (accounts.length === 1 && onlyAccount) return onlyAccount;
-	if (accounts.length === 0) {
-		throw new Error('Cloudflare did not grant access to an account');
-	}
-	throw new Error('Select exactly one Cloudflare account when authorizing Crate, then try again');
 }
 
 export class CloudflareDeploymentService {
@@ -114,7 +68,7 @@ export class CloudflareDeploymentService {
 	get isBusy(): boolean { return this.handlingCallback; }
 
 	get pendingIntent(): DeploymentIntent | null {
-		return this.pendingSession?.intent ?? null;
+		return this.pendingSession?.request.intent ?? null;
 	}
 
 	async startDeployment(intent: DeploymentIntent = 'connect'): Promise<void> {
@@ -141,10 +95,12 @@ export class CloudflareDeploymentService {
 			verifier,
 			state,
 			createdAt: this.now(),
-			metadata,
-			originalMetadata: JSON.stringify(existingMetadata),
-			discoverExisting: intent === 'switch' || (intent === 'connect' && (!existingMetadata || Boolean(existingMetadata.lastDeployedVersion))),
-			intent,
+			request: {
+				metadata,
+				originalMetadata: JSON.stringify(existingMetadata),
+				discoverExisting: intent === 'switch' || (intent === 'connect' && (!existingMetadata || Boolean(existingMetadata.lastDeployedVersion))),
+				intent,
+			},
 		};
 
 		const authorizationUrl = new URL(CLOUDFLARE_OAUTH_AUTHORIZE_URL);
@@ -203,11 +159,11 @@ export class CloudflareDeploymentService {
 		onProgress?.('Completing Cloudflare authorization…');
 		this.lifetime.signal.throwIfAborted();
 		const tokens = await this.oauthClient.exchangeTokens(params.code, pending.verifier);
-		return this.runAuthorizedDeployment(pending, tokens, device, onProgress, selectDeployment);
+		return this.runAuthorizedDeployment(pending.request, tokens, device, onProgress, selectDeployment);
 	}
 
 	private async runAuthorizedDeployment(
-		pending: PendingOAuthSession,
+		request: DeploymentRequest,
 		tokens: CloudflareOAuthTokens,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
@@ -220,57 +176,35 @@ export class CloudflareDeploymentService {
 		try {
 			this.lifetime.signal.throwIfAborted();
 			const api = this.createGuardedApi(tokens, savedLogin ? 'saved' : 'temporary',
-				savedLogin || pending.intent === 'reconnect' ? () => this.checkSavedTarget(pending.metadata, pending.intent) : undefined);
+				savedLogin || request.intent === 'reconnect' ? () => this.checkSavedTarget(request.metadata, request.intent) : undefined);
 			const saved = this.options.settingsOwner.settings.cloudflareDeployment;
-			if (saved?.deletion && pending.intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
-			if (pending.intent !== 'reset' && pending.intent !== 'delete' && saved?.reset) throw new Error('Resume the server reset before connecting or updating.');
-			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
+			if (saved?.deletion && request.intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
+			if (request.intent !== 'reset' && request.intent !== 'delete' && saved?.reset) throw new Error('Resume the server reset before connecting or updating.');
+			if ((request.intent === 'reset' || request.intent === 'delete') && JSON.stringify(request.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
 			}
-			if ((pending.intent === 'switch' || pending.intent === 'create') && pending.originalMetadata !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
-			if (pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
-			let metadata = pending.metadata;
-			let discoveredExisting = false;
-			onProgress?.('Checking your Cloudflare account…');
-			const account = selectAccount(await this.whileActive(() => api.listAuthorizedAccounts()), metadata);
-			if (pending.discoverExisting) {
-				onProgress?.('Finding your Crate servers…');
-				const remembered = pending.intent === 'connect' && Boolean(metadata.d1DatabaseId);
-				const workers = remembered ? await this.whileActive(() => api.listWorkers(account.id)) : null;
-				const missingServer = Boolean(workers && !workers.some(worker => worker.id === metadata.workerName));
-				const deployments = await this.whileActive(() => discoverCloudflareDeployments(api, account));
-				// Account membership does not identify a vault. Only reuse this vault's saved server.
-				const savedDeployment = remembered && !missingServer
-					? deployments.find(deployment => deployment.metadata.workerName === metadata.workerName
-						&& deployment.metadata.d1DatabaseId === metadata.d1DatabaseId
-						&& deployment.metadata.r2BucketName === metadata.r2BucketName)
-					: undefined;
-				const selected = savedDeployment
-					?? await this.whileActive(() => selectDeployment(deployments, missingServer));
-				if (!selected) throw new Error('No Cloudflare server was selected');
-				if (selected === 'create') {
-					metadata = createCloudflareDeploymentMetadata(this.options.getVaultName?.());
-				} else {
-					metadata = selected.metadata;
-					discoveredExisting = true;
-				}
-			}
-			if (savedLogin || pending.intent === 'reconnect') this.checkSavedTarget(pending.metadata, pending.intent);
+			if ((request.intent === 'switch' || request.intent === 'create') && request.originalMetadata !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
+			if (request.intent === 'reconnect') this.checkSavedTarget(request.metadata, request.intent);
+			const { metadata, account, reuseExisting } = await this.whileActive(() => resolveDeploymentTarget({
+				request, api, getVaultName: this.options.getVaultName, selectDeployment, onProgress,
+				whileActive: operation => this.whileActive(operation),
+			}));
+			if (savedLogin || request.intent === 'reconnect') this.checkSavedTarget(request.metadata, request.intent);
 			onProgress?.('Preparing the selected server…');
 			const previous = this.options.settingsOwner.settings.cloudflareDeployment;
 			const changingServer = previous && (previous.accountId !== account.id || previous.workerName !== metadata.workerName);
-			if (changingServer || pending.intent === 'switch' || pending.intent === 'create') {
+			if (changingServer || request.intent === 'switch' || request.intent === 'create') {
 				if (!this.options.beforeServerSwitch) throw new Error('Switching servers requires sync shutdown.');
 				await this.whileActive(this.options.beforeServerSwitch);
 			}
-			if (!metadata.vaultName && (pending.intent === 'update' || pending.intent === 'reset')) {
+			if (!metadata.vaultName && (request.intent === 'update' || request.intent === 'reset')) {
 				metadata.vaultName = normalizeVaultName(this.options.getVaultName?.());
 			}
 			metadata.accountId = account.id;
 			metadata.accountName = account.name;
 			await this.persistMetadata(metadata);
 
-			if (pending.intent === 'delete') {
+			if (request.intent === 'delete') {
 				if (!this.options.beforeServerReset) throw new Error('Deletion requires sync shutdown.');
 				await this.whileActive(() => deleteCrateServer({
 					api, accountId: account.id, metadata,
@@ -280,8 +214,8 @@ export class CloudflareDeploymentService {
 				if (!savedLogin) await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 				return { status: 'deleted', accountName: account.name };
 			}
-			const artifacts = pending.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
-			if (pending.intent === 'reset') {
+			const artifacts = request.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
+			if (request.intent === 'reset') {
 				if (!device || !artifacts || !this.options.beforeServerReset) throw new Error('Reset requires a new device credential and sync shutdown.');
 				await this.whileActive(() => resetCrateServer({
 					api, accountId: account.id, metadata, version: artifacts.version,
@@ -290,7 +224,7 @@ export class CloudflareDeploymentService {
 				}));
 			}
 			let workerUrl: string;
-			if (pending.intent === 'reconnect' || (pending.intent === 'connect' || pending.intent === 'switch') && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
+			if (reuseExisting) {
 				// Registering a replica must never replace shared Worker/PWA code.
 				const subdomain = await this.whileActive(() => api.getWorkersSubdomain(account.id));
 				if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
@@ -358,16 +292,16 @@ export class CloudflareDeploymentService {
 		if ((intent === 'reset' || intent === 'delete') && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
 		this.cancelPendingDeployment();
 		this.handlingCallback = true;
-		const pending: PendingOAuthSession = {
+		const request: DeploymentRequest = {
 			metadata: structuredClone(metadata), intent, discoverExisting: false,
-			originalMetadata: JSON.stringify(metadata), state: '', verifier: '', createdAt: this.now(),
+			originalMetadata: JSON.stringify(metadata),
 		};
 		try {
 			const result = await withAuthorization(async tokens => {
 				this.lifetime.signal.throwIfAborted();
-				this.checkSavedTarget(pending.metadata, pending.intent);
-				if (JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment) !== pending.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
-				return this.runAuthorizedDeployment(pending, tokens, device, onProgress, selectDeployment, true);
+				this.checkSavedTarget(request.metadata, request.intent);
+				if (JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
+				return this.runAuthorizedDeployment(request, tokens, device, onProgress, selectDeployment, true);
 			});
 			if (result.status === 'deleted') await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 			return result;

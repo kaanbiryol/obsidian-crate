@@ -8,7 +8,7 @@ export function pwaSyncState(snapshot: Pick<SettingsSnapshot, 'reading' | 'remin
 	const ready = models.length === 2 && models.every(model => model.ready);
 	const pendingCount = models.reduce((sum, model) => sum + (model.pendingCount ?? 0), 0);
 	const unsynced = !ready || models.some(model => model.unsynced);
-	const canUpdate = ready && !unsynced && models.every(model => model.updateReady !== false && model.canApplyUpdate?.() !== false);
+	const canUpdate = ready && !unsynced && models.every(model => model.updateReady === true && model.canApplyUpdate?.() === true);
 	const nextRetryAt = Math.min(...models.map(model => model.retryAt ?? Infinity));
 	const named = (feature: string, label: string) => `${feature === 'reading' ? 'Reading' : 'Reminders'}: ${label}`;
 	let status: { state: SyncIndicatorState; label: string };

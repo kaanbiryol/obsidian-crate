@@ -26,7 +26,6 @@ import { PwaReadingDialog } from './PwaReadingDialog';
 import { ReadingOpening } from './ReadingOpening';
 import { useReadingRuntime } from './ReadingRuntime';
 import { useReadingAppearance } from './appearance';
-import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
 import { assertReadingSession, exportReadingData, writeValue } from './storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
@@ -42,26 +41,13 @@ function ReadingAppContent() {
   const captureFormId = useId();
   const featureNavigation = useContext(FeatureNavigationContext);
   const active = featureNavigation?.active !== false;
-  const { connection, sync, showToast, saving, setSaving, savingRef } = useReadingRuntime();
-  const { session, ready, connecting, cache, pending, setPending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
+  const { connection, sync, showToast, saving, setSaving, savingRef, queueChange } = useReadingRuntime();
+  const { session, ready, connecting, cache, pending, error, setError, recovery, connectionState, adding, setAdding, url, setUrl, share, setShare, alive, run, connect } = connection;
   const { refresh, refreshManually, isOffline } = sync;
   const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, alive, setError, run });
   const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
   const [settingsOpen, setSettingsOpen] = useSettingsOpen();
   useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
-  const queueChange = async (command: ReadingCommand) => {
-    if (!session) throw new Error('Connect Reading before saving changes.');
-    try {
-      const work = await queueReading(session, command);
-      assertReadingSession(session);
-      return work;
-    } catch (cause) {
-      // An old session's failure must not appear after reconnecting or signing out.
-      try { assertReadingSession(session); } catch { throw cause; }
-      if (alive.current) showToast('error', cause instanceof Error ? cause.message : 'Could not save this change on your device.');
-      throw cause;
-    }
-  };
   const update = async (item: ReadingItem, changes: ReadingChanges) => {
     if (!session) return;
     // The first edit also migrates native/legacy highlights on the server.
@@ -74,9 +60,8 @@ function ReadingAppContent() {
     }
     validateReadingMetadata({ ...item, ...changes });
     const before = Object.fromEntries(Object.keys(changes).map(key => [key, item[key as keyof ReadingChanges]]));
-    const work = await queueChange({ action: 'update', intent: { id: item.crate_reading_id, changes, before } });
+    await queueChange({ action: 'update', intent: { id: item.crate_reading_id, changes, before } });
     assertReadingSession(session);
-    setPending(work);
     void run(() => refresh(session));
   };
   const canSaveLink = (() => {
@@ -96,10 +81,10 @@ function ReadingAppContent() {
         setUrl(''); setShare(null); showToast('info', 'Opened your saved link'); return;
       }
       const fetchArticle = true;
-      const work = await queueChange({ action: 'capture', intent: { url: link, fetchArticle } });
+      await queueChange({ action: 'capture', intent: { url: link, fetchArticle } });
       assertReadingSession(session);
       if (share) await writeValue(`share:${share}`, null, session);
-      setPending(work); setUrl(''); setShare(null);
+      setUrl(''); setShare(null);
       showToast('success', navigator.onLine ? 'Link saved' : 'Link saved on this device');
       void run(() => refresh(session));
     } finally { savingRef.current = false; setSaving(false); }
@@ -139,7 +124,7 @@ function ReadingAppContent() {
         </EmptyState> : undefined}
         beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
         headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { const work = await queueChange({ action: 'retry', intent: { id: reader.item.crate_reading_id } }); assertReadingSession(session); setPending(work); showToast('info', youtubeVideoId(reader.item.source_url) ? 'Video details requested.' : 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
+        reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight} item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }} status={!reader.item.path ? (cache?.items.some(item => item.crate_reading_id === reader.item.crate_reading_id) ? (youtubeVideoId(reader.item.source_url) ? 'Fetching video details' : 'Fetching article') : 'Saved on this device') : reader.availableOffline ? (youtubeVideoId(reader.item.source_url) ? 'Details available offline' : 'Available offline') : undefined} notice={notices} mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id) || migratingHighlights} onBack={closeReader} onUpdate={changes => update(visibleReader, changes)} onCopyComplete={() => showToast('success', 'Copied')} onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)} onRetry={async () => { await queueChange({ action: 'retry', intent: { id: reader.item.crate_reading_id } }); assertReadingSession(session); showToast('info', youtubeVideoId(reader.item.source_url) ? 'Video details requested.' : 'Article extraction requested.'); void run(() => refresh(session)); }} />} />
       {adding && active && !settingsOpen && <ReadingDialog title="Save a link" action={{ label: 'Save', ariaLabel: 'Save link', type: 'submit', form: captureFormId, disabled: !canSaveLink, busy: saving }} busy={saving} onClose={() => setAdding(false)}>{close => <SaveLinkForm id={captureFormId} captureOnDevice={Boolean(readingKeys())} headerAction url={url} onUrl={setUrl} saving={saving} error={error} onCancel={close} onSave={() => void run(async () => { await save(); close(); })} />}</ReadingDialog>}
 
     </>}

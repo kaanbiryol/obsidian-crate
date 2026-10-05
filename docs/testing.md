@@ -1,5 +1,11 @@
 # Testing
 
+## Sync shutdown
+
+`engine-checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads
+through shutdown. `runtime-operations.test.ts` checks that late saves cannot update
+history, persist settings, or fall back through a replacement engine.
+
 ## Structured merge and Reading recovery
 
 `markdown-merge-transitions.test.ts` protects newly added, moved and removed code
@@ -93,7 +99,11 @@ behavior still require an installed-app check on an iPhone.
 
 `useReminderMutations-lifecycle.test.ts` mounts the production hook and settings
 publication with real React. It covers delayed operation identity, overlapping
-preparations, rejection, durable handoff and logout/unmount. `apply-update.test.ts`
+preparations, rejection, durable handoff and logout/unmount. `ReadingRuntime.test.ts`
+mounts the production runtime and session hook, holding its storage lock while
+capture, edit and retry commands are prepared. It checks overlapping failures,
+durable publication, and logout/unmount. The mutation and failure-toast suites use
+the shared real React harness for rerenders and effect cleanup. `apply-update.test.ts`
 also starts transient work during asynchronous storage checks before activation
 and reload.
 
@@ -104,7 +114,9 @@ Screenshots are written to `test-results/update-notice/`.
 `node scripts/pwa-update-test.mjs` exercises real service-worker preparation,
 activation, failed/slow checks, launch updates, pending writes, and other tabs.
 It delays the server clock while preparing a completion command and checks that
-updates stay blocked before that command reaches the durable outbox.
+updates stay blocked before that command reaches the durable outbox. It also holds
+the native Reading mutation lock during an article edit, checks the queue is still
+empty and updates are blocked, then releases the edit and completes a real update.
 Both are included in `npm run test:pwa-browser`. Installed iPhone safe areas,
 app suspension, and VoiceOver announcements still require physical-device checks.
 

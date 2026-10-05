@@ -14,6 +14,50 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime operation wrappers', () => {
+	it.each(['manual', 'automatic'] as const)('does not publish %s completion after its engine is replaced during checkpointing', async mode => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const checkpoint = createDeferred<undefined>();
+		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
+		const oldLocalCheckpoint = vi.fn(async () => 'old-checkpoint');
+		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
+		await initializeRuntime(runtime, {
+			sync: vi.fn(async () => createEmptySyncResult()),
+			saveSharedHistoryCheckpoint, saveHistoryCheckpoint: oldLocalCheckpoint,
+		});
+		const automatic = callback.mock.calls.at(-1)![0];
+		callback.mockRestore();
+		const operation = mode === 'manual' ? runtime.sync() : automatic(createEmptySyncResult());
+		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
+		const newLocalCheckpoint = vi.fn(async () => 'new-checkpoint');
+		await initializeRuntime(runtime, { saveHistoryCheckpoint: newLocalCheckpoint });
+		const entry = settings.syncHistory[0]!;
+		const stateChanged = vi.fn();
+		runtime.addStateChangeListener(stateChanged);
+		checkpoint.resolve(undefined);
+		await operation;
+		expect(oldLocalCheckpoint).not.toHaveBeenCalled();
+		expect(newLocalCheckpoint).not.toHaveBeenCalled();
+		expect(entry).not.toHaveProperty('historyCheckpoint');
+		expect(entry).not.toHaveProperty('sharedCheckpoint');
+		expect(persistSettings).not.toHaveBeenCalled();
+		expect(stateChanged).not.toHaveBeenCalled();
+	});
+
+	it('does not attach a local checkpoint or persist after destruction during its save', async () => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const checkpoint = createDeferred<string>();
+		const saveHistoryCheckpoint = vi.fn(() => checkpoint.promise);
+		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveHistoryCheckpoint });
+		const operation = runtime.sync();
+		await vi.waitFor(() => expect(saveHistoryCheckpoint).toHaveBeenCalledOnce());
+		const entry = settings.syncHistory[0]!;
+		runtime.destroy();
+		checkpoint.resolve('obsolete-checkpoint');
+		await operation;
+		expect(entry).not.toHaveProperty('historyCheckpoint');
+		expect(persistSettings).not.toHaveBeenCalled();
+	});
+
 	it.each(['sync', 'initialSync', 'forceFullSync'] as const)('shows saving progress until %s history and settings are persisted', async method => {
 		const { runtime, persistSettings } = createRuntimeHarness();
 		const checkpoint = createDeferred<undefined>();

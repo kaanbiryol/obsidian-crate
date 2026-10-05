@@ -1,3 +1,4 @@
+import { reminderUpdateReadiness } from '../sync/update-readiness';
 import { createContext, lazy, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
@@ -220,11 +221,13 @@ function useRemindersController() {
 		enabled, pendingCount: changes.length,
 		retryAt: Math.min(...changes.flatMap(change => reminderRetryAt(change) ?? [])),
 		connected: Boolean(authToken), config, push,
-		updateContentReady: !enabled || initialContentReady,
+		...reminderUpdateReadiness({
+			bootstrapped, enabled, connected: Boolean(authToken), mutationsReady, initialContentReady,
+			interacting: Boolean(modal) || saving || loggingOut || reorderDragging,
+			preparingMutation: isPreparingMutation(), launchPending: Boolean(launchReminderId),
+			loading, refreshing, isOffline, unsettled: Boolean(storageError) || changes.length > 0 || needsRecovery,
+		}),
 		canApplyUpdate: () => !isPreparingMutation(),
-		updateReady: bootstrapped && !modal && !saving && !loggingOut && !reorderDragging && !isPreparingMutation()
-			&& (!authToken || (mutationsReady && (!enabled || (initialContentReady && !launchReminderId && !loading && !refreshing && !isOffline))
-				&& !storageError && changes.length === 0 && recoveryChanges.length === 0 && quarantinedChanges.length === 0)),
 		status: enabled ? syncStatus : { state: needsRecovery || storageError ? 'error' : 'cached', label: changes.length ? `Paused: ${changes.length} ${changes.length === 1 ? 'change' : 'changes'} saved on this device` : 'Paused' },
 		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
 		unsynced: changes.length > 0 || needsRecovery || Boolean(storageError),
