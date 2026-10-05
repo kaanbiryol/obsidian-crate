@@ -1,3 +1,4 @@
+import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
 import { processVaultMarkdown } from '../vault-markdown';
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import type { IndexedReminder } from "../reminder-index";
@@ -14,7 +15,6 @@ import {
 import { normalizeReminderProjectPath } from "../../core/reminderProjectPath";
 import type {
   MarkdownWriterContext,
-  UpdateReminderInput,
 } from "./types";
 import {
   markdownWriterLog,

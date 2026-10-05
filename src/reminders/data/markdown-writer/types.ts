@@ -1,3 +1,4 @@
+import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
 import type { App, TFile } from "obsidian";
 import type {
   Priority,
@@ -5,16 +6,6 @@ import type {
 } from "@/reminders/types/reminder";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 import type { ReminderMoveJournal } from '../reminder-move-journal';
-
-export interface UpdateReminderInput {
-  content?: string;
-  description?: string;
-  dueDate?: Date;
-  priority?: Priority;
-  project?: string;
-  recurrence?: RecurrenceRule | null;
-  hasTime?: boolean;
-}
 
 export type OnFileWrittenCallback = (file: TFile) => Promise<void>;
 

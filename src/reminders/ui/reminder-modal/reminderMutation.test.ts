@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Reminder } from '../../types';
 import { buildReminderSubmission, executeReminderAction } from './reminderMutation';
-import { buildReminderUpdate } from '../../data/reminder-repository/shared';
+import { buildReminderUpdate } from '../../core/reminderMutationPlan';
 import { buildUpdatedReminderBlock } from '../../core/markdownReminderMutation';
 
 afterEach(() => vi.useRealTimers());

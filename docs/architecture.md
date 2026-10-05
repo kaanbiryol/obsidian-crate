@@ -148,6 +148,11 @@ deletion and reordering. Parser errors carry a stable category and source line t
 the plugin scanner and index to presentation; the original reason remains available
 for logs and callers without structured diagnostics.
 
+`reminders/core/reminderMutationPlan.ts` normalizes create/update inputs for the
+plugin repository, shared file commands and Worker routes. Its update contract
+belongs to the domain; core code does not depend on the Obsidian writer interface.
+Repository queries and optimistic fallback records remain in the data layer.
+
 `cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around

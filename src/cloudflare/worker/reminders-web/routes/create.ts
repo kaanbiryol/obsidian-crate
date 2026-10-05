@@ -1,6 +1,6 @@
 import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
-import { buildCreateReminderArgs } from '@/reminders/data/reminder-repository/shared';
+import { buildCreateReminderArgs } from '@/reminders/core/reminderMutationPlan';
 import { corsResponse } from '../../cors';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';

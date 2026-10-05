@@ -1,6 +1,7 @@
 import { reminderRevision } from '../../core/reminderRevision';
 import { createReminderId } from "../../core/reminderIdentity";
-import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate } from "./shared";
+import { buildCreatedReminderFallback } from "./shared";
+import { buildCreateReminderArgs, buildReminderUpdate } from "../../core/reminderMutationPlan";
 import type { ReminderRepositoryContext } from "./types";
 import type { CreateReminderParams, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";

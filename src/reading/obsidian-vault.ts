@@ -1,5 +1,6 @@
 import { TFile, TFolder, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
+import { isCurrentVaultFile } from '@/platform/vault-file-identity';
 import type { ReadingFile, ReadingVault } from './data/library';
 
 /** Bind Reading snapshots to Obsidian file identities, even across equal-mtime edits. */
@@ -16,7 +17,7 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 	const resolve = (file: ReadingFile): TFile => {
 		signal.throwIfAborted();
 		const ref = fileRefs.get(file);
-		if (!ref || vault.getAbstractFileByPath(file.path) !== ref || ref.path !== file.path || !allowed(file.path)) throw new Error('Reading note moved, was deleted, or is excluded from sync.');
+		if (!ref || !isCurrentVaultFile(vault, file.path, ref) || !allowed(file.path)) throw new Error('Reading note moved, was deleted, or is excluded from sync.');
 		return ref;
 	};
 	return {

@@ -3,7 +3,7 @@ import { reminderRevision } from './reminderRevision';
 import { assertReminderMutationInput } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
 import { validateRecurrence } from './validateRecurrence';
-import { buildCreateReminderArgs, buildReminderUpdate } from '../data/reminder-repository/shared';
+import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { parseStoredReminderDate, reminderHasTime } from '../utils/reminderDate';
