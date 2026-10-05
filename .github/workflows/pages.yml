@@ -63,8 +63,6 @@ jobs:
         run: npm run security:check
       - name: Check documentation
         run: npm run check:docs
-      - name: Build static site and documentation
-        run: npm run build:site
       - name: Verify shortcut template and website downloads
         run: node --test scripts/reading-shortcut.test.mjs scripts/shortcut-release.test.mjs
       - name: Build shortcut support page
@@ -74,6 +72,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/download-release-shortcut.mjs published site/shortcuts/v2 --install-page
+      # Documentation links include the generated shortcut installation page.
+      - name: Build static site and documentation
+        run: npm run build:site
       - name: Upload static site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
