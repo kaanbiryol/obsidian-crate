@@ -13,11 +13,11 @@ import { setReminderIdMarker } from './reminderIdentity';
 import {
 	appendReminderBlockToContent,
 	assertReminderBlockUnchanged,
-	buildDescriptionBlock,
 	findReminderLineNumber,
 	replaceReminderBlockInContent,
 	type ReminderLineRecord,
 } from './markdownReminderFile';
+import { buildDescriptionBlock } from './reminderDescription';
 
 export interface MarkdownReminderRecord extends ReminderLineRecord {
 	description?: string;

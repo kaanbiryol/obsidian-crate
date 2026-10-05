@@ -46,6 +46,22 @@ it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens
 });
 
 describe('vaultScanner', () => {
+	it.each(['file', 'vault'] as const)('preserves description diagnostics through a %s scan and index refresh', async mode => {
+		const file = makeMockFile('Reminders/Inbox.md');
+		const content = '- [ ] Task <!-- crate-id:rem-1 -->\n<!-- crate-desc:v2:unknown -->';
+		const app = withBinaryReads({ vault: {
+			read: vi.fn(async () => content),
+			getAbstractFileByPath: () => Object.assign(new TFolder(), { path: 'Reminders', children: [file] }),
+		} } as unknown as App);
+		const index = createReminderIndex(app, 'Reminders');
+		if (mode === 'file') await index.rescanFile(file);
+		else await index.load();
+		expect(index.sourceIssues).toEqual([{
+			path: file.path, reason: 'Unsupported reminder description encoding on line 2',
+			diagnostic: { code: 'unsupported-description-encoding', line: 2 },
+		}]);
+	});
+
   it('derives project from paths using case-sensitive vault semantics', () => {
     expect(getProjectFromPath('Reminders/Work.md', 'Reminders')).toBe('Work');
     expect(getProjectFromPath('Reminders/Personal/Health.md', 'Reminders')).toBe('Personal/Health');

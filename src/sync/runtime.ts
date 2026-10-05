@@ -368,8 +368,14 @@ export class SyncRuntime {
 		this.stoppingWork = Promise.allSettled([this.stoppingWork, engine?.waitForIdle()]).then(() => {});
 	}
 
-	private changeConfiguration(operation: () => Promise<void>): Promise<void> {
-		const task = this.configurationChain.then(operation);
+	private changeConfiguration(operation: (transition: RuntimeConfigurationTransition) => Promise<void>, signal?: AbortSignal): Promise<void> {
+		// Every queued operation belongs to the runtime that accepted it, even
+		// when its caller has no signal or shutdown happens before dispatch.
+		const transition = this.configurationTransition(signal);
+		const task = this.configurationChain.then(() => {
+			transition.verify();
+			return operation(transition);
+		});
 		this.configurationChain = task.catch(() => {});
 		return task;
 	}
@@ -377,11 +383,7 @@ export class SyncRuntime {
 	/** Keep the current connection stable and wait for local journal I/O before
 	 * moving its server into conversion. Failed conversions remain resumable. */
 	runEncryptionSetup(operation: () => Promise<void>): Promise<void> {
-		// Capture authority before queuing: a stopped or replaced connection must
-		// not begin conversion or resume sync after an older operation completes.
-		const transition = this.configurationTransition();
-		return this.changeConfiguration(async () => {
-			transition.verify();
+		return this.changeConfiguration(async transition => {
 			transition.stop();
 			await transition.waitForIdle();
 			transition.verify();
@@ -393,9 +395,9 @@ export class SyncRuntime {
 	/** A durable checkpoint blocks ordinary sync until reset and reconciliation finish. */
 	turnOffEncryption(state: EncryptionServerState | null, progress: (message: string) => void,
 		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
-		return this.changeConfiguration(() => runEncryptionReset({
+		return this.changeConfiguration(transition => runEncryptionReset({
 			settings: this.settings, secretStorage: this.secretStorage,
-			transition: this.configurationTransition(signal), persistSettings: this.persistSettings,
+			transition, persistSettings: this.persistSettings,
 			clearLocalState: () => deleteManifestFile(this.plugin, signal),
 			getResetEngine: () => {
 				this.acceptingEvents = false;
@@ -405,7 +407,7 @@ export class SyncRuntime {
 			pushSharedSettings: () => this.pushSharedSettingsBestEffort(),
 			resumeEvents: () => { this.acceptingEvents = true; },
 			reportError: message => { this.initializationError = message; this.emitCurrentState(); },
-		}, state, progress, expected, signal));
+		}, state, progress, expected, signal), signal);
 	}
 
 	private configurationTransition(signal?: AbortSignal): RuntimeConfigurationTransition {
@@ -478,38 +480,35 @@ export class SyncRuntime {
 
 	/** Authenticate a changed transport address without losing pending disk work. */
 	updateEncryptedServerAddress(address: string, signal: AbortSignal, expected: { workerUrl: string; authToken: string }): Promise<void> {
-		return this.changeConfiguration(() => changeEncryptedServerAddress(this.addressWorkflowContext(signal), address, signal, expected));
+		return this.changeConfiguration(transition => changeEncryptedServerAddress(this.addressWorkflowContext(transition, signal), address, signal, expected), signal);
 	}
 
 	/** Relocate only the same self-hosted reset, retaining both scopes until settings save. */
 	updateEncryptionResetAddress(address: string, signal?: AbortSignal): Promise<void> {
-		return this.changeConfiguration(() => changeEncryptionResetAddress(this.addressWorkflowContext(signal), address, signal));
+		return this.changeConfiguration(transition => changeEncryptionResetAddress(this.addressWorkflowContext(transition, signal), address, signal), signal);
 	}
 
-	private addressWorkflowContext(signal?: AbortSignal) {
+	private addressWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
 		return {
 			settings: this.settings, secretStorage: this.secretStorage,
-			transition: this.configurationTransition(signal), persistSettings: this.persistSettings,
+			transition, persistSettings: this.persistSettings,
 			clearLocalState: () => deleteManifestFile(this.plugin, signal),
 			emitCurrentState: () => this.emitCurrentState(),
 		};
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal, expected?: ApplyInfrastructureConfigInput): Promise<void> {
-		const context = this.connectionWorkflowContext(signal);
-		return this.changeConfiguration(() => changeServerConnection(context, config, expected));
+		return this.changeConfiguration(transition => changeServerConnection(this.connectionWorkflowContext(transition, signal), config, expected), signal);
 	}
 
 	async clearSyncConfiguration(signal?: AbortSignal): Promise<void> {
-		const context = this.connectionWorkflowContext(signal);
-		return this.changeConfiguration(() => disconnectServerConnection(context, signal));
+		return this.changeConfiguration(transition => disconnectServerConnection(this.connectionWorkflowContext(transition, signal), signal), signal);
 	}
 
-	private connectionWorkflowContext(signal?: AbortSignal) {
-		// Capture authority before queuing, including callers without a signal.
+	private connectionWorkflowContext(transition: RuntimeConfigurationTransition, signal?: AbortSignal) {
 		return {
 			settings: this.settings, secretStorage: this.secretStorage, api: this.apiClient,
-			transition: this.configurationTransition(signal), persistSettings: this.persistSettings,
+			transition, persistSettings: this.persistSettings,
 			clearLocalState: () => deleteManifestFile(this.plugin, signal),
 		};
 	}

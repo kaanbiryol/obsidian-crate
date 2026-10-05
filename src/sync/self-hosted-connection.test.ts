@@ -4,6 +4,7 @@ import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from './self-hosted-connection';
 import { createVaultKeyBundle } from '../encryption/key-bundle';
 import { SECRET_KEYS } from '../plugin/settings-types';
+import { ConnectionSetupError } from './connection-errors';
 
 const api = vi.hoisted(() => ({
 	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(),
@@ -144,5 +145,14 @@ it('preserves a self-hosted connection when replacement pairing fails', async ()
 	owner.syncRuntime.isConfigured.mockReturnValue(true);
 	exchange.mockRejectedValue(new Error('Pairing code expired'));
 	await expect(connectSelfHostedServer(owner as unknown as CratePlugin, owner.settings.workerUrl, `crate-pair-${'b'.repeat(64)}`, true)).rejects.toThrow('expired');
+	expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
+});
+
+it('identifies reconnecting to a different address before making requests', async () => {
+	const owner = plugin();
+	owner.syncRuntime.isConfigured.mockReturnValue(true);
+	await expect(connectSelfHostedServer(owner as unknown as CratePlugin, 'https://new.example', token, true))
+		.rejects.toEqual(new ConnectionSetupError('address-update-required'));
+	expect(api.testConnection).not.toHaveBeenCalled();
 	expect(owner.syncRuntime.applyInfrastructureConfig).not.toHaveBeenCalled();
 });

@@ -15,12 +15,20 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime teardown and reinitialization', () => {
-	it.each(['connect', 'disconnect'] as const)('rejects %s after destruction before its queued work starts, without a caller signal', async action => {
+	const changes = ['connect', 'disconnect', 'encrypted address', 'reset address'] as const;
+	function change(runtime: ReturnType<typeof createRuntimeHarness>['runtime'], action: typeof changes[number]) {
+		switch (action) {
+			case 'connect': return runtime.applyInfrastructureConfig({ workerUrl: 'https://new.example', authToken: 'new-token' });
+			case 'disconnect': return runtime.clearSyncConfiguration();
+			case 'encrypted address': return runtime.updateEncryptedServerAddress('https://new.example', new AbortController().signal,
+				{ workerUrl: 'https://worker.example', authToken: 'auth-token' });
+			case 'reset address': return runtime.updateEncryptionResetAddress('https://new.example');
+		}
+	}
+	it.each(changes)('rejects %s after destruction before its queued work starts, without a cancelled caller signal', async action => {
 		const { runtime, settings, secretStorage, persistSettings, plugin } = createRuntimeHarness({ lastSeq: 42 });
 		const initialize = vi.spyOn(runtime, 'initialize');
-		const pending = action === 'connect'
-			? runtime.applyInfrastructureConfig({ workerUrl: 'https://new.example', authToken: 'new-token' })
-			: runtime.clearSyncConfiguration();
+		const pending = change(runtime, action);
 		runtime.destroy();
 
 		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
@@ -33,15 +41,13 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		expect(initialize).not.toHaveBeenCalled();
 	});
 
-	it.each(['connect', 'disconnect'] as const)('rejects %s waiting behind a cancelled configuration operation', async action => {
+	it.each(changes)('rejects %s waiting behind a cancelled configuration operation', async action => {
 		const { runtime, settings, secretStorage, persistSettings } = createRuntimeHarness({ lastSeq: 42 });
 		const converted = createDeferred<void>();
 		const operation = vi.fn(() => converted.promise);
 		const setup = runtime.runEncryptionSetup(operation);
 		await vi.waitFor(() => expect(operation).toHaveBeenCalledOnce());
-		const pending = action === 'connect'
-			? runtime.applyInfrastructureConfig({ workerUrl: 'https://new.example', authToken: 'new-token' })
-			: runtime.clearSyncConfiguration();
+		const pending = change(runtime, action);
 		const settled = Promise.allSettled([setup, pending]);
 		runtime.destroy();
 		converted.resolve();

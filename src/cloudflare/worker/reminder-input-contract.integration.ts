@@ -10,7 +10,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminder-mutation';
 import { scanReminderMarkdownFile, toReminderPayload } from './reminders-web/scan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
-import { buildDescriptionBlock } from '@/reminders/core/markdownReminderFile';
+import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import type { ReminderRecord } from '@/pwa/types';
 
 beforeEach(async () => {

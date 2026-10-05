@@ -4,9 +4,11 @@ import { loadFileHistoryPreview, loadCurrentSyncedPreview } from './file-history
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 const version = { path: 'note.md', storage_key: 'key', hash: 'a'.repeat(64), size: 5, reason: 'replaced' as const, created_at: '2026-09-19', expires_at: 1 };
 const api = () => ({ previewFileVersion: vi.fn().mockResolvedValue(bytes('saved')) });
-it('compares saved text with a local snapshot without writing files', async () => {
- const adapter = { stat: vi.fn().mockResolvedValue({ type: 'file', size: 7 }), readBinary: vi.fn().mockResolvedValue(bytes('current')) };
- expect(await loadFileHistoryPreview(adapter, api(), version)).toEqual({ saved: 'saved', current: 'current' });
+it.each(['', '\uFEFF'])('compares saved text with a local snapshot, hiding the optional BOM %j', async bom => {
+ const current = bytes(`${bom}current`), saved = bytes(`${bom}saved`);
+ const adapter = { stat: vi.fn().mockResolvedValue({ type: 'file', size: current.byteLength }), readBinary: vi.fn().mockResolvedValue(current) };
+ const client = api(); client.previewFileVersion.mockResolvedValue(saved);
+ expect(await loadFileHistoryPreview(adapter, client, { ...version, size: saved.byteLength })).toEqual({ saved: 'saved', current: 'current' });
 });
 it('preserves the saved preview when the local copy is missing or unreadable', async () => {
  const adapter = { stat: vi.fn().mockResolvedValue(null), readBinary: vi.fn() };
@@ -22,13 +24,13 @@ it('does not download binary or oversized versions', async () => {
  }
  expect(client.previewFileVersion).not.toHaveBeenCalled();
 });
-it('rejects binary content masquerading as text', async () => {
- const client = api(); client.previewFileVersion.mockResolvedValue(bytes('a\0b'));
+it.each([bytes('a\0b'), new Uint8Array([0xff]).buffer])('rejects binary or invalid UTF-8 content masquerading as text', async content => {
+ const client = api(); client.previewFileVersion.mockResolvedValue(content);
  expect((await loadFileHistoryPreview({ stat: vi.fn(), readBinary: vi.fn() }, client, version)).unavailable).toBeTypeOf('string');
 });
 
-it('reads the current synced copy and verifies its bytes, hash and revision', async () => {
- const content = bytes('server'); const hash = await computeHash(content);
+it.each(['', '\uFEFF'])('reads the current synced copy with optional BOM %j and verifies its bytes, hash and revision', async bom => {
+ const content = bytes(`${bom}server`); const hash = await computeHash(content);
  const file = { hash, size: content.byteLength, revision: 'current', modified: '2026-09-19' };
  const client = { getFileMetadata: vi.fn().mockResolvedValue({ files: { 'note.md': file } }), downloadFile: vi.fn().mockResolvedValue({ content, hash, revision: 'current' }) };
  expect(await loadCurrentSyncedPreview(client, 'note.md')).toEqual({ file, text: 'server' });

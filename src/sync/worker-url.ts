@@ -1,3 +1,4 @@
+import { ConnectionSetupError } from './connection-errors';
 import { createLogger } from '../plugin/logger';
 import type { CrateSettings } from '../plugin/settings-types';
 
@@ -39,7 +40,7 @@ export function normalizeWorkerUrl(workerUrl: string): string {
 export function requireNormalizedWorkerUrl(workerUrl: string): string {
 	const normalized = normalizeWorkerUrl(workerUrl);
 	if (!normalized) {
-		throw new Error('Worker URL must use HTTPS (or localhost over HTTP) and be a valid URL');
+		throw new ConnectionSetupError('invalid-address');
 	}
 	return normalized;
 }

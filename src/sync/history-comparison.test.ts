@@ -29,6 +29,19 @@ it('does not invent additions when the preceding state is unknown', async () => 
     expect(comparison.items).toEqual([{ path: 'note.md', action: 'saved' }]);
     expect(await comparison.preview('note.md')).toEqual({ current: '', saved: 'saved' });
 });
+it('preserves BOMs when comparing restore contents', async () => {
+    const before = await snapshot({ 'note.md': '\uFEFFbefore' });
+    const after = await snapshot({ 'note.md': '\uFEFFafter' });
+    expect(await compareHistorySnapshots(after, before).preview('note.md')).toEqual({ current: '\uFEFFbefore', saved: '\uFEFFafter' });
+});
+it.each([bytes('a\0b'), new Uint8Array([0xff]).buffer])('does not render binary or invalid UTF-8 restore contents', async content => {
+    const saved = await snapshot({ 'note.md': 'placeholder' });
+    saved.files['note.md'] = { hash: await computeHash(content), size: content.byteLength, modified: '' };
+    saved.read.mockResolvedValue(content);
+    expect(await compareHistorySnapshots(saved).preview('note.md')).toEqual({
+        unavailable: 'This file is not valid UTF-8 text. You can still restore this point.',
+    });
+});
 it('does not read contents when both states match or files are too large or binary', async () => {
     const before = await snapshot({ 'same.md': 'same' });
     const after = await snapshot({ 'same.md': 'same', 'big.md': 'a'.repeat(256_001), 'image.png': 'bytes' });

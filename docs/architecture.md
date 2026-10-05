@@ -109,6 +109,11 @@ only attaches a completed checkpoint while its originating engine is still curre
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
+`sync/preview-format.ts` owns text decoding, binary control-character rejection and
+the 256 KB preview limit. Each preview loader retains its storage access and integrity
+checks. File history hides the UTF-8 BOM for display; pending diffs, restore comparisons
+and conflict review preserve it. Conflict review retains its separate 1 MB edit limit.
+
 `sync/engine-file-operations.ts` binds durable uploads, restores and rename deletion
 guards to one engine's manifest and Markdown cache. Planners, transfers and the queue
 receive this required handle. Creating it does not change the raw endpoint methods
@@ -128,6 +133,12 @@ succeed. These helpers do not own engine cancellation or runtime lifecycle state
 file renames. Its `lookup-store.ts` maintains derived lookup maps: the owner removes
 old keys before changing records, then adds the updated records before notifying
 subscribers. Scan failure retains the last published records and lookups together.
+
+`reminders/core/reminderDescription.ts` owns description encoding and attached comment
+parsing. `markdownReminderFile.ts` retains reminder lookup, guarded replacement,
+deletion and reordering. Parser errors carry a stable category and source line through
+the plugin scanner and index to presentation; the original reason remains available
+for logs and callers without structured diagnostics.
 
 `cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
@@ -157,9 +168,12 @@ invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verifi
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
-Connection changes and encryption setup capture that authority before entering
-the configuration queue and check it after asynchronous work. Shutdown invalidates
-queued operations even when the caller supplies no cancellation signal.
+The configuration queue captures authority when accepting each operation and verifies
+it before dispatch; workflows also check it after asynchronous work. Shutdown invalidates
+queued resets, address changes, connection changes and encryption setup even when the
+caller supplies no cancellation signal. `sync/connection-errors.ts` defines stable
+codes for owned setup failures; settings presentation uses those codes to preserve
+recovery guidance while redacting unknown transport failures.
 `sync/engine-contexts.ts` binds planners and transfers directly to their dependencies.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.

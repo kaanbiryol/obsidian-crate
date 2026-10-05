@@ -29,7 +29,7 @@ describe('plugin reminder byte safety', () => {
 	])('refuses normalization of %s without rewriting any bytes', async (_name, bytes) => {
 		const h = await workspace(bytes);
 		expect(h.index.getAll()).toEqual([]);
-		expect(h.index.sourceIssues).toEqual([expect.objectContaining({ path: source })]);
+		expect(h.index.sourceIssues).toEqual([expect.objectContaining({ path: source, diagnostic: { code: 'invalid-markdown-encoding' } })]);
 		expect(h.index.isComplete).toBe(false);
 		expect(await h.readBytes(source)).toEqual(bytes);
 		expect(h.vault.process).not.toHaveBeenCalled();

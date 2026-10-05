@@ -1,3 +1,4 @@
+import { ConnectionSetupError } from './connection-errors';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import { prepareEncryptedAddressChange } from './encrypted-connection';
@@ -24,7 +25,7 @@ export async function changeEncryptedServerAddress(
 	const verify = () => {
 		transition.verify();
 		if (settings.cloudflareDeployment || settings.workerUrl !== expected.workerUrl || secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken) {
-			throw new Error('The server connection changed. Reopen settings and try again.');
+			throw new ConnectionSetupError('changed');
 		}
 	};
 	verify();

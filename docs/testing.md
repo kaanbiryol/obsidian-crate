@@ -6,6 +6,11 @@
 through shutdown. `runtime-operations.test.ts` checks that late saves cannot update
 history, persist settings, or fall back through a replacement engine.
 
+`runtime-lifecycle.test.ts` and `runtime-encryption-reset.test.ts` cancel configuration
+changes both before dispatch and behind an active queued operation. They verify that
+shutdown prevents remote resets, credential/settings writes, local cleanup and restart
+without relying on a caller-provided abort signal.
+
 `engine-file-operations.test.ts` checks that raw API calls retain their transport
 semantics while engine operations persist interrupted uploads and guard deletion.
 `runtime-file-restore.test.ts` checks restore completion against the originating
@@ -13,6 +18,15 @@ engine; `file-restore-retry.integration.ts` exercises its durable retry against 
 Worker. `activity/shared-history-loader.test.ts` checks coalesced reloads, errors and
 disposal through the loader's public interface. `activity/activity-status.test.ts`
 covers completion progress after engine idle, stopping, conflicts and status labels.
+
+## Reminder descriptions and diagnostics
+
+`reminderDescription.test.ts` and `markdownReminderFile.test.ts` cover the description
+format and guarded edits. `vaultScanner.test.ts` and
+`reminder-source-issue-presentation.test.ts` check structured categories and source
+lines through the index and UI, including compatibility with reason-only diagnostics.
+Worker `reminder-input-contract.integration.ts` verifies the shared format across
+plugin-created notes and PWA mutations with local D1/R2/DO bindings.
 
 ## Structured merge and Reading recovery
 
@@ -628,6 +642,9 @@ stability during refresh. `engine-history.test.ts`,
 complete-inventory comparisons, unsynced edits, hidden configuration, exclusions,
 incomplete reads, missing saved states, byte verification, preview limits, and
 connection changes.
+`file-history-preview.test.ts`, `pending-diff.test.ts`, `history-comparison.test.ts`
+and `conflict-review.test.ts` protect each flow's BOM behavior and rejection of
+binary or invalid UTF-8 text alongside storage, size and integrity checks.
 Restore opens a compact confirmation directly from Vault history. Browser checks
 cover transparent footer actions, current-file counts, cancellation during preflight,
 unavailable versions, unchanged states, busy dismissal guards, and failed-restore
@@ -660,6 +677,9 @@ code at the saved address and keep the existing local connection on failure.
 Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 `src/cloudflare/deployment-service.test.ts`,
 `src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
+`self-hosted-pairing.test.ts` and `ui/settings/self-hosted-errors.test.ts` check
+typed setup failures, including address-update guidance and pairing status handling
+that does not depend on server error wording.
 Browser OAuth handoff and real hosted credentials still require manual acceptance.
 
 ## Saved YouTube videos

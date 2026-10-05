@@ -42,6 +42,33 @@ async function setup() {
 	return { ...harness, values, state, local, run };
 }
 
+it.each(['before dispatch', 'behind another operation'] as const)('cancels an encryption reset stopped %s', async boundary => {
+	const h = await setup();
+	const blocked = createDeferred<void>();
+	const operations: Promise<void>[] = [];
+	if (boundary === 'behind another operation') {
+		const started = vi.fn(() => blocked.promise);
+		operations.push(h.runtime.runEncryptionSetup(started));
+		await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
+	}
+	operations.push(h.run());
+	const settled = Promise.allSettled(operations);
+	h.runtime.destroy();
+	blocked.resolve();
+	for (const result of await settled) {
+		expect(result.status).toBe('rejected');
+		if (result.status === 'rejected') expect(result.reason).toMatchObject({ name: 'AbortError' });
+	}
+	expect(WorkerApiHttpClient.prototype.getServerInfo).not.toHaveBeenCalled();
+	expect(remote).not.toHaveBeenCalled();
+	expect(h.persistSettings).not.toHaveBeenCalled();
+	expect(h.plugin.app.vault.adapter.remove).not.toHaveBeenCalled();
+	expect(h.secretStorage.set).not.toHaveBeenCalled();
+	expect(h.secretStorage.delete).not.toHaveBeenCalled();
+	expect(h.settings.lastSeq).toBe(500);
+	expect(h.runtime.isInitialized()).toBe(false);
+});
+
 it('keeps local notes, replaces credentials and sync state, then uploads without encryption', async () => {
 	const h = await setup();
 	try {

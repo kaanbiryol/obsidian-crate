@@ -1,6 +1,6 @@
 import { TFile, type App } from 'obsidian';
 import { extractReminderId } from '../core/reminderIdentity';
-import { buildDescriptionBlock, readDescriptionBlock } from '../core/markdownReminderFile';
+import { buildDescriptionBlock, readDescriptionBlock } from '../core/reminderDescription';
 import { hasAttachedMarkdownContent, markdownTaskContexts } from '../core/markdownTaskContext';
 import { createReminderMoveStorage, type ReminderMoveRecord } from './reminder-move-storage';
 import { portablePathKey } from '@/protocol/portable-path';

@@ -2,7 +2,7 @@ import type { DataAdapter } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { assertLocalSyncPath } from './local-path-safety';
 import { computeHash } from './hasher';
-import { isBinaryPreviewPath } from './preview-format';
+import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from './preview-format';
 
 export interface PendingDiff {
     before?: string;
@@ -14,8 +14,6 @@ export interface PendingDiff {
     unchanged?: boolean;
     baselineUnavailable?: boolean;
 }
-
-const MAX_PREVIEW_BYTES = 256_000;
 
 /** Read a snapshot for display only; never advance the manifest or sync queue. */
 export async function loadPendingDiff(
@@ -66,12 +64,11 @@ export async function loadPendingDiff(
         return { ...result, unavailable: 'This file is too large to preview (limit: 256 KB).' };
     }
     try {
-        const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-        const beforeText = decoder.decode(beforeBytes), afterText = decoder.decode(afterBytes);
-        // Allow tabs and line endings, but do not render binary control characters.
-        const binary = /[\x00-\x08\x0b\x0c\x0e-\x1f]/; // eslint-disable-line no-control-regex -- Detect binary bytes before rendering text.
-        if (binary.test(beforeText) || binary.test(afterText)) throw new Error('Binary file');
-        return { ...result, before: beforeText, after: afterText };
+        return {
+            ...result,
+            before: decodePreviewText(beforeBytes, { preserveBom: true }),
+            after: decodePreviewText(afterBytes, { preserveBom: true }),
+        };
     } catch {
         return { ...result, unavailable: 'A text preview isn’t available for this file.' };
     }

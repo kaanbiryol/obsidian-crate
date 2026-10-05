@@ -1,3 +1,4 @@
+import { ConnectionSetupError } from './connection-errors';
 import { saveEncryptionKeys } from '../plugin/encryption-storage';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
@@ -28,7 +29,7 @@ export async function changeServerConnection(
 	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)) throw new Error('Resume the encrypted folder move before changing this device’s connection.');
 	if (secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) throw new Error('Resume the encryption reset before changing this device’s connection.');
 	if (expected && (settings.workerUrl !== expected.workerUrl || secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== expected.authToken)) {
-		throw new Error('The server connection changed. Reopen settings and try again.');
+		throw new ConnectionSetupError('changed');
 	}
 	const workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
 	if (!config.authToken.trim()) throw new Error('Auth token is required');

@@ -2,6 +2,7 @@ import { FileSystemAdapter, Platform, type App } from 'obsidian';
 import type { ConflictRecord } from './types';
 import { conflictReviewFile } from './conflict-review-file';
 import { TEXT_PATH } from './local-apply';
+import { decodePreviewText } from './preview-format';
 
 export type ConflictChoice = 'current' | 'saved' | 'both' | 'manual';
 export interface ConflictReview {
@@ -31,11 +32,10 @@ export async function createConflictReview(
     let currentText: string | undefined, savedText: string | undefined;
     if (TEXT_PATH.test(original.path) && Math.max(currentBytes.byteLength, savedBytes.byteLength) <= 1_000_000) {
         try {
-            const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-            const current = decoder.decode(currentBytes), other = decoder.decode(savedBytes);
-            // Avoid presenting binary content as editable text.
-            const binary = /[\x00-\x08\x0b\x0c\x0e-\x1f]/; // eslint-disable-line no-control-regex -- Detect binary control characters.
-            if (!binary.test(current) && !binary.test(other)) { currentText = current; savedText = other; }
+            const current = decodePreviewText(currentBytes, { preserveBom: true });
+            const other = decodePreviewText(savedBytes, { preserveBom: true });
+            currentText = current;
+            savedText = other;
         } catch { /* Binary files can still be opened and resolved without a text preview. */ }
     }
     const text = currentText !== undefined && savedText !== undefined;

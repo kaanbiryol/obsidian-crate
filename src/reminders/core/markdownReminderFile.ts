@@ -1,3 +1,4 @@
+import { buildDescriptionBlock, readDescriptionBlock } from './reminderDescription';
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
@@ -22,26 +23,6 @@ export interface FileContentMutationResult {
 	content: string;
 	lineNumber: number;
 	found: boolean;
-}
-
-const DESCRIPTION_ENCODING_PREFIX = "v1:";
-
-export function encodeDescriptionForMarkdown(description: string): string {
-	const text = description.trim();
-	// Keep note text readable. Escape only HTML comment syntax, literal carriage
-	// returns and prefixes that the existing reader interprets as an encoding.
-	if (!/--|\r|^v\d+:/.test(text)) return text;
-	return `${DESCRIPTION_ENCODING_PREFIX}${encodeURIComponent(text).replace(/-/g, "%2D")}`;
-}
-
-export function decodeDescriptionFromMarkdown(description: string): string {
-	const trimmed = description.trim();
-	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) {
-		if (/^v\d+:/.test(trimmed)) throw new Error('Unsupported reminder description encoding');
-		// Unversioned descriptions are literal text, including percent signs.
-		return trimmed;
-	}
-	return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
 }
 
 function recurrenceKey(value: RecurrenceRule | undefined): string {
@@ -105,47 +86,6 @@ export function findReminderLineNumber(lines: string[], reminder: ReminderLineRe
 export function getInitialProjectFileContent(project: string): string {
 	const projectName = project.split("/").pop() || project;
 	return `# ${projectName}\n\n`;
-}
-
-export function buildDescriptionBlock(description: string | undefined): string[] {
-	if (!description?.trim()) return [];
-	return `<!-- crate-desc:${encodeDescriptionForMarkdown(description)} -->`.split('\n');
-}
-
-export function readDescriptionBlock(
-	lines: readonly string[],
-	checkboxLineNumber: number,
-): { description?: string; lineCount: number } {
-	const nextIndex = checkboxLineNumber + 1;
-	const nextLine = lines[nextIndex];
-	const prefix = '<!-- crate-desc:';
-	if (!nextLine?.startsWith(prefix)) return { lineCount: 0 };
-
-	const payload = nextLine.slice(prefix.length);
-	const versioned = /^v\d+:/.test(payload.trimStart());
-	const descriptionLines: string[] = [];
-	for (let index = nextIndex; index < lines.length; index++) {
-		const line = (index === nextIndex ? payload : lines[index]!).replace(/\r$/, '');
-		if (line.includes('<!--')) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
-		const end = line.indexOf('-->');
-		if (end !== -1) {
-			if (!line.endsWith(' -->') || end !== line.length - 3) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
-			descriptionLines.push(line.slice(0, end));
-			try {
-				return {
-					description: decodeDescriptionFromMarkdown(descriptionLines.join('\n')) || undefined,
-					lineCount: index - nextIndex + 1,
-				};
-			} catch (error) {
-				const reason = error instanceof URIError ? 'Invalid reminder description encoding' : error instanceof Error ? error.message : 'Invalid reminder description block';
-				throw new Error(`${reason} on line ${nextIndex + 1}`, { cause: error });
-			}
-		}
-		// Encoded descriptions are always one line; plain text may span lines.
-		if (versioned) throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
-		descriptionLines.push(line);
-	}
-	throw new Error(`Invalid reminder description block on line ${nextIndex + 1}`);
 }
 
 export function assertReminderBlockUnchanged(lines: string[], reminder: ReminderLineRecord, lineNumber: number): void {

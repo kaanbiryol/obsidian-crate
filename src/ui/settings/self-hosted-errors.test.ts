@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selfHostedConnectionMessage, syncConnectionFailureMessage } from './self-hosted-errors';
+import { ConnectionSetupError } from '../../sync/connection-errors';
 
 describe('self-hosted connection messages', () => {
 	it('explains the connection-refused error and Docker address choice', () => {
@@ -36,12 +37,20 @@ describe('self-hosted connection messages', () => {
 	});
 	it('preserves actionable setup validation and sanitizes unknown failures', () => {
 		const validation = 'Disconnect this device before connecting another server.';
-		expect(selfHostedConnectionMessage(new Error(validation), '')).toBe(validation);
+		const error = new ConnectionSetupError('already-connected');
+		error.message = 'Changed internal wording with private details';
+		expect(selfHostedConnectionMessage(error, '')).toBe(validation);
 		for (const error of [new Error('unexpected internals with secret'), 'unexpected internals with secret', null]) {
 			const message = selfHostedConnectionMessage(error, 'https://crate.example');
 			expect(message).toContain('Could not connect to Crate');
 			expect(message).not.toContain('secret');
 		}
+	});
+	it('keeps address-update guidance and formats invalid addresses by code', () => {
+		expect(selfHostedConnectionMessage(new ConnectionSetupError('address-update-required'), 'https://crate.example'))
+			.toBe('Use Update server address before reconnecting to a different address.');
+		expect(selfHostedConnectionMessage(new ConnectionSetupError('invalid-address'), 'http://remote.example'))
+			.toContain('Enter the server address printed by Crate');
 	});
 });
 

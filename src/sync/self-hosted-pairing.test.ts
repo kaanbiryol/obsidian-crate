@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { requestUrl } from 'obsidian';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { ConnectionSetupError } from './connection-errors';
 
 vi.mock('obsidian', () => ({ requestUrl: vi.fn() }));
 beforeEach(() => { vi.stubGlobal('window', globalThis); vi.mocked(requestUrl).mockReset(); });
@@ -38,4 +39,10 @@ it('does not send a pairing request after the plugin is unloaded', async () => {
 	const controller = new AbortController(); controller.abort();
 	await expect(exchangeSelfHostedPairingCode('https://crate.example', 'code', controller.signal)).rejects.toThrow();
 	expect(requestUrl).not.toHaveBeenCalled();
+});
+
+it.each([[400, 'pairing-invalid'], [401, 'pairing-expired']] as const)('classifies pairing status %s independently of response text', async (status, code) => {
+	mockResponse({ error: 'Changed server wording with private details' }, status);
+	await expect(exchangeSelfHostedPairingCode('https://crate.example', 'code', new AbortController().signal))
+		.rejects.toMatchObject({ name: 'ConnectionSetupError', code, message: new ConnectionSetupError(code).message });
 });

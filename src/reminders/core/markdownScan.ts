@@ -2,7 +2,7 @@ import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkb
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
-import { readDescriptionBlock } from "./markdownReminderFile";
+import { readDescriptionBlock } from "./reminderDescription";
 import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
 import { extractReminderId } from './reminderIdentity';
 import { markdownTaskContexts } from './markdownTaskContext';

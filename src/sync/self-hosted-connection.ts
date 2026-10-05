@@ -1,3 +1,4 @@
+import { ConnectionSetupError } from './connection-errors';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { SyncApiClient } from './api';
@@ -17,12 +18,12 @@ export function isSelfHostedConnectionPending(plugin: CratePlugin): boolean {
  * Authenticate the encrypted vault before retaining its pending disk work.
  * Unencrypted connections keep normal server-change reconciliation. */
 export async function updateSelfHostedServerAddress(plugin: CratePlugin, address: string): Promise<void> {
-	if (plugin.settings.cloudflareDeployment || !plugin.syncRuntime.isConfigured()) throw new Error('Connect to a self-hosted server first.');
+	if (plugin.settings.cloudflareDeployment || !plugin.syncRuntime.isConfigured()) throw new ConnectionSetupError('not-self-hosted');
 	if (connecting.has(plugin) || plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
-		throw new Error('A server connection is already in progress.');
+		throw new ConnectionSetupError('busy');
 	}
 	const expected = { workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '' };
-	if (!expected.authToken) throw new Error('The saved access token is missing.');
+	if (!expected.authToken) throw new ConnectionSetupError('missing-token');
 	const workerUrl = requireNormalizedWorkerUrl(address);
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
@@ -43,7 +44,7 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 			return;
 		}
 		signal.throwIfAborted();
-		if (plugin.settings.cloudflareDeployment) throw new Error('The server connection changed. Reopen settings and try again.');
+		if (plugin.settings.cloudflareDeployment) throw new ConnectionSetupError('changed');
 		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken: expected.authToken }, signal, expected);
 	} finally { connecting.delete(plugin); }
 }
@@ -52,20 +53,20 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 export async function connectSelfHostedServer(plugin: CratePlugin, address: string, token: string, reconnect = false): Promise<void> {
 	const expected = { workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '' };
 	const assertAvailable = () => {
-		if (reconnect && (plugin.settings.workerUrl !== expected.workerUrl || (plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '') !== expected.authToken)) throw new Error('The server connection changed. Reopen settings and try again.');
-		if (!reconnect && plugin.syncRuntime.isConfigured()) throw new Error('Disconnect this device before connecting another server.');
-		if (plugin.settings.cloudflareDeployment) throw new Error('Forget the saved Cloudflare connection before connecting your own server.');
+		if (reconnect && (plugin.settings.workerUrl !== expected.workerUrl || (plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '') !== expected.authToken)) throw new ConnectionSetupError('changed');
+		if (!reconnect && plugin.syncRuntime.isConfigured()) throw new ConnectionSetupError('already-connected');
+		if (plugin.settings.cloudflareDeployment) throw new ConnectionSetupError('cloudflare-saved');
 		if (plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
-			throw new Error('Finish the Cloudflare connection before connecting your own server.');
+			throw new ConnectionSetupError('cloudflare-pending');
 		}
 	};
 	assertAvailable();
-	if (connecting.has(plugin)) throw new Error('A server connection is already in progress.');
+	if (connecting.has(plugin)) throw new ConnectionSetupError('busy');
 	const workerUrl = requireNormalizedWorkerUrl(address);
-	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new Error('Use Update server address before reconnecting to a different address.');
+	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new ConnectionSetupError('address-update-required');
 	let authToken = token.trim();
 	const pairing = /^crate-pair-[a-f0-9]{64}$/.test(authToken);
-	if (!pairing && !/^[a-f0-9]{64}$/.test(authToken)) throw new Error('Paste a pairing code or device access token generated on your Crate server.');
+	if (!pairing && !/^[a-f0-9]{64}$/.test(authToken)) throw new ConnectionSetupError('invalid-token');
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
 	connecting.add(plugin);

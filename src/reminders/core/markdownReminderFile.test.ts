@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
 	appendReminderBlockToContent,
-	buildDescriptionBlock,
-	decodeDescriptionFromMarkdown,
 	deleteReminderBlockFromContent,
-	encodeDescriptionForMarkdown,
 	findReminderLineNumber,
-	readDescriptionBlock,
 	replaceReminderBlockInContent,
 	reorderReminderBlocksInContent,
 	type ReminderLineRecord,
 } from './markdownReminderFile';
+import { buildDescriptionBlock } from './reminderDescription';
 
 function makeRecord(overrides: Partial<ReminderLineRecord>): ReminderLineRecord {
 	return {
@@ -42,36 +39,6 @@ describe('markdownReminderFile', () => {
 			'<!-- crate-desc:extra details -->',
 			'',
 		].join('\n'));
-	});
-
-	it.each(['kaan', 'hello world', 'hello%20world', '100% complete %invalid café 😀', 'line one\n- [ ] example\nline three', 'text\twith\ttabs'])(
-		'writes descriptions as literal Markdown text: %j', description => {
-			const block = buildDescriptionBlock(description);
-			expect(block.join('\n')).toBe(`<!-- crate-desc:${description} -->`);
-			expect(readDescriptionBlock(['- [ ] Task', ...block, '- [ ] Next'], 0)).toEqual({ description, lineCount: block.length });
-		},
-	);
-
-	it.each(['text --> still text', '<!-- nested comment', 'text -- comment syntax', 'v1:hello%20world', 'v2:plain text', 'line one\r\nline two'])(
-		'preserves text that cannot be written as a literal description comment: %j', description => {
-			const block = buildDescriptionBlock(description);
-			expect(block).toHaveLength(1);
-			expect(block[0]).toMatch(/^<!-- crate-desc:v1:/);
-			expect(readDescriptionBlock(['- [ ] Task', ...block], 0).description).toBe(description);
-		},
-	);
-
-	it('encodes description payloads so comment syntax and newlines round-trip safely', () => {
-		const description = 'line one\nline two --> still text -- ok';
-		const encoded = encodeDescriptionForMarkdown(description);
-
-		expect(encoded).not.toContain('--');
-		expect(encoded).not.toContain('\n');
-		expect(encoded).not.toContain('>');
-		expect(decodeDescriptionFromMarkdown(encoded)).toBe(description);
-		expect(decodeDescriptionFromMarkdown(' legacy 100% %20 café 😀 ')).toBe('legacy 100% %20 café 😀');
-		expect(() => decodeDescriptionFromMarkdown('v2:plain text')).toThrow('Unsupported reminder description encoding');
-		expect(() => decodeDescriptionFromMarkdown('v1:%invalid')).toThrow();
 	});
 
 	it('edits and deletes multiline legacy descriptions without consuming the next reminder', () => {

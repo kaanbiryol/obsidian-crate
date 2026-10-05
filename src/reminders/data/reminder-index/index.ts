@@ -255,7 +255,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
         if (signal?.aborted || !scan.current || file.path !== scan.path) return;
         if (result.deferred) { deferredPaths.add(filePath); return; }
         if (result.error) {
-          sourceIssues.set(filePath, { path: filePath, reason: result.error });
+          sourceIssues.set(filePath, { path: filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
           log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
           notifyListeners();
           return;

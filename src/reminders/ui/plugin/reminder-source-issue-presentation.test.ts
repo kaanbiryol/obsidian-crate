@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { presentReminderSourceIssues } from './reminder-source-issue-presentation';
+import type { ReminderSourceIssue } from '../../data/reminder-source-issues';
 
 describe('reminder source issue presentation', () => {
+	it.each([
+		[{ code: 'invalid-description-block', line: 8 }, 'Inbox.md · line 8', 'This reminder has an invalid description.'],
+		[{ code: 'invalid-description-encoding', line: 9 }, 'Inbox.md · line 9', 'This reminder has an invalid description.'],
+		[{ code: 'unsupported-description-encoding', line: 12 }, 'Inbox.md · line 12', 'This reminder’s description uses an unsupported format.'],
+		[{ code: 'invalid-markdown-encoding' }, 'Inbox.md', 'Save this note as UTF-8 text without null characters.'],
+	] satisfies [ReminderSourceIssue['diagnostic'], string, string][])('formats structured diagnostic %j independently of the reason', (diagnostic, location, description) => {
+		const issue = { path: 'Reminders/Inbox.md', reason: 'New parser diagnostic wording', diagnostic };
+		expect(presentReminderSourceIssues([issue])[0]).toMatchObject({ ...issue, location, description });
+	});
+
 	it.each(['Invalid reminder description block on line 8', 'Invalid reminder description block on line 8.', 'Invalid reminder description encoding on line 8'])('humanizes %s', reason => {
 		const issue = { path: 'Reminders/Inbox.md', reason };
 		expect(presentReminderSourceIssues([issue])).toEqual([{

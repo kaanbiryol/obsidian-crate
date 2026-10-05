@@ -1,21 +1,13 @@
-const setupMessages = new Set([
-	'Connect to a self-hosted server first.',
-	'A server connection is already in progress.',
-	'The saved access token is missing.',
-	'The server connection changed. Reopen settings and try again.',
-	'Disconnect this device before connecting another server.',
-	'Forget the saved Cloudflare connection before connecting your own server.',
-	'Finish the Cloudflare connection before connecting your own server.',
-	'Paste the access token generated on your Crate server.',
-	'Paste a pairing code or device access token generated on your Crate server.',
-	'Pairing code expired or already used. Generate a new code on your server.',
-	'Could not redeem this pairing code. Generate a new code and try again.',
-	'The server did not return a valid device token. Generate a new pairing code and try again.',
-]);
+import { CONNECTION_SETUP_MESSAGES, ConnectionSetupError } from '../../sync/connection-errors';
 
 /** Translate connection failures at the UI boundary without exposing response
  * bodies, credentials, or platform-specific network diagnostics in a notice. */
 export function selfHostedConnectionMessage(error: unknown, address: string): string {
+	if (error instanceof ConnectionSetupError) {
+		return error.code === 'invalid-address'
+			? 'Enter the server address printed by Crate, starting with https://. Use http://localhost only for a local-only server.'
+			: CONNECTION_SETUP_MESSAGES[error.code];
+	}
 	const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
 	const status = typeof error === 'object' && error !== null && 'status' in error
 		&& typeof error.status === 'number' ? error.status : Number(/\bHTTP (\d{3})\b/.exec(message)?.[1]);
@@ -26,10 +18,6 @@ export function selfHostedConnectionMessage(error: unknown, address: string): st
 		local = ['localhost', '127.0.0.1', '[::1]'].includes(host);
 		temporary = host.endsWith('.trycloudflare.com');
 	} catch { /* Invalid addresses are explained below. */ }
-	if (setupMessages.has(message)) return message;
-	if (message === 'Worker URL must use HTTPS (or localhost over HTTP) and be a valid URL') {
-		return 'Enter the server address printed by Crate, starting with https://. Use http://localhost only for a local-only server.';
-	}
 	if (status === 401 || /^(Unauthorized|Invalid (access )?token)\.?$/i.test(message)) {
 		return 'This server did not accept your access token. Copy the device token from your Crate server and try again.';
 	}

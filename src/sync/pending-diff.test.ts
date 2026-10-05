@@ -30,6 +30,17 @@ describe('pending file previews', () => {
         expect(await h.load()).toEqual({ before: 'old', after: 'new', beforeSize: 3, afterSize: 3, kind: 'modified' });
         expect(h.readBase).toHaveBeenCalledWith('note.md', 'hash');
     });
+    it('preserves BOMs in both sides of a pending diff', async () => {
+        expect(await setup('\uFEFFnew', '\uFEFFold').load()).toMatchObject({ before: '\uFEFFold', after: '\uFEFFnew' });
+    });
+    it('does not substitute replacement characters for invalid UTF-8 bytes', async () => {
+        const h = setup();
+        h.adapter.readBinary.mockResolvedValue(new Uint8Array([0xff]).buffer);
+        const result = await h.load();
+        expect(result.unavailable).toContain('text preview');
+        expect(result.before).toBeUndefined();
+        expect(result.after).toBeUndefined();
+    });
     it('previews additions without a baseline', async () => {
         const h = setup('new', null);
         expect(await h.load()).toMatchObject({ before: '', after: 'new', kind: 'added' });

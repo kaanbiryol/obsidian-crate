@@ -1,6 +1,6 @@
 import type { DataAdapter } from 'obsidian';
 import { extractReminderId } from '../core/reminderIdentity';
-import { readDescriptionBlock } from '../core/markdownReminderFile';
+import { readDescriptionBlock } from '../core/reminderDescription';
 
 export interface ReminderMoveRecord {
 	version: 1;

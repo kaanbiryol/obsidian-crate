@@ -22,7 +22,7 @@ import { addReminderIdentityOwners, resolveReminderIdentityOwners, type Reminder
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
-import type { ReminderSourceIssue } from './reminder-source-issues';
+import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict';
 
 const log = createLogger('VaultScanner');
@@ -45,6 +45,7 @@ export interface FileScanResult {
   reminders: IndexedReminder[];
   lineCount: number;
   error?: string;
+  diagnostic?: ReminderSourceIssue['diagnostic'];
   releasedOwners?: ReminderIdentityOwner[];
   deferred?: boolean;
 }
@@ -223,6 +224,7 @@ export async function scanFile(
       reminders: [],
       lineCount: 0,
       error: error instanceof Error ? error.message : String(error),
+      diagnostic: reminderSourceDiagnostic(error),
     };
   }
 }
@@ -272,7 +274,10 @@ export async function scanVault(
     if (shouldDeferNormalization()) { deferred = true; break; }
     const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair);
     if (result.deferred) deferred = true;
-    if (result.error) { issues.push({ path: result.filePath, reason: result.error }); continue; }
+    if (result.error) {
+      issues.push({ path: result.filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
+      continue;
+    }
     filesScanned++;
     for (const released of result.releasedOwners ?? []) {
       const stale = allReminders.findIndex(reminder => reminder.id === released.id && reminder.filePath === released.filePath);
