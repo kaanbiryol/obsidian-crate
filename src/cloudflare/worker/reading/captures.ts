@@ -8,7 +8,7 @@ import { stageMarkdownFile } from '../markdown-file-staging';
 import { commitStagedFile } from '../sync-mutations';
 import type { Env } from '../types';
 import { policy } from './common';
-import { managedArticle } from './projection';
+import { managedArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
 import { transcriptMetadata } from '@/reading/extraction/types';
 

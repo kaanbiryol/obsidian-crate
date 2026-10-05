@@ -1,122 +1,154 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createHarness, toArrayBuffer } from './engine-test-harness';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import type { BatchUploadFile, FileEntry } from '../protocol/sync-types';
+import { TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
+import { createPersistentEngineHarness } from './engine-persistence-test-harness';
 import { computeHash } from './hasher';
+import { arrayBufferToBase64 } from './encoding';
+import type { ApiHttpResponse, ApiHttpTransport } from './worker-api/http';
 import { formatSyncProgress } from '../ui/activity/progress-label';
 
+beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
+afterEach(() => vi.unstubAllGlobals());
+const bytes = new TextEncoder().encode('local').buffer;
+function response(value: unknown): ApiHttpResponse {
+    const text = JSON.stringify(value);
+    return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
+}
 async function harness() {
-    const h = createHarness({ automaticSync: false, lastSeq: 42 });
-    const content = toArrayBuffer('local');
-    const hash = await computeHash(content);
-    h.vault.adapter.readBinary.mockResolvedValue(content);
-    h.vault.getAbstractFileByPath.mockImplementation((path: string) => ({ path, extension: 'md', stat: { size: content.byteLength, mtime: 1 } }));
-    const api = Object.assign(h.api, { getFileMetadata: vi.fn(async (paths: string[]) => ({ files: Object.fromEntries(paths.map(path => [path, { hash, revision: 'v1', size: content.byteLength, modified: 'now' }])) })) });
-    h.engine.onFileChange({ path: 'a.md' } as never);
-    h.engine.onFileChange({ path: 'b.md' } as never);
-    return { ...h, api };
+    const hash = await computeHash(bytes);
+    const entry = { hash, revision: 'v1', size: bytes.byteLength, modified: '2026-09-30T10:00:00Z' };
+    const remote = {
+        metadata: vi.fn(async (paths: string[]): Promise<{ files: Record<string, FileEntry> }> => ({ files: Object.fromEntries(paths.map(path => [path, entry])) })),
+        batchUpload: vi.fn(async (files: BatchUploadFile[]) => ({ success: true, results: files.map(file => ({ path: file.path, hash: file.hash, revision: 'uploaded', success: true })) })),
+        upload: vi.fn(async (path: string) => ({ path, hash, revision: 'uploaded', success: true })),
+        delete: vi.fn(async (body: { path: string; expectedHash: string; expectedRevision: string }) => ({ path: body.path, success: true })),
+    };
+    const transport = vi.fn<ApiHttpTransport>(async request => {
+        const url = new URL(request.url);
+        switch (url.pathname) {
+            case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+            case '/sync/metadata': return response(await remote.metadata((JSON.parse(request.body as string) as { paths: string[] }).paths));
+            case '/sync/batch-upload': return response(await remote.batchUpload((JSON.parse(request.body as string) as { files: BatchUploadFile[] }).files));
+            case '/sync/upload': return response(await remote.upload(url.searchParams.get('path')!));
+            case '/sync/delete': return response(await remote.delete(JSON.parse(request.body as string) as Parameters<typeof remote.delete>[0]));
+            default: throw new Error(`Unexpected request: ${request.url}`);
+        }
+    });
+    const h = await createPersistentEngineHarness(transport, { automaticSync: false, lastSeq: 42 });
+    for (const path of ['a.md', 'b.md']) {
+        h.disk.write(path, bytes);
+        h.engine.onFileChange(h.vault.getAbstractFileByPath(path) as never);
+    }
+    const restart = async () => {
+        h.engine.destroy(); await h.engine.waitForIdle();
+        return createPersistentEngineHarness(transport, h.settings, h.disk);
+    };
+    return { ...h, remote, transport, entry, restart };
 }
 
-describe('selected sync', () => {
+describe('selected sync with durable file operations', () => {
     it('shows checking, per-file progress, and saving during selected uploads', async () => {
-        const h = await harness();
-        const labels: string[] = [];
+        const h = await harness(), labels: string[] = [];
         h.engine.setStateChangeCallback(state => labels.push(formatSyncProgress(null, state.work)));
-        h.api.getFileMetadata.mockImplementation(async () => {
+        h.remote.metadata.mockImplementation(async () => {
             expect(labels.at(-1)).toBe('Checking for changes…');
             return { files: {} };
         });
-        const batchUpload = vi.fn(async (files: Array<{ path: string; hash: string }>) => {
+        const upload = h.remote.batchUpload.getMockImplementation()!;
+        h.remote.batchUpload.mockImplementation(async files => {
             expect(labels.at(-1)).toBe('Uploading 0 of 2 files');
-            return { success: true, results: files.map(file => ({ ...file, success: true })) };
+            expect(h.localManifest.uploadJournal.pending().map(file => file.path)).toEqual(['a.md', 'b.md']);
+            return upload(files);
         });
-        h.api.batchUpload.mockImplementation(batchUpload);
-        h.localManifest.save.mockImplementation(() => {
+        const save = h.localManifest.save.bind(h.localManifest);
+        vi.spyOn(h.localManifest, 'save').mockImplementation(async () => {
             expect(labels.at(-1)).toBe('Saving sync progress…');
+            await save();
         });
-
         const result = await h.engine.syncSelected(['a.md', 'b.md']);
-
-        expect(result.success).toBe(true);
+        expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.uploadedPaths).toEqual(['a.md', 'b.md']);
-        expect(h.api.batchUpload).toHaveBeenCalledTimes(1);
-        expect(h.api.uploadFile).not.toHaveBeenCalled();
+        expect(h.remote.batchUpload).toHaveBeenCalledTimes(1);
+        expect(h.remote.upload).not.toHaveBeenCalled();
         expect(labels).toContain('Uploading 2 of 2 files');
         expect(labels).toContain('Applying changes: 2/2');
         expect(h.engine.getState()).toMatchObject({ status: 'idle', work: undefined });
-        h.engine.destroy();
+        const restarted = await h.restart();
+        expect(restarted.localManifest.getAllPaths()).toEqual(['a.md', 'b.md']);
+        expect(restarted.localManifest.uploadJournal.pending()).toEqual([]);
     });
-    it('settles only selected touched files and preserves the global server cursor', async () => {
+    it('settles only selected touched files, persists their baseline, and preserves the global server cursor', async () => {
         const h = await harness();
         const result = await h.engine.syncSelected(['a.md']);
         expect(result.success).toBe(true);
         expect(result.settledPaths).toEqual(['a.md']);
-        expect(h.api.getFileMetadata).toHaveBeenCalledWith(['a.md']);
-        expect(h.api.getManifest).not.toHaveBeenCalled();
-        expect(h.api.recoverUploads).not.toHaveBeenCalled();
+        expect(h.remote.metadata).toHaveBeenCalledWith(['a.md']);
+        expect(h.transport).toHaveBeenCalledTimes(1);
         expect(h.engine.getPendingPaths()).toEqual(['b.md']);
         expect(h.settings.lastSeq).toBe(42);
-        h.engine.destroy();
+        const restarted = await h.restart();
+        expect(restarted.localManifest.getEntry('a.md')).toMatchObject({ hash: h.entry.hash, revision: 'v1' });
+        expect(restarted.localManifest.hasFile('b.md')).toBe(false);
     });
-    it('uploads only a selected file', async () => {
-        const h = await harness();
-        h.api.getFileMetadata.mockResolvedValue({ files: {} });
-        h.api.uploadFile.mockResolvedValue({ path: 'a.md', success: true });
+    it('uploads only a selected file and checkpoints its receipt before removing the journal', async () => {
+        const h = await harness(); h.remote.metadata.mockResolvedValue({ files: {} });
         const result = await h.engine.syncSelected(['a.md']);
-        expect(result.success).toBe(true);
+        expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.uploadedPaths).toEqual(['a.md']);
         expect(h.engine.getPendingPaths()).toEqual(['b.md']);
-        h.engine.destroy();
+        const restarted = await h.restart();
+        expect(restarted.localManifest.getEntry('a.md')).toMatchObject({ hash: h.entry.hash, revision: 'uploaded' });
+        expect(restarted.localManifest.uploadJournal.pending()).toEqual([]);
+        expect((await h.vault.adapter.list(`${TEST_PLUGIN_DIR}/pending-uploads`)).files).toEqual([]);
     });
     it('syncs a selected deletion without touching other pending files', async () => {
         const h = await harness();
-        const entry = (await h.api.getFileMetadata(['a.md'])).files['a.md']!;
-        h.localManifest.setEntry('a.md', entry);
-        h.vault.getAbstractFileByPath.mockImplementation((path: string) => path === 'a.md' ? null
-            : { path, extension: 'md', stat: { size: entry.size, mtime: 1 } });
-        h.api.deleteFile.mockResolvedValue({ path: 'a.md', success: true });
-        h.engine.onFileDelete({ path: 'a.md' } as never);
+        h.localManifest.setEntry('a.md', h.entry); await h.localManifest.save();
+        h.disk.remove('a.md'); h.engine.onFileDelete({ path: 'a.md' } as never);
         const result = await h.engine.syncSelected(['delete:a.md']);
-        expect(result.success).toBe(true);
+        expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.deletedPaths).toEqual(['a.md']);
+        expect(h.remote.delete).toHaveBeenCalledWith({ path: 'a.md', expectedHash: h.entry.hash, expectedRevision: 'v1' });
         expect(h.engine.getPendingPaths()).toEqual(['b.md']);
-        h.engine.destroy();
+        expect((await h.restart()).localManifest.hasFile('a.md')).toBe(false);
+        expect(h.disk.text('b.md')).toBe('local');
     });
     it('retains an edit queued while its selected sync is running', async () => {
-        const h = await harness();
-        const metadata = h.api.getFileMetadata.getMockImplementation()!;
-        h.api.getFileMetadata.mockImplementation(async paths => {
-            h.engine.onFileChange({ path: 'a.md' } as never);
+        const h = await harness(), metadata = h.remote.metadata.getMockImplementation()!;
+        h.remote.metadata.mockImplementation(async paths => {
+            h.engine.onFileChange(h.vault.getAbstractFileByPath('a.md') as never);
             return metadata(paths);
         });
         expect((await h.engine.syncSelected(['a.md'])).success).toBe(true);
         expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
-        h.engine.destroy();
     });
-    it('does not recover unselected journal uploads as a side effect', async () => {
+    it('does not recover unselected journal uploads as a side effect, including after restart', async () => {
         const h = await harness();
-        vi.spyOn(h.localManifest.uploadJournal, 'pending').mockReturnValue([{ path: 'b.md' }]);
+        await h.localManifest.uploadJournal.prepare([{ path: 'b.md', hash: h.entry.hash, size: bytes.byteLength, content: arrayBufferToBase64(bytes), contentType: 'text/markdown', expectedHash: null, intent: { kind: 'local' } }], Math.floor(Date.now() / 86_400_000));
         await expect(h.engine.syncSelected(['a.md'])).rejects.toThrow('recover interrupted uploads');
-        expect(h.api.recoverUploads).not.toHaveBeenCalled();
-        expect(h.api.getFileMetadata).not.toHaveBeenCalled();
-        h.engine.destroy();
+        const restarted = await h.restart();
+        expect(restarted.localManifest.uploadJournal.pending().map(file => file.path)).toEqual(['b.md']);
+        restarted.engine.onFileChange(restarted.vault.getAbstractFileByPath('a.md') as never);
+        await expect(restarted.engine.syncSelected(['a.md'])).rejects.toThrow('recover interrupted uploads');
+        expect(h.transport).not.toHaveBeenCalled();
     });
     it.each([{ keys: [] }, { keys: ['unknown.md'] }])('rejects an empty or stale selection: %j', async ({ keys }) => {
         const h = await harness();
         await expect(h.engine.syncSelected(keys)).rejects.toThrow('Pending files changed');
-        expect(h.api.getFileMetadata).not.toHaveBeenCalled();
+        expect(h.transport).not.toHaveBeenCalled();
         expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
-        h.engine.destroy();
     });
     it('refuses to start while another sync is running', async () => {
         const h = await harness();
         let finish!: () => void;
         const blocked = new Promise<void>(resolve => { finish = resolve; });
-        h.api.getFileMetadata.mockImplementation(async () => { await blocked; return { files: {} }; });
+        h.remote.metadata.mockImplementation(async () => { await blocked; return { files: {} }; });
         const running = h.engine.syncSelected(['b.md']);
-        await vi.waitFor(() => expect(h.api.getFileMetadata).toHaveBeenCalledWith(['b.md']));
+        await vi.waitFor(() => expect(h.remote.metadata).toHaveBeenCalledWith(['b.md']));
         await expect(h.engine.syncSelected(['a.md'])).rejects.toThrow('current sync');
-        expect(h.api.getFileMetadata).toHaveBeenCalledTimes(1);
+        expect(h.remote.metadata).toHaveBeenCalledTimes(1);
         finish();
         expect((await running).success).toBe(true);
-        h.engine.destroy();
     });
 });

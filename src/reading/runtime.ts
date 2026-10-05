@@ -2,14 +2,14 @@ import { loadEncryptionKeys } from '../plugin/encryption-storage';
 import { captureAuthority, ReadingCaptureOutbox } from './data/capture-outbox';
 import { getCheckpointAuthority } from '../sync/worker-url';
 import { SECRET_KEYS } from '../plugin/settings-types';
-import { portablePathKey } from '@/protocol/portable-path';
 import { readingServerRequest } from './server';
 import { captureServerConnection } from '../plugin/server-request';
-import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
+import { Notice, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath } from '../sync/engine-ignore';
-import { ReadingLibrary, type ReadingFile } from './data/library';
+import { ReadingLibrary } from './data/library';
+import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
 const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () => Promise<void> }>();
@@ -53,32 +53,11 @@ export function startReading(plugin: CratePlugin): void {
 	const folder = validateReadingConfiguration(plugin, plugin.settings.reading);
 	const controller = new AbortController();
 	const { vault } = plugin.app;
-	const fileRefs = new WeakMap<ReadingFile, TFile>();
-	const fileIds = new WeakMap<TFile, number>();
-	const fileEvents = new WeakMap<TFile, number>();
-	let nextFileId = 0;
-	const allowed = (path: string) => allowedReadingPath(plugin, path);
-	const files = (): ReadingFile[] => {
-		validateReadingConfiguration(plugin, plugin.settings.reading);
-		const result: ReadingFile[] = [];
-		const walk = (entry: TAbstractFile) => {
-			if (!allowed(entry.path)) return;
-			if (entry instanceof TFolder) for (const child of entry.children) walk(child);
-			else if (entry instanceof TFile && entry.extension.toLowerCase() === 'md') {
-				if (!fileIds.has(entry)) fileIds.set(entry, ++nextFileId);
-				const file = { path: entry.path, size: entry.stat.size, modifiedAt: entry.stat.mtime, revision: `${fileIds.get(entry)}:${entry.stat.mtime}:${entry.stat.size}:${fileEvents.get(entry) ?? 0}` };
-				fileRefs.set(file, entry); result.push(file);
-			}
-		};
-		const root = vault.getAbstractFileByPath(folder);
-		if (root) walk(root);
-		return result;
-	};
-	const resolve = (file: ReadingFile): TFile => {
-		const ref = fileRefs.get(file);
-		if (!ref || vault.getAbstractFileByPath(file.path) !== ref || ref.path !== file.path || !allowed(file.path)) throw new Error('Reading note moved, was deleted, or is excluded from sync.');
-		return ref;
-	};
+	const readingVault = createObsidianReadingVault(vault, folder, {
+		signal: controller.signal,
+		allowed: path => allowedReadingPath(plugin, path),
+		validate: () => { validateReadingConfiguration(plugin, plugin.settings.reading); },
+	});
 	let policyChecked = !plugin.settings.workerUrl;
  let checkedAt = 0;
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
@@ -109,31 +88,15 @@ export function startReading(plugin: CratePlugin): void {
 			},
 		}, authority, folder, controller.signal, [alias]);
 	})();
-	const library = new ReadingLibrary({ files, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
+	const library = new ReadingLibrary({ ...readingVault, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
 		...{ captureArticle: async (url: string, signal: AbortSignal) => {
 			const { captureDesktopArticle } = await import('./desktop-capture');
 			return captureDesktopArticle(url, signal);
 		} },
-		occupied: path => vault.getAllLoadedFiles().some(file => portablePathKey(file.path) === portablePathKey(path)),
 		...(plugin.settings.workerUrl ? {
 			pendingCaptures: async () => (await outbox()).list(),
 			queueCapture: async (url: string, title?: string) => { const item = await (await outbox()).add(url, title); schedule(); return item; },
 		} : {}),
-		read: async file => { const content = await vault.read(resolve(file)); resolve(file); return content; },
-		process: (file, update) => vault.process(resolve(file), current => { resolve(file); return update(current); }),
-		create: async (path, content) => {
-			const segments = folder.split('/');
-			for (let i = 1; i <= segments.length; i++) {
-				controller.signal.throwIfAborted();
-				const part = segments.slice(0, i).join('/');
-				if (!vault.getAbstractFileByPath(part)) {
-					try { await vault.createFolder(part); } catch (error) { if (!(vault.getAbstractFileByPath(part) instanceof TFolder)) throw error; }
-				}
-			}
-			controller.signal.throwIfAborted();
-			if (!allowed(path)) throw new Error('Reading folder is excluded from sync.');
-			await vault.create(path, content);
-		},
 	}, folder, controller.signal, canAdopt);
 	let timer: number | undefined;
 	let lastErrorAt = 0;
@@ -182,8 +145,7 @@ export function startReading(plugin: CratePlugin): void {
 	const inFolder = (path: string) => path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`);
 	const changed = (path: string) => {
 		if (!inFolder(path)) return;
-		const file = vault.getAbstractFileByPath(path);
-		if (file instanceof TFile) fileEvents.set(file, (fileEvents.get(file) ?? 0) + 1);
+		readingVault.changed(path);
 		library.invalidate(path); schedule();
 	};
 	const refs = [

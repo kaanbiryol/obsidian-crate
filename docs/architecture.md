@@ -307,6 +307,15 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 
 ## Desktop Reading capture
 
+`reading/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
+discovery, guarded reads/writes, and file-event revisions. `reading/runtime.ts`
+owns configuration, policy refresh, scheduling and lifecycle cleanup.
+`reading/core/mutation-policy.ts` shares edited-field preconditions and empty
+capture checks across the library, encrypted client and plaintext Worker.
+Transport authorization, extraction consent and atomic publication stay with
+their respective hosts. Worker `reading/queries.ts` owns item/list queries and
+payloads; its route admits reads only after authorization and complete projection.
+
 Desktop Obsidian saves a local bookmark before downloading its source through
 `requestUrl`. `ReadingLibrary` serializes downloads separately from vault mutations,
 so the user can keep reading or editing notes. An empty local bookmark is stored

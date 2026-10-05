@@ -88,6 +88,7 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
   expect(library.items).toHaveLength(1); expect(library.items[0]!.crate_reading_id).toBe(receipt.id);
   await h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: receipt.id, changes: { favorite: true }, before: { favorite: false } }));
   await expect(h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: receipt.id, changes: { favorite: false }, before: { favorite: false } }))).rejects.toThrow('changed on another device');
+  await expect(h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: receipt.id, changes: { source_url: 'https://other.example' }, before: {} }))).rejects.toThrow('409:');
   const file = await env.DB.prepare('SELECT path,storage_key FROM files').first<{ path: string; storage_key: string }>();
   const bytes = new Uint8Array(await (await env.BUCKET.get(file!.storage_key))!.arrayBuffer());
   expect(new TextDecoder().decode(bytes)).not.toContain('confidential-article');

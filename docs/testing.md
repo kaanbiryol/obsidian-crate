@@ -30,6 +30,18 @@ plugin-created notes and PWA mutations with local D1/R2/DO bindings.
 
 ## Structured merge and Reading recovery
 
+Sync orchestration tests observe the engine's constructor-owned manifest through
+`engine-test-harness.ts`. File transfer and recovery tests use
+`engine-persistence-test-harness.ts`, with real file operations, journals and a
+persistent vault; only HTTP responses and deliberate I/O failures are substituted.
+`engine-selected.test.ts` and `deletion-safety.test.ts` reload saved checkpoints to
+verify selected uploads/deletions, interrupted journals and incomplete discovery.
+
+`reading/obsidian-vault.test.ts` exercises file replacement, rename, exclusion and
+shutdown while reads or atomic updates are pending. Reading Worker integration
+coverage checks pagination, duplicates across pages, queued items, source integrity
+and preserved plaintext/encrypted conflict responses.
+
 `markdown-merge-transitions.test.ts` protects newly added, moved and removed code
 fences and indented blocks, alongside ordinary prose and independent-block controls.
 `sync-engine.integration.ts` checks authored conflict copies across both arrival

@@ -1,10 +1,11 @@
-import { applyLocalArticle, managedArticle } from './core/article';
+import { applyLocalArticle } from './core/article';
+import { isEmptyReadingCapture, readingUpdateIssue } from './core/mutation-policy';
 import type { CapturedArticle } from './extraction/types';
 import { openFile, sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, updateReadingNote, readingImportId } from './core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from './core/frontmatter';
-import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingChanges, type ReadingItem } from './core/model';
+import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } from './core/model';
 import { readingCapturePath } from './core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { reminderRequestHash } from '@/encryption/reminder-receipt';
@@ -159,15 +160,12 @@ export class EncryptedReadingApi {
         if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
         const source = await this.source(this.files.get(item.path)!); path = item.path; previous = source.file; itemId = item.crate_reading_id;
         if (action === 'retry') {
-          const block = managedArticle(source.content);
-          if (item.capture_method !== 'url' || !block || block.text.trim()) throw this.options.error('Only empty saved links can be downloaded.', 409);
+          if (!isEmptyReadingCapture(source.content, item)) throw this.options.error('Only empty saved links can be downloaded.', 409);
           content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
         }
         else {
           if (!body.changes || typeof body.changes !== 'object' || !body.before || typeof body.before !== 'object') throw new Error('Choose a Reading change.');
-          for (const field of Object.keys(body.changes)) {
-            if (!['favorite', 'tags', 'reading_status', 'highlights'].includes(field) || JSON.stringify(item[field as keyof ReadingChanges]) !== JSON.stringify((body.before as Record<string, unknown>)[field])) throw this.options.error('This article changed on another device. Refresh before editing.', 409, 'reading_conflict');
-          }
+          if (readingUpdateIssue(item, body.before, body.changes)) throw this.options.error('This article changed on another device. Refresh before editing.', 409, 'reading_conflict');
           content = updateReadingNote(source.content, itemId, body.changes);
         }
       }

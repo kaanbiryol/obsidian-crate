@@ -80,7 +80,7 @@ describe('pending events from remote application', () => {
 	it('retains a genuine edit made after applying the merge', async () => {
 		const h = await setup(1);
 		try {
-			h.localManifest.save.mockImplementationOnce(() => h.edit(`${merged}new edit\n`));
+			h.localManifest.save.mockImplementationOnce(async () => h.edit(`${merged}new edit\n`));
 			const result = await h.engine.sync();
 			expect(result.errors).toEqual([]);
 			expect(h.text()).toBe(`${merged}new edit\n`);
@@ -91,7 +91,7 @@ describe('pending events from remote application', () => {
 	it('retains an edit arriving during the final content verification', async () => {
 		const h = await setup(1);
 		try {
-			h.localManifest.save.mockImplementationOnce(() => {
+			h.localManifest.save.mockImplementationOnce(async () => {
 				h.vault.adapter.readBinary.mockImplementationOnce(async () => {
 					const snapshot = toArrayBuffer(h.text());
 					h.edit(`${merged}new edit\n`);

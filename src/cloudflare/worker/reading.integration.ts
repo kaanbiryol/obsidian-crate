@@ -16,6 +16,7 @@ import { getStoredFileRow } from './sync-storage';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { readingDocument } from '@/reading/core/markdown';
 import { writeMarkdownHighlights } from '@/reading/core/markdown-highlights';
+import type { ReadingItem } from '@/reading/core/model';
 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const command = (path: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
@@ -26,6 +27,46 @@ beforeEach(async () => {
   expect((await command('policy', { enabled: true, folderPath: 'Reading', revision: null })).status).toBe(200);
 });
 afterEach(reset);
+it('paginates current sources, queues only the first page, and reports duplicate IDs across pages', async () => {
+  let last = '';
+  for (let index = 0; index < 100; index++) {
+    const path = `Reading/${String(index).padStart(3, '0')}.md`;
+    last = await adoptReadingClip(`Note ${index}.`, path, '2026-09-26T00:00:00Z');
+    await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, last, null);
+  }
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/100.md', last, null);
+  const current = (await policy(env.DB))!;
+  for (let page = 0; page < 5; page++) await projectReading(env, current);
+  const saved = await command('capture', { url: 'https://example.com/queued', operationId: id() });
+  expect(saved.status).toBe(200);
+  const queued = await saved.json() as { id: string };
+  const get = (suffix: string) => handleReadingRoute(new Request(`https://test/reading/${suffix}`), env, principal);
+  const first = await (await get('list')).json() as { items: ReadingItem[]; cursor: string; issues: Array<{ path: string }> };
+  expect(first.items).toHaveLength(100);
+  expect(first.items[0]).toMatchObject({ path: '', crate_reading_id: queued.id });
+  expect(first.cursor).toBe('Reading/099.md');
+  expect(first.issues).toMatchObject([{ path: 'Reading/099.md' }]);
+  expect(await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json()).toMatchObject({ items: [], cursor: null, issues: [{ path: 'Reading/100.md' }] });
+  expect(await (await get(`item?id=${queued.id}`)).json()).toMatchObject({ item: { path: '', crate_reading_id: queued.id }, markdown: '' });
+  expect(await (await get(`item?id=${first.items[1]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: 'Reading/000.md' }, markdown: 'Note 0.' });
+  expect((await get(`item?id=${parseReadingNote(last)!.crate_reading_id}`)).status).toBe(409);
+  expect((await get(`list?cursor=${'x'.repeat(4097)}`)).status).toBe(400);
+}, 20_000);
+
+it('preserves source bytes and HTTP error distinctions for rejected edits and retries', async () => {
+  const path = 'Reading/Guarded.md', content = await adoptReadingClip('Original user text.', path, '2026-09-26T00:00:00Z');
+  const item = parseReadingNote(content)!;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  for (const [changes, before, status] of [
+    [{ favorite: true }, { favorite: true }, 409],
+    [{ source_url: 'https://other.example' }, {}, 400],
+  ] as const) {
+    expect((await command('update', { id: item.crate_reading_id, changes, before, operationId: id() })).status).toBe(status);
+  }
+  expect((await command('retry', { id: item.crate_reading_id, operationId: id() })).status).toBe(400);
+  expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.content).toBe(content);
+});
+
 it('projects folder imports without extraction and syncs their reading metadata', async () => {
   for (const [path, original] of [
     ['Reading/Clip.md', '---\nsource: https://example.com/article\n---\nClipped text.'],

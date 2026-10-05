@@ -1,6 +1,5 @@
 import { readEncryptionState } from '../encryption-state';
 import { managedArticle } from '@/reading/core/article';
-export { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
 import { ReadingError, readSource, type ReadingPolicy } from './common';

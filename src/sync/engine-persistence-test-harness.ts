@@ -15,8 +15,7 @@ afterEach(async () => {
 });
 
 /** Keep the engine's actual manifest, journals and file operations bound together. */
-export async function createPersistentEngineHarness(transport: ApiHttpTransport, overrides: Partial<CrateSettings> = {}) {
-	const disk = new PersistentTestVault();
+export async function createPersistentEngineHarness(transport: ApiHttpTransport, overrides: Partial<CrateSettings> = {}, disk = new PersistentTestVault()) {
 	const settings = { ...structuredClone(DEFAULT_SETTINGS), workerUrl: 'https://server.test', syncInterval: 0, ...overrides };
 	const api = new SyncApiClient(settings.workerUrl, 'test-token', transport);
 	const createFiles = api.createFileOperations.bind(api);

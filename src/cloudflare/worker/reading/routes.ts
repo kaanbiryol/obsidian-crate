@@ -8,13 +8,11 @@ import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../authenticate';
 import { parseJsonObject } from '../utils';
-import { policy, authority, readingResponse, ReadingError, sourceById } from './common';
+import { policy, authority, readingResponse, ReadingError } from './common';
 import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess, handoffAuthority } from './access';
 import { mutateReading } from './mutations';
 import { projectReading } from './projection';
-import { readReadingFrontmatter } from '@/reading/core/frontmatter';
-import { parseReadingNote } from '@/reading/core/notes';
-import { validateReadingMetadata } from '@/reading/core/model';
+import { readingItem, readingList } from './queries';
 
 export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState): Promise<Response> {
   try {
@@ -79,25 +77,8 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
     if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
     if (await projectReading(env, current) !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);
-    if (path === '/reading/item' && request.method === 'GET') {
-      const queued = await env.DB.prepare('SELECT note FROM reading_captures WHERE id=? AND generation=?').bind(url.searchParams.get('id'), current.generation).first<{ note: string }>();
-      if (queued) return readingResponse({ item: { ...parseReadingNote(queued.note)!, path: '' }, markdown: '' });
-      const source = await sourceById(env, current, url.searchParams.get('id'));
-      return readingResponse({ item: { ...source.item, path: source.path }, markdown: readReadingFrontmatter(source.content)?.body ?? '' });
-    }
-    if (path === '/reading/list' && request.method === 'GET') {
-      const cursor = url.searchParams.get('cursor') ?? '';
-      if (cursor.length > 4096) throw new ReadingError('Invalid library cursor.');
-      const { results } = await env.DB.prepare(`SELECT s.path, s.metadata_json, s.error,
-        (SELECT count(*) FROM reading_sources d JOIN files df ON df.path=d.path AND df.storage_key=d.revision WHERE d.item_id=s.item_id AND d.generation=s.generation) AS copies
-        FROM reading_sources s JOIN files f ON f.path=s.path AND f.storage_key=s.revision
-        WHERE s.generation=? AND s.path>? AND (s.item_id IS NOT NULL OR s.error IS NOT NULL) ORDER BY s.path LIMIT 100`)
-        .bind(current.generation, cursor).all<{ path: string; metadata_json: string | null; error: string | null; copies: number }>();
-      const queued = cursor ? [] : (await env.DB.prepare('SELECT note FROM reading_captures WHERE generation=? ORDER BY available_at LIMIT 1000').bind(current.generation).all<{ note: string }>()).results;
-      return readingResponse({ items: [...queued.map(row => ({ ...parseReadingNote(row.note)!, path: '' })), ...results.filter(row => row.metadata_json && row.copies === 1).map(row => ({ ...validateReadingMetadata(JSON.parse(row.metadata_json!) as Record<string, unknown>), path: row.path }))],
-        issues: results.filter(row => row.error || row.copies > 1).map(row => ({ path: row.path, message: row.error ?? 'Several notes have this Reading ID. Fix the duplicates in Obsidian.' })),
-        cursor: results.length === 100 ? results.at(-1)!.path : null });
-    }
+    if (path === '/reading/item' && request.method === 'GET') return readingResponse(await readingItem(env, current, url.searchParams.get('id')));
+    if (path === '/reading/list' && request.method === 'GET') return readingResponse(await readingList(env, current, url.searchParams.get('cursor') ?? ''));
     return readingResponse({ error: 'Not found' }, 404);
   } catch (error) {
     if (error instanceof ReadingError) return readingResponse({ error: error.message, code: error.code }, error.status);

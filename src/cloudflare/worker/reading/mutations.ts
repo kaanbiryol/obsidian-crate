@@ -2,7 +2,8 @@ import { youtubeVideoId } from '@/reading/core/youtube';
 import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
-import { readingUrl, readingUrlIdentity, type ReadingChanges } from '@/reading/core/model';
+import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
+import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../markdown-file-staging';
 import { commitStagedFile } from '../sync-mutations';
@@ -10,7 +11,7 @@ import type { Env } from '../types';
 import type { AuthPrincipal } from '../authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
 import { ReadingError, readingResponse, sourceById, type ReadingPolicy } from './common';
-import { projectReading, managedArticle } from './projection';
+import { projectReading } from './projection';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
   const op = await beginOperation(env.DB, principal, current, body, action);
@@ -80,17 +81,14 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
   let content: string;
   if (action === 'retry') {
     if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
-    const block = managedArticle(source.content);
-    if (source.item.capture_method !== 'url' || !block || block.text.trim()) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
+    if (!isEmptyReadingCapture(source.content, source.item)) throw new ReadingError('Only URL captures with an unchanged article section can be extracted.');
     content = patchReadingFrontmatter(source.content, { extraction_status: 'pending' });
   } else {
     const changes = body.changes;
     if (!changes || typeof changes !== 'object' || Array.isArray(changes) || !body.before || typeof body.before !== 'object') throw new ReadingError('Choose a Reading change.');
-    const before = body.before as Record<string, unknown>;
-    for (const field of Object.keys(changes)) {
-      if (!['favorite', 'tags', 'reading_status', 'highlights'].includes(field)) throw new ReadingError('Unsupported Reading change.');
-      if (JSON.stringify(source.item[field as keyof ReadingChanges]) !== JSON.stringify(before[field])) throw new ReadingError('This item changed on another device. Refresh before editing it.', 409, 'reading_conflict');
-    }
+    const issue = readingUpdateIssue(source.item, body.before, changes);
+    if (issue === 'unsupported') throw new ReadingError('Unsupported Reading change.');
+    if (issue === 'conflict') throw new ReadingError('This item changed on another device. Refresh before editing it.', 409, 'reading_conflict');
     try { content = updateReadingNote(source.content, source.item.crate_reading_id, changes); }
     catch (error) { throw new ReadingError(error instanceof Error ? error.message : 'Invalid Reading change.'); }
   }

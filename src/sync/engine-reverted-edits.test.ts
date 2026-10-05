@@ -48,7 +48,7 @@ describe('reverted edits', () => {
 	it.each([0, 1])('preserves edits arriving after the scan (cursor %i)', async lastSeq => {
 		const { h, path } = await revertedEdit(lastSeq);
 		try {
-			h.localManifest.save.mockImplementationOnce(() => {
+			h.localManifest.save.mockImplementationOnce(async () => {
 				h.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('new edit'));
 				h.engine.onFileChange({ path } as never);
 			});

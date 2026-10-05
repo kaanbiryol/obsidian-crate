@@ -83,7 +83,7 @@ it('retains a settings edit made after applying the server version', async () =>
 	const path = configPaths[1]!;
 	const edited = '{"device":"b","newEdit":true}';
 	try {
-		h.localManifest.save = vi.fn(async () => { await h.edit(path, edited); });
+		h.localManifest.save.mockImplementation(async () => { await h.edit(path, edited); });
 		const result = await h.engine.sync();
 		expect(result.errors).toEqual([]);
 		expect(h.files.get(path)).toEqual(toArrayBuffer(edited));
@@ -97,7 +97,7 @@ it('retains a settings event arriving during final content verification', async 
 	const h = await setup();
 	const path = configPaths[1]!;
 	try {
-		h.localManifest.save.mockImplementationOnce(() => {
+		h.localManifest.save.mockImplementationOnce(async () => {
 			h.vault.adapter.readBinary = vi.fn(async (candidate: string) => {
 				const content = h.files.get(candidate);
 				if (!content) throw new Error(`Missing file: ${candidate}`);

@@ -1,6 +1,7 @@
 import { youtubeVideoId } from '../core/youtube';
 import { enrichReadingBookmark } from '../core/duplicates';
-import { applyLocalArticle, managedArticle } from '../core/article';
+import { applyLocalArticle } from '../core/article';
+import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
 import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
@@ -170,9 +171,9 @@ export class ReadingLibrary {
 				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
 				const file = this.vault.files().find(file => file.path === item.path);
 				if (!file) throw new Error('This reading note was moved or deleted.');
-				const content = await this.vault.read(file), metadata = parseReadingNote(content), block = managedArticle(content);
+				const content = await this.vault.read(file), metadata = parseReadingNote(content);
 				if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
-					|| metadata.capture_method !== 'url' || !(['unavailable', 'pending'].includes(metadata.extraction_status) || youtubeVideoId(metadata.source_url)) || !block || block.text.trim()) throw new Error('Only empty saved links can be downloaded.');
+					|| !(['unavailable', 'pending'].includes(metadata.extraction_status) || youtubeVideoId(metadata.source_url)) || !isEmptyReadingCapture(content, metadata)) throw new Error('Only empty saved links can be downloaded.');
 				return file;
 			});
 			this.signal.throwIfAborted();
@@ -222,9 +223,7 @@ export class ReadingLibrary {
 				this.signal.throwIfAborted();
 				const current = parseReadingNote(content);
 				if (!current) throw new Error('This is no longer a reading note.');
-				for (const key of Object.keys(changes) as (keyof ReadingChanges)[]) {
-					if (JSON.stringify(current[key]) !== JSON.stringify(item[key])) throw new Error('This property changed elsewhere. Refresh before trying again.');
-				}
+				if (readingUpdateIssue(current, item, changes)) throw new Error('This property changed elsewhere. Refresh before trying again.');
 				return updateReadingNote(content, item.crate_reading_id, changes);
 			});
 			await this.scan();

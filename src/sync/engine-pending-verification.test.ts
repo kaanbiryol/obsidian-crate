@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
+import { arrayBufferToBase64 } from './encoding';
 import { createHarness, createSyncResult, spyOnIncrementalSync, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -22,6 +23,11 @@ beforeEach(async () => {
 });
 
 afterEach(() => { h.engine.destroy(); vi.useRealTimers(); });
+
+async function pendingUpload(path: string) {
+	await h.localManifest.uploadJournal.prepare([{ path, hash: await computeHash(original), size: original.byteLength,
+		content: arrayBufferToBase64(original), contentType: 'application/json', expectedHash: null, intent: { kind: 'local' } }], Math.floor(Date.now() / 86_400_000));
+}
 
 function touch(candidate = path) { h.engine.onFileChange({ path: candidate } as never); }
 async function startVerification() { await vi.advanceTimersByTimeAsync(250); }
@@ -133,7 +139,7 @@ it('keeps a deletion arriving while the old contents are being read', async () =
 });
 
 it('keeps an edit arriving while the timestamp checkpoint is being saved', async () => {
-	h.localManifest.save.mockImplementationOnce(() => { touch(); });
+	h.localManifest.save.mockImplementationOnce(async () => { touch(); });
 	touch();
 	await verify();
 	expect(h.engine.getPendingPaths()).toEqual([path]);
@@ -178,7 +184,7 @@ it('leaves oversized files for ordinary sync error handling', async () => {
 });
 
 it.each(['upload', 'restore'])('preserves pending work when a durable %s still needs reconciliation', async kind => {
-	if (kind === 'upload') vi.spyOn(h.localManifest.uploadJournal, 'pending').mockReturnValue([{ path }]);
+	if (kind === 'upload') await pendingUpload(path);
 	else h.api.getPendingRestores.mockReturnValue([{ path }]);
 	touch();
 	await verify();
@@ -252,7 +258,7 @@ it('preserves a file recreated during absent-file verification', async () => {
 });
 
 it('keeps an untracked deletion when an upload receipt needs recovery', async () => {
- vi.spyOn(h.localManifest.uploadJournal, 'pending').mockReturnValue([{ path: 'temporary.md' }]);
+ await pendingUpload('temporary.md');
  h.vault.adapter.stat.mockResolvedValue(null);
  h.engine.onFileDelete({ path: 'temporary.md' } as never);
  await verify();

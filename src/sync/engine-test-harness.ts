@@ -4,19 +4,12 @@ import { SyncEngine } from './engine';
 import type { ConflictStore } from './conflict-store';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { BatchUploadFile, BatchUploadResponse, FileManifest, UploadResult } from '../protocol/sync-types';
+import type { FileManifest, UploadResult } from '../protocol/sync-types';
 import type { SyncResult } from './types';
-import type { InitialConfigPull } from './initial-config-pull';
+import type { LocalManifest } from './manifest';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
-
-type ManifestEntry = {
-	hash: string;
-	size: number;
-	modified: string;
-	revision?: string;
-};
 
 type MockAdapter = {
 	read: ReturnType<typeof vi.fn>;
@@ -29,69 +22,6 @@ type MockAdapter = {
 	mkdir: ReturnType<typeof vi.fn>;
 	list: ReturnType<typeof vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>>;
 };
-
-export type Harness = {
-	engine: SyncEngine;
-	settings: CrateSettings;
-	fileManager: {
-		trashFile: ReturnType<typeof vi.fn>;
-	};
-	workspace: {
-		onLayoutReady: ReturnType<typeof vi.fn>;
-		runLayoutReady: () => void;
-	};
-	api: {
-		isConfigured: ReturnType<typeof vi.fn>;
-		setAbortSignal: ReturnType<typeof vi.fn>;
-		createFileOperations: ReturnType<typeof vi.fn>;
-		recoverUploads: ReturnType<typeof vi.fn>;
-		getChanges: ReturnType<typeof vi.fn>;
-		uploadFile: ReturnType<typeof vi.fn<(
-			path: string,
-			content: ArrayBuffer,
-			hash: string,
-			size: number,
-			contentType: string,
-		) => Promise<UploadResult>>>;
-		deleteFile: ReturnType<typeof vi.fn>;
-		downloadFile: ReturnType<typeof vi.fn>;
-		getManifest: ReturnType<typeof vi.fn<() => Promise<FileManifest>>>;
-		getPendingRestores: ReturnType<typeof vi.fn>;
-		checkForChanges: ReturnType<typeof vi.fn>;
-		batchUpload: ReturnType<typeof vi.fn<(files: BatchUploadFile[]) => Promise<BatchUploadResponse>>>;
-		batchDownload: ReturnType<typeof vi.fn>;
-		batchDelete: ReturnType<typeof vi.fn>;
-	};
-	vault: {
-		adapter: MockAdapter;
-		getAbstractFileByPath: ReturnType<typeof vi.fn>;
-		delete: ReturnType<typeof vi.fn>;
-		createFolder: ReturnType<typeof vi.fn>;
-		modifyBinary: ReturnType<typeof vi.fn>;
-		createBinary: ReturnType<typeof vi.fn>;
-		getFiles: ReturnType<typeof vi.fn>;
-	};
-	localManifest: {
-		getInitialConfigPull(): InitialConfigPull | undefined;
-		setInitialConfigPull(state: InitialConfigPull | undefined): void;
-		uploadJournal: { pending: () => unknown[] };
-		load: ReturnType<typeof vi.fn>;
-		save: ReturnType<typeof vi.fn>;
-		hashMatches: ReturnType<typeof vi.fn>;
-		hasFile: ReturnType<typeof vi.fn>;
-		getEntry: ReturnType<typeof vi.fn<(path: string) => ManifestEntry | undefined>>;
-		getAllPaths: ReturnType<typeof vi.fn>;
-		getManifest: ReturnType<typeof vi.fn>;
-		setEntry: ReturnType<typeof vi.fn<(path: string, entry: ManifestEntry) => void>>;
-		removeEntry: ReturnType<typeof vi.fn>;
-		clear: ReturnType<typeof vi.fn>;
-		recordRename: ReturnType<typeof vi.fn>;
-	};
-};
-
-function setEngineLocalManifest(engine: SyncEngine, localManifest: Harness['localManifest']): void {
-	(engine as unknown as { localManifest: Harness['localManifest'] }).localManifest = localManifest;
-}
 
 export async function runPeriodicCheck(engine: SyncEngine): Promise<void> {
 	await (engine as unknown as { lifecycle: { periodicCheck(): Promise<void> } }).lifecycle.periodicCheck();
@@ -143,16 +73,18 @@ export function createNamedAbortError(message = 'Sync request aborted'): Error {
 	return error;
 }
 
-export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness {
+/** Orchestration tests only; use the persistent harness for file transfer and recovery. */
+export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	const settings = { ...createSettings(), ...settingsOverrides };
 
+	const stored = new Map<string, string>();
 	const adapter: MockAdapter = {
-		read: vi.fn(),
-		write: vi.fn(),
+		read: vi.fn(async (path: string) => stored.get(path)),
+		write: vi.fn(async (path: string, content: string) => { stored.set(path, content); }),
 		readBinary: vi.fn<(path: string) => Promise<ArrayBuffer>>(),
 		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
-		exists: vi.fn(),
-		remove: vi.fn(),
+		exists: vi.fn(async (path: string) => stored.has(path)),
+		remove: vi.fn(async (path: string) => { stored.delete(path); }),
 		writeBinary: vi.fn(),
 		mkdir: vi.fn(),
 		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(),
@@ -193,7 +125,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
 		getManifest: vi.fn<() => Promise<FileManifest>>(),
-		getPendingRestores: vi.fn(() => []),
+		getPendingRestores: vi.fn<() => Array<{ path: string }>>(() => []),
 		checkForChanges: vi.fn(),
 		batchUpload: vi.fn().mockImplementation(async (files: Array<{ path: string; hash: string; size: number }>) => ({
 			success: true,
@@ -206,12 +138,16 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		})),
 	};
 
-	api.createFileOperations.mockReturnValue({
-		...api,
-		getUploadDiagnostics: () => [],
-		recordMergeApplication: vi.fn(async () => {}),
-		restoreFileVersion: vi.fn(async () => {}),
-		finishRestore: vi.fn(async () => {}),
+	let manifest!: LocalManifest;
+	api.createFileOperations.mockImplementation((current: LocalManifest) => {
+		manifest = current;
+		return {
+			...api,
+			getUploadDiagnostics: () => [],
+			recordMergeApplication: vi.fn(async () => {}),
+			restoreFileVersion: vi.fn(async () => {}),
+			finishRestore: vi.fn(async () => {}),
+		};
 	});
 
 	const fileManager = {
@@ -232,39 +168,24 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 
 	const engine = new SyncEngine(plugin as never, api as never, settings);
 
-	const manifestFiles: Record<string, ManifestEntry> = {};
-	let initialConfigPull: InitialConfigPull | undefined;
-	const localManifest = {
-		getInitialConfigPull: () => structuredClone(initialConfigPull),
-		setInitialConfigPull: (state: InitialConfigPull | undefined) => { initialConfigPull = structuredClone(state); },
-		uploadJournal: { pending: () => [] },
-		load: vi.fn(),
-		close: vi.fn(async () => {}),
-		save: vi.fn(),
-		hashMatches: vi.fn((path: string, hash: string) => manifestFiles[path]?.hash === hash),
-		hasFile: vi.fn((path: string) => path in manifestFiles),
-		getEntry: vi.fn((path: string) => manifestFiles[path]),
-		getAllPaths: vi.fn(() => Object.keys(manifestFiles)),
-		getManifest: vi.fn(() => ({ version: 1, files: { ...manifestFiles } })),
-		setEntry: vi.fn((path: string, entry: { hash: string; size: number; modified: string }) => {
-			manifestFiles[path] = entry;
-		}),
-		removeEntry: vi.fn((path: string) => {
-			delete manifestFiles[path];
-		}),
-		recordRename: vi.fn(),
-		clear: vi.fn(() => {
-			for (const path of Object.keys(manifestFiles)) {
-				delete manifestFiles[path];
-			}
-		}),
-		replaceManifest: vi.fn((manifest: FileManifest) => {
-			for (const path of Object.keys(manifestFiles)) delete manifestFiles[path];
-			Object.assign(manifestFiles, structuredClone(manifest.files));
-		}),
+	const spies = {
+		load: vi.spyOn(manifest, 'load'),
+		close: vi.spyOn(manifest, 'close'),
+		save: vi.spyOn(manifest, 'save'),
+		hashMatches: vi.spyOn(manifest, 'hashMatches'),
+		hasFile: vi.spyOn(manifest, 'hasFile'),
+		getEntry: vi.spyOn(manifest, 'getEntry'),
+		getAllPaths: vi.spyOn(manifest, 'getAllPaths'),
+		getManifest: vi.spyOn(manifest, 'getManifest'),
+		setEntry: vi.spyOn(manifest, 'setEntry'),
+		removeEntry: vi.spyOn(manifest, 'removeEntry'),
+		recordRename: vi.spyOn(manifest, 'recordRename'),
+		clear: vi.spyOn(manifest, 'clear'),
+		replaceManifest: vi.spyOn(manifest, 'replaceManifest'),
 	};
-
-	setEngineLocalManifest(engine, localManifest);
+	const localManifest: Omit<LocalManifest, keyof typeof spies> & typeof spies = Object.assign(manifest, spies);
 
 	return { engine, settings, fileManager, workspace, api, vault, localManifest };
 }
+
+export type Harness = ReturnType<typeof createHarness>;
