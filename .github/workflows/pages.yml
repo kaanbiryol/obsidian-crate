@@ -21,6 +21,8 @@ on:
       - "scripts/reading-shortcut-fixture.mjs"
       - "scripts/build-shortcut-support.mjs"
       - "scripts/build-site-images.mjs"
+      - "scripts/site-deployment.mjs"
+      - "scripts/site-deployment.test.mjs"
       - "src/reading/shortcut-contract.json"
       - "src/cloudflare/worker/reading/save-page.ts"
       - "src/cloudflare/worker/reading/save-client.ts"
@@ -28,6 +30,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to deploy if changed; leave empty to force-deploy master"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -40,11 +47,16 @@ jobs:
   build:
     # Template tests use macOS plutil; signing runs only on the maintainer’s Mac.
     runs-on: macos-26
+    outputs:
+      deploy: ${{ steps.website.outputs.deploy }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
+          ref: >-
+            ${{ (github.event.release.tag_name || inputs.release_tag)
+                && format('refs/tags/{0}', github.event.release.tag_name || inputs.release_tag)
+                || (github.event_name == 'workflow_dispatch' && 'master' || github.sha) }}
           fetch-depth: 0
           persist-credentials: false
       - name: Use Node.js
@@ -64,7 +76,7 @@ jobs:
       - name: Check documentation
         run: npm run check:docs
       - name: Verify shortcut template and website downloads
-        run: node --test scripts/reading-shortcut.test.mjs scripts/shortcut-release.test.mjs
+        run: node --test scripts/reading-shortcut.test.mjs scripts/shortcut-release.test.mjs scripts/site-deployment.test.mjs
       - name: Build shortcut support page
         run: node scripts/build-shortcut-support.mjs
       - name: Download the supported shortcut
@@ -75,12 +87,20 @@ jobs:
       # Documentation links include the generated shortcut installation page.
       - name: Build static site and documentation
         run: npm run build:site
+      - name: Compare with the deployed website
+        if: github.event_name != 'push'
+        id: website
+        env:
+          SITE_DEPLOY_FORCE: ${{ github.event_name == 'workflow_dispatch' && !inputs.release_tag }}
+        run: node scripts/site-deployment.mjs
       - name: Upload static site
+        if: steps.website.outputs.deploy == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
   deploy:
     needs: build
+    if: github.event_name != 'push' && needs.build.outputs.deploy == 'true'
     permissions:
       pages: write
       id-token: write

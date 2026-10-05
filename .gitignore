@@ -66,3 +66,6 @@ __pycache__/
 
 # Machine-local development server version
 /server-development.local.json
+
+# Written into the published website to compare future releases.
+/site/deployment.json

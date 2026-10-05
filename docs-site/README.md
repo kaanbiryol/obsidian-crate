@@ -83,9 +83,16 @@ existing styles and docs, creates the local Pagefind index, and checks built
 documentation links, anchors, assets, and landing-page links to the docs.
 Generated files go only into the ignored `site/docs/` directory.
 
-The existing Pages workflow installs the separate lockfile, checks and builds
-the site, and uploads `site/`. Pushes to `docs-site/` or `docs/` also trigger it.
-Local builds do not deploy anything.
+The Pages workflow validates website-related pushes to `master` without deploying.
+Publishing a release (including a beta) builds its tagged commit and deploys only
+when the generated website differs from the last successful deployment. The
+comparison includes documentation, styles, images, and downloaded shortcuts.
+`deployment.json` records the deployed content fingerprint and source commit; the
+first release after enabling this comparison deploys once to establish it.
+
+For an independent website fix, run **Deploy GitHub Pages** manually without a
+`release_tag` to force-deploy `master`. Supplying `release_tag` instead builds that
+tag and uses the normal change check. Local builds do not deploy anything.
 
 For a dependency review, run `npm --prefix docs-site audit`. As of 2026-10-03,
 Astro pulls in `http-cache-semantics` 4.2.0, which has an unpatched advisory

@@ -86,7 +86,13 @@ and test import, pairing, and saving on iOS 27 or later. Complete the plugin's
 assets. Publish the draft through GitHub only after those checks pass. This remains
 an explicit maintainer action; preparing the release does not publish it.
 
-Publishing triggers **Deploy GitHub Pages**. It selects the most recently published
+Publishing triggers **Deploy GitHub Pages**, which builds the published tag.
+Website-related pushes to `master` only validate the build. Publication compares
+the complete built website against the last successful deployment and skips
+unchanged content; new shortcut bytes count as a change. A manual workflow run
+without `release_tag` force-deploys `master` for independent website fixes.
+
+The website build selects the most recently published
 release containing shortcut metadata, including prereleases, verifies the download,
 and serves it at `shortcuts/v2/Save to Crate.shortcut`. Retired development shortcut
 downloads are no longer distributed.
@@ -97,5 +103,5 @@ Until a v2 shortcut release is published, Pages generates an unavailable install
 page with a manual-save alternative. Existing releases without shortcut metadata
 are not modified automatically. Publishing manually through
 GitHub triggers Pages; if publishing via a workflow's `GITHUB_TOKEN`, explicitly
-run **Deploy GitHub Pages**, because token-created events do not start another
-workflow.
+dispatch **Deploy GitHub Pages** with `release_tag` set to the published tag,
+because token-created release events do not start another workflow.
