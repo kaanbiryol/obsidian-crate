@@ -272,6 +272,11 @@ File/vault history browser checks also run in `release:check`.
 with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifetime.
 Browser focus and persistent storage behavior remain covered by Chromium/WebKit
 checks against the built PWA.
+`useReminderEditorActions.test.ts` covers delayed saves, duplicate submissions,
+failed persistence and logout; `useReminderMutations.test.ts` exercises those actions
+with the command hook. `runtime-encryption-setup.test.ts` verifies shutdown before
+queued setup, during draining and during conversion. Server-status tests exercise
+cache identity, expiry, throttling and cancellation through the public runtime API.
 
 Release runs resolve the tag to one commit before starting verification. Every job checks out that commit. A separate clean-install rebuild starts after the source artifacts are ready and must reproduce their plugin, CSS, Worker/PWA and source metadata hashes. Draft asset attachment waits for all required verification jobs and that rebuild. Source artifacts alone cannot authorize a release, and the original push run is rechecked before reused assets are attached.
 
@@ -525,6 +530,13 @@ containment, synthetic touch-event propagation, keyboard navigation, dropdown
 placement, and selection/focus restoration through the real plugin editor overlay.
 The unit style test retains theme-token assertions; interaction coverage does not
 depend on component source text. Physical touch scrolling still requires a device.
+
+After building the plugin styles, run
+`node scripts/visual-test-run.mjs tests/visual/reminder-editor-layout.spec.ts tests/visual/reminder-editor-layout-webkit.spec.ts --workers=2`
+for editor geometry in both hosts. Chromium and WebKit check header alignment,
+title/description hierarchy, compact spacing and long-field scrolling at 320px,
+390px and desktop widths in light and dark themes. These replace SCSS text checks
+for layout; source assertions remain for token and scoping conventions.
 
 ## File history browser checks
 

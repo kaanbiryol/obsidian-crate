@@ -26,14 +26,6 @@ export interface CrateSettings {
 	debounceDelay: number;
 }
 
-export interface SharedSettings {
-	ignorePatterns: string[];
-	syncOnStartup: boolean;
-	syncOnResume: boolean;
-	syncInterval: number;
-	pushEnabled: boolean;
-}
-
 export const DEFAULT_SETTINGS: CrateSettings = {
 	reading: { ...DEFAULT_READING_SETTINGS },
 	usageSnapshot: null,

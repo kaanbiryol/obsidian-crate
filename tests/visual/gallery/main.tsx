@@ -99,7 +99,7 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'project-interactions' || scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && new URLSearchParams(location.search).has('titles'))));
+const useShadow = scene === 'navigation' || scene === 'source' || (host === 'plugin' && (scene === 'project-interactions' || scene === 'list-style' || scene === 'motion' || scene === 'controls' || scene === 'reading' || scene === 'lexical' || (scene === 'editor' && (params.has('titles') || params.has('shadow')))));
 const mount = useShadow ? document.createElement('div') : app;
 if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 const resolvePageTitle = async (url: string) => {

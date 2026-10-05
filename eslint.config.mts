@@ -3,6 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 import { globalIgnores } from "eslint/config";
+import workerImportBoundary from './scripts/worker-import-boundary.mjs';
 
 const pluginAdapterImports = {
 	regex: '^(?:@/ui/plugin|(?:\\.\\./)+(?:ui/)?plugin)(?:/|$)',
@@ -158,6 +159,14 @@ export default tseslint.config(
 				paths: [{ name: 'obsidian', message: 'Shared UI must work in both the plugin and PWA; keep Obsidian APIs in ui/plugin.' }],
 				patterns: [pluginAdapterImports],
 			}],
+		},
+	},
+	{
+		files: ['src/cloudflare/worker/**/*.{ts,tsx}'],
+		ignores: ['**/*.test.ts', '**/*.integration.ts', '**/*-test-harness.ts'],
+		plugins: { crate: { rules: { 'worker-import-boundary': workerImportBoundary } } },
+		rules: {
+			'crate/worker-import-boundary': 'error',
 		},
 	},
 	{

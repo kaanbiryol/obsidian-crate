@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
-import { createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
+import { createDeferred, createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
 import type { SyncState } from './types';
 
 const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v3'] };
@@ -72,5 +72,42 @@ describe('manual sync server status', () => {
 		expect(runtime.getState().status).toBe('offline');
 		expect(runtime.getState().lastError).toContain('too long to respond');
 		expect(sync).not.toHaveBeenCalled();
+	});
+
+	it.each(['destroy', 'replace'] as const)('cancels a probe and ignores a delayed response when the runtime is %s', async action => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		await initializeRuntime(runtime);
+		const pending = createDeferred<Response>();
+		const fetch = vi.fn((_url: string, _options: RequestInit) => pending.promise);
+		vi.stubGlobal('fetch', fetch);
+		await vi.advanceTimersByTimeAsync(2_000);
+		const signal = fetch.mock.calls[0]![1].signal!;
+		if (action === 'destroy') runtime.destroy();
+		else await initializeRuntime(runtime);
+		expect(signal.aborted).toBe(true);
+		const listener = vi.fn();
+		runtime.addStateChangeListener(listener);
+		pending.resolve(new Response(null, { status: 503 }));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(runtime.getState().status).toBe('idle');
+		expect(listener).not.toHaveBeenCalled();
+	});
+
+	it('coalesces scheduled probes and respects the cooldown', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		await initializeRuntime(runtime);
+		const fetch = vi.fn(async () => new Response(JSON.stringify(serverInfo)));
+		vi.stubGlobal('fetch', fetch);
+		runtime.triggerForegroundSync('focus');
+		runtime.triggerForegroundSync('online');
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(fetch).toHaveBeenCalledOnce();
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(fetch).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(58_000);
+		runtime.triggerForegroundSync('online');
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 });

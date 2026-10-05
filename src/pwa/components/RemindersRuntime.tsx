@@ -11,6 +11,7 @@ import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
 import { usePwaPreferences } from '../hooks/usePwaPreferences';
 import { usePwaRefreshLifecycle } from '../hooks/usePwaRefreshLifecycle';
 import { usePwaStatus } from '../hooks/usePwaStatus';
+import { useReminderEditorActions } from '../hooks/useReminderEditorActions';
 import { useReminderEditor } from '../hooks/useReminderEditor';
 import { useReminderMutations } from '../hooks/useReminderMutations';
 import { useReminderSync } from '../hooks/useReminderSync';
@@ -19,9 +20,6 @@ import { isInitialPwaContentReady } from '../initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
 import { toSharedReminder } from '../reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings-context';
-import type {
-	ModalMode,
-} from '../types';
 import { DeferredNotice } from './DeferredNotice';
 import { reminderSyncStatus } from '../sync/reminder-status';
 import { reminderRetryAt } from '../reminder-outbox';
@@ -44,7 +42,8 @@ function useRemindersController() {
 	const { preferences } = usePwaPreferences();
 	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
-	const { modal, saving, setSaving, transition: modalTransition, closeModal, resetEditor, openEditor, openReminder } = useReminderEditor(setSettingsOpen);
+	const editor = useReminderEditor(setSettingsOpen);
+	const { modal, saving, transition: modalTransition, closeModal, resetEditor, openReminder } = editor;
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
 	const reminderSync = useReminderSync({ apiFetch, authToken, config, setSelectedProject, enabled });
@@ -140,26 +139,7 @@ function useRemindersController() {
 
 	const toggleSettings = useCallback(() => setSettingsOpen(open => !open), [setSettingsOpen]);
 
-	const {
-		saveReminder,
-		toggleReminderCompleted,
-		deleteReminder,
-		persistReorder,
-		visibleReminders,
-		visibleProjects,
-		changes,
-		ready: mutationsReady,
-		retryChange,
-		discardChange,
-		prepareEdit,
-		isPreparingMutation,
-		storageError,
-		retryInitialization,
-		recoveryChanges,
-		recoverChanges,
-		quarantinedChanges,
-		removeQuarantinedChanges,
-	} = useReminderMutations({
+	const mutations = useReminderMutations({
 		enabled,
 		hasSnapshot: lastUpdatedAt !== null,
 		canRecover: enabled && !readOnly,
@@ -170,16 +150,32 @@ function useRemindersController() {
 		loadReminders,
 		beginLocalMutation,
 		commitReminderState,
-		closeModal,
 		config,
 		ensureCanMutate,
 		projects,
 		getSnapshot,
 		selectedProject,
 		refreshPresentation,
-		setSaving,
 		showToast,
 	});
+
+	const {
+		toggleReminderCompleted,
+		persistReorder,
+		visibleReminders,
+		visibleProjects,
+		changes,
+		ready: mutationsReady,
+		retryChange,
+		discardChange,
+		isPreparingMutation,
+		storageError,
+		retryInitialization,
+		recoveryChanges,
+		recoverChanges,
+		quarantinedChanges,
+		removeQuarantinedChanges,
+	} = mutations;
 
 	const initialContentReady = isInitialPwaContentReady({
 		notificationPromptReady: !isStandaloneApp() || initialCheckComplete,
@@ -189,31 +185,11 @@ function useRemindersController() {
 		pendingChangesReady: mutationsReady || Boolean(storageError),
 	});
 
-	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
-		if (!mutationsReady || !ensureCanMutate()) return;
-		if (reminderId && changes.some(change => (change.status !== 'failed' || change.reviewRequired)
-			&& (change.recordId === reminderId || change.optimistic?.id === reminderId))) {
-			showToast('info', 'This reminder is still syncing. Retry its pending change first.');
-			return;
-		}
-		const reminder = reminderId ? visibleReminders.find((item) => item.id === reminderId) ?? null : null;
-		openReminder(mode, reminder, defaultProject ?? selectedProject);
-	}, [changes, ensureCanMutate, mutationsReady, visibleReminders, selectedProject, openReminder, showToast]);
-
-	const editFailedChange = useCallback((operationId: string) => {
-		if (!mutationsReady || !ensureCanMutate()) return;
-		const draft = prepareEdit(operationId);
-		if (draft) openEditor(draft);
-	}, [ensureCanMutate, mutationsReady, prepareEdit, openEditor]);
-
-
+	const { openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = useReminderEditorActions({
+		editor, mutations, selectedProject, folderPath: config.folderPath, ensureCanMutate, showToast,
+	});
 	const sharedReminders = useMemo(() => visibleReminders.map(toSharedReminder), [visibleReminders]);
-	const editReminder = useCallback((id: string) => {
-		const failedSave = changes.find(change => change.kind === 'save' && change.status === 'failed'
-			&& (change.recordId === id || change.optimistic?.id === id));
-		if (failedSave) editFailedChange(failedSave.operationId);
-		else openModal('edit', id);
-	}, [changes, editFailedChange, openModal]);
+
 	const syncStatus = reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError });
 	const needsRecovery = recoveryChanges.length > 0 || quarantinedChanges.length > 0;
 	useFeatureSettings('reminders', {

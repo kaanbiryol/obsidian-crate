@@ -2,7 +2,7 @@ import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { PWA_CONTROL_SPRING, PWA_FADE } from '../motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { FeatureNavigationContext } from './FeatureSwitcherButton';
 
 import { PwaDock, PwaDockAddButton } from './PwaDock';
@@ -15,7 +15,7 @@ import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
+import { PwaNavigationScreen } from './PwaNavigationScreen';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
@@ -26,13 +26,12 @@ import {
 	getRemindersHeaderData,
 	getReorderProject,
 	shouldShowReminderFab,
-	type ViewMode,
 } from '@/reminders/ui/remindersViewModel';
 import { PwaThemeIcon } from './PwaThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
 import { EmptyStateMessageContext } from '@/reminders/components/EmptyState';
 import { useReminderClock } from '@/reminders/ui/useReminderClock';
-import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../project-history';
+import { useReminderProjectNavigation } from '../hooks/useReminderProjectNavigation';
 
 const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };
 const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
@@ -100,12 +99,11 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	onReorderDragActiveChange,
 }) => {
 	const requested = useContext(FeatureNavigationContext)?.destination;
-	// Seed the real screen from the same destination as its lazy loading shell.
-	// Applying it later via the dock retains the default tab as an outgoing fade.
-	const [viewMode, setViewMode] = useState<ViewMode>(() => initialProject ? 'browse'
-		: requested?.section === 'reminders' ? requested.tab : initialTab);
-	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
 	const reduceMotion = useReducedMotion();
+	const { viewMode, selectedProject, navigationMotion, projectOpen, canGoBack,
+		handleViewModeChange, handleProjectSelect, handleBackToProjects, finishProjectClose } = useReminderProjectNavigation({
+		initialTab: requested?.section === 'reminders' ? requested.tab : initialTab, initialProject, reduceMotion,
+	});
 	const shell = useRef<HTMLDivElement>(null);
 	const contentRevealed = useRef(false);
 
@@ -124,72 +122,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		));
 		return () => animations.forEach(animation => animation.cancel());
 	}, [showLoadingIndicator, reduceMotion]);
-	const [skipProjectMotion, setSkipProjectMotion] = useState(Boolean(initialProject));
-	const navigationMotion = { direction, reduceMotion: reduceMotion || skipProjectMotion };
-	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
-	const projectStack = useRef<string | null>(null);
-	const closingProject = useRef(false);
-	const lastProject = useRef(initialProject ?? null);
-	const historyFrame = useRef(0);
-
-	useLayoutEffect(() => {
-		if (initialProject) void openProjectHistory(initialProject).then(stack => { projectStack.current = stack; });
-		return () => cancelAnimationFrame(historyFrame.current);
-	}, [initialProject]);
-
-	useEffect(() => {
-		const back = () => {
-			if (new URL(location.href).searchParams.get('section') === 'reading' || !projectStack.current) return;
-			closingProject.current = false;
-			setSkipProjectMotion(true);
-			setDirection(-1);
-			setSelectedProject(null);
-			const stack = projectStack.current;
-			projectStack.current = null;
-			cancelAnimationFrame(historyFrame.current);
-			historyFrame.current = requestAnimationFrame(() => {
-				historyFrame.current = requestAnimationFrame(() => {
-					dismissProjectHistory(stack);
-					const button = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action="open-project"]'))
-						.find(candidate => candidate.dataset.project === lastProject.current);
-					button?.focus({ preventScroll: true });
-				});
-			});
-		};
-		window.addEventListener('popstate', back);
-		return () => window.removeEventListener('popstate', back);
-	}, []);
-
-	const handleViewModeChange = useCallback((mode: ViewMode) => {
-		if (selectedProject || closingProject.current) return;
-		setDirection(0);
-		setViewMode(mode);
-	}, [selectedProject]);
-
-	const handleProjectSelect = useCallback(async (project: string) => {
-		if (selectedProject || closingProject.current) return;
-		const stack = await openProjectHistory(project);
-		if (!stack || new URL(location.href).searchParams.get('project') !== project) return;
-		projectStack.current = stack;
-		lastProject.current = project;
-		setSkipProjectMotion(false);
-		setDirection(1);
-		setSelectedProject(project);
-	}, [selectedProject]);
-
-	const handleBackToProjects = useCallback(() => {
-		if (closingProject.current || !selectedProject) return;
-		closingProject.current = true;
-		setSkipProjectMotion(false);
-		setDirection(-1);
-		setSelectedProject(null);
-	}, [selectedProject]);
-
-	const finishProjectClose = useCallback(() => {
-		if (!closingProject.current) return;
-		if (hasProjectHistory()) history.back();
-		else closingProject.current = false;
-	}, []);
 
 	const clock = useReminderClock(reminders);
 	const headerData = useMemo(() => {
@@ -289,7 +221,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					className,
 				].filter(Boolean).join(' ')}
 			>
-				<div className="pwa-navigation-viewport" inert={backgroundInert || Boolean(selectedProject) || closingProject.current}>
+				<div className="pwa-navigation-viewport" inert={backgroundInert || projectOpen}>
 					{/* Keep the Projects list and its scroll position mounted behind detail. */}
 					<PwaTabTransition viewKey={primaryTab}>
 						<div className="overflow-hidden" inert={initializing}>
@@ -324,10 +256,10 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				</div>
 
 				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
-					inert={initializing || backgroundInert || Boolean(selectedProject) || closingProject.current}
+					inert={initializing || backgroundInert || projectOpen}
 					onAdd={initializing || !suppressFab ? handleAdd : undefined} />
 
-				<div className="pwa-project-layer" data-project-open={Boolean(selectedProject) || closingProject.current} data-pwa-back={Boolean(selectedProject) && !closingProject.current} inert={initializing}>
+				<div className="pwa-project-layer" data-project-open={projectOpen} data-pwa-back={canGoBack} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
 						{selectedProject && <PwaNavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
 							<div className="reminders-content">

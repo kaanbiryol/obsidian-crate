@@ -32,7 +32,7 @@ import type {
 	UploadResult,
 	RemoteFileVersion,
 } from '../protocol/sync-types';
-import type { SharedSettings } from '../plugin/settings-types';
+import type { SharedSettings } from '../protocol/shared-settings';
 import type { CrateServerInfo } from '../protocol';
 import { AuthWorkerApi } from './worker-api/auth';
 import { WorkerApiHttpClient } from './worker-api/http';

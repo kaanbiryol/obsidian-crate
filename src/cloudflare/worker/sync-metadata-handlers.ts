@@ -1,6 +1,6 @@
 import { portablePathKey } from '../../protocol/portable-path';
 import { MAX_SHARED_SETTINGS_BYTES } from '../../encryption/settings-format';
-import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
+import { normalizeSharedSettingsValue } from '../../protocol/shared-settings';
 import { corsResponse } from './cors';
 import { parseJsonObject, sanitizePath } from './utils';
 import { CHANGELOG_BOUNDS_SQL, getChangelogBounds } from './sync-storage';

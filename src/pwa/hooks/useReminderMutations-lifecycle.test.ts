@@ -45,8 +45,8 @@ function harness() {
 	const hook = renderHook(() => {
 		const mutations = useReminderMutations({ authToken: 'token', bootstrapped: true, config, reminders: [reminder], projects: ['Inbox'],
 			getSnapshot: () => ({ reminders: [reminder], projects: ['Inbox'] }), selectedProject: null,
-			apiFetch: vi.fn(), beginLocalMutation: () => () => {}, commitReminderState: vi.fn(), closeModal: vi.fn(),
-			ensureCanMutate: () => true, refreshPresentation: vi.fn(), setSaving: vi.fn(), showToast, loadReminders: vi.fn() });
+			apiFetch: vi.fn(), beginLocalMutation: () => () => {}, commitReminderState: vi.fn(),
+			ensureCanMutate: () => true, refreshPresentation: vi.fn(), showToast, loadReminders: vi.fn() });
 		useFeatureSettings('reminders', { ...feature, config, push: { phase: 'unsupported', status: null },
 			onEnablePush: vi.fn(async () => {}), recovery: null, unsynced: changes.length > 0,
 			updateReady: !mutations.isPreparingMutation(), canApplyUpdate: () => !mutations.isPreparingMutation() });
@@ -59,7 +59,7 @@ it.each(['complete', 'delete', 'reorder'] as const)('blocks updates before enque
 	const issuance = deferred();
 	vi.mocked(newReminderOperationId).mockReturnValueOnce(issuance.promise);
 	const h = harness();
-	let pending!: Promise<void>;
+	let pending!: Promise<unknown>;
 	act(() => {
 		pending = action === 'complete' ? h.hook.current.toggleReminderCompleted('one', false)
 			: action === 'delete' ? h.hook.current.deleteReminder('one') : h.hook.current.persistReorder('Inbox', ['one']);
@@ -96,7 +96,7 @@ it('does not republish readiness or enqueue after logout and unmount during prep
 	const issuance = deferred();
 	vi.mocked(newReminderOperationId).mockReturnValueOnce(issuance.promise);
 	const h = harness();
-	let pending!: Promise<void>;
+	let pending!: Promise<unknown>;
 	act(() => { pending = h.hook.current.toggleReminderCompleted('one', false); });
 	invalidatePwaSession();
 	h.hook.unmount();

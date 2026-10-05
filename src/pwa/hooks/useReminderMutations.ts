@@ -1,9 +1,7 @@
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
 import { useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { newReminderOperationId } from '../reminder-operation-id';
-import { discardReminderDraft } from '../reminder-drafts';
 import { applyReminderChanges, predictReminderCompletion } from '../reminder-optimistic-state';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import { useReminderOutbox } from './useReminderOutbox';
@@ -16,7 +14,6 @@ export function useReminderMutations(options: {
 	bootstrapped: boolean;
 	beginLocalMutation: () => () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => void | Promise<void>;
-	closeModal: () => void;
 	config: StoredConfig;
 	ensureCanMutate: () => boolean;
 	reminders: ReminderRecord[];
@@ -24,14 +21,13 @@ export function useReminderMutations(options: {
 	getSnapshot: () => ConfirmedReminderSnapshot;
 	selectedProject: string | null;
 	refreshPresentation: () => void;
-	setSaving: Dispatch<SetStateAction<boolean>>;
 	showToast: ShowToast;
 	loadReminders: LoadReminders;
 	hasSnapshot?: boolean;
 	canRecover?: boolean;
 }) {
 	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
-	const { closeModal, config, ensureCanMutate, projects, getSnapshot, selectedProject, refreshPresentation, setSaving, showToast } = options;
+	const { config, ensureCanMutate, projects, getSnapshot, selectedProject, refreshPresentation, showToast } = options;
 	const preparingRef = useRef(false);
 	const pendingPreparations = useRef(0);
 	const [, setPreparationCount] = useState(0);
@@ -55,7 +51,6 @@ export function useReminderMutations(options: {
 		const sessionCurrent = capturePwaSession();
 		preparingRef.current = true;
 		const finishPreparation = beginPreparation();
-		setSaving(true);
 		try {
 			const { createSaveReminderChange } = await import('../save-reminder-command');
 			if (!sessionCurrent()) return false;
@@ -63,11 +58,9 @@ export function useReminderMutations(options: {
 			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
 			if (!sessionCurrent()) return false;
 			enqueue(change);
-			discardReminderDraft(modal, config.folderPath);
-			closeModal();
 			return true;
 		} catch (error) { if (sessionCurrent()) report(error); return false; }
-		finally { preparingRef.current = false; finishPreparation(); if (sessionCurrent()) setSaving(false); }
+		finally { preparingRef.current = false; finishPreparation(); }
 	};
 
 	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
@@ -98,17 +91,17 @@ export function useReminderMutations(options: {
 		} catch (error) { if (current()) report(error); }
 		finally { finishPreparation(); }
 	};
-	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string) => {
-		if (!ensureCanMutate()) return;
+	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string): Promise<boolean> => {
+		if (!ensureCanMutate()) return false;
 		const current = capturePwaSession();
 		const finishPreparation = beginPreparation();
 		try {
 			const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
-			if (!current()) return;
+			if (!current()) return false;
 			enqueue(change);
-			closeModal();
 			showToast('success', 'Reminder deleted');
-		} catch (error) { if (current()) report(error); }
+			return true;
+		} catch (error) { if (current()) report(error); return false; }
 		finally { finishPreparation(); }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {

@@ -1,6 +1,7 @@
+import type { SharedSettings } from '../protocol/shared-settings';
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../plugin/secret-storage";
-import { SECRET_KEYS, type CrateSettings, type SharedSettings } from '../plugin/settings-types';
+import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import { requireNormalizedWorkerUrl } from "./worker-url";
 import type { VaultKeyBundle } from '../encryption/key-bundle';
 

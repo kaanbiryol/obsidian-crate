@@ -108,6 +108,11 @@ only attaches a completed checkpoint while its originating engine is still curre
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
+`sync/runtime-server-status.ts` owns version caching and delayed reachability
+probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
+guard, resets probes during lifecycle changes, and retains foreground sync policy.
+Server observations cannot publish after a newer sync, shutdown or engine replacement.
+
 `cloudflare/deployment-types.ts` defines authorization-independent deployment requests
 and distinguishes a deleted server from a deployed server with a URL. OAuth sessions
 contain a request; saved authorization runs that request directly.
@@ -122,6 +127,8 @@ invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verifi
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
+Encryption setup captures that authority before entering the configuration queue
+and checks it after draining and conversion, so shutdown cannot restart sync.
 `sync/engine-contexts.ts` binds planners and transfers directly to their dependencies.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
@@ -290,12 +297,22 @@ Shared icons and reduced-motion preferences live in `src/ui/shared/`; the Obsidi
 icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
 these implementations for existing feature consumers.
 
-`src/pwa/main.tsx` mounts the feature shell. `components/RemindersApp.tsx` composes
-reminder data, session, outbox, and presentation hooks. `useReminderSync` owns the
-confirmed snapshot and exposes reads and explicit commit/reset operations; outbox
+`src/pwa/main.tsx` mounts the feature shell. `components/RemindersRuntime.tsx` composes
+reminder data, session, outbox, and editor hooks independently of the lazy screen.
+`useReminderSync` owns the confirmed snapshot and exposes reads and explicit
+commit/reset operations; outbox
 consumers cannot independently replace its refs or React state. `useReminderEditor`
 owns editor presentation, synchronous tap opening, close transitions, recovered
-drafts, and session reset.
+drafts, and session reset. `useReminderEditorActions` owns edit eligibility and
+save/delete completion: drafts and editors remain open until durable enqueue succeeds
+in the current session. `useReminderMutations` prepares and queues commands and
+exposes a synchronous preparation guard for updates, without controlling the editor.
+`useReminderProjectNavigation` keeps browser history, project exit completion and
+focus restoration together; `PwaRemindersAppShell` renders that navigation state.
+
+`protocol/shared-settings.ts` defines and validates shared settings for both hosts.
+`sync/shared-settings.ts` applies them to plugin settings. Production Worker modules
+cannot import plugin or sync implementation modules; ESLint enforces this boundary.
 
 `pwa/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
 connectivity and timer wakeups honor the stored deadline and attempt budget.

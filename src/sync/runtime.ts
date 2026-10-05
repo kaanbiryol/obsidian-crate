@@ -30,13 +30,11 @@ import {
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
-import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from './server-reachability';
+import { RuntimeServerStatus } from './runtime-server-status';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
 export const FOREGROUND_SYNC_COOLDOWN_MS = 30_000;
-const SERVER_CHECK_DELAY_MS = 2_000;
-const SERVER_CHECK_COOLDOWN_MS = 60_000;
 
 export type ForegroundSyncReason = 'focus' | 'visible' | 'online';
 
@@ -62,10 +60,7 @@ export class SyncRuntime {
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
-	private serverCheckTimer: ReturnType<typeof setTimeout> | null = null;
-	private serverCheckController: AbortController | null = null;
-	private lastServerCheckAt: number | null = null;
-	private connectionIssue: string | null = null;
+	private readonly serverStatus: RuntimeServerStatus;
 
 	async loadCurrentSyncedPreview(path: string) {
 		const api = this.apiClient;
@@ -106,7 +101,21 @@ export class SyncRuntime {
 		private secretStorage: SecretStorageService,
 		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
     private prepareReminderScope?: () => Promise<void>,
-	) {}
+	) {
+		this.serverStatus = new RuntimeServerStatus({
+			settings,
+			getClient: () => this.apiClient,
+			captureIdleState: () => {
+				const engine = this.syncEngine;
+				if (!engine || engine.getState().status !== 'idle') return null;
+				const revision = this.initializationRevision;
+				const lastSync = engine.getState().lastSync;
+				return () => this.initializationRevision === revision && this.syncEngine === engine
+					&& engine.getState().status === 'idle' && engine.getState().lastSync === lastSync;
+			},
+			onIssueChange: () => this.emitCurrentState(),
+		});
+	}
 
 	isInitialized(): boolean {
 		return this.syncEngine !== null;
@@ -115,8 +124,8 @@ export class SyncRuntime {
 	getState(): SyncState {
 		if (this.syncEngine) {
 			const state = this.syncEngine.getState();
-			return this.connectionIssue && state.status === 'idle'
-				? { ...state, status: 'offline', lastError: this.connectionIssue, lastIssues: undefined }
+			return this.serverStatus.issue && state.status === 'idle'
+				? { ...state, status: 'offline', lastError: this.serverStatus.issue, lastIssues: undefined }
 				: state;
 		}
 		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0 };
@@ -141,38 +150,16 @@ export class SyncRuntime {
 		return preview;
 	}
 
-	private versionInfo?: { client: SyncApiClient; connection: string; expires: number; info: CrateServerInfo };
-	private versionRequest?: { client: SyncApiClient; connection: string; promise: Promise<CrateServerInfo> };
-
-	private versionConnection(): string {
-		const deployment = this.settings.cloudflareDeployment;
-		return JSON.stringify([this.settings.workerUrl, deployment?.accountId, deployment?.workerName, deployment?.d1DatabaseId]);
-	}
-
 	getCachedVersionInfo(): CrateServerInfo | undefined {
-		const cached = this.versionInfo;
-		return cached?.client === this.apiClient && cached?.connection === this.versionConnection()
-			&& cached.expires > Date.now() ? cached.info : undefined;
+		return this.serverStatus.getCachedVersionInfo();
 	}
 
-	async getVersionInfo(): Promise<CrateServerInfo> {
-		const client = this.apiClient;
-		if (!client) throw new Error('Not connected');
-		const connection = this.versionConnection();
-		if (this.versionRequest?.client === client && this.versionRequest.connection === connection) return this.versionRequest.promise;
-		this.versionInfo = undefined;
-		const promise = client.getServerInfo().then(info => {
-			if (this.apiClient !== client || connection !== this.versionConnection()) throw new Error('Server changed');
-			this.versionInfo = { client, connection, info, expires: Date.now() + 30_000 };
-			return info;
-		});
-		this.versionRequest = { client, connection, promise };
-		try { return await promise; }
-		finally { if (this.versionRequest?.promise === promise) this.versionRequest = undefined; }
+	getVersionInfo(): Promise<CrateServerInfo> {
+		return this.serverStatus.getVersionInfo();
 	}
 
 	exportDiagnostics(): string {
-		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics(), this.versionInfo?.client === this.apiClient ? this.versionInfo?.info : undefined);
+		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics(), this.serverStatus.getDiagnosticVersionInfo());
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
@@ -240,9 +227,7 @@ export class SyncRuntime {
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
-		this.clearServerCheck();
-		this.connectionIssue = null;
-		this.lastServerCheckAt = null;
+		this.serverStatus.reset();
 
 		this.stopEngine();
 		this.activityProgress = null;
@@ -287,7 +272,7 @@ export class SyncRuntime {
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
 			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
-			if (state.status === 'syncing') this.connectionIssue = null;
+			if (state.status === 'syncing') this.serverStatus.clearIssue();
 			this.emitCurrentState();
 		});
 
@@ -347,8 +332,7 @@ export class SyncRuntime {
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
-		this.clearServerCheck();
-		this.connectionIssue = null;
+		this.serverStatus.reset();
 		this.stopEngine();
 		this.apiClient = null;
 		this.activityProgress = null;
@@ -394,11 +378,16 @@ export class SyncRuntime {
 	/** Keep the current connection stable and wait for local journal I/O before
 	 * moving its server into conversion. Failed conversions remain resumable. */
 	runEncryptionSetup(operation: () => Promise<void>): Promise<void> {
+		// Capture authority before queuing: a stopped or replaced connection must
+		// not begin conversion or resume sync after an older operation completes.
+		const transition = this.configurationTransition();
 		return this.changeConfiguration(async () => {
-			this.destroy();
-			await this.stoppingWork;
+			transition.verify();
+			transition.stop();
+			await transition.waitForIdle();
+			transition.verify();
 			await operation();
-			await this.initialize({ skipStartupSync: true });
+			await transition.initialize();
 		});
 	}
 
@@ -563,7 +552,7 @@ export class SyncRuntime {
 	updateSyncSettings(): void {
 		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) return;
 		this.syncEngine?.updateSettings(this.settings);
-		if (this.settings.automaticSync) this.clearServerCheck();
+		if (this.settings.automaticSync) this.serverStatus.cancelCheck();
 		else this.scheduleServerCheck();
 	}
 
@@ -592,47 +581,9 @@ export class SyncRuntime {
 		}
 	}
 
-	private clearServerCheck(): void {
-		if (this.serverCheckTimer) clearTimeout(this.serverCheckTimer);
-		this.serverCheckTimer = null;
-		this.serverCheckController?.abort();
-		this.serverCheckController = null;
-	}
-
 	private scheduleServerCheck(): void {
-		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine || this.serverCheckTimer || this.serverCheckController) return;
-		if (this.lastServerCheckAt !== null && Date.now() - this.lastServerCheckAt < SERVER_CHECK_COOLDOWN_MS) return;
-		this.serverCheckTimer = setTimeout(() => {
-			this.serverCheckTimer = null;
-			void this.checkServer();
-		}, SERVER_CHECK_DELAY_MS);
-	}
-
-	private async checkServer(): Promise<void> {
-		const engine = this.syncEngine;
-		if (!engine || engine.getState().status !== 'idle') return;
-		const controller = new AbortController();
-		this.serverCheckController = controller;
-		this.lastServerCheckAt = Date.now();
-		const revision = this.initializationRevision;
-		const lastSync = engine.getState().lastSync;
-		let timedOut = false;
-		const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, SERVER_CHECK_TIMEOUT_MS);
-		try {
-			const result = await checkServerReachability(this.settings.workerUrl, controller.signal);
-			if ((controller.signal.aborted && !timedOut) || this.serverCheckController !== controller || this.initializationRevision !== revision || this.syncEngine !== engine) return;
-			if (engine.getState().status !== 'idle' || engine.getState().lastSync !== lastSync) return;
-			const issue = timedOut ? 'The sync server took too long to respond. Check that it is running.' : result;
-			if (this.connectionIssue !== issue) {
-				this.connectionIssue = issue;
-				this.emitCurrentState();
-			}
-		} catch (error) {
-			if (!controller.signal.aborted) logger.warn('Server check failed:', errorMessage(error));
-		} finally {
-			clearTimeout(timeout);
-			if (this.serverCheckController === controller) this.serverCheckController = null;
-		}
+		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
+		this.serverStatus.scheduleCheck();
 	}
 
 	private isForegroundSyncOnCooldown(): boolean {

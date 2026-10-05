@@ -1,15 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applySharedSettings, normalizeSharedSettingsValue } from './shared-settings';
+import { applySharedSettings } from './shared-settings';
 
 describe('shared-settings helpers', () => {
-	it('rejects shared settings missing required flags', () => {
-		expect(normalizeSharedSettingsValue({
-			ignorePatterns: ['.git/'],
-			syncOnStartup: true,
-			syncInterval: 30,
-		})).toBeNull();
-	});
-
 	it('applies shared settings without changing local status bar visibility', () => {
 		const target = {
 			ignorePatterns: ['.trash/'],

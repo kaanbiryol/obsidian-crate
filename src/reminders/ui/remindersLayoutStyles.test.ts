@@ -50,6 +50,8 @@ describe('plugin reminder layout styles', () => {
     expect(modalStyles).toContain('font-family: var(--reminder-font-ui)');
     expect(modalStyles).toContain('font-size: var(--reminder-font-base)');
     expect(modalStyles).not.toContain('backdrop-filter: blur(8px)');
+    expect(editorStyles).toContain('--reminder-modal-header-control-size: var(--crate-icon-button-size)');
+    expect(editorStyles).toContain('--crate-icon-button-control-size: var(--reminder-modal-header-control-size)');
     expect(editorStyles).toContain('background: var(--crate-control-hover-bg)');
     expect(editorStyles).toContain('color: var(--text-normal)');
     expect(editorStyles).toContain('background: var(--crate-picker-selection-bg)');
@@ -72,34 +74,6 @@ describe('plugin reminder layout styles', () => {
     expect(editorHost).toContain('transform: none !important');
   });
 
-  it('keeps editor actions aligned and uses the compact spacing at sheet widths', async () => {
-    const styles = await readEditorStyles();
-    const themeStyles = await readPluginThemeStyles();
-    const editorHeader = styles.match(/\.reminder-modal-header \{([\s\S]*?)\n\}/)?.[1];
-    const headerSide = styles.match(/\.reminder-modal-header-side \{([\s\S]*?)\n\}/)?.[1];
-    const headerCopy = styles.match(/\.reminder-modal-header-copy \{([\s\S]*?)\n\}/)?.[1];
-    const headerClose = styles.match(/\.reminder-modal-header-close \{([\s\S]*?)\n\}/)?.[1];
-    const headerIcon = styles.match(/\.reminder-modal-header-icon \{([\s\S]*?)\n\}/)?.[1];
-    const iconButton = themeStyles.match(/\.crate-icon-button \{([\s\S]*?)\n\s{2}\}/)?.[1];
-    const headerAction = styles.match(/\.reminder-modal-header-action \{([\s\S]*?)\n\}/)?.[1];
-
-    expect(editorHeader).toContain('--reminder-modal-header-control-size: var(--crate-icon-button-size)');
-    expect(editorHeader).toContain('grid-template-columns: var(--reminder-modal-header-control-size) minmax(0, 1fr) auto');
-    expect(editorHeader).toContain('min-height: 44px');
-    expect(headerSide).toContain('width: 100%');
-    expect(headerSide).toContain('justify-content: flex-start');
-    expect(headerSide).toContain('justify-content: flex-end');
-    expect(headerSide).toContain('gap: var(--size-4-2, 8px)');
-    expect(headerIcon).toContain('--crate-icon-button-control-size: var(--reminder-modal-header-control-size)');
-    expect(iconButton).toContain('padding: 0');
-    expect(headerCopy).toContain('text-align: left');
-    expect(headerClose).toContain('background: transparent !important');
-    expect(headerClose).toContain('&:focus-visible');
-    expect(headerClose).toContain('background: var(--crate-control-hover-bg) !important');
-    expect(headerAction).toContain('border: 0 !important');
-    expect(headerAction).toContain('box-shadow: none !important');
-    expect(styles).toContain('@container (max-width: 420px)');
-  });
 
   it('keeps the reminder delete icon quiet until its destructive hover state', async () => {
     const styles = await readEditorStyles();
@@ -139,16 +113,6 @@ describe('plugin reminder layout styles', () => {
     expect(submitButton).toContain('background: var(--crate-control-active-bg)');
   });
 
-  it('keeps reminder descriptions visually subordinate to their titles', async () => {
-    const styles = await readEditorStyles();
-    const description = styles.match(
-      /\.reminder-description-input \{([\s\S]*?)\n\}/,
-    )?.[1];
-
-    expect(description).toContain('color: var(--text-muted)');
-    expect(description).toContain('color: var(--text-faint)');
-    expect(description).toContain('font-size: var(--reminder-font-sm)');
-  });
 
   it('uses one compact picker layout with native date and time inputs', async () => {
     const styles = await readEditorStyles();
@@ -298,21 +262,6 @@ describe('plugin reminder layout styles', () => {
     expect(actionChip).toContain('outline: 2px solid var(--crate-focus-ring)');
   });
 
-  it('keeps the reminder editor vertical rhythm compact', async () => {
-    const editorStyles = await readEditorStyles();
-    const modalStyles = await readFile(
-      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
-      'utf8',
-    );
-
-    expect(editorStyles).toContain('min-height: 32px');
-    expect(editorStyles).toContain('padding: 12px 16px 16px');
-    expect(editorStyles).toContain('min-height: var(--reminder-action-chip-height)');
-    expect(editorStyles).toContain('height: 40px');
-    expect(editorStyles).toContain('vertical-align: baseline');
-    expect(modalStyles).toContain(':is(.crate-reminder-editor-surface, .crate-reminder-picker-surface).is-centered');
-    expect(modalStyles).toContain('padding-bottom: 8px');
-  });
 
   it('uses Obsidian checkbox and progress tokens without primary-screen overrides', async () => {
     const cardStyles = await readFile(

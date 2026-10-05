@@ -2,6 +2,7 @@ import { act } from 'react';
 import { renderHook } from '../../test/react-hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useReminderMutations } from './useReminderMutations';
+import { useReminderEditorActions } from './useReminderEditorActions';
 import { useReminderOutbox } from './useReminderOutbox';
 import { invalidatePwaSession } from '../session-generation';
 import { restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
@@ -44,9 +45,15 @@ function harness() {
 		apiFetch, authToken: 'token', bootstrapped: true, beginLocalMutation: () => () => {}, ensureCanMutate,
 		commitReminderState, refreshPresentation, getSnapshot: () => ({ reminders: remindersRef.current, projects: ['Inbox'] }), reminders: remindersRef.current,
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
-		projects: ['Inbox'], selectedProject: null, closeModal, setSaving, showToast, loadReminders: vi.fn(),
+		projects: ['Inbox'], selectedProject: null, showToast, loadReminders: vi.fn(),
 	};
-	const rendered = renderHook(() => useReminderMutations({ ...options, reminders: remindersRef.current }));
+	const editor = { closeModal, setSaving, openEditor: vi.fn(), openReminder: vi.fn() };
+	const rendered = renderHook(() => {
+		const mutations = useReminderMutations({ ...options, reminders: remindersRef.current });
+		const actions = useReminderEditorActions({ editor, mutations, selectedProject: null,
+			folderPath: 'Reminders', ensureCanMutate, showToast });
+		return { ...mutations, ...actions };
+	});
 	const render = () => { rendered.rerender(); return rendered.current; };
 	return { hook: render(), render, state, outbox, changes, remindersRef, apiFetch, closeModal, showToast,
 		setSaving, ensureCanMutate, commitReminderState, refreshPresentation, memory };
