@@ -42,7 +42,7 @@ describe('safe diagnostic export', () => {
 	});
 
 	it('persists safe correlation through settings reload while excluding local history details from export', async () => {
-		const h = createRuntimeHarness({ syncOnStartup: false });
+		const h = createRuntimeHarness({ automaticSync: false });
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
 		await h.runtime.initialize({ skipStartupSync: true });
 		const client = h.runtime.getApiClient()!;
@@ -80,7 +80,7 @@ describe('safe diagnostic export', () => {
 
 describe('periodic sync activity', () => {
 	it.each([true, false])('records a periodic result once and persists it (success: %s)', async success => {
-		const h = createRuntimeHarness({ syncOnStartup: false, lastSeq: 10 });
+		const h = createRuntimeHarness({ automaticSync: true, lastSeq: 10 });
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
 		await h.runtime.initialize({ skipStartupSync: true });
 		vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: true, lastSeq: 11 });
@@ -96,12 +96,13 @@ describe('periodic sync activity', () => {
 	});
 
 	it('does not create history for an idle check', async () => {
-		const h = createRuntimeHarness({ syncOnStartup: false });
+		const h = createRuntimeHarness({ automaticSync: true });
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
 		await h.runtime.initialize({ skipStartupSync: true });
-		vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: false, lastSeq: 0 });
+		const check = vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: false, lastSeq: 0 });
 		const engine = (h.runtime as unknown as { syncEngine: SyncEngine }).syncEngine;
 		await runPeriodicCheck(engine);
+		expect(check).toHaveBeenCalledOnce();
 		expect(h.settings.syncHistory).toEqual([]);
 		expect(h.persistSettings).not.toHaveBeenCalled();
 		h.runtime.destroy();

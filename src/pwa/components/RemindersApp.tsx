@@ -30,18 +30,20 @@ import { usePwaPreferences } from '../hooks/usePwaPreferences';
 export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
+	const { connection, sync, mutations, editor, status, presentation, enablePushNotifications } = useRemindersRuntime();
+	const { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId } = connection;
+	const { loading, refreshing, error, issues, dataMode, isOffline, loadReminders, rebuildOfflineCache } = sync;
 	const {
-		colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
-		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
-		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
-		showToast, loading, refreshing, error,
-		issues, dataMode, isOffline, loadReminders, rebuildOfflineCache, enablePushNotifications,
-		readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind, handlePullRefresh,
-		toggleSettings, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, visibleReminders,
-		visibleProjects, changes, mutationsReady, retryChange, discardChange, storageError,
-		retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges, initialContentReady,
-		openModal, editFailedChange, sharedReminders, editReminder, resolvePageTitle,
-	} = useRemindersRuntime();
+		toggleReminderCompleted, persistReorder, visibleReminders, visibleProjects, changes,
+		ready: mutationsReady, retryChange, discardChange, storageError, retryInitialization,
+		recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges,
+	} = mutations;
+	const { modal, saving, transition: modalTransition, closeModal, openReminder, openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = editor;
+	const { readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind } = status;
+	const {
+		colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
+		showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
+	} = presentation;
 	const { version: updateVersion, launchPending } = useAppUpdate();
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));

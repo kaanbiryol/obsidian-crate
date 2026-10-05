@@ -22,22 +22,12 @@
 		"!src/test/**!",
 		"tests/reading-extraction/*.ts"
 	],
-	"ignoreFiles": [
-		"src/cloudflare/worker/notifications/web-push-library.d.ts",
-		"src/cloudflare/worker/cloudflare-env.d.ts",
-		"src/cloudflare/worker/pwa/assets.d.ts",
-		"src/cloudflare/worker/pwa/raw-css.d.ts",
-		"src/cloudflare/worker/raw-text.d.ts"
-	],
 	"ignoreDependencies": [
-		"@plugin-build/styles.css",
 		"cloudflare",
 		"electron",
 		"tailwindcss"
 	],
 	"ignoreBinaries": [
-		"tar",
-		"python3",
 		"plutil",
 		"shortcuts",
 		"openssl"

@@ -261,6 +261,10 @@ Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Use
 
 Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
 
+`syncOnStartup` and `syncOnResume` are retained compatibility fields. Current
+plugins use the device-local `automaticSync` preference for automatic triggers;
+that preference is not part of this shared-settings contract.
+
 ### PUT /settings
 
 Stores shared plugin preferences to R2.

@@ -121,7 +121,7 @@ describe('checkpoint authority and reset', () => {
 	});
 
 	it('leaves manual sync unavailable after refusing a foreign checkpoint', async () => {
-		const harness = createRuntimeHarness({ syncOnStartup: false });
+		const harness = createRuntimeHarness({ automaticSync: false });
 		const disk = createDisk({ [main]: checkpoint('https://old.example') });
 		Object.assign(harness.plugin.app.vault.adapter, disk.adapter);
 		harness.plugin.manifest.dir = dir;

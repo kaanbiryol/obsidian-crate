@@ -5,7 +5,7 @@ import { readFolderMoves, writeFolderMoves } from '../plugin/encryption-folder-m
 import { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { LocalManifest } from './manifest';
 import { getCheckpointAuthority } from './worker-url';
 import { WorkerApiHttpClient } from './worker-api/http';

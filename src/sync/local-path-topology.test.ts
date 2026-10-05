@@ -1,6 +1,6 @@
 import { Platform } from 'obsidian';
 import { expect, it, vi } from 'vitest';
-import { PersistentTestVault } from '../cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault } from '@/test/factories/sync-vault';
 import { applyRemoteContentIfUnchanged } from './local-apply';
 const incoming = new TextEncoder().encode('remote replacement').buffer;
 

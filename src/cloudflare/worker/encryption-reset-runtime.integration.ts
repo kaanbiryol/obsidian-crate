@@ -12,7 +12,7 @@ import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { loadEncryptionReset } from '../../sync/encryption-reset';
 import { sha256Hex } from './auth';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from './sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { SyncTestDevice } from './sync-engine-test-harness';
 
 const bridge = vi.hoisted(() => vi.fn());

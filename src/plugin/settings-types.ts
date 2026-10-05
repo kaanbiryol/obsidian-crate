@@ -17,7 +17,9 @@ export interface CrateSettings {
 	lastSeq: number;
 	deviceId: string;
 	ignorePatterns: string[];
+	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
 	syncOnStartup: boolean;
+	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
 	syncOnResume: boolean;
 	syncInterval: number;
 	syncHistory: SyncHistoryEntry[];

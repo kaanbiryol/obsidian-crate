@@ -1,7 +1,7 @@
 import { DurableUploads } from './durable-uploads';
 import { expect, it, vi } from 'vitest';
 import { LocalManifest } from './manifest';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 function fixture() {
 	const disk = new PersistentTestVault();

@@ -1,16 +1,9 @@
 import serverRelease from './server-release.json';
 import { describe, expect, it, vi } from 'vitest';
-import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
+import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { HttpTransport } from './http';
 
-const artifacts = {
-	version: '0.1.0',
-	fingerprint: 'f'.repeat(64),
-	workerBundle: 'export class ReminderAlarm {}',
-	workerBundleSha256: 'worker-hash',
-	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
-	d1SchemaSha256: 'schema-hash',
-};
+const fingerprint = 'f'.repeat(64);
 
 describe('CloudflareApiClient', () => {
 	it.each([404, 403, 503])('preserves the recovery object HTTP status %s independently of its message', async status => {
@@ -20,13 +13,6 @@ describe('CloudflareApiClient', () => {
 	it('does not treat a missing recovery response body as a missing object', async () => {
 		const api = new CloudflareApiClient('synthetic', async () => ({ status: 200, text: '' }));
 		await expect(api.getRecoveryObject('account', 'bucket', 'key')).rejects.toMatchObject({ status: 200 });
-	});
-	it('preserves the experimental safety namespace without binding it to active requests', () => {
-		const body = new TextDecoder().decode(buildWorkerMultipartBody({ publicOrigin: 'https://crate.workers.dev', artifacts,
-			d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef' }).body);
-		expect(body).toContain('"CloudSafety":{"type":"durable-object","storage":"sqlite","state":"created"}');
-		expect(body).not.toContain('"class_name":"CloudSafety"');
-		expect(body).not.toContain('"state":"deleted"');
 	});
 
 	it('reads address activation and preview settings without mutating them', async () => {
@@ -47,20 +33,6 @@ describe('CloudflareApiClient', () => {
 		expect(transport).toHaveBeenCalledWith('https://api.cloudflare.com/client/v4/accounts/account/d1/database/database', expect.objectContaining({ method: 'DELETE' }));
 	});
 
-	it('retires only ReminderAlarm and installs the authenticated cleanup Worker', () => {
-		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body);
-		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","state":"deleted"}');
-		expect(body).toContain('export class CloudSafety');
-		expect(body).not.toContain('export class ReminderAlarm');
-		expect(body).toContain('"CloudSafety":{"type":"durable-object","storage":"sqlite","state":"created"}');
-		expect(body).not.toContain('"force":true');
-		expect(body).toContain('status: 503');
-		expect(body).toContain('Crate reset reset-id');
-		expect(body).toContain('"name":"CRATE_RESET_ID","text":"reset-id"');
-		expect(body).toContain('record.cleanupTokenHash');
-		expect(new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket', true).body)).not.toContain('"state":"deleted"');
-	});
-
 	it('reads R2 pagination metadata and encodes the listing cursor', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({
 			success: true, result: [{ key: 'Notes/a #b.md' }], result_info: { is_truncated: true, cursor: 'next/page' },
@@ -77,14 +49,12 @@ describe('CloudflareApiClient', () => {
 		await new CloudflareApiClient('account-secret', transport).uploadServerDeletionWorker('account', `crate-delete-${id}`, id, 'crate-0123456789abcdef', hash, tag);
 		const [url, request] = transport.mock.calls[0]!;
 		expect(url).toBe(`https://api.cloudflare.com/client/v4/accounts/account/workers/scripts/crate-delete-${id}`);
+		expect(request.method).toBe('PUT');
+		expect(request.headers?.Authorization).toBe('Bearer account-secret');
+		expect(request.headers?.['Content-Type']).toMatch(/^multipart\/form-data; boundary=crate-/);
 		const body = new TextDecoder().decode(request.body as ArrayBuffer);
-		const metadata = JSON.parse(body.split('\r\n\r\n')[1]!.split('\r\n--')[0]!) as { bindings: unknown[]; annotations: Record<string, string> };
-		expect(metadata.bindings).toEqual([{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-0123456789abcdef' },
-			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: id }, { type: 'plain_text', name: 'CRATE_DELETE_TOKEN_HASH', text: hash },
-			{ type: 'plain_text', name: 'CRATE_DELETE_UPLOAD_TAG', text: tag }]);
-		expect(metadata.annotations).toEqual({ 'workers/message': `Crate deletion ${id}`, 'workers/tag': tag });
+
 		expect(body).not.toContain('account-secret');
-		expect(body).not.toContain('sqlite_master');
 	});
 
 	it('rejects an ambiguous truncated R2 listing', async () => {
@@ -131,31 +101,6 @@ describe('CloudflareApiClient', () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, ...response }) }));
 		await expect(new CloudflareApiClient('token', transport).listDurableObjectNamespaces('account')).rejects.toThrow('complete Durable Object');
 		expect(transport.mock.calls.length).toBeLessThanOrEqual(2);
-	});
-
-	it('builds a module upload with D1, R2, and declarative Durable Object bindings', () => {
-		const multipart = buildWorkerMultipartBody({
-			publicOrigin: 'https://worker.test',
-			vaultName: 'Notes',
-			uploadTag: 'crate-12345678-1234-1234-1234-123456789012',
-			artifacts,
-			d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef',
-			r2BucketName: 'crate-0123456789abcdef',
-		});
-		const body = new TextDecoder().decode(multipart.body);
-
-		expect(multipart.contentType).toMatch(/^multipart\/form-data; boundary=crate-/);
-		expect(body).toContain('"type":"d1","name":"DB"');
-		expect(body).toContain('"name":"CRATE_PUBLIC_ORIGIN","text":"https://worker.test"');
-		expect(body).toContain('"name":"CRATE_VAULT_NAME","text":"Notes"');
-		expect(body).toContain('"type":"r2_bucket","name":"BUCKET"');
-		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
-		expect(body).not.toContain('"name":"SETUP"');
-		expect(body).not.toContain('SetupCoordinator');
-		expect(body).toContain('"storage":"sqlite","state":"created"');
-		expect(body).toContain('"workers/tag":"crate-12345678-1234-1234-1234-123456789012"');
-		expect(body).toContain(`"workers/message":"Crate 0.1.0 ${'f'.repeat(64)}"`);
-		expect(body).toContain(artifacts.workerBundle);
 	});
 
 	it('uses a bearer token only in the request header', async () => {
@@ -229,7 +174,6 @@ describe('CloudflareApiClient', () => {
 	});
 });
 
-
 describe('Worker deletion', () => {
 	it.each(['', JSON.stringify({ success: true, result: null })])('accepts a successful delete response: %s', async text => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text }));
@@ -248,7 +192,6 @@ describe('Worker deletion', () => {
 		await expect(new CloudflareApiClient('token', transport).deleteWorker('account', 'crate-server')).rejects.toThrow();
 	});
 });
-
 
 describe('R2 cursor pagination compatibility', () => {
 	it.each([undefined, {}, { cursor: '' }, { cursor: null }, { is_truncated: false }])('accepts a terminal page with metadata %j', async result_info => {
@@ -287,10 +230,10 @@ describe('R2 cursor pagination compatibility', () => {
 });
 
 it('probes the exact Worker release without forwarding management credentials', async () => {
-  const metadata = { service: 'crate', serverRevision: serverRelease.revision, schemaVersion: serverRelease.schemaVersion, deploymentFingerprint: artifacts.fingerprint };
+  const metadata = { service: 'crate', serverRevision: serverRelease.revision, schemaVersion: serverRelease.schemaVersion, deploymentFingerprint: fingerprint };
   const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(metadata) }));
   const client = new CloudflareApiClient('management-secret', transport);
-  await client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint);
+  await client.verifyWorkerDeployment('https://crate.example.workers.dev', fingerprint);
   expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
   expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
 });

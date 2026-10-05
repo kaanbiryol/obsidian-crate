@@ -33,7 +33,7 @@ const ReminderQuarantineNotice = lazy(() => import('./ReminderQuarantineNotice')
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;
 	const connection = useAppConnection();
-	const { authority, authToken, apiFetch, config: storedConfig, encryption, logOut, loggingOut,
+	const { authority, authToken, apiFetch, config: storedConfig, logOut, loggingOut,
 		selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, registerPushCleanup } = connection;
 	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
 	const bootstrapped = connection.bootstrapped && hydratedAuthority === authority;
@@ -43,7 +43,7 @@ function useRemindersController() {
 	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
 	const editor = useReminderEditor(setSettingsOpen);
-	const { modal, saving, transition: modalTransition, closeModal, resetEditor, openReminder } = editor;
+	const { modal, saving, resetEditor } = editor;
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
 	const reminderSync = useReminderSync({ apiFetch, authToken, config, setSelectedProject, enabled });
@@ -66,7 +66,6 @@ function useRemindersController() {
 		loading,
 		refreshing,
 		error,
-		issues,
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
@@ -74,7 +73,6 @@ function useRemindersController() {
 		hasHydratedCache,
 		hydrateCachedSnapshot,
 		loadReminders,
-		rebuildOfflineCache,
 		beginLocalMutation,
 		commitReminderState,
 		resetReminderState,
@@ -110,13 +108,7 @@ function useRemindersController() {
 		refreshPushState,
 	});
 
-	const {
-		readOnlyMessage,
-		readOnly,
-		canShowNotificationPrompt,
-		statusText,
-		statusKind,
-	} = usePwaStatus({
+	const status = usePwaStatus({
 		authToken,
 		bootstrapped,
 		dataMode,
@@ -126,6 +118,8 @@ function useRemindersController() {
 		push,
 		refreshing,
 	});
+
+	const { readOnlyMessage, readOnly } = status;
 
 	const ensureCanMutate = useCallback(() => {
 		if (!enabled) return false;
@@ -160,17 +154,11 @@ function useRemindersController() {
 	});
 
 	const {
-		toggleReminderCompleted,
-		persistReorder,
 		visibleReminders,
-		visibleProjects,
 		changes,
 		ready: mutationsReady,
-		retryChange,
-		discardChange,
 		isPreparingMutation,
 		storageError,
-		retryInitialization,
 		recoveryChanges,
 		recoverChanges,
 		quarantinedChanges,
@@ -185,7 +173,7 @@ function useRemindersController() {
 		pendingChangesReady: mutationsReady || Boolean(storageError),
 	});
 
-	const { openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = useReminderEditorActions({
+	const editorActions = useReminderEditorActions({
 		editor, mutations, selectedProject, folderPath: config.folderPath, ensureCanMutate, showToast,
 	});
 	const sharedReminders = useMemo(() => visibleReminders.map(toSharedReminder), [visibleReminders]);
@@ -219,16 +207,16 @@ function useRemindersController() {
 	});
 
 	return {
-		encryption, logOut, loggingOut, colorScheme, isDarkMode, authToken, bootstrapped, config, selectedProject,
-		setSelectedProject, startTab, settingsOpen, launchReminderId, setLaunchReminderId, modal,
-		saving, modalTransition, closeModal, openReminder, reorderDragging, setReorderDragging,
-		showToast, loading, refreshing, error,
-		issues, dataMode, isOffline, loadReminders, rebuildOfflineCache, enablePushNotifications,
-		readOnlyMessage, readOnly, canShowNotificationPrompt, statusText, statusKind, handlePullRefresh,
-		toggleSettings, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, visibleReminders,
-		visibleProjects, changes, mutationsReady, retryChange, discardChange, storageError,
-		retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges, initialContentReady,
-		openModal, editFailedChange, sharedReminders, editReminder, resolvePageTitle,
+		connection: { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId },
+		sync: reminderSync,
+		mutations,
+		editor: { ...editor, ...editorActions },
+		status,
+		presentation: {
+			colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
+			showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
+		},
+		enablePushNotifications,
 	};
 }
 

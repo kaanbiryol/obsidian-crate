@@ -75,6 +75,11 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 
 ## Worker Bindings
 
+`cloudflare/worker-upload-payload.ts` builds multipart metadata and module bytes for
+normal, reset and deletion Workers. `cloudflare/cloudflare-api.ts` owns authenticated
+transport, response handling and pagination. Binding and export policy belongs with
+the payload builders, including preserved Durable Object namespaces during reset.
+
 | Binding | Type | Purpose |
 |---|---|---|
 | `BUCKET` | R2 Bucket | File storage |
@@ -102,6 +107,9 @@ CratePlugin (src/plugin/CratePlugin.ts)
 ```
 
 Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
+Pending previews, discard preparation and post-sync baseline verification live in
+`sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions.
+Discard keeps baseline persistence and queue settlement in one ordered operation.
 The engine retains cancellation, exclusive-operation checks and active-work tracking,
 including local and shared checkpoint saves. Shutdown drains those writes; the runtime
 only attaches a completed checkpoint while its originating engine is still current.
@@ -359,6 +367,9 @@ these implementations for existing feature consumers.
 
 `src/pwa/main.tsx` mounts the feature shell. `components/RemindersRuntime.tsx` composes
 reminder data, session, outbox, and editor hooks independently of the lazy screen.
+Its screen-facing contract groups connection, sync, mutations, editor, status and
+presentation models. The always-mounted provider retains hydration, recovery and
+update-readiness registration when the reminders screen is hidden.
 `useReminderSync` owns the confirmed snapshot and exposes reads and explicit
 commit/reset operations; outbox
 consumers cannot independently replace its refs or React state. `useReminderEditor`

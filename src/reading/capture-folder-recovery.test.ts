@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type CratePlugin from '../plugin/CratePlugin';
 import { createRuntimeHarness } from '../sync/runtime-test-harness';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
 import { saveEncryptionKeys } from '../plugin/encryption-storage';
 import { SECRET_KEYS } from '../plugin/settings-types';

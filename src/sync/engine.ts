@@ -1,10 +1,8 @@
 import type { RemoteFileVersion } from '../protocol/sync-types';
 import type { EngineFileOperations } from './engine-file-operations';
 import { createEngineHistory } from './engine-history';
+import { createEnginePendingChanges } from './engine-pending-changes';
 import { getSyncIssues, recordSyncError, syncErrorIssues } from './issues';
-import { loadPendingDiff } from './pending-diff';
-import { loadRemotePendingBase } from './pending-baseline';
-import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
@@ -45,8 +43,6 @@ import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './engine-full-sync-upload';
 import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
-import { createPendingDiscard } from './pending-discard';
-import { readLocalFileEntry } from './local-file-entry';
 import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { getCheckpointAuthority } from './worker-url';
@@ -270,23 +266,20 @@ export class SyncEngine {
 		return { ...this.state };
 	}
 
-	async loadPendingDiff(path: string, deleted: boolean) {
-		assertLocalSyncPath(path);
-		const baseline = this.localManifest.getEntry(path);
-		const verifyBaseline = () => {
-			if (this.localManifest.getEntry(path)?.hash !== baseline?.hash) {
-				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
-			}
-		};
-		const preview = await loadPendingDiff(this.vault.adapter, baseline,
-			async (filePath, hash) => {
-				const cached = await this.markdownBaseCache.readBase(filePath, hash);
-				verifyBaseline();
-				return cached ?? (baseline ? await loadRemotePendingBase(this.api, filePath, baseline, 256_000) : null);
-			}, path, deleted);
-		verifyBaseline();
-		return preview;
-	}
+    private pendingChanges() {
+        return createEnginePendingChanges({
+            vault: this.vault, api: this.api, manifest: this.localManifest,
+            cache: this.markdownBaseCache, queue: this.queueController,
+            backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
+            assertActive: () => this.lifecycle.throwIfDestroyed(),
+            isDestroyed: () => this.lifecycle.isDestroyed,
+            beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
+        });
+    }
+
+    async loadPendingDiff(path: string, deleted: boolean) {
+        return this.pendingChanges().loadDiff(path, deleted);
+    }
 
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
@@ -344,32 +337,7 @@ export class SyncEngine {
 
     async createPendingDiscard(keys: string[]) {
         this.assertPendingSelection(keys);
-        const review = await createPendingDiscard({
-            vault: this.vault,
-            getBaseline: path => this.localManifest.getEntry(path),
-            readBase: async (path, baseline) => await this.markdownBaseCache.readBase(path, baseline.hash)
-                ?? loadRemotePendingBase(this.api, path, baseline, MAX_FILE_SIZE_BYTES),
-            backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
-            verify: () => {
-                this.lifecycle.throwIfDestroyed();
-            },
-            beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
-            applied: async (path, remote, content) => {
-                if (remote && content) {
-                    const local = await readLocalFileEntry(this.vault, path);
-                    this.localManifest.setEntry(path, { ...remote, modified: local?.hash === remote.hash ? local.modified : 'unverified' });
-                }
-                else this.localManifest.removeEntry(path);
-                await this.localManifest.save();
-                const revisions = this.queueController.snapshotPendingRevisions();
-                const local = await readLocalFileEntry(this.vault, path);
-                if ((local?.hash ?? null) === (remote?.hash ?? null)) {
-                    const result = createEmptySyncResult();
-                    result.settledPaths = [path, `delete:${path}`];
-                    this.queueController.clearSyncedPendingPaths(result, revisions);
-                }
-            },
-        }, keys);
+        const review = await this.pendingChanges().prepareDiscard(keys);
         return { ...review, discard: async () => {
             this.assertPendingSelection(keys);
             return this.runExclusiveOperation(() => review.discard());
@@ -636,7 +604,7 @@ export class SyncEngine {
             } finally {
                 this.contexts.clearPlannedContent();
             }
-			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}
@@ -644,38 +612,6 @@ export class SyncEngine {
 		});
 	}
 
-	private async clearSyncedPendingPaths(result: SyncResult, revisions: ReadonlyMap<string, number>): Promise<void> {
-		if (this.lifecycle.isDestroyed) return;
-		this.queueController.clearSyncedPendingPaths(result, revisions);
-		if (!result.success) return;
-		// Applying remote bytes emits vault events too. Verify those events against
-		// the committed baseline instead of requiring another sync to clear them.
-		const applied = new Set([
-			...result.downloadedPaths,
-			...result.mergedPaths,
-			...result.deletedPaths,
-			// Conflict copies stay local; remote content was applied to the originals.
-			...result.unresolvedConflicts.map(conflict => conflict.path),
-		]);
-		const snapshot = this.queueController.snapshotPendingRevisions();
-		const settled = createEmptySyncResult();
-		for (const key of this.queueController.getPendingPaths()) {
-			if (this.lifecycle.isDestroyed) return;
-			const path = key.startsWith('delete:') ? key.substring(7) : key;
-			if (!applied.has(path)) continue;
-			const baseline = this.localManifest.getEntry(path);
-			try {
-				const local = await readLocalFileEntry(this.vault, path);
-				if (this.lifecycle.isDestroyed) return;
-				if (this.localManifest.getEntry(path) !== baseline) continue;
-				if (local?.hash === baseline?.hash) settled.settledPaths.push(key);
-			} catch {
-				// Unreadable files remain pending for the next sync.
-			}
-		}
-		// Events arriving during verification must still remain pending.
-		this.queueController.clearSyncedPendingPaths(settled, snapshot);
-	}
 
 	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
         if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
@@ -684,7 +620,7 @@ export class SyncEngine {
 			this.updateState({ status: 'syncing' });
 			try {
 				const result = await this.reconcilePaths(queueKeys, !selectedOnly);
-				await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+				await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 				if (result.success) {
 					if (!selectedOnly) await this.contexts.finishInitialSetup();
 					const lastSync = new Date().toISOString();
@@ -744,7 +680,7 @@ export class SyncEngine {
 			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback);
-			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}
@@ -757,7 +693,7 @@ export class SyncEngine {
 			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback);
-			await this.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();
 			}

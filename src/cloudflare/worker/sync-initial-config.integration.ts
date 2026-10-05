@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
-import { TEST_PLUGIN_DIR } from './sync-engine-vault-test-harness';
+import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 const paths = ['app', 'appearance', 'community-plugins', 'core-plugins'].map(name => `.obsidian/${name}.json`);
 const appearance = '.obsidian/appearance.json';

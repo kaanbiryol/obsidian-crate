@@ -441,9 +441,23 @@ The vitest config aliases `obsidian` imports to this mock file, so all `import {
 
 ## Testing Patterns
 
-### The Harness Pattern (engine.test.ts)
+### Persistent Engine Harness
 
-For integration-level tests of `SyncEngine`, a typed `Harness` object bundles all mock dependencies:
+`sync/engine-persistence-test-harness.ts` initializes a real `SyncEngine`,
+`LocalManifest`, upload/restore journals and file operations against
+`test/factories/sync-vault.ts`. Inject responses through `ApiHttpTransport` for
+network-dependent cases. The shared vault fixture is also used by Worker runtime
+integration tests; plugin and sync tests do not import fixtures from Worker code.
+
+Use this harness for checkpoint persistence, discard/recovery and shutdown ordering.
+Assert stored bytes and public engine results. Do not replace private engine fields:
+file operations retain their original manifest and journal bindings. The harness
+destroys engines and drains active work after each test.
+
+### Lightweight Engine Harness
+
+`sync/engine-test-harness.ts` bundles mock dependencies for isolated planning and
+orchestration tests. It does not establish persistence behavior:
 
 ```ts
 type Harness = {
@@ -539,8 +553,9 @@ const context = {
 
 ### Engine (integration)
 
-- Uses the full Harness type with all dependencies mocked
-- Tests the orchestration logic (sync mode selection, state transitions, error handling)
+- Use the persistent harness for manifest, journal, recovery and shutdown behavior.
+- Use the lightweight mock harness for sync mode selection, state transitions and
+  isolated error handling.
 - Trigger fallback through an expired changelog response and cancellation through
   pending adapter/API work, rather than replacing private engine contexts.
 - Test pagination directly with `incremental-changelog.test.ts`; incremental

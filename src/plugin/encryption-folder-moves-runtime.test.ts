@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { TFolder } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { createRuntimeHarness } from '../sync/runtime-test-harness';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { LocalManifest } from '../sync/manifest';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertRenamePreserved } from '../sync/rename-dependencies';
@@ -18,7 +18,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it.each(['single', 'rapid', 'previous rename', 'paused rename'] as const)('preserves the remote-deletion guard when encrypted conversion stops the engine (%s)', async mode => {
   const second = mode === 'rapid';
   vi.stubGlobal('window', { setTimeout, clearTimeout });
-  const h = createRuntimeHarness({ automaticSync: false, syncOnStartup: false, reading: { enabled: true, folderPath: 'Reading' } });
+  const h = createRuntimeHarness({ automaticSync: false, reading: { enabled: true, folderPath: 'Reading' } });
   const disk = new PersistentTestVault();
   for (const folder of ['Reading', 'Articles', 'Saved']) await disk.vault.createFolder(folder);
   disk.write('Reading/note.md', 'private note');

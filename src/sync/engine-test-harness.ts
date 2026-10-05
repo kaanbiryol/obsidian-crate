@@ -123,7 +123,7 @@ function createSettings(): CrateSettings {
 		deviceId: 'dev-1',
 		ignorePatterns: ['.trash/', '*.tmp'],
 		automaticSync: true,
-		syncOnStartup: false,
+		syncOnStartup: true,
 		syncOnResume: true,
 		syncInterval: 0,
 		syncHistory: [],

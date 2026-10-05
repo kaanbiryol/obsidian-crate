@@ -9,6 +9,12 @@ sync. Empty remotes activate encryption before the first file upload; existing
 remote files and retained versions are converted on the client. Pending local
 changes and upload receipts reconcile on the next encrypted sync. Explicitly saved preferences are preserved when upgrading or restarting.
 
+`automaticSync` is the device-local control for startup, foreground, periodic and
+edit-triggered sync. `syncOnStartup` and `syncOnResume` remain in saved/shared
+settings for compatibility with older clients; the current runtime does not use
+them to decide whether to sync. Tests that disable automatic work should set
+`automaticSync: false`.
+
 ## Sync Modes
 
 ### 1. Periodic Check

@@ -3,7 +3,7 @@ import { getExtensionFromPath, isHiddenPath } from '../../sync/file-discovery';
 
 export const TEST_PLUGIN_DIR = '.obsidian/plugins/crate';
 
-/** Persistent host filesystem seam; real sync owns checkpoints, hashes and merges. */
+/** Shared persistent vault fixture; real sync owns checkpoints, hashes and merges. */
 export class PersistentTestVault {
 	private readonly files = new Map<string, { content: ArrayBuffer; mtime: number }>();
 	private readonly folders = new Set<string>(['']);

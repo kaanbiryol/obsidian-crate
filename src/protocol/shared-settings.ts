@@ -2,7 +2,9 @@ import { isRecord } from '../platform/validation';
 
 export interface SharedSettings {
 	ignorePatterns: string[];
+	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
 	syncOnStartup: boolean;
+	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
 	syncOnResume: boolean;
 	syncInterval: number;
 	pushEnabled: boolean;

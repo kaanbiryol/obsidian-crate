@@ -1,19 +1,23 @@
 import { expect, it, vi } from 'vitest';
-import { createHarness } from './engine-test-harness';
+import { createPersistentEngineHarness } from './engine-persistence-test-harness';
 import { createDeferred } from './runtime-test-harness';
+import { TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
+
+const unexpectedRequest = vi.fn(async (): Promise<never> => { throw new Error('Unexpected network request'); });
 
 it.each(['write', 'read'] as const)('drains a local history checkpoint during delayed %s before shutdown completes', async boundary => {
-	const { engine, vault } = createHarness({ automaticSync: false });
+	const { engine, vault, disk } = await createPersistentEngineHarness(unexpectedRequest);
 	const started = createDeferred<void>();
 	const release = createDeferred<void>();
-	const files = new Map<string, string>();
-	vault.adapter.write = vi.fn(async (path: string, text: string) => {
+	const write = vault.adapter.write.bind(vault.adapter);
+	const read = vault.adapter.read.bind(vault.adapter);
+	vi.spyOn(vault.adapter, 'write').mockImplementation(async (path, text) => {
 		if (boundary === 'write') { started.resolve(); await release.promise; }
-		files.set(path, text);
+		await write(path, text);
 	});
-	vault.adapter.read = vi.fn(async (path: string) => {
+	vi.spyOn(vault.adapter, 'read').mockImplementation(async path => {
 		if (boundary === 'read') { started.resolve(); await release.promise; }
-		return files.get(path);
+		return read(path);
 	});
 	const saving = engine.saveHistoryCheckpoint();
 	await started.promise;
@@ -29,13 +33,16 @@ it.each(['write', 'read'] as const)('drains a local history checkpoint during de
 		await stopping;
 	}
 	expect(drained).toHaveBeenCalledOnce();
+	const id = await saving;
+	expect(JSON.parse(disk.text(`${TEST_PLUGIN_DIR}/history-checkpoints/${id}.json`))).toMatchObject({
+		authority: 'https://server.test', files: {},
+	});
 });
 
 it('drains a shared history checkpoint before shutdown completes', async () => {
-	const { engine, api } = createHarness({ automaticSync: false });
+	const { engine, api } = await createPersistentEngineHarness(unexpectedRequest);
 	const result = createDeferred<undefined>();
-	const save = vi.fn(() => result.promise);
-	Object.assign(api, { sharedHistory: { save } });
+	const save = vi.spyOn(api.sharedHistory, 'save').mockImplementation(() => result.promise);
 	const saving = engine.saveSharedHistoryCheckpoint();
 	expect(save).toHaveBeenCalledOnce();
 	engine.destroy();

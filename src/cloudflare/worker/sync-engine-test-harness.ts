@@ -8,7 +8,7 @@ import type { FileManifest } from '../../protocol/sync-types';
 import { sha256Hex } from './auth';
 import worker from './index';
 import type { Env } from './types';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from './sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 interface PausedResponse {
 	committed(): void;

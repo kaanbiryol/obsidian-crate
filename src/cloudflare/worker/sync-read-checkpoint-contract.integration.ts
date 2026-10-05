@@ -5,7 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
-import { TEST_PLUGIN_DIR } from './sync-engine-vault-test-harness';
+import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import worker from './index';
 
 const devices: SyncTestDevice[] = [];

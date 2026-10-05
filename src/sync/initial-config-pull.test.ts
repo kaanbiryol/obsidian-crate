@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { PersistentTestVault, TEST_PLUGIN_DIR } from '../cloudflare/worker/sync-engine-vault-test-harness';
+import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import type { FileEntry } from '../protocol/sync-types';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
