@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
+import { pendingChangeKey } from '../src/sync/pending-change.ts';
 
 // Exercise the production renderer with Obsidian's small DOM helper surface.
 const { outputFiles } = await build({
@@ -10,6 +11,7 @@ const { outputFiles } = await build({
         resolveDir: process.cwd(), loader: 'ts', contents: `
             import { renderPendingPanel } from './src/ui/activity/panels';
             import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
+            import { pendingChangeKey, decodePendingChange } from './src/sync/pending-change';
             HTMLElement.prototype.createEl = function(tag, options = {}) {
                 const el = document.createElement(tag);
                 if (options.cls) el.className = options.cls;
@@ -24,6 +26,8 @@ const { outputFiles } = await build({
             HTMLElement.prototype.empty = function() { this.replaceChildren(); };
             HTMLElement.prototype.toggleClass = function(name, active) { this.classList.toggle(name, active); };
             window.calls = 0;
+            window.loadArguments = [];
+            window.pendingChangeKey = pendingChangeKey;
             window.syncKeys = []; window.discardKeys = []; window.discarded = 0;
             window.syncFailure = false;
             const actions = {
@@ -37,15 +41,15 @@ const { outputFiles } = await build({
                     new PendingDiscardModal({}, async () => {
                         if (window.delayDiscardReview) await new Promise(resolve => { window.releaseDiscardReview = resolve; });
                         return ({
-                        items: keys.filter(key => window.allChanged || key.endsWith('appearance.json') || key.startsWith('delete:')).map(key => ({ path: key.replace(/^delete:/, ''), action: 'restore' })),
-                        unchangedCount: keys.filter(key => !window.allChanged && !key.endsWith('appearance.json') && !key.startsWith('delete:')).length, discard: async () => { window.discarded++; },
-                    }); }, () => {}, keys.map(key => key.replace(/^delete:/, ''))).open();
+                        items: keys.filter(key => window.allChanged || decodePendingChange(key).path.endsWith('appearance.json') || decodePendingChange(key).kind === 'delete').map(key => ({ path: decodePendingChange(key).path, action: 'restore' })),
+                        unchangedCount: keys.filter(key => !window.allChanged && !decodePendingChange(key).path.endsWith('appearance.json') && decodePendingChange(key).kind !== 'delete').length, discard: async () => { window.discarded++; },
+                    }); }, () => {}, keys.map(key => decodePendingChange(key).path)).open();
                 },
             };
             window.fail = false;
             window.delayed = false;
             const state = {};
-            window.paths = ['.obsidian/appearance.json', '.obsidian/core-plugins.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', 'delete:Notes/Archive.md'];
+            window.paths = ['.obsidian/appearance.json', '.obsidian/core-plugins.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', pendingChangeKey('delete', 'Notes/Archive.md')];
             const before = JSON.stringify({
                 theme: 'system', accentColor: '#7c3aed', baseFontSize: 16,
                 cssTheme: '', enabledCssSnippets: [], showViewHeader: true,
@@ -60,6 +64,7 @@ const { outputFiles } = await build({
                 renderPendingPanel(panel, window.paths, false, false, null, '', undefined,
                     async (path, deleted) => {
                         window.calls++;
+                        window.loadArguments.push({ path, deleted });
                         if (window.delayed) { window.delayed = false; await new Promise(resolve => { window.release = resolve; }); }
                         if (window.fail) throw new Error('Could not reach the sync server.');
                         return { before, after: deleted ? '' : window.allChanged || path.endsWith('appearance.json') ? after : before, beforeSize: before.length, afterSize: deleted ? 0 : after.length, kind: deleted ? 'deleted' : 'modified' };
@@ -212,7 +217,7 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
                 await page.getByRole('button', { name: /^Sync \d+ files?$/ }).click();
                 assert.deepEqual(await page.evaluate(() => window.syncKeys), [
-                    '.obsidian/appearance.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', 'delete:Notes/Archive.md',
+                    '.obsidian/appearance.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', pendingChangeKey('delete', 'Notes/Archive.md'),
                 ]);
                 await page.evaluate(() => window.mount());
                 await expect(checks.nth(1)).not.toBeChecked();
@@ -380,7 +385,7 @@ for (const browserType of [chromium, webkit]) {
                     await checks.first().uncheck();
                     await first.click({ button: 'right' });
                     await page.getByRole('menuitem', { name: 'Discard 3 items…', exact: true }).click();
-                    assert.deepEqual(await page.evaluate(() => window.discardKeys), ['.obsidian/appearance.json', '.obsidian/types.json', 'delete:Notes/Archive.md']);
+                    assert.deepEqual(await page.evaluate(() => window.discardKeys), ['.obsidian/appearance.json', '.obsidian/types.json', pendingChangeKey('delete', 'Notes/Archive.md')]);
                     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
                     await rows.nth(3).click({ button: 'right' });
                     await expect(highlighted).toHaveCount(1);
@@ -452,9 +457,39 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.getByRole('button', { name: 'Discard changes (20)' })).toBeEnabled();
                 assert.equal((await page.evaluate(() => window.discardKeys)).length, 20);
                 await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+                // A filename beginning with "delete:" and a real deletion stay distinct.
+                await page.evaluate(() => {
+                    window.paths = [window.pendingChangeKey('upload', 'delete:note.md'), window.pendingChangeKey('delete', 'note.md')];
+                    window.loadArguments = [];
+                    window.mount();
+                });
+                const literalPath = page.getByRole('button', { name: 'Review changes for delete:note.md', exact: true });
+                const deletedPath = page.getByRole('button', { name: 'Review deletion of note.md', exact: true });
+                await expect(literalPath).toBeVisible();
+                await expect(deletedPath.getByText('Deleted', { exact: true })).toBeVisible();
+                assert.deepEqual(await page.evaluate(() => window.loadArguments), [
+                    { path: 'delete:note.md', deleted: false }, { path: 'note.md', deleted: true },
+                ]);
+                await page.getByRole('checkbox', { name: 'Sync note.md', exact: true }).uncheck();
+                await expect(page.getByRole('checkbox', { name: 'Sync delete:note.md', exact: true })).toBeChecked();
+                await syncSelected.click();
+                assert.deepEqual(await page.evaluate(() => window.syncKeys), ['delete:note.md']);
+                await all.check();
+                await syncSelected.click();
+                assert.deepEqual(await page.evaluate(() => window.syncKeys), ['delete:note.md', pendingChangeKey('delete', 'note.md')]);
+                await literalPath.click({ button: 'right' });
+                await page.getByRole('menuitem', { name: 'Open in Obsidian', exact: true }).click();
+                assert.equal(await page.evaluate(() => window.openedPath), 'delete:note.md');
+                for (const [row, key] of [[literalPath, 'delete:note.md'], [deletedPath, pendingChangeKey('delete', 'note.md')]]) {
+                    await row.click({ button: 'right' });
+                    await page.getByRole('menuitem', { name: 'Discard 1 item…', exact: true }).click();
+                    assert.deepEqual(await page.evaluate(() => window.discardKeys), [key]);
+                    await expect(page.getByRole('button', { name: 'Discard changes (1)', exact: true })).toBeEnabled();
+                    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+                }
                 // Large attachment queues do not make a request per image before reaching text.
                 await page.evaluate(() => {
-                    window.paths = Array.from({ length: 499 }, (_, i) => (i % 2 ? 'delete:' : '') + 'Image ' + i + '.PNG');
+                    window.paths = Array.from({ length: 499 }, (_, i) => window.pendingChangeKey(i % 2 ? 'delete' : 'upload', 'Image ' + i + '.PNG'));
                     window.paths.push('Note.md');
                     window.calls = 0;
                     window.mount();

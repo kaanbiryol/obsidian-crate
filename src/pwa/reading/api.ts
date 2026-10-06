@@ -2,7 +2,7 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
 import { EncryptedReadingApi } from '@/reading/encrypted-api';
-import { readValue, writeValue } from './storage';
+import { readReadingAttempt, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -11,6 +11,7 @@ import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingS
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
 import { isReadingCache } from './storage-validation';
+import { isReadingArticle, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption-folder-routing';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
@@ -65,8 +66,8 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
         captureArticle: async url => (await import('./capture-article')).captureBrowserArticle(url),
         folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },
         request: (route, wire) => rawReadingRequest(route, session, wire),
-        readAttempt: id => readValue(`attempt:${session.id}:${id}`),
-        writeAttempt: (id, attempt) => writeValue(`attempt:${session.id}:${id}`, attempt, session),
+        readAttempt: id => readReadingAttempt(session, id),
+        writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
         error: (message, status, code) => new ReadingApiError(message, status, code),
       }) };
       const value = await encryptedClient.api.request(path, body); assertReadingSession(session);
@@ -98,4 +99,10 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
   } while (cursor);
   if (!isReadingCache(cache, session.folderPath)) throw new Error('Reading library response is unreadable.');
   return commitReadingCache(session, cache);
+}
+
+export async function loadReadingArticle(session: ReadingSession, id: string): Promise<ReadingArticle> {
+  const article = await readingRequest<unknown>(`/reading/item?id=${encodeURIComponent(id)}`, session);
+  if (!isReadingArticle(article, session.folderPath, id) || !article.item.path) throw new Error('Reading article response is unreadable.');
+  return article;
 }

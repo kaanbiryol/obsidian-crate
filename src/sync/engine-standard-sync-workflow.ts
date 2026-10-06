@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { recordSyncError } from './issues';
 import {
 	createEmptySyncResult,
@@ -118,7 +119,7 @@ export async function runSyncWorkflow(
 		result.errors.push(...errors);
 		if (plan.issues?.length) (result.issues ??= []).push(...plan.issues);
 		for (const [path, entry] of Object.entries(localFiles)) {
-			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(path);
+			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(pendingChangeKey('upload', path));
 		}
 
 		const conflictDiffs = diffs.filter(diff => diff.action === 'conflict');

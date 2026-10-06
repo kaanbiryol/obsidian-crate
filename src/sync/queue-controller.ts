@@ -1,3 +1,4 @@
+import { pendingChangeKey, decodePendingChange } from './pending-change';
 import type { TAbstractFile } from 'obsidian';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import { createEmptySyncResult } from './sync-result';
@@ -55,6 +56,7 @@ export class SyncQueueController {
 
 	constructor(private readonly context: SyncQueueControllerContext) {}
 
+	/** Canonical pending-change keys; decode before treating them as file paths. */
 	getPendingPaths(): string[] {
 		const combined = new Set(this.pendingPaths);
 		for (const path of this.inFlightPaths) combined.add(path);
@@ -67,9 +69,9 @@ export class SyncQueueController {
 
 	restorePendingPaths(paths: string[]): void {
 		for (const key of paths) {
-			const path = key.startsWith('delete:') ? key.substring(7) : key;
+			const path = decodePendingChange(key).path;
 			// Live events take precedence over the startup snapshot.
-			if (this.pendingPaths.has(path) || this.pendingPaths.has(`delete:${path}`)) continue;
+			if (this.pendingPaths.has(pendingChangeKey('upload', path)) || this.pendingPaths.has(pendingChangeKey('delete', path))) continue;
 			if (this.context.shouldIgnore(path)) continue;
 			this.pendingPaths.add(key);
 			this.pendingRevisions.set(key, ++this.nextRevision);

@@ -1,6 +1,7 @@
 import type { TAbstractFile } from 'obsidian';
 import { TFolder } from 'obsidian';
 import type { SyncResult, SyncState } from './types';
+import { pendingChangeKey, type PendingChange } from './pending-change';
 
 export interface QueueDebounceContext {
 	pendingPaths: Set<string>;
@@ -28,10 +29,9 @@ export interface QueueReconcileContext {
 	updateState(updates: Partial<SyncState>): void;
 }
 
-function addPendingPath(context: QueueEventContext, path: string): void {
-	const oppositePath = path.startsWith('delete:')
-		? path.substring(7)
-		: `delete:${path}`;
+function addPendingPath(context: QueueEventContext, change: PendingChange): void {
+	const path = pendingChangeKey(change.kind, change.path);
+	const oppositePath = pendingChangeKey(change.kind === 'delete' ? 'upload' : 'delete', change.path);
 	context.pendingPaths.delete(oppositePath);
 	context.clearPending?.(oppositePath);
 	context.pendingPaths.add(path);
@@ -40,14 +40,14 @@ function addPendingPath(context: QueueEventContext, path: string): void {
 
 export function onFileChange(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
-		addPendingPath(context, file.path);
+		addPendingPath(context, { kind: 'upload', path: file.path });
 		context.triggerDebouncedSync();
 	}
 }
 
 export function onFileDelete(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
-		addPendingPath(context, `delete:${file.path}`);
+		addPendingPath(context, { kind: 'delete', path: file.path });
 		context.triggerDebouncedSync();
 	}
 }
@@ -64,10 +64,10 @@ export function onFileRename(
 	if (oldIgnored && newIgnored) return;
 
 	if (!oldIgnored) {
-		addPendingPath(context, `delete:${oldPath}`);
+		addPendingPath(context, { kind: 'delete', path: oldPath });
 	}
 	if (!newIgnored) {
-		addPendingPath(context, file.path);
+		addPendingPath(context, { kind: 'upload', path: file.path });
 	}
 	context.triggerDebouncedSync();
 }
@@ -136,10 +136,10 @@ export function clearSyncedPendingPaths(
 		context.pendingRevisions?.delete(key);
 	};
 
-	for (const path of result.uploadedPaths) clearIfUnchanged(path);
-	for (const path of result.downloadedPaths) clearIfUnchanged(path);
-	for (const path of result.mergedPaths ?? []) clearIfUnchanged(path);
-	for (const path of result.deletedPaths) clearIfUnchanged(`delete:${path}`);
+	for (const path of result.uploadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));
+	for (const path of result.downloadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));
+	for (const path of result.mergedPaths ?? []) clearIfUnchanged(pendingChangeKey('upload', path));
+	for (const path of result.deletedPaths) clearIfUnchanged(pendingChangeKey('delete', path));
 	for (const queueKey of result.settledPaths) clearIfUnchanged(queueKey);
 
 	if (context.pendingPaths.size === previousPendingCount) {

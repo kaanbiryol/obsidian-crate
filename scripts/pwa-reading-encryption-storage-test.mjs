@@ -7,6 +7,7 @@ const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 
 export * from './src/pwa/reading/storage';
+export { readingDatabase } from './src/pwa/reading/database';
 export * from './src/pwa/reading/encryption-session';
 export * from './src/pwa/reading/encryption-lifecycle';
 export * from './src/pwa/encryption-fragments';
@@ -14,7 +15,7 @@ export * from './src/pwa/encryption-keys';
 export { loadReading } from './src/pwa/reading/api';
 export { createReadingNote, parseReadingNote } from './src/reading/core/notes';
 export { LocalStateCipher } from './src/encryption/local-state';
-export { lockReadingStorage, unlockReadingStorage } from './src/pwa/reading/private-storage';
+export { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './src/pwa/reading/private-storage';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useReadingSession } from './src/pwa/reading/useReadingSession';
@@ -57,7 +58,7 @@ for (const engine of [chromium, webkit]) {
       const migrated = await db.get('values', 'draft:reader');
       const raw = JSON.stringify(await db.getAll('values'));
       if (raw.includes('private.example') || raw.includes('private queued edit')) throw new Error('Migration left plaintext');
-      const opened = await t.readReadingDraft('draft:reader');
+      const opened = await t.readReadingDraft(session);
       const unrelated = await db.get('values', 'draft:reader-other');
       const keys = await t.readReminderKeys(bundle.vaultId, scope.id);
       if (keys.data.key.extractable || keys.data.secret) throw new Error('Persisted extractable key');
@@ -87,7 +88,7 @@ for (const engine of [chromium, webkit]) {
       await t.rememberReminderKeys(t.createReminderKeyGrant(bundle, 'Reading'));
       t.resetReadingEncryption();
       await t.prepareReadingEncryption(session);
-      const recovered = await t.readReadingDraft('draft:reader');
+      const recovered = await t.readReadingDraft(session);
 
       // A transaction failure may not leave a half-migrated plaintext session.
       t.resetReadingEncryption();
@@ -110,10 +111,10 @@ for (const engine of [chromium, webkit]) {
       await clearing;
       const survived = await db.get('values', 'draft:reader');
       let staleRejected = false;
-      try { await t.writeValue('draft:reader', { url: 'stale' }, session); } catch { staleRejected = true; }
+      try { await t.saveReadingDraft(session, { url: 'stale' }); } catch { staleRejected = true; }
       t.resetReadingEncryption();
       let locked = false;
-      try { await t.readReadingDraft('draft:reader'); } catch { locked = true; }
+      try { await t.readReadingDraft(session); } catch { locked = true; }
       return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack,
         healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement, preservedList, recoveryIssue: live.issues.length === 1,
         preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked };
@@ -144,8 +145,9 @@ for (const engine of [chromium, webkit]) {
         unlock();
         const pending = kind === 'empty' ? [] : kind === 'damaged' ? { damaged: true }
           : [{ id: 'retained', sessionId: session.id, action: 'capture', intent: { url: 'https://example.com/retained' } }];
-        await t.writeValue('pending:reader', pending, session);
-        await t.writeValue('draft:reader', { url: 'https://example.com/draft' }, session);
+        if (kind === 'damaged') await (await t.readingDatabase()).put('values', t.encodeReadingValue('pending:reader', pending), 'pending:reader');
+        else await t.savePendingReading(session, pending);
+        await t.saveReadingDraft(session, { url: 'https://example.com/draft' });
         window.pendingBytes = JSON.stringify(await (await t.readingDatabase()).get('values', 'pending:reader'));
         t.lockReadingStorage();
         const render = t.mountSession({ session: null, lockedSession: null, ready: false, connecting: false, error: null, resetSession() {} });

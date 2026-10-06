@@ -1,3 +1,4 @@
+import { decodePendingChange } from './pending-change';
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -30,7 +31,7 @@ interface DiscardSnapshot extends DiscardItem { localHash: string | null; remote
 
 /** Capture confirmation versions without holding file contents in memory. */
 export async function createPendingDiscard(context: DiscardContext, keys: string[]): Promise<PendingDiscardReview> {
-    const paths = [...new Set(keys.map(key => key.startsWith('delete:') ? key.slice(7) : key))];
+    const paths = [...new Set(keys.map(key => decodePendingChange(key).path))];
     for (const path of paths) assertLocalSyncPath(path);
     context.verify();
     const snapshots: DiscardSnapshot[] = [];

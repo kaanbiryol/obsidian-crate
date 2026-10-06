@@ -115,6 +115,11 @@ Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
 Pending previews, discard preparation and post-sync baseline verification live in
 `sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions.
 Discard keeps baseline persistence and queue settlement in one ordered operation.
+`sync/pending-change.ts` owns the operation/path representation used by the queue,
+reconciliation, discard and Activity selection. Deletion keys use a marker that
+cannot occur in a valid sync path; a file named `delete:note.md` remains an ordinary
+upload. These keys are volatile and are rebuilt from local files at startup, so
+the representation does not change checkpoints or the wire protocol.
 The engine retains cancellation, exclusive-operation checks and active-work tracking,
 including local and shared checkpoint saves. Shutdown drains those writes; the runtime
 only attaches a completed checkpoint while its originating engine is still current.
@@ -278,9 +283,16 @@ explicit refresh can retry uncertain commands. Rejected commands remain for revi
 Settings deadlines and failure announcements use the same outbox policy: transient
 errors remain visible, while toasts wait until automatic recovery stops or review
 is required.
-`pwa/reading/storage.ts` owns `commitReadingCache`, keeping uncertain-source
+`pwa/reading/cache.ts` owns `commitReadingCache`, keeping uncertain-source
 preservation, article pruning, encrypted records and list persistence in one guarded
-transaction. `pwa/reading/api.ts` retains pagination and response validation.
+transaction. `reading/database.ts` owns database lifetime and raw encrypted values;
+`reading/session.ts` owns session authority. The storage facade exposes specific
+draft, pending-command, share and immutable-attempt operations, keeping raw keys
+inside persistence and migration code. Export and logout retain their recovery guards.
+`pwa/reading/api.ts` retains pagination and response validation, including
+`loadReadingArticle`. Network and cache reads share item/article validation in
+`reading/record-validation.ts`; live articles must match the requested identity and
+enrolled folder before the reader or offline cache receives them.
 The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
 
@@ -372,6 +384,11 @@ The plugin stores two local values through `SecretStorageService`:
 
 The service uses Obsidian's official `App.secretStorage` type and scopes the sync bearer token by Worker URL so credentials cannot leak between deployments.
 
+`plugin/settings-types.ts` separates persisted settings from the runtime device ID.
+Loading initializes settings before hydrating that ID from secret storage. Queued
+settings writes normalize and publish only persisted fields, preserving the hydrated
+identity and the existing shared settings object.
+
 ## Worker and PWA build
 
 The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML, styles, install assets, and service worker live in `src/cloudflare/worker/pwa/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes the deployable module to `.generated/cloudflare/worker.mjs`.
@@ -443,6 +460,9 @@ maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
 request budgets before storage work. `sync-batch/upload.ts` retains receipt
 checks, encryption validation, staging and the bulk/conditional commit paths.
 Per-file validation errors retain the batch response's partial-success behavior.
+Single and bulk notification-source publication share ID, due-key and occurrence
+aggregation in `worker/reminder-source-summary.ts`. Their specialized SQL and
+atomic file-publication transactions remain separate.
 
 `cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
 notification coordination requirements once. Admission, scope authorization and

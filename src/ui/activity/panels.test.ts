@@ -3,6 +3,7 @@ import { FakeElement, createObsidianUiModule } from '../../test/fakes/obsidian-u
 
 vi.mock('obsidian', () => createObsidianUiModule());
 import { renderConflictsPanel, renderPendingPanel } from './panels';
+import { pendingChangeKey } from '../../sync/pending-change';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -40,7 +41,7 @@ it('shows runtime saving progress after the engine finishes an unchanged sync', 
 
 it('replaces the pending file list with a loading indicator during sync', () => {
     const element = new FakeElement('div');
-    renderPendingPanel(element as never, ['Notes/draft.md', 'delete:old.md'], false, true);
+    renderPendingPanel(element as never, ['Notes/draft.md', pendingChangeKey('delete', 'old.md')], false, true);
     expect(element.collectText()).toBe('Starting sync…');
     expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
     expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
@@ -49,6 +50,17 @@ it('replaces the pending file list with a loading indicator during sync', () => 
     renderPendingPanel(element as never, ['Notes/draft.md']);
     expect(element.collectText()).toContain('draft.md');
     expect(element.collectText()).not.toContain('Starting sync…');
+});
+
+it('keeps a literal delete-prefixed filename separate from a pending deletion', () => {
+    const element = new FakeElement('div');
+    renderPendingPanel(element as never, [pendingChangeKey('upload', 'delete:note.md'), pendingChangeKey('delete', 'note.md')]);
+    const cards = element.children[0]!.children;
+    expect(cards).toHaveLength(2);
+    expect(cards[0]!.collectText()).toBe('delete:note.md');
+    expect(cards[0]!.querySelector('.crate-file-icon-upload')?.getAttribute('aria-label')).toBe('Upload');
+    expect(cards[1]!.collectText()).toBe('note.md');
+    expect(cards[1]!.querySelector('.crate-file-icon-delete')?.getAttribute('aria-label')).toBe('Delete');
 });
 
 it.each([false, true])('shows a conflict state without a duplicate sync subtitle (checking: %s)', checking => {

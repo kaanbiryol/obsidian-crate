@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { getPathEntry } from '../protocol/path-record';
@@ -17,16 +18,16 @@ export async function findStartupPendingPaths(context: {
 	const changes = await context.runConcurrent(files.map(file => async () => {
 		context.throwIfDestroyed();
 		const entry = getPathEntry(context.baseline, file.path);
-		if (!entry || file.size > MAX_FILE_SIZE_BYTES) return file.path;
+		if (!entry || file.size > MAX_FILE_SIZE_BYTES) return pendingChangeKey('upload', file.path);
 		const hash = await computeHash(await context.vault.adapter.readBinary(file.path));
-		return hash === entry.hash ? null : file.path;
+		return hash === entry.hash ? null : pendingChangeKey('upload', file.path);
 	}), concurrency);
 	const present = new Set(files.map(file => file.path));
 	const missing = Object.keys(context.baseline).filter(path => !context.shouldIgnore(path)
 		&& !present.has(path));
 	const deletions = await context.runConcurrent(missing.map(path => async () => {
 		context.throwIfDestroyed();
-		return await context.vault.adapter.exists(path) ? null : `delete:${path}`;
+		return await context.vault.adapter.exists(path) ? null : pendingChangeKey('delete', path);
 	}), concurrency);
 	context.throwIfDestroyed();
 	return [...changes, ...deletions].filter((path): path is string => path !== null);

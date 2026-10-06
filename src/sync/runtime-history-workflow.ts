@@ -1,3 +1,4 @@
+import { decodePendingChange } from './pending-change';
 import type { SyncEngine } from './engine';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { SyncHistoryEntry, SyncResult } from './types';
@@ -56,7 +57,7 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
         if (!review.items.length) return;
         const result = await runSyncOperation(async (current, progress) => {
             const removed = new Set(review.items.filter(item => item.action === 'remove').map(item => item.path));
-            const keys = removed.size ? current.getPendingPaths().filter(key => removed.has(key.startsWith('delete:') ? key.slice(7) : key)) : [];
+            const keys = removed.size ? current.getPendingPaths().filter(key => removed.has(decodePendingChange(key).path)) : [];
             // The verified local recovery copies allow explicit removals to
             // settle first, freeing paths for historical file/folder renames.
             const deletions = keys.length ? await current.syncSelected(keys) : undefined;

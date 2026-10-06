@@ -2,6 +2,7 @@ import { readEncryptionState } from './encryption-state';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
 import { parseReminderSource } from './reminder-source-parse';
+import { summarizeReminderSources } from './reminder-source-summary';
 import { recordReminderSourceState } from './reminder-source-state';
 import { getReminderFolder, isReminderPath } from './reminder-scope';
 
@@ -24,13 +25,7 @@ export async function enqueueFileProjection(db: D1Database, path: string, storag
         last_error = excluded.last_error, updated_at = datetime('now')`).bind(path, token, parsed.issue, ...args),
       recordFileFailure(db, path, parsed.issue, guard, args, true)];
   }
-  const sources = new Map<string, { id: string; due: string; count: number }>();
-  for (const reminder of parsed.reminders) {
-    const prior = sources.get(reminder.id);
-    if (prior) prior.count++;
-    else sources.set(reminder.id, { id: reminder.id, due: reminder.dueDatetime ?? reminder.dueDate ?? '', count: 1 });
-  }
-  const json = JSON.stringify([...sources.values()]);
+  const json = JSON.stringify(summarizeReminderSources(parsed.reminders));
   return [
     ...reset,
     recordReminderSourceState(db, path, storageKey, true),

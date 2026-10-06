@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingUrl, type ReadingChanges } from '@/reading/core/model';
 import { loadReading, readingRequest } from './api';
 import { ReadingApiError } from './api-error';
-import { assertReadingSession, readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, writeValue, type ReadingSession, type ReadingCache } from './storage';
+import { assertReadingSession, readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingSession, type ReadingCache } from './storage';
 import { isReadingCommand } from './storage-validation';
 
 export interface ReadingUpdateIntent { id: string; changes: ReadingChanges; before: ReadingChanges }
@@ -45,11 +45,11 @@ export async function queueReading(session: ReadingSession, input: ReadingComman
     if (command.action === 'update') assertReadingUpdateBase(previous, command.intent);
     const existing = previous.at(-1);
     if (command.action === 'update' && existing && coalesceReadingUpdate(existing, command.intent)) {
-      await writeValue(`pending:${session.id}`, queue, session); return queue;
+      await savePendingReading(session, queue); return queue;
     }
     if (queue.length >= 200) throw new Error('Send or review pending Reading changes before adding more.');
     queue.push({ id: crypto.randomUUID(), sessionId: session.id, ...command, queuedAt: new Date().toISOString() });
-    await writeValue(`pending:${session.id}`, queue, session);
+    await savePendingReading(session, queue);
     return queue;
   });
 }
@@ -76,7 +76,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
         if (!next.body) {
           next.body = JSON.stringify({ ...next.intent, operationId: createReminderOperationId(info.day) });
           // Store exact dispatch bytes and ID before making the request.
-          await writeValue(`pending:${session.id}`, current, session);
+          await savePendingReading(session, current);
         }
         return next;
       });
@@ -103,7 +103,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
               followUp.error = 'An earlier change to this article needs review. These edits are saved on this device.';
             }
           }
-          await writeValue(`pending:${session.id}`, current, session);
+          await savePendingReading(session, current);
         });
         break;
       }
@@ -114,7 +114,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
     const cache = await loadReading(session);
     await readingLock(async () => {
       const current = await pendingReading(session);
-      await writeValue(`pending:${session.id}`, current.filter(op => !confirmed.has(op.id)), session);
+      await savePendingReading(session, current.filter(op => !confirmed.has(op.id)));
       await pruneReadingAttempts(session).catch(() => { /* Committed changes remain settled; cleanup can retry later. */ });
     });
     return cache;

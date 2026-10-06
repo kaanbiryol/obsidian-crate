@@ -1,5 +1,6 @@
 import { portablePathKey } from '../../protocol/portable-path';
 import { parseReminderSource } from './reminder-source-parse';
+import { summarizeReminderSources } from './reminder-source-summary';
 import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 import { getReminderFolder, isReminderPath } from './reminder-scope';
 
@@ -8,13 +9,8 @@ export async function bulkFileProjection(db: D1Database, files: Array<{ path: st
   const folder = await getReminderFolder(db);
   const rows = files.filter(file => isReminderPath(file.path, folder)).map(file => {
     const parsed = parseReminderSource(file.path, file.content, folder!);
-    const sources = new Map<string, { id: string; due: string; count: number }>();
-    for (const reminder of parsed.reminders) {
-      const prior = sources.get(reminder.id);
-      if (prior) prior.count++;
-      else sources.set(reminder.id, { id: reminder.id, due: reminder.dueDatetime ?? reminder.dueDate ?? '', count: 1 });
-    }
-    return { path: file.path, portable: portablePathKey(file.path), key: file.objectKey, issue: parsed.issue ?? null, sources: [...sources.values()] };
+    return { path: file.path, portable: portablePathKey(file.path), key: file.objectKey, issue: parsed.issue ?? null,
+      sources: summarizeReminderSources(parsed.reminders) };
   });
   if (!rows.length) return [];
   const json = JSON.stringify(rows);

@@ -1,6 +1,7 @@
 import { Notice, setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/preview-format';
+import { decodePendingChange } from '../../sync/pending-change';
 import { buildDiff } from './diff-model';
 import { renderDiffPreview } from './pending-diff';
 import { PendingComparisons } from './pending-comparisons';
@@ -22,6 +23,7 @@ let nextBrowserId = 0;
 
 /** Check file statuses on opening; keep one selected comparison in view. */
 export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): void {
+    const changes = paths.map(decodePendingChange);
     const browser = container.createDiv({ cls: 'crate-pending-browser' });
     const sidebar = browser.createDiv({ cls: 'crate-browser-sidebar' });
     const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
@@ -54,11 +56,11 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     let requestRevision = 0;
     let selectedIndex = -1;
     // Binary files have no text diff; load their metadata only when selected.
-    const canPreview = (index: number) => !isBinaryPreviewPath(paths[index]!);
+    const canPreview = (index: number) => !isBinaryPreviewPath(changes[index]!.path);
     const rows: Array<{ button: HTMLButtonElement; status: HTMLSpanElement }> = [];
     const comparisons = new PendingComparisons(paths.length, index => {
-        const key = paths[index]!;
-        return load(key.startsWith('delete:') ? key.slice(7) : key, key.startsWith('delete:'));
+        const { kind, path } = changes[index]!;
+        return load(path, kind === 'delete');
     }, (index, snapshot) => {
         if (!browser.isConnected) return;
         const status = rows[index]!.status;
@@ -93,8 +95,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         state.selectedKey = key;
         if (moveFocus) state.showDetail = true;
         browser.classList.toggle('is-reviewing', !!state.showDetail);
-        const deleted = key.startsWith('delete:');
-        const path = deleted ? key.slice(7) : key;
+        const { path } = changes[index]!;
         const parts = path.split('/');
         fileName.textContent = parts.pop() ?? path;
         filePath.textContent = parts.join('/') || 'Vault root';
@@ -130,8 +131,8 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     };
 
     paths.forEach((key, index) => {
-        const deleted = key.startsWith('delete:');
-        const path = deleted ? key.slice(7) : key;
+        const { kind, path } = changes[index]!;
+        const deleted = kind === 'delete';
         const parts = path.split('/');
         const row = actions ? list.createDiv({ cls: 'crate-browser-file-row' }) : list;
         selection?.addCheckbox(row, key);

@@ -23,7 +23,8 @@ vi.mock('./storage', async importOriginal => ({
   readReadingCache: async () => cache,
   readReadingDraft: async () => undefined,
   hasEarlierReadingChanges: async () => false,
-  writeValue: async (key: string, value: PendingReading[]) => { if (key.startsWith('pending:')) stored.queue = structuredClone(value); },
+  savePendingReading: async (_session: ReadingSession, value: PendingReading[]) => { stored.queue = structuredClone(value); },
+  saveReadingDraft: async () => {},
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'one', folderPath: 'Reading', expiresAt: 1 };
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };

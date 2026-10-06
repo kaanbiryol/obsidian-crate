@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import type { RemoteFileVersion } from '../protocol/sync-types';
 import type { EngineFileOperations } from './engine-file-operations';
 import { createEngineHistory } from './engine-history';
@@ -296,7 +297,7 @@ export class SyncEngine {
                 || this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
             canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
             runExclusive: operation => this.runExclusiveOperation(operation),
-            applied: (path, removed) => this.queueController.restorePendingPaths([removed ? `delete:${path}` : path]),
+            applied: (path, removed) => this.queueController.restorePendingPaths([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
         });
     }
 
@@ -376,7 +377,7 @@ export class SyncEngine {
 		this.localManifest.setEntry(record.originalPath, { ...remote, modified: 'unverified' });
 		await this.localManifest.save();
 		this.lifecycle.throwIfDestroyed();
-		this.queueController.restorePendingPaths([record.originalPath]);
+		this.queueController.restorePendingPaths([pendingChangeKey('upload', record.originalPath)]);
 	}
 
 	getActiveConflicts(): ConflictRecord[] {

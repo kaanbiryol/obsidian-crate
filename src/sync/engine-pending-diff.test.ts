@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { computeHash } from './hasher';
@@ -99,11 +100,11 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  for (const [name, method] of Object.entries(h.api)) {
   if (name !== 'isConfigured' && vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Offline'); });
  }
- const review = await h.engine.createPendingDiscard(['delete:note.md']);
+ const review = await h.engine.createPendingDiscard([pendingChangeKey('delete', 'note.md')]);
  await review.discard();
  expect(restored).toBe(true);
  expect(h.localManifest.getEntry('note.md')).toMatchObject({ hash, revision: baseline.revision });
- expect(h.engine.getPendingPaths()).not.toContain('delete:note.md');
+ expect(h.engine.getPendingPaths()).not.toContain(pendingChangeKey('delete', 'note.md'));
  for (const [name, method] of Object.entries(h.api)) {
   if (name !== 'isConfigured' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
  }

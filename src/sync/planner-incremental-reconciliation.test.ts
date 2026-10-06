@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import type { DownloadRequest } from './transfer-download';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from './types';
@@ -234,7 +235,7 @@ describe('runIncrementalSync', () => {
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
 		expect(reconcileVersionConflicts).toHaveBeenCalledWith(
-			['delete:notes/changed-remotely.md'],
+			[pendingChangeKey('delete', 'notes/changed-remotely.md')],
 			expect.any(Object),
 		);
 		expect(result?.success).toBe(true);

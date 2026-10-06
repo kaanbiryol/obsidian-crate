@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { describe, expect, it, vi } from 'vitest';
 import type { App, PluginManifest, Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
@@ -60,9 +61,9 @@ describe('targeted rename reconciliation', () => {
 		const h = await harness(uploaded);
 		const reportWork = vi.fn<NonNullable<TargetedReconcileContext['reportWork']>>();
 		h.context.reportWork = reportWork;
-		const result = await reconcileQueuePaths(h.context, [`delete:${h.source}`, h.destination]);
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source), h.destination]);
 		expect(result.success).toBe(true);
-		expect(result.settledPaths).toEqual([h.destination, `delete:${h.source}`]);
+		expect(result.settledPaths).toEqual([h.destination, pendingChangeKey('delete', h.source)]);
 		expect(h.deleted).toHaveBeenCalledWith(h.source);
 		expect(h.remote[h.destination]?.revision).toBe('v2');
 		expect(reportWork.mock.calls.map(([work]) => work)).toEqual([
@@ -83,7 +84,7 @@ describe('targeted rename reconciliation', () => {
 	it('preserves the source when the destination upload fails', async () => {
 		const h = await harness(false);
 		h.processDiff.mockRejectedValueOnce(new Error('Upload failed'));
-		const result = await reconcileQueuePaths(h.context, [`delete:${h.source}`, h.destination]);
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source), h.destination]);
 		expect(result.success).toBe(false);
 		expect(result.settledPaths).toEqual([]);
 		expect(h.deleted).not.toHaveBeenCalled();
@@ -92,7 +93,7 @@ describe('targeted rename reconciliation', () => {
 
 	it('does not upload an unselected destination or bypass the deletion guard', async () => {
 		const h = await harness(false);
-		const result = await reconcileQueuePaths(h.context, [`delete:${h.source}`]);
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', h.source)]);
 		expect(result.success).toBe(false);
 		expect(result.errors.join(' ')).toContain('renamed file is uploaded');
 		expect(h.getRemoteEntries).toHaveBeenCalledWith([h.source]);

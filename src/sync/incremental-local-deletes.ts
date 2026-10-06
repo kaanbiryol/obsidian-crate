@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { recordSyncError } from './issues';
 import { errorMessage } from '../plugin/logger';
 import type { MutationFailure } from '../protocol/sync-types';
@@ -51,7 +52,7 @@ export async function applyIncrementalLocalDeletes(
       if (versionConflicts.length > 0) {
         if (context.reconcileVersionConflicts) {
           await context.reconcileVersionConflicts(
-            versionConflicts.map((failure) => `delete:${failure.path}`),
+            versionConflicts.map((failure) => pendingChangeKey('delete', failure.path)),
             result,
           );
         } else {

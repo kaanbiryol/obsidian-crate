@@ -15,7 +15,7 @@ function createPlugin() {
 	const saveData = vi.fn<(value: unknown) => Promise<void>>(async () => {});
 	Object.assign(plugin, {
 		app: { vault: { configDir: '.obsidian' } },
-		settings: normalizeCrateSettings({}, '.obsidian'),
+		settings: { ...normalizeCrateSettings({}, '.obsidian'), deviceId: 'device-local' },
 		saveData,
 	});
 	return { plugin, saveData };
@@ -50,6 +50,7 @@ describe('queued settings writes across plugin lifetimes', () => {
 		expect(saveData).toHaveBeenCalledOnce();
 		expect(plugin.settings.cloudflareDeployment).toBeNull();
 		expect(plugin.settings.syncInterval).toBe(300);
+		expect(plugin.settings.deviceId).toBe('device-local');
 	});
 
 	it.each(['core', 'reminders', 'debug', 'snapshot'] as const)('does not publish an in-flight %s save after another instance loads', async kind => {
@@ -72,6 +73,7 @@ describe('queued settings writes across plugin lifetimes', () => {
 		release();
 		await rejected;
 		expect(old.settings.syncInterval).toBe(42);
+		expect(old.settings.deviceId).toBe('device-local');
 		expect(old.settings.debugLogging).toBe(false);
 		expect(current.remindersSettings.remindersFolderPath).toBe('Current');
 		expect(syncLogging).toHaveBeenCalledTimes(syncCalls);
@@ -90,6 +92,7 @@ describe('queued settings writes across plugin lifetimes', () => {
 		await plugin.writeSettings({ syncInterval: 60 });
 		expect(saveData).toHaveBeenCalledOnce();
 		expect(plugin.settings.syncInterval).toBe(60);
+		expect(plugin.settings.deviceId).toBe('device-local');
 	});
 
 	it('keeps old queued writes cancelled when the same instance begins a new lifecycle', async () => {
@@ -108,5 +111,6 @@ describe('queued settings writes across plugin lifetimes', () => {
 		expect(saveData).toHaveBeenLastCalledWith(expect.objectContaining({ syncInterval: 60, workerUrl: '' }));
 		expect(plugin.settings.syncInterval).toBe(60);
 		expect(plugin.settings.workerUrl).toBe('');
+		expect(plugin.settings.deviceId).toBe('device-local');
 	});
 });

@@ -1,3 +1,4 @@
+import { pendingChangeKey, decodePendingChange } from './pending-change';
 import { prepareUploadChunks } from './transfer-budget';
 import { createAbortError } from './abort';
 import { createLogger } from '../plugin/logger';
@@ -40,10 +41,10 @@ function buildQueueSyncResult(
 ): SyncResult {
 	const result = createEmptySyncResult();
 	result.uploadedPaths = uploads
-		.filter(upload => completedQueueKeys.has(upload.path))
+		.filter(upload => completedQueueKeys.has(pendingChangeKey('upload', upload.path)))
 		.map(upload => upload.path);
 	result.deletedPaths = deletes
-		.filter(file => completedQueueKeys.has(`delete:${file.path}`))
+		.filter(file => completedQueueKeys.has(pendingChangeKey('delete', file.path)))
 		.map(file => file.path);
 	result.uploaded = result.uploadedPaths.length;
 	result.deleted = result.deletedPaths.length;
@@ -81,6 +82,9 @@ export async function processPendingChanges(
 	}
 
 	const paths = Array.from(context.pendingPaths);
+	const changes = paths.map(decodePendingChange);
+	const uploadPaths = changes.filter(change => change.kind === 'upload').map(change => change.path);
+	const deletedPaths = changes.filter(change => change.kind === 'delete').map(change => change.path);
 	const revisionSnapshot = new Map(
 		paths.map(path => [path, context.pendingRevisions?.get(path)] as const),
 	);
@@ -99,12 +103,11 @@ export async function processPendingChanges(
 		await context.recoverUploads();
 		if (context.isDestroyed()) throw createAbortError('Queue recovery aborted');
 		const uploads: Array<{ path: string }> = [];
-		const deletes = paths.filter(path => path.startsWith('delete:')).flatMap(key => {
-			const path = key.substring(7);
+		const deletes = deletedPaths.flatMap(path => {
 			const expectedHash = context.localManifest.getEntry(path)?.hash;
 			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
 		});
-		const chunks = prepareUploadChunks(paths.filter(path => !path.startsWith('delete:')), async path => {
+		const chunks = prepareUploadChunks(uploadPaths, async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
 			return withSyncFileContext(path, () => context.prepareUploadFromPath(path));
 		});
@@ -113,8 +116,9 @@ export async function processPendingChanges(
 			uploads.push(...chunk.map(upload => ({ path: upload.path })));
 			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, uploadConcurrency);
 			for (const failure of uploadFailures) {
-				context.pendingPaths.add(failure.path);
-				if (isQueueVersionConflict(failure.status, failure.code)) reconciliationPaths.add(failure.path);
+				const key = pendingChangeKey('upload', failure.path);
+				context.pendingPaths.add(key);
+				if (isQueueVersionConflict(failure.status, failure.code)) reconciliationPaths.add(key);
 				if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
 			}
 			failures.push(...uploadFailures);
@@ -122,7 +126,7 @@ export async function processPendingChanges(
 
 		if (deletes.length > 0 && failures.length > 0) {
 			for (const file of deletes) {
-				context.pendingPaths.add(`delete:${file.path}`);
+				context.pendingPaths.add(pendingChangeKey('delete', file.path));
 				failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
 			}
 		}
@@ -194,8 +198,8 @@ export async function processPendingChanges(
 				pendingChanges: context.pendingPaths.size,
 			});
 			const failed = buildQueueSyncResult(
-				paths.filter(path => !path.startsWith('delete:')).map(path => ({ path })),
-				paths.filter(path => path.startsWith('delete:')).map(path => ({ path: path.substring(7) })),
+				uploadPaths.map(path => ({ path })),
+				deletedPaths.map(path => ({ path })),
 				completedQueueKeys,
 			);
 			recordSyncError(failed, error);

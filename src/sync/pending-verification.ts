@@ -1,3 +1,4 @@
+import { decodePendingChange } from './pending-change';
 import type { DataAdapter } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -18,11 +19,11 @@ interface PendingVerificationContext {
 export async function verifyUnchangedPendingPaths(context: PendingVerificationContext, keys: string[]): Promise<string[]> {
 	const { adapter, manifest, isCurrent } = context;
 	const absent: Array<{ key: string; path: string }> = [];
-	const matches: Array<{ key: string; baseline: FileEntry; modified: string }> = [];
+	const matches: Array<{ key: string; path: string; baseline: FileEntry; modified: string }> = [];
 	// Read sequentially to keep memory bounded even for large attachments.
 	for (const key of keys) {
 		if (!isCurrent(key)) continue;
-		const path = key.startsWith('delete:') ? key.slice(7) : key;
+		const { path, kind } = decodePendingChange(key);
 		const baseline = manifest.getEntry(path);
 		try {
 			assertLocalSyncPath(path);
@@ -31,27 +32,27 @@ export async function verifyUnchangedPendingPaths(context: PendingVerificationCo
 				if (await adapter.stat(path) === null && isCurrent(key)) absent.push({ key, path });
 				continue;
 			}
-			if (key.startsWith('delete:')) continue;
-			const before = await adapter.stat(key);
+			if (kind === 'delete') continue;
+			const before = await adapter.stat(path);
 			if (!before || before.type !== 'file' || before.size > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
-			const bytes = await adapter.readBinary(key);
+			const bytes = await adapter.readBinary(path);
 			if (bytes.byteLength > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
 			const hash = await computeHash(bytes);
 			if (hash !== baseline.hash || !isCurrent(key)) continue;
-			const after = await adapter.stat(key);
+			const after = await adapter.stat(path);
 			if (!after || after.type !== 'file' || after.mtime !== before.mtime
 				|| after.size !== before.size || after.size !== bytes.byteLength) continue;
-			matches.push({ key, baseline, modified: new Date(before.mtime).toISOString() });
+			matches.push({ key, path, baseline, modified: new Date(before.mtime).toISOString() });
 		} catch {
 			// Unreadable or changing files stay pending for ordinary sync/review.
 		}
 	}
 	const settled: string[] = [];
 	let updated = false;
-	for (const { key, baseline, modified } of matches) {
-		if (!isCurrent(key) || manifest.getEntry(key) !== baseline) continue;
+	for (const { key, path, baseline, modified } of matches) {
+		if (!isCurrent(key) || manifest.getEntry(path) !== baseline) continue;
 		if (baseline.modified !== modified) {
-			manifest.setEntry(key, { ...baseline, modified });
+			manifest.setEntry(path, { ...baseline, modified });
 			updated = true;
 		}
 		settled.push(key);

@@ -15,6 +15,7 @@ import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-type
 import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';
 import {
 	type CrateSettings,
+	type PersistedCrateSettings,
 	DEFAULT_SETTINGS,
 	MAX_SYNC_HISTORY,
 	MAX_SYNC_HISTORY_PATHS,
@@ -230,15 +231,14 @@ function normalizeIgnorePatterns(ignorePatterns: string[], configDir: string): s
 		: [...patterns, workspacePattern];
 }
 
-export function normalizeCrateSettings(
-	value: Partial<CrateSettings> | null | undefined,
+export function normalizePersistedCrateSettings(
+	value: Partial<PersistedCrateSettings> | null | undefined,
 	configDir: string,
-): CrateSettings {
+): PersistedCrateSettings {
 	const workerUrl = normalizeWorkerUrl(normalizeString(value?.workerUrl));
 	const scopeUrl = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.workerUrl));
 	const authority = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.authority));
 	return {
-		...DEFAULT_SETTINGS,
 		reading: normalizeReadingSettings(value?.reading),
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
 		workerUrl,
@@ -247,7 +247,6 @@ export function normalizeCrateSettings(
 		cloudflareRestore: validRestoreState(value?.cloudflareRestore) ? structuredClone(value.cloudflareRestore) : null,
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
-		deviceId: DEFAULT_SETTINGS.deviceId,
 		ignorePatterns: normalizeIgnorePatterns(
 			normalizeStringArray(value?.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
 			configDir,
@@ -263,7 +262,15 @@ export function normalizeCrateSettings(
 	};
 }
 
-export function buildPersistedCrateSettings(settings: CrateSettings): Omit<CrateSettings, 'deviceId'> {
+/** Initialize runtime settings before hydrating this device's local identity. */
+export function normalizeCrateSettings(
+	value: Partial<CrateSettings> | null | undefined,
+	configDir: string,
+): CrateSettings {
+	return { ...normalizePersistedCrateSettings(value, configDir), deviceId: DEFAULT_SETTINGS.deviceId };
+}
+
+export function buildPersistedCrateSettings(settings: CrateSettings): PersistedCrateSettings {
 	const { deviceId, ...persistedSettings } = settings;
 	void deviceId;
 	return persistedSettings;
@@ -271,5 +278,6 @@ export function buildPersistedCrateSettings(settings: CrateSettings): Omit<Crate
 
 export {
 	type CrateSettings,
+	type PersistedCrateSettings,
 	DEFAULT_SETTINGS,
 };

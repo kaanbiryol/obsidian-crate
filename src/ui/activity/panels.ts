@@ -3,6 +3,7 @@ import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
+import { decodePendingChange } from '../../sync/pending-change';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
 	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress);
@@ -31,8 +32,9 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	const uploads: string[] = [];
 	const deletes: string[] = [];
 	for (const raw of paths) {
-		if (raw.startsWith('delete:')) deletes.push(raw.substring(7));
-		else uploads.push(raw);
+		const { kind, path } = decodePendingChange(raw);
+		if (kind === 'delete') deletes.push(path);
+		else uploads.push(path);
 	}
 
 	const list = container.createDiv({ cls: 'crate-activity-list' });

@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import type { ConnectionTestResult } from './types';
 import { createRuntimeHistoryRestore, loadRuntimeHistoryComparison } from './runtime-history-workflow';
 import type { SharedCheckpoint } from '../protocol/history-checkpoints';
@@ -137,7 +138,7 @@ export class SyncRuntime {
 	async loadPendingDiff(path: string, deleted: boolean) {
 		const engine = this.syncEngine;
 		if (!engine) throw new Error('Sync is not initialized');
-		const pendingPath = deleted ? `delete:${path}` : path;
+		const pendingPath = pendingChangeKey(deleted ? 'delete' : 'upload', path);
 		const verify = () => {
 			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !this.getPendingPaths().includes(pendingPath)) {
 				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');

@@ -1,5 +1,30 @@
 # Testing
 
+## Settings identity and pending-change keys
+
+`plugin/CratePlugin.test.ts` hydrates a device ID before successful and rejected
+core settings writes, verifying that runtime identity survives and persisted JSON
+omits it. `settings-write-lifecycle.test.ts` retains queue and shutdown coverage.
+
+`sync/queue.test.ts`, `engine-selected.test.ts`, `pending-discard.test.ts`,
+`engine-startup-pending.test.ts` and `engine-pending-verification.test.ts` distinguish
+a literal `delete:note.md` filename from deletion of `note.md`, including renames,
+startup recovery, selection, discard and newer edits during settlement.
+`scripts/activity-diff-test.mjs` checks independent labels, previews, selection,
+file actions and discard targets in Chromium and WebKit.
+
+`worker/delivery-integrity.integration.ts` runs old-delivery/new-occurrence races
+against real D1 for both push success and failure. Remaining alarm unit SQL fakes
+reject unknown queries. `file-projection-parity.integration.ts` compares single
+and bulk publication for duplicate identities, timed/all-day occurrences, malformed
+sources and rejected revisions; bulk query-budget coverage remains separate.
+
+`pwa/reading/useReadingArticle.test.ts` checks malformed bodies, mismatched article
+IDs and out-of-folder responses on open and background refresh, preserving the
+confirmed reader and cache. Typed persistence writes retain session checks.
+The Reading cache-recovery, optimistic-action and encrypted-storage browser suites
+exercise the extracted storage owners with native IndexedDB and Web Locks.
+
 ## Sync shutdown
 
 `engine-checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads

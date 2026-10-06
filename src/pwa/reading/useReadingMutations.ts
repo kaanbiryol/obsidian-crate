@@ -3,7 +3,7 @@ import { readingUrl, readingUrlIdentity, validateReadingMetadata, type ReadingCh
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
-import { assertReadingSession, writeValue, type ReadingSession } from './storage';
+import { assertReadingSession, removeReadingShare, type ReadingSession } from './storage';
 import type { useReadingSession } from './useReadingSession';
 
 type ReadingMutationSession = Pick<ReturnType<typeof useReadingSession>,
@@ -82,14 +82,14 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
       if (matches[0]) {
         await openSaved(matches[0]);
         assertReadingSession(session);
-        if (share) await writeValue(`share:${share}`, null, session);
+        if (share) await removeReadingShare(session, share);
         if (!finishCapture(session)) return false;
         showToast('info', 'Opened your saved link');
         return true;
       }
       await queueChange({ action: 'capture', intent: { url: link, fetchArticle: true } });
       assertReadingSession(session);
-      if (share) await writeValue(`share:${share}`, null, session);
+      if (share) await removeReadingShare(session, share);
       if (!finishCapture(session)) return false;
       showToast('success', navigator.onLine ? 'Link saved' : 'Link saved on this device');
       void run(() => refresh(session));

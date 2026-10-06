@@ -2,8 +2,10 @@ import type { PendingReading, ReadingCommand } from './outbox';
 import { isRecord } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
-import { readingTimestamp, readingUrl, validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
-import type { ReadingCache, ReadingSession } from './storage';
+import { readingTimestamp, readingUrl } from '@/reading/core/model';
+import { isReadingItem, isReadingArticle, type ReadingArticle } from './record-validation';
+import type { ReadingCache } from './cache';
+import type { ReadingSession } from './session';
 
 const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const nonNegativeNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -12,12 +14,6 @@ export function isReadingSession(value: unknown): value is ReadingSession {
   return isRecord(value) && nonEmptyString(value.token) && nonEmptyString(value.id)
     && nonEmptyString(value.folderPath) && nonEmptyString(value.generation) && nonNegativeNumber(value.expiresAt)
     && (value.source === undefined || value.source === 'reminders');
-}
-
-function isReadingItem(value: unknown, folder: string): value is ReadingItem {
-  if (!isRecord(value) || typeof value.path !== 'string') return false;
-  if (value.path && (!value.path.startsWith(`${folder}/`) || value.path.split('/').some(part => !part || part === '.' || part === '..'))) return false;
-  try { validateReadingMetadata(value); return true; } catch { return false; }
 }
 
 export function isReadingCache(value: unknown, folder: string): value is ReadingCache {
@@ -29,9 +25,9 @@ export function isReadingCache(value: unknown, folder: string): value is Reading
   }) && value.issues.every((issue: unknown) => isRecord(issue) && typeof issue.path === 'string' && typeof issue.message === 'string');
 }
 
-export interface ReadingArticleCache { item: ReadingItem; markdown: string; usedAt: number }
+export interface ReadingArticleCache extends ReadingArticle { usedAt: number }
 export function isReadingArticleCache(value: unknown, folder: string): value is ReadingArticleCache {
-  return isRecord(value) && isReadingItem(value.item, folder) && typeof value.markdown === 'string' && nonNegativeNumber(value.usedAt);
+  return isReadingArticle(value, folder) && 'usedAt' in value && nonNegativeNumber(value.usedAt);
 }
 
 export function isReadingDraft(value: unknown): value is { url: string } {

@@ -6,7 +6,8 @@ import type { ScopedEncryptionState } from '../encryption-scope';
 import { unlockLocalState, type StoredReminderKeys } from '../encryption-keys';
 import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption-fragments';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
-import { assertReadingSession, readingDatabase, type ReadingSession } from './storage';
+import { assertReadingSession, type ReadingSession } from './session';
+import { readingDatabase } from './database';
 
 type ReadingEncryptionState = ScopedEncryptionState;
 let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } | undefined;

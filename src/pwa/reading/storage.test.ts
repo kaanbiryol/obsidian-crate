@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from './outbox';
-import { assertReadingSession, exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY, type ReadingSession } from './storage';
+import { assertReadingSession, exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY,
+  saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, type ReadingSession } from './storage';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
@@ -10,6 +11,8 @@ vi.mock('../download', () => ({ downloadJson: download }));
 vi.mock('../encryption-keys', () => ({ exportWrappedLocalKeys: async () => [] }));
 vi.mock('idb', () => ({ openDB: async () => ({
   get: async (_store: string, key: string) => values.get(key),
+  put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
+  delete: async (_store: string, key: string) => { values.delete(key); },
   getAllKeys: async () => [...values.keys()],
   transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key) } }),
 }) }));
@@ -39,6 +42,35 @@ it('retains the exact dispatched bytes and unknown metadata during validation', 
   expect(loaded).toBe(saved);
   expect(loaded?.body).toBe(saved.body);
   expect(isPendingReading({ ...saved, body: undefined }, session.id)).toBe(true);
+});
+
+it('preserves durable draft, pending, and encrypted-attempt formats through typed writes', async () => {
+  const pending = { ...command(), action: 'update' as const, futureMetadata: { label: '保留' } };
+  const attempt = { requestHash: 'request-hash', body: '{\n  "ciphertext": "exact bytes"\n}', generation: 3 };
+  await saveReadingDraft(session, { url: 'An unfinished draft' });
+  await savePendingReading(session, [pending]);
+  await writeReadingAttempt(session, 'operation', attempt);
+  expect(values.get(`draft:${session.id}`)).toEqual({ url: 'An unfinished draft' });
+  expect(values.get(`pending:${session.id}`)).toEqual([pending]);
+  expect(values.get(`attempt:${session.id}:operation`)).toEqual(attempt);
+  expect((await pendingReading(session))[0]?.body).toBe(pending.body);
+  await expect(readReadingAttempt(session, 'operation')).resolves.toEqual(attempt);
+});
+
+it('rejects every typed write after the session changes without overwriting retained work', async () => {
+  values.set(`draft:${session.id}`, { url: 'Saved draft' });
+  values.set(`pending:${session.id}`, [command()]);
+  values.set(`attempt:${session.id}:operation`, { body: 'Saved ciphertext' });
+  values.set('share:shared', { url: 'Shared link' });
+  const before = structuredClone(values);
+  vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ ...session, generation: 'replacement' }) });
+  for (const write of [
+    () => saveReadingDraft(session, { url: 'Changed' }),
+    () => savePendingReading(session, []),
+    () => writeReadingAttempt(session, 'operation', { requestHash: 'changed', body: 'Changed' }),
+    () => removeReadingShare(session, 'shared'),
+  ]) await expect(write()).rejects.toThrow('Reading sign-in changed');
+  expect(values).toEqual(before);
 });
 
 it.each([
@@ -83,7 +115,7 @@ it('rejects malformed cache envelopes and drafts without overwriting either', as
   values.set(`list:${session.id}`, cache);
   values.set(`draft:${session.id}`, { url: { private: 'saved text' } });
   await expect(readReadingCache(session)).rejects.toThrow('saved Reading library');
-  await expect(readReadingDraft(`draft:${session.id}`)).rejects.toThrow('saved Reading draft');
+  await expect(readReadingDraft(session)).rejects.toThrow('saved Reading draft');
   expect(values.get(`list:${session.id}`)).toBe(cache);
   expect(values.get(`draft:${session.id}`)).toEqual({ url: { private: 'saved text' } });
   expect(isReadingCache({ items: [], issues: [], savedAt: 1 }, 'Reading')).toBe(true);

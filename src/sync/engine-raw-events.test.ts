@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
@@ -40,7 +41,7 @@ it.each(['notes/note.md', '.trash/file.json', '.vault-config/plugins/crate/data.
 it('queues deletion and replaces it when the file is recreated', async () => {
 	harness.vault.adapter.stat.mockResolvedValueOnce(null);
 	await harness.engine.onRawFileChange(path);
-	expect(harness.engine.getPendingPaths()).toEqual([`delete:${path}`]);
+	expect(harness.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', path)]);
 	await harness.engine.onRawFileChange(path);
 	expect(harness.engine.getPendingPaths()).toEqual([path]);
 });

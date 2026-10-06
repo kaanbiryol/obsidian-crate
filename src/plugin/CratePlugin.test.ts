@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
+import { ensurePluginDeviceId } from './deviceId';
 import { initializeReminders } from '../reminders/plugin-integration';
 import {
 	DEFAULT_REMINDERS_SETTINGS,
@@ -23,6 +24,48 @@ describe('CratePlugin settings persistence', () => {
 	beforeEach(() => {
 		vi.mocked(initializeReminders).mockReset();
 		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
+	});
+
+	it.each(['snapshot', 'update'] as const)('preserves hydrated device identity after a successful %s save', async kind => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async (_data: unknown) => {});
+		const settings = normalizeCrateSettings({}, 'vault-config');
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			secretStorage: { get: () => 'device-local' },
+			saveData,
+			settings,
+		});
+		ensurePluginDeviceId(plugin);
+
+		if (kind === 'snapshot') await plugin.saveSettings();
+		else await plugin.writeSettings({ syncInterval: 120 });
+
+		expect(plugin.settings).toBe(settings);
+		expect(plugin.settings.deviceId).toBe('device-local');
+		expect(saveData).toHaveBeenCalledOnce();
+		expect(saveData.mock.calls[0]![0]).not.toHaveProperty('deviceId');
+	});
+
+	it.each(['snapshot', 'update'] as const)('preserves hydrated device identity after a rejected %s save', async kind => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async (_data: unknown) => { throw new Error('disk full'); });
+		const settings = normalizeCrateSettings({}, 'vault-config');
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			secretStorage: { get: () => 'device-local' },
+			saveData,
+			settings,
+		});
+		ensurePluginDeviceId(plugin);
+
+		await expect(kind === 'snapshot' ? plugin.saveSettings() : plugin.writeSettings({ syncInterval: 120 }))
+			.rejects.toThrow('disk full');
+
+		expect(plugin.settings).toBe(settings);
+		expect(plugin.settings.deviceId).toBe('device-local');
+		expect(plugin.settings.syncInterval).toBe(300);
+		expect(saveData.mock.calls[0]![0]).not.toHaveProperty('deviceId');
 	});
 
 
@@ -252,7 +295,7 @@ describe('CratePlugin settings persistence', () => {
 		Object.assign(plugin, {
 			app: { vault: { configDir: 'vault-config' } },
 			saveData,
-			settings: normalizeCrateSettings({}, 'vault-config'),
+			settings: { ...normalizeCrateSettings({}, 'vault-config'), deviceId: 'device-local' },
 		});
 
 		const coreUpdate = plugin.writeSettings({ syncInterval: 120 });
@@ -271,6 +314,8 @@ describe('CratePlugin settings persistence', () => {
 		};
 		expect(lastPersisted.syncInterval).toBe(120);
 		expect(lastPersisted.reminders?.upcomingDaysDefault).toBe(14);
+		expect(plugin.settings.deviceId).toBe('device-local');
+		for (const saved of persisted) expect(saved).not.toHaveProperty('deviceId');
 	});
 
 	it('opens its settings tab when the host exposes the settings controller', () => {

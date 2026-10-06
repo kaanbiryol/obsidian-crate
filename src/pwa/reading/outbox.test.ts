@@ -2,7 +2,7 @@ import type { PendingReading } from './outbox';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingSession } from './storage';
 import { drainReading, queueReading } from './outbox';
-import { pendingReading, writeValue } from './storage';
+import { pendingReading, savePendingReading } from './storage';
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
 vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
@@ -13,11 +13,8 @@ vi.mock('./storage', () => ({
 	readingLock: async <T>(action: () => Promise<T>) => action(),
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async (session: ReadingSession) => structuredClone(storage.values.get(`pending:${session.id}`) ?? []) as PendingReading[],
-	writeValue: vi.fn(async (key: string, value: unknown) => { storage.values.set(key, structuredClone(value)); }),
-	readingDatabase: async () => ({ transaction: () => ({ store: {
-		getAllKeys: async () => [], get: async (key: string) => storage.values.get(key),
-		put: async (value: unknown, key: string) => { storage.values.set(key, structuredClone(value)); },
-	}, done: Promise.resolve() }) }),
+	savePendingReading: vi.fn(async (session: ReadingSession, value: PendingReading[]) => { storage.values.set(`pending:${session.id}`, structuredClone(value)); }),
+	commitReadingCache: async (_session: ReadingSession, cache: import('./cache').ReadingCache) => cache,
 }));
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
@@ -29,7 +26,7 @@ function deferred<T>() {
 }
 beforeEach(() => {
 	storage.values.clear(); storage.current = true;
-	vi.mocked(writeValue).mockClear();
+	vi.mocked(savePendingReading).mockClear();
 	vi.stubGlobal('navigator', { onLine: true });
 	vi.stubGlobal('fetch', network);
 	network.mockReset().mockImplementation(async path => {
@@ -113,7 +110,7 @@ it('retains rejected edits and their dependents for review without sending depen
 it('rejects stale peer edits and failed persistence before accepting work', async () => {
 	await queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } });
 	await expect(queueReading(session, { action: 'update', intent: { id: 'article', changes: { favorite: true }, before: { favorite: false } } })).rejects.toThrow('another tab');
-	vi.mocked(writeValue).mockRejectedValueOnce(new Error('Storage full'));
+	vi.mocked(savePendingReading).mockRejectedValueOnce(new Error('Storage full'));
 	await expect(queueReading(session, { action: 'capture', intent: { url: 'https://example.com/article' } })).rejects.toThrow('Storage full');
 	expect(await pendingReading(session)).toHaveLength(1);
 	expect(network).not.toHaveBeenCalled();

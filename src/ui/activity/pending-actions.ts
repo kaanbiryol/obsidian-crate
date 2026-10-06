@@ -1,4 +1,5 @@
 import { Menu, Notice } from 'obsidian';
+import { decodePendingChange } from '../../sync/pending-change';
 import type { PendingFileAction } from './file-actions';
 import type { PendingRowSelection } from './pending-row-selection';
 
@@ -50,7 +51,7 @@ export function createPendingActions(
     });
     const contextMenu = (key: string) => {
         const targets = rows.contextTargets(key);
-        const path = key.startsWith('delete:') ? key.slice(7) : key;
+        const { path } = decodePendingChange(key);
         const menu = new Menu();
         const fileActions = actions.fileActions?.(path) ?? [];
         for (const action of fileActions) menu.addItem(item => item.setTitle(action.title).setIcon(action.icon).onClick(() => {
@@ -66,7 +67,7 @@ export function createPendingActions(
     return {
         toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
         addCheckbox: (row: HTMLElement, key: string) => {
-            const path = key.startsWith('delete:') ? key.slice(7) : key;
+            const { path } = decodePendingChange(key);
             const label = row.createEl('label', { cls: 'crate-browser-file-check' });
             const input = label.createEl('input', { attr: { type: 'checkbox', 'aria-label': `Sync ${path}` } });
             checkboxes.set(key, input); input.checked = !excluded.has(key);

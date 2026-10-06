@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../test/factories/sync-vault';
@@ -18,7 +19,7 @@ function response(content: unknown): ApiHttpResponse {
 async function setup(saved = '{"theme":"saved"}', local: string | null = '{"theme":"local"}') {
     const base = toArrayBuffer(saved);
     const baseline = { hash: await computeHash(base), size: base.byteLength, modified: '2026-09-30T10:00:00Z', revision: 'last-synced-revision' };
-    const key = local === null ? `delete:${path}` : path;
+    const key = local === null ? pendingChangeKey('delete', path) : path;
     const version = { ...baseline, path, storage_key: 'retained', created_at: '2026-09-30T10:00:00Z', expires_at: 1, reason: 'replaced' as const };
     const remote = {
         getFileMetadata: vi.fn(async (): Promise<{ files: Record<string, FileEntry> }> => ({ files: { [path]: baseline } })),

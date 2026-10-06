@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
 import { arrayBufferToBase64 } from './encoding';
@@ -60,6 +61,20 @@ it('coalesces repeated events and checkpoints multiple matching files once', asy
 	expect(h.engine.getPendingPaths()).toEqual([]);
 });
 
+it('verifies a literal delete-prefixed file without settling the neighboring deletion', async () => {
+	const baseline = h.localManifest.getEntry(path)!;
+	h.localManifest.setEntry('delete:note.md', baseline);
+	h.localManifest.setEntry('note.md', baseline);
+	h.vault.adapter.stat.mockImplementation(async candidate => candidate === 'note.md' ? null : stat);
+	touch('delete:note.md');
+	h.engine.onFileDelete({ path: 'note.md' } as never);
+	await verify();
+	expect(h.vault.adapter.readBinary).toHaveBeenCalledExactlyOnceWith('delete:note.md');
+	expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'note.md')]);
+	expect(h.localManifest.getEntry('note.md')).toEqual(baseline);
+	expectNoTransfers();
+});
+
 it('does not transfer unchanged events when automatic sync is enabled', async () => {
 	h.engine.updateSettings({ ...h.settings, automaticSync: true });
 	touch();
@@ -94,7 +109,7 @@ it('keeps new files, deletions, and both sides of renames pending', async () => 
 	touch('new.md');
 	h.engine.onFileRename({ path: 'renamed.json' } as never, path);
 	await verify();
-	expect(h.engine.getPendingPaths().sort()).toEqual([`delete:${path}`, 'new.md', 'renamed.json'].sort());
+	expect(h.engine.getPendingPaths().sort()).toEqual([pendingChangeKey('delete', path), 'new.md', 'renamed.json'].sort());
 	expect(h.vault.adapter.readBinary).not.toHaveBeenCalled();
 	expectNoTransfers();
 });
@@ -134,7 +149,7 @@ it('keeps a deletion arriving while the old contents are being read', async () =
 	h.engine.onFileDelete({ path } as never);
 	reading.resolve(original);
 	await h.engine.waitForIdle();
-	expect(h.engine.getPendingPaths()).toEqual([`delete:${path}`]);
+	expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', path)]);
 	expect(h.localManifest.setEntry).not.toHaveBeenCalled();
 });
 
@@ -242,7 +257,7 @@ it('keeps deletion of a synced file pending', async () => {
  h.vault.adapter.stat.mockResolvedValue(null);
  h.engine.onFileDelete({ path } as never);
  await verify();
- expect(h.engine.getPendingPaths()).toEqual([`delete:${path}`]);
+ expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', path)]);
  expectNoTransfers();
 });
 
@@ -262,6 +277,6 @@ it('keeps an untracked deletion when an upload receipt needs recovery', async ()
  h.vault.adapter.stat.mockResolvedValue(null);
  h.engine.onFileDelete({ path: 'temporary.md' } as never);
  await verify();
- expect(h.engine.getPendingPaths()).toEqual(['delete:temporary.md']);
+ expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'temporary.md')]);
  expectNoTransfers();
 });

@@ -1,5 +1,5 @@
 import { decodeReadingValue } from './private-storage';
-import { readingDatabase } from './storage';
+import { readingDatabase } from './database';
 export async function hasUnsettledReading(): Promise<boolean> {
   if (document.querySelector('.crate-reading__capture')) return true;
   const db = await readingDatabase(), tx = db.transaction('values');

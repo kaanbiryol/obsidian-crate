@@ -1,3 +1,5 @@
+import { pendingChangeKey } from './pending-change';
+import type { TFile } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
 import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
@@ -41,6 +43,19 @@ async function restore(h: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('pending changes after restart with automatic sync off', () => {
+	it('rebuilds separate entries for delete-prefixed files and neighboring deletions', async () => {
+		const h = await setup();
+		const original = toArrayBuffer('original');
+		h.localManifest.setEntry('note.md', { hash: await computeHash(original), size: original.byteLength, modified: new Date(1000).toISOString() });
+		const files = h.vault.getFiles() as TFile[];
+		h.vault.getFiles.mockReturnValue([...files, { path: 'delete:note.md', extension: 'md', stat: { size: original.byteLength, mtime: 1000 } }]);
+		try {
+			await restore(h);
+			expect(h.engine.getPendingPaths()).toContain('delete:note.md');
+			expect(h.engine.getPendingPaths()).toContain(pendingChangeKey('delete', 'note.md'));
+		} finally { h.engine.destroy(); }
+	});
+
 	it('keeps fresh-install files pending without transfers after discovery, edits, and periodic checks', async () => {
 		vi.useFakeTimers();
 		const h = createHarness(normalizeCrateSettings(undefined, '.vault-config'));
@@ -75,8 +90,8 @@ describe('pending changes after restart with automatic sync off', () => {
 		try {
 			await restore(h);
 			expect(h.engine.getPendingPaths().sort()).toEqual([
-				'.hidden.md', 'added.md', 'delete:deleted.md', 'delete:old-name.md', 'edited.md', 'new-name.md',
-			]);
+				'.hidden.md', 'added.md', pendingChangeKey('delete', 'deleted.md'), pendingChangeKey('delete', 'old-name.md'), 'edited.md', 'new-name.md',
+			].sort());
 			expect(h.engine.getState()).toMatchObject({ status: 'idle', pendingChanges: 6, lastSync: h.settings.lastSync });
 			for (const call of [h.api.getChanges, h.api.getManifest, h.api.uploadFile, h.api.batchUpload, h.api.batchDownload, h.api.batchDelete, h.api.recoverUploads]) {
 				expect(call).not.toHaveBeenCalled();
@@ -94,7 +109,7 @@ describe('pending changes after restart with automatic sync off', () => {
 			h.engine.onFileDelete({ path: 'edited.md' } as never);
 			reading.resolve(toArrayBuffer('modified'));
 			await h.engine.waitForIdle();
-			expect(h.engine.getPendingPaths()).toContain('delete:edited.md');
+			expect(h.engine.getPendingPaths()).toContain(pendingChangeKey('delete', 'edited.md'));
 			expect(h.engine.getPendingPaths()).not.toContain('edited.md');
 		} finally { h.engine.destroy(); }
 	});

@@ -7,6 +7,7 @@ import { chromium, webkit } from '@playwright/test';
 const { outputFiles } = await build({ stdin: { contents: `
   export { loadReading } from './src/pwa/reading/api';
   export * from './src/pwa/reading/storage';
+  export { readingDatabase } from './src/pwa/reading/database';
   export { createReadingNote, parseReadingNote } from './src/reading/core/notes';
 `, resolveDir: process.cwd() }, bundle: true, format: 'iife', globalName: 'readingRecovery', write: false });
 
@@ -27,7 +28,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: Reading source 
       const db = await api.readingDatabase();
       const seed = async () => {
         await api.cacheReadingArticle(session, item, 'The saved offline article.');
-        await api.writeValue(listKey, { items: [item], issues: [], savedAt: 1 }, session);
+        await api.commitReadingCache(session, { items: [item], issues: [], savedAt: 1 });
       };
       let body = {}, status = 503;
       window.fetch = async path => path === '/reading/encryption' ? Response.json({ encryption: null }) : new Response(JSON.stringify(body), { status });

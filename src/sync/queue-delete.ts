@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import type {
 	QueueDeleteCandidate,
 	QueueDeleteFailure,
@@ -15,7 +16,7 @@ export async function deletePendingFiles(
 
 	for (const path of result.deleted) {
 		context.localManifest.removeEntry(path);
-		completedQueueKeys.add(`delete:${path}`);
+		completedQueueKeys.add(pendingChangeKey('delete', path));
 	}
 	if (result.success) {
 		return { failures: [], reconciliationPaths: [], hasTerminalFailure: false };
@@ -31,9 +32,9 @@ export async function deletePendingFiles(
 	const reconciliationPaths: string[] = [];
 	let hasTerminalFailure = false;
 	for (const failure of failures) {
-		context.pendingPaths.add(`delete:${failure.path}`);
+		context.pendingPaths.add(pendingChangeKey('delete', failure.path));
 		if (isQueueVersionConflict(failure.status)) {
-			reconciliationPaths.push(`delete:${failure.path}`);
+			reconciliationPaths.push(pendingChangeKey('delete', failure.path));
 		}
 		if (isQueueTerminalFailure(failure.status)) hasTerminalFailure = true;
 	}

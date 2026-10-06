@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { readLocalFileEntry } from './local-file-entry';
 import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { classifyPath } from './reconciliation';
@@ -126,7 +127,7 @@ export async function reconcileIncrementalRemoteChanges(
 
 			if (!decision) {
 				context.localManifest.setEntry(path, { ...localEntry, revision: entry.revision });
-				result.settledPaths.push(path);
+				result.settledPaths.push(pendingChangeKey('upload', path));
 			} else if (decision.action === 'upload') {
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);

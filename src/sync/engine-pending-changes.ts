@@ -1,3 +1,4 @@
+import { pendingChangeKey, decodePendingChange } from './pending-change';
 import type { Vault } from 'obsidian';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import type { SyncApiClient } from './api';
@@ -65,7 +66,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
                     const local = await readLocalFileEntry(context.vault, path);
                     if ((local?.hash ?? null) === (remote?.hash ?? null)) {
                         const result = createEmptySyncResult();
-                        result.settledPaths = [path, `delete:${path}`];
+                        result.settledPaths = [pendingChangeKey('upload', path), pendingChangeKey('delete', path)];
                         context.queue.clearSyncedPendingPaths(result, revisions);
                     }
                 },
@@ -89,7 +90,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
             const settled = createEmptySyncResult();
             for (const key of context.queue.getPendingPaths()) {
                 if (context.isDestroyed()) return;
-                const path = key.startsWith('delete:') ? key.substring(7) : key;
+                const path = decodePendingChange(key).path;
                 if (!applied.has(path)) continue;
                 const baseline = context.manifest.getEntry(path);
                 try {

@@ -1,3 +1,4 @@
+import { decodePendingChange } from './pending-change';
 import { recordSyncError } from './issues';
 import type { Vault } from 'obsidian';
 import { HttpError } from './api';
@@ -44,7 +45,7 @@ export async function reconcileQueuePaths(
 	const result = createEmptySyncResult();
 	const uniqueQueueKeys = [...new Set(queueKeys)];
 	const targetPaths = [...new Set(uniqueQueueKeys.map(queueKey =>
-		queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey))];
+		decodePendingChange(queueKey).path))];
 	context.reportWork?.({ phase: 'server' });
 	const remoteEntries = createPathRecord(await context.getRemoteEntries(targetPaths));
 	let processed = 0;
@@ -56,7 +57,7 @@ export async function reconcileQueuePaths(
 	const deletions: string[] = [];
 	const uploads = new Map<string, { diff: UploadDiff; keys: string[] }>();
 	async function reconcile(queueKey: string, allowDelete: boolean, firstAttempt = 1, collectUploads = false) {
-		const path = queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey;
+		const path = decodePendingChange(queueKey).path;
 		if (context.shouldIgnore(path)) {
 			result.settledPaths.push(queueKey);
 			processed++;

@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { TFolder } from 'obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -193,6 +194,31 @@ function createNamedAbortError(message = 'Sync request aborted'): Error {
 }
 
 describe('queue event handlers', () => {
+	it('keeps literal delete-prefixed names independent during edits, deletes and renames', () => {
+		const h = createEventContext();
+		onFileChange(h.context, { path: 'note.md' });
+		onFileChange(h.context, { path: 'delete:note.md' });
+		onFileDelete(h.context, { path: 'note.md' });
+		expect([...h.pendingPaths]).toEqual(['delete:note.md', pendingChangeKey('delete', 'note.md')]);
+		onFileRename(h.context, { path: 'renamed.md' } as never, 'delete:note.md');
+		expect([...h.pendingPaths]).toEqual([
+			pendingChangeKey('delete', 'note.md'), pendingChangeKey('delete', 'delete:note.md'), 'renamed.md',
+		]);
+		expect([...h.pendingRevisions.keys()]).toEqual([...h.pendingPaths]);
+	});
+
+	it('settles the matching deletion without clearing a newer edit to a prefixed filename', () => {
+		const h = createEventContext();
+		onFileChange(h.context, { path: 'delete:note.md' });
+		onFileDelete(h.context, { path: 'note.md' });
+		const revisions = new Map(h.pendingRevisions);
+		onFileChange(h.context, { path: 'delete:note.md' });
+		clearSyncedPendingPaths({ ...h.context, pendingRevisions: h.pendingRevisions, clearDebounceTimer: vi.fn(), updateState: vi.fn() },
+			createSyncResult({ uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'] }), revisions);
+		expect([...h.pendingPaths]).toEqual(['delete:note.md']);
+		expect([...h.pendingRevisions.keys()]).toEqual(['delete:note.md']);
+	});
+
 	it('queues file changes for syncable paths', () => {
 		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
 
@@ -207,7 +233,7 @@ describe('queue event handlers', () => {
 
 		onFileDelete(context, { path: 'notes/a.md' });
 
-		expect(pendingPaths.has('delete:notes/a.md')).toBe(true);
+		expect(pendingPaths.has(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
 
@@ -217,7 +243,7 @@ describe('queue event handlers', () => {
 		onFileRename(context, { path: '.trash/a.md' } as never, 'notes/a.md');
 		onFileRename(context, { path: 'notes/b.md' } as never, '.trash/b.md');
 
-		expect(pendingPaths.has('delete:notes/a.md')).toBe(true);
+		expect(pendingPaths.has(pendingChangeKey('delete', 'notes/a.md'))).toBe(true);
 		expect(pendingPaths.has('notes/b.md')).toBe(true);
 		expect(pendingPaths.has('.trash/b.md')).toBe(false);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(2);
@@ -327,7 +353,7 @@ describe('clearSyncedPendingPaths', () => {
 			'notes/uploaded.md',
 			'notes/downloaded.md',
 			'notes/merged.md',
-			'delete:notes/deleted.md',
+			pendingChangeKey('delete', 'notes/deleted.md'),
 		]);
 		const clearDebounceTimer = vi.fn();
 		const updateState = vi.fn();
@@ -431,7 +457,7 @@ describe('processPendingChanges', () => {
 			}),
 		});
 		harness.pendingPaths.add('notes/a.md');
-		harness.pendingPaths.add('delete:notes/old.md');
+		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/old.md'));
 
 		await processPendingChanges(harness.context, 4);
 
@@ -577,7 +603,7 @@ describe('processPendingChanges', () => {
 	it('chunks mass deletes to the shared server limit', async () => {
 		const harness = createFlushHarness();
 		for (let index = 0; index < 14; index++) {
-			harness.pendingPaths.add(`delete:notes/${index}.md`);
+			harness.pendingPaths.add(pendingChangeKey('delete', `notes/${index}.md`));
 		}
 
 		await processPendingChanges(harness.context, 4);
@@ -647,15 +673,15 @@ describe('processPendingChanges', () => {
 				],
 			}),
 		});
-		harness.pendingPaths.add('delete:notes/ok.md');
-		harness.pendingPaths.add('delete:notes/fail.md');
+		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/ok.md'));
+		harness.pendingPaths.add(pendingChangeKey('delete', 'notes/fail.md'));
 
 		await processPendingChanges(harness.context, 4);
 
 		expect(harness.removeEntry).toHaveBeenCalledWith('notes/ok.md');
 		expect(harness.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
-		expect(harness.pendingPaths.has('delete:notes/fail.md')).toBe(true);
-		expect(harness.pendingPaths.has('delete:notes/ok.md')).toBe(false);
+		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'notes/fail.md'))).toBe(true);
+		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'notes/ok.md'))).toBe(false);
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('notes/fail.md');
 		expect(harness.save).toHaveBeenCalledTimes(1);
@@ -667,23 +693,23 @@ describe('processPendingChanges', () => {
 describe('queued deletion revalidation', () => {
 	it('keeps the checkpoint and reconciles a file recreated after its delete event', async () => {
 		const harness = createFlushHarness();
-		harness.pendingPaths.add('delete:note.md');
+		harness.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new LocalFilePresentError('note.md'));
 		await processPendingChanges(harness.context, 2);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has('delete:note.md')).toBe(true);
-		expect(harness.requestReconciliation).toHaveBeenCalledWith(['delete:note.md']);
+		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
+		expect(harness.requestReconciliation).toHaveBeenCalledWith([pendingChangeKey('delete', 'note.md')]);
 	});
 
 	it('preserves pending deletion when local absence cannot be checked', async () => {
 		const harness = createFlushHarness();
-		harness.pendingPaths.add('delete:note.md');
+		harness.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new Error('adapter unavailable'));
 		await processPendingChanges(harness.context, 2);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
-		expect(harness.pendingPaths.has('delete:note.md')).toBe(true);
+		expect(harness.pendingPaths.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
 		expect(harness.state.lastError).toContain('adapter unavailable');
 	});
 });
@@ -695,4 +721,20 @@ it('does not queue deleted folders as files', () => {
  onFileDelete(h.context, folder);
  expect(h.pendingPaths.size).toBe(0);
  expect(h.triggerDebouncedSync).not.toHaveBeenCalled();
+});
+
+it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', async () => {
+	const h = createFlushHarness({ prepareUploadFromPath: async path => ({
+		path, hash: 'a'.repeat(64), size: 1, content: new ArrayBuffer(1), contentType: 'text/plain',
+	}) });
+	h.pendingPaths.add(pendingChangeKey('delete', 'note.md'));
+	h.pendingPaths.add('delete:note.md');
+	await processPendingChanges(h.context, 1);
+	expect(h.prepareUploadFromPath).toHaveBeenCalledExactlyOnceWith('delete:note.md');
+	expect(h.uploadFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'delete:note.md' }));
+	expect(h.batchDelete).toHaveBeenCalledExactlyOnceWith(['note.md'], { 'note.md': 'd'.repeat(64) }, { 'note.md': 'version-1' });
+	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+		success: true, uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'],
+	}));
+	expect([...h.pendingPaths]).toEqual([]);
 });

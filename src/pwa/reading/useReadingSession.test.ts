@@ -4,7 +4,7 @@ import { renderHook } from '../../test/react-hooks';
 import { useReadingConnection } from './useReadingConnection';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY, PWA_LOGOUT_KEY } from '../config';
-import { READING_SESSION_KEY, readReadingCache, readReadingDraft, writeValue, type ReadingSession } from './storage';
+import { READING_SESSION_KEY, readReadingCache, readReadingDraft, saveReadingDraft, type ReadingSession } from './storage';
 import { connectReadingFromReminders } from './api';
 import { invalidatePwaSession } from '../session-generation';
 import { prepareReadingEncryption } from './encryption-session';
@@ -17,8 +17,8 @@ vi.mock('./api', async importOriginal => ({
 vi.mock('./storage', async importOriginal => ({
   ...await importOriginal<typeof import('./storage')>(),
   readReadingCache: vi.fn(async () => undefined), pendingReading: vi.fn(async () => []),
-  readReadingDraft: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
-  writeValue: vi.fn(async () => {}),
+  readReadingDraft: vi.fn(async () => undefined), readReadingShare: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
+  saveReadingDraft: vi.fn(async () => {}),
 }));
 
 const session: ReadingSession = { token: 'enrolled-token', id: 'enrolled-session', folderPath: 'Reading', generation: 'one', expiresAt: 1 };
@@ -80,7 +80,7 @@ describe('Reading enrollment authority', () => {
     expect(document.cookie).toContain('crate-reading-install=install-token');
     expect(network).toHaveBeenCalledOnce();
     await act(async () => h.rendered.current.setUrl('https://edited.example/article'));
-    expect(writeValue).toHaveBeenLastCalledWith(`draft:${session.id}`, { url: 'https://edited.example/article' }, session);
+    expect(saveReadingDraft).toHaveBeenLastCalledWith(session, { url: 'https://edited.example/article' });
   });
 
   it.each(['peer logout', 'local logout', 'replacement reading session', 'replacement reminders session', 'reset', 'unmount'] as const)(
@@ -122,14 +122,14 @@ describe('Reading enrollment authority', () => {
     await act(async () => h.rendered.current.resetSession());
     await act(async () => { cache.resolve(undefined); });
     expect(h.rendered.current.session).toBeNull();
-    expect(writeValue).not.toHaveBeenCalled();
+    expect(saveReadingDraft).not.toHaveBeenCalled();
     h.rendered.unmount();
 
     vi.mocked(readReadingDraft).mockRejectedValueOnce(new Error('Saved draft needs recovery'));
     const damaged = start();
     await act(async () => { damaged.release(new Response(JSON.stringify(session))); });
     expect(damaged.rendered.current).toMatchObject({ session, recovery: true, error: 'Saved draft needs recovery' });
-    expect(writeValue).not.toHaveBeenCalled();
+    expect(saveReadingDraft).not.toHaveBeenCalled();
   });
 
   it('does not restore a connection when encryption finishes after reset', async () => {

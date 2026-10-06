@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from './runtime-test-harness';
 import {
@@ -34,7 +35,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
 
 		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes('delete:notes/note.md')).toBe(true);
+		expect(pendingPaths.includes(pendingChangeKey('delete', 'notes/note.md'))).toBe(true);
 		expect(pendingPaths.includes('.trash/note.md')).toBe(false);
 	});
 
@@ -42,7 +43,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.onFileRename({ path: 'notes/note.md' } as never, '.trash/note.md');
 
 		const pendingPaths = harness.engine.getPendingPaths();
-		expect(pendingPaths.includes('delete:.trash/note.md')).toBe(false);
+		expect(pendingPaths.includes(pendingChangeKey('delete', '.trash/note.md'))).toBe(false);
 		expect(pendingPaths.includes('notes/note.md')).toBe(true);
 	});
 
@@ -173,7 +174,7 @@ describe('SyncEngine explicit sync queue reconciliation', () => {
 		expect(syncResult).toBe(result);
 		expect(pendingPaths.includes('notes/uploaded.md')).toBe(false);
 		expect(pendingPaths.includes('notes/downloaded.md')).toBe(false);
-		expect(pendingPaths.includes('delete:notes/deleted.md')).toBe(false);
+		expect(pendingPaths.includes(pendingChangeKey('delete', 'notes/deleted.md'))).toBe(false);
 		expect(pendingPaths.includes('notes/still-pending.md')).toBe(true);
 		expect(harness.engine.getState().pendingChanges).toBe(1);
 		harness.engine.destroy();

@@ -1,5 +1,5 @@
 import { PushPayloadError } from './notifications/payload-budget';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
 import { ReminderAlarm } from './notifications/reminder-alarm';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './notifications/push';
@@ -9,8 +9,14 @@ vi.mock('./notifications/push', () => ({
 	sendToAllSubscriptions: vi.fn(),
 }));
 
+const unexpectedQueries: string[] = [];
 beforeEach(() => {
 	vi.clearAllMocks();
+	unexpectedQueries.length = 0;
+});
+afterEach(() => {
+	vi.restoreAllMocks();
+	expect(unexpectedQueries).toEqual([]);
 });
 
 function createHarness(authority = true) {
@@ -52,10 +58,25 @@ function createHarness(authority = true) {
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, async all() { const row = await this.first(); return { results: row ? [row] : [] }; }, first: sql.includes('SELECT 1 FROM reminder_projections') ? async () => authority ? { ok: 1 } : null : sql.includes('SELECT file_path FROM reminder_projections') ? async () => ({ file_path: 'Notes/task.md' }) : sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
-            ? async () => ({ file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
-                notification_token: scheduledReminder.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' })
-            : first })) })),
+		prepare: vi.fn((sql: string) => {
+			const query = sql.replace(/\s+/g, ' ').trim();
+			let read: () => Promise<unknown>;
+			if (query.startsWith('SELECT 1 FROM reminder_projections p JOIN files')) read = async () => authority ? { ok: 1 } : null;
+			else if (query === 'SELECT file_path FROM reminder_projections WHERE reminder_id = ?') read = async () => ({ file_path: 'Notes/task.md' });
+			else if (query.startsWith('SELECT job_token FROM notification_jobs WHERE reminder_id = ?')) read = async () => ({ job_token: 'current-job' });
+			else if (query === 'SELECT schedule_token, content, project, due_datetime FROM scheduled_reminders WHERE reminder_id = ?') read = first;
+			else if (query.startsWith('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
+				|| query.startsWith('INSERT OR REPLACE INTO scheduled_reminders ')
+				|| query.startsWith('UPDATE scheduled_reminders SET delivery_failed_at = ?')) read = async () => null;
+			else {
+				unexpectedQueries.push(query);
+				throw new Error(`Unexpected reminder alarm query: ${query}`);
+			}
+			return { bind: vi.fn(() => ({ run, first: read, async all() {
+				const row = await read();
+				return { results: row ? [row] : [] };
+			} })) };
+		}),
 	} as unknown as D1Database;
 	return {
 		alarm: new ReminderAlarm(state, { DB: db, CRATE_PUBLIC_ORIGIN: 'https://worker.test' }),

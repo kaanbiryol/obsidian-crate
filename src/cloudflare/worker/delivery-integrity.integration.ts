@@ -100,6 +100,50 @@ it('retains recipient completion when the same occurrence is reprojected during 
   expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 });
 
+it.each([false, true])('preserves a new occurrence when an old delivery finishes (failed=%s)', async failed => {
+  const { first, alarm, alarmState, body } = await setup();
+  let started!: () => void;
+  const sending = new Promise<void>(resolve => { started = resolve; });
+  let finish!: () => void;
+  const finished = new Promise<void>(resolve => { finish = resolve; });
+  vi.mocked(sendToAllSubscriptions).mockImplementationOnce(async () => {
+    started();
+    await finished;
+    return { sent: failed ? 0 : 1, failed: failed ? 1 : 0, pruned: 0, quarantined: 0,
+      errors: failed ? ['offline'] : [], failedSubscriptionIds: failed ? ['sub'] : [] };
+  });
+  const delivery = alarm.alarm();
+  await sending;
+  let next: Command;
+  try {
+    await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md',
+      note.replace('Old title', 'Next occurrence').replace(body.dueDatetime, '2099-02-01T10:00:00.000Z'), first.hash);
+    await drainNotificationProjections(env);
+    next = await currentCommand();
+    expect(next.dueDatetime).not.toBe(body.dueDatetime);
+    expect(next.jobToken).not.toBe(body.jobToken);
+    expect((await alarm.fetch(new Request('https://do', { method: 'PUT', body: JSON.stringify(next) }))).status).toBe(200);
+  } finally {
+    finish();
+    await delivery;
+  }
+  expect(await alarmState.storage.get('reminder')).toMatchObject({ content: 'Next occurrence', scheduleToken: next.jobToken });
+  for (const key of ['pendingSubscriptionIds', 'deliveryComplete', 'retryAttempt', 'deliveryFailure', 'completedOccurrence']) {
+    expect(await alarmState.storage.get(key), key).toBeUndefined();
+  }
+  expect(await alarmState.storage.getAlarm()).toBe(Date.parse(next.dueDatetime));
+  expect(await env.DB.prepare('SELECT schedule_token, due_datetime FROM scheduled_reminders WHERE reminder_id = ?').bind(id).first())
+    .toEqual({ schedule_token: next.jobToken, due_datetime: next.dueDatetime });
+
+  await alarm.alarm();
+  expect(sendToAllSubscriptions).toHaveBeenCalledTimes(2);
+  expect(sendToAllSubscriptions).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ title: 'Next occurrence' }),
+    expect.objectContaining({ subscriptionIds: ['sub'] }));
+  expect(await alarmState.storage.get('reminder')).toBeUndefined();
+  expect(await alarmState.storage.get('completedOccurrence')).toBe(next.dueDatetime);
+  expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders').first()).toBeNull();
+});
+
 it('does not clear a terminal failure when the same schedule is retried', async () => {
   const { alarm, alarmState, body } = await setup();
   await alarmState.storage.put('retryAttempt', 10);

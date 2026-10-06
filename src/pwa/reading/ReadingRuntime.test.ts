@@ -5,7 +5,7 @@ import { SettingsContext } from '../settings-context';
 import { createSettingsStore } from '../settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
-import { READING_SESSION_KEY, readReadingCache, readReadingDraft, readingLock, writeValue, type ReadingSession } from './storage';
+import { READING_SESSION_KEY, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, savePendingReading, type ReadingSession } from './storage';
 import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
 
@@ -21,7 +21,8 @@ vi.mock('./storage', async importOriginal => ({
   ...await importOriginal<typeof import('./storage')>(),
   readReadingCache: vi.fn(async () => ({ items: [], issues: [], savedAt: 1 })),
   pendingReading: vi.fn(async () => []), readReadingDraft: vi.fn(async () => undefined),
-  hasEarlierReadingChanges: vi.fn(async () => false), writeValue: vi.fn(async () => {}),
+  hasEarlierReadingChanges: vi.fn(async () => false), saveReadingDraft: vi.fn(async () => {}), savePendingReading: vi.fn(async () => {}),
+  readReadingShare: vi.fn(async () => undefined), removeReadingShare: vi.fn(async () => {}),
   readingLock: vi.fn(),
 }));
 
@@ -34,7 +35,8 @@ const article: ReadingItem = { crate_reading_version: 1, crate_reading_id: '1234
 let currentSession: ReadingSession | null;
 beforeEach(() => {
   vi.clearAllMocks(); currentSession = session; connection.connecting = false;
-  vi.mocked(writeValue).mockReset().mockResolvedValue(undefined);
+  vi.mocked(savePendingReading).mockReset().mockResolvedValue(undefined);
+  vi.mocked(removeReadingShare).mockReset().mockResolvedValue(undefined);
   vi.mocked(readingLock).mockReset();
   vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(currentSession) : null });
   vi.stubGlobal('location', { href: 'https://example.test/notifications' });
@@ -93,7 +95,7 @@ it.each(commands)('blocks reload while a $action command waits for storage and t
   h.hook.rerender();
   expect(pwaSyncState(h.store.getSnapshot()).canUpdate).toBe(false);
   await act(async () => { h.release(); await pending; });
-  expect(writeValue).toHaveBeenCalledWith(`pending:${session.id}`, [expect.objectContaining(command)], session);
+  expect(savePendingReading).toHaveBeenCalledWith(session, [expect.objectContaining(command)]);
   expect(h.store.getSnapshot().reading).toMatchObject({ pendingCount: 1, unsynced: true });
   expect(pwaSyncState(h.store.getSnapshot()).canUpdate).toBe(false);
 });
@@ -102,7 +104,7 @@ it('keeps overlapping preparations blocked until both fail and allows retry afte
   const h = await harness();
   let failFirst!: (cause: Error) => void;
   vi.mocked(readingLock).mockImplementationOnce(() => new Promise((_resolve, reject) => { failFirst = reject; }));
-  vi.mocked(writeValue).mockRejectedValueOnce(new Error('Storage full'));
+  vi.mocked(savePendingReading).mockRejectedValueOnce(new Error('Storage full'));
   let first!: Promise<unknown>, second!: Promise<unknown>;
   act(() => {
     first = h.hook.current.queueChange(commands[0]!).catch(() => {});
@@ -122,16 +124,16 @@ it('does not publish a delayed command after logout and unmount', async () => {
   let pending!: Promise<unknown>;
   act(() => { pending = h.hook.current.queueChange(commands[0]!).catch(() => {}); });
   currentSession = null; h.hook.unmount();
-  vi.mocked(writeValue).mockClear();
+  vi.mocked(savePendingReading).mockClear();
   await act(async () => { h.release(); await pending; });
-  expect(writeValue).not.toHaveBeenCalled();
+  expect(savePendingReading).not.toHaveBeenCalled();
   expect(showToast).not.toHaveBeenCalled();
   expect(h.store.getSnapshot().reading).toBeNull();
 });
 
 it('clears transient preparation after a failure during connection rehydration', async () => {
   const h = await harness();
-  vi.mocked(writeValue).mockRejectedValueOnce(new Error('Storage unavailable'));
+  vi.mocked(savePendingReading).mockRejectedValueOnce(new Error('Storage unavailable'));
   let pending!: Promise<unknown>;
   act(() => { pending = h.hook.current.queueChange(commands[0]!).catch(() => {}); });
   connection.connecting = true; h.hook.rerender();
@@ -165,7 +167,8 @@ it('owns save preparation while storage is delayed and prevents duplicate captur
 
 it.each([false, true])('opens an existing shared link and guards delayed completion (session replaced: %s)', async replaced => {
   vi.mocked(readReadingCache).mockResolvedValueOnce({ items: [article], issues: [], savedAt: 1 });
-  vi.mocked(readReadingDraft).mockResolvedValueOnce(undefined).mockResolvedValueOnce({ url: `${article.source_url}#section` });
+  vi.mocked(readReadingDraft).mockResolvedValueOnce(undefined);
+  vi.mocked(readReadingShare).mockResolvedValueOnce({ url: `${article.source_url}#section` });
   vi.stubGlobal('location', { href: 'https://example.test/notifications?share=shared' });
   // This starts with an open capture, so update readiness is intentionally false.
   const hook = renderHook(useReadingRuntime, undefined, children => createElement(SettingsContext.Provider,
@@ -173,12 +176,12 @@ it.each([false, true])('opens an existing shared link and guards delayed complet
   await act(async () => {});
   let release!: () => void;
   const cleanup = new Promise<void>(resolve => { release = resolve; });
-  vi.mocked(writeValue).mockImplementation(async key => { if (key === 'share:shared') await cleanup; });
+  vi.mocked(removeReadingShare).mockImplementation(async () => { await cleanup; });
   const open = vi.fn(async () => {});
   let saved!: Promise<boolean>;
   await act(async () => { saved = hook.current.saveLink(open); });
   expect(open).toHaveBeenCalledWith(article);
-  expect(writeValue).toHaveBeenCalledWith('share:shared', null, session);
+  expect(removeReadingShare).toHaveBeenCalledWith(session, 'shared');
   expect(hook.current.saving).toBe(true);
   if (replaced) currentSession = null;
   await act(async () => { release(); expect(await saved).toBe(!replaced); });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReadingConnection } from './useReadingConnection';
 import type { PendingReading } from './outbox';
-import { assertReadingSession, hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, writeValue, type ReadingCache, type ReadingSession } from './storage';
+import { assertReadingSession, hasEarlierReadingChanges, pendingReading, readReadingCache, readReadingDraft, readReadingShare, saveReadingDraft, type ReadingCache, type ReadingSession } from './storage';
 
 interface ReadingSyncPublication {
   pending: PendingReading[];
@@ -84,7 +84,7 @@ export function useReadingSession(connection: ReadingConnection) {
       // Read each lifetime separately: a disposable cache failure must not hide a
       // saved draft, and an unreadable draft must never be replaced by empty input.
       const results = await Promise.allSettled([
-        readReadingCache(current), pendingReading(current), readReadingDraft(`draft:${current.id}`), hasEarlierReadingChanges(current.id),
+        readReadingCache(current), pendingReading(current), readReadingDraft(current), hasEarlierReadingChanges(current.id),
       ]);
       if (!currentRequest()) return;
       const [saved, work, draft, earlier] = results;
@@ -107,7 +107,7 @@ export function useReadingSession(connection: ReadingConnection) {
       setHydrated(current);
       const shareId = new URL(location.href).searchParams.get('share');
       if (shareId) {
-        const draft = await readReadingDraft(`share:${shareId}`);
+        const draft = await readReadingShare(shareId);
         if (currentRequest() && draft) { setUrl(draft.url); setAdding(true); setShare(shareId); }
       }
     });
@@ -115,7 +115,7 @@ export function useReadingSession(connection: ReadingConnection) {
   }, [connection.session, connection.ready, connection.connecting, connection.lockedSession, run]);
   const ready = connection.ready && (!connection.session || hydrated === connection.session || Boolean(error));
   useEffect(() => {
-    if (session && ready && draftReady) void run(() => writeValue(`draft:${session.id}`, { url }, session));
+    if (session && ready && draftReady) void run(() => saveReadingDraft(session, { url }));
   }, [session, ready, draftReady, url, run]);
   return { ...connection, session, ready, resetSession, cache, pending,
     error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, share, run,

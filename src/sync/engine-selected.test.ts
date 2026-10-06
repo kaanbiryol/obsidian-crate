@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 import type { BatchUploadFile, FileEntry } from '../protocol/sync-types';
@@ -15,7 +16,7 @@ function response(value: unknown): ApiHttpResponse {
     const text = JSON.stringify(value);
     return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 }
-async function harness() {
+async function harness(paths = ['a.md', 'b.md']) {
     const hash = await computeHash(bytes);
     const entry = { hash, revision: 'v1', size: bytes.byteLength, modified: '2026-09-30T10:00:00Z' };
     const remote = {
@@ -36,7 +37,7 @@ async function harness() {
         }
     });
     const h = await createPersistentEngineHarness(transport, { automaticSync: false, lastSeq: 42 });
-    for (const path of ['a.md', 'b.md']) {
+    for (const path of paths) {
         h.disk.write(path, bytes);
         h.engine.onFileChange(h.vault.getAbstractFileByPath(path) as never);
     }
@@ -48,6 +49,25 @@ async function harness() {
 }
 
 describe('selected sync with durable file operations', () => {
+    it('selects an upload named delete:note.md separately from deleting note.md', async () => {
+        const h = await harness(['note.md', 'delete:note.md']);
+        h.localManifest.setEntry('note.md', h.entry); await h.localManifest.save();
+        h.disk.remove('note.md'); h.engine.onFileDelete({ path: 'note.md' } as never);
+        h.remote.metadata.mockImplementation(async (paths): Promise<{ files: Record<string, FileEntry> }> => ({ files: paths.includes('note.md') ? { 'note.md': h.entry } : {} }));
+        const uploaded = await h.engine.syncSelected(['delete:note.md']);
+        expect(uploaded.success, uploaded.errors.join('\n')).toBe(true);
+        expect(uploaded.uploadedPaths).toEqual(['delete:note.md']);
+        expect(h.remote.metadata).toHaveBeenCalledExactlyOnceWith(['delete:note.md']);
+        expect(h.remote.delete).not.toHaveBeenCalled();
+        expect(h.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'note.md')]);
+        const deleted = await h.engine.syncSelected([pendingChangeKey('delete', 'note.md')]);
+        expect(deleted.success, deleted.errors.join('\n')).toBe(true);
+        expect(deleted.deletedPaths).toEqual(['note.md']);
+        expect(h.remote.delete).toHaveBeenCalledWith({ path: 'note.md', expectedHash: h.entry.hash, expectedRevision: 'v1' });
+        expect(h.disk.text('delete:note.md')).toBe('local');
+        expect(h.engine.getPendingPaths()).toEqual([]);
+    });
+
     it('shows checking, per-file progress, and saving during selected uploads', async () => {
         const h = await harness(), labels: string[] = [];
         h.engine.setStateChangeCallback(state => labels.push(formatSyncProgress(null, state.work)));
@@ -106,7 +126,7 @@ describe('selected sync with durable file operations', () => {
         const h = await harness();
         h.localManifest.setEntry('a.md', h.entry); await h.localManifest.save();
         h.disk.remove('a.md'); h.engine.onFileDelete({ path: 'a.md' } as never);
-        const result = await h.engine.syncSelected(['delete:a.md']);
+        const result = await h.engine.syncSelected([pendingChangeKey('delete', 'a.md')]);
         expect(result.success, result.errors.join('\n')).toBe(true);
         expect(result.deletedPaths).toEqual(['a.md']);
         expect(h.remote.delete).toHaveBeenCalledWith({ path: 'a.md', expectedHash: h.entry.hash, expectedRevision: 'v1' });

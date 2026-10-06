@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { withSyncFileContext } from './issues';
 import { computeHash } from "./hasher";
 import { getAllVaultFiles } from "./file-discovery";
@@ -41,7 +42,7 @@ export async function getLocalChanges(
   const candidates = allFiles.filter((file) => {
     if (file.size > MAX_FILE_SIZE_BYTES) return false;
 
-    if (context.pendingPaths?.has(file.path)) return true;
+    if (context.pendingPaths?.has(pendingChangeKey('upload', file.path))) return true;
     const existing = context.localManifest.getEntry(file.path);
     if (!existing) return true;
     if (existing.size !== file.size) return true;

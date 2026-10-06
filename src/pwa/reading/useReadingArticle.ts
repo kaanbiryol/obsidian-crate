@@ -1,9 +1,9 @@
 import type { PendingReading } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { readingUrlIdentity, validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
+import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
-import { readingRequest } from './api';
+import { loadReadingArticle } from './api';
 import { assertReadingSession, readReadingArticle, cacheReadingArticle, type ReadingSession, type ReadingCache } from './storage';
 import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './article-history';
@@ -57,7 +57,6 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
       try {
         const saved = await readReadingArticle(session, item.crate_reading_id);
         if (saved?.item?.crate_reading_id === item.crate_reading_id && typeof saved.markdown === 'string') {
-          validateReadingMetadata({ ...saved.item });
           if (current()) { cached = true; setReader({ item, markdown: saved.markdown, availableOffline: true, sourceHighlights: JSON.stringify(saved.item.highlights ?? []), sourceExtractionStatus: saved.item.extraction_status }); }
         }
       } catch { /* A damaged or blocked cache must not prevent an online open. */ }
@@ -67,8 +66,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
         return;
       }
       try {
-        const article = await readingRequest<{ item: ReadingItem; markdown: string }>(`/reading/item?id=${encodeURIComponent(item.crate_reading_id)}`, session);
-        validateReadingMetadata({ ...article.item });
+        const article = await loadReadingArticle(session, item.crate_reading_id);
         if (!current()) return;
         setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, sourceHighlights: JSON.stringify(article.item.highlights ?? []), sourceExtractionStatus: article.item.extraction_status });
         try {
@@ -93,8 +91,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
     // Extraction and inline edits can replace the body without changing its saved highlights.
     void (async () => {
       try {
-        const article = await readingRequest<{ item: ReadingItem; markdown: string }>(`/reading/item?id=${encodeURIComponent(reader.item.crate_reading_id)}`, session);
-        validateReadingMetadata({ ...article.item });
+        const article = await loadReadingArticle(session, reader.item.crate_reading_id);
         if (!active || request !== navigation.current) return;
         let cached = false;
         try { await cacheReadingArticle(session, article.item, article.markdown); cached = true; } catch { /* Preserve the confirmed online article. */ }

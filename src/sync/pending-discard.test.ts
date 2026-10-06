@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { describe, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../protocol/sync-types';
 import { createPendingDiscard } from './pending-discard';
@@ -39,6 +40,22 @@ async function harness(initial: Record<string, ArrayBuffer>, server: Record<stri
 }
 
 describe('pending discard', () => {
+    it('discards a literal delete-prefixed file independently of its deleted neighbor', async () => {
+        const h = await harness({ 'delete:note.md': bytes('local edit') }, {
+            'delete:note.md': bytes('saved prefixed file'), 'note.md': bytes('saved neighbor'),
+        });
+        const edited = await createPendingDiscard(h.context, ['delete:note.md']);
+        expect(edited.items).toEqual([{ path: 'delete:note.md', action: 'restore' }]);
+        await edited.discard();
+        expect(h.files.get('delete:note.md')).toEqual(bytes('saved prefixed file'));
+        expect(h.files.has('note.md')).toBe(false);
+        const deleted = await createPendingDiscard(h.context, [pendingChangeKey('delete', 'note.md')]);
+        expect(deleted.items).toEqual([{ path: 'note.md', action: 'restore' }]);
+        await deleted.discard();
+        expect(h.files.get('note.md')).toEqual(bytes('saved neighbor'));
+        expect(h.files.get('delete:note.md')).toEqual(bytes('saved prefixed file'));
+    });
+
     it.each(['.hidden/image.bin', '.obsidian/app.json'])('keeps recreation at the final hidden-file create: %s', async path => {
         const h = await harness({}, { [path]: bytes('server') });
         const review = await createPendingDiscard(h.context, [path]);
@@ -55,7 +72,7 @@ describe('pending discard', () => {
 
     it('prepares actions without changing files and excludes unchanged content', async () => {
         const h = await harness({ 'new.md': bytes('new'), 'same.md': bytes('same'), 'edit.md': bytes('edit') }, { 'same.md': bytes('same'), 'edit.md': bytes('server'), 'deleted.md': bytes('restore') });
-        const review = await createPendingDiscard(h.context, ['new.md', 'same.md', 'edit.md', 'delete:deleted.md']);
+        const review = await createPendingDiscard(h.context, ['new.md', 'same.md', 'edit.md', pendingChangeKey('delete', 'deleted.md')]);
         expect(review.items).toEqual([{ path: 'new.md', action: 'trash' }, { path: 'edit.md', action: 'restore' }, { path: 'deleted.md', action: 'restore' }]);
         expect(review.unchangedCount).toBe(1);
         expect(h.adapter.writeBinary).not.toHaveBeenCalled();
@@ -73,7 +90,7 @@ describe('pending discard', () => {
     });
     it.each(['note.md', '.obsidian/app.json'])('restores a locally deleted file: %s', async path => {
         const h = await harness({}, { [path]: bytes('server') });
-        await (await createPendingDiscard(h.context, [`delete:${path}`])).discard();
+        await (await createPendingDiscard(h.context, [pendingChangeKey('delete', path)])).discard();
         expect(h.files.get(path)).toEqual(bytes('server'));
     });
     it.each(['new.md', '.hidden/new.bin'])('moves a locally added file to trash: %s', async path => {

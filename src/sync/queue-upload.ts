@@ -1,4 +1,5 @@
 import { isMarkdownPath } from './markdown-base-cache';
+import { pendingChangeKey } from './pending-change';
 import type { PreparedUpload } from './types';
 import type { QueueFlushContext, QueueUploadFailure } from './queue-flush-types';
 import { HttpError } from './api';
@@ -38,7 +39,7 @@ export async function uploadPendingFiles(
 			if (isMarkdownPath(upload.path)) {
 				await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
 			}
-			completedQueueKeys.add(upload.path);
+			completedQueueKeys.add(pendingChangeKey('upload', upload.path));
 			return null;
 		} catch (error) {
 			if (isAbortError(error)) {

@@ -26,9 +26,15 @@ import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
-import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings } from './settings';
+import {
+	buildPersistedCrateSettings,
+	normalizeCrateSettings,
+	normalizePersistedCrateSettings,
+	type CrateSettings,
+	type PersistedCrateSettings,
+} from './settings';
 
-type PluginData = Partial<CrateSettings> & {
+type PluginData = Partial<PersistedCrateSettings> & {
 	reminders?: Partial<RemindersSettings>;
 };
 
@@ -74,9 +80,9 @@ export default class CratePlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
-			const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
+			const normalizedSettings = normalizePersistedCrateSettings(this.settings, this.app.vault.configDir);
 			await this.saveData({
-				...buildPersistedCrateSettings(normalizedSettings),
+				...normalizedSettings,
 				reminders: this.remindersSettings,
 			});
 			signal.throwIfAborted();
@@ -84,15 +90,15 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	async writeSettings(update: Partial<CrateSettings>, assertCurrent?: () => void): Promise<void> {
+	async writeSettings(update: Partial<PersistedCrateSettings>, assertCurrent?: () => void): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
 			assertCurrent?.();
-			const nextSettings = normalizeCrateSettings(
+			const nextSettings = normalizePersistedCrateSettings(
 				{ ...this.settings, ...update },
 				this.app.vault.configDir,
 			);
 			await this.saveData({
-				...buildPersistedCrateSettings(nextSettings),
+				...nextSettings,
 				reminders: this.remindersSettings,
 			});
 			signal.throwIfAborted();

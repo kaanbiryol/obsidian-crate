@@ -4,7 +4,7 @@ import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-type
 import type { SyncHistoryEntry } from '../sync/types';
 import { DEFAULT_READING_SETTINGS, type ReadingSettings } from '../reading/settings';
 
-export interface CrateSettings {
+export interface PersistedCrateSettings {
 	cloudflareRestore?: ServerRestoreState | null;
 	reading: ReadingSettings;
 	usageSnapshot?: UsageSnapshot | null;
@@ -15,7 +15,6 @@ export interface CrateSettings {
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	lastSync: string | null;
 	lastSeq: number;
-	deviceId: string;
 	ignorePatterns: string[];
 	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
 	syncOnStartup: boolean;
@@ -26,6 +25,11 @@ export interface CrateSettings {
 	pushEnabled: boolean;
 	debugLogging: boolean;
 	debounceDelay: number;
+}
+
+export interface CrateSettings extends PersistedCrateSettings {
+	/** Hydrated from local secret storage; never loaded from or saved to plugin data. */
+	deviceId: string;
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {

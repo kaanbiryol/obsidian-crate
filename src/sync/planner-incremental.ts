@@ -1,3 +1,4 @@
+import { pendingChangeKey } from './pending-change';
 import { recordSyncError } from './issues';
 import { BATCH_UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
@@ -44,7 +45,7 @@ export async function runIncrementalSync(
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
     const result = createEmptySyncResult();
-    result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)));
+    result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
 
     if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
       if (unchangedPaths.length > 0) await context.localManifest.save();
