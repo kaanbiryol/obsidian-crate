@@ -24,6 +24,7 @@ import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
+import { publishSavedSettings } from './settings-persistence';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import {
@@ -86,15 +87,15 @@ export default class CratePlugin extends Plugin {
 				reminders: this.remindersSettings,
 			});
 			signal.throwIfAborted();
-			Object.assign(this.settings, normalizedSettings);
 		});
 	}
 
 	async writeSettings(update: Partial<PersistedCrateSettings>, assertCurrent?: () => void): Promise<void> {
+		const requested = { ...update };
 		await this.enqueueSettingsWrite(async signal => {
 			assertCurrent?.();
 			const nextSettings = normalizePersistedCrateSettings(
-				{ ...this.settings, ...update },
+				{ ...this.settings, ...requested },
 				this.app.vault.configDir,
 			);
 			await this.saveData({
@@ -103,7 +104,7 @@ export default class CratePlugin extends Plugin {
 			});
 			signal.throwIfAborted();
 			assertCurrent?.();
-			Object.assign(this.settings, nextSettings);
+			publishSavedSettings(this.settings, requested, nextSettings);
 		});
 	}
 
@@ -132,7 +133,7 @@ export default class CratePlugin extends Plugin {
 				reminders: this.remindersSettings,
 			});
 			signal.throwIfAborted();
-			Object.assign(this.settings, nextSettings);
+			publishSavedSettings(this.settings, { debugLogging: enabled }, nextSettings);
 			configureSyncLogger({ enabled });
 			configureRemindersLogger({ prefix: 'Crate', enabled });
 		});

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
 import { ensurePluginDeviceId } from './deviceId';
+import { recordSyncHistory } from '../sync/runtime-history';
+import { createEmptySyncResult } from '../sync/sync-result';
 import { initializeReminders } from '../reminders/plugin-integration';
 import {
 	DEFAULT_REMINDERS_SETTINGS,
@@ -66,6 +68,67 @@ describe('CratePlugin settings persistence', () => {
 		expect(plugin.settings.deviceId).toBe('device-local');
 		expect(plugin.settings.syncInterval).toBe(300);
 		expect(saveData.mock.calls[0]![0]).not.toHaveProperty('deviceId');
+	});
+
+	it.each(['snapshot', 'update', 'debug'] as const)('preserves sync progress completed during a delayed %s save', async kind => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const settings = normalizeCrateSettings({ lastSeq: 10, lastSync: '2026-10-05T12:00:00Z' }, '.obsidian');
+		let release!: () => void;
+		const saveData = vi.fn<(value: unknown) => Promise<void>>(async () => {});
+		saveData.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, settings, saveData });
+		const saving = kind === 'snapshot' ? plugin.saveSettings()
+			: kind === 'update' ? plugin.writeSettings({ syncInterval: 120 }) : plugin.setDebugLogging(true);
+		await vi.waitFor(() => expect(saveData).toHaveBeenCalledOnce());
+		settings.lastSeq = 11;
+		settings.lastSync = '2026-10-06T12:00:00Z';
+		recordSyncHistory(settings, 'sync', createEmptySyncResult());
+		const progress = { lastSeq: 11, lastSync: settings.lastSync, syncHistory: structuredClone(settings.syncHistory) };
+		const persistedProgress = plugin.saveSettings();
+		release();
+		await Promise.all([saving, persistedProgress]);
+		expect(plugin.settings).toBe(settings);
+		expect(settings).toMatchObject(progress);
+		expect(settings.syncHistory).toHaveLength(1);
+		expect(saveData).toHaveBeenLastCalledWith(expect.objectContaining(progress));
+		expect(settings.syncInterval).toBe(kind === 'update' ? 120 : 300);
+		expect(settings.debugLogging).toBe(kind === 'debug');
+	});
+
+	it('publishes normalized requested settings and invalidates a checkpoint scope when its address changes', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn<(value: unknown) => Promise<void>>(async () => {});
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, saveData,
+			settings: normalizeCrateSettings({ workerUrl: 'https://old.example', checkpointScope: {
+				workerUrl: 'https://old.example', authority: 'https://original.example',
+			} }, '.obsidian'),
+		});
+		await plugin.writeSettings({ workerUrl: ' https://new.example/ ', ignorePatterns: ['secret/', 'secret/'] });
+		expect(plugin.settings.workerUrl).toBe('https://new.example');
+		expect(plugin.settings.ignorePatterns).toEqual(['secret/', '.obsidian/workspace*']);
+		expect(plugin.settings).not.toHaveProperty('checkpointScope');
+		expect(saveData.mock.calls[0]![0]).not.toHaveProperty('checkpointScope');
+	});
+
+	it('retains sync progress and a queued save when a preference write fails', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const settings = normalizeCrateSettings({ lastSeq: 10 }, '.obsidian');
+		let reject!: (error: Error) => void;
+		const saveData = vi.fn<(value: unknown) => Promise<void>>(async () => {});
+		saveData.mockImplementationOnce(() => new Promise((_resolve, rejectWrite) => { reject = rejectWrite; }));
+		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, settings, saveData });
+		const saving = plugin.writeSettings({ syncInterval: 120 });
+		const rejected = expect(saving).rejects.toThrow('disk full');
+		await vi.waitFor(() => expect(saveData).toHaveBeenCalledOnce());
+		settings.lastSeq = 11;
+		recordSyncHistory(settings, 'sync', createEmptySyncResult());
+		const progressSave = plugin.saveSettings();
+		reject(new Error('disk full'));
+		await Promise.all([rejected, progressSave]);
+		expect(settings.lastSeq).toBe(11);
+		expect(settings.syncHistory).toHaveLength(1);
+		expect(settings.syncInterval).toBe(300);
+		expect(saveData).toHaveBeenLastCalledWith(expect.objectContaining({ lastSeq: 11, syncHistory: settings.syncHistory, syncInterval: 300 }));
 	});
 
 

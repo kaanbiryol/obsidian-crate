@@ -271,7 +271,10 @@ asynchronous storage reads, covering the interval before a command reaches its o
 Reading's PWA adapter separates durable state from its screen. `useReadingSession`
 owns durable hydration and session-checked publication methods; app connection
 hooks own enrollment and unlocking. `useReadingSync` owns refresh serialization,
-retry scheduling and foreground/cross-tab refresh. `useReadingMutations` owns capture,
+retry scheduling and foreground/cross-tab refresh. Its serialized refresh includes
+the connection check, queue drain and list load. Storage events are limited to
+Reading credentials, shared authentication/logout and storage clears, so unrelated
+preference or reminder edits do not fetch the Reading library. `useReadingMutations` owns capture,
 metadata edits, extraction retries and synchronous update guards in the mounted
 runtime, while `useReadingArticle` owns article loading, browser history and stale
 navigation guards. The runtime provider composes these owners and publishes settings;
@@ -386,8 +389,18 @@ The service uses Obsidian's official `App.secretStorage` type and scopes the syn
 
 `plugin/settings-types.ts` separates persisted settings from the runtime device ID.
 Loading initializes settings before hydrating that ID from secret storage. Queued
-settings writes normalize and publish only persisted fields, preserving the hydrated
-identity and the existing shared settings object.
+settings writes use `plugin/settings-persistence.ts` to publish only requested
+normalized fields after saving; snapshot saves do not republish captured state.
+The same module exposes a narrow synchronous sync-progress update with bounded,
+immutable history. Sync retains cursor/checkpoint ordering and persists at operation
+completion. This preserves newer progress during unrelated settings saves, the
+hydrated device identity and the existing shared settings object.
+
+`cloudflare/deployment-state.ts` validates persisted deployment, reset and deletion
+state; plugin settings compose that domain normalizer. `cloudflare/restore/workflow.ts`
+keeps restore checkpoint selection, destination creation and persist-before-remote
+ordering together. `CloudflareDeploymentService` retains authorization, operation
+exclusion, lifetime guards and guarded settings/transport access.
 
 ## Worker and PWA build
 

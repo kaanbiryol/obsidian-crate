@@ -68,6 +68,7 @@ describe('runIncrementalSync', () => {
 		};
 		const context = {
 			settings,
+			setLastSeq: (value: number) => { settings.lastSeq = value; },
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(),

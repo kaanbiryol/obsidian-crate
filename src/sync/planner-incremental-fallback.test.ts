@@ -27,6 +27,7 @@ it('falls back to full sync when cursor is expired', async () => {
 		const settings = createSettings({ lastSeq: 5 });
 		const context = {
 			settings,
+			setLastSeq: (value: number) => { settings.lastSeq = value; },
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(),
@@ -100,6 +101,7 @@ it('falls back to full sync when cursor is expired', async () => {
 
 		const context = {
 			settings,
+			setLastSeq: (value: number) => { settings.lastSeq = value; },
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(() => ({
@@ -178,6 +180,7 @@ it('falls back to full sync when cursor is expired', async () => {
 
 		const context = {
 			settings,
+			setLastSeq: (value: number) => { settings.lastSeq = value; },
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(() => ({
@@ -240,6 +243,7 @@ it('falls back to full sync when cursor is expired', async () => {
 	it('falls back to full sync when changelog request throws', async () => {
 		const context = {
 			settings: createSettings({ lastSeq: 2 }),
+			setLastSeq: vi.fn(),
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(),

@@ -25,6 +25,7 @@ import {
 import { createByteBudgetedVaultFileChunks } from './transfer-budget';
 import { PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './engine-constants';
 import type { CrateSettings } from '../plugin/settings-types';
+import { updateSyncProgress } from '../plugin/settings-persistence';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { runInitialImport } from './initial-import';
@@ -152,6 +153,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			settings: dependencies.getSettings(),
+			setLastSeq: (lastSeq: number) => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
@@ -217,10 +219,10 @@ export class SyncEngineContexts {
 			},
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),
 			setLastSync: (value: string) => {
-				dependencies.getSettings().lastSync = value;
+				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
 			},
 			setLastSeq: (value: number) => {
-				dependencies.getSettings().lastSeq = value;
+				updateSyncProgress(dependencies.getSettings(), { lastSeq: value });
 			},
 		};
 	}
@@ -244,7 +246,7 @@ export class SyncEngineContexts {
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			setLastSync: (value: string) => {
-				dependencies.getSettings().lastSync = value;
+				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
 			},
 		};
 	}
@@ -264,7 +266,7 @@ export class SyncEngineContexts {
       prepareReminderScope: dependencies.prepareReminderScope,
       shouldIgnore: dependencies.shouldIgnore, throwIfDestroyed: dependencies.throwIfDestroyed,
       save: () => dependencies.getLocalManifest().save(),
-      setLastSeq: seq => { dependencies.getSettings().lastSeq = seq; },
+      setLastSeq: lastSeq => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
       report: work => dependencies.updateState({ work }),
     }, result, progress);
   }
@@ -295,7 +297,7 @@ export class SyncEngineContexts {
 			removeLocalManifestEntry: (path: string) => dependencies.getLocalManifest().removeEntry(path),
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),
 			setLastSync: (value: string) => {
-				dependencies.getSettings().lastSync = value;
+				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
 			},
 		};
 	}

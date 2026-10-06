@@ -1,4 +1,5 @@
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type CrateSettings } from '../plugin/settings-types';
+import { MAX_SYNC_HISTORY_PATHS, type CrateSettings } from '../plugin/settings-types';
+import { updateSyncProgress } from '../plugin/settings-persistence';
 import type { SyncHistoryEntry, SyncResult } from './types';
 import { getSyncIssues } from './issues';
 
@@ -6,7 +7,8 @@ export function recordSyncHistory(
   settings: CrateSettings,
   type: SyncHistoryEntry["type"],
   result: SyncResult,
-): void {
+  details: Pick<SyncHistoryEntry, 'timings' | 'requestDiagnostics'> = {},
+): SyncHistoryEntry {
   const entry: SyncHistoryEntry = {
     timestamp: new Date().toISOString(),
     type,
@@ -26,19 +28,16 @@ export function recordSyncHistory(
     downloadedPaths: limitHistoryPaths(result.downloadedPaths),
     mergedPaths: limitHistoryPaths(result.mergedPaths),
     deletedPaths: limitHistoryPaths(result.deletedPaths),
+    ...details,
   };
 
-  settings.syncHistory.unshift(entry);
-  if (settings.syncHistory.length > MAX_SYNC_HISTORY) {
-    settings.syncHistory.length = MAX_SYNC_HISTORY;
-  }
+  updateSyncProgress(settings, { syncHistory: [entry, ...settings.syncHistory] });
+  return entry;
 }
 
 export function resetStoredSyncState(settings: CrateSettings): void {
 	delete settings.checkpointScope;
-  settings.lastSeq = 0;
-  settings.lastSync = null;
-  settings.syncHistory = [];
+  updateSyncProgress(settings, { lastSeq: 0, lastSync: null, syncHistory: [] });
 }
 
 function limitHistoryPaths(paths: string[] = []): string[] {

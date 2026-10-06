@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { ChangelogEntry, MutationFailure } from '../protocol/sync-types';
 import type { CrateSettings } from '../plugin/settings-types';
+import { updateSyncProgress } from '../plugin/settings-persistence';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 
 export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
@@ -72,6 +73,7 @@ export function createIncrementalHarness(overrides: Partial<{
 	};
 	const context: IncrementalSyncPlannerContext = {
 		settings,
+		setLastSeq: lastSeq => updateSyncProgress(settings, { lastSeq }),
 		vault: vault as never,
 		fileManager,
 		api,

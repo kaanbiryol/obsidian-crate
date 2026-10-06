@@ -27,6 +27,7 @@ import {
 	type ApplyInfrastructureConfigInput,
 } from './runtime-config';
 import { recordSyncHistory } from './runtime-history';
+import { updateSyncProgress } from '../plugin/settings-persistence';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
 import { RuntimeServerStatus } from './runtime-server-status';
@@ -576,18 +577,22 @@ export class SyncRuntime {
 	private async recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
 		if (this.syncEngine !== engine) return;
 		const api = this.apiClient;
-		recordSyncHistory(this.settings, type, result);
-		const latest = this.settings.syncHistory[0];
-		if (latest) latest.timings = engine.getTimings();
-		if (latest && api) latest.requestDiagnostics = engine.getRequestDiagnostics();
-		if (latest && result.success && !result.conflicts.length) {
+		const latest = recordSyncHistory(this.settings, type, result, {
+			timings: engine.getTimings(),
+			...(api ? { requestDiagnostics: engine.getRequestDiagnostics() } : {}),
+		});
+		const attachCheckpoint = (checkpoint: Pick<SyncHistoryEntry, 'sharedCheckpoint' | 'historyCheckpoint'>) => {
+			if (this.syncEngine !== engine) return;
+			updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, ...checkpoint } : entry) });
+		};
+		if (result.success && !result.conflicts.length) {
 			try {
                 const shared = await engine.saveSharedHistoryCheckpoint();
                 if (this.syncEngine !== engine) return;
-                if (shared) latest.sharedCheckpoint = shared.id;
+                if (shared) attachCheckpoint({ sharedCheckpoint: shared.id });
                 else {
                     const checkpoint = await engine.saveHistoryCheckpoint();
-                    if (this.syncEngine === engine) latest.historyCheckpoint = checkpoint;
+                    attachCheckpoint({ historyCheckpoint: checkpoint });
                 }
             }
 			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
@@ -602,7 +607,7 @@ export class SyncRuntime {
 		if (this.syncEngine !== engine) return;
 		const state = engine.getState();
 		if (result.success && state.lastSync) {
-			this.settings.lastSync = state.lastSync;
+			updateSyncProgress(this.settings, { lastSync: state.lastSync });
 		}
 		await this.recordSyncResult(engine, 'sync', result);
 		if (this.syncEngine !== engine) return;

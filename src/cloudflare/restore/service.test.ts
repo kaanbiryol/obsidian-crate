@@ -31,6 +31,56 @@ it('persists the restore identity before remote work and preserves the current c
   expect(f.settings.cloudflareDeployment).toEqual(source);
   expect(f.writeSettings.mock.calls.every(([update]) => Object.keys(update).join() === 'cloudflareRestore')).toBe(true);
 });
+it.each([
+  ['copying', false], ['copying', true],
+  ['publishing', false], ['publishing', true],
+  ['complete', false], ['complete', true],
+] as const)('selects the checkpoint after %s with an explicit choice: %s', async (phase, chooseAnother) => {
+  const f = harness();
+  vi.mocked(restoreUpgradeBackup).mockImplementationOnce(async input => {
+    input.state.phase = phase;
+    input.state.target.d1DatabaseId = '22222222-2222-2222-2222-222222222222';
+    await input.save();
+    return 'restored';
+  });
+  await f.service.restoreBackup(authorize, f.choice, vi.fn());
+  const checkpoint = structuredClone(f.settings.cloudflareRestore);
+  const choice = chooseAnother ? {
+    ...f.choice, prefix: '__crate__/backups/schema-upgrade-33333333-3333-3333-3333-333333333333', hash: 'd'.repeat(64),
+  } : null;
+  vi.mocked(restoreUpgradeBackup).mockImplementationOnce(async input => {
+    expect(f.settings.cloudflareRestore).toEqual(input.state);
+    if (phase === 'complete' && choice) {
+      expect(input.state.id).not.toBe(checkpoint!.id);
+      expect(input.state).toMatchObject({ phase: 'copying', prefix: choice.prefix, archiveHash: choice.hash });
+      expect(input.state.target.d1DatabaseId).toBeNull();
+    } else expect(input.state).toEqual(checkpoint);
+    return 'restored';
+  });
+  await f.service.restoreBackup(authorize, choice, vi.fn());
+});
+it('does not start remote restore when the initial checkpoint cannot be saved', async () => {
+  const f = harness();
+  f.writeSettings.mockRejectedValueOnce(new Error('Storage unavailable'));
+  await expect(f.service.restoreBackup(authorize, f.choice, vi.fn())).rejects.toThrow('Storage unavailable');
+  expect(restoreUpgradeBackup).not.toHaveBeenCalled();
+  expect(f.settings.cloudflareRestore).toBeUndefined();
+  expect(f.service.isBusy).toBe(false);
+});
+it('does not replace a checkpoint belonging to another source server', async () => {
+  const f = harness();
+  vi.mocked(restoreUpgradeBackup).mockResolvedValueOnce('restored');
+  await f.service.restoreBackup(authorize, f.choice, vi.fn());
+  const checkpoint = structuredClone(f.settings.cloudflareRestore);
+  f.settings.cloudflareDeployment!.d1DatabaseId = '22222222-2222-2222-2222-222222222222';
+  f.writeSettings.mockClear();
+  vi.mocked(restoreUpgradeBackup).mockClear();
+  await expect(f.service.restoreBackup(authorize, null, vi.fn())).rejects.toThrow('original server');
+  expect(f.writeSettings).not.toHaveBeenCalled();
+  expect(restoreUpgradeBackup).not.toHaveBeenCalled();
+  expect(f.settings.cloudflareRestore).toEqual(checkpoint);
+  expect(f.service.isBusy).toBe(false);
+});
 it('holds the operation lock during authorization and releases it after failure', async () => {
   const f = harness(); let release!: () => void;
   const pending = f.service.listRestoreBackups(async () => { await new Promise<void>(resolve => { release = resolve; }); throw new Error('Login cancelled'); });

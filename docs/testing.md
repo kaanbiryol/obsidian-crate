@@ -5,6 +5,10 @@
 `plugin/CratePlugin.test.ts` hydrates a device ID before successful and rejected
 core settings writes, verifying that runtime identity survives and persisted JSON
 omits it. `settings-write-lifecycle.test.ts` retains queue and shutdown coverage.
+Delayed snapshot, preference and debug saves also retain newer sync cursor/history
+updates, including a failed preference write followed by queued persistence.
+`runtime-operations.test.ts` verifies that checkpoint attachment retains newer
+history entries without mutating a previously captured settings snapshot.
 
 `sync/queue.test.ts`, `engine-selected.test.ts`, `pending-discard.test.ts`,
 `engine-startup-pending.test.ts` and `engine-pending-verification.test.ts` distinguish
@@ -117,7 +121,9 @@ foreground events and reload; **Settings → Sync → Refresh all** can
 retry uncertain changes explicitly. The browser test covers this against real
 server receipts, including repeated lost acknowledgements.
 `useReadingSession.test.ts` and `useReadingSync.test.ts` use real React effects and
-rerenders. `useLocalReadingArticle.test.ts` covers competing opens, Back, library
+rerenders. Sync coverage checks irrelevant keyed storage events, auth/logout/clear
+invalidation, coalesced connection/list requests, and delayed connection checks
+after pause, replacement or unmount. `useLocalReadingArticle.test.ts` covers competing opens, Back, library
 replacement, unmount and late update completions.
 Rejected edits and their dependents remain available for export in settings.
 New links appear immediately; editing them becomes available when extraction finishes and the server

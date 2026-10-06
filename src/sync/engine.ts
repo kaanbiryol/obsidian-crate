@@ -48,6 +48,7 @@ import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { getCheckpointAuthority } from './worker-url';
 import { LocalContentVerifier } from './content-verifier';
+import { updateSyncProgress } from '../plugin/settings-persistence';
 import { verifyUnchangedPendingPaths } from './pending-verification';
 
 const logger = createLogger('SyncEngine');
@@ -629,7 +630,7 @@ export class SyncEngine {
 				if (result.success) {
 					if (!selectedOnly) await this.contexts.finishInitialSetup();
 					const lastSync = new Date().toISOString();
-					this.settings.lastSync = lastSync;
+					updateSyncProgress(this.settings, { lastSync });
 					this.updateState({
 						status: 'idle',
 						lastSync,

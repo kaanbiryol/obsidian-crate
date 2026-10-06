@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../plugin/settings-types';
 import type { SyncResult } from './types';
 import { createEmptySyncResult } from './sync-result';
-import { normalizeCrateSettings } from '../plugin/settings';
+import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
+import { recordSyncHistory } from './runtime-history';
 import { SyncRuntime } from './runtime';
 import { formatSyncProgress } from '../ui/activity/progress-label';
 import {
@@ -14,6 +15,28 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime operation wrappers', () => {
+	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const checkpoint = createDeferred<string>();
+		const saveHistoryCheckpoint = vi.fn(() => checkpoint.promise);
+		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveHistoryCheckpoint });
+		const operation = runtime.sync();
+		await vi.waitFor(() => expect(saveHistoryCheckpoint).toHaveBeenCalledOnce());
+		const previousSnapshot = buildPersistedCrateSettings(settings);
+		const original = previousSnapshot.syncHistory[0]!;
+		const newer = recordSyncHistory(settings, 'initial', createEmptySyncResult());
+		persistSettings.mockImplementation(async () => {
+			expect(settings.syncHistory[1]?.historyCheckpoint).toBe('a'.repeat(64));
+		});
+		checkpoint.resolve('a'.repeat(64));
+		await operation;
+		expect(settings.syncHistory[0]).toBe(newer);
+		expect(settings.syncHistory[1]).toEqual({ ...original, historyCheckpoint: 'a'.repeat(64) });
+		expect(previousSnapshot.syncHistory).toEqual([original]);
+		expect(original).not.toHaveProperty('historyCheckpoint');
+		expect(persistSettings).toHaveBeenCalledOnce();
+	});
+
 	it.each(['manual', 'automatic'] as const)('does not publish %s completion after its engine is replaced during checkpointing', async mode => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const checkpoint = createDeferred<undefined>();

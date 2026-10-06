@@ -1,5 +1,5 @@
 import type { BackupChoice } from './restore/archive';
-import type { ServerRestoreState } from './restore/state';
+import { runRestoreWorkflow } from './restore/workflow';
 import { normalizeVaultName } from './vault-name';
 import { recoverDeployment, type DeploymentRecoveryResult } from './deployment-recovery';
 import { completePublishedDeployment } from './complete-published-deployment';
@@ -16,7 +16,7 @@ import {
 	CLOUDFLARE_OAUTH_SCOPES,
 } from './oauth-config';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './oauth-client';
-import { constantTimeEqual, createPkcePair, randomBase64Url, randomHex } from './pkce';
+import { constantTimeEqual, createPkcePair, randomBase64Url } from './pkce';
 import { provisionCloudflareDeployment } from './provisioner';
 import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './deployment-target';
 import {
@@ -332,26 +332,14 @@ export class CloudflareDeploymentService {
         choice: BackupChoice | null, onProgress: (message: string) => void): Promise<string> {
         return this.restoreBackups(withAuthorization, async (api, source) => {
             const artifacts = await this.whileActive(this.options.loadArtifacts);
-            const saved = this.options.settingsOwner.settings.cloudflareRestore;
-            let state: ServerRestoreState;
-            if (saved && (saved.phase !== 'complete' || !choice)) state = structuredClone(saved);
-            else {
-                if (!choice) throw new Error('Select a backup first');
-                const id = randomHex(8), resourceName = `crate-${id}`;
-                state = { id, source: { account: source.accountId!, database: source.d1DatabaseId!, bucket: source.r2BucketName },
-                    prefix: choice.prefix, archiveHash: choice.hash, fingerprint: artifacts.fingerprint, restoredAt: this.now(), phase: 'copying',
-                    target: { deploymentId: id, vaultName: `${source.vaultName ?? 'Crate'} (restored)`, accountId: source.accountId,
-                        accountName: source.accountName, workerName: resourceName, d1DatabaseName: resourceName, d1DatabaseId: null,
-                        r2BucketName: resourceName, workersSubdomain: source.workersSubdomain, lastDeployedVersion: null, lastDeployedFingerprint: null } };
-            }
-            if (state.source.account !== source.accountId || state.source.database !== source.d1DatabaseId || state.source.bucket !== source.r2BucketName) throw new Error('Reconnect to the backup’s original server before resuming.');
-            const save = () => this.whileActive(() => {
-                this.checkSavedTarget(source, 'update');
-                return this.options.settingsOwner.writeSettings({ cloudflareRestore: structuredClone(state) });
+            return runRestoreWorkflow({
+                api, source, artifacts, choice, now: this.now, onProgress,
+                saved: this.options.settingsOwner.settings.cloudflareRestore,
+                persist: state => this.whileActive(() => {
+                    this.checkSavedTarget(source, 'update');
+                    return this.options.settingsOwner.writeSettings({ cloudflareRestore: structuredClone(state) });
+                }),
             });
-            await save(); // Persist destination identity before any remote mutation.
-            const { restoreUpgradeBackup } = await import('./restore/server-restore');
-            return restoreUpgradeBackup({ api, state, artifacts, save, onProgress });
         });
     }
 

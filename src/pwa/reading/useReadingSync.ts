@@ -1,8 +1,8 @@
 import { drainReading, readingRetryAt, type ReadingRetryMode } from './outbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PWA_AUTH_CHANGED_EVENT } from '../config';
+import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { connectReadingFromReminders, loadReading } from './api';
-import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, type ReadingCache, type ReadingSession } from './storage';
+import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import type { useReadingSession } from './useReadingSession';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
@@ -33,6 +33,16 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
     }
     refreshing.current = true; setSyncing(true); setSyncedSession(null);
     try {
+      // Enrollment checks share the refresh lock. Foreground and cross-tab
+      // events can arrive together while the previous check is still pending.
+      if (current.source === 'reminders' && navigator.onLine) {
+        const connected = await connectReadingFromReminders();
+        if (!isCurrentSession(current)) return;
+        if (!connected || connected.id !== current.id || connected.token !== current.token || connected.generation !== current.generation) {
+          resetSession(); return;
+        }
+        if (!enabledRef.current) return;
+      }
       let data: ReadingCache | undefined;
       let completed = false;
       try {
@@ -56,7 +66,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       refreshQueued.current = null;
       if (queued && isCurrentSession(queued.session)) void run(() => refresh(queued.session, queued.mode));
     }
-  }, [session, run, isCurrentSession, publishSyncResult]);
+  }, [session, run, isCurrentSession, publishSyncResult, resetSession]);
   const retryAt = Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity));
   useEffect(() => {
     if (!enabled || !session || !ready || isOffline || !Number.isFinite(retryAt)) return;
@@ -69,15 +79,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   }, [enabled, session, ready, isOffline, retryAt, refresh, run]);
   useEffect(() => {
     if (!session || !ready) return;
-    const reload = () => { if (enabledRef.current && document.visibilityState === 'visible') void run(async () => {
-      if (session.source === 'reminders' && navigator.onLine) {
-        const current = await connectReadingFromReminders();
-        if (!current || current.id !== session.id || current.generation !== session.generation) {
-          resetSession(); return;
-        }
-      }
-      await refresh(session);
-    }); };
+    const reload = () => { if (enabledRef.current && document.visibilityState === 'visible') void run(() => refresh(session)); };
     const changed = () => {
       let current: ReadingSession | null;
       try { current = readingSession(); } catch (cause) {
@@ -87,10 +89,13 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) resetSession();
       else reload();
     };
+    const storageChanged = (event: StorageEvent) => {
+      if (event.key === AUTH_TOKEN_KEY || event.key === READING_SESSION_KEY || event.key === PWA_LOGOUT_KEY || event.key === null) changed();
+    };
     reload();
     const timer = window.setInterval(reload, 30_000);
-    window.addEventListener('online', reload); window.addEventListener('storage', changed); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
-    return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', changed); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
+    window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
+    return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
   }, [enabled, session, ready, refresh, run, resetSession]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };

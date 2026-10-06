@@ -1,6 +1,6 @@
 import { isRecord } from '../platform/validation';
 import { validRestoreState } from '../cloudflare/restore/state';
-import { normalizeVaultName } from '../cloudflare/vault-name';
+import { normalizeCloudflareDeployment } from '../cloudflare/deployment-state';
 import { normalizeReadingSettings } from '../reading/settings';
 import { normalizeSyncTimings } from '../sync/timings';
 import { normalizeSyncIssues } from '../sync/issues';
@@ -11,7 +11,6 @@ import { normalizeSyncIssues } from '../sync/issues';
 import { normalizeUsageSnapshot } from '../cloudflare/usage-snapshot';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import { normalizeRequestDiagnostics } from '../sync/request-diagnostics';
-import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
 import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';
 import {
 	type CrateSettings,
@@ -40,79 +39,6 @@ function normalizeNullableString(value: unknown): string | null {
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback;
-}
-
-function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMetadata | null {
-	if (!isRecord(value)) {
-		return null;
-	}
-
-	const deploymentId = normalizeString(value.deploymentId).toLowerCase();
-	const workerName = normalizeString(value.workerName).toLowerCase();
-	const d1DatabaseName = normalizeString(value.d1DatabaseName).toLowerCase();
-	const r2BucketName = normalizeString(value.r2BucketName).toLowerCase();
-	if (!/^[a-f0-9]{16}$/.test(deploymentId)
-		|| !/^crate-[a-f0-9]{16}$/.test(workerName)
-		|| !/^crate-[a-f0-9]{16}$/.test(d1DatabaseName)
-		|| !/^crate-[a-f0-9]{16}$/.test(r2BucketName)) {
-		return null;
-	}
-
-	const accountId = normalizeNullableString(value.accountId);
-	const d1DatabaseId = normalizeNullableString(value.d1DatabaseId);
-	const workersSubdomain = normalizeNullableString(value.workersSubdomain);
-	const normalizedFingerprint = normalizeNullableString(value.lastDeployedFingerprint)?.toLowerCase() ?? null;
-	const lastDeployedFingerprint = normalizedFingerprint && /^[a-f0-9]{64}$/.test(normalizedFingerprint)
-		? normalizedFingerprint
-		: null;
-	if (accountId !== null && !/^[a-f0-9]{32}$/i.test(accountId)) {
-		return null;
-	}
-	if (d1DatabaseId !== null && !/^[a-f0-9-]{32,36}$/i.test(d1DatabaseId)) {
-		return null;
-	}
-	if (workersSubdomain !== null && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workersSubdomain)) {
-		return null;
-	}
-	let deletion: CloudflareDeploymentMetadata['deletion'];
-	if (value.deletion !== undefined) {
-		const job = value.deletion;
-		if (!isRecord(job) || typeof job.id !== 'string' || !/^[a-f0-9]{32}$/.test(job.id)
-			|| typeof job.databaseId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(job.databaseId)
-			|| job.databaseId !== d1DatabaseId || job.helperName !== `crate-delete-${job.id}`
-			|| !['removing-worker', 'clearing-bucket', 'removing-database', 'removing-helper', 'complete'].includes(String(job.phase))
-			|| (job.bucketCreatedAt !== null && (typeof job.bucketCreatedAt !== 'string' || !job.bucketCreatedAt))
-			|| (job.workerCreatedAt !== null && (typeof job.workerCreatedAt !== 'string' || !job.workerCreatedAt))
-			|| (job.helperUploadPending !== undefined && (typeof job.helperUploadPending !== 'string' || !/^crate-[a-f0-9-]{36}$/.test(job.helperUploadPending)))) return null;
-		deletion = { id: job.id, databaseId: job.databaseId, helperName: job.helperName,
-			phase: job.phase as NonNullable<CloudflareDeploymentMetadata['deletion']>['phase'],
-			bucketCreatedAt: job.bucketCreatedAt, workerCreatedAt: job.workerCreatedAt,
-			...(typeof job.helperUploadPending === 'string' ? { helperUploadPending: job.helperUploadPending } : {}) };
-	}
-	return {
-		deploymentId,
-		...(normalizeVaultName(value.vaultName) ? { vaultName: normalizeVaultName(value.vaultName) } : {}),
-		accountId,
-		accountName: normalizeNullableString(value.accountName),
-		workerName,
-		d1DatabaseName,
-		d1DatabaseId,
-		r2BucketName,
-		workersSubdomain,
-		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
-		lastDeployedFingerprint,
-		...(deletion ? { deletion } : {}),
-		...(typeof value.lastKnownRevision === 'number' && Number.isSafeInteger(value.lastKnownRevision) && value.lastKnownRevision > 0
-			? { lastKnownRevision: value.lastKnownRevision } : {}),
-		...(isRecord(value.reset) && typeof value.reset.id === 'string' && /^[a-f0-9]{32}$/.test(value.reset.id)
-			&& (value.reset.phase === 'clearing' || value.reset.phase === 'rebuilding')
-			&& typeof value.reset.databaseId === 'string' && /^[a-f0-9-]{36}$/i.test(value.reset.databaseId)
-			&& typeof value.reset.bucketCreatedAt === 'string' && value.reset.bucketCreatedAt.length > 0
-			&& typeof value.reset.namespaceId === 'string' && /^[a-f0-9]{32}$/i.test(value.reset.namespaceId)
-			? { reset: { id: value.reset.id, phase: value.reset.phase, databaseId: value.reset.databaseId,
-				bucketCreatedAt: value.reset.bucketCreatedAt, namespaceId: value.reset.namespaceId,
-				...(value.reset.deleteOnly === true ? { deleteOnly: true as const } : {}) } } : {}),
-	};
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {

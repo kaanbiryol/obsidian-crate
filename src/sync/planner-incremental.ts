@@ -49,7 +49,7 @@ export async function runIncrementalSync(
 
     if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
       if (unchangedPaths.length > 0) await context.localManifest.save();
-      context.settings.lastSeq = latestSeq;
+      context.setLastSeq(latestSeq);
       return result;
     }
 
@@ -173,7 +173,7 @@ export async function runIncrementalSync(
     context.reportWork?.('saving');
     await context.localManifest.save();
     if (finalizeSyncResult(result)) {
-      context.settings.lastSeq = latestSeq;
+      context.setLastSeq(latestSeq);
     }
 
     logger.info(
