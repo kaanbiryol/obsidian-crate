@@ -17,7 +17,7 @@ import { createPathRecord, getPathEntry } from '../protocol/path-record';
 const MAX_RECONCILE_ATTEMPTS = 3;
 
 interface TargetedManifest {
-	getEntry(path: string): FileEntry | undefined;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
 	setEntry(path: string, entry: FileEntry): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;

@@ -4,7 +4,8 @@ import { reminderRequestHash } from '../../../encryption/reminder-receipt';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
-import { expiredReminderOperation, REMINDER_OPERATION_VALID } from './operation-expiry';
+import { expiredReminderOperation } from './operation-expiry';
+import { OPERATION_VALID } from '../operation-expiry';
 
 export interface ReminderOperation { id: string; requestHash: string; day: number }
 export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string): Promise<ReminderOperation | Response> {
@@ -13,7 +14,7 @@ export async function beginReminderOperation(db: D1Database, body: Record<string
 	const receipt = await readReminderReceipt(db, { id: body.operationId, requestHash });
 	if (receipt) return receipt;
 	const day = reminderOperationDay(body.operationId);
-	if (day === null || !await db.prepare(`SELECT 1 AS valid WHERE ${REMINDER_OPERATION_VALID}`).bind(day, day).first()) return expiredReminderOperation();
+	if (day === null || !await db.prepare(`SELECT 1 AS valid WHERE ${OPERATION_VALID}`).bind(day, day).first()) return expiredReminderOperation();
 	return { id: body.operationId, requestHash, day };
 }
 async function readReminderReceipt(db: D1Database, operation: Pick<ReminderOperation, 'id' | 'requestHash'>): Promise<Response | null> {
@@ -36,7 +37,7 @@ export function reminderOperationEffects(db: D1Database, operation: ReminderOper
 			// An operation can expire while R2 is being staged. A NOT NULL failure
 			// aborts the entire D1 batch, including both files of a project move.
 			db.prepare(`INSERT INTO reminder_operations (operation_id, request_hash, response_json)
-				SELECT ?, ?, CASE WHEN ${REMINDER_OPERATION_VALID} THEN ? ELSE NULL END WHERE ${predicate}`)
+				SELECT ?, ?, CASE WHEN ${OPERATION_VALID} THEN ? ELSE NULL END WHERE ${predicate}`)
 				.bind(operation.id, operation.requestHash, operation.day, operation.day, receipt.json, ...bindings),
 			...(createdId ? [db.prepare(`INSERT INTO reminder_identities (reminder_id, created_operation_id) SELECT ?, ? WHERE ${predicate}`)
 				.bind(createdId, operation.id, ...bindings)] : []),

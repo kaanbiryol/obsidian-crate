@@ -8,7 +8,7 @@ import { assertLocalSyncPath } from './local-path-safety';
 interface PendingVerificationContext {
 	adapter: Pick<DataAdapter, 'stat' | 'readBinary'>;
 	manifest: {
-		getEntry(path: string): FileEntry | undefined;
+		getEntry(path: string): Readonly<FileEntry> | undefined;
 		setEntry(path: string, entry: FileEntry): void;
 		save(): Promise<void>;
 	};
@@ -19,7 +19,7 @@ interface PendingVerificationContext {
 export async function verifyUnchangedPendingPaths(context: PendingVerificationContext, keys: string[]): Promise<string[]> {
 	const { adapter, manifest, isCurrent } = context;
 	const absent: Array<{ key: string; path: string }> = [];
-	const matches: Array<{ key: string; path: string; baseline: FileEntry; modified: string }> = [];
+	const matches: Array<{ key: string; path: string; baseline: Readonly<FileEntry>; modified: string }> = [];
 	// Read sequentially to keep memory bounded even for large attachments.
 	for (const key of keys) {
 		if (!isCurrent(key)) continue;

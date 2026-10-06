@@ -2,7 +2,7 @@ import type { EngineFileOperations } from './engine-file-operations';
 import { PlannedContent } from './planned-content';
 import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from './api';
-import type { LocalManifest } from './manifest';
+import type { LocalManifest, LocalManifestView } from './manifest';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import type { ConflictStore } from './conflict-store';
 import type { DownloadRequest } from './transfer-download';
@@ -27,7 +27,7 @@ import { PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY, DOWNLOAD_CONCURRENCY } from '.
 import type { CrateSettings } from '../plugin/settings-types';
 import { updateSyncProgress } from '../plugin/settings-persistence';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
-import type { FileEntry, FileManifest } from '../protocol/sync-types';
+import type { FileEntry } from '../protocol/sync-types';
 import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from './initial-config-pull';
@@ -286,7 +286,7 @@ export class SyncEngineContexts {
 			getManifest: () => dependencies.api.getManifest(),
 			snapshotLocalManifest: () => structuredClone(dependencies.getLocalManifest().getManifest()),
 			clearLocalManifest: () => dependencies.getLocalManifest().clear(),
-			replaceLocalManifest: (manifest: FileManifest) => dependencies.getLocalManifest().replaceManifest(manifest),
+			replaceLocalManifest: (manifest: LocalManifestView) => dependencies.getLocalManifest().replaceManifest(manifest),
 			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,

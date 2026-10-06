@@ -1,6 +1,6 @@
 import { readEncryptedReceipt } from './encrypted-receipt-storage';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
-import { REMINDER_OPERATION_VALID } from './reminders-web/operation-expiry';
+import { OPERATION_VALID } from './operation-expiry';
 import { corsResponse } from './cors';
 
 /** Vault-only recovery reads. No private request body or write is needed. */
@@ -17,6 +17,6 @@ export async function readCaptureRecovery(request: Request, db: D1Database): Pro
       receipts.push({ kind, requestHash: row.request_hash, envelope: value.e2eeLegacy?.vault, encrypted: value.encrypted });
     }
   }
-  const retryValid = Boolean(await db.prepare(`SELECT 1 WHERE ${REMINDER_OPERATION_VALID}`).bind(day, day).first());
+  const retryValid = Boolean(await db.prepare(`SELECT 1 WHERE ${OPERATION_VALID}`).bind(day, day).first());
   return corsResponse({ receipts, retryValid }, 200, { 'Cache-Control': 'no-store' });
 }

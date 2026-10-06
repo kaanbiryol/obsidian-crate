@@ -4,14 +4,13 @@ import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption
 import { EncryptedReadingApi } from '@/reading/encrypted-api';
 import { readReadingAttempt, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
-import { validateReadingMetadata } from '@/reading/core/model';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
 import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingSession, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
 import { isReadingCache } from './storage-validation';
-import { isReadingArticle, type ReadingArticle } from './record-validation';
+import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption-folder-routing';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
@@ -89,13 +88,25 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
   if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
   return data;
 }
+const MAX_READING_LIST_ITEMS = 10_000;
+const MAX_READING_LIST_ISSUES = 10_000;
+const MAX_READING_LIST_PAGES = 1000;
+
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
   const cache: ReadingCache = { items: [], issues: [], savedAt: Date.now() }; let cursor: string | null = null;
+  const seenCursors = new Set<string>();
+  let pages = 0;
   do {
-    const page: { items: Array<Record<string, unknown>>; issues: ReadingCache['issues']; cursor: string | null } = await readingRequest(`/reading/list${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, session);
-    if (!Array.isArray(page.items) || !Array.isArray(page.issues) || cache.items.length > 10_000) throw new Error('Reading library response is too large or unreadable.');
-    cache.items.push(...page.items.map(item => ({ ...validateReadingMetadata(item), path: String(item.path) }))); cache.issues.push(...page.issues);
-    if (page.cursor && page.cursor === cursor) throw new Error('Reading library did not advance.'); cursor = page.cursor;
+    if (++pages > MAX_READING_LIST_PAGES) throw new Error('Reading library response is too large or unreadable.');
+    const response = await readingRequest<unknown>(`/reading/list${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, session);
+    const page = parseReadingListPage(response, session.folderPath);
+    if (!page) throw new Error('Reading library response is unreadable.');
+    if (cache.items.length + page.items.length > MAX_READING_LIST_ITEMS
+      || cache.issues.length + page.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is too large or unreadable.');
+    if (page.cursor !== null && seenCursors.has(page.cursor)) throw new Error('Reading library did not advance.');
+    if (page.cursor !== null) seenCursors.add(page.cursor);
+    cache.items.push(...page.items); cache.issues.push(...page.issues);
+    cursor = page.cursor;
   } while (cursor);
   if (!isReadingCache(cache, session.folderPath)) throw new Error('Reading library response is unreadable.');
   return commitReadingCache(session, cache);

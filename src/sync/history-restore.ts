@@ -1,6 +1,7 @@
 import type { Vault } from 'obsidian';
 import { findHistorySource } from './history-source';
 import type { FileEntry } from '../protocol/sync-types';
+import type { LocalManifestView } from './manifest';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { assertPortablePaths } from '../protocol/portable-path';
 import type { SyncApiClient } from './api';
@@ -23,7 +24,7 @@ export interface HistoryRestoreReview {
 interface Context {
     vault: Vault;
     api: Pick<SyncApiClient, 'getManifest' | 'listFileVersions' | 'previewFileVersion' | 'downloadFile'>;
-    baseline: Files;
+    baseline: LocalManifestView['files'];
     target: Files;
     recoveryRoot: string;
     readTarget?(path: string, file: FileEntry): Promise<ArrayBuffer>;
@@ -36,7 +37,7 @@ interface Context {
 /** Compare complete inventories, not the truncated path lists displayed in activity. */
 export async function createHistoryRestore(context: Context): Promise<HistoryRestoreReview & { verifySynced(): Promise<void> }> {
     const { vault, api } = context;
-    const filter = (files: Files): Files => Object.assign(Object.create(null) as Files,
+    const filter = (files: LocalManifestView['files']): Files => Object.assign(Object.create(null) as Files,
         Object.fromEntries(Object.entries(files).filter(([path]) => !context.shouldIgnore(path)).map(([path, entry]) => [path, { ...entry }])));
     const target = filter(context.target);
     assertPortablePaths(Object.keys(target));

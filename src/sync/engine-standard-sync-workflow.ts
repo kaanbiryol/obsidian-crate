@@ -50,7 +50,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
-	getLocalManifestEntry(path: string): FileEntry | undefined;
+	getLocalManifestEntry(path: string): Readonly<FileEntry> | undefined;
 	setLocalManifestEntry(path: string, entry: FileEntry): void;
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;

@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { App, PluginManifest } from 'obsidian';
+import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { LocalManifest } from './manifest';
 
 const CONFIG_DIR = '.vault-config';
@@ -42,6 +43,30 @@ describe('LocalManifest', () => {
 	beforeEach(() => {
 		adapter = createMockAdapter();
 		manifest = createLocalManifest(adapter);
+	});
+
+	it('keeps baseline views readonly and preserves entry identity until a controlled replacement', async () => {
+		expectTypeOf(manifest.getEntry('note.md')).toEqualTypeOf<Readonly<FileEntry> | undefined>();
+		expectTypeOf(manifest.getManifest().files).toEqualTypeOf<Readonly<Record<string, Readonly<FileEntry>>>>();
+		expectTypeOf(manifest.getManifest()).toEqualTypeOf<Readonly<Omit<FileManifest, 'files'>> & {
+			readonly files: Readonly<Record<string, Readonly<FileEntry>>>;
+		}>();
+		const original = { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z', revision: 'r1' };
+		manifest.setEntry('note.md', original);
+		const view = manifest.getManifest();
+		const baseline = manifest.getEntry('note.md');
+		expect(baseline).toBe(view.files['note.md']);
+		expect(baseline).not.toBe(original);
+		await manifest.save();
+		expect(manifest.getEntry('note.md')).toBe(baseline);
+
+		manifest.setEntry('note.md', { ...original, modified: '2026-01-02T00:00:00Z' });
+		expect(manifest.getManifest()).toBe(view);
+		expect(manifest.getEntry('note.md')).not.toBe(baseline);
+		expect(baseline?.modified).toBe(original.modified);
+		await manifest.save();
+		const persisted = JSON.parse(adapter.write.mock.lastCall![1]) as FileManifest;
+		expect(persisted.files['note.md']).toEqual(view.files['note.md']);
 	});
 
 	it.each(['__proto__', 'constructor', 'toString'])('persists, reloads and removes the literal filename %s', async path => {

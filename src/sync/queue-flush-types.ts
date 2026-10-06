@@ -1,4 +1,4 @@
-import type { UploadResult } from '../protocol/sync-types';
+import type { FileEntry, UploadResult } from '../protocol/sync-types';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 
 interface QueueApi {
@@ -19,8 +19,8 @@ interface QueueApi {
 }
 
 interface QueueManifest {
-	getEntry(path: string): { hash: string; size: number; modified: string; revision?: string } | undefined;
-	setEntry(path: string, entry: { hash: string; size: number; modified: string; revision?: string }): void;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
+	setEntry(path: string, entry: FileEntry): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
 }

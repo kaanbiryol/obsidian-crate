@@ -8,7 +8,7 @@ import { corsResponse } from '../cors';
 import type { AuthPrincipal } from '../auth/index';
 import { handleEncryptedSettings } from '../encrypted-settings';
 import { reminderOperationDay } from '../../../protocol/reminder-operation';
-import { REMINDER_OPERATION_VALID } from '../reminders-web/operation-expiry';
+import { OPERATION_VALID } from '../operation-expiry';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
 /** Scoped sessions receive their public scope and the encrypted recovery bundle.
@@ -22,7 +22,7 @@ export async function handleEncryptionRoute(request: Request, db: D1Database, pa
 		if (day === null) return corsResponse({ error: 'Invalid upload identity' }, 400);
 		const row = await db.prepare('SELECT response_json FROM upload_operations WHERE operation_id = ?').bind(id).first<{ response_json: string }>();
 		const receipt = row ? (await readEncryptedReceipt(db, 'upload', id, row.response_json) as { e2eeLegacy?: { vault: string } }).e2eeLegacy : undefined;
-		const retryValid = Boolean(await db.prepare(`SELECT 1 WHERE ${REMINDER_OPERATION_VALID}`).bind(day, day).first());
+		const retryValid = Boolean(await db.prepare(`SELECT 1 WHERE ${OPERATION_VALID}`).bind(day, day).first());
 		return corsResponse({ envelope: receipt?.vault ?? null, retryValid });
 	}
 	if (path === '/encryption/deletion-precondition' && request.method === 'GET' && principal.scope === 'vault') {

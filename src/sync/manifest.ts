@@ -1,4 +1,4 @@
-import { CHECKPOINT_VERSION, parseCheckpoint, parseLocalManifest } from './manifest-checkpoint';
+import { encodeCheckpoint, parseCheckpoint, parseLocalManifest, sameCheckpointRecoveryState } from './manifest-checkpoint';
 import { UploadJournal } from './upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from './restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
@@ -18,6 +18,11 @@ const logger = createLogger('Manifest');
 
 const MANIFEST_FILENAME = 'file-manifest.json';
 const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
+
+/** Live baseline view. Only the owner may replace entries and mark them dirty. */
+export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
+	readonly files: Readonly<Record<string, Readonly<FileEntry>>>;
+};
 
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
@@ -79,11 +84,7 @@ export class LocalManifest {
 			}
 		}
 		if (main && tmp && (main.authority !== tmp.authority || main.generation === tmp.generation
-			&& (JSON.stringify(main.manifest) !== JSON.stringify(tmp.manifest)
-				|| JSON.stringify(main.settledUploads) !== JSON.stringify(tmp.settledUploads)
-				|| JSON.stringify(main.restoreIntents) !== JSON.stringify(tmp.restoreIntents)
-				|| JSON.stringify(main.initialConfigPull) !== JSON.stringify(tmp.initialConfigPull)
-				|| main.appliedRename !== tmp.appliedRename || JSON.stringify([...main.renames]) !== JSON.stringify([...tmp.renames])))) {
+			&& !sameCheckpointRecoveryState(main, tmp))) {
 			throw new Error('Conflicting manifest checkpoints. Preserve both generations before recovering sync.');
 		}
 		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
@@ -143,7 +144,17 @@ export class LocalManifest {
 	}
 
 	private serialize(): string {
-		return JSON.stringify({ ...this.manifest, version: CHECKPOINT_VERSION, ...(this.appliedRename ? { appliedRename: this.appliedRename } : {}), ...(this.initialConfigPull ? { initialConfigPull: this.initialConfigPull } : {}), ...(this.restoreIntents.length ? { restoreIntents: this.restoreIntents } : {}), ...(this.uploadDiagnostics.length ? { uploadDiagnostics: this.uploadDiagnostics } : {}), ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
+		return encodeCheckpoint({
+			manifest: this.manifest,
+			generation: this.generation,
+			authority: this.authority,
+			settledUploads: this.uploadJournal.completedSnapshot(),
+			renames: this.renameDependencies,
+			appliedRename: this.appliedRename,
+			uploadDiagnostics: this.uploadDiagnostics,
+			restoreIntents: this.restoreIntents,
+			initialConfigPull: this.initialConfigPull,
+		});
 	}
 
 	private async persist(): Promise<void> {
@@ -161,17 +172,15 @@ export class LocalManifest {
 		}
 	}
 
-	/**
-	 * Get file entry
-	 */
-	getEntry(path: string): FileEntry | undefined {
+	/** Preserve entry identity so readers can detect replacement across awaited I/O. */
+	getEntry(path: string): Readonly<FileEntry> | undefined {
 		return getPathEntry(this.manifest.files, path);
 	}
 
 	/**
 	 * Set file entry
 	 */
-	setEntry(path: string, entry: FileEntry): void {
+	setEntry(path: string, entry: Readonly<FileEntry>): void {
 		const previous = this.getEntry(path);
 		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
 		this.revision++;
@@ -261,17 +270,15 @@ export class LocalManifest {
 		return Object.keys(this.manifest.files);
 	}
 
-	/**
-	 * Get full manifest
-	 */
-	getManifest(): FileManifest {
+	/** Return the live baseline without permitting writes around revision tracking. */
+	getManifest(): LocalManifestView {
 		return this.manifest;
 	}
 
 	/**
 	 * Replace entire manifest (used after remote sync)
 	 */
-	replaceManifest(manifest: FileManifest): void {
+	replaceManifest(manifest: LocalManifestView): void {
 		this.manifest = parseLocalManifest(manifest);
 		this.revision++;
 		this.dirty = true;

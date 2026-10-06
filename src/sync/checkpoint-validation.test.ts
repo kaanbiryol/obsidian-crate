@@ -46,3 +46,44 @@ it('does not treat read failures or equal-generation disagreement as an absent c
 	await expect(manifest.load()).rejects.toThrow('Disk unavailable');
 	expect(disk.has(tmpPath)).toBe(true);
 });
+
+it.each([
+	['cursor', { lastSeq: 11 }],
+	['upload receipts', { settledUploads: ['e1_00020000_11111111-1111-1111-1111-111111111111'] }],
+	['rename dependencies', { renameDependencies: { 'note.md': 'renamed.md' } }],
+	['applied rename', { appliedRename: 'folder-move-1' }],
+	['initial settings pull', { initialConfigPull: { configDir: '.obsidian', files: { '.obsidian/app.json': 'b'.repeat(64) } } }],
+	['restore intent', { restoreIntents: [{
+		request: { operationId: 'e1_00020000_11111111-1111-1111-1111-111111111111', path: 'note.md', storageKey: 'old-version', expectedHash: null, expectedRevision: null },
+		version: { path: 'note.md', storage_key: 'old-version', hash: 'b'.repeat(64), size: 1,
+			expires_at: 2_000_000_000_000, created_at: '2026-01-01T00:00:00Z', reason: 'deleted' },
+		phase: 'pending',
+	}] }],
+])('preserves both equal-generation checkpoints when their %s differs', async (_name, patch) => {
+	const { disk, manifest } = fixture();
+	const main = JSON.stringify(good);
+	const tmp = JSON.stringify({ ...good, ...patch });
+	disk.write(mainPath, main);
+	disk.write(tmpPath, tmp);
+	await expect(manifest.load()).rejects.toThrow('Conflicting manifest checkpoints');
+	expect(disk.text(mainPath)).toBe(main);
+	expect(disk.text(tmpPath)).toBe(tmp);
+	expect(manifest.getFileCount()).toBe(0);
+});
+
+it('keeps main recovery state when equal-generation checkpoints differ only in diagnostics', async () => {
+	const { disk, manifest } = fixture();
+	const main = JSON.stringify(good);
+	disk.write(mainPath, main);
+	disk.write(tmpPath, JSON.stringify({ ...good, uploadDiagnostics: [{
+		at: '2026-01-01T00:00:00Z', clientSession: '11111111-1111-1111-1111-111111111111',
+		operationId: 'e1_00020000_11111111-1111-1111-1111-111111111111',
+		kind: 'local', phase: 'prepared', generation: 5,
+		pathHash: 'a'.repeat(64), uploadHash: 'b'.repeat(64), baseHash: 'c'.repeat(64),
+	}] }));
+	await manifest.load();
+	expect(manifest.getEntry('note.md')).toEqual(good.files['note.md']);
+	expect(manifest.getUploadDiagnostics()).toEqual([]);
+	expect(disk.text(mainPath)).toBe(main);
+	expect(disk.has(tmpPath)).toBe(false);
+});

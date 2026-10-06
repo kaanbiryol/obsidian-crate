@@ -1,5 +1,6 @@
 import type { FileDiff } from './types';
 import type { FileEntry } from '../protocol/sync-types';
+import type { LocalManifestView } from './manifest';
 import { getPathEntry } from '../protocol/path-record';
 
 /**
@@ -10,7 +11,7 @@ export function classifyPath(
 	path: string,
 	local: FileEntry | undefined,
 	remote: FileEntry | undefined,
-	base: FileEntry | undefined,
+	base: Readonly<FileEntry> | undefined,
 ): FileDiff | null {
 	if (local && remote) {
 		if (local.hash === remote.hash) return null;
@@ -85,7 +86,7 @@ export function classifyPath(
 export function classifyPaths(
 	localFiles: Record<string, FileEntry>,
 	remoteFiles: Record<string, FileEntry>,
-	manifestEntries: Record<string, FileEntry>,
+	manifestEntries: LocalManifestView['files'],
 ): FileDiff[] {
 	const diffs: FileDiff[] = [];
 	const allPaths = new Set([

@@ -1,6 +1,6 @@
 import { pendingChangeKey } from './pending-change';
 import type { Vault } from 'obsidian';
-import type { FileEntry } from '../protocol/sync-types';
+import type { LocalManifestView } from './manifest';
 import { getPathEntry } from '../protocol/path-record';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { getAllVaultFiles } from './file-discovery';
@@ -9,7 +9,7 @@ import { computeHash } from './hasher';
 /** Rebuild the volatile queue from local bytes without changing sync authority. */
 export async function findStartupPendingPaths(context: {
 	vault: Vault;
-	baseline: Record<string, FileEntry>;
+	baseline: LocalManifestView['files'];
 	shouldIgnore(path: string): boolean;
 	throwIfDestroyed(): void;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;

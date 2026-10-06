@@ -8,7 +8,7 @@ import { findHistorySource } from './history-source';
 export async function loadRemotePendingBase(
     api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile' | 'listFileVersions' | 'previewFileVersion'>,
     path: string,
-    baseline: FileEntry,
+    baseline: Readonly<FileEntry>,
     maxBytes: number,
 ): Promise<ArrayBuffer> {
     assertLocalSyncPath(path);

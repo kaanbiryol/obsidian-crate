@@ -13,7 +13,7 @@ const SEED_BATCH_BYTES = 8 * 1024 * 1024;
 
 export interface MarkdownBaseCacheManifest {
 	getAllPaths(): string[];
-	getEntry(path: string): FileEntry | undefined;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
 }
 
 export interface MarkdownBaseCacheSeedOptions {

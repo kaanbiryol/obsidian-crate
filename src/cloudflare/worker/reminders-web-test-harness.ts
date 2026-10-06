@@ -16,12 +16,7 @@ type ReminderCacheValue = {
 	remindersJson: string;
 };
 
-function createBucket(
-	initialEntries: Record<string, string> = {},
-	config?: {
-		failPutWhen?: (key: string, content: string) => boolean;
-	},
-) {
+function createBucket(initialEntries: Record<string, string> = {}) {
 	const store = new Map<string, StoredObject>();
 	for (const [key, value] of Object.entries(initialEntries)) {
 		store.set(key, {
@@ -34,10 +29,6 @@ function createBucket(
 		bucket: {
 			put: vi.fn(async (key: string, body: ArrayBuffer | Uint8Array, options?: StoredObject) => {
 				const normalizedBody = body instanceof Uint8Array ? new Uint8Array(body).buffer : body;
-				const content = new TextDecoder().decode(normalizedBody);
-				if (config?.failPutWhen?.(key, content)) {
-					throw new Error('forced put failure');
-				}
 				store.set(key, {
 					body: normalizedBody,
 					httpMetadata: options?.httpMetadata,
@@ -65,12 +56,12 @@ function createBucket(
 		},
 	};
 }
+// Handler/cache unit tests only. Transaction and move invariants use real D1/R2
+// in reminders-web-moves.integration.ts and the other Worker integration suites.
 function createDb(options?: {
 	files?: Record<string, string>;
 	fileSizes?: Record<string, number>;
 	fileHashes?: Record<string, string>;
-	committedPaths?: string[];
-	atomicSourceConflictPath?: string;
 }) {
 	const files = new Map<string, string>(Object.entries(options?.files ?? {}));
 	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
@@ -207,50 +198,10 @@ function createDb(options?: {
 			return statement;
 		}),
 		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
-			if (options?.atomicSourceConflictPath && statements.some(statement => statement._sql.includes('atomic-'))) {
-				hashes.set(options.atomicSourceConflictPath, 'f'.repeat(64));
-			}
 			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements) {
 				let changes = 0;
-				if (statement._sql.includes('atomic-destination-insert')) {
-					const destinationPath = getBoundString(statement._args, 0);
-					const sourcePath = getBoundString(statement._args, 8);
-					const sourceExpectedHash = getBoundString(statement._args, 9);
-					if (!files.has(destinationPath) && hashes.get(sourcePath) === sourceExpectedHash) {
-						files.set(destinationPath, getBoundString(statement._args, 4));
-						hashes.set(destinationPath, getBoundString(statement._args, 2));
-						sizes.set(destinationPath, Number(statement._args[3]));
-						options?.committedPaths?.push(destinationPath);
-						changes = 1;
-					}
-				} else if (statement._sql.includes('atomic-destination-update')) {
-					const destinationPath = getBoundString(statement._args, 5);
-					const sourcePath = getBoundString(statement._args, 8);
-					if (
-						hashes.get(destinationPath) === getBoundString(statement._args, 6)
-						&& hashes.get(sourcePath) === getBoundString(statement._args, 9)
-					) {
-						files.set(destinationPath, getBoundString(statement._args, 3));
-						hashes.set(destinationPath, getBoundString(statement._args, 1));
-						sizes.set(destinationPath, Number(statement._args[2]));
-						options?.committedPaths?.push(destinationPath);
-						changes = 1;
-					}
-				} else if (statement._sql.includes('atomic-source-update')) {
-					const sourcePath = getBoundString(statement._args, 5);
-					const destinationPath = getBoundString(statement._args, 8);
-					if (
-						hashes.get(sourcePath) === getBoundString(statement._args, 6)
-						&& files.get(destinationPath) === getBoundString(statement._args, 9)
-					) {
-						files.set(sourcePath, getBoundString(statement._args, 3));
-						hashes.set(sourcePath, getBoundString(statement._args, 1));
-						sizes.set(sourcePath, Number(statement._args[2]));
-						options?.committedPaths?.push(sourcePath);
-						changes = 1;
-					}
-				} else if (statement._sql.includes('INSERT INTO reminder_file_cache')) {
+				if (statement._sql.includes('INSERT INTO reminder_file_cache')) {
 					const folderPath = getBoundString(statement._args, 0);
 					const filePath = getBoundString(statement._args, 1);
 					const fileHash = getBoundString(statement._args, 2);
@@ -262,13 +213,12 @@ function createDb(options?: {
 						});
 						changes = 1;
 					}
-				} else if (statement._sql.includes('INSERT INTO files (path, portable_path, hash, size, modified, storage_key)')) {
+				} else if (statement._sql.startsWith('INSERT INTO files (path, portable_path, hash, size, modified, storage_key)')) {
 					const path = getBoundString(statement._args, 0);
 					if (!statement._sql.includes('DO NOTHING') || !files.has(path)) {
 						files.set(path, getBoundString(statement._args, 4));
 						hashes.set(path, getBoundString(statement._args, 2));
 						sizes.set(path, Number(statement._args[3]));
-						options?.committedPaths?.push(path);
 						changes = 1;
 					}
 				} else if (statement._sql.startsWith('UPDATE files')) {
@@ -277,11 +227,9 @@ function createDb(options?: {
 						files.set(path, getBoundString(statement._args, 3));
 						hashes.set(path, getBoundString(statement._args, 1));
 						sizes.set(path, Number(statement._args[2]));
-						options?.committedPaths?.push(path);
 						changes = 1;
 					}
-				}
-				if (statement._sql.includes('DELETE FROM files WHERE')) {
+				} else if (statement._sql.startsWith('DELETE FROM files WHERE')) {
 					const path = getBoundString(statement._args, 1);
 					const expectedHash = statement._args[2];
 					if (files.has(path) && (expectedHash === undefined || hashes.get(path) === expectedHash)) {
@@ -290,8 +238,10 @@ function createDb(options?: {
 						sizes.delete(path);
 						changes = 1;
 					}
-				} else if (statement._sql.includes('INSERT INTO changelog')) {
+				} else if (statement._sql.startsWith('INSERT INTO changelog')) {
 					changes = 1;
+				} else if (!/^(INSERT OR IGNORE INTO file_versions|INSERT INTO reminder_operations|INSERT INTO reminder_identities|DELETE FROM staged_uploads)/.test(statement._sql)) {
+					throw new Error(`Unsupported reminder unit-test batch SQL: ${statement._sql}`);
 				}
 				results.push({ meta: { changes } });
 			}
@@ -306,11 +256,8 @@ function createDb(options?: {
 export async function createEnv(input: {
 	bucketEntries: Record<string, string>;
 	files: Record<string, string | null>;
-	failPutWhen?: (key: string, content: string) => boolean;
-	atomicSourceConflictPath?: string;
 }) {
-	const committedPaths: string[] = [];
-	const { bucket, store } = createBucket(input.bucketEntries, { failPutWhen: input.failPutWhen });
+	const { bucket, store } = createBucket(input.bucketEntries);
 	const resolvedFiles = Object.fromEntries(Object.entries(input.files).map(([path, storageKey]) => [
 		path,
 		storageKey ?? `files/${path}`,
@@ -327,8 +274,6 @@ export async function createEnv(input: {
 		files: resolvedFiles,
 		fileSizes,
 		fileHashes,
-		committedPaths,
-		atomicSourceConflictPath: input.atomicSourceConflictPath,
 	});
 
 	return {
@@ -358,7 +303,6 @@ export async function createEnv(input: {
 		store,
 		files,
 		scheduled,
-		committedPaths,
 		async mutationBody(body: Record<string, unknown>) {
 			const path = typeof body.filePath === 'string' ? body.filePath : `Reminders/${typeof body.project === 'string' ? body.project : 'Inbox'}.md`;
 			const stored = store.get(files.get(path) ?? '');

@@ -10,7 +10,7 @@ import { handleBatchUpload } from './sync-batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { sha256Hex } from './auth';
 import { SyncTestDevice } from './sync-engine-test-harness';
-import { pruneReminderOperations } from './maintenance/reminder-history';
+import { pruneOperationReceipts } from './maintenance/operation-receipts';
 import type { UploadResult } from '@/protocol/sync-types';
 
 const devices: SyncTestDevice[] = [];
@@ -73,7 +73,7 @@ it('rejects expired operations after pruning their receipts', async () => {
 	const operation = id();
 	await upload(operation, false);
 	await env.DB.prepare("INSERT INTO maintenance_state(key,value) VALUES('reminder_operation_floor', ?)").bind(String(day() + 1)).run();
-	await pruneReminderOperations(env.DB);
+	await pruneOperationReceipts(env.DB);
 	expect(await upload(operation, false)).toMatchObject({ success: false, code: 'operation_expired', status: 410 });
 });
 

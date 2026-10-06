@@ -4,7 +4,7 @@ import type { FileEntry } from '../protocol/sync-types';
 
 interface LocalFileManifest {
 	getAllPaths(): string[];
-	getEntry(path: string): FileEntry | undefined;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
 }
 
 /**

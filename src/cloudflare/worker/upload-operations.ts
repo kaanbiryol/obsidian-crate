@@ -2,7 +2,7 @@ import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
-import { REMINDER_OPERATION_VALID } from './reminders-web/operation-expiry';
+import { OPERATION_VALID } from './operation-expiry';
 import { fileNamespaceGuard, namespacePredicate, FileNamespaceConflictError } from './file-namespace';
 import type { RestoreFileRequest, UploadResult } from '@/protocol/sync-types';
 
@@ -31,7 +31,7 @@ export async function beginUploadOperation(db: D1Database, id: unknown, payload:
 	const operation = { id, day, requestHash: await sha256Hex(JSON.stringify(payload)) };
 	const row = await db.prepare(`SELECT request_hash, response_json FROM upload_operations WHERE operation_id = ?
 		UNION ALL SELECT NULL, NULL WHERE NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)
-		AND ${REMINDER_OPERATION_VALID} LIMIT 1`).bind(id, id, day, day).first<{ request_hash: string | null; response_json: string | null }>();
+		AND ${OPERATION_VALID} LIMIT 1`).bind(id, id, day, day).first<{ request_hash: string | null; response_json: string | null }>();
 	if (row?.response_json) {
 		if (row.request_hash !== operation.requestHash) return corsResponse({ success: false, path: payload.path, status: 409, code: 'operation_mismatch', error: 'An upload operation ID cannot be reused for different bytes or preconditions.' }, 409);
 		const receipt = decodeReceipt(row.response_json);
@@ -49,7 +49,7 @@ export function recordUploadReceipt(db: D1Database, operation: UploadOperation, 
 	const namespace = fileNamespaceGuard(file.path);
 	const conflict = namespacePredicate(file.path);
 	return db.prepare(`INSERT INTO upload_operations (operation_id, request_hash, response_json)
-		SELECT ?, ?, CASE WHEN ${REMINDER_OPERATION_VALID} THEN
+		SELECT ?, ?, CASE WHEN ${OPERATION_VALID} THEN
 			CASE WHEN EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
 			THEN json_object('success', json('true'), 'path', ?, 'hash', ?, 'revision', ?)
 			ELSE json_object('success', json('false'), 'path', ?, 'status', 409,

@@ -112,6 +112,11 @@ CratePlugin (src/plugin/CratePlugin.ts)
 ```
 
 Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
+`sync/manifest-checkpoint.ts` owns checkpoint parsing, encoding and recovery
+equivalence. `LocalManifest` retains generation selection, file I/O and ordered
+saves. Its baseline readers expose readonly views with stable entry identities;
+mutations replace entries through the manifest so revision tracking and checks
+across asynchronous reads agree. Diagnostics remain outside recovery equivalence.
 Pending previews, discard preparation and post-sync baseline verification live in
 `sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions.
 Discard keeps baseline persistence and queue settlement in one ordered operation.
@@ -184,6 +189,13 @@ The handler selects required `UploadCommitters` from that execution kind and pas
 them through the routes. Worker `Env` contains bindings, not optional publication
 callbacks. Upload handlers retain staging and validation; direct publication and
 coordinator forwarding remain explicit choices without fallback defaults.
+
+`cloudflare/worker/operation-expiry.ts` owns the shared retry floor used by
+Reminders, Reading, uploads and encryption recovery. Its persisted
+`reminder_operation_floor` key remains unchanged. `maintenance/operation-receipts.ts`
+publishes that floor and prunes receipts in the same transaction, and coordinates
+expired enrollment and pairing cleanup. Reminder-specific expiration copy and
+occurrence retention stay with the reminder modules.
 
 `sync/runtime-server-status.ts` owns version caching and delayed reachability
 probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
@@ -310,6 +322,9 @@ inside persistence and migration code. Export and logout retain their recovery g
 `loadReadingArticle`. Network and cache reads share item/article validation in
 `reading/record-validation.ts`; live articles must match the requested identity and
 enrolled folder before the reader or offline cache receives them.
+List pages are validated before accumulation. The loader rejects repeated cursors
+and bounds page, item and issue counts before committing a complete cache revision;
+rejected pagination leaves the prior cache and unsettled commands available.
 The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
 `reading/ui/useReadingReaderActions.ts` scopes mutation and sharing feedback to the

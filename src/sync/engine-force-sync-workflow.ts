@@ -8,7 +8,7 @@ import {
 } from './sync-result';
 import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { FileManifest } from '../protocol/sync-types';
+import type { LocalManifestView } from './manifest';
 import { getPathEntry } from '../protocol/path-record';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
@@ -31,9 +31,9 @@ export interface ForceSyncWorkflowContext {
 	shouldIgnore(path: string): boolean;
 	isAbortError(error: unknown): boolean;
 	getManifest(): Promise<RemoteManifest>;
-	snapshotLocalManifest(): FileManifest;
+	snapshotLocalManifest(): LocalManifestView;
 	clearLocalManifest(): void;
-	replaceLocalManifest(manifest: FileManifest): void;
+	replaceLocalManifest(manifest: LocalManifestView): void;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],

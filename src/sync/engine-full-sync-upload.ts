@@ -12,7 +12,7 @@ export interface FullSyncUploadContext {
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
-	getLocalManifestEntry(path: string): FileEntry | undefined;
+	getLocalManifestEntry(path: string): Readonly<FileEntry> | undefined;
 	throwIfDestroyed(): void;
 	isAbortError(error: unknown): boolean;
 }

@@ -1,5 +1,24 @@
 # Testing
 
+## Reading pagination and checkpoint boundaries
+
+`pwa/reading/list-response.test.ts` exercises malformed page envelopes and cursors,
+cursor cycles, and cumulative item, issue and request limits.
+`scripts/reading-cache-recovery.browser.test.mjs` verifies that rejected pagination
+preserves the confirmed cache, offline articles and pending commands in Chromium
+and WebKit.
+
+`manifest.test.ts`, `manifest-checkpoint.test.ts` and `checkpoint-validation.test.ts`
+retain entry-identity checks, checkpoint round trips, conflicting recovery metadata,
+torn-write recovery and overlapping saves. Content-verifier and pending-verification
+races ensure an older asynchronous read cannot replace or settle a newer baseline.
+
+`reminders-web-moves.integration.ts` runs the production handlers against real D1/R2
+bindings, including completed reminders, source conflicts and destination write
+failures. Unit tests retain lightweight reorder coverage without simulating the
+atomic SQL publication. Operation-expiry and upload-retry integration tests exercise
+the shared receipt cleanup owner, including monotonic floors and batch rollback.
+
 ## Sync outcomes and reader action lifetimes
 
 `engine-lifecycle.test.ts` distinguishes cancellation from successful completion

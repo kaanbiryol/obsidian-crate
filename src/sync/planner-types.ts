@@ -8,11 +8,12 @@ import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import type { VaultFile } from './file-discovery';
 import type { InitialConfigPull } from './initial-config-pull';
+import type { LocalManifestView } from './manifest';
 
 interface PlannerManifest {
-  getEntry(path: string): FileEntry | undefined;
+  getEntry(path: string): Readonly<FileEntry> | undefined;
   getAllPaths(): string[];
-  getManifest(): { version: number; files: Record<string, FileEntry> };
+  getManifest(): LocalManifestView;
   setEntry(path: string, entry: FileEntry): void;
   removeEntry(path: string): void;
   save(): Promise<void>;

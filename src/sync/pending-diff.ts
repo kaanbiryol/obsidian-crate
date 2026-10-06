@@ -18,7 +18,7 @@ export interface PendingDiff {
 /** Read a snapshot for display only; never advance the manifest or sync queue. */
 export async function loadPendingDiff(
     adapter: Pick<DataAdapter, 'stat' | 'readBinary'>,
-    baseline: FileEntry | undefined,
+    baseline: Readonly<FileEntry> | undefined,
     readBase: (path: string, hash: string) => Promise<ArrayBuffer | null>,
     path: string,
     deleted: boolean,

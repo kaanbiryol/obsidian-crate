@@ -1,6 +1,6 @@
 import { sha256Hex } from '../auth';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
-import { REMINDER_OPERATION_VALID } from '../reminders-web/operation-expiry';
+import { OPERATION_VALID } from '../operation-expiry';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
 import type { AuthPrincipal } from '../authenticate';
 import type { CommitEffects } from '../commit-effects';
@@ -16,14 +16,14 @@ export async function beginOperation(db: D1Database, principal: AuthPrincipal, c
     if (saved.principal_id !== principal.tokenId || saved.generation !== current.generation || saved.request_hash !== hash) throw new ReadingError('This operation ID belongs to a different save.', 409, 'operation_mismatch');
     return readingResponse(JSON.parse(saved.response_json));
   }
-  if (day === null || !await db.prepare(`SELECT 1 WHERE ${REMINDER_OPERATION_VALID}`).bind(day, day).first()) {
+  if (day === null || !await db.prepare(`SELECT 1 WHERE ${OPERATION_VALID}`).bind(day, day).first()) {
     throw new ReadingError('This change is too old to retry safely. Compare your library before saving it again.', 410, 'operation_expired');
   }
   return { id: body.operationId, principal: principal.tokenId, generation: current.generation, hash, day };
 }
 export function operationStatement(db: D1Database, op: ReadingOperation, response: unknown, predicate = '1', args: string[] = []) {
   return db.prepare(`INSERT INTO reading_operations(operation_id, principal_id, generation, request_hash, response_json, day)
-    SELECT ?, ?, ?, ?, CASE WHEN ${REMINDER_OPERATION_VALID}
+    SELECT ?, ?, ?, ?, CASE WHEN ${OPERATION_VALID}
       AND EXISTS (SELECT 1 FROM reading_policy WHERE generation=?)
       AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at > ?))
       THEN ? ELSE NULL END, ? WHERE ${predicate}`)

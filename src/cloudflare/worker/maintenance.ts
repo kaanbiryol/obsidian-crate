@@ -7,7 +7,8 @@ import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/i
 import type { Env } from './types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
-import { pruneReminderOccurrences, pruneReminderOperations } from './maintenance/reminder-history';
+import { pruneReminderOccurrences } from './maintenance/reminder-history';
+import { pruneOperationReceipts } from './maintenance/operation-receipts';
 import { pruneEncryptedReceiptChunks } from './encrypted-receipt-storage';
 import { pruneEncryptionMetadata } from './maintenance/encryption-metadata';
 
@@ -29,7 +30,7 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 		['prune changelog', () => pruneChangelog(env.DB)],
 		['prune file deletion receipts', () => pruneFileDeletionReceipts(env.DB)],
 		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(env.DB)],
-		['prune expired reminder operations', () => pruneReminderOperations(env.DB)],
+		['prune expired operation receipts', () => pruneOperationReceipts(env.DB)],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],

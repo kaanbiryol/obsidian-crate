@@ -6,6 +6,7 @@ import { chromium, webkit } from '@playwright/test';
 
 const { outputFiles } = await build({ stdin: { contents: `
   export { loadReading } from './src/pwa/reading/api';
+  export { drainReading } from './src/pwa/reading/outbox';
   export * from './src/pwa/reading/storage';
   export { readingDatabase } from './src/pwa/reading/database';
   export { createReadingNote, parseReadingNote } from './src/reading/core/notes';
@@ -78,5 +79,67 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: Reading source 
     assert.equal(result.rollback.article, true);
     assert.equal(result.rollback.list.savedAt, 1);
     assert.deepEqual(result.damagedRetained, { markdown: 'Unvalidated recovery text' });
+  } finally { await browser.close(); }
+});
+
+for (const engine of [chromium, webkit]) test(`${engine.name()}: invalid Reading pagination preserves the durable revision and pending changes`, async () => {
+  const browser = await engine.launch();
+  try {
+    const page = await browser.newPage();
+    await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Reading pagination</title>' }));
+    await page.goto('https://reading-pagination.test');
+    await page.addScriptTag({ content: outputFiles[0].text });
+    const results = await page.evaluate(async () => {
+      const api = readingRecovery;
+      const session = { id: 'pagination-session', token: 'test-token', generation: 'generation', folderPath: 'Reading', expiresAt: Date.now() + 86400000 };
+      localStorage.setItem(api.READING_SESSION_KEY, JSON.stringify(session));
+      const id = crypto.randomUUID();
+      const item = { ...api.parseReadingNote(api.createReadingNote({ id, url: 'https://example.invalid/read', savedAt: new Date().toISOString() })), path: 'Reading/Saved.md' };
+      const intent = { id, changes: { favorite: true }, before: { favorite: false } };
+      const command = { id: crypto.randomUUID(), sessionId: session.id, action: 'update', intent,
+        body: JSON.stringify({ ...intent, operationId: `e1_00020000_${crypto.randomUUID()}` }, null, 2) };
+      await api.commitReadingCache(session, { items: [item], issues: [], savedAt: 1 });
+      await api.cacheReadingArticle(session, item, 'Keep the previous offline article.');
+      await api.savePendingReading(session, [command]);
+      await api.saveReadingDraft(session, { url: 'https://example.invalid/unfinished-✓' });
+      const db = await api.readingDatabase();
+      const snapshot = async () => JSON.stringify({ keys: await db.getAllKeys('values'), values: await db.getAll('values') });
+      const before = await snapshot();
+      const issue = { path: 'Reading/Damaged.md', message: 'Source could not be read.' };
+      const scenarios = [
+        { name: 'malformed cursor', pages: [
+          { items: [], issues: [], cursor: 'next' }, { items: [], issues: [], cursor: {} },
+        ] },
+        { name: 'cursor cycle', pages: ['A', 'B', 'A'].map(cursor => ({ items: [], issues: [], cursor })) },
+        { name: 'terminal overflow', pages: [
+          { items: [], issues: Array.from({ length: 10_000 }, () => issue), cursor: 'next' },
+          { items: [], issues: [issue], cursor: null },
+        ] },
+        { name: 'acknowledged command with invalid list', drain: true, pages: [{ items: [], issues: [], cursor: {} }] },
+      ];
+      const results = [];
+      for (const scenario of scenarios) {
+        let lists = 0, mutations = 0;
+        window.fetch = async path => {
+          if (path === '/reading/encryption') return Response.json({ encryption: null });
+          if (path === '/reading/session') return Response.json({ day: 20_000, generation: session.generation });
+          if (path === '/reading/update') { mutations++; return Response.json({ saved: true }); }
+          const response = scenario.pages[lists++];
+          if (!response) throw new Error('Unexpected extra list request');
+          return Response.json(response);
+        };
+        let error = null;
+        try { await (scenario.drain ? api.drainReading(session) : api.loadReading(session)); }
+        catch (cause) { error = cause.message; }
+        results.push({ name: scenario.name, error, lists, mutations, unchanged: before === await snapshot() });
+      }
+      return results;
+    });
+    assert.deepEqual(results, [
+      { name: 'malformed cursor', error: 'Reading library response is unreadable.', lists: 2, mutations: 0, unchanged: true },
+      { name: 'cursor cycle', error: 'Reading library did not advance.', lists: 3, mutations: 0, unchanged: true },
+      { name: 'terminal overflow', error: 'Reading library response is too large or unreadable.', lists: 2, mutations: 0, unchanged: true },
+      { name: 'acknowledged command with invalid list', error: 'Reading library response is unreadable.', lists: 1, mutations: 1, unchanged: true },
+    ]);
   } finally { await browser.close(); }
 });

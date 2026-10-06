@@ -10,7 +10,7 @@ export const VERIFICATION_FILE_BUDGET = 32;
 export const VERIFICATION_BYTE_BUDGET = 8 * 1024 * 1024;
 
 interface VerificationManifest {
-	getEntry(path: string): FileEntry | undefined;
+	getEntry(path: string): Readonly<FileEntry> | undefined;
 	setEntry(path: string, entry: FileEntry): void;
 	save(): Promise<void>;
 }
