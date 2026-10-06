@@ -1,4 +1,3 @@
-import { preserveRecurrenceMetadata } from '../../utils/recurrenceRule';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Reminder, RecurrenceRule } from '../../types';
 import {
@@ -6,6 +5,7 @@ import {
 	buildInitialReminderContent,
 	deriveReminderDraftContentMetadata,
 	getDefaultProject,
+	reconcileReminderDraftMetadata,
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
 } from '../../core/reminderDraft';
@@ -94,48 +94,17 @@ export function useReminderDraft({
 	);
 
 	useEffect(() => {
-		if (metadata.priority !== priority) {
-			setPriority(metadata.priority);
-		}
-
-		if (metadata.project !== project) {
-			setProject(metadata.project);
-		}
-
-		const detectedRecurrence = preserveRecurrenceMetadata(metadata.recurrence, recurrence);
-		if (detectedRecurrence) {
-			const currentJson = recurrence ? JSON.stringify(recurrence) : null;
-			const detectedJson = JSON.stringify(detectedRecurrence);
-			if (currentJson !== detectedJson) setRecurrence(detectedRecurrence);
-			if (detectedRecurrence !== recurrence) {
-				if (dueDate) setDueDate(null);
-				if (hasTime) setHasTime(false);
-			}
-			dueDateSetFromText.current = false;
-		} else if (recurrence) {
-			setRecurrence(undefined);
-		}
-
-		const detectedDueDate = metadata.dueDate;
-		if (detectedDueDate && !detectedRecurrence) {
-			if (dueDate !== detectedDueDate) {
-				dueDateSetFromText.current = true;
-				setDueDate(detectedDueDate);
-			}
-			if (hasTime !== metadata.hasTime) {
-				setHasTime(metadata.hasTime);
-			}
-		} else if (
-			!detectedDueDate &&
-			!detectedRecurrence &&
-			dueDate &&
-			(initialContentHadSchedule || dueDateSetFromText.current)
-		) {
-			setDueDate(null);
-			setHasTime(false);
-			dueDateSetFromText.current = false;
-		}
-	}, [dueDate, hasTime, initialContentHadSchedule, metadata, priority, project, recurrence]);
+		const next = reconcileReminderDraftMetadata(
+			{ content, dueDate, hasTime, recurrence, project, priority }, metadata,
+			{ initialContentHadSchedule, dueDateSetFromText: dueDateSetFromText.current, recurrenceTimezone: 'preserve' },
+		);
+		dueDateSetFromText.current = next.dueDateSetFromText;
+		setPriority(next.state.priority);
+		setProject(next.state.project);
+		if (JSON.stringify(next.state.recurrence) !== JSON.stringify(recurrence)) setRecurrence(next.state.recurrence);
+		setDueDate(next.state.dueDate);
+		setHasTime(next.state.hasTime);
+	}, [content, dueDate, hasTime, initialContentHadSchedule, metadata, priority, project, recurrence]);
 
 	const applyDateSelection = useCallback((nextDate: string | null, nextHasTime?: boolean) => {
 		dueDateSetFromText.current = false;

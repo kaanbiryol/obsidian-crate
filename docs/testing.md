@@ -21,6 +21,18 @@ the shared receipt cleanup owner, including monotonic floors and batch rollback.
 
 ## Sync outcomes and reader action lifetimes
 
+`engine-queue.test.ts` delays automatic result recording while a later upload is
+pending, covering same-path edits, different paths and failed-upload retries.
+`reading/runtime.test.ts` delays accepted host creates/processes and checks that
+shutdown and replacement reads wait for them. Library tests also cover closed
+admission and delayed capture completion.
+
+`reminderDraft.test.ts` covers shared reconciliation, recurrence metadata, schedule
+provenance and stable relative dates. PWA state tests retain recovery of a stored
+time without a date. `tests/visual/reminder-draft.spec.ts` exercises the actual
+plugin draft hook in Shadow DOM in Chromium and WebKit, including title edits,
+picker changes and renders after the clock advances.
+
 `engine-lifecycle.test.ts` distinguishes cancellation from successful completion
 across ordinary, initial and forced sync, while retaining cursor and baseline
 checks. `runtime-operations.test.ts` verifies that cancelled manual and automatic
@@ -36,6 +48,8 @@ channels and delayed clipboard/native-share completion across article lifetimes.
 
 `pwa-update-test.mjs` registers installation, launch, deferred-update and command
 preparation scenarios as independent named Node tests for Chromium and WebKit.
+`pwa-dock-test.mjs` and `pwa-schedule-test.mjs` likewise isolate navigation,
+gestures, motion, launch, empty-state and responsive checks into named scenarios.
 Each owns its browser and storage; one failed scenario does not skip later cases.
 Run a focused case with `node --test --test-name-pattern='<name>' scripts/pwa-update-test.mjs`.
 

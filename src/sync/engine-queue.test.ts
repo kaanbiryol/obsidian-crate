@@ -127,6 +127,79 @@ describe('SyncEngine event queue behavior', () => {
 		expect(pendingPaths.includes('notes/b.md')).toBe(true);
 	});
 
+	it('uploads a newer edit after settling an earlier upload of the same path', async () => {
+		const path = 'notes/a.md';
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path, extension: 'md', stat: { size: 1, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockImplementationOnce(async () => {
+			harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('B'));
+			harness.engine.onFileChange({ path } as never);
+			return { success: true, path };
+		}).mockResolvedValue({ success: true, path });
+
+		harness.engine.onFileChange({ path } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
+		expect(harness.engine.getPendingPaths()).toContain(path);
+
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
+		expect(harness.api.uploadFile.mock.calls.map(([, content]) => new TextDecoder().decode(content))).toEqual(['A', 'B']);
+		expect(harness.engine.getPendingPaths()).toEqual([]);
+	});
+
+	it.each([
+		{ nextPath: 'notes/a.md', firstSuccess: true },
+		{ nextPath: 'notes/b.md', firstSuccess: true },
+		{ nextPath: 'notes/a.md', firstSuccess: false },
+	])('keeps $nextPath visible while an earlier flush finishes reporting (success: $firstSuccess)', async ({ nextPath, firstSuccess }) => {
+		const reporting = createDeferred<void>();
+		const reportingStarted = createDeferred<void>();
+		const uploading = createDeferred<void>();
+		const uploadingStarted = createDeferred<void>();
+		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => ({
+			path, extension: 'md', stat: { size: 1, mtime: 1700000000000 },
+		}));
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockResolvedValueOnce({ success: firstSuccess, path: 'notes/a.md', ...(!firstSuccess ? { error: 'Upload failed' } : {}) })
+			.mockImplementationOnce(async path => {
+				uploadingStarted.resolve();
+				await uploading.promise;
+				return { success: true, path };
+			});
+		const onQueueSyncResult = vi.fn(async () => {}).mockImplementationOnce(() => {
+			reportingStarted.resolve();
+			return reporting.promise;
+		});
+		harness.engine.setAutomaticSyncResultCallback(onQueueSyncResult);
+
+		try {
+			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+			await vi.advanceTimersByTimeAsync(5000);
+			await reportingStarted.promise;
+			expect(onQueueSyncResult).toHaveBeenCalledOnce();
+
+			harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('B'));
+			harness.engine.onFileChange({ path: nextPath } as never);
+			await vi.advanceTimersByTimeAsync(5000);
+			await uploadingStarted.promise;
+			expect(harness.api.uploadFile).toHaveBeenCalledTimes(2);
+			expect(harness.engine.getPendingPaths()).toContain(nextPath);
+
+			reporting.resolve();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(harness.engine.getState().status).toBe('syncing');
+			expect(harness.engine.getPendingPaths()).toContain(nextPath);
+		} finally {
+			reporting.resolve();
+			uploading.resolve();
+			await harness.engine.waitForIdle();
+		}
+		expect(harness.engine.getPendingPaths()).toEqual([]);
+	});
+
 	it('re-queues pending path when upload returns success false', async () => {
 		const content = toArrayBuffer('A');
 		harness.vault.getAbstractFileByPath.mockReturnValue({

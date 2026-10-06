@@ -1,6 +1,7 @@
 import {
 	applyReminderDraftContentUpdate,
 	deriveReminderDraftContentMetadata,
+	reconcileReminderDraftMetadata,
 	type ReminderDraftContentMetadata,
 } from '@/reminders/core/reminderDraft';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
@@ -107,44 +108,23 @@ export function deriveDraftPatchFromContent(
 	projectOptions: string[],
 	metadata: ReminderDraftContentMetadata = deriveReminderDraftContentMetadata(draft.content, projectOptions, draft.defaultProject),
 ): Partial<ModalDraft> {
+	const { state } = reconcileReminderDraftMetadata({
+		content: draft.content, dueDate: getDraftDueValue(draft), hasTime: draftHasTime(draft),
+		recurrence: draft.recurrence, project: draft.project, priority: draft.priority,
+	}, metadata, {
+		// PWA dates are encoded in the editor text; there is no implicit initial date.
+		initialContentHadSchedule: true, dueDateSetFromText: false, recurrenceTimezone: 'local-default',
+	});
 	const patch: Partial<ModalDraft> = {};
-	const nextProject = metadata.project;
-
-	if (nextProject !== draft.project) {
-		patch.project = nextProject;
-	}
-
-	const nextPriority = metadata.priority;
-	if (nextPriority !== draft.priority) {
-		patch.priority = nextPriority;
-	}
-
-	if (metadata.recurrence) {
-		const nextRecurrence = normalizeRecurrenceRule(preserveRecurrenceMetadata(metadata.recurrence, draft.recurrence));
-		if (JSON.stringify(nextRecurrence) !== JSON.stringify(draft.recurrence)) {
-			patch.recurrence = nextRecurrence;
-		}
-		if (nextRecurrence !== draft.recurrence && (draft.dueDate || draft.dueTime)) {
-			patch.dueDate = '';
-			patch.dueTime = '';
-		}
-		return patch;
-	}
-
-	if (draft.recurrence) {
-		patch.recurrence = undefined;
-	}
-
-	if (metadata.dueDate) {
-		const dateFields = splitDraftDateValue(metadata.dueDate, metadata.hasTime);
+	if (state.project !== draft.project) patch.project = state.project;
+	if (state.priority !== draft.priority) patch.priority = state.priority;
+	if (JSON.stringify(state.recurrence) !== JSON.stringify(draft.recurrence)) patch.recurrence = state.recurrence;
+	// Preserve the original fields for an unchanged occurrence, including local DST ambiguity.
+	const orphanTimeRemoved = !state.dueDate && draft.dueTime && (!state.recurrence || state.recurrence !== draft.recurrence);
+	if (state.dueDate !== getDraftDueValue(draft) || state.hasTime !== draftHasTime(draft) || orphanTimeRemoved) {
+		const dateFields = splitDraftDateValue(state.dueDate, state.hasTime);
 		if (dateFields.dueDate !== draft.dueDate) patch.dueDate = dateFields.dueDate;
 		if (dateFields.dueTime !== draft.dueTime) patch.dueTime = dateFields.dueTime;
-		return patch;
-	}
-
-	if (draft.dueDate || draft.dueTime) {
-		patch.dueDate = '';
-		patch.dueTime = '';
 	}
 
 	return patch;

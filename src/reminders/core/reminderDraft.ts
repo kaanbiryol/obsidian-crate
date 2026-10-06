@@ -3,6 +3,7 @@ import { recurrenceToEditorText } from '../utils/rruleConverter';
 import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
 import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
 import { findProjectMatches } from '../utils/richTextMatchers';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '../utils/recurrenceRule';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -31,6 +32,41 @@ export interface ReminderDraftContentMetadata {
 	priority: Priority;
 	hasPriorityMarker: boolean;
 	hasTime: boolean;
+}
+
+export interface ReminderDraftScheduleSource {
+	initialContentHadSchedule: boolean;
+	dueDateSetFromText: boolean;
+	/** PWA drafts store an explicit zone; plugin drafts retain the parsed rule. */
+	recurrenceTimezone: 'preserve' | 'local-default';
+}
+
+/** Reconcile already-parsed text without re-evaluating relative dates on renders. */
+export function reconcileReminderDraftMetadata(
+	current: ReminderDraftContentState,
+	metadata: ReminderDraftContentMetadata,
+	source: ReminderDraftScheduleSource,
+): { state: ReminderDraftContentState; dueDateSetFromText: boolean } {
+	const preserved = preserveRecurrenceMetadata(metadata.recurrence, current.recurrence);
+	const recurrence = source.recurrenceTimezone === 'local-default' ? normalizeRecurrenceRule(preserved) : preserved;
+	const state = { ...current, project: metadata.project, priority: metadata.priority, recurrence };
+	let dueDateSetFromText = source.dueDateSetFromText;
+	if (recurrence) {
+		if (recurrence !== current.recurrence) {
+			state.dueDate = null;
+			state.hasTime = false;
+		}
+		dueDateSetFromText = false;
+	} else if (metadata.dueDate) {
+		if (state.dueDate !== metadata.dueDate) dueDateSetFromText = true;
+		state.dueDate = metadata.dueDate;
+		state.hasTime = metadata.hasTime;
+	} else if (state.dueDate && (source.initialContentHadSchedule || dueDateSetFromText)) {
+		state.dueDate = null;
+		state.hasTime = false;
+		dueDateSetFromText = false;
+	}
+	return { state, dueDateSetFromText };
 }
 
 export function getDefaultProject(defaultProject: string): string {

@@ -6,16 +6,25 @@ import type { Env } from './types';
 import { isReminderPath } from './reminder-scope';
 import { getNotificationPolicy } from './notification-policy';
 import { readEncryptionState } from './encryption-state';
-import type { UploadCommitters } from './upload-committers';
+import type { UploadCommitInput, UploadCommitters } from './upload-committers';
 
-type UploadParams = Parameters<typeof commitStagedFile>[2];
+type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
+// Explicit fields keep local-only commit options out of the JSON transport.
+type UploadMetadata = Pick<UploadParams,
+  'path' | 'hash' | 'size' | 'objectKey' | 'expectedHash' | 'expectedRevision'
+  | 'previousFile' | 'encryptionState' | 'resetGeneration' | 'operation'>;
 
 /** File transfer and hashing finish before acquiring the coordinator lock. */
 export function coordinatedUpload(env: Env): CommitUpload {
   return async (bucket, db, params) => {
     if (!params.path.toLowerCase().endsWith('.md')) return commitStagedFile(bucket, db, params);
-    const { content: _content, ...metadata } = params;
+    const metadata: UploadMetadata = {
+      path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
+      expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
+      previousFile: params.previousFile, encryptionState: params.encryptionState,
+      resetGeneration: params.resetGeneration, operation: params.operation,
+    };
     const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
     const response = await stub.fetch('https://do/commit-upload', { method: 'POST', body: JSON.stringify(metadata) });
     if (!response.ok) {
@@ -29,7 +38,7 @@ export function coordinatedUpload(env: Env): CommitUpload {
 
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
   // Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
-  const metadata = await request.json() as Omit<UploadParams, 'content'>;
+  const metadata = await request.json() as UploadMetadata & { reminderPolicyRevision?: string | null };
   const policy = await getNotificationPolicy(env.DB);
   metadata.reminderPolicyRevision = policy?.revision ?? null;
   if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };

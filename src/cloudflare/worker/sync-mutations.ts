@@ -82,24 +82,26 @@ export interface CommitResult {
 	failure?: UploadResult;
 }
 
+export interface StagedFileCommitInput {
+	reminderPolicyRevision?: string | null;
+	path: string;
+	hash: string;
+	size: number;
+	objectKey: string;
+	content: string | ArrayBuffer;
+	effects?: CommitEffects;
+	encryptionState?: EncryptionServerState | null;
+	resetGeneration?: string | null;
+	operation?: UploadOperation;
+	expectedHash: ExpectedFileHash;
+	expectedRevision?: string;
+	previousFile: FileStorageRow | null;
+}
+
 export async function commitStagedFile(
 	bucket: R2Bucket,
 	db: D1Database,
-	params: {
-		reminderPolicyRevision?: string | null;
-		path: string;
-		hash: string;
-		size: number;
-		objectKey: string;
-		content: string | ArrayBuffer;
-		effects?: CommitEffects;
-		encryptionState?: EncryptionServerState | null;
-		resetGeneration?: string | null;
-		operation?: UploadOperation;
-		expectedHash: ExpectedFileHash;
-		expectedRevision?: string;
-		previousFile: FileStorageRow | null;
-	},
+	params: StagedFileCommitInput,
 ): Promise<CommitResult> {
 	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState);
 	const cleanupKeys = collectCleanupKeys(params.previousFile, params.objectKey);

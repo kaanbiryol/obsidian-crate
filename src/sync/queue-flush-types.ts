@@ -48,12 +48,18 @@ export interface QueueUploadFailure {
 	status?: number;
 }
 
+export interface QueueFlushBatch {
+	readonly paths: readonly string[];
+	requeue(keys: Iterable<string>): void;
+	settle(completedKeys: ReadonlySet<string>): void;
+	release(): void;
+}
+
 export interface QueueFlushContext {
 	finishInitialSetup(): Promise<void>;
 	recoverUploads(): Promise<void>;
-	pendingPaths: Set<string>;
-	inFlightPaths: Set<string>;
-	pendingRevisions: Map<string, number>;
+	getPendingPathCount(): number;
+	beginBatch(): QueueFlushBatch;
 	api: QueueApi;
 	localManifest: QueueManifest;
 	updateState(updates: Partial<SyncState>): void;

@@ -1,5 +1,6 @@
 import { ObsidianReadingDialog } from '@/reading/ui/ObsidianReadingDialog';
 import { ReminderListStyleFixture } from './ReminderListStyleFixture';
+import { ReminderDraftFixture } from './ReminderDraftFixture';
 import { NavigationFixture } from './NavigationFixture';
 import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import { AppDock } from '@/ui/shared/navigation/AppDock';
@@ -78,6 +79,7 @@ function Gallery() {
   let content: React.ReactNode;
   if (scene === 'tabs') content = <div className={`reminders-view is-primary ${host === 'pwa' ? 'pwa-reminders-view' : ''}`}><AppDock section="reminders" tabs={['inbox', 'today', 'browse']} activeTab={activeTab === 'upcoming' ? 'today' : activeTab} onSelect={tab => setActiveTab(tab as TabId)} onPin={tab => setActiveTab(tab as TabId)} /></div>;
   else if (scene === 'list-style') content = <ReminderListStyleFixture host={host} />;
+  else if (scene === 'draft') content = <ReminderDraftFixture />;
   else if (scene === 'navigation') content = <NavigationFixture isDark={isDark} onAdd={setResult} />;
   else if (scene === 'lexical') content = <LexicalTrial />;
   else if (scene === 'source') content = <SourceNoticeFixture isDark={isDark} />;

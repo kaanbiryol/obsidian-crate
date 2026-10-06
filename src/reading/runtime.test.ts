@@ -6,7 +6,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
-import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime } from './runtime';
+import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readingServerRequest } from './server';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
@@ -41,6 +41,52 @@ function harness() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('Reading runtime lifecycle', () => {
+  it.each(['create', 'process'] as const)('drains an accepted host %s before completing shutdown or reading its replacement', async operation => {
+    const h = harness();
+    let enter!: () => void, release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    let completed = false;
+    if (operation === 'create') {
+      Object.assign(h.vault, {
+        getAllLoadedFiles: () => [h.file],
+        create: async () => { enter(); await pending; completed = true; },
+      });
+    } else {
+      h.vault.process.mockImplementationOnce(async (_file, update) => {
+        const next = update(await h.vault.read());
+        enter(); await pending;
+        h.edit(() => next); completed = true;
+        return next;
+      });
+    }
+    startReading(h.plugin);
+    const original = getReadingLibrary(h.plugin)!;
+    await original.refresh();
+    const saving = operation === 'create'
+      ? original.add('https://example.com/new', undefined, false)
+      : original.update(original.getSnapshot().items[0]!, { favorite: true });
+    await entered;
+    stopReading(h.plugin);
+    let drained = false;
+    const stopped = waitForStoppedReading(h.plugin).then(() => { drained = true; });
+    startReading(h.plugin);
+    const replacement = getReadingLibrary(h.plugin)!;
+    const reads = h.vault.read.mock.calls.length;
+    const refreshed = replacement.refresh();
+    await expect(original.refresh()).rejects.toThrow();
+    expect(drained).toBe(false);
+    expect(completed).toBe(false);
+    expect(h.vault.read).toHaveBeenCalledTimes(reads);
+    release();
+    await Promise.all([saving, stopped, refreshed]);
+    expect(completed).toBe(true);
+    expect(drained).toBe(true);
+    expect(h.vault.read.mock.calls.length).toBeGreaterThan(reads);
+    if (operation === 'process') expect(replacement.getSnapshot().items[0]?.favorite).toBe(true);
+    stopReading(h.plugin);
+    await waitForStoppedReading(h.plugin);
+  });
   it('waits for a pending encrypted folder move before starting policy or capture work', () => {
     const h = harness(); h.workspace.layoutReady = true;
     Object.assign(h.plugin.secretStorage, { get: (key: string) => key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending' : null });

@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Reminder } from '../types';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
 	deriveReminderDraftContentMetadata,
 	rebuildReminderContent,
+	reconcileReminderDraftMetadata,
+	type ReminderDraftContentState,
 } from './reminderDraft';
 
 function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
@@ -159,6 +161,60 @@ describe('reminder draft content helpers', () => {
 		expect(updated.recurrence).toEqual(recurrence);
 		expect(updated.content).toContain('daily 09:00');
 		expect(updated.content).not.toContain('Apr 3, 2026');
+	});
+});
+
+describe('draft metadata reconciliation', () => {
+	const projects = ['Inbox', 'Work'];
+	const source = { initialContentHadSchedule: true, dueDateSetFromText: false, recurrenceTimezone: 'preserve' as const };
+	const draft = (overrides: Partial<ReminderDraftContentState> = {}): ReminderDraftContentState => ({
+		content: 'Task', dueDate: '2026-04-03', hasTime: false, recurrence: undefined, project: 'Inbox', priority: 4, ...overrides,
+	});
+	const metadata = (content: string) => deriveReminderDraftContentMetadata(content, projects, 'Inbox');
+
+	it('retains implicit initial dates but clears dates whose text was removed', () => {
+		const current = draft();
+		expect(reconcileReminderDraftMetadata(current, metadata('Task'), { ...source, initialContentHadSchedule: false }).state.dueDate).toBe('2026-04-03');
+		for (const provenance of [source, { ...source, initialContentHadSchedule: false, dueDateSetFromText: true }]) {
+			expect(reconcileReminderDraftMetadata(current, metadata('Task'), provenance)).toMatchObject({
+				state: { dueDate: null, hasTime: false }, dueDateSetFromText: false,
+			});
+		}
+	});
+
+	it('preserves recurrence identity, hidden metadata and the exact occurrence on title edits', () => {
+		const recurrence = { frequency: 'weekly' as const, daysOfWeek: [1], hour: 9, minute: 0, timezone: 'America/New_York', count: 8, completedCount: 3 };
+		const current = draft({ recurrence, dueDate: '2026-10-26T13:00:37.123Z', hasTime: true });
+		const content = buildInitialReminderContent(makeReminder({ content: 'Renamed', recurrence }), 'Inbox');
+		for (const recurrenceTimezone of ['preserve', 'local-default'] as const) {
+			const next = reconcileReminderDraftMetadata(current, metadata(content), { ...source, recurrenceTimezone });
+			expect(next.state.recurrence).toBe(recurrence);
+			expect(next.state.dueDate).toBe(current.dueDate);
+			expect(next.state.hasTime).toBe(true);
+		}
+	});
+
+	it('resets occurrences for replaced recurrence and clears a removed schedule', () => {
+		const current = draft({ recurrence: { frequency: 'weekly', hour: 9, minute: 0 }, hasTime: true });
+		expect(reconcileReminderDraftMetadata(current, metadata('Task daily 10:00'), source).state).toMatchObject({
+			recurrence: { frequency: 'daily', hour: 10, minute: 0 }, dueDate: null, hasTime: false,
+		});
+		expect(reconcileReminderDraftMetadata(current, metadata('Task #Work !'), source).state).toMatchObject({
+			recurrence: undefined, dueDate: null, hasTime: false, project: 'Work', priority: 1,
+		});
+	});
+
+	it('uses the parsed relative date across later reconciliations', () => {
+		vi.useFakeTimers();
+		try {
+			vi.setSystemTime(new Date('2026-04-03T12:00:00Z'));
+			const parsed = metadata('Task in 5 minutes');
+			const first = reconcileReminderDraftMetadata(draft({ dueDate: null }), parsed, source);
+			expect(first.state.dueDate).toBe('2026-04-03T12:05:00.000Z');
+			vi.advanceTimersByTime(120_000);
+			const later = reconcileReminderDraftMetadata(first.state, parsed, { ...source, dueDateSetFromText: first.dueDateSetFromText });
+			expect(later.state.dueDate).toBe(first.state.dueDate);
+		} finally { vi.useRealTimers(); }
 	});
 });
 

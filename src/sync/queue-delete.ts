@@ -37,7 +37,6 @@ export async function deletePendingFiles(
 	const reconciliationPaths: string[] = [];
 	let hasTerminalFailure = false;
 	for (const failure of failures) {
-		context.pendingPaths.add(pendingChangeKey('delete', failure.path));
 		if (isQueueVersionConflict(failure.status)) {
 			reconciliationPaths.push(pendingChangeKey('delete', failure.path));
 		}

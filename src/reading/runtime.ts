@@ -88,6 +88,7 @@ export function startReading(plugin: CratePlugin): void {
 			},
 		}, authority, folder, controller.signal, [alias]);
 	})();
+	// Keep replacement views synchronous, but start their vault work after the old library drains.
 	const library = new ReadingLibrary({ ...readingVault, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
 		...{ captureArticle: async (url: string, signal: AbortSignal) => {
 			const { captureDesktopArticle } = await import('./desktop-capture');
@@ -97,7 +98,7 @@ export function startReading(plugin: CratePlugin): void {
 			pendingCaptures: async () => (await outbox()).list(),
 			queueCapture: async (url: string, title?: string) => { const item = await (await outbox()).add(url, title); schedule(); return item; },
 		} : {}),
-	}, folder, controller.signal, canAdopt);
+	}, folder, controller.signal, canAdopt, stopping.get(plugin));
 	let timer: number | undefined;
 	let lastErrorAt = 0;
 	let draining = false;
@@ -161,7 +162,7 @@ export function startReading(plugin: CratePlugin): void {
 		for (const ref of refs) vault.offref(ref);
 		plugin.syncRuntime.removeStateChangeListener(schedule);
 		lifetime.removeEventListener('abort', onAbort);
-    return Promise.allSettled([...refreshes, outboxPromise?.then(box => box.waitForIdle())]).then(() => {});
+    return Promise.allSettled([library.close(), ...refreshes, outboxPromise?.then(box => box.waitForIdle())]).then(() => {});
 	};
   const onAbort = () => { void stop(); };
 	lifetime.addEventListener('abort', onAbort, { once: true });

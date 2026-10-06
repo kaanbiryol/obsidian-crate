@@ -132,6 +132,30 @@ describe('local Reading library', () => {
 		const h = harness(); const pending = h.library.add('https://example.com'); h.controller.abort();
 		await expect(pending).rejects.toThrow(); expect(h.files.size).toBe(0);
 	});
+	it('closes admission and waits for an accepted create without starting queued writes', async () => {
+		const h = harness(), entered = deferred<void>(), release = deferred<void>();
+		const create = h.vault.create.bind(h.vault);
+		h.vault.create = async (path, content) => {
+			entered.resolve(); await release.promise;
+			await create(path, content);
+		};
+		const saving = h.library.add('https://example.com/first', undefined, false);
+		await entered.promise;
+		const queued = h.library.add('https://example.com/second', undefined, false);
+		const rejected = expect(queued).rejects.toThrow('stopped');
+		let drained = false;
+		const closing = h.library.close();
+		void closing.then(() => { drained = true; });
+		expect(h.library.close()).toBe(closing);
+		await expect(h.library.refresh()).rejects.toThrow('stopped');
+		expect(drained).toBe(false);
+		expect(h.files.size).toBe(0);
+		release.resolve();
+		await Promise.all([closing, saving, rejected]);
+		expect(drained).toBe(true);
+		expect(h.files.size).toBe(1);
+		expect(h.library.getSnapshot().items).toEqual([]);
+	});
 	it('merges independent properties without losing the latest value', async () => {
 		const h = harness(); const { item } = await h.library.add('https://example.com');
 		h.files.set(item.path, updateReadingNote(h.files.get(item.path)!, item.crate_reading_id, { tags: ['latest'] }));
@@ -143,6 +167,23 @@ describe('local Reading library', () => {
 
 describe('local article downloads', () => {
   const article = { markdown: 'Article text saved on this device.', title: 'An article', author: 'Writer' };
+  it('waits for a dispatched capture to settle and rejects its late write after closing', async () => {
+    const h = harness(), entered = deferred<void>(), pending = deferred<typeof article>();
+    const { item } = await h.library.add('https://example.com/article', undefined, false);
+    h.vault.captureArticle = vi.fn(() => { entered.resolve(); return pending.promise; });
+    const capture = h.library.retryCapture(item);
+    const rejected = expect(capture).rejects.toThrow('stopped');
+    await entered.promise;
+    let drained = false;
+    const closing = h.library.close().then(() => { drained = true; });
+    await expect(h.library.retryCapture(item)).rejects.toThrow('stopped');
+    expect(drained).toBe(false);
+    pending.resolve(article);
+    await Promise.all([closing, rejected]);
+    expect(drained).toBe(true);
+    expect(h.library.isCapturing(item)).toBe(false);
+    expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
+  });
   it('saves before downloading, skips server capture and preserves metadata and personal notes', async () => {
     const h = harness(), pending = deferred<typeof article>();
     h.vault.captureArticle = vi.fn(() => pending.promise);

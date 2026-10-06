@@ -28,25 +28,39 @@ export interface ReadingSnapshot { items: ReadingItem[]; issues: ReadingIssue[];
 export class ReadingLibrary {
 	private snapshot: ReadingSnapshot = { items: [], issues: [], loading: true, error: null };
 	private listeners = new Set<() => void>();
-	private queue: Promise<void> = Promise.resolve();
+	private queue: Promise<void>;
+	private closed = false;
+	private closing: Promise<void> | undefined;
 	private captures = new Map<string, Promise<void>>();
 	private captureErrors = new Map<string, string>();
 	private captureQueue: Promise<void> = Promise.resolve();
 	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null }>();
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
-		private canAdopt: () => boolean = () => true) {}
+		private canAdopt: () => boolean = () => true, startAfter: Promise<void> = Promise.resolve()) {
+		this.queue = startAfter;
+	}
 	getSnapshot = (): ReadingSnapshot => this.snapshot;
 	subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
 	private publish(snapshot: ReadingSnapshot): void {
-		if (this.signal.aborted) return;
+		if (this.closed || this.signal.aborted) return;
 		this.snapshot = snapshot;
 		for (const listener of this.listeners) listener();
 	}
 	private enqueue<T>(work: () => Promise<T>): Promise<T> {
-		const run = () => { this.signal.throwIfAborted(); return work(); };
+		try { this.assertActive(); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error('Reading library is stopped.')); }
+		const run = () => { this.assertActive(); return work(); };
 		const pending = this.queue.then(run, run);
 		this.queue = pending.then(() => undefined, () => undefined);
 		return pending;
+	}
+	private assertActive(): void {
+		this.signal.throwIfAborted();
+		if (this.closed) throw new Error('Reading library is stopped.');
+	}
+	/** Accepted host writes cannot be cancelled; drain both queues before replacing their owner. */
+	close(): Promise<void> {
+		this.closed = true;
+		return this.closing ??= Promise.allSettled([this.queue, this.captureQueue]).then(() => {});
 	}
 	refresh(): Promise<void> { return this.enqueue(() => this.scan()); }
 	invalidate(path: string): void {
@@ -56,11 +70,12 @@ export class ReadingLibrary {
 		const items: ReadingItem[] = [];
 		const issues: ReadingIssue[] = [...this.captureErrors].map(([path, message]) => ({ path, message }));
 		try {
+			this.assertActive();
 			const files = this.vault.files().filter(file => file.path.startsWith(`${this.folder}/`) && /\.md$/i.test(file.path));
 			const paths = new Set(files.map(file => file.path));
 			for (const path of this.cache.keys()) if (!paths.has(path)) this.cache.delete(path);
 			for (const file of files) {
-				this.signal.throwIfAborted();
+				this.assertActive();
 				if (file.size > MAX_READING_BYTES) { issues.push({ path: file.path, message: 'File exceeds the 1 MB reading limit.' }); continue; }
 				const cached = this.cache.get(file.path);
 				if (cached && file.revision && cached.revision === file.revision) {
@@ -72,9 +87,9 @@ export class ReadingLibrary {
 					if (this.canAdopt()) {
 						const original = content;
 						const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
-						this.signal.throwIfAborted();
+						this.assertActive();
 						if (adopted !== original) content = await this.vault.process(file, current => {
-							this.signal.throwIfAborted();
+							this.assertActive();
 							if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
 							return adopted;
 						});
@@ -87,7 +102,7 @@ export class ReadingLibrary {
 					else issues.push({ path: file.path, message: 'Note is waiting for import after sync.' });
 				} catch (error) {
 					this.cache.delete(file.path);
-					this.signal.throwIfAborted();
+					this.assertActive();
 					issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Could not read this note.' });
 				}
 			}
@@ -96,7 +111,7 @@ export class ReadingLibrary {
 					if (!items.some(item => item.crate_reading_id === pending.crate_reading_id || item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(pending.source_url))) items.push(pending);
 				}
 			} catch (error) {
-				this.signal.throwIfAborted();
+				this.assertActive();
 				issues.push({ path: this.folder, message: error instanceof Error ? error.message : 'Pending Reading saves need recovery.' });
 			}
 			const counts = new Map<string, number>();
@@ -109,7 +124,7 @@ export class ReadingLibrary {
 			unique.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));
 			this.publish({ items: unique, issues, loading: false, error: null });
 		} catch (error) {
-			if (this.signal.aborted) return;
+			if (this.closed || this.signal.aborted) return;
 			this.publish({ ...this.snapshot, loading: false, error: error instanceof Error ? error.message : 'Could not load reading notes.' });
 			throw error;
 		}
@@ -131,7 +146,7 @@ export class ReadingLibrary {
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });
 			const path = await readingCapturePath(this.folder, this.vault.privateFilenames?.() ? 'Article' : parseReadingNote(content)!.title, id, candidate => this.vault.occupied?.(candidate) ?? this.vault.files().some(file => portablePathKey(file.path) === portablePathKey(candidate)));
-			this.signal.throwIfAborted();
+			this.assertActive();
 			await this.vault.create(path, content);
 			await this.scan();
 			const item = { ...parseReadingNote(content)!, path };
@@ -150,7 +165,7 @@ export class ReadingLibrary {
 			const next = enrichReadingBookmark(before, clipped);
 			parseReadingNote(next);
 			await this.vault.process(destination, current => {
-				this.signal.throwIfAborted();
+				this.assertActive();
 				if (current !== before) throw new Error('The bookmark changed. Its content has been kept.');
 				return next;
 			});
@@ -159,6 +174,7 @@ export class ReadingLibrary {
 	}
 	isCapturing(item: ReadingItem): boolean { return this.captures.has(item.crate_reading_id); }
 	retryCapture(item: ReadingItem): Promise<void> {
+		try { this.assertActive(); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error('Reading library is stopped.')); }
 		const existing = this.captures.get(item.crate_reading_id);
 		if (existing) return existing;
 		const capture = this.vault.captureArticle;
@@ -176,24 +192,24 @@ export class ReadingLibrary {
 					|| !(['unavailable', 'pending'].includes(metadata.extraction_status) || youtubeVideoId(metadata.source_url)) || !isEmptyReadingCapture(content, metadata)) throw new Error('Only empty saved links can be downloaded.');
 				return file;
 			});
-			this.signal.throwIfAborted();
+			this.assertActive();
 			const article = await capture(item.source_url, this.signal);
 			await this.enqueue(async () => {
 				await this.scan();
 				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
 				await this.vault.process(file, content => {
-					this.signal.throwIfAborted();
+					this.assertActive();
 					return applyLocalArticle(content, item, article);
 				});
 				this.invalidate(item.path);
 				await this.scan();
 			});
 		}).catch((error: unknown) => {
-			if (!this.signal.aborted) this.captureErrors.set(item.path, `Link saved. ${error instanceof Error ? error.message : 'Article download failed.'}`);
+			if (!this.closed && !this.signal.aborted) this.captureErrors.set(item.path, `Link saved. ${error instanceof Error ? error.message : 'Article download failed.'}`);
 			throw error;
 		}).finally(() => {
 			this.captures.delete(item.crate_reading_id);
-			if (!this.signal.aborted) void this.refresh().catch(() => { /* Refresh already publishes its error. */ });
+			if (!this.closed && !this.signal.aborted) void this.refresh().catch(() => { /* Refresh already publishes its error. */ });
 		});
 		this.captures.set(item.crate_reading_id, work);
 		this.captureQueue = work.catch(() => undefined);
@@ -206,7 +222,7 @@ export class ReadingLibrary {
 			const file = this.vault.files().find(file => file.path === item.path);
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			const content = await this.vault.read(file);
-			this.signal.throwIfAborted();
+			this.assertActive();
 			const metadata = parseReadingNote(content);
 			if (!metadata || metadata.crate_reading_id !== item.crate_reading_id) throw new Error('This reading note changed. Refresh before opening it.');
 			return { item: { ...metadata, path: file.path }, markdown: readReadingFrontmatter(content)!.body };
@@ -220,7 +236,7 @@ export class ReadingLibrary {
 			const file = this.vault.files().find(file => file.path === item.path);
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			await this.vault.process(file, content => {
-				this.signal.throwIfAborted();
+				this.assertActive();
 				const current = parseReadingNote(content);
 				if (!current) throw new Error('This is no longer a reading note.');
 				if (readingUpdateIssue(current, item, changes)) throw new Error('This property changed elsewhere. Refresh before trying again.');

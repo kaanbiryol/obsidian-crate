@@ -118,7 +118,10 @@ saves. Its baseline readers expose readonly views with stable entry identities;
 mutations replace entries through the manifest so revision tracking and checks
 across asynchronous reads agree. Diagnostics remain outside recovery equivalence.
 Pending previews, discard preparation and post-sync baseline verification live in
-`sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions.
+`sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions and
+accepted flush batches. Each batch captures its revision snapshot and releases its
+in-flight paths once before publishing idle/error. Result recording can overlap a
+later transfer without an older finalizer clearing that transfer's pending work.
 Discard keeps baseline persistence and queue settlement in one ordered operation.
 `sync/pending-change.ts` owns the operation/path representation used by the queue,
 reconciliation, discard and Activity selection. Deletion keys use a marker that
@@ -189,6 +192,9 @@ The handler selects required `UploadCommitters` from that execution kind and pas
 them through the routes. Worker `Env` contains bindings, not optional publication
 callbacks. Upload handlers retain staging and validation; direct publication and
 coordinator forwarding remain explicit choices without fallback defaults.
+`UploadCommitInput` excludes local callback effects, and staged forwarding selects
+explicit JSON metadata. Direct `commitStagedFile` callers retain transaction-local
+effects for atomic domain receipts.
 
 `cloudflare/worker/operation-expiry.ts` owns the shared retry floor used by
 Reminders, Reading, uploads and encryption recovery. Its persisted
@@ -381,6 +387,9 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 `reading/obsidian-vault.ts` binds snapshots to Obsidian file identities and owns
 discovery, guarded reads/writes, and file-event revisions. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
+`ReadingLibrary.close()` closes admission and drains its accepted mutation and
+capture queues. Runtime shutdown waits for it alongside refreshes and outbox work;
+replacement libraries defer vault access until the previous runtime has drained.
 `reading/core/mutation-policy.ts` shares edited-field preconditions and empty
 capture checks across the library, encrypted client and plaintext Worker.
 Transport authorization, extraction consent and atomic publication stay with
@@ -549,6 +558,11 @@ The plugin scans local Markdown for its UI. The server derives notification sche
 Reminder editing uses semantic revisions captured when the form opens, plus file compare-and-swap at commit. Web mutations require an operation UUID; the transaction persists a request hash and response receipt alongside the file update. Retrying a committed request replays its result. Creation IDs remain reserved after deletion. Timed reminders persist UTC instants; recurrence metadata retains timezone, count, end date, and completion progress in a Markdown comment tied to the visible rule.
 
 `reminderSchedule.ts` resolves schedule spans for both editors. Highlighting, draft metadata and saving consume the same result type: a Chrono date or a recurrence rule from the shared repeat grammar. They do not identify a phrase and then reinterpret it with a separate parser. Timezone suffixes use Chrono's abbreviations and offsets; IANA names use the platform timezone database. Recurrence calculations use `@internationalized/date`. Named zones follow daylight-saving changes, while explicit offsets stay fixed. Editors display non-local recurrence zones and retain them through title, priority, project and repeat-picker edits.
+
+`reminders/core/reminderDraft.ts` also owns reconciliation of parsed text with
+the current draft. Both editors pass already-parsed metadata, preserving relative
+dates across renders. The plugin retains implicit initial-date provenance; the PWA
+retains explicit timezone defaults and converts canonical dates into local fields.
 
 The repeat grammar owns the cadence, weekday lists/ranges and monthly day. `reminderTime.ts` delegates the following time phrase to Chrono, retaining its complete span and time precision, so forms such as `every Monday at 9 in the morning` stay recurring. A bare `Monday 9` does not imply a time when Chrono leaves the number as text. Seconds, fractional seconds and timestamps follow Chrono's recognition. Repeat time ranges still cannot fit the single-time recurrence rule. Calendar dates following a repeat remain separate schedules, subject to the last-schedule rule.
 

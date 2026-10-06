@@ -59,7 +59,6 @@ function createFlushHarness(overrides: Partial<{
 	batchDelete: (paths: string[]) => Promise<{ success: boolean; deleted: string[] }>;
 }> = {}) {
 	const pendingPaths = new Set<string>();
-	const inFlightPaths = new Set<string>();
 	const pendingRevisions = new Map<string, number>();
 	const state: QueueState = {
 		status: overrides.status ?? 'idle',
@@ -117,9 +116,22 @@ function createFlushHarness(overrides: Partial<{
 		context: {
 			finishInitialSetup: vi.fn(async () => {}),
 			recoverUploads: vi.fn(async () => {}),
-			pendingPaths,
-			inFlightPaths,
-			pendingRevisions,
+			getPendingPathCount: () => pendingPaths.size,
+			beginBatch: () => {
+				const paths = [...pendingPaths];
+				const revisions = new Map(pendingRevisions);
+				for (const path of paths) pendingPaths.delete(path);
+				return {
+					paths,
+					requeue: (keys: Iterable<string>) => { for (const key of keys) pendingPaths.add(key); },
+					settle: (completedKeys: ReadonlySet<string>) => {
+						for (const key of completedKeys) {
+							if (!pendingPaths.has(key) && pendingRevisions.get(key) === revisions.get(key)) pendingRevisions.delete(key);
+						}
+					},
+					release: vi.fn(),
+				};
+			},
 			api: {
 				isConfigured: vi.fn(() => overrides.configured ?? true),
 				uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string) =>

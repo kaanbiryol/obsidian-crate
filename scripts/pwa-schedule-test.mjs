@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 import { mkdir } from 'node:fs/promises';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { previewEnrollmentToken } from './pwa-preview-fixtures.mjs';
 
-const { server } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
-const origin = `http://127.0.0.1:${server.address().port}`;
 const reminders = [
 	{ id: 'today', content: 'Send the draft', description: 'Review the detailed notes and include the final changes before sending the draft to the team.', dueDate: '2026-09-26' },
 	{ id: 'tomorrow', content: 'Review the launch', dueDate: '2026-09-27' },
@@ -29,12 +28,9 @@ async function fixCalendarDate(page) {
 	}, Date.parse('2026-09-26T12:00:00Z'));
 }
 
-async function checkTodayStartup(browser, reducedMotion) {
-	const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
-		timezoneId: 'UTC', serviceWorkers: 'block', reducedMotion });
+async function checkTodayStartup({ page, origin }, reducedMotion) {
 	let response = Promise.withResolvers();
 	const list = Array.from({ length: 21 }, (_, index) => ({ ...reminders[0], id: `overdue-${index}`, dueDate: '2026-09-25' }));
-	await fixCalendarDate(page);
 	await page.route('**/reminders/list?*', async route => {
 		await response.promise;
 		await route.fulfill({ json: { reminders: list, projects: ['Work'], issues: [] } });
@@ -105,7 +101,7 @@ async function checkTodayStartup(browser, reducedMotion) {
 				assert.ok(await page.evaluate(() => window.startupFrames.every(frame => frame.opacity.every(value => value === 1))), 'Background refresh must not replay the reveal');
 			}
 		}
-	} finally { response.resolve(); await page.close(); }
+	} finally { response.resolve(); }
 }
 
 async function checkScheduleFade(page, nextView, interruptWith) {
@@ -165,6 +161,7 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 // A transition-end cleanup and a new selection can be batched into one React
 // commit. Reopening the departed view must start with a fresh opaque layer.
 async function checkCleanupReversal(page) {
+	await expect(page.locator('.reminders-content > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])')).toHaveCSS('opacity', '1');
 	const result = await page.evaluate(async () => {
 		const shell = document.querySelector('.pwa-reminders-view');
 		const container = shell.querySelector('.reminders-content > .pwa-tab-transition');
@@ -315,148 +312,210 @@ async function checkRapidSwitches(page, dock = false) {
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 
-try {
-	await mkdir('test-results/schedule', { recursive: true });
-	for (const engine of [chromium, webkit]) {
-		const browser = await engine.launch();
+// Assets are immutable across scenarios; browsers, origins, routes and storage
+// belong to each named test and are always released after a failure.
+let previewAssets;
+function scheduleScenario(engine, name, run, { reducedMotion = 'no-preference', list = reminders } = {}) {
+	test(`PWA schedule ${engine.name()}: ${name}`, { timeout: 90000 }, async () => {
+		previewAssets ??= buildPwaPreviewAssets();
+		const { server } = await listenPwaPreviewServer({ port: 0, assets: await previewAssets });
+		const origin = `http://127.0.0.1:${server.address().port}`;
+		let browser, page;
 		try {
-			await checkTodayStartup(browser, 'no-preference');
-			await checkTodayStartup(browser, 'reduce');
-			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, timezoneId: 'UTC', serviceWorkers: 'block' });
+			await mkdir('test-results/schedule', { recursive: true });
+			browser = await engine.launch();
+			const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+				timezoneId: 'UTC', serviceWorkers: 'block', reducedMotion });
+			page = await context.newPage();
 			const errors = [];
 			page.on('pageerror', error => errors.push(error.message));
 			await fixCalendarDate(page);
-			let empty = false, list = reminders;
-			await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders: empty ? [] : list, projects: ['Work'], issues: [] } }));
+			await page.route('**/reminders/list?*', route => route.fulfill({ json: { reminders: list, projects: ['Work'], issues: [] } }));
 			const live = page.locator('.pwa-reminders-view:not([data-pwa-opening])');
 			const chips = live.getByRole('group', { name: 'Reminder dates' });
 			const chip = name => chips.getByRole('button', { name, exact: true });
 			const dock = live.locator('.pwa-dock');
 			const row = id => live.locator(`[data-reminder-id="${id}"]`);
-			const geometry = () => page.locator('.pwa-schedule-switcher').evaluate(element => {
-				const rect = node => { const box = node.getBoundingClientRect(); return [box.x, box.y, box.width, box.height]; };
-				return [rect(element), ...Array.from(element.querySelectorAll('.pwa-schedule-control, .pwa-schedule-chip'), rect)];
-			});
-			for (const initialTab of ['today', 'upcoming']) {
-				const app = Promise.withResolvers();
-				await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
-				try {
-					await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${initialTab}&upcomingDays=7`, { waitUntil: 'commit' });
-					const opening = page.locator('.pwa-launch-splash');
-					await expect(opening.locator('.pwa-schedule-switcher')).toBeHidden();
-					await expect(opening.locator('.view-header-title')).toHaveText('Reminders');
-					await expect(opening.locator('.pwa-schedule-chip[aria-pressed="true"]')).toHaveText(initialTab === 'today' ? 'Today' : 'Upcoming');
-					const openingGeometry = await geometry();
-					app.resolve();
-					await expect(live).toBeVisible();
-					await expect(live.locator('.view-header-title')).toHaveText('Reminders');
-					assert.deepEqual(await geometry(), openingGeometry, 'Chips must not shift between the cached shell and the live app');
-					await expect(chip(initialTab === 'today' ? 'Today' : 'Upcoming')).toHaveAttribute('aria-pressed', 'true');
-					await expect(dock.getByRole('button', { name: 'Reminders', exact: true })).toHaveAttribute('aria-current', 'page');
-					await expect(dock.locator('.pwa-dock__indicator')).toHaveCSS('opacity', '1');
-					await expect(chips).toHaveCSS('opacity', '1');
-				} finally { app.resolve(); await page.unroute('**/notifications/app.js*'); }
-			}
-			await expect(row('tomorrow')).toBeVisible();
-			await expect(row('later')).toBeVisible();
-			await expect(row('today')).toHaveCount(0);
-			await expect(row('outside-range')).toHaveCount(0);
-			await expect(row('completed')).toHaveCount(0);
-			await expect(live.locator('.upcoming-date-header')).toHaveCount(2);
-			await expect(live.locator('.view-header-count')).toHaveText('2 reminders');
-			// Observe unmodified native reversals before the separate fade checks
-			// seek CSS animations; finished seeked effects can affect later reversals.
-			await checkRapidSwitches(page);
-			await checkCleanupReversal(page);
-			await checkScheduleFade(page, 'Today');
-			await checkScheduleFade(page, 'Upcoming');
-			await checkScheduleFade(page, 'Today', 'Upcoming');
-			await page.emulateMedia({ reducedMotion: 'reduce' });
-			await checkScheduleFade(page, 'Today');
-			await checkScheduleFade(page, 'Upcoming');
-			await checkRapidSwitches(page);
-			// Higher contrast adds borders to the selection. Percentage transforms
-			// travel by its border box, which can differ from computed content width.
-			await page.emulateMedia({ reducedMotion: 'no-preference', contrast: 'more' });
-			const upcomingButton = await chip('Upcoming').elementHandle();
-			await chip('Today').tap();
-			await expect(row('today')).toBeVisible();
-			await expect(row('tomorrow')).toHaveCount(0);
-			await expect(live.locator('.view-header-count')).toHaveText('1 reminder');
 			const control = chips.locator('.pwa-schedule-control');
-			await expect.poll(() => control.evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element, '::after').transform).m41)).toBe(0);
-			const slide = await chips.evaluate(async element => {
-				const control = element.querySelector('.pwa-schedule-control');
-				element.querySelector('[aria-pressed="false"]').click();
-				const positions = [], start = performance.now();
-				while (performance.now() - start < 260) {
-					await new Promise(requestAnimationFrame);
-					positions.push(new DOMMatrixReadOnly(getComputedStyle(control, '::after').transform).m41);
-				}
-				const style = getComputedStyle(control, '::after');
-				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
-					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-				return { positions, destination: parseFloat(style.width) + borders };
-			});
-			assert.ok(slide.positions.some(x => x > 0 && x < slide.destination), 'The shared selection must slide between segments');
-			await expect.poll(() => control.evaluate(element => {
-				const style = getComputedStyle(element, '::after');
-				const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
-					+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-				return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width) - borders);
-			}), { message: 'The selection must settle under Upcoming' }).toBeLessThan(1);
-			await page.emulateMedia({ contrast: 'no-preference' });
-			await chip('Upcoming').focus();
-			await page.keyboard.press('Space');
-			await expect(chip('Upcoming')).toBeFocused();
-			await expect(row('tomorrow')).toBeVisible();
-			assert.equal(await upcomingButton.evaluate(element => element.isConnected), true, 'Switching lists must retain the chip controls');
-			for (const name of ['Today', 'Upcoming', 'Today', 'Upcoming']) await chip(name).tap();
-			await expect(chip('Upcoming')).toHaveAttribute('aria-pressed', 'true');
-			await expect(chips.locator('[aria-pressed="true"]')).toHaveCount(1);
-			await expect(live.locator('.pwa-tab-panel')).toHaveCount(2);
-			await dock.getByRole('button', { name: 'Inbox', exact: true }).tap();
-			await expect(chips).toHaveCount(0);
-			await dock.getByRole('button', { name: 'Reminders', exact: true }).tap();
-			await expect(chip('Today')).toHaveAttribute('aria-pressed', 'true');
-			await expect(row('today')).toBeVisible();
-			await checkRapidSwitches(page, true);
-			for (const theme of ['dark', 'light']) for (const width of [320, 390, 1024]) {
-				await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-				await page.setViewportSize({ width, height: 844 });
-				for (const name of ['Today', 'Upcoming']) {
-					await chip(name).tap();
-					await expect(chip(name)).toHaveAttribute('aria-pressed', 'true');
-					await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
-					await expect(chip(name)).toHaveCSS('transition-duration', '0s');
-					assert.equal(await control.evaluate(element => getComputedStyle(element, '::after').transitionDuration), '0s');
-					const bounds = await chips.getByRole('button').evaluateAll(buttons => buttons.map(button => {
-						const rect = button.getBoundingClientRect(); return { height: rect.height, right: rect.right, left: rect.left };
-					}));
-					assert.ok(bounds.every(box => box.height >= 44 && box.left >= 0 && box.right <= width));
-					assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-					await page.screenshot({ path: `test-results/schedule/${engine.name()}-${theme}-${width}-${name.toLowerCase()}.png` });
-				}
-			}
-			// Reversing while scrolled must retain the same cards in the viewport.
-			list = Array.from({ length: 100 }, (_, index) => ({ ...reminders[0], id: `scroll-${index}`, description: index % 2 ? reminders[0].description : '' }));
-			await page.emulateMedia({ reducedMotion: 'no-preference' });
-			await page.setViewportSize({ width: 390, height: 844 });
-			await page.reload();
-			await chip('Today').tap();
-			await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
-			await live.locator('.reminders-view-scroll').evaluate(element => { element.scrollTop = 2000; });
-			await expect.poll(() => live.locator('.reminders-view-scroll').evaluate(element => element.scrollTop)).toBe(2000);
-			await checkRapidSwitches(page);
-			empty = true;
-			await page.reload();
-			await expect(live.getByRole('heading', { name: 'No upcoming reminders', exact: true })).toBeVisible();
-			await chip('Today').tap();
-			await expect(live.getByRole('heading', { name: 'Nothing due today', exact: true })).toBeVisible();
-			await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
-			await checkScheduleFade(page, 'Upcoming');
+			const open = async (tab = 'upcoming') => {
+				await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${tab}&upcomingDays=7`);
+				await expect(live).toBeVisible();
+				await expect(live).not.toHaveAttribute('data-pwa-loading');
+				await expect(chips).toBeVisible();
+				await expect(chip(tab === 'today' ? 'Today' : 'Upcoming')).toHaveAttribute('aria-pressed', 'true');
+				await expect(chips).toHaveCSS('opacity', '1');
+				await expect(live.locator('.reminders-content')).toHaveCSS('opacity', '1');
+				await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+			};
+			await run({ page, origin, live, chips, chip, dock, row, control, open, engine });
 			assert.deepEqual(errors, []);
-			console.log(`${engine.name()}: schedule chips, keyboard focus, filters, empty states, launch, and responsive themes passed`);
-		} finally { await browser.close(); }
+		} catch (error) {
+			if (page) await page.screenshot({ path: `test-results/schedule/${engine.name()}-${name.replace(/[^a-z0-9]+/gi, '-')}-failure.png` });
+			throw error;
+		} finally {
+			try { await browser?.close(); }
+			finally { await new Promise(resolve => server.close(resolve)); }
+		}
+	});
+}
+
+async function checkLaunchGeometry({ page, origin, live, chips, chip, dock, initialTab }) {
+	const geometry = () => page.locator('.pwa-schedule-switcher').evaluate(element => {
+		const rect = node => { const box = node.getBoundingClientRect(); return [box.x, box.y, box.width, box.height]; };
+		return [rect(element), ...Array.from(element.querySelectorAll('.pwa-schedule-control, .pwa-schedule-chip'), rect)];
+	});
+
+	const app = Promise.withResolvers();
+	await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
+	try {
+		await page.goto(`${origin}/notifications?token=${previewEnrollmentToken}&folder=Reminders&tab=${initialTab}&upcomingDays=7`, { waitUntil: 'commit' });
+		const opening = page.locator('.pwa-launch-splash');
+		await expect(opening.locator('.pwa-schedule-switcher')).toBeHidden();
+		await expect(opening.locator('.view-header-title')).toHaveText('Reminders');
+		await expect(opening.locator('.pwa-schedule-chip[aria-pressed="true"]')).toHaveText(initialTab === 'today' ? 'Today' : 'Upcoming');
+		const openingGeometry = await geometry();
+		app.resolve();
+		await expect(live).toBeVisible();
+		await expect(live.locator('.view-header-title')).toHaveText('Reminders');
+		assert.deepEqual(await geometry(), openingGeometry, 'Chips must not shift between the cached shell and the live app');
+		await expect(chip(initialTab === 'today' ? 'Today' : 'Upcoming')).toHaveAttribute('aria-pressed', 'true');
+		await expect(dock.getByRole('button', { name: 'Reminders', exact: true })).toHaveAttribute('aria-current', 'page');
+		await expect(dock.locator('.pwa-dock__indicator')).toHaveCSS('opacity', '1');
+		await expect(chips).toHaveCSS('opacity', '1');
+	} finally { app.resolve(); await page.unroute('**/notifications/app.js*'); }
+}
+
+async function checkFiltersAndNavigation({ live, chips, chip, dock, row, open }) {
+	await open();
+	await expect(row('tomorrow')).toBeVisible();
+	await expect(row('later')).toBeVisible();
+	await expect(row('today')).toHaveCount(0);
+	await expect(row('outside-range')).toHaveCount(0);
+	await expect(row('completed')).toHaveCount(0);
+	await expect(live.locator('.upcoming-date-header')).toHaveCount(2);
+	await expect(live.locator('.view-header-count')).toHaveText('2 reminders');
+	for (const name of ['Today', 'Upcoming', 'Today', 'Upcoming']) await chip(name).tap();
+	await expect(chip('Upcoming')).toHaveAttribute('aria-pressed', 'true');
+	await expect(chips.locator('[aria-pressed="true"]')).toHaveCount(1);
+	await expect(live.locator('.pwa-tab-panel')).toHaveCount(2);
+	await dock.getByRole('button', { name: 'Inbox', exact: true }).tap();
+	await expect(chips).toHaveCount(0);
+	await dock.getByRole('button', { name: 'Reminders', exact: true }).tap();
+	await expect(chip('Today')).toHaveAttribute('aria-pressed', 'true');
+	await expect(row('today')).toBeVisible();
+}
+
+async function checkContrastAndKeyboard({ page, live, chips, chip, row, control, open }) {
+	await open();
+	// Higher contrast adds borders to the selection. Percentage transforms
+	// travel by its border box, which can differ from computed content width.
+	await page.emulateMedia({ reducedMotion: 'no-preference', contrast: 'more' });
+	const upcomingButton = await chip('Upcoming').elementHandle();
+	await chip('Today').tap();
+	await expect(row('today')).toBeVisible();
+	await expect(row('tomorrow')).toHaveCount(0);
+	await expect(live.locator('.view-header-count')).toHaveText('1 reminder');
+	await expect.poll(() => control.evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element, '::after').transform).m41)).toBe(0);
+	const slide = await chips.evaluate(async element => {
+		const control = element.querySelector('.pwa-schedule-control');
+		element.querySelector('[aria-pressed="false"]').click();
+		const positions = [], start = performance.now();
+		while (performance.now() - start < 260) {
+			await new Promise(requestAnimationFrame);
+			positions.push(new DOMMatrixReadOnly(getComputedStyle(control, '::after').transform).m41);
+		}
+		const style = getComputedStyle(control, '::after');
+		const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+			+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+		return { positions, destination: parseFloat(style.width) + borders };
+	});
+	assert.ok(slide.positions.some(x => x > 0 && x < slide.destination), 'The shared selection must slide between segments');
+	await expect.poll(() => control.evaluate(element => {
+		const style = getComputedStyle(element, '::after');
+		const borders = style.boxSizing === 'border-box' ? 0 : parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+			+ parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+		return Math.abs(new DOMMatrixReadOnly(style.transform).m41 - parseFloat(style.width) - borders);
+	}), { message: 'The selection must settle under Upcoming' }).toBeLessThan(1);
+	await page.emulateMedia({ contrast: 'no-preference' });
+	await chip('Upcoming').focus();
+	await page.keyboard.press('Space');
+	await expect(chip('Upcoming')).toBeFocused();
+	await expect(row('tomorrow')).toBeVisible();
+	assert.equal(await upcomingButton.evaluate(element => element.isConnected), true, 'Switching lists must retain the chip controls');
+}
+
+async function checkResponsiveLayouts({ page, engine, live, chips, chip, control, open }) {
+	await open();
+	for (const theme of ['dark', 'light']) for (const width of [320, 390, 1024]) {
+		await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+		await page.setViewportSize({ width, height: 844 });
+		for (const name of ['Today', 'Upcoming']) {
+			await chip(name).tap();
+			await expect(chip(name)).toHaveAttribute('aria-pressed', 'true');
+			await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+			await expect(chip(name)).toHaveCSS('transition-duration', '0s');
+			assert.equal(await control.evaluate(element => getComputedStyle(element, '::after').transitionDuration), '0s');
+			const bounds = await chips.getByRole('button').evaluateAll(buttons => buttons.map(button => {
+				const rect = button.getBoundingClientRect(); return { height: rect.height, right: rect.right, left: rect.left };
+			}));
+			assert.ok(bounds.every(box => box.height >= 44 && box.left >= 0 && box.right <= width));
+			assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+			await page.screenshot({ path: `test-results/schedule/${engine.name()}-${theme}-${width}-${name.toLowerCase()}.png` });
+		}
 	}
-} finally { await new Promise(resolve => server.close(resolve)); }
+}
+
+async function checkScrolledReversals({ page, live, chip, open }) {
+	await open('today');
+	await chip('Today').tap();
+	await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+	await live.locator('.reminders-view-scroll').evaluate(element => { element.scrollTop = 2000; });
+	await expect.poll(() => live.locator('.reminders-view-scroll').evaluate(element => element.scrollTop)).toBe(2000);
+	await checkRapidSwitches(page);
+}
+
+async function checkEmptyStates({ page, live, chip, open }) {
+	await open();
+	await expect(live.getByRole('heading', { name: 'No upcoming reminders', exact: true })).toBeVisible();
+	await chip('Today').tap();
+	await expect(live.getByRole('heading', { name: 'Nothing due today', exact: true })).toBeVisible();
+	await expect(live.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+	await checkScheduleFade(page, 'Upcoming');
+}
+
+for (const engine of [chromium, webkit]) {
+	for (const reducedMotion of ['no-preference', 'reduce']) {
+		scheduleScenario(engine, `cold and cached startup, ${reducedMotion}`, fixture => checkTodayStartup(fixture, reducedMotion), { reducedMotion });
+		scheduleScenario(engine, `natural schedule reversals, ${reducedMotion}`, async ({ page, open }) => {
+			await open();
+			await checkRapidSwitches(page);
+		}, { reducedMotion });
+		scheduleScenario(engine, `schedule fades, ${reducedMotion}`, async ({ page, open }) => {
+			await open();
+			await checkScheduleFade(page, 'Today');
+			await checkScheduleFade(page, 'Upcoming');
+			if (reducedMotion !== 'reduce') await checkScheduleFade(page, 'Today', 'Upcoming');
+		}, { reducedMotion });
+	}
+	for (const initialTab of ['today', 'upcoming']) {
+		scheduleScenario(engine, `${initialTab} launch shell geometry`, fixture => checkLaunchGeometry({ ...fixture, initialTab }));
+	}
+	scheduleScenario(engine, 'filters and dock navigation', checkFiltersAndNavigation);
+	scheduleScenario(engine, 'transition cleanup and immediate reopening', async ({ page, chip, open }) => {
+		// Prime the visited tab explicitly before testing batched cleanup and reopening.
+		await open('today');
+		await chip('Upcoming').tap();
+		await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
+		await checkCleanupReversal(page);
+	});
+	scheduleScenario(engine, 'high-contrast selection and keyboard focus', checkContrastAndKeyboard);
+	scheduleScenario(engine, 'rapid dock reversals', async ({ page, open }) => {
+		await open('today');
+		await checkRapidSwitches(page, true);
+	});
+	scheduleScenario(engine, 'responsive themes and accessible touch targets', checkResponsiveLayouts);
+	scheduleScenario(engine, 'scrolled schedule reversals preserve card geometry', checkScrolledReversals, {
+		list: Array.from({ length: 100 }, (_, index) => ({ ...reminders[0], id: `scroll-${index}`, description: index % 2 ? reminders[0].description : '' })),
+	});
+	scheduleScenario(engine, 'empty states preserve schedule fades', checkEmptyStates, { list: [] });
+}

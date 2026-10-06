@@ -4,6 +4,7 @@ import type { ReminderDraftContentState } from '@/reminders/core/reminderDraft';
 import { buildInboxViewModel } from '@/reminders/ui/views/viewModels';
 import {
 	applyReminderTextUpdate,
+	deriveDraftPatchFromContent,
 	hasReminderDraftTitle,
 } from './reminder-state';
 import { reorderProjectReminders, toSharedReminder } from './reminder-list-state';
@@ -43,6 +44,10 @@ function createReminderRecord(id: string, lineNumber: number, overrides: Partial
 }
 
 describe('PWA reminder state', () => {
+	it.each(['Task', 'Task daily 09:00'])('clears an orphan time restored without a date when reconciling %s', content => {
+		const draft = createModalDraft({ content, dueTime: '09:00' });
+		expect({ ...draft, ...deriveDraftPatchFromContent(draft, ['Inbox']) }).toMatchObject({ dueDate: '', dueTime: '' });
+	});
     it('clears recurrence without allowing the old inline rule to return', () => {
         const draft = createModalDraft({ content: 'Task every week', recurrence: { frequency: 'weekly' } });
         const patch = applyReminderTextUpdate(draft, ['Inbox'], { recurrence: null });
