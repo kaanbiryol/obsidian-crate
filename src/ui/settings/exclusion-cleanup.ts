@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { openConfirmationModal } from '../confirmation-modal';
-import { runButtonTask } from './action-helpers';
+import { getErrorMessage, runButtonTask } from './action-helpers';
 
 export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePlugin): void {
 	new Setting(containerEl)
@@ -16,7 +16,8 @@ export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePl
 					idleText: 'Review and remove',
 					runningText: 'Checking...',
 					task: async () => {
-						const paths = await plugin.syncRuntime.previewIgnoredRemoteFiles();
+						const review = await plugin.syncRuntime.createExclusionCleanupReview();
+						const { paths } = review;
 						if (paths.length === 0) return null;
 						const confirmed = await openConfirmationModal(plugin.app, {
 							title: 'Remove excluded server files',
@@ -29,15 +30,15 @@ export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePl
 							confirmText: 'Remove remote copies',
 							warning: true,
 						});
-						return confirmed ? plugin.syncRuntime.purgeIgnoredRemoteFiles() : undefined;
+						return confirmed ? review.execute() : undefined;
 					},
 					onSuccess: result => {
 						if (result === null) new Notice('No excluded server files found');
 						else if (result?.errors.length) new Notice(`Removed ${result.deleted.length} files; ${result.errors.length} failed`);
 						else if (result) new Notice(`Removed ${result.deleted.length} excluded server files`);
 					},
-					onError: () => {
-						new Notice('Could not remove excluded server files');
+					onError: error => {
+						new Notice(`Could not remove excluded server files: ${getErrorMessage(error)}`);
 					},
 				});
 			}));

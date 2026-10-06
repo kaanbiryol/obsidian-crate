@@ -10,7 +10,7 @@ import { logMutation } from './request-diagnostics';
 import { limitNotificationRequest } from './rate-limit';
 import { rememberAuthenticatedRequest } from './admission-state';
 import { coordinatedUpload } from './staged-upload-dispatch';
-import { affectsNotifications } from './notification-mutations';
+import { apiRoutePolicy } from './routes/policy';
 import { armNotificationCoordinator } from './notification-lifecycle';
 import { isCrateMutation } from '../../protocol';
 import { corsHeaders, corsResponse } from './cors';
@@ -69,7 +69,9 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		// One-use public Reading grants must be redeemed under the coordinator.
 		// Their bounded pre-auth admission runs above; ordinary routes authenticate
 		// and authorize before entering the coordinator below.
-		const readingGrant = method === 'POST' && (['/reading/exchange', '/reading/handoff'].includes(path) || shortcut?.kind === 'exchange');
+		const routePolicy = apiRoutePolicy(path, method);
+		const routeExecution = routePolicy?.execution;
+		const readingGrant = routeExecution?.kind === 'reading-grant';
 		if (readingGrant && execution.kind !== 'coordinator') {
 			const forwarded = new Request(request);
 			forwarded.headers.set('X-Crate-Internal-Mutation', '1');
@@ -93,28 +95,26 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return withRequestId(corsResponse({ error: 'Token is not authorized for this operation' }, 403), requestId, started);
 		const encryption = authResult.encryption ?? null;
 		assertRequestEncryption(request, encryption);
-		if (execution.kind === 'public' && ((path === '/sync/upload' && method === 'PUT') || (path === '/sync/batch-upload' && method === 'POST'))) {
+		if (execution.kind === 'public' && routeExecution?.kind === 'transfer') {
 			// Stream without decoding or hashing on the public Worker's CPU budget.
 			// The transfer object reauthenticates after queuing, before reading bytes.
-			const response = await forwardTransferRequest(request, env, path === '/sync/upload' ? '/sync-upload' : '/sync-batch-upload');
+			const response = await forwardTransferRequest(request, env, routeExecution.path);
 			return withRequestId(response, response.headers.get('X-Crate-Request-Id') ?? requestId, started);
 		}
 		const mutation = isCrateMutation(path, method);
-		if (execution.kind === 'coordinator' && (path.startsWith('/reading/') || path === '/features' && method === 'POST')) await armNotificationCoordinator(execution.state);
-		const notificationMutation = await affectsNotifications(request);
-		if ((notificationMutation || path.startsWith('/reading/') || path === '/features') && execution.kind !== 'coordinator') {
+		if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator') {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 			const forwarded = new Request(request);
 			forwarded.headers.set('X-Crate-Internal-Mutation', '1');
 			const forwardedResponse = await stub.fetch(forwarded);
 			return withRequestId(forwardedResponse, forwardedResponse.headers.get('X-Crate-Request-Id') ?? requestId, started);
 		}
-		if (!mutation && execution.kind !== 'coordinator' && ['/sync/check', '/sync/manifest', '/reminders/list'].includes(path)) {
+		if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection) {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 			const ensured = await stub.fetch('https://do/ensure', { method: 'POST' });
 			if (!ensured.ok) throw new Error('Unable to initialize notification processing');
 		}
-		if (notificationMutation && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);
+		if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);
 		if (mutation && execution.kind !== 'coordinator') {
 			const maintenance = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/maintenance'));
 			const scheduled = await maintenance.fetch('https://do/maintain', { method: 'POST' });

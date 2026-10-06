@@ -163,14 +163,20 @@ export class SyncRuntime {
 		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.syncEngine?.getRequestDiagnostics() ?? this.apiClient?.getRequestDiagnostics(), this.serverStatus.getDiagnosticVersionInfo());
 	}
 
-	async previewIgnoredRemoteFiles(): Promise<string[]> {
-		if (!this.syncEngine) throw new Error('Sync is not configured');
-		return this.syncEngine.previewIgnoredRemoteFiles();
-	}
-
-	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
-		if (!this.syncEngine) throw new Error('Sync is not configured');
-		return this.syncEngine.purgeIgnoredRemoteFiles();
+	async createExclusionCleanupReview() {
+		const engine = this.syncEngine;
+		if (!engine) throw new Error('Sync is not configured');
+		const verify = () => {
+			if (engine !== this.syncEngine) throw new DOMException('Sync connection changed. Review the excluded server files again.', 'AbortError');
+		};
+		const review = await engine.createExclusionCleanupReview();
+		verify();
+		return { ...review, execute: async () => {
+			verify();
+			const result = await review.execute();
+			verify();
+			return result;
+		} };
 	}
 
 	async createConflictReview(record: ConflictRecord) {

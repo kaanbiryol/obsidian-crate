@@ -13,7 +13,7 @@ const pending: PendingReminderChange = {
 function render(overrides: Partial<Parameters<typeof reminderSyncStatus>[0]> = {}) {
 	return renderToStaticMarkup(React.createElement(PwaSyncStatusIndicator, {
 		...reminderSyncStatus({
-		changes: [], isOffline: false, refreshing: false, dataMode: 'live', error: null, storageError: null,
+		changes: [], isOffline: false, refreshing: false, indexingProgress: null, dataMode: 'live', error: null, storageError: null,
 		...overrides,
 		}), onShowStatus: () => undefined,
 	}));

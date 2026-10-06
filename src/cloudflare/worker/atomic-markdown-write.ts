@@ -1,4 +1,5 @@
 import { deleteBucketObjectsOrQueue } from './maintenance/object-cleanup';
+import { publishedChangelogStatement, retainReplacedVersionStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -12,7 +13,6 @@ import { FileVersionConflictError } from './storage';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	collectCleanupKeys,
-	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 } from './sync-storage';
 
@@ -95,37 +95,6 @@ function sourceMutation(
 		);
 }
 
-function changelogStatement(db: D1Database, staged: StagedMarkdownFile): D1PreparedStatement {
-	return db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
-		SELECT ?, 'put', ?, ?, ?
-		WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
-		.bind(staged.path, staged.hash, staged.size, staged.objectKey, ...filePathArgs(staged.path), staged.objectKey);
-}
-
-function retainVersionStatement(
-	db: D1Database,
-	previous: { path: string; hash: string; size: number; storageKey: string },
-	source: StagedMarkdownFile,
-	destination: StagedMarkdownFile,
-): D1PreparedStatement {
-	return db.prepare(`INSERT OR IGNORE INTO file_versions
-		(storage_key, path, hash, size, reason, expires_at)
-		SELECT ?, ?, ?, ?, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})
-		WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
-		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
-		.bind(
-			previous.storageKey,
-			previous.path,
-			previous.hash,
-			previous.size,
-			Date.now() + FILE_VERSION_RETENTION_MS,
-			...filePathArgs(source.path),
-			source.objectKey,
-			...filePathArgs(destination.path),
-			destination.objectKey,
-		);
-}
-
 export async function writeCommittedMarkdownFilePair(
 	bucket: R2Bucket,
 	db: D1Database,
@@ -190,9 +159,9 @@ export async function writeCommittedMarkdownFilePair(
 			sourceMutation(db, source, destination),
 			...recordEncryptedFile(db, source.path, source.objectKey, sourceEncryption.descriptor),
 			...recordEncryptedFile(db, destination.path, destination.objectKey, destinationEncryption.descriptor),
-			changelogStatement(db, destination),
-			changelogStatement(db, source),
-			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
+			publishedChangelogStatement(db, destination),
+			publishedChangelogStatement(db, source),
+			...previousVersions.map(previous => retainReplacedVersionStatement(db, previous, [source, destination])),
 			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
 			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
 			finishStagedUpload(db, source.objectKey, source.path),

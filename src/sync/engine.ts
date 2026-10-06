@@ -33,7 +33,7 @@ import {
 	shouldIgnoreSyncPath,
 } from './engine-ignore';
 import { hasLocalFileChanges } from './local-file-changes';
-import { deleteFilesInBatches } from './delete-batches';
+import { createExclusionCleanupReview } from './engine-exclusion-cleanup';
 import {
 	runForceFullSyncWorkflow,
 	runInitialSyncWorkflow,
@@ -395,27 +395,16 @@ export class SyncEngine {
 		));
 	}
 
-	async previewIgnoredRemoteFiles(): Promise<string[]> {
-		const manifest = await this.api.getManifest();
-		return Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
-	}
-
-	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
-		return this.trackWork(async () => {
-			const manifest = await this.api.getManifest();
-			const paths = Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
-			this.lifecycle.throwIfDestroyed();
-			const result = await deleteFilesInBatches({
-				batchDelete: (batchPaths, expectedHashes, expectedRevisions) =>
-					this.retryWithBackoff(() => this.files.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
-			}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
-			for (const path of result.deleted) this.localManifest.removeEntry(path);
-			await this.localManifest.save();
-			if (result.outcome === 'cancelled') throw createAbortError('Remote cleanup cancelled');
-			return {
-				deleted: result.deleted,
-				errors: result.errors.map(error => `${error.path}: ${error.error}`),
-			};
+	async createExclusionCleanupReview() {
+		return createExclusionCleanupReview({
+			getManifest: () => this.api.getManifest(),
+			getIgnorePatterns: () => this.settings.ignorePatterns,
+			shouldIgnore: path => this.shouldIgnore(path),
+			assertActive: () => this.lifecycle.throwIfDestroyed(),
+			runExclusive: operation => this.runExclusiveOperation(operation),
+			retryWithBackoff: operation => this.retryWithBackoff(operation),
+			batchDelete: (...args) => this.files.batchDelete(...args),
+			manifest: this.localManifest,
 		});
 	}
 

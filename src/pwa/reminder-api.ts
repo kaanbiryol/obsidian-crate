@@ -2,6 +2,11 @@ import type { ApiFetch, ReminderRecord, ReminderSourceIssue } from './types';
 import { isReminderList } from './reminder-storage-validation';
 import { parseReminderSourceIssues } from './reminder-source-issues';
 
+export interface ReminderIndexingProgress {
+	indexedFiles: number;
+	totalFiles: number;
+}
+
 /** Validate the complete revision before either the UI or its cache accepts it. */
 export function parseReminderListResponse(value: unknown, folderPath: string): {
 	reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[];

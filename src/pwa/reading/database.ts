@@ -1,4 +1,5 @@
-import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
+import type { IDBPDatabase, DBSchema } from 'idb';
+import { openSingleStoreDatabase } from '../single-store-database';
 import { encodeReadingValue, decodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
 
@@ -7,16 +8,17 @@ let opening: Promise<IDBPDatabase<ReadingDatabase>> | undefined;
 /** Shared database lifetime for caches, durable changes, and encryption migration. */
 export function readingDatabase(): Promise<IDBPDatabase<ReadingDatabase>> {
   if (opening) return opening;
-  let abandoned = false;
-  const request = openDB<ReadingDatabase>('crate-reading-v1', 1, { upgrade(db, _old, _new, tx) {
-    if (abandoned) { tx.abort(); return; }
-    db.createObjectStore('values');
-  }, blocking() { void opening?.then(db => db.close()); opening = undefined; } });
-  opening = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => { abandoned = true; opening = undefined; reject(new Error('Reading storage is blocked. Close other Crate tabs and retry.')); }, 4000);
-    request.then(db => { clearTimeout(timeout); if (abandoned) db.close(); else resolve(db); }, error => { clearTimeout(timeout); opening = undefined; reject(error instanceof Error ? error : new Error('Reading storage is unavailable.')); });
+  const request = openSingleStoreDatabase<ReadingDatabase>('crate-reading-v1', 'values', {
+    messages: {
+      blocked: 'Reading storage is blocked. Close other Crate tabs and retry.',
+      unsupported: 'Reading storage uses an unsupported format. Update Crate before retrying.',
+      unavailable: 'Reading storage is unavailable. Check browser storage permissions and retry.',
+    },
+    onClose: () => { if (opening === request) opening = undefined; },
   });
-  return opening;
+  opening = request;
+  void request.catch(() => { if (opening === request) opening = undefined; });
+  return request;
 }
 /** Storage internals retain raw keys so exports can preserve unknown records. */
 export async function readReadingValue(key: string): Promise<unknown> {

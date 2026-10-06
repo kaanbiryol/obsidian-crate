@@ -68,6 +68,13 @@ Logout invalidates in-memory authority and removes private rendered content befo
 
 ## Reading storage validation
 
+Reading's version-one database uses the same bounded single-store opener as the
+encryption databases. It rejects unknown stores, unexpected key configuration,
+and newer versions without modifying their data. Blocked requests fail promptly;
+the three-second deadline aborts pending upgrades and fences late connections.
+Closing an obsolete connection releases Reading's cached handle so a later open
+can retry.
+
 Reading validates session fields, list and article caches, drafts and pending commands
 when reading browser storage. A damaged pending queue blocks dispatch and retains its
 original records for **Export earlier changes** or **Export Reading data**. Validation

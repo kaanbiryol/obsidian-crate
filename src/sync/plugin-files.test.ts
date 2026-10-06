@@ -49,6 +49,6 @@ describe('plugin file sync scope', () => {
 			[`${pluginsDir}/other-plugin/data.json`]: entry,
 			[`${pluginsDir}/crate/data.json`]: entry,
 		} });
-		await expect(harness.engine.previewIgnoredRemoteFiles()).resolves.toEqual([`${pluginsDir}/crate/data.json`]);
+		expect((await harness.engine.createExclusionCleanupReview()).paths).toEqual([`${pluginsDir}/crate/data.json`]);
 	});
 });

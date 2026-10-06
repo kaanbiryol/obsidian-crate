@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { fetchReadyReminderList, parseReminderListResponse } from '../reminder-api';
+import { fetchReadyReminderList, parseReminderListResponse, type ReminderIndexingProgress } from '../reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
@@ -16,6 +16,7 @@ export interface ReminderSyncState {
 	projects: string[];
 	loading: boolean;
 	refreshing: boolean;
+	indexingProgress: ReminderIndexingProgress | null;
 	error: string | null;
 	issues: ReminderSourceIssue[];
 	dataMode: DataMode;
@@ -52,6 +53,7 @@ export function useReminderSync({
 	const { reminders, projects } = snapshot;
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const [indexingProgress, setIndexingProgress] = useState<ReminderIndexingProgress | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [dataMode, setDataMode] = useState<DataMode>('live');
 	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
@@ -69,6 +71,7 @@ export function useReminderSync({
 	useEffect(() => {
 		const lifetime = { active: true };
 		lifetimeRef.current = lifetime;
+		setIndexingProgress(null);
 		return () => {
 			lifetime.active = false;
 			activeReadRef.current = null;
@@ -129,6 +132,7 @@ export function useReminderSync({
 			if (options.silent) setRefreshing(true);
 			else setLoading(true);
 			setError(null);
+			setIndexingProgress(null);
 			try {
 				const headers = new Headers();
 				if (etagRef.current) headers.set('If-None-Match', etagRef.current);
@@ -136,7 +140,11 @@ export function useReminderSync({
 					apiFetch,
 					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`,
 					headers,
-					(remaining, total) => { if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) setError(`Preparing reminders: ${Math.max(0, total - remaining)} of ${total} files indexed…`); },
+					(remaining, total) => {
+						if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) {
+							setIndexingProgress({ indexedFiles: Math.max(0, total - remaining), totalFiles: total });
+						}
+					},
 				);
 				if (response.status === 304) {
 					if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
@@ -180,6 +188,7 @@ export function useReminderSync({
 				}
 			} finally {
 				if (sessionCurrent() && requestCoordinatorRef.current.isLatestRead(readToken)) {
+					setIndexingProgress(null);
 					setRefreshing(false);
 					setLoading(false);
 				}
@@ -207,6 +216,7 @@ export function useReminderSync({
 		const coordinator = requestCoordinatorRef.current;
 		const finish = coordinator.beginMutation();
 		activeReadRef.current = null;
+		setIndexingProgress(null);
 		return () => {
 			finish();
 			// A refresh after acknowledgement must not join a read invalidated by this write.
@@ -236,6 +246,7 @@ export function useReminderSync({
 		activeReadRef.current = null;
 		setLoading(false);
 		setRefreshing(false);
+		setIndexingProgress(null);
 		setLastUpdatedAt(null);
 		etagRef.current = undefined;
 		lastCheckedAtRef.current = null;
@@ -246,6 +257,7 @@ export function useReminderSync({
 		projects,
 		loading,
 		refreshing,
+		indexingProgress,
 		error,
 		issues,
 		dataMode,

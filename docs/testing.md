@@ -1,5 +1,29 @@
 # Testing
 
+## Cleanup reviews, storage opening and route execution
+
+`sync/engine-ignored-purge.test.ts` binds excluded-file cleanup to reviewed paths,
+hashes, revisions and exclusions, including acknowledged batches before cancellation
+and exclusive sync admission. `runtime-exclusion-cleanup.test.ts` rejects replaced
+engines during review or confirmation; `ui/settings/exclusion-cleanup.test.ts`
+checks confirmation and stale-review guidance.
+
+`pwa/hooks/useReminderSync.test.ts` composes indexing progress with sync status,
+including HTTP 202 followed by 200/304, terminal failure and request/session
+invalidation. Normal preparation must not publish recovery attention.
+`scripts/reading-cache-recovery.browser.test.mjs` exercises Reading's shared
+single-store opener in Chromium/WebKit: unknown layouts and key configurations,
+blocked/late opens, retry and version-change closure, preserving original bytes.
+`scripts/pwa-encryption-storage-test.mjs` retains native key, attempt, logout and
+push coverage for the same opener. These do not establish physical-device acceptance.
+
+`worker/routes/admission.test.ts` checks scopes, execution destination, coordinator
+wakes and projection initialization. Worker `commit-safety.integration.ts` checks
+single-file and atomic-move changelog/history publication against real D1, including
+rejected revisions that must leave derived state unchanged. Retain the move,
+upload-publication, topology and protocol integration tests when changing these
+boundaries.
+
 ## Reading pagination and checkpoint boundaries
 
 `pwa/reading/list-response.test.ts` exercises malformed page envelopes and cursors,

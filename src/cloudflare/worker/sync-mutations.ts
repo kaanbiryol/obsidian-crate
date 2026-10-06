@@ -1,4 +1,5 @@
 import { deleteBucketObjectsOrQueue } from './maintenance/object-cleanup';
+import { publishedChangelogStatement, retainReplacedVersionStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -113,24 +114,10 @@ export async function commitStagedFile(
 	const results: unknown[] = await db.batch([
 		mutation,
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
-		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
-			SELECT ?, 'put', ?, ?, ?
-			WHERE EXISTS (
-				SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?
-			)`).bind(params.path, params.hash, params.size, params.objectKey, ...filePathArgs(params.path), params.objectKey),
-		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO file_versions
-			(storage_key, path, hash, size, reason, expires_at)
-			SELECT ?, ?, ?, ?, 'replaced', MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS}) WHERE EXISTS (
-				SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?
-			)`).bind(
-			key,
-			params.path,
-			params.previousFile?.hash ?? '',
-			params.previousFile?.size ?? 0,
-			Date.now() + FILE_VERSION_RETENTION_MS,
-			...filePathArgs(params.path),
-			params.objectKey,
-		)),
+		publishedChangelogStatement(db, params),
+		...cleanupKeys.map(storageKey => retainReplacedVersionStatement(db, {
+			storageKey, path: params.path, hash: params.previousFile?.hash ?? '', size: params.previousFile?.size ?? 0,
+		}, [params])),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state)),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),

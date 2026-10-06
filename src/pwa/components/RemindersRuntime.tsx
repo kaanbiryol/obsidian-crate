@@ -65,6 +65,7 @@ function useRemindersController() {
 		projects,
 		loading,
 		refreshing,
+		indexingProgress,
 		error,
 		dataMode,
 		lastUpdatedAt,
@@ -178,7 +179,7 @@ function useRemindersController() {
 	});
 	const sharedReminders = useMemo(() => visibleReminders.map(toSharedReminder), [visibleReminders]);
 
-	const syncStatus = reminderSyncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError });
+	const syncStatus = reminderSyncStatus({ changes, isOffline, refreshing, loading, indexingProgress, dataMode, error, storageError });
 	const needsRecovery = recoveryChanges.length > 0 || quarantinedChanges.length > 0;
 	useFeatureSettings('reminders', {
 		ready: bootstrapped && (mutationsReady || Boolean(storageError) || !authToken),

@@ -153,6 +153,12 @@ on `SyncApiClient`; the client retains HTTP, protocol and encryption concerns.
 Restore writes participate in engine shutdown draining, and the runtime only finishes
 a restore after successful reconciliation by the same engine.
 
+`sync/engine-exclusion-cleanup.ts` binds a cleanup review to its original paths,
+hashes, revisions and exclusions. The engine retains exclusive mutation admission
+and lifetime checks; the runtime rejects reviews from a replaced engine. Execution
+cannot add newly discovered remote files to an already reviewed deletion set.
+Acknowledged deletions are saved before cancellation is reported.
+
 Engine shutdown also drains accepted conflict mutations, background recovery and
 Markdown-cache work before a replacement engine can load their files. The conflict
 store closes after its producers settle, finishes queued writes, and rejects new
@@ -328,6 +334,9 @@ is required.
 `pwa/reading/cache.ts` owns `commitReadingCache`, keeping uncertain-source
 preservation, article pruning, encrypted records and list persistence in one guarded
 transaction. `reading/database.ts` owns database lifetime and raw encrypted values;
+`pwa/single-store-database.ts` shares bounded opening, schema validation and late
+request fencing with the encryption databases. Reading retains its cached
+connection, and each feature retains its own records and transactions.
 `reading/session.ts` owns session authority. The storage facade exposes specific
 draft, pending-command, share and immutable-attempt operations, keeping raw keys
 inside persistence and migration code. Export and logout retain their recovery guards.
@@ -488,8 +497,9 @@ Its screen-facing contract groups connection, sync, mutations, editor, status an
 presentation models. The always-mounted provider retains hydration, recovery and
 update-readiness registration when the reminders screen is hidden.
 `useReminderSync` owns the confirmed snapshot and exposes reads and explicit
-commit/reset operations; outbox
-consumers cannot independently replace its refs or React state. `useReminderEditor`
+commit/reset operations. Indexing progress is separate from failure state, so an
+HTTP 202 preparation response remains a syncing status without recovery attention.
+Outbox consumers cannot independently replace its refs or React state. `useReminderEditor`
 owns editor presentation, synchronous tap opening, close transitions, recovered
 drafts, and session reset. `useReminderEditorActions` owns edit eligibility and
 save/delete completion: drafts and editors remain open until durable enqueue succeeds
@@ -533,9 +543,17 @@ Single and bulk notification-source publication share ID, due-key and occurrence
 aggregation in `worker/reminder-source-summary.ts`. Their specialized SQL and
 atomic file-publication transactions remain separate.
 
+`worker/file-publication-statements.ts` constructs per-file changelog and retained
+version statements. Single-file publication requires its committed revision;
+atomic moves retain both revision conditions. Each writer still owns transaction
+assembly, receipts, projection work and recovery; bulk publication keeps its
+specialized SQL.
+
 `cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
-notification coordination requirements once. Admission, scope authorization and
-notification wakeup checks consume that policy. Route handlers retain folder,
+execution, notification wakeup and projection initialization requirements.
+Admission, scope authorization and request dispatch consume that policy. The
+request handler retains authentication and guard ordering, including public grant
+redemption and upload reauthentication. Route handlers retain folder,
 feature and encryption guards, while public assets and Shortcut compatibility
 handling retain their existing admission behavior. Reading handoff redemption
 checks issuer scopes against the preparation route's policy.

@@ -5,6 +5,7 @@ import { useReminderSync } from './useReminderSync';
 import { invalidatePwaSession } from '../session-generation';
 import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import type { ApiFetch, ReminderRecord } from '../types';
+import { reminderSyncStatus } from '../sync/reminder-status';
 
 vi.mock('../reminder-cache', () => ({
 	loadCachedReminderSnapshot: vi.fn(async () => null),
@@ -43,6 +44,61 @@ function harness() {
 }
 
 describe('PWA reminder refresh around local writes', () => {
+	it.each([200, 304])('keeps indexing progress out of recovery state until HTTP %s confirms the list', async status => {
+		const { rendered, original, requests, load, settle } = harness();
+		act(() => { window.dispatchEvent(new window.Event('online')); });
+		const pending = load();
+		await act(async () => {
+			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
+		});
+		expect(requests).toHaveLength(2);
+		expect(rendered.current.indexingProgress).toEqual({ indexedFiles: 7, totalFiles: 10 });
+		expect(rendered.current.error).toBeNull();
+		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null })).toEqual({
+			state: 'syncing', label: 'Preparing reminders: 7 of 10 files indexed…',
+		});
+		await settle(1, status === 200 ? response([original]) : new Response(null, { status: 304 }), pending);
+		expect(rendered.current.indexingProgress).toBeNull();
+		expect(rendered.current.error).toBeNull();
+		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null }).state).toBe('synced');
+	});
+
+	it('replaces indexing progress with attention only when the refresh fails', async () => {
+		const { rendered, requests, load, settle } = harness();
+		const pending = load();
+		await act(async () => {
+			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
+		});
+		await settle(1, new Response('Index unavailable', { status: 503 }), pending);
+		expect(rendered.current.indexingProgress).toBeNull();
+		expect(rendered.current.error).toBe('Index unavailable');
+		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null }).state).toBe('error');
+	});
+
+	it.each(['reset', 'replacement', 'mutation'] as const)('clears indexing progress on %s and ignores the old response', async change => {
+		const { rendered, options, requests, load, settle } = harness();
+		const pending = load();
+		await act(async () => {
+			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
+		});
+		let finish: (() => void) | undefined;
+		if (change === 'reset') {
+			invalidatePwaSession();
+			act(() => rendered.current.resetReminderState());
+		} else if (change === 'replacement') {
+			options.apiFetch = vi.fn(async () => response([]));
+			rendered.rerender();
+		} else act(() => { finish = rendered.current.beginLocalMutation(); });
+		expect(rendered.current.indexingProgress).toBeNull();
+		await act(async () => {
+			requests[1]!.resolve(new Response(JSON.stringify({ remainingFiles: 1, totalFiles: 10 }), { status: 202 }));
+		});
+		expect(rendered.current.indexingProgress).toBeNull();
+		await settle(2, response([]), pending);
+		finish?.();
+		expect(rendered.current.indexingProgress).toBeNull();
+	});
+
 	it.each([
 		{}, { reminders: [] }, { projects: [] },
 		{ reminders: [null], projects: ['Inbox'] },
