@@ -3,7 +3,8 @@ import { SyncEngine } from './engine';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
 
 import { SyncQueueController } from './queue-controller';
-import { createEmptySyncResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult } from './sync-result';
+import * as conflict from './conflict';
 import { FOREGROUND_SYNC_DEBOUNCE_MS, SyncRuntime } from './runtime';
 import type { SyncResult } from './types';
 import {
@@ -183,6 +184,22 @@ describe('SyncRuntime startup event handling', () => {
 
 		await expect(runtime.waitForStartupSync()).resolves.toBe(true);
 		expect(sync).toHaveBeenCalledTimes(2);
+		expectFileEventsAccepted(runtime, true);
+	});
+
+	it('does not announce conflicts or report completion when the startup recovery pass is cancelled', async () => {
+		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
+		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
+		sync.mockResolvedValueOnce(createEmptySyncResult()).mockResolvedValueOnce(
+			cancelSyncResult({ ...createEmptySyncResult(), conflicts: ['notes/recovery-conflict.md'] }),
+		);
+		const notifyConflicts = vi.spyOn(conflict, 'notifyConflicts').mockImplementation(() => {});
+		const { runtime, settings } = createRuntimeHarness();
+		await runtime.initialize();
+		expect(await runtime.waitForStartupSync()).toBe(false);
+		expect(sync).toHaveBeenCalledTimes(2);
+		expect(notifyConflicts).toHaveBeenCalledExactlyOnceWith([]);
+		expect(settings.syncHistory).toHaveLength(1);
 		expectFileEventsAccepted(runtime, true);
 	});
 });

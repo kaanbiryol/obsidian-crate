@@ -144,6 +144,7 @@ export async function parallelDownloadAndSaveFiles(
             result.downloaded++;
             result.downloadedPaths.push(file.path);
           } catch (error) {
+            if (isAbortError(error)) throw error;
             const downloadError = error instanceof Error ? error.message : "Download failed";
             recordSyncError(result, `${downloadError}`, file.path);
           } finally {
@@ -185,6 +186,7 @@ async function downloadFilesIndividually(
         recordSyncError(result, `${outcome.reason}`, request.path);
       }
     } catch (error) {
+      if (isAbortError(error)) throw error;
       const downloadError = error instanceof Error ? error.message : "Download failed";
       recordSyncError(result, `${downloadError}`, request.path);
     } finally {

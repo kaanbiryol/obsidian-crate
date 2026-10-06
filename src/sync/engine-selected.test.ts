@@ -49,6 +49,16 @@ async function harness(paths = ['a.md', 'b.md']) {
 }
 
 describe('selected sync with durable file operations', () => {
+    it('preserves selected pending files and the cursor when metadata loading is cancelled', async () => {
+        const h = await harness();
+        h.remote.metadata.mockRejectedValue(new DOMException('Request cancelled', 'AbortError'));
+        expect(await h.engine.syncSelected(['a.md'])).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
+        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.settings.lastSeq).toBe(42);
+        expect(h.settings.lastSync).toBeNull();
+        expect(h.engine.getState().status).toBe('idle');
+    });
+
     it('selects an upload named delete:note.md separately from deleting note.md', async () => {
         const h = await harness(['note.md', 'delete:note.md']);
         h.localManifest.setEntry('note.md', h.entry); await h.localManifest.save();

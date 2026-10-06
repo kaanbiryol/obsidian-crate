@@ -334,6 +334,17 @@ describe('transfer download/process helpers', () => {
 		expect(harness.api.downloadFile).not.toHaveBeenCalled();
 		expect(result.errors).toEqual([]);
 	});
+
+	it('propagates individual download cancellation without recording a file error', async () => {
+		const harness = createTransferHarness();
+		harness.api.batchDownload.mockRejectedValue(new Error('Batch unavailable'));
+		harness.api.downloadFile.mockRejectedValue(createNamedAbortError());
+		const result = emptyResult();
+		await expect(parallelDownloadAndSaveFiles(harness.context,
+			[{ path: 'aborted.md', expectedLocalHash: null, expectedRemoteHash: 'remote', remoteSize: 2 }], result, 5))
+			.rejects.toMatchObject({ name: 'AbortError' });
+		expect(result.errors).toEqual([]);
+	});
 });
 
 it('reports every file across concurrent download batches', async () => {

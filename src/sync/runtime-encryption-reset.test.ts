@@ -4,7 +4,7 @@ import { SyncEngine } from './engine';
 import { WorkerApiHttpClient } from './worker-api/http';
 import { SyncApiClient } from './api';
 import { createRuntimeHarness, createDeferred } from './runtime-test-harness';
-import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult } from './sync-result';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../encryption/key-bundle';
 import { createEncryptionState } from '../encryption/server-state';
 import { SECRET_KEYS } from '../plugin/settings-types';
@@ -101,6 +101,15 @@ it('blocks startup and ordinary sync after failure, and resumes only the unfinis
 		expect(h.plugin.app.vault.adapter.remove.mock.calls).toHaveLength(removals);
 		expect(h.local.get('local-note.md')).toBe('keep this note');
 	} finally { h.runtime.destroy(); }
+});
+
+it('retains the reset checkpoint when reconciliation returns cancellation', async () => {
+	const h = await setup();
+	vi.mocked(SyncEngine.prototype.sync).mockResolvedValueOnce(cancelSyncResult(createEmptySyncResult()));
+	await expect(h.run()).rejects.toMatchObject({ name: 'AbortError' });
+	expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
+	expect(h.settings.automaticSync).toBe(false);
+	expect(SyncApiClient.prototype.putSharedSettings).not.toHaveBeenCalled();
 });
 
 it('retains the resume checkpoint and old keys when the server response is lost', async () => {

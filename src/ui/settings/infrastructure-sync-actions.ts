@@ -50,6 +50,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 						updateFileSyncProgress(forceProgress, current, total);
 					}),
 					onSuccess: (result) => {
+						if (result.outcome === 'cancelled') return;
 						if (result.success) {
 							new Notice(`Server files replaced: ${result.uploaded} uploaded, ${result.deleted} deleted`);
 						} else {

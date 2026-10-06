@@ -101,7 +101,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		expect(harness.api.batchDelete).not.toHaveBeenCalled();
 		expect(harness.settings.lastSeq).toBe(42);
 		expect(harness.settings.lastSync).toBeNull();
-		expect(result.errors).toEqual([]);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 	});
 
 	it('does not advance lastSeq when incremental sync is aborted', async () => {
@@ -130,7 +130,7 @@ describe('SyncEngine abort-on-destroy', () => {
 
 		const result = await harness.engine.sync();
 
-		expect(result.errors).toHaveLength(0);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.settings.lastSeq).toBe(5);
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
@@ -158,7 +158,7 @@ describe('SyncEngine abort-on-destroy', () => {
 
 		const result = await harness.engine.sync();
 
-		expect(result.errors).toHaveLength(0);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.settings.lastSeq).toBe(5);
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
@@ -185,7 +185,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		const result = await syncPromise;
 
 		// Should not have set error state (abort is not an error)
-		expect(result.errors).toHaveLength(0);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 
@@ -207,7 +207,7 @@ describe('SyncEngine abort-on-destroy', () => {
 
 		expect(harness.vault.adapter.readBinary).toHaveBeenCalled();
 		expect(harness.api.batchUpload).not.toHaveBeenCalled();
-		expect(result.errors).toHaveLength(0);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 
@@ -226,7 +226,7 @@ describe('SyncEngine abort-on-destroy', () => {
 
 		expect(harness.vault.adapter.readBinary).toHaveBeenCalled();
 		expect(harness.api.batchUpload).not.toHaveBeenCalled();
-		expect(result.errors).toHaveLength(0);
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 });

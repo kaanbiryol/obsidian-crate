@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { bundleServiceWorkerRuntime } from './service-worker-build.mjs';
 
 /** The production push listener and crypto run inside an actual service worker.
  * Only push transport and native notification display are simulated. */
 export async function buildEncryptedPushWorker() {
-  const crypto = (await build({ entryPoints: ['src/pwa/encrypted-push.ts'], bundle: true,
-    write: false, format: 'iife', globalName: 'crateEncryptedPush', platform: 'browser', target: 'es2022' })).outputFiles[0].text;
+  const runtime = await bundleServiceWorkerRuntime(process.cwd());
   const module = (await build({ entryPoints: ['src/cloudflare/worker/pwa/service-worker.ts'], bundle: true,
     write: false, format: 'esm', platform: 'node', target: 'es2022',
-    define: { __CRATE_ENCRYPTED_PUSH_JS__: JSON.stringify(crypto), __CRATE_PWA_CLIENT_ASSETS__: '{}',
+    define: { __CRATE_SERVICE_WORKER_JS__: JSON.stringify(runtime.script), __CRATE_PWA_CLIENT_ASSETS__: '{}',
       __CRATE_PWA_ASSET_VERSION__: JSON.stringify('encrypted-push-test') },
   })).outputFiles[0].text;
   const { SERVICE_WORKER_JS } = await import(`data:text/javascript;base64,${Buffer.from(module).toString('base64')}`);

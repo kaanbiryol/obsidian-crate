@@ -1,4 +1,5 @@
 import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
+import { isAbortError } from './abort';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
 import type { MutationFailure } from '../protocol/sync-types';
@@ -19,6 +20,7 @@ interface ConditionalDeleteApi {
 }
 
 export interface ConditionalDeleteResult {
+	outcome: 'completed' | 'cancelled' | 'failed';
 	success: boolean;
 	deleted: string[];
 	errors: MutationFailure[];
@@ -62,6 +64,7 @@ export async function deleteFilesInBatches(
 				}
 			}
 		} catch (error) {
+			if (isAbortError(error)) return { outcome: 'cancelled', success: false, deleted, errors };
 			const status = error instanceof LocalFilePresentError ? 409 : error instanceof HttpError ? error.status : undefined;
 			const code = error instanceof LocalFilePresentError ? 'version_conflict' : error instanceof HttpError && isMutationFailureCode(error.code)
 				? error.code
@@ -81,7 +84,7 @@ export async function deleteFilesInBatches(
 		}
 	}
 
-	return { success: errors.length === 0, deleted, errors };
+	return { outcome: errors.length === 0 ? 'completed' : 'failed', success: errors.length === 0, deleted, errors };
 }
 
 function isMutationFailureCode(value: string | undefined): value is NonNullable<MutationFailure['code']> {

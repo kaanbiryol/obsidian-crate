@@ -59,6 +59,7 @@ export async function runPeriodicCheckWorkflow(
 		if (context.automaticSyncEnabled?.() === false) return;
 		logger.info('Periodic check: changes detected, running sync');
 		const result = await context.sync();
+		if (result.outcome === 'cancelled') return;
 		notifyConflicts(result.conflicts);
 		context.setConsecutiveCheckFailures(result.success ? 0 : context.getConsecutiveCheckFailures() + 1);
 	} catch (error) {

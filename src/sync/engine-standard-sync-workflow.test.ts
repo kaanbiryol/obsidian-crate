@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileDiff, SyncResult } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './engine-standard-sync-workflow';
+import { isAbortError } from './abort';
 
 function createContext(options: {
 	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];
@@ -75,6 +76,24 @@ function createContext(options: {
 }
 
 describe('runSyncWorkflow', () => {
+	it('retains acknowledged uploads and prior issues when a later transfer is cancelled', async () => {
+		const { context, spies } = createContext();
+		context.isAbortError = isAbortError;
+		spies.uploadPreparedFiles.mockImplementation(async (_uploads, result) => {
+			result.uploaded = 1;
+			result.uploadedPaths.push('saved.md');
+			result.errors.push('earlier.md: unreadable');
+			throw new DOMException('Transfer cancelled', 'AbortError');
+		});
+		expect(await runSyncWorkflow(context)).toMatchObject({
+			outcome: 'cancelled', success: false, uploaded: 1, uploadedPaths: ['saved.md'], errors: ['earlier.md: unreadable'],
+		});
+		expect(spies.setLastSync).not.toHaveBeenCalled();
+		expect(spies.setLastSeq).not.toHaveBeenCalled();
+		expect(spies.finishInitialSetup).not.toHaveBeenCalled();
+		expect(spies.updateState).toHaveBeenLastCalledWith({ status: 'idle' });
+	});
+
 	it('reports a vanished upload and leaves scanned state unconfirmed', async () => {
 		const { context, spies } = createContext({ prepareFullSyncUpload: async () => null });
 		const progress = vi.fn();
@@ -95,6 +114,7 @@ describe('runSyncWorkflow', () => {
 		const result = await runSyncWorkflow(context);
 
 		expect(result.success).toBe(false);
+		expect(result.outcome).toBe('failed');
 		expect(result.errors).toEqual(['notes/a.md: quota exceeded']);
 		expect(spies.setLocalManifestEntry).not.toHaveBeenCalled();
 		expect(spies.saveLocalManifest).toHaveBeenCalledTimes(1);
@@ -113,6 +133,7 @@ describe('runSyncWorkflow', () => {
 		const result = await runSyncWorkflow(context);
 
 		expect(result.success).toBe(true);
+		expect(result.outcome).toBe('completed');
 		expect(spies.setLocalManifestEntry).toHaveBeenCalledWith('notes/a.md', localFiles['notes/a.md']);
 		expect(spies.setLastSync).toHaveBeenCalledWith(expect.any(String));
 		expect(spies.setLastSeq).toHaveBeenCalledWith(9);

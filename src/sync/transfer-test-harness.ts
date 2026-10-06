@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { SyncResult } from './types';
+import { createEmptySyncResult } from './sync-result';
 
 const CONFIG_DIR = '.vault-config';
 export const HIDDEN_CONFIG_PATH = `${CONFIG_DIR}/config.json`;
@@ -69,22 +70,7 @@ export function createTransferHarness() {
 	}
 
 export function emptyResult(): SyncResult {
-	return {
-		success: true,
-		uploaded: 0,
-		downloaded: 0,
-		merged: 0,
-		deleted: 0,
-		conflicts: [],
-		unresolvedConflicts: [],
-		resolvedRaces: [],
-		settledPaths: [],
-		errors: [],
-		uploadedPaths: [],
-		downloadedPaths: [],
-		mergedPaths: [],
-		deletedPaths: [],
-	};
+	return createEmptySyncResult();
 }
 export function createNamedAbortError(message = 'Sync request aborted'): Error {
 	const error = new Error(message);

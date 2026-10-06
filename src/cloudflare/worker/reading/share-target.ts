@@ -57,7 +57,6 @@ export async function receiveReadingShare(request: Request): Promise<Response> {
     return Response.redirect(`${new URL(request.url).origin}/notifications?section=reading&share=${id}`, 303);
   } catch (error) { return new Response(error instanceof Error ? error.message : 'Could not keep this link. Open Crate and paste it again.', { status: 400, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } }); }
 }
-export const READING_SHARE_SW = `const receiveReadingShare = ${receiveReadingShare.toString()};`;
 
 export async function readingShareFallback(request: Request): Promise<Response> {
   // First install has no controlling SW. Keep the submitted form in this page until its own storage succeeds.

@@ -1,4 +1,5 @@
 import { pendingChangeKey } from './pending-change';
+import { createAbortError } from './abort';
 import type {
 	QueueDeleteCandidate,
 	QueueDeleteFailure,
@@ -17,6 +18,10 @@ export async function deletePendingFiles(
 	for (const path of result.deleted) {
 		context.localManifest.removeEntry(path);
 		completedQueueKeys.add(pendingChangeKey('delete', path));
+	}
+	if (result.outcome === 'cancelled') {
+		if (result.deleted.length) await context.localManifest.save();
+		throw createAbortError('Queued deletion cancelled');
 	}
 	if (result.success) {
 		return { failures: [], reconciliationPaths: [], hasTerminalFailure: false };

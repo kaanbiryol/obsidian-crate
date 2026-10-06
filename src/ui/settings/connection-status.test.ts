@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 import type { SyncState } from '../../sync/types';
+import { showSyncErrorNotice } from '../sync-error-notice';
+import { notifyConflicts } from '../../sync/conflict';
 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('../activity-modal', () => ({ ActivityModal: vi.fn() }));
@@ -11,6 +13,24 @@ import { renderConnectionStatus } from './connection-status';
 afterEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });
 
 describe('connection status', () => {
+	it('restores the sync button without reporting cancellation as an error', async () => {
+		const sync = vi.fn().mockResolvedValue({ outcome: 'cancelled', success: false, errors: [], conflicts: [] });
+		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {
+			syncRuntime: {
+				getState: () => ({ status: 'idle', lastSync: null }),
+				sync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+			},
+		} as never);
+		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Sync now')!;
+		button.click();
+		await vi.waitFor(() => expect(button.buttonEl.classNames.has('is-disabled')).toBe(false));
+		expect(sync).toHaveBeenCalledOnce();
+		expect(showSyncErrorNotice).not.toHaveBeenCalled();
+		expect(notifyConflicts).not.toHaveBeenCalled();
+		expect(noticeMessages).toEqual([]);
+		cleanup();
+	});
+
 	it('can stop an active sync without disconnecting the vault', async () => {
 		const stopSync = vi.fn(async () => {});
 		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {

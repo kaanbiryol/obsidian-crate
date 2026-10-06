@@ -19,7 +19,7 @@ import { isConflictFile } from './conflict';
 import { isHiddenPath, type VaultFile } from './file-discovery';
 import { assertLocalSyncPath } from './local-path-safety';
 import { SyncQueueController } from './queue-controller';
-import { isAbortError as isSyncAbortError } from './abort';
+import { createAbortError, isAbortError as isSyncAbortError } from './abort';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { SyncState, SyncResult, ConflictRecord } from './types';
 import type { FileEntry } from '../protocol/sync-types';
@@ -43,7 +43,7 @@ import { SyncEngineContexts } from './engine-contexts';
 import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './engine-full-sync-upload';
-import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from './sync-result';
 import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { getCheckpointAuthority } from './worker-url';
@@ -411,6 +411,7 @@ export class SyncEngine {
 			}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
 			for (const path of result.deleted) this.localManifest.removeEntry(path);
 			await this.localManifest.save();
+			if (result.outcome === 'cancelled') throw createAbortError('Remote cleanup cancelled');
 			return {
 				deleted: result.deleted,
 				errors: result.errors.map(error => `${error.path}: ${error.error}`),
@@ -624,8 +625,13 @@ export class SyncEngine {
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			this.updateState({ status: 'syncing' });
+			let result = createEmptySyncResult();
 			try {
-				const result = await this.reconcilePaths(queueKeys, !selectedOnly);
+				result = await this.reconcilePaths(queueKeys, !selectedOnly);
+				if (result.outcome === 'cancelled') {
+					this.updateState({ status: 'idle' });
+					return result;
+				}
 				await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
 				if (result.success) {
 					if (!selectedOnly) await this.contexts.finishInitialSetup();
@@ -642,9 +648,12 @@ export class SyncEngine {
 				}
 				return result;
 			} catch (error) {
-				const result = createEmptySyncResult();
+				if (this.isAbortError(error)) {
+					this.updateState({ status: 'idle' });
+					return cancelSyncResult(result);
+				}
 				recordSyncError(result, error);
-				result.success = false;
+				finalizeSyncResult(result);
 				this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed', lastIssues: getSyncIssues(result) });
 				return result;
 			}
@@ -654,6 +663,7 @@ export class SyncEngine {
 	private async reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void> {
 		const reconciliation = await this.reconcilePaths(paths);
 		mergeSyncResults(result, reconciliation);
+		if (reconciliation.outcome === 'cancelled') throw createAbortError('Sync reconciliation aborted');
 	}
 
 	private async reconcilePaths(queueKeys: string[], recover = true): Promise<SyncResult> {

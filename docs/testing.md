@@ -1,5 +1,30 @@
 # Testing
 
+## Sync outcomes and reader action lifetimes
+
+`engine-lifecycle.test.ts` distinguishes cancellation from successful completion
+across ordinary, initial and forced sync, while retaining cursor and baseline
+checks. `runtime-operations.test.ts` verifies that cancelled manual and automatic
+work cannot publish history or checkpoints. Queue race tests use required revision
+snapshots, matching production settlement. Settings and file-history tests keep
+cancellation quiet and retain the controls needed to sync or resume a restore.
+
+`reading-action-state.spec.ts` holds an article save pending while replacing or
+unmounting the reader, in both the PWA document and plugin Shadow DOM hosts. Late
+completion cannot clear a newer save's pending state, close its dialog or announce
+an old save. `useReadingReaderActions.test.ts` covers independent mutation/sharing
+channels and delayed clipboard/native-share completion across article lifetimes.
+
+`pwa-update-test.mjs` registers installation, launch, deferred-update and command
+preparation scenarios as independent named Node tests for Chromium and WebKit.
+Each owns its browser and storage; one failed scenario does not skip later cases.
+Run a focused case with `node --test --test-name-pattern='<name>' scripts/pwa-update-test.mjs`.
+
+The service-worker cache and push tests execute the compiled runtime, using the
+same bundler as production and browser previews. `npm run typecheck:service-worker`
+checks that source with WebWorker globals. Asset-version tests cover runtime-only
+changes so a changed handler cannot retain the previous offline shell version.
+
 ## Settings identity and pending-change keys
 
 `plugin/CratePlugin.test.ts` hydrates a device ID before successful and rejected
@@ -328,7 +353,7 @@ gate locally:
 npm run release:check
 ```
 
-It first runs the npm advisory audit (including development dependencies, failing at low severity) and a checksum-pinned Gitleaks scan of complete fetched Git history and current source. Network failures and shallow clones fail this gate. It builds and checks both TypeScript targets, runs lint, dead-code analysis of both the full project and production dependency graph, the complete unit and Worker-runtime suites, and the PWA preview smoke test. It then creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point. Chromium/WebKit tests cover PWA storage, recovery, authentication, updates, concurrency, clock boundaries and capacity.
+It first runs the npm advisory audit (including development dependencies, failing at low severity) and a checksum-pinned Gitleaks scan of complete fetched Git history and current source. Network failures and shallow clones fail this gate. It builds and checks the plugin, Worker and service-worker TypeScript targets, runs lint, dead-code analysis of both the full project and production dependency graph, the complete unit and Worker-runtime suites, and the PWA preview smoke test. It then creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point. Chromium/WebKit tests cover PWA storage, recovery, authentication, updates, concurrency, clock boundaries and capacity.
 
 Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 

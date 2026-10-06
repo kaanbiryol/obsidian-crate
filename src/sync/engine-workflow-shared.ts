@@ -5,6 +5,7 @@ import type { DownloadDiff, FileDiff, SyncResult, SyncState, UploadDiff } from '
 import type { FileEntry } from '../protocol/sync-types';
 import { AUTH_ERROR_MESSAGE, isAuthError } from './engine-constants';
 import {
+	cancelSyncResult,
 	createSyncFailureResult,
 	finalizeSyncResult,
 	getSyncResultError,
@@ -53,9 +54,7 @@ export function completeWorkflowResult(
 		errorFallback: string;
 	},
 ): void {
-	const hadExplicitFailure = !result.success;
-
-	if (finalizeSyncResult(result) && !hadExplicitFailure) {
+	if (finalizeSyncResult(result)) {
 		const lastSync = new Date().toISOString();
 		context.updateState({
 			status: 'idle',
@@ -66,7 +65,10 @@ export function completeWorkflowResult(
 		return;
 	}
 
-	result.success = false;
+	if (result.outcome === 'cancelled') {
+		context.updateState({ status: 'idle' });
+		return;
+	}
 	context.updateState({
 		status: 'error',
 		lastError: getSyncResultError(result, options.errorFallback),
@@ -91,6 +93,8 @@ export function handleWorkflowError(
 	},
 ): void {
 	if (context.isAbortError(error)) {
+		cancelSyncResult(result);
+		context.updateState({ status: 'idle' });
 		options.logger.info(options.abortLogMessage);
 		return;
 	}

@@ -25,6 +25,7 @@ export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePl
 		button.setDisabled(true);
 		try {
 			const result = await runtime.sync();
+			if (result.outcome === 'cancelled') return;
 			if (!result.success) showSyncErrorNotice(plugin, 'Sync completed with errors.');
 			notifyConflicts(result.conflicts);
 		} catch (error) {

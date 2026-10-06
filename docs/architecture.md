@@ -123,6 +123,12 @@ the representation does not change checkpoints or the wire protocol.
 The engine retains cancellation, exclusive-operation checks and active-work tracking,
 including local and shared checkpoint saves. Shutdown drains those writes; the runtime
 only attaches a completed checkpoint while its originating engine is still current.
+Sync results carry an explicit completed, cancelled or failed outcome. Cancellation
+retains transfer counts and diagnostics, but does not publish a successful sync,
+history checkpoint or error notice. Result aggregation and finalization preserve
+cancellation rather than inferring completion from an empty error list.
+Queue revision tracking and settlement snapshots are required dependencies, so
+settling an earlier upload cannot silently bypass the guard for a newer local edit.
 `sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
@@ -223,6 +229,14 @@ without manipulating the DOM. Conflict panel rendering stays with the modal.
 interruptible section transitions and focus restoration as one lifecycle.
 `pwa/FeatureShell.tsx` composes providers and renders the retained feature panels.
 
+`pwa/service-worker/runtime.ts` owns typed service-worker event handlers, including
+offline shell caches, update activation, encrypted push and Reading shares. It is
+compiled with WebWorker globals into a version-neutral bundle before the PWA asset
+version is calculated. `cloudflare/worker/pwa/service-worker.ts` supplies the final
+version and chunk URLs. The runtime bundle and its transitive inputs participate in
+asset hashing and server revision checks; cache policy and browser message formats
+remain owned by the runtime.
+
 The PWA mounts one `PwaSyncProvider` under the application shell. It owns the
 Reading and Reminders runtimes independently of their lazy screens, so pending work
 resumes without visiting either section. Feature adapters retain their existing
@@ -298,6 +312,11 @@ inside persistence and migration code. Export and logout retain their recovery g
 enrolled folder before the reader or offline cache receives them.
 The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
+`reading/ui/useReadingReaderActions.ts` scopes mutation and sharing feedback to the
+displayed article's lifetime. The two action channels remain independent; replacing
+the article or unmounting prevents delayed errors, save completion, dialog closure
+and clipboard feedback from affecting another reader. Host callbacks still own
+metadata persistence, while `ReadingReader` retains content and navigation layout.
 
 Reminder vault events are debounced by `reminders/services/vaultWatcher.ts`.
 The reminder index serializes accepted scans without a second time-based filter.

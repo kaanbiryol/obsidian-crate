@@ -97,6 +97,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	try {
 		const result = await plugin.syncRuntime.sync();
+		if (result.outcome === 'cancelled') return;
 		if (!result.success) {
 			showSyncErrorNotice(plugin, 'Sync completed with errors.');
 		}

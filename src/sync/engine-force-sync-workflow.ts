@@ -127,6 +127,7 @@ export async function runForceFullSyncWorkflow(
 				result.deleted++;
 				result.deletedPaths.push(path);
 			} catch (error) {
+				if (context.isAbortError(error)) throw error;
 				recordSyncError(result, errorMessage(error), path);
 			}
 			current++;

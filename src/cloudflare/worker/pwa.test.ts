@@ -301,28 +301,9 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .pwa-dock__add {');
 	});
 
-	it('ships an offline-capable installed app shell service worker', () => {
+	it('ships a parseable compiled service worker', () => {
 		expect(() => new Script(SERVICE_WORKER_JS)).not.toThrow();
-		expect(SERVICE_WORKER_JS.endsWith('`')).toBe(false);
-		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_CACHE = 'crate-reminders-shell-");
-		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_URL = '/notifications'");
-		expect(SERVICE_WORKER_JS).toContain("for (const url of PWA_PRECACHE_URLS)");
-		expect(SERVICE_WORKER_JS).toContain("await cache.put(url, response)");
-		expect(SERVICE_WORKER_JS).not.toContain('apple-startup');
-		expect(SERVICE_WORKER_JS).toContain("url.pathname === PWA_SHELL_URL");
-		expect(SERVICE_WORKER_JS).toContain("return cache.match(PWA_SHELL_URL)");
-		expect(SERVICE_WORKER_JS).toContain('collectUnusedShellCaches');
-		expect(SERVICE_WORKER_JS.indexOf("cache.match(PWA_SHELL_URL)")).toBeLessThan(
-			SERVICE_WORKER_JS.indexOf('return fetch(event.request)'),
-		);
-		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname.indexOf('/notifications/assets/') === 0");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/theme-bootstrap.js'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/icon.svg'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-192.png'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-512.png'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-mark-256.png'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-touch-icon-180.png'");
+		expect(SERVICE_WORKER_JS).not.toContain('Crate service worker was not generated before build.');
 	});
 
 	it('does not replace the Obsidian handoff navigation with the cached app shell', () => {
@@ -340,6 +321,7 @@ describe('PWA activation metadata', () => {
 			clients: { claim: vi.fn() },
 		};
 		new Script(SERVICE_WORKER_JS).runInNewContext({
+			TextEncoder, TextDecoder,
 			URL,
 			URLSearchParams,
 			Response,
@@ -389,22 +371,6 @@ describe('PWA activation metadata', () => {
 		expect(() => new Script(PWA_THEME_BOOTSTRAP_JS)).not.toThrow();
 		expect(() => new Script(OPEN_OBSIDIAN_JS)).not.toThrow();
 		expect(OPEN_OBSIDIAN_HTML.endsWith('`')).toBe(false);
-	});
-
-	it('deep links notification clicks to the reminder and project', () => {
-		expect(SERVICE_WORKER_JS).toContain("var reminderId = notificationData.reminderId || ''");
-		expect(SERVICE_WORKER_JS).toContain("if (project) params.set('project', project)");
-		expect(SERVICE_WORKER_JS).toContain("if (reminderId) params.set('reminderId', reminderId)");
-		expect(SERVICE_WORKER_JS).toContain("var url = notificationData.navigate || '/notifications'");
-		expect(SERVICE_WORKER_JS).toContain("clients.matchAll({ type: 'window', includeUncontrolled: true })");
-		expect(SERVICE_WORKER_JS).toContain('return client.navigate(url)');
-		expect(SERVICE_WORKER_JS).toContain('return (navigatedClient || client).focus()');
-		expect(SERVICE_WORKER_JS).toContain('return clients.openWindow(url)');
-	});
-
-	it('supports declarative push with a fallback notification handler', () => {
-		expect(SERVICE_WORKER_JS).toContain('var notification = event.notification || payload.notification || payload');
-		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 
 	it('paints the launch theme before native launcher metadata', () => {

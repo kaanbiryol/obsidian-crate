@@ -1,4 +1,5 @@
 import { SyncIssueError } from './issues';
+import { isAbortError } from './abort';
 /**
  * File discovery — merges Obsidian-indexed files with hidden (dot) files
  * discovered via the low-level vault adapter.
@@ -207,6 +208,7 @@ async function safeList(vault: Vault, folderPath: string, assertActive?: () => v
 		listing = await vault.adapter.list(folderPath);
 	} catch (error) {
 		assertActive?.();
+		if (isAbortError(error)) throw error;
 		const message = `Vault scan incomplete: cannot list ${folderPath || '/'}: ${errorMessage(error)}`;
 		throw new SyncIssueError(message, [{ message, ...(folderPath ? { path: folderPath } : {}) }]);
 	}
@@ -221,6 +223,7 @@ async function safeStat(vault: Vault, filePath: string, assertActive?: () => voi
 		stat = await vault.adapter.stat(filePath);
 	} catch (error) {
 		assertActive?.();
+		if (isAbortError(error)) throw error;
 		const message = `Vault scan incomplete: cannot stat ${filePath}: ${errorMessage(error)}`;
 		throw new SyncIssueError(message, [{ path: filePath, message }]);
 	}

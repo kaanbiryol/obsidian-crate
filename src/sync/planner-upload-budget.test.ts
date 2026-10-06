@@ -3,6 +3,21 @@ import { createIncrementalHarness } from './planner-test-harness';
 import { runIncrementalSync } from './planner-incremental';
 
 describe('incremental upload budgeting', () => {
+	it('retains partial upload results when incremental sync is cancelled', async () => {
+		const h = createIncrementalHarness({ localChanges: [{ path: 'a.png', hash: 'hash' }] });
+		h.context.prepareUploadFromPath = async path => ({ path, content: new ArrayBuffer(1), size: 1, hash: 'hash' });
+		h.context.uploadPreparedFiles = async (_files, result) => {
+			result.uploaded = 1;
+			result.uploadedPaths.push('saved.md');
+			result.errors.push('earlier.md: unreadable');
+			throw new DOMException('Cancelled', 'AbortError');
+		};
+		expect(await runIncrementalSync(h.context, { uploadConcurrency: 2 })).toMatchObject({
+			outcome: 'cancelled', success: false, uploaded: 1, uploadedPaths: ['saved.md'], errors: ['earlier.md: unreadable'],
+		});
+		expect(h.settings.lastSeq).toBe(10);
+	});
+
 	it('uploads bounded chunks before preparing the rest of the changed files', async () => {
 		const h = createIncrementalHarness({
 			localChanges: Array.from({ length: 300 }, (_, index) => ({ path: `${index}.png`, hash: 'hash' })),
@@ -28,7 +43,7 @@ describe('incremental upload budgeting', () => {
 		const upload = vi.spyOn(h.context, 'uploadPreparedFiles');
 		const prepare = vi.fn(async () => { throw new DOMException('Cancelled', 'AbortError'); });
 		h.context.prepareUploadFromPath = prepare;
-		await expect(runIncrementalSync(h.context, { uploadConcurrency: 2 })).rejects.toMatchObject({ name: 'AbortError' });
+		await expect(runIncrementalSync(h.context, { uploadConcurrency: 2 })).resolves.toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
 		expect(h.settings.lastSeq).toBe(cursor);
 		expect(upload).not.toHaveBeenCalled();
 	});

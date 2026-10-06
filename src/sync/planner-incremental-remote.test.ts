@@ -99,6 +99,7 @@ describe('runIncrementalSync', () => {
 		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
 
 		expect(result).toEqual({
+			outcome: 'completed',
 			success: true,
 			uploaded: 0,
 			downloaded: 0,

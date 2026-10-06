@@ -12,6 +12,8 @@ import { processPendingChanges } from './queue-flush';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import { HttpError } from './api';
 import { LocalFilePresentError } from './local-absence';
+import { createEmptySyncResult } from './sync-result';
+import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -151,20 +153,7 @@ function createFlushHarness(overrides: Partial<{
 
 function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
 	return {
-		success: true,
-		uploaded: 0,
-		downloaded: 0,
-		merged: 0,
-		deleted: 0,
-		conflicts: [],
-		unresolvedConflicts: [],
-		resolvedRaces: [],
-		settledPaths: [],
-		errors: [],
-		uploadedPaths: [],
-		downloadedPaths: [],
-		mergedPaths: [],
-		deletedPaths: [],
+		...createEmptySyncResult(),
 		...overrides,
 	};
 }
@@ -357,15 +346,17 @@ describe('clearSyncedPendingPaths', () => {
 		]);
 		const clearDebounceTimer = vi.fn();
 		const updateState = vi.fn();
+		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
 
 		clearSyncedPendingPaths(
-			{ pendingPaths, clearDebounceTimer, updateState },
+			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
 			createSyncResult({
 				uploadedPaths: ['notes/uploaded.md'],
 				downloadedPaths: ['notes/downloaded.md'],
 				mergedPaths: ['notes/merged.md'],
 				deletedPaths: ['notes/deleted.md'],
 			}),
+			new Map(pendingRevisions),
 		);
 
 		expect(pendingPaths.size).toBe(0);
@@ -380,10 +371,12 @@ describe('clearSyncedPendingPaths', () => {
 		]);
 		const clearDebounceTimer = vi.fn();
 		const updateState = vi.fn();
+		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
 
 		clearSyncedPendingPaths(
-			{ pendingPaths, clearDebounceTimer, updateState },
+			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
 			createSyncResult({ uploadedPaths: ['notes/uploaded.md'] }),
+			new Map(pendingRevisions),
 		);
 
 		expect([...pendingPaths]).toEqual(['notes/still-pending.md']);
@@ -395,10 +388,12 @@ describe('clearSyncedPendingPaths', () => {
 		const pendingPaths = new Set(['notes/a.md']);
 		const clearDebounceTimer = vi.fn();
 		const updateState = vi.fn();
+		const pendingRevisions = new Map([...pendingPaths].map(path => [path, 1]));
 
 		clearSyncedPendingPaths(
-			{ pendingPaths, clearDebounceTimer, updateState },
+			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
 			createSyncResult({ success: false, uploadedPaths: ['notes/a.md'] }),
+			new Map(pendingRevisions),
 		);
 
 		expect([...pendingPaths]).toEqual(['notes/a.md']);
@@ -612,6 +607,27 @@ describe('processPendingChanges', () => {
 		expect(harness.removeEntry).toHaveBeenCalledTimes(14);
 		expect(harness.pendingPaths.size).toBe(0);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
+	});
+
+	it('persists acknowledged delete batches and retries only unfinished deletions after cancellation', async () => {
+		const h = createFlushHarness();
+		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `deleted-${index}.md`);
+		for (const path of paths) {
+			const key = pendingChangeKey('delete', path);
+			h.pendingPaths.add(key);
+			h.pendingRevisions.set(key, 1);
+		}
+		h.batchDelete.mockImplementationOnce(async deleted => ({ success: true, deleted }))
+			.mockRejectedValueOnce(createNamedAbortError());
+		await processPendingChanges(h.context, 4);
+		expect(h.batchDelete.mock.calls.map(([batch]) => batch.length)).toEqual([BATCH_DELETE_MAX_FILES, 1]);
+		expect(h.removeEntry.mock.calls.map((call: unknown[]) => call[0])).toEqual(paths.slice(0, -1));
+		expect(h.context.localManifest.save).toHaveBeenCalledOnce();
+		const remaining = pendingChangeKey('delete', paths.at(-1)!);
+		expect([...h.pendingPaths]).toEqual([remaining]);
+		expect([...h.pendingRevisions]).toEqual([[remaining, 1]]);
+		expect(h.state.status).toBe('idle');
+		expect(h.onFlushResult).not.toHaveBeenCalled();
 	});
 
 	it('clears completed queue revisions but preserves a newer event for the same path', async () => {

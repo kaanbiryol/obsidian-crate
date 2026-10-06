@@ -2,6 +2,16 @@ import { expect, it, vi } from 'vitest';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles } from './file-discovery';
 
+it.each(['list', 'stat'] as const)('preserves cancellation from the adapter %s operation', async operation => {
+	const error = new DOMException('Adapter cancelled', 'AbortError');
+	const list = vi.fn(async () => ({ files: ['.hidden'], folders: [] }));
+	const stat = vi.fn(async () => ({ type: 'file', size: 10, mtime: 1 }));
+	if (operation === 'list') list.mockRejectedValue(error);
+	else stat.mockRejectedValue(error);
+	const vault = { getFiles: () => [], adapter: { list, stat } } as unknown as Vault;
+	await expect(getAllVaultFiles(vault, () => false)).rejects.toBe(error);
+});
+
 it.each(['', '.config', 'notes', 'notes/.config'])('stops discovery after cancelling the listing of %s', async folder => {
 	const controller = new AbortController();
 	const listings: Record<string, { files: string[]; folders: string[] }> = {

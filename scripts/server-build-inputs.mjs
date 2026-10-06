@@ -22,7 +22,7 @@ export async function collectServerInputs(root, metafiles, rawInputs) {
 	}
 	// These are read dynamically or affect compilation without appearing in esbuild's graph.
 	for (const path of ['src/cloudflare/schema.sql', 'src/cloudflare/server-release.json',
-		'tsconfig.json', 'src/cloudflare/worker/tsconfig.json', '.nvmrc']) inputs.add(path);
+		'tsconfig.json', 'src/cloudflare/worker/tsconfig.json', 'src/pwa/service-worker/tsconfig.json', '.nvmrc']) inputs.add(path);
 	const migrations = resolve(root, 'src/cloudflare/migrations');
 	for (const file of existsSync(migrations) ? readdirSync(migrations, { withFileTypes: true }) : []) {
 		if (file.isFile() && file.name.endsWith('.sql')) inputs.add(`src/cloudflare/migrations/${file.name}`);

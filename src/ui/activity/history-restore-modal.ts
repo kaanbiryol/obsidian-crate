@@ -4,6 +4,7 @@ import type { HistoryRestoreReview } from '../../sync/history-restore';
 import { SharedModal } from '../plugin/SharedModal';
 import type { SyncHistoryEntry } from '../../sync/types';
 import { historyPointLabel } from './history-point';
+import { isAbortError } from '../../sync/abort';
 
 /** Confirm once, then apply the verified restore; diffs live in Vault history. */
 export class HistoryRestoreModal extends SharedModal {
@@ -82,6 +83,11 @@ export class HistoryRestoreModal extends SharedModal {
             new Notice('Synced vault returned to the selected state.');
         } catch (error) {
             this.onRestored();
+            if (isAbortError(error)) {
+                this.busy = false;
+                this.close();
+                return;
+            }
             if (this.active) this.showError(error, 'Could not finish restoring this state.');
         } finally {
             this.busy = false;

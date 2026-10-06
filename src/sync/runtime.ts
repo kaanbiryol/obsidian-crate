@@ -295,6 +295,7 @@ export class SyncRuntime {
 		if (this.settings.automaticSync && !options.skipStartupSync) {
 			this.startupSyncTask = this.sync()
 				.then(async result => {
+					if (result.outcome === 'cancelled') return false;
 					notifyConflicts(result.conflicts);
 					if (
 						result.success
@@ -307,6 +308,7 @@ export class SyncRuntime {
 						if (await syncEngine.hasUnsyncedLocalChanges() && this.settings.automaticSync) {
 							logger.info('Local changes detected after startup sync; running a recovery pass');
 							const recoveryResult = await this.sync();
+							if (recoveryResult.outcome === 'cancelled') return false;
 							notifyConflicts(recoveryResult.conflicts);
 						}
 					}
@@ -568,14 +570,14 @@ export class SyncRuntime {
 
 		try {
 			const result = await this.sync();
-			notifyConflicts(result.conflicts);
+			if (result.outcome !== 'cancelled') notifyConflicts(result.conflicts);
 		} catch (error) {
 			logger.warn('Foreground sync failed:', error);
 		}
 	}
 
 	private async recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
-		if (this.syncEngine !== engine) return;
+		if (this.syncEngine !== engine || result.outcome === 'cancelled') return;
 		const api = this.apiClient;
 		const latest = recordSyncHistory(this.settings, type, result, {
 			timings: engine.getTimings(),
@@ -604,7 +606,7 @@ export class SyncRuntime {
 	}
 
 	private async recordAutomaticSyncResult(engine: SyncEngine, result: SyncResult): Promise<void> {
-		if (this.syncEngine !== engine) return;
+		if (this.syncEngine !== engine || result.outcome === 'cancelled') return;
 		const state = engine.getState();
 		if (result.success && state.lastSync) {
 			updateSyncProgress(this.settings, { lastSync: state.lastSync });
@@ -646,7 +648,7 @@ export class SyncRuntime {
 		};
 		try {
 			const result = await operation(engine, wrappedCallback);
-			if (this.syncEngine !== engine) return result;
+			if (this.syncEngine !== engine || result.outcome === 'cancelled') return result;
 			// The engine is finished, but checkpoint and settings persistence can
 			// still take time. Keep that work visible after the engine clears its phase.
 			active.work = { phase: 'saving' };

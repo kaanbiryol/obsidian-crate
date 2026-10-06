@@ -63,6 +63,23 @@ async function createHarness(options: {
 }
 
 describe('reconcileQueuePaths', () => {
+	it('keeps acknowledged results when a later path is cancelled', async () => {
+		const h = await createHarness({
+			baseHash: 'base', localText: 'local edit',
+			remoteManifests: [{ version: 1, files: Object.fromEntries(['a.md', 'b.md'].map(path => [path, { hash: 'remote', size: 6, modified: 'now' }])) }],
+		});
+		h.processDiff.mockImplementation(async (diff, _local, result) => {
+			if (diff.path === 'b.md') throw new DOMException('Cancelled', 'AbortError');
+			result.merged++;
+			result.mergedPaths.push(diff.path);
+			return { status: 'applied' };
+		});
+		expect(await reconcileQueuePaths(h.context, ['a.md', 'b.md'])).toMatchObject({
+			outcome: 'cancelled', success: false, merged: 1, mergedPaths: ['a.md'], errors: [],
+		});
+		expect(h.localManifest.save).not.toHaveBeenCalled();
+	});
+
 	it('includes the batch attempt in the bounded version-race retries', async () => {
 		const h = await createHarness({
 			baseHash: 'base', localText: 'local edit',

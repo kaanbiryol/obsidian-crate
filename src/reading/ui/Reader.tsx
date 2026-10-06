@@ -2,6 +2,7 @@ import { highlightReadingCode } from './code-highlighting';
 import { DEFAULT_READING_APPEARANCE, type ReadingAppearance } from './appearance';
 import { readerScrollElement } from './reader-scroll';
 import { useReaderNavigation } from './useReaderNavigation';
+import { useReadingReaderActions } from './useReadingReaderActions';
 import { ReadingHighlightActions } from './ReadingHighlightActions';
 import { ReadingBody } from './ReadingBody';
 import { ReadingTagsForm } from './ReadingTagsForm';
@@ -44,8 +45,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 }) {
 	const body = useRef<HTMLDivElement>(null);
 	const tagsFormId = useId();
-	const [error, setError] = useState<string | null>(null), [busy, setBusy] = useState(false);
-	const [sharing, setSharing] = useState(false);
+	const { error, setError, busy, sharing, copied, run, shareLink } = useReadingReaderActions(item.crate_reading_id);
 	const [dialog, setDialog] = useState<'appearance' | 'tags' | null>(null);
 	const [localAppearance, setLocalAppearance] = useState(DEFAULT_READING_APPEARANCE);
 	const { fontSize, serif } = appearance ?? localAppearance;
@@ -54,14 +54,13 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		setLocalAppearance(next);
 		onAppearanceChange?.(next);
 	};
-	const [copied, setCopied] = useState(false);
 	const [mode, setMode] = useState<'article' | 'highlights'>('article');
 	const [highlightsOpen, setHighlightsOpen] = useState(false);
 	const sheetAction = useRef<(() => void) | null>(null);
 	const targetAfterSheet = useRef(false);
 	const [target, setTarget] = useState<ReadingHighlight | null>(null);
 	const [annotation, setAnnotation] = useState<ReadingHighlight | null>(null), [note, setNote] = useState('');
-	const pending = useRef({ mutation: false, share: false }), article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
+	const article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
 	const [enteredId, setEnteredId] = useState<string | null>(null);
 	const markdown = deferContentUntilEntered && enteredId !== item.crate_reading_id ? null : loadedMarkdown;
 	const videoId = youtubeVideoId(item.source_url);
@@ -84,38 +83,15 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		return () => { cancelled = true; };
 	}, [deferContentUntilEntered, item.crate_reading_id]);
 	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), item.crate_reading_id);
-	const copyTimer = useRef<{ window: Window; id: number } | undefined>(undefined);
-	const clearCopyTimer = () => { if (copyTimer.current) copyTimer.current.window.clearTimeout(copyTimer.current.id); };
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
-		setError(null); setCopied(false); setDialog(null); setVideoSeek(null); setVideoPinned(true);
+		setDialog(null); setVideoSeek(null); setVideoPinned(true);
 		setMode('article'); setAnnotation(null); setHighlightsOpen(false); sheetAction.current = null;
-		return clearCopyTimer;
 	}, [item.crate_reading_id]);
 	useEffect(() => {
 		// Transfer opening focus without taking it from a control used while loading.
 		if (showHeader && article.current?.ownerDocument.activeElement === article.current) heading.current?.focus({ preventScroll: true });
 	}, [showHeader]);
-	// Serialize metadata writes without dimming unrelated toolbar actions. Sharing
-	// has its own guard so it remains available while a local write settles.
-	// Native sharing may settle after the sheet closes; keep its button visually
-	// stable throughout, with aria-disabled and the guard preventing repeat shares.
-	const run = async (action: () => Promise<void>, kind: 'mutation' | 'share' = 'mutation') => {
-		if (pending.current[kind]) return;
-		const setPending = kind === 'share' ? setSharing : setBusy;
-		pending.current[kind] = true; setPending(true); setError(null);
-		try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not update this article.'); }
-		finally { pending.current[kind] = false; setPending(false); }
-	};
-	const share = async () => {
-		const ownerWindow = article.current?.ownerDocument.defaultView;
-		if (!ownerWindow) return;
-		const navigator = ownerWindow.navigator;
-		try {
-			if (navigator.share) await navigator.share({ title: readingTitle(item), url: item.source_url });
-			else { await navigator.clipboard.writeText(item.source_url); setCopied(true); clearCopyTimer(); copyTimer.current = { window: ownerWindow, id: ownerWindow.setTimeout(() => setCopied(false), 2500) }; }
-		} catch (cause) { if (!(cause instanceof Error && cause.name === 'AbortError')) throw cause; }
-	};
 	const content = useMemo(() => {
 		if (markdown === null) return null;
 		const result = renderReadingContent(markdown, item.source_url, highlightCode);
@@ -140,7 +116,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		// Let the closing sheet release its scroll lock and restore trigger focus first.
 		const frame = ownerWindow.requestAnimationFrame(() => { targetAfterSheet.current = false; focusPassage(); });
 		return () => ownerWindow.cancelAnimationFrame(frame);
-	}, [target, mode, markdown, content, floatingHighlights]);
+	}, [target, mode, markdown, content, floatingHighlights, setError]);
 	const saveHighlights = async (highlights: ReadingHighlight[]) => {
 		if (!onUpdate || markdown === null) throw new Error('Open the article before saving highlights.');
 		const document = readingDocument(markdown);
@@ -173,7 +149,7 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 			{notice}
 			{showHeader && <header className="crate-reading-reader__header">{item.source_url ? <a className="crate-reading-reader__source" href={item.source_url} target="_blank" rel="noopener noreferrer"><ReadingSourceIcon item={item} />{readingSource(item.source_url)}<ThemeIcon id="arrow-up-right" size="xs" aria-hidden="true" /></a> : <span className="crate-reading-reader__source"><ReadingSourceIcon item={item} />Vault note</span>}<h1 ref={heading} tabIndex={-1}>{readingTitle(item)}</h1>
 				<div className="crate-reading-reader__byline">{item.author && <span>{item.author}</span>}<time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{videoId && <span>Video</span>}{videoId && segments.length > 0 && item.transcript_language && <span>Transcript: {item.transcript_language}</span>}{!videoId && markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}</div>
-				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing} onClick={() => void run(share, 'share')} />}</div>
+				<div className="crate-reading-reader__tools"><div className="crate-reading-reader__availability">{status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing} onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
 			</header>}
 			{error && <p role="alert" className="crate-reading__notice">{error}</p>}
@@ -193,8 +169,8 @@ export function ReadingReader({ item, markdown: loadedMarkdown, deferContentUnti
 		</div>
 		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content} highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onCopyComplete={onCopyComplete} onSelect={videoId ? highlight => { const seconds = transcriptMoment(segments, highlight.start, highlight.end); if (seconds !== undefined) setVideoSeek({ seconds, reveal: false }); } : undefined} />}
 		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={() => { setHighlightsOpen(false); const action = sheetAction.current; sheetAction.current = null; action?.(); }}>{close => renderHighlights(close)}</ReadingDialog>}
-		{annotation && <ReadingDialog title="Highlight note" busy={busy} onClose={() => setAnnotation(null)}>{close => <form className="crate-reading-reader__annotation" onSubmit={event => { event.preventDefault(); void run(async () => { await saveNote(); onSaveComplete?.('note'); close(); }); }}><blockquote>{annotation.text}</blockquote><label htmlFor="reading-highlight-note">Your note</label><textarea id="reading-highlight-note" data-initial-focus value={note} maxLength={4000} onChange={event => setNote(event.target.value)} disabled={busy || highlightsPending} />{error && <p role="alert">{error}</p>}<div className="crate-dialog-actions crate-reading-dialog__actions"><Button variant="outline" disabled={busy} onClick={close}>Cancel</Button><Button variant="primary" type="submit" disabled={busy || highlightsPending}>Save note</Button></div></form>}</ReadingDialog>}
+		{annotation && <ReadingDialog title="Highlight note" busy={busy} onClose={() => setAnnotation(null)}>{close => <form className="crate-reading-reader__annotation" onSubmit={event => { event.preventDefault(); void run(async isCurrent => { await saveNote(); if (!isCurrent()) return; onSaveComplete?.('note'); if (isCurrent()) close(); }); }}><blockquote>{annotation.text}</blockquote><label htmlFor="reading-highlight-note">Your note</label><textarea id="reading-highlight-note" data-initial-focus value={note} maxLength={4000} onChange={event => setNote(event.target.value)} disabled={busy || highlightsPending} />{error && <p role="alert">{error}</p>}<div className="crate-dialog-actions crate-reading-dialog__actions"><Button variant="outline" disabled={busy} onClick={close}>Cancel</Button><Button variant="primary" type="submit" disabled={busy || highlightsPending}>Save note</Button></div></form>}</ReadingDialog>}
 		{dialog === 'appearance' && <ReadingDialog title="Reading appearance" onClose={() => setDialog(null)}><div className="crate-reading-reader__preferences"><span>Typeface</span><div className="crate-reading-reader__font-choice"><ToggleButton variant="outline" pressed={!serif} onPressedChange={() => updateAppearance({ serif: false })}>Modern<span>Sans serif</span></ToggleButton><ToggleButton variant="outline" pressed={serif} onPressedChange={() => updateAppearance({ serif: true })}>Literary<span>Serif</span></ToggleButton></div><div className="crate-reading-reader__font-size"><span>Text size</span><IconButton icon="minus" iconSize="s" label="Decrease text size" disabled={fontSize <= 16} onClick={() => updateAppearance({ fontSize: Math.max(16, fontSize - 1) })} /><output aria-label="Text size" aria-live="polite">{fontSize}</output><IconButton icon="plus" iconSize="s" label="Increase text size" disabled={fontSize >= 26} onClick={() => updateAppearance({ fontSize: Math.min(26, fontSize + 1) })} /></div><div className="crate-reading-reader__sample-frame"><p className="crate-reading-reader__sample" style={{ fontSize, fontFamily: serif ? 'Georgia, serif' : 'var(--font-interface)' }}>A little room to read.<br />A little space to think.</p></div></div></ReadingDialog>}
-		{dialog === 'tags' && onUpdate && <ReadingDialog title={videoId ? "Video tags" : "Article tags"} action={{ label: 'Save', ariaLabel: 'Save tags', type: 'submit', form: tagsFormId, disabled: busy, busy }} busy={busy} onClose={() => setDialog(null)}>{close => <ReadingTagsForm id={tagsFormId} initialTags={item.tags} busy={busy} error={error} onSave={tags => { void run(async () => { await onUpdate({ tags }); onSaveComplete?.('tags'); close(); }); }} />}</ReadingDialog>}
+		{dialog === 'tags' && onUpdate && <ReadingDialog title={videoId ? "Video tags" : "Article tags"} action={{ label: 'Save', ariaLabel: 'Save tags', type: 'submit', form: tagsFormId, disabled: busy, busy }} busy={busy} onClose={() => setDialog(null)}>{close => <ReadingTagsForm id={tagsFormId} initialTags={item.tags} busy={busy} error={error} onSave={tags => { void run(async isCurrent => { await onUpdate({ tags }); if (!isCurrent()) return; onSaveComplete?.('tags'); if (isCurrent()) close(); }); }} />}</ReadingDialog>}
 	</article>;
 }

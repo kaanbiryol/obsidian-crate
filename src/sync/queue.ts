@@ -17,14 +17,14 @@ export interface QueueDebounceContext {
 export interface QueueEventContext {
 	pendingPaths: Set<string>;
 	shouldIgnore(path: string): boolean;
-	markPending?(path: string): void;
-	clearPending?(path: string): void;
+	markPending(path: string): void;
+	clearPending(path: string): void;
 	triggerDebouncedSync(): void;
 }
 
 export interface QueueReconcileContext {
 	pendingPaths: Set<string>;
-	pendingRevisions?: Map<string, number>;
+	pendingRevisions: Map<string, number>;
 	clearDebounceTimer(): void;
 	updateState(updates: Partial<SyncState>): void;
 }
@@ -33,9 +33,9 @@ function addPendingPath(context: QueueEventContext, change: PendingChange): void
 	const path = pendingChangeKey(change.kind, change.path);
 	const oppositePath = pendingChangeKey(change.kind === 'delete' ? 'upload' : 'delete', change.path);
 	context.pendingPaths.delete(oppositePath);
-	context.clearPending?.(oppositePath);
+	context.clearPending(oppositePath);
 	context.pendingPaths.add(path);
-	context.markPending?.(path);
+	context.markPending(path);
 }
 
 export function onFileChange(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
@@ -115,7 +115,7 @@ export function debouncedSync(
 export function clearSyncedPendingPaths(
 	context: QueueReconcileContext,
 	result: SyncResult,
-	revisionSnapshot?: ReadonlyMap<string, number>,
+	revisionSnapshot: ReadonlyMap<string, number>,
 ): void {
 	if (!result.success || context.pendingPaths.size === 0) {
 		return;
@@ -124,16 +124,11 @@ export function clearSyncedPendingPaths(
 	const previousPendingCount = context.pendingPaths.size;
 
 	const clearIfUnchanged = (key: string) => {
-		if (revisionSnapshot && context.pendingRevisions) {
-			const startRevision = revisionSnapshot.get(key);
-			const currentRevision = context.pendingRevisions.get(key);
-			if (
-				(startRevision === undefined && currentRevision !== undefined)
-				|| (startRevision !== undefined && currentRevision !== startRevision)
-			) return;
-		}
+		const startRevision = revisionSnapshot.get(key);
+		const currentRevision = context.pendingRevisions.get(key);
+		if (currentRevision !== startRevision) return;
 		context.pendingPaths.delete(key);
-		context.pendingRevisions?.delete(key);
+		context.pendingRevisions.delete(key);
 	};
 
 	for (const path of result.uploadedPaths) clearIfUnchanged(pendingChangeKey('upload', path));

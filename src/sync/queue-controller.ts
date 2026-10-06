@@ -95,7 +95,7 @@ export class SyncQueueController {
 		return new Map(this.pendingRevisions);
 	}
 
-	clearSyncedPendingPaths(result: SyncResult, revisionSnapshot?: ReadonlyMap<string, number>): void {
+	clearSyncedPendingPaths(result: SyncResult, revisionSnapshot: ReadonlyMap<string, number>): void {
 		clearSyncedQueuePaths(this.getQueueReconcileContext(), result, revisionSnapshot);
 	}
 

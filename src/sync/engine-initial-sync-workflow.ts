@@ -60,7 +60,7 @@ export async function runInitialSyncWorkflow(
 		context.throwIfDestroyed();
     const imported = await context.tryInitialImport?.(result, progressCallback);
     if (imported) {
-      if (!imported.errors.length) await context.finishInitialSetup();
+      if (finalizeSyncResult(imported)) await context.finishInitialSetup();
       completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
       return imported;
     }

@@ -9,7 +9,7 @@
 		"tests/editor-contract/*.spec.ts",
 		"tests/editor-contract/*.config.{ts,mts}",
 		"tests/reading-extraction/*.ts",
-		"src/pwa/encrypted-push.ts!"
+		"src/pwa/service-worker/runtime.ts!"
 	],
 	"project": [
 		"tests/visual/**/*.{ts,tsx}",

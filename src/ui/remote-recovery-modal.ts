@@ -259,6 +259,7 @@ class RemoteRecoveryModal extends SharedModal {
 			if (!confirmed || this.closed) return;
 			label.setText('Restoring…');
 			const result = await this.runtime.restoreRecentFileVersion(version);
+			if (result.outcome === 'cancelled') return;
 			if (!result.success) { new Notice(`Restore confirmed remotely. Local sync is incomplete: ${result.errors[0] || 'Retry sync'}. Resume the saved restore to finish safely.`); return; }
 			new Notice(`Restored ${version.path}. Current remote changes synced.`);
 			if (!this.closed) { label.setText('Restored'); await this.loadFileVersions(); }

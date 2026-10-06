@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockModal, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
+import { FakeElement, MockModal, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../test/fakes/obsidian-ui';
 import type { FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
 
 vi.mock('react-dom/client', () => ({ createRoot: (element: { textContent: string }) => ({
@@ -66,4 +66,18 @@ it('keeps the current file usable when saved history cannot be loaded', async ()
  await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('Offline'));
  expect(modal.contentEl.collectText()).toContain('local contents');
  expect(button('Retry versions')).toBeDefined();
+});
+
+it('keeps a cancelled restore available to resume without a completion or failure notice', async () => {
+ const { runtime } = await open(undefined, [row], 'older.md');
+ runtime.restoreRecentFileVersion.mockResolvedValue({ outcome: 'cancelled', success: false, errors: [] });
+ await vi.waitFor(() => expect(MockModal.instances.flatMap(modal => descendants(modal.contentEl)).some(el => el.getAttribute('data-version-key') === row.storage_key)).toBe(true));
+ const version = MockModal.instances.flatMap(modal => descendants(modal.contentEl)).find(el => el.getAttribute('data-version-key') === row.storage_key)!;
+ clicks.get(version)!();
+ await vi.waitFor(() => expect(button('Resume restore')).toBeDefined());
+ button('Resume restore').click();
+ await vi.waitFor(() => expect(runtime.restoreRecentFileVersion).toHaveBeenCalledOnce());
+ await vi.waitFor(() => expect(button('Resume restore')).toBeDefined());
+ expect(runtime.getPendingRestores()).toEqual([row]);
+ expect(noticeMessages).toEqual([]);
 });

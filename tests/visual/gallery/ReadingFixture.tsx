@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ReadingLibraryPanel, type ReadingLibraryProps } from '@/reading/ui/ReadingLibrary';
 import { ReadingReader } from '@/reading/ui/Reader';
 import type { ReadingItem } from '@/reading/core/model';
@@ -67,16 +67,35 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 	const [items, setItems] = useState(() => videoFixture ? videos : new URLSearchParams(location.search).has('highlight-library') ? initial.slice(0, 3).map((item, index) => ({ ...item, highlights: [{ start: 0, end: 14, text: 'A good article', note: index === 0 ? 'Revisit this idea' : undefined, createdAt: `2026-09-${23 - index}T10:00:00Z` }] })) : new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
+	const [mounted, setMounted] = useState(true);
+	const updateCount = useRef(0);
+	useEffect(() => {
+		if (!new URLSearchParams(location.search).has('reader-action-lifetime')) return;
+		const replace = () => setArticle({ ...initial[0]!, crate_reading_id: initial[1]!.crate_reading_id, title: 'A newly saved article' });
+		const unmount = () => setMounted(false);
+		window.addEventListener('reading-replace-article', replace);
+		window.addEventListener('reading-unmount', unmount);
+		return () => { window.removeEventListener('reading-replace-article', replace); window.removeEventListener('reading-unmount', unmount); };
+	}, []);
 	const update = async (item: ReadingItem, changes: Partial<ReadingItem>) => {
 		if (new URLSearchParams(location.search).has('reader-delayed-update')) {
-			await new Promise<void>((resolve, reject) => window.addEventListener('reading-settle-update', event => {
-				if ((event as CustomEvent).detail === 'fail') reject(new Error('Could not save article.')); else resolve();
-			}, { once: true }));
+			const request = ++updateCount.current;
+			document.documentElement.dataset.readingUpdateCalls = String(request);
+			await new Promise<void>((resolve, reject) => {
+				const settle = (event: Event) => {
+					const result = (event as CustomEvent<string | null | { request: number; outcome: string }>).detail;
+					if (result && typeof result === 'object' && result.request !== request) return;
+					window.removeEventListener('reading-settle-update', settle);
+					if ((result && typeof result === 'object' ? result.outcome : result) === 'fail') reject(new Error('Could not save article.')); else resolve();
+				};
+				window.addEventListener('reading-settle-update', settle);
+			});
 		}
 		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
+	if (!mounted) return null;
 	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
-		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onEdit={() => {}} />} />
+		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}} />} />
 		{adding && (new URLSearchParams(location.search).get('host') === 'plugin' ? <ReadingDialogHost.Provider value={PluginReadingDialog}><SaveLinkDialog variant={innerWidth > 600 ? 'centered' : 'bottom-sheet'} url={url} onUrl={setUrl} saving={false} onClose={() => setAdding(false)} onSave={() => setAdding(false)} /></ReadingDialogHost.Provider> : <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>)}
 	</>;
 }

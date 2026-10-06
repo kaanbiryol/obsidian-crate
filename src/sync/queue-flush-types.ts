@@ -53,7 +53,7 @@ export interface QueueFlushContext {
 	recoverUploads(): Promise<void>;
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;
-	pendingRevisions?: Map<string, number>;
+	pendingRevisions: Map<string, number>;
 	api: QueueApi;
 	localManifest: QueueManifest;
 	updateState(updates: Partial<SyncState>): void;

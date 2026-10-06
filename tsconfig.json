@@ -36,6 +36,7 @@
 		"src/**/*.tsx"
 	],
 	"exclude": [
-		"src/cloudflare/worker/**"
+		"src/cloudflare/worker/**",
+		"src/pwa/service-worker/**"
 	]
 }

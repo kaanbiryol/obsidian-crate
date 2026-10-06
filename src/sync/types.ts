@@ -30,6 +30,8 @@ export interface SyncState {
 }
 
 export interface SyncResult {
+	/** Operation outcome; cancellation stays silent and never records a completed sync. */
+	outcome: 'completed' | 'cancelled' | 'failed';
 	success: boolean;
 	uploaded: number;
 	downloaded: number;

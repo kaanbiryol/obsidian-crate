@@ -1,4 +1,5 @@
 import { pendingChangeKey } from './pending-change';
+import { isAbortError } from './abort';
 import { readLocalFileEntry } from './local-file-entry';
 import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { classifyPath } from './reconciliation';
@@ -147,6 +148,7 @@ export async function reconcileIncrementalRemoteChanges(
 				});
 			}
 		} catch (error) {
+			if (isAbortError(error)) throw error;
 			recordSyncError(result, error, path);
 		}
 	}

@@ -6,6 +6,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 import { createIncrementalHarness } from './planner-test-harness';
 import { runIncrementalSync } from './planner-incremental';
 import { assertLocalFileAbsent } from './local-absence';
+import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 
 const path = '.private/note.md';
 const entry = { hash: 'a'.repeat(64), revision: 'original-incarnation', size: 4, modified: new Date(1000).toISOString() };
@@ -34,6 +35,32 @@ async function persistentHarness(lastSeq = 0) {
 }
 
 describe('destructive sync requires complete discovery', () => {
+	it('preserves acknowledged deletion batches when a later batch is cancelled', async () => {
+		const paths = Array.from({ length: BATCH_DELETE_MAX_FILES + 1 }, (_, index) => `deleted-${index}.md`);
+		const h = createIncrementalHarness({ localDeletes: paths });
+		h.localManifest.getEntry.mockReturnValue(entry);
+		h.api.batchDelete.mockImplementationOnce(async deleted => ({ success: true, deleted, errors: [] }))
+			.mockRejectedValueOnce(new DOMException('Delete cancelled', 'AbortError'));
+		const result = await runIncrementalSync(h.context, { uploadConcurrency: 2 });
+		expect(result).toMatchObject({
+			outcome: 'cancelled', success: false, errors: [], deleted: BATCH_DELETE_MAX_FILES, deletedPaths: paths.slice(0, -1),
+		});
+		expect(h.api.batchDelete.mock.calls.map(([batch]) => batch.length)).toEqual([BATCH_DELETE_MAX_FILES, 1]);
+		expect(h.localManifest.removeEntry.mock.calls.map((call: unknown[]) => call[0])).toEqual(paths.slice(0, -1));
+		expect(h.localManifest.save).toHaveBeenCalledOnce();
+		expect(h.settings.lastSeq).toBe(10);
+	});
+
+	it('keeps incremental deletion cancellation silent and does not advance the cursor', async () => {
+		const h = createIncrementalHarness({ localDeletes: [path] });
+		h.localManifest.getEntry.mockReturnValue(entry);
+		h.api.batchDelete.mockRejectedValue(new DOMException('Delete cancelled', 'AbortError'));
+		const result = await runIncrementalSync(h.context, { uploadConcurrency: 2 });
+		expect(result).toMatchObject({ outcome: 'cancelled', success: false, errors: [] });
+		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
+		expect(h.settings.lastSeq).toBe(10);
+	});
+
 	for (const mode of ['full', 'expired-cursor', 'force'] as const) {
 		it.each(['root-list', 'hidden-list', 'nested-list', 'stat'])(`${mode} preserves remote files and checkpoint after %s failure`, async failure => {
 			const harness = await persistentHarness(mode === 'expired-cursor' ? 5 : 0);

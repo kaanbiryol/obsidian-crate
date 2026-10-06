@@ -1,4 +1,5 @@
 import { decodePendingChange } from './pending-change';
+import { createAbortError } from './abort';
 import type { SyncEngine } from './engine';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { SyncHistoryEntry, SyncResult } from './types';
@@ -67,6 +68,7 @@ export async function createRuntimeHistoryRestore({ engine, settings, verify, cl
             return synced;
         });
         verify();
+        if (result.outcome === 'cancelled') throw createAbortError('History restore sync cancelled');
         if (!result.success || result.conflicts.length) throw new Error('Restore needs attention during sync. Automatic sync is off; review Pending and Conflicts before continuing.');
         await review.verifySynced();
         verify();

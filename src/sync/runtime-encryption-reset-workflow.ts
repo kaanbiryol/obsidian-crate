@@ -1,3 +1,4 @@
+import { createAbortError } from './abort';
 import type { EncryptionServerState } from '../encryption/server-state';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
@@ -86,6 +87,7 @@ export async function runEncryptionReset(
 		// edited the new server copy; retries must retain the normal sync baseline.
 		const result = await engine.sync((current, total) => progress(`Syncing files: ${current} of ${total}`));
 		verify();
+		if (result.outcome === 'cancelled') throw createAbortError('Encryption reset sync cancelled');
 		if (!result.success || result.conflicts.length) throw new Error('The server reset is complete, but uploading needs attention. Resume to retry the upload.');
 		if (!await pushSharedSettings()) throw new Error('Files were uploaded, but shared settings need to be retried. Resume the reset.');
 		verify();

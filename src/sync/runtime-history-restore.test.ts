@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRuntimeHistoryRestore } from './runtime-history-workflow';
-import { createEmptySyncResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult } from './sync-result';
 import type { SyncHistoryEntry } from './types';
 import { normalizeCrateSettings } from '../plugin/settings';
 import type { CrateSettings } from '../plugin/settings-types';
@@ -36,6 +36,15 @@ function harness(automaticSync = true) {
 }
 
 describe('history restore orchestration', () => {
+    it('retains the pause and stops completion verification when reconciliation is cancelled', async () => {
+        const h = harness();
+        h.engine.sync.mockResolvedValue(cancelSyncResult(createEmptySyncResult()));
+        await expect((await h.prepare(h.entry)).restore()).rejects.toMatchObject({ name: 'AbortError' });
+        expect(h.verifySynced).not.toHaveBeenCalled();
+        expect(h.settings.automaticSync).toBe(false);
+        expect(h.persistSettings).not.toHaveBeenCalledWith({ automaticSync: true });
+    });
+
     it.each([true, false])('persists the pause before writes and restores the previous automatic-sync setting (%s) only after verifying sync', async automaticSync => {
         const h = harness(automaticSync);
         const review = await h.prepare(h.entry);

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { test } from 'node:test';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { createPwaPreviewServer } from './pwa-preview-server.mjs';
@@ -582,21 +583,20 @@ async function testLaunchUpdate(browser, mode) {
 }
 
 for (const browserType of [chromium, webkit]) {
-  const browser = await browserType.launch();
-  try {
-    for (const mode of ['manifest', 'cookie']) {
-      await testUpdate(browser, mode);
-      console.log(`${browserType.name()}: Safari update → ${mode} installation → repeated Home Screen launch passed`);
-    }
-    for (const mode of ['fast', 'slow-check', 'slow-install', 'failed-check', browserType === chromium ? 'offline' : 'offline-signal']) {
-      await testLaunchUpdate(browser, mode);
-      console.log(`${browserType.name()}: ${mode} launch update passed`);
-    }
-    await testDeferredUpdate(browser);
-    console.log(`${browserType.name()}: deferred update preserves editors, pending writes, reading and resume, and keeps other tabs intact`);
-    await testPreparingReadingUpdate(browser);
-    console.log(`${browserType.name()}: updates stay blocked while a Reading edit waits for the native storage lock`);
-    await testPreparingCommandUpdate(browser);
-    console.log(`${browserType.name()}: updates stay blocked while a completion command awaits its identity, then resume after sync`);
-  } finally { await browser.close(); }
+  // Each scenario owns its browser, contexts and server. A failed assertion must
+  // not skip the remaining update boundaries or coverage in the other engine.
+  const scenario = (name, run) => test(`${browserType.name()}: ${name}`, { timeout: 90_000 }, async t => {
+    const browser = await browserType.launch();
+    t.after(() => browser.close());
+    await run(browser);
+  });
+  for (const mode of ['manifest', 'cookie']) {
+    scenario(`Safari update, ${mode} installation and repeated Home Screen launch`, browser => testUpdate(browser, mode));
+  }
+  for (const mode of ['fast', 'slow-check', 'slow-install', 'failed-check', browserType === chromium ? 'offline' : 'offline-signal']) {
+    scenario(`${mode} launch update`, browser => testLaunchUpdate(browser, mode));
+  }
+  scenario('deferred update preserves editors, pending writes and other tabs', testDeferredUpdate);
+  scenario('update waits for a Reading edit to acquire its storage lock', testPreparingReadingUpdate);
+  scenario('update waits for a completion command to acquire its identity', testPreparingCommandUpdate);
 }

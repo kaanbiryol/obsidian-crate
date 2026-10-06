@@ -15,7 +15,9 @@ export const bundleBudgets = {
 		// bring the total to 5.526 MB raw / 2.780 MB gzip; retain a small margin.
 		// 0.6.0 adds transcript playback, shared dialogs and native settings controls:
 		// measured 5.592 MB raw / 2.812 MB gzip, including the embedded app.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5600000', 10),
+		// Explicit cancellation and article-lifetime guards bring raw size to about
+		// 5.604 MB. Retain a small margin; the gzip ceiling stays unchanged.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5610000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2820000', 10),
 	},
 	{

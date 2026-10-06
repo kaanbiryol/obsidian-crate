@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runPeriodicCheckWorkflow, type PeriodicCheckWorkflowContext } from './engine-periodic-workflow';
-import { createEmptySyncResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult } from './sync-result';
 
 function createContext(overrides: Partial<{
 	checkForChanges: PeriodicCheckWorkflowContext['checkForChanges'];
@@ -44,6 +44,14 @@ function createContext(overrides: Partial<{
 }
 
 describe('runPeriodicCheckWorkflow', () => {
+	it('does not count a cancelled sync as a failed periodic check', async () => {
+		const harness = createContext({ localFilesChanged: true });
+		harness.sync.mockResolvedValue(cancelSyncResult(createEmptySyncResult()));
+		await runPeriodicCheckWorkflow(harness.context);
+		expect(harness.getFailures()).toBe(0);
+		expect(harness.context.onCheckFailure).not.toHaveBeenCalled();
+	});
+
 	it('does not check or sync when periodic syncing is disabled', async () => {
 		const harness = createContext({ localFilesChanged: true });
 		harness.context.automaticSyncEnabled = () => false;

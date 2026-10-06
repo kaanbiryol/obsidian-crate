@@ -2,7 +2,58 @@ import { test, expect, chromium, webkit } from '@playwright/test';
 
 for (const browserName of ['chromium', 'webkit'] as const) {
 	test.describe(browserName, () => {
-		for (const host of ['pwa', 'plugin']) {
+			for (const host of ['pwa', 'plugin']) {
+				for (const outcome of ['success', 'fail']) {
+					test(`${host} ignores ${outcome} from a replaced article while its new save is pending`, async ({ baseURL }) => {
+						const browser = await ({ chromium, webkit })[browserName].launch();
+						try {
+							const page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+							await page.route(/^https:\/\//, route => route.abort());
+							await page.goto(`/?host=${host}&scene=reading&theme=dark&reader&reader-delayed-update&reader-action-lifetime`);
+							await page.getByRole('button', { name: 'Edit article tags' }).click();
+							await page.getByRole('button', { name: 'Save tags', exact: true }).click();
+							await expect(page.locator('html')).toHaveAttribute('data-reading-update-calls', '1');
+							await page.evaluate(() => window.dispatchEvent(new Event('reading-replace-article')));
+							await expect(page.getByRole('heading', { name: 'A newly saved article', exact: true })).toBeVisible();
+							await expect(page.getByRole('dialog', { name: 'Article tags' })).toHaveCount(0);
+							await page.getByRole('button', { name: 'Edit article tags' }).click();
+							const save = page.getByRole('button', { name: 'Save tags', exact: true });
+							await expect(save).toBeEnabled();
+							await save.click();
+							await expect(page.locator('html')).toHaveAttribute('data-reading-update-calls', '2');
+							await page.evaluate(async outcome => {
+								window.dispatchEvent(new CustomEvent('reading-settle-update', { detail: { request: 1, outcome } }));
+								await new Promise(requestAnimationFrame);
+							}, outcome);
+							await expect(save).toBeDisabled();
+							await expect(page.getByRole('alert')).toHaveCount(0);
+							await expect(page.locator('html')).not.toHaveAttribute('data-reading-save-completions');
+							await page.evaluate(() => window.dispatchEvent(new CustomEvent('reading-settle-update', { detail: { request: 2, outcome: 'success' } })));
+							await expect(page.getByRole('dialog', { name: 'Article tags' })).toHaveCount(0);
+							await expect(page.locator('html')).toHaveAttribute('data-reading-save-completions', '1');
+						} finally { await browser.close(); }
+					});
+				}
+
+				test(`${host} does not announce a tag save after its reader unmounts`, async ({ baseURL }) => {
+					const browser = await ({ chromium, webkit })[browserName].launch();
+					try {
+						const page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+						await page.route(/^https:\/\//, route => route.abort());
+						await page.goto(`/?host=${host}&scene=reading&theme=dark&reader&reader-delayed-update&reader-action-lifetime`);
+						await page.getByRole('button', { name: 'Edit article tags' }).click();
+						await page.getByRole('button', { name: 'Save tags', exact: true }).click();
+						await expect(page.locator('html')).toHaveAttribute('data-reading-update-calls', '1');
+						await page.evaluate(() => window.dispatchEvent(new Event('reading-unmount')));
+						await expect(page.locator('article.crate-reading-reader')).toHaveCount(0);
+						await page.evaluate(async () => {
+							window.dispatchEvent(new CustomEvent('reading-settle-update'));
+							await new Promise(requestAnimationFrame);
+						});
+						await expect(page.locator('html')).not.toHaveAttribute('data-reading-save-completions');
+					} finally { await browser.close(); }
+				});
+
 			test(`${host} keeps the reader stable throughout native sharing`, async ({ baseURL }) => {
 				const browser = await ({ chromium, webkit })[browserName].launch();
 				try {

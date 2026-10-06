@@ -74,7 +74,7 @@ export async function runSyncWorkflow(
     const imported = await context.tryInitialImport?.(result, progressCallback);
     if (imported) {
       result = imported;
-      if (!imported.errors.length) await context.finishInitialSetup();
+      if (finalizeSyncResult(imported)) await context.finishInitialSetup();
       completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
       return imported;
     }
@@ -83,17 +83,13 @@ export async function runSyncWorkflow(
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
 			result = incrementalResult;
-			if (!result.errors.length) await context.finishInitialSetup();
+			if (finalizeSyncResult(result)) await context.finishInitialSetup();
 			completeWorkflowResult(context, incrementalResult, {
 				errorFallback: 'Incremental sync completed with errors',
 			});
 			return incrementalResult;
 		}
 	} catch (error) {
-		if (context.isAbortError(error)) {
-			logger.info('Incremental sync aborted');
-			return result;
-		}
 		handleWorkflowError(context, result, error, { abortLogMessage: 'Sync recovery aborted', failureLogPrefix: 'Sync recovery failed', logger });
 		finalizeSyncResult(result);
 		return result;
@@ -197,6 +193,7 @@ export async function runSyncWorkflow(
 					recordSyncError(result, `${outcome.reason}`, diff.path);
 				}
 			} catch (error) {
+				if (context.isAbortError(error)) throw error;
 				recordSyncError(result, `${errorMessage(error)}`, diff.path);
 			}
 			current++;

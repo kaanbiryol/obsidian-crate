@@ -4,7 +4,7 @@ import { BATCH_UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
-import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
+import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { FileEntry } from '../protocol/sync-types';
 import type { SyncResult } from './types';
@@ -26,6 +26,7 @@ export async function runIncrementalSync(
     return null;
   }
 
+  const result = createEmptySyncResult();
   try {
     context.reportWork?.('server');
     const changelog = await readIncrementalChangelog(context.api, context.settings.lastSeq, () => context.throwIfDestroyed());
@@ -44,7 +45,6 @@ export async function runIncrementalSync(
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
-    const result = createEmptySyncResult();
     result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)).map(path => pendingChangeKey('upload', path)));
 
     if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
@@ -182,7 +182,7 @@ export async function runIncrementalSync(
     return result;
   } catch (error) {
     if (isAbortError(error)) {
-      throw error;
+      return cancelSyncResult(result);
     }
 
     logger.warn("Incremental sync failed, falling back to full sync:", errorMessage(error));

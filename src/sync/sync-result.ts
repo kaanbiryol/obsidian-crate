@@ -7,6 +7,7 @@ export const SYNC_ERROR_MESSAGES = {
 
 export function createEmptySyncResult(): SyncResult {
 	return {
+		outcome: 'completed',
 		success: true,
 		uploaded: 0,
 		downloaded: 0,
@@ -70,6 +71,9 @@ export function mergeSyncResults(target: SyncResult, source: SyncResult): void {
 	appendUnique(target.downloadedPaths, source.downloadedPaths);
 	appendUnique(target.mergedPaths, source.mergedPaths);
 	appendUnique(target.deletedPaths, source.deletedPaths);
+	if (source.outcome === 'cancelled') cancelSyncResult(target);
+	else if (!source.success || source.outcome === 'failed') target.success = false;
+	finalizeSyncResult(target);
 }
 
 function appendUnique(target: string[], additions: string[]): void {
@@ -80,13 +84,22 @@ function appendUnique(target: string[], additions: string[]): void {
 
 export function createSyncFailureResult(error: string): SyncResult {
 	const result = createEmptySyncResult();
-	result.success = false;
 	result.errors.push(error);
+	finalizeSyncResult(result);
+	return result;
+}
+
+export function cancelSyncResult(result: SyncResult): SyncResult {
+	result.outcome = 'cancelled';
+	result.success = false;
 	return result;
 }
 
 export function finalizeSyncResult(result: SyncResult): boolean {
-	result.success = result.errors.length === 0;
+	if (result.outcome !== 'cancelled') {
+		result.outcome = result.success && result.outcome !== 'failed' && result.errors.length === 0 ? 'completed' : 'failed';
+	}
+	result.success = result.outcome === 'completed';
 	return result.success;
 }
 

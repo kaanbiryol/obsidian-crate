@@ -1,11 +1,23 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Script } from 'node:vm';
-import { SERVICE_WORKER_JS } from '../cloudflare/worker/pwa/service-worker';
+import { build } from 'esbuild';
 import { addReminderScope, createVaultKeyBundle } from '../encryption/key-bundle';
 import { createReminderProjection } from '../encryption/reminder-projection';
 import { importEncryptionSecret } from '../encryption/envelope';
 import { readReminderKeys, type StoredReminderKeys } from './encryption-keys';
 import { decryptPushDisplay } from './encrypted-push';
+
+// Keep the key-read seam while exercising the compiled production event handler.
+const runtime = await build({
+	entryPoints: [new URL('./service-worker/runtime.ts', import.meta.url).pathname],
+	bundle: true, write: false, format: 'iife', globalName: 'crateServiceWorker', platform: 'browser', target: 'es2022',
+	plugins: [{ name: 'push-key-read-fixture', setup(bundle) {
+		bundle.onLoad({ filter: /[/\\]encrypted-push\.ts$/ }, () => ({
+			contents: 'export const decryptPushDisplay = value => crateEncryptedPush.decryptPushDisplay(value);', loader: 'js',
+		}));
+	} }],
+});
+const SERVICE_WORKER_JS = `${runtime.outputFiles[0]!.text}\ncrateServiceWorker.initialize(self, { version: 'test', chunkUrls: [] });`;
 
 vi.mock('./encryption-keys', () => ({ readReminderKeys: vi.fn() }));
 afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });

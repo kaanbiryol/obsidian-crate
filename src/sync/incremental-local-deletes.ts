@@ -1,4 +1,5 @@
 import { pendingChangeKey } from './pending-change';
+import { createAbortError, isAbortError } from './abort';
 import { recordSyncError } from './issues';
 import { errorMessage } from '../plugin/logger';
 import type { MutationFailure } from '../protocol/sync-types';
@@ -27,11 +28,16 @@ export async function applyIncrementalLocalDeletes(
     }
     const deleteResult = deleteFiles.length > 0
       ? await deleteFilesInBatches(context.api, deleteFiles, path => assertLocalFileAbsent(context.vault, path))
-      : { success: true, deleted: [], errors: [] };
+      : { outcome: 'completed' as const, success: true, deleted: [], errors: [] };
     for (const path of deleteResult.deleted) {
       context.localManifest.removeEntry(path);
       result.deleted++;
       result.deletedPaths.push(path);
+    }
+    if (deleteResult.outcome === 'cancelled') {
+      for (const failure of deleteResult.errors) recordSyncError(result, failure.error, failure.path);
+      if (deleteResult.deleted.length) await context.localManifest.save();
+      throw createAbortError('Remote deletion cancelled');
     }
 
     if (!deleteResult.success) {
@@ -63,6 +69,7 @@ export async function applyIncrementalLocalDeletes(
       }
     }
   } catch (error) {
+    if (isAbortError(error)) throw error;
     const errMsg = errorMessage(error);
     for (const path of localOnlyDeletes) {
       recordSyncError(result, `${errMsg}`, path);

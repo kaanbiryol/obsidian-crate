@@ -9,7 +9,7 @@ import type { QueueFlushContext } from './queue-flush-types';
 import { uploadPendingFiles } from './queue-upload';
 import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
 import { HttpError } from './api';
-import { createEmptySyncResult } from './sync-result';
+import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import type { SyncResult } from './types';
 import { recordSyncError, syncErrorIssues, formatSyncIssue, withSyncFileContext } from './issues';
 
@@ -26,9 +26,9 @@ function clearCompletedRevisions(
 		const startingRevision = revisionSnapshot.get(path);
 		if (
 			!context.pendingPaths.has(path)
-			&& context.pendingRevisions?.get(path) === startingRevision
+			&& context.pendingRevisions.get(path) === startingRevision
 		) {
-			context.pendingRevisions?.delete(path);
+			context.pendingRevisions.delete(path);
 		}
 	}
 }
@@ -49,7 +49,7 @@ function buildQueueSyncResult(
 	result.uploaded = result.uploadedPaths.length;
 	result.deleted = result.deletedPaths.length;
 	result.errors.push(...errors);
-	result.success = errors.length === 0;
+	finalizeSyncResult(result);
 	return result;
 }
 
@@ -86,7 +86,7 @@ export async function processPendingChanges(
 	const uploadPaths = changes.filter(change => change.kind === 'upload').map(change => change.path);
 	const deletedPaths = changes.filter(change => change.kind === 'delete').map(change => change.path);
 	const revisionSnapshot = new Map(
-		paths.map(path => [path, context.pendingRevisions?.get(path)] as const),
+		paths.map(path => [path, context.pendingRevisions.get(path)] as const),
 	);
 	const completedQueueKeys = new Set<string>();
 	const reconciliationPaths = new Set<string>();
@@ -175,6 +175,7 @@ export async function processPendingChanges(
 			for (const path of paths) {
 				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
 			}
+			clearCompletedRevisions(context, completedQueueKeys, revisionSnapshot);
 			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.pendingPaths.size });
 			logger.info('Queue processing aborted');
 		} else {
@@ -203,7 +204,7 @@ export async function processPendingChanges(
 				completedQueueKeys,
 			);
 			recordSyncError(failed, error);
-			failed.success = false;
+			finalizeSyncResult(failed);
 			await reportFlushResult(context, failed);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 		}

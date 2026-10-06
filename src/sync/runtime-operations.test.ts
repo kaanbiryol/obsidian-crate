@@ -2,7 +2,7 @@ import { SyncEngine } from './engine';
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../plugin/settings-types';
 import type { SyncResult } from './types';
-import { createEmptySyncResult } from './sync-result';
+import { cancelSyncResult, createEmptySyncResult } from './sync-result';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
 import { recordSyncHistory } from './runtime-history';
 import { SyncRuntime } from './runtime';
@@ -15,6 +15,25 @@ import {
 } from './runtime-test-harness';
 
 describe('SyncRuntime operation wrappers', () => {
+	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history or checkpoint progress', async mode => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const result = cancelSyncResult({ ...createEmptySyncResult(), uploaded: 1, uploadedPaths: ['saved.md'] });
+		const saveHistoryCheckpoint = vi.fn(async () => 'checkpoint');
+		const saveSharedHistoryCheckpoint = vi.fn(async () => undefined);
+		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
+		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveHistoryCheckpoint, saveSharedHistoryCheckpoint });
+		const automatic = callback.mock.calls.at(-1)![0];
+		callback.mockRestore();
+		if (mode === 'manual') expect(await runtime.sync()).toBe(result);
+		else await automatic(result);
+		expect(settings.syncHistory).toEqual([]);
+		expect(settings.lastSync).toBeNull();
+		expect(saveHistoryCheckpoint).not.toHaveBeenCalled();
+		expect(saveSharedHistoryCheckpoint).not.toHaveBeenCalled();
+		expect(persistSettings).not.toHaveBeenCalled();
+		expect(runtime.getActivityProgress()).toBeNull();
+	});
+
 	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const checkpoint = createDeferred<string>();
