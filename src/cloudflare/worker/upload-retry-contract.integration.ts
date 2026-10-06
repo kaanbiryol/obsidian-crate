@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -25,8 +27,8 @@ async function upload(operationId: string, batch: boolean, content = 'Original b
 	const hash = await sha256Hex(content);
 	const path = 'note.md';
 	const response = batch
-		? await handleBatchUpload(new Request('https://test/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files: [{ operationId, path, content: btoa(content), hash, size: content.length, contentType: 'text/markdown', expectedHash }] }) }), env.BUCKET, env.DB)
-		: await handleUpload(new Request(`https://test/sync/upload?path=${path}`, { method: 'PUT', body: content, headers: { 'X-Crate-Upload-Operation': operationId, 'X-Crate-Expected-Hash': expectedHash ?? 'absent', 'Content-Type': 'text/markdown' } }), env.BUCKET, env.DB);
+		? await handleBatchUpload(new Request('https://test/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files: [{ operationId, path, content: btoa(content), hash, size: content.length, contentType: 'text/markdown', expectedHash }] }) }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })
+		: await handleUpload(new Request(`https://test/sync/upload?path=${path}`, { method: 'PUT', body: content, headers: { 'X-Crate-Upload-Operation': operationId, 'X-Crate-Expected-Hash': expectedHash ?? 'absent', 'Content-Type': 'text/markdown' } }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	const body = await response.json() as UploadResult & { results?: UploadResult[] };
 	return body.results?.[0] ?? { ...body, ...(!body.success ? { status: response.status } : {}) };
 }

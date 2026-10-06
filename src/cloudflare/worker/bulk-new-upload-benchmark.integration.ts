@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -35,7 +37,7 @@ it('compares 8000 new Markdown files at four concurrent requests', { timeout: 90
         const chunk = files.slice(offset, offset + chunkSize);
         const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', {
           method: 'POST', body: JSON.stringify({ files: chunk, bulkNewFiles }),
-        }), env.BUCKET, meter.db);
+        }), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles });
         const body = await response.json() as BatchUploadResponse;
         expect(body.success, JSON.stringify(body)).toBe(true);
         expect(body.results).toHaveLength(chunk.length);

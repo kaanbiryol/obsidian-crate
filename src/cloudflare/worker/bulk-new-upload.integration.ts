@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -15,7 +17,7 @@ const file = (path: string, content = '# Ordinary note') => ({ path, content: bt
   operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) });
 const send = (files: ReturnType<typeof file>[], bulkNewFiles = true) => handleBatchUpload(new Request('https://test/sync/batch-upload', {
   method: 'POST', body: JSON.stringify({ files, bulkNewFiles }),
-}), env.BUCKET, env.DB);
+}), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 const body = async (files: ReturnType<typeof file>[], bulk = true) => (await send(files, bulk)).json() as Promise<BatchUploadResponse>;
 
 it('commits eight notes with grouped projection writes and one transaction', async () => {

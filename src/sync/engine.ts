@@ -68,6 +68,7 @@ export class SyncEngine {
 	getTimings() { return { ...this.timingRecorder.snapshot(), requests: this.api.getRequestTimings?.() }; }
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
+	private shutdownTask: Promise<void> | null = null;
 	private contentVerifier: LocalContentVerifier;
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
@@ -476,10 +477,10 @@ export class SyncEngine {
 	}
 
 	private seedMarkdownBaseCacheInBackground(): void {
-		void this.markdownBaseCache.seedFromManifest(this.localManifest, {
+		void this.trackWork(() => this.markdownBaseCache.seedFromManifest(this.localManifest, {
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			runConcurrent: this.runConcurrent.bind(this),
-		}).catch((error) => {
+		})).catch((error) => {
 			logger.warn('Markdown base cache seed failed:', errorMessage(error));
 		});
 	}
@@ -487,10 +488,10 @@ export class SyncEngine {
 	private recoverConflictStoreInBackground(): void {
 		if (this.lifecycle.isDestroyed) return;
 		const ignoreMatcherContext = this.getIgnoreMatcherContext();
-		void this.conflictStore.recoverFromVault(
+		void this.trackWork(() => this.conflictStore.recoverFromVault(
 			(path) => shouldIgnoreConfiguredPath(path, ignoreMatcherContext),
 			() => this.lifecycle.isDestroyed,
-		).catch((error) => {
+		)).catch((error) => {
 			logger.warn('Conflict recovery failed:', errorMessage(error));
 		});
 	}
@@ -505,7 +506,7 @@ export class SyncEngine {
 
 	private pruneMarkdownBaseCacheInBackground(): void {
 		if (this.lifecycle.isDestroyed) return;
-		void this.markdownBaseCache.pruneUnreferenced(this.localManifest).catch((error) => {
+		void this.trackWork(() => this.markdownBaseCache.pruneUnreferenced(this.localManifest)).catch((error) => {
 			logger.warn('Markdown base cache prune failed:', errorMessage(error));
 		});
 	}
@@ -534,8 +535,9 @@ export class SyncEngine {
 	}
 
 	onFileChange(file: TAbstractFile): void {
+		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {
-			void this.conflictStore.registerDiscovered(file.path).catch((error) => {
+			void this.trackWork(() => this.conflictStore.registerDiscovered(file.path)).catch((error) => {
 				logger.warn('Failed to register conflict copy:', errorMessage(error));
 			});
 		}
@@ -543,8 +545,9 @@ export class SyncEngine {
 	}
 
 	onFileDelete(file: TAbstractFile): void {
+		if (this.lifecycle.isDestroyed) return;
 		if (isConflictFile(file.path)) {
-			void this.conflictStore.markResolved(file.path).catch((error) => {
+			void this.trackWork(() => this.conflictStore.markResolved(file.path)).catch((error) => {
 				logger.warn('Failed to resolve conflict copy:', errorMessage(error));
 			});
 		}
@@ -554,14 +557,15 @@ export class SyncEngine {
 	getRenameDependencies(): Record<string, string> { return this.localManifest.getRenameDependencies(); }
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
+		if (this.lifecycle.isDestroyed) return;
 		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path);
 		if (isConflictFile(oldPath)) {
-			void this.conflictStore.markResolved(oldPath).catch((error) => {
+			void this.trackWork(() => this.conflictStore.markResolved(oldPath)).catch((error) => {
 				logger.warn('Failed to resolve renamed conflict copy:', errorMessage(error));
 			});
 		}
 		if (isConflictFile(file.path)) {
-			void this.conflictStore.registerDiscovered(file.path).catch((error) => {
+			void this.trackWork(() => this.conflictStore.registerDiscovered(file.path)).catch((error) => {
 				logger.warn('Failed to register renamed conflict copy:', errorMessage(error));
 			});
 		}
@@ -703,22 +707,36 @@ export class SyncEngine {
 
 	private async trackWork<T>(operation: () => Promise<T>): Promise<T> {
 		this.lifecycle.throwIfDestroyed();
-		const task = operation();
-		this.activeWork.add(task);
-		try { return await task; } finally { this.activeWork.delete(task); }
+		// Register before dispatch: synchronous host callbacks may stop the engine
+		// while operation() is starting its first asynchronous write.
+		let finish!: () => void;
+		const active = new Promise<void>(resolve => { finish = resolve; });
+		this.activeWork.add(active);
+		try { return await operation(); }
+		finally { this.activeWork.delete(active); finish(); }
 	}
 
 	async waitForIdle(): Promise<void> {
+		if (this.shutdownTask) return this.shutdownTask;
 		await Promise.allSettled([...this.activeWork, this.queueController.waitForIdle(), this.localManifest.close()]);
+		// A shutdown begun during this wait may own additional accepted work.
+		return this.shutdownTask ?? undefined;
 	}
 
 	destroy(): void {
+		if (this.lifecycle.isDestroyed) return;
 		if (this.conflictRecoveryTimer !== null) {
 			clearTimeout(this.conflictRecoveryTimer);
 			this.conflictRecoveryTimer = null;
 		}
 		this.lifecycle.destroy();
 		this.queueController.destroy();
-		void this.localManifest.close();
+		// Accepted transfers and recovery jobs may still enqueue conflict metadata
+		// after awaited I/O. Close that store only after its producers have drained.
+		this.shutdownTask = Promise.allSettled([
+			...this.activeWork,
+			this.queueController.waitForIdle(),
+			this.localManifest.close(),
+		]).then(() => this.conflictStore.close());
 	}
 }

@@ -8,6 +8,7 @@ import { openLocalRuntime } from './local-server-runtime.mjs';
 import { listenLocalServer } from './local-server-http.mjs';
 import { createPairing, startLocalControl } from './local-server-pairing.mjs';
 import { monitorPublicReadiness } from './local-server-readiness.mjs';
+import { closeLocalServerResources } from './local-server-lifecycle.mjs';
 
 export function quickTunnelOrigin(output) {
 	return output.match(/https:\/\/[a-z0-9]+(?:-[a-z0-9]+)*\.trycloudflare\.com(?=[\s/]|$)/)?.[0] ?? null;
@@ -52,17 +53,9 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 	let control;
 	let readiness;
 	const instance = randomUUID();
-	async function close() {
+	async function close(startupError) {
 		active = null;
-		await readiness?.close();
-		await control?.close();
-		await tunnel?.stop();
-		if (server) {
-			const deadline = setTimeout(() => server.closeAllConnections(), 5000);
-			try { await new Promise(resolve => server.close(resolve)); }
-			finally { clearTimeout(deadline); }
-		}
-		await runtime?.close();
+		await closeLocalServerResources({ readiness, control, tunnel, server, runtime }, startupError);
 	}
 	try {
 		// Reject a bad or already-running data directory before any exposure.
@@ -81,5 +74,5 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		active = runtime;
 		readiness = monitorPublicReadiness({ origin: runtime.origin, instance, signal, onChange: onReadiness });
 		return { runtime, tunnel, server, pairingCode, name, close };
-	} catch (error) { await close(); throw error; }
+	} catch (error) { await close(error); throw error; }
 }

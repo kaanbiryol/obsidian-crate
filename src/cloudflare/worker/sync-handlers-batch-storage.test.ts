@@ -1,3 +1,5 @@
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	handleBatchDownload,
@@ -38,6 +40,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(503);
@@ -262,6 +265,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(200);

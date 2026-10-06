@@ -20,6 +20,7 @@ import { handleEncryptedReminders } from './encrypted-reminders';
 import { handleEncryptionReset } from './encryption-reset';
 import { handleEncryptionConversion } from './encryption-conversion';
 import type { EncryptionServerState } from '../../encryption/server-state';
+import type { UploadCommitters } from './upload-committers';
 
 
 export { handlePublicRoute };
@@ -38,6 +39,7 @@ export function isAuthenticatedRouteAllowed(
 export async function handleAuthenticatedRoute(
 	request: Request,
 	env: Env,
+	uploadCommitters: UploadCommitters,
 	path: string,
 	method: RouteMethod,
 	principal: AuthPrincipal,
@@ -78,7 +80,7 @@ export async function handleAuthenticatedRoute(
 		?? (principal.scope === 'vault' ? await handleEncryptionConversion(request, env, path) : null)
 		?? await handleEncryptionRoute(request, db, path, principal, encryption)
 		?? await handleEncryptedReminders(request, env, path)
-		?? await handleSyncRoute(request, env, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
+		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
 		?? await handleNotificationsRoute(request, db, path, method, principal);

@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -49,7 +51,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	const request = new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
 		headers: { 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)) } });
-	const result = await handleUpload(request, env.BUCKET, env.DB);
+	const result = await handleUpload(request, env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	expect(result.status, await result.clone().text()).toBe(200);
 	const stored = await getStoredFileRow(env.DB, path);
 	expect(stored?.hash).toBe(file.hash);

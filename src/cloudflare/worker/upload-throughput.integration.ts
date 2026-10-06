@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -18,7 +20,7 @@ const files = (extension = 'svg') => Array.from({ length: 4 }, (_, index) => ({
 const send = (payload: ReturnType<typeof files>) => handleBatchUpload(new Request('https://test/sync/batch-upload', {
   method: 'POST', body: JSON.stringify({ files: payload }),
 // Production authentication supplies both snapshots before this handler runs.
-}), env.BUCKET, env.DB, undefined, undefined, null, null);
+}), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles }, null, null);
 
 it('uses one lease write and commit-returned receipts for a larger asset batch', async () => {
   const payload = files();

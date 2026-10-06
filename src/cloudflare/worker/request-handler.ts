@@ -23,6 +23,9 @@ import { ReminderMarkdownContextError } from '@/reminders/core/markdownTaskConte
 import { EncryptionStateError } from './encryption-state';
 import { assertRequestEncryption, checkRequestProtocol } from './request-guards';
 import { forwardTransferRequest } from './transfer-dispatch';
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
+import type { UploadCommitters } from './upload-committers';
 
 function withRequestId(response: Response, requestId: string, started: number): Response {
 	const headers = new Headers(response.headers);
@@ -117,8 +120,10 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 			const scheduled = await maintenance.fetch('https://do/maintain', { method: 'POST' });
 			if (!scheduled.ok) throw new Error('Unable to schedule cleanup');
 		}
-		const routeEnv = execution.kind === 'coordinator' ? env : { ...env, commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) };
-		const response = await handleAuthenticatedRoute(request, routeEnv, path, method, authResult.principal, authResult.resetGeneration, requestId, encryption)
+		const uploadCommitters: UploadCommitters = execution.kind === 'coordinator'
+			? { commitUpload: commitStagedFile, commitNewFiles }
+			: { commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) };
+		const response = await handleAuthenticatedRoute(request, env, uploadCommitters, path, method, authResult.principal, authResult.resetGeneration, requestId, encryption)
 			?? corsResponse({ error: 'Not found' }, 404);
 		if (mutation) await logMutation(request, response, requestId, authResult.principal);
 		return withRequestId(response, requestId, started);

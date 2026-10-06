@@ -1,3 +1,4 @@
+import { commitNewFiles } from './bulk-new-file-commit';
 import { commitStagedFile } from './sync-mutations';
 import { describe, expect, it } from 'vitest';
 import {
@@ -58,6 +59,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 		const deleteResponse = await handleBatchDelete(
 			new Request('https://worker.test/sync/batch-delete', {
@@ -114,7 +116,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}),
 			bucket,
 			db,
-      commitUpload,
+      { commitUpload, commitNewFiles },
 		);
 
 		expect(response.status).toBe(200);
@@ -155,6 +157,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(409);

@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -35,13 +37,13 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 
   const meter = meterD1Writes(env.DB);
   const files = Array.from({ length: 8 }, (_, i) => file(`Notes/${i}.md`));
-  const result = await (await handleBatchUpload(request(files), env.BUCKET, meter.db)).json() as BatchUploadResponse;
+  const result = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
   expect(result.success).toBe(true);
   await drainNotificationProjections({ ...env, DB: meter.db }, 8);
   expect(meter.writes()).toBe(legacy ? 76 : 52);
   expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
   const beforeRetry = meter.writes();
-  const retry = await (await handleBatchUpload(request(files), env.BUCKET, meter.db)).json() as BatchUploadResponse;
+  const retry = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
   expect(retry).toEqual(result);
   expect(meter.writes() - beforeRetry).toBe(0);
 });
@@ -50,7 +52,7 @@ it('keeps cleanup work when a new upload replaces stale reminder state', async (
   await initialize();
   await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, file_revision, notification_token, policy_revision)
     VALUES ('old-reminder', 'Notes/recreated.md', 'old-revision', 'old-token', 'policy')`).run();
-  const result = await (await handleBatchUpload(request([file('Notes/recreated.md')]), env.BUCKET, env.DB)).json() as BatchUploadResponse;
+  const result = await (await handleBatchUpload(request([file('Notes/recreated.md')]), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
   expect(result.success).toBe(true);
   expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path: 'Notes/recreated.md' });
   await drainNotificationProjections(env, 8);
@@ -63,7 +65,7 @@ it('passes batch leases through the real reminder coordinator and schedules actu
   await initialize();
   const id = '11111111-1111-4111-8111-111111111111';
   const files = [file('Notes/plain.md'), file('Notes/reminder.md', `- [ ] Due @2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`)];
-  const result = await (await handleBatchUpload(request(files), env.BUCKET, env.DB, undefined, coordinatedNewFiles(env))).json() as BatchUploadResponse;
+  const result = await (await handleBatchUpload(request(files), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles: coordinatedNewFiles(env) })).json() as BatchUploadResponse;
   expect(result.success).toBe(true);
   expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
   expect(await env.DB.prepare("SELECT path FROM notification_projection_jobs WHERE path = 'Notes/plain.md'").first()).toBeNull();

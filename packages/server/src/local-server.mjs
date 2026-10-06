@@ -12,6 +12,7 @@ import { createPairing, requestLocalPairing, startLocalControl } from './local-s
 import { monitorPublicReadiness } from './local-server-readiness.mjs';
 import { randomUUID } from 'node:crypto';
 import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from './local-server-backup.mjs';
+import { closeLocalServerResources } from './local-server-lifecycle.mjs';
 
 const help = `Crate local server
 
@@ -178,16 +179,8 @@ try {
 	if (!shutdown.signal.aborted) { console.error(error.message); process.exitCode = 1; }
 } finally {
 	try {
-		await readiness?.close();
-		await control?.close();
-		await quickServer?.close();
-		await tunnel?.stop();
-		if (server) {
-			const deadline = setTimeout(() => server.closeAllConnections(), 5000);
-			try { await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
-			finally { clearTimeout(deadline); }
-		}
-		await runtime?.close();
+		if (quickServer) await quickServer.close();
+		else await closeLocalServerResources({ readiness, control, tunnel, server, runtime });
 	} catch (error) { console.error(error.message); process.exitCode = 1; }
 	for (const signal of signals) process.removeListener(signal, onSignal);
 }

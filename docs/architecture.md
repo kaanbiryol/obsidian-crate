@@ -51,6 +51,11 @@ stays on loopback. Schema and runtime compatibility are checked before Durable
 Objects start. Local administration issues hashed per-device credentials
 without Cloudflare OAuth. See [self-hosting](self-hosting.md).
 
+`packages/server/src/local-server-lifecycle.mjs` owns ordered teardown for the CLI
+and Quick Server. It drains the HTTP listener before closing the runtime, attempts
+remaining cleanup after individual failures, and preserves startup errors alongside
+cleanup errors. Runtime disposal still owns safe release of the data-directory lock.
+
 `Dockerfile` packages that same standalone runtime and a pinned tunnel connector.
 `compose.yaml` owns container lifecycle and the persistent `/data` volume. Its
 entrypoint holds a kernel lease across the CLI and its children, allowing crash
@@ -129,6 +134,11 @@ on `SyncApiClient`; the client retains HTTP, protocol and encryption concerns.
 Restore writes participate in engine shutdown draining, and the runtime only finishes
 a restore after successful reconciliation by the same engine.
 
+Engine shutdown also drains accepted conflict mutations, background recovery and
+Markdown-cache work before a replacement engine can load their files. The conflict
+store closes after its producers settle, finishes queued writes, and rejects new
+mutations; serialization within one store alone cannot protect replacement stores.
+
 `sync/planner-incremental.ts` owns incremental phase ordering, progress, manifest
 saves and cursor advancement. `incremental-changelog.ts` reads a deduplicated
 snapshot without changing the saved cursor. `incremental-remote-reconciliation.ts`
@@ -159,6 +169,10 @@ protocol and encryption checks; the handler retains their ordering around
 admission, authentication, scope authorization and route dispatch. Transfer
 requests authenticate again after entering the queue. Coordinator execution
 receives the Durable Object state and persists notification wakes before mutations.
+The handler selects required `UploadCommitters` from that execution kind and passes
+them through the routes. Worker `Env` contains bindings, not optional publication
+callbacks. Upload handlers retain staging and validation; direct publication and
+coordinator forwarding remain explicit choices without fallback defaults.
 
 `sync/runtime-server-status.ts` owns version caching and delayed reachability
 probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
@@ -264,6 +278,9 @@ explicit refresh can retry uncertain commands. Rejected commands remain for revi
 Settings deadlines and failure announcements use the same outbox policy: transient
 errors remain visible, while toasts wait until automatic recovery stops or review
 is required.
+`pwa/reading/storage.ts` owns `commitReadingCache`, keeping uncertain-source
+preservation, article pruning, encrypted records and list persistence in one guarded
+transaction. `pwa/reading/api.ts` retains pagination and response validation.
 The plugin's `reading/ui/useLocalReadingArticle.ts` owns reader navigation and
 invalidates late reads on Back, a newer open, library replacement or unmount.
 

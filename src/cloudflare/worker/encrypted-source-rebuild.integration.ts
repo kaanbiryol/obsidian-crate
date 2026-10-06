@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -36,7 +38,7 @@ async function fixture(padding: number, count = 1) {
 	const response = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
-	} }), env.BUCKET, env.DB);
+	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	expect(response.status, await response.clone().text()).toBe(200);
 	return { state, file, path, bundle, keys };
 }
@@ -123,7 +125,7 @@ it('keeps coordinator passes within their query budget while rebuilding two dens
 	const uploaded = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 		'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
-	} }), env.BUCKET, env.DB);
+	} }), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
 	expect(uploaded.status).toBe(200);
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0').run();
 	// Revalidation refreshes a job's timestamp. An older, still-unverified job

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAllVaultFiles } from './file-discovery';
 import { ConflictStore } from './conflict-store';
+import { createDeferred } from './runtime-test-harness';
 
 vi.mock('./file-discovery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./file-discovery')>();
@@ -170,5 +171,45 @@ describe('ConflictStore', () => {
 			localHash: 'local',
 			remoteHash: 'remote',
 		}]);
+	});
+
+	it('finishes queued mutations on close and rejects later writes', async () => {
+		const { store, adapter, files } = createHarness();
+		const started = createDeferred<void>();
+		const release = createDeferred<void>();
+		const write = adapter.write.getMockImplementation()!;
+		adapter.write.mockImplementationOnce(async (path, value) => {
+			started.resolve();
+			await release.promise;
+			await write(path, value);
+		});
+		const path = 'note (conflict 2026-01-02 03-04-05 ab12).md';
+		const discovering = store.registerDiscovered(path);
+		const recording = store.record({ originalPath: 'note.md', conflictPath: path,
+			cause: 'concurrent-edit', localHash: 'local', remoteHash: 'remote' });
+		await started.promise;
+		const drained = vi.fn();
+		const closing = store.close().then(drained);
+		try {
+			await expect(store.markResolved(path)).rejects.toMatchObject({ name: 'AbortError' });
+			expect(drained).not.toHaveBeenCalled();
+		} finally {
+			release.resolve();
+			await Promise.all([discovering, recording, closing]);
+		}
+		expect(JSON.parse(files.get('.obsidian/plugins/crate/conflicts.json')!)).toEqual({ version: 1, conflicts: [
+			expect.objectContaining({ conflictPath: path, cause: 'concurrent-edit', localHash: 'local', remoteHash: 'remote', status: 'active' }),
+		] });
+	});
+
+	it('does not enqueue a discovered snapshot after the store closes', async () => {
+		const { store, adapter } = createHarness();
+		const discovery = createDeferred<Awaited<ReturnType<typeof getAllVaultFiles>>>();
+		getAllVaultFilesMock.mockReturnValueOnce(discovery.promise);
+		const recovering = store.recoverFromVault(() => false);
+		await store.close();
+		discovery.resolve([{ path: 'note (conflict 2026-01-02 03-04-05 ab12).md', size: 1, mtime: 1, extension: 'md' }]);
+		await recovering;
+		expect(adapter.write).not.toHaveBeenCalled();
 	});
 });

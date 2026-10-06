@@ -7,7 +7,8 @@ import { sha256HexBytes } from './auth';
 import { readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
 import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from './utils';
-import { commitFileDelete, commitStagedFile } from './sync-mutations';
+import { commitFileDelete } from './sync-mutations';
+import type { UploadCommitters } from './upload-committers';
 import { FileNamespaceConflictError } from './file-namespace';
 import { mutationAuditContext } from './request-diagnostics';
 import type { FileDeletionReceipt } from './file-delete-audit';
@@ -22,7 +23,7 @@ import {
 	type FileStorageRow,
 } from './sync-storage';
 
-export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, commitUpload = commitStagedFile, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
+export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
 	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined);
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
@@ -98,7 +99,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		let revision: string | undefined;
 		try {
-			const commit = await commitUpload(bucket, db, {
+			const commit = await committers.commitUpload(bucket, db, {
 				path: safePath,
 				hash,
 				size,

@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -117,12 +119,12 @@ it('rejects an encrypted upload authorized before reset, even if staging starts 
 		if (property === 'put') return async (...args: Parameters<R2Bucket['put']>) => { staged(); await gate; return target.put(...args); };
 		const value: unknown = Reflect.get(target, property); return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
 	} });
-	const pending = handleUpload(upload(), bucket, env.DB, undefined, state);
+	const pending = handleUpload(upload(), bucket, env.DB, { commitUpload: commitStagedFile, commitNewFiles }, state);
 	await ready;
 	expect((await start()).status).toBe(200);
 	await finish();
 	release();
 	expect((await pending).status).not.toBe(200);
-	expect((await handleUpload(upload(), env.BUCKET, env.DB, undefined, state)).status).not.toBe(200);
+	expect((await handleUpload(upload(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles }, state)).status).not.toBe(200);
 	expect(await getStoredFileRow(env.DB, 'late.md')).toBeNull();
 });

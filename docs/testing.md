@@ -6,6 +6,12 @@
 through shutdown. `runtime-operations.test.ts` checks that late saves cannot update
 history, persist settings, or fall back through a replacement engine.
 
+`engine-background-lifecycle.test.ts` holds conflict writes, discovery reads and
+Markdown-cache writes/deletes through shutdown. It checks that replacement engines
+retain conflict metadata and accepted operations can finish their metadata writes
+before the store closes. `conflict-store.test.ts` also checks queued-write draining
+and rejection of mutations or late discovery after closure.
+
 `runtime-lifecycle.test.ts` and `runtime-encryption-reset.test.ts` cancel configuration
 changes both before dispatch and behind an active queued operation. They verify that
 shutdown prevents remote resets, credential/settings writes, local cleanup and restart
@@ -70,6 +76,12 @@ PWA header and dock suites, share
 authenticated setup requests and cleanup. Request gates and lost replies stay in
 their individual scenarios through `handleRequest`; normal requests still reach
 the real Worker and its storage bindings.
+
+`reading-browser.test.mjs` gives shell/settings, cross-feature navigation, reader
+history/geometry, offline replay, sharing and enrollment/logout separate scenarios
+with fresh Worker and browser state. Each seeds its own required articles and
+offline cache, so an earlier layout failure does not skip the remaining checks.
+Both Chromium and WebKit retain their existing platform-specific coverage.
 
 Reading persists changes locally before updating the UI and sends them in the
 background, like Reminders. Unsent edits combine while preserving their original
@@ -184,7 +196,10 @@ Remote setup tests run the real launcher and workerd with a fake `cloudflared`
 executable; they cover saved launches, DNS failure recovery, tunnel shutdown,
 credential permissions, and missing credentials. They create no public resources.
 Quick Tunnel tests also cover hostname discovery, startup failure, timeout cleanup,
-and rejection of downloads with an invalid checksum. `npm run test:server-package`
+and rejection of downloads with an invalid checksum. `local-server-lifecycle.test.mjs`
+injects cleanup failures, checks that later resources are still attempted, retains
+the original startup error, and verifies HTTP draining before storage disposal.
+`npm run test:server-package`
 installs a packed artifact through npx in an isolated cache and exercises real
 HTTP and storage across changing public URLs, using a fake connector.
 Production launcher modules live in `packages/server/src/`; these tests cover
@@ -815,6 +830,11 @@ Worker `encrypted-source-rebuild.integration.ts` covers conversion of previously
 Worker `encrypted-sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and cross-key-scope rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
 
 `encryption-upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
+
+`upload-publication.integration.ts` rejects Markdown publication at the coordinator
+for single, batch and bulk-new uploads. It checks that bytes remain staged without
+file metadata, changelog or receipts being committed, while binary uploads retain
+their direct publication path.
 
 After `npm run build:plugin`, run `node scripts/encryption-setup-test.mjs` for the
 Obsidian encryption setup UI. It uses production key verification with a synthetic

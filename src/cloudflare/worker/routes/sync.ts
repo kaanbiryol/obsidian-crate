@@ -26,10 +26,12 @@ import { beginInitialImport, finishInitialImport } from '../initial-import';
 import { pruneInitialImport } from '../initial-import-prune';
 import { forwardTransferRequest } from '../transfer-dispatch';
 import { finishInitialReminderSetup } from '../initial-import-readiness';
+import type { UploadCommitters } from '../upload-committers';
 
 export async function handleSyncRoute(
 	request: Request,
 	env: Env,
+	uploadCommitters: UploadCommitters,
 	path: string,
 	method: RouteMethod,
 	resetGeneration: string | null,
@@ -74,7 +76,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleGetFileMetadata(request, requiredDb));
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
-		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, env.commitUpload, encryption, resetGeneration));
+		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, uploadCommitters, encryption, resetGeneration));
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
@@ -83,7 +85,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload, env.commitNewFiles, encryption, resetGeneration));
+		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, uploadCommitters, encryption, resetGeneration));
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
 		return forwardTransferRequest(request, env, '/batch-download');

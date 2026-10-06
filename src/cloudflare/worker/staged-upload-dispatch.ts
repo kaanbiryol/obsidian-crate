@@ -6,9 +6,10 @@ import type { Env } from './types';
 import { isReminderPath } from './reminder-scope';
 import { getNotificationPolicy } from './notification-policy';
 import { readEncryptionState } from './encryption-state';
+import type { UploadCommitters } from './upload-committers';
 
 type UploadParams = Parameters<typeof commitStagedFile>[2];
-export type CommitUpload = typeof commitStagedFile;
+type CommitUpload = UploadCommitters['commitUpload'];
 
 /** File transfer and hashing finish before acquiring the coordinator lock. */
 export function coordinatedUpload(env: Env): CommitUpload {

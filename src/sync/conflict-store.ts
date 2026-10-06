@@ -33,6 +33,7 @@ export class ConflictStore {
 	private data: ConflictStoreData = { version: 1, conflicts: [] };
 	private dirty = false;
 	private mutationChain: Promise<void> = Promise.resolve();
+	private closed = false;
 
 	constructor(
 		private readonly app: App,
@@ -45,6 +46,12 @@ export class ConflictStore {
 
 	load(): Promise<void> {
 		return this.enqueueMutation(() => this.loadFromDisk());
+	}
+
+	/** Finish accepted mutations before another store opens the same files. */
+	async close(): Promise<void> {
+		this.closed = true;
+		await this.mutationChain;
 	}
 
 	private async loadFromDisk(): Promise<void> {
@@ -82,7 +89,7 @@ export class ConflictStore {
 		shouldIgnore: (path: string) => boolean,
 		isCancelled: () => boolean = () => false,
 	): Promise<void> {
-		if (isCancelled()) return;
+		if (this.closed || isCancelled()) return;
 
 		let discoveredPaths: Set<string>;
 		try {
@@ -98,7 +105,7 @@ export class ConflictStore {
 			return;
 		}
 
-		if (isCancelled()) return;
+		if (this.closed || isCancelled()) return;
 		await this.enqueueMutation(async () => {
 			if (isCancelled()) return;
 			let changed = false;
@@ -254,6 +261,7 @@ export class ConflictStore {
 	}
 
 	private enqueueMutation(task: () => Promise<void>): Promise<void> {
+		if (this.closed) return Promise.reject(createAbortError('Conflict store closed'));
 		const next = this.mutationChain.then(task, task);
 		this.mutationChain = next.catch(() => {});
 		return next;

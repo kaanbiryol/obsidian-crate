@@ -29,7 +29,7 @@ async function setup(lastSeq = 0) {
 	});
 	h.vault.adapter.read.mockImplementation((path: string) => new TextDecoder().decode(files.get(path)));
 	h.vault.adapter.write.mockImplementation((path: string, text: string) => { files.set(path, toArrayBuffer(text)); });
-	h.vault.adapter.remove.mockImplementation((path: string) => { files.delete(path); });
+	h.vault.adapter.remove.mockImplementation(async (path: string) => { files.delete(path); });
 	const edit = async (path: string, text: string) => {
 		files.set(path, toArrayBuffer(text));
 		mtime++;

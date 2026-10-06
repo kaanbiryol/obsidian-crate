@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -40,9 +42,9 @@ describe('uncertain commits preserve live content', () => {
 			method: 'PUT', headers: { 'X-Crate-Upload-Operation': operationId, 'X-Crate-Expected-Hash': 'absent' }, body: 'only copy',
 		});
 		loseNextCommitResponse();
-		expect((await handleUpload(request(), bucket, db)).status).toBe(503);
+		expect((await handleUpload(request(), bucket, db, { commitUpload: commitStagedFile, commitNewFiles })).status).toBe(503);
 		await expectLiveBytes();
-		expect((await handleUpload(request(), bucket, db)).status).toBe(200);
+		expect((await handleUpload(request(), bucket, db, { commitUpload: commitStagedFile, commitNewFiles })).status).toBe(200);
 		await expectLiveBytes();
 	});
 
@@ -50,7 +52,7 @@ describe('uncertain commits preserve live content', () => {
 		loseNextCommitResponse();
 		const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', {
 			method: 'POST', body: JSON.stringify({ files: [{ path: 'note.md', content: btoa('only copy'), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)), expectedHash: null }] }),
-		}), bucket, db);
+		}), bucket, db, { commitUpload: commitStagedFile, commitNewFiles });
 		expect(response.status).toBe(503);
 		await expectLiveBytes();
 	});

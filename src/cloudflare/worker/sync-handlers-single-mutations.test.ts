@@ -1,3 +1,5 @@
+import { commitStagedFile } from './sync-mutations';
+import { commitNewFiles } from './bulk-new-file-commit';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	handleDelete,
@@ -28,6 +30,7 @@ it('rejects traversal-style upload paths', async () => {
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(400);
@@ -52,6 +55,7 @@ it('rejects traversal-style upload paths', async () => {
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(400);
@@ -75,6 +79,7 @@ it('rejects traversal-style upload paths', async () => {
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(200);
@@ -107,6 +112,7 @@ it('rejects traversal-style upload paths', async () => {
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(503);
@@ -137,6 +143,7 @@ it('rejects traversal-style upload paths', async () => {
 			}),
 			bucket,
 			db,
+			{ commitUpload: commitStagedFile, commitNewFiles },
 		);
 
 		expect(response.status).toBe(503);

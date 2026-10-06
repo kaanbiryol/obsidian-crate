@@ -1,11 +1,10 @@
-import { commitNewFiles } from '../bulk-new-file-commit';
+import type { UploadCommitters } from '../upload-committers';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { trackStagedUploads } from '../staged-uploads';
 import { trackStagedBatch } from '../staged-upload-batches';
 import { beginUploadOperation } from '../upload-operations';
 import { corsResponse } from '../cors';
-import { commitStagedFile } from '../sync-mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption-state';
 import {
@@ -21,8 +20,7 @@ export async function handleBatchUpload(
 	request: Request,
 	bucket: R2Bucket,
 	db: D1Database,
-  commitUpload = commitStagedFile,
-  commitBulk = commitNewFiles,
+  committers: UploadCommitters,
   expectedEncryption?: EncryptionServerState | null,
   resetGeneration?: string | null,
 ): Promise<Response> {
@@ -99,7 +97,7 @@ export async function handleBatchUpload(
 			}));
 		}
 		try {
-			results.push(...await commitBulk(bucket, db, staged.map(file => ({
+			results.push(...await committers.commitNewFiles(bucket, db, staged.map(file => ({
 				path: file.safePath, hash: file.hash, size: file.size, objectKey: file.objectKey,
 				operation: file.operation, content: file.bytes, stagingBatchId, resetGeneration,
 			}))));
@@ -119,7 +117,7 @@ export async function handleBatchUpload(
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
-			const commit = await commitUpload(bucket, db, {
+			const commit = await committers.commitUpload(bucket, db, {
 				encryptionState,
 				resetGeneration,
 				operation: file.operation,

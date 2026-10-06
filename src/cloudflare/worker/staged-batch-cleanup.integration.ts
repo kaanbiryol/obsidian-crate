@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { commitStagedFile } from './sync-mutations';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -34,7 +35,7 @@ it('registers one lease before any R2 puts and retires it with the successful co
     counts.push((await env.DB.prepare('SELECT COUNT(*) AS n FROM staged_upload_batches').first<{ n: number }>())!.n);
     return put(...args);
   });
-  expect((await handleBatchUpload(request(), env.BUCKET, env.DB)).status).toBe(200);
+  expect((await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).status).toBe(200);
   expect(counts).toEqual(Array(8).fill(1));
   expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
   expect(await env.DB.prepare('SELECT storage_key FROM staged_uploads').first()).toBeNull();
@@ -47,16 +48,16 @@ it('does not upload any objects when batch registration fails', async () => {
     return prepare(sql);
   });
   const put = vi.spyOn(env.BUCKET, 'put');
-  expect((await handleBatchUpload(request(), env.BUCKET, env.DB)).status).toBe(503);
+  expect((await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).status).toBe(503);
   expect(put).not.toHaveBeenCalled();
 });
 
 it('cleans expired keys and prevents a delayed bulk commit from publishing them', async () => {
-  const response = await handleBatchUpload(request(), env.BUCKET, env.DB, undefined, async (bucket, db, files) => {
+  const response = await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles: async (bucket, db, files) => {
     await expire();
     expect(await cleanStagedBatches(bucket, db)).toBe(8);
     return commitNewFiles(bucket, db, files);
-  });
+  } });
   const result = await response.json() as { results: Array<{ success: boolean }> };
   expect(result.results).toHaveLength(8);
   expect(result.results.every(file => !file.success)).toBe(true);
@@ -64,7 +65,7 @@ it('cleans expired keys and prevents a delayed bulk commit from publishing them'
 });
 
 it('retains missing keys to collect a late R2 upload without risking committed files', async () => {
-  await handleBatchUpload(request(), env.BUCKET, env.DB);
+  await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
   const live = await env.DB.prepare('SELECT storage_key FROM files LIMIT 1').first<{ storage_key: string }>();
   const id = await trackStagedBatch(env.DB, [live!.storage_key, 'late-key']);
   await expire();
