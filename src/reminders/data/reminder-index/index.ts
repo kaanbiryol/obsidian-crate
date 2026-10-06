@@ -9,7 +9,8 @@
 import { TFile, type App } from "obsidian";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
-import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./dates";
+import { isReminderDueToday, isReminderOverdue } from "@/reminders/utils/reminderDate";
+import { getUpcomingReminders } from "@/reminders/utils/reminderSort";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
@@ -48,9 +49,9 @@ export interface ReminderIndex {
   getAll(): IndexedReminder[];
   getActive(): IndexedReminder[];
   getCompleted(): IndexedReminder[];
-  getToday(): IndexedReminder[];
-  getUpcoming(days: number): IndexedReminder[];
-  getOverdue(): IndexedReminder[];
+  getToday(now?: Date): IndexedReminder[];
+  getUpcoming(days: number, now?: Date): IndexedReminder[];
+  getOverdue(now?: Date): IndexedReminder[];
   getByProject(project: string): IndexedReminder[];
   getByFile(filePath: string): IndexedReminder[];
   getById(id: string): IndexedReminder | undefined;
@@ -143,21 +144,19 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       return getMergedReminders().filter((reminder) => reminder.completed);
     },
 
-    getToday() {
+    getToday(now = new Date()) {
       return getMergedReminders().filter(
-        (reminder) => !reminder.completed && isReminderToday(reminder.dueDatetime || reminder.dueDate),
+        (reminder) => !reminder.completed && isReminderDueToday(reminder, now),
       );
     },
 
-    getUpcoming(days: number) {
-      return getMergedReminders().filter(
-        (reminder) => !reminder.completed && isReminderWithinDays(reminder.dueDatetime || reminder.dueDate, days),
-      );
+    getUpcoming(days: number, now = new Date()) {
+      return getUpcomingReminders(getMergedReminders(), days, now);
     },
 
-    getOverdue() {
+    getOverdue(now = new Date()) {
       return getMergedReminders().filter((reminder) =>
-        isReminderOverdue(reminder.dueDatetime || reminder.dueDate, reminder.completed),
+        isReminderOverdue(reminder, now),
       );
     },
 

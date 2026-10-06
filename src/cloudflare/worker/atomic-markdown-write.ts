@@ -1,3 +1,4 @@
+import { deleteBucketObjectsOrQueue } from './maintenance/object-cleanup';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -11,7 +12,6 @@ import { FileVersionConflictError } from './storage';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	collectCleanupKeys,
-	deleteBucketObjectsOrQueue,
 	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 } from './sync-storage';

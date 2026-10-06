@@ -7,7 +7,7 @@ import schemaSql from '../schema.sql?raw';
 import { sha256HexBytes } from './auth';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-version-handlers';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './sync-storage';
+import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './maintenance/object-cleanup';
 import type { Env } from './types';
 
 const { DB: db, BUCKET: bucket }: Env = env;

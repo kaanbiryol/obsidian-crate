@@ -10,7 +10,7 @@ import { handleUpload, handleDownload } from './sync-file-handlers';
 import { handleBatchUpload } from './sync-batch/upload';
 import { writeCommittedMarkdownFile } from './storage';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
-import { drainObjectCleanupQueue } from './sync-storage';
+import { drainObjectCleanupQueue } from './maintenance/object-cleanup';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {

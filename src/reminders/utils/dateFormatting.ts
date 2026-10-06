@@ -1,6 +1,8 @@
-import type { Reminder, RecurrenceRule } from '../types/reminder';
+import type { RecurrenceRule } from '../types/reminder';
 import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
 import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
+
+export { isReminderOverdue } from './reminderDate';
 
 function formatRelativeDay(offset: number, locale = getUiLocale()): string {
   const value = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(offset, 'day');
@@ -70,20 +72,4 @@ export function formatDateHeader(date: Date, locale = getUiLocale(), now = new D
     month: 'short',
     day: 'numeric',
   }).format(date);
-}
-
-/**
- * Check if a reminder is overdue
- * @param reminder - Reminder to check
- * @returns True if reminder is overdue
- */
-export function isReminderOverdue(reminder: Pick<Reminder, 'dueDate' | 'dueDatetime' | 'completed'>, now = new Date()): boolean {
-  if (reminder.completed) return false;
-  if (reminder.dueDatetime) {
-    return new Date(reminder.dueDatetime) < now;
-  }
-  if (reminder.dueDate) {
-    return reminder.dueDate < formatLocalDateKey(now);
-  }
-  return false;
 }

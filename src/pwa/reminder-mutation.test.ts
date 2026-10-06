@@ -27,6 +27,24 @@ function createDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {
 }
 
 describe('buildReminderMutationBody', () => {
+    it.each(['', 'tomorrow', '#Work', 'every Monday 09:00 #Work !'])(
+        'rejects a titleless submission before constructing its API body: %j', content => {
+            for (const mode of ['create', 'edit'] as const) {
+                expect(() => buildReminderMutationBody({ config, mode, projects: ['Inbox', 'Work'], selectedProject: null,
+                    draft: createDraft({ content }) })).toThrow('Enter a reminder title.');
+            }
+        },
+    );
+
+    it('retains the API date fields for parsed times and timed picker values', () => {
+        const common = { config, mode: 'create' as const, projects: ['Inbox'], selectedProject: null };
+        const parsed = buildReminderMutationBody({ ...common, draft: createDraft({ content: 'Task 2026-04-03 14:30' }) });
+        const picker = buildReminderMutationBody({ ...common, draft: createDraft({ dueDate: '2026-04-03', dueTime: '14:30' }) });
+        const instant = new Date('2026-04-03T14:30').toISOString();
+        expect(parsed).toMatchObject({ dueDate: instant.slice(0, 10), dueDatetime: instant, description: null, recurrence: undefined });
+        expect(picker).toMatchObject({ dueDate: null, dueDatetime: instant, description: null, recurrence: undefined });
+    });
+
     it('keeps Inbox through project selection, priority changes, saving and reopening from Work', () => {
         const projects = ['Inbox', 'Work'];
         const draft = createDraft({ project: 'Work', defaultProject: 'Work' });

@@ -203,6 +203,11 @@ publishes that floor and prunes receipts in the same transaction, and coordinate
 expired enrollment and pairing cleanup. Reminder-specific expiration copy and
 occurrence retention stay with the reminder modules.
 
+`cloudflare/worker/maintenance/object-cleanup.ts` owns reference-aware R2 deletion
+and its retry queue. Scheduled drains report failures to maintenance diagnostics;
+cleanup after a committed mutation remains best effort. Reference checks, object
+deletion and queue settlement stay in one operation.
+
 `sync/runtime-server-status.ts` owns version caching and delayed reachability
 probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
 guard, resets probes during lifecycle changes, and retains foreground sync policy.
@@ -564,6 +569,13 @@ the current draft. Both editors pass already-parsed metadata, preserving relativ
 dates across renders. The plugin retains implicit initial-date provenance; the PWA
 retains explicit timezone defaults and converts canonical dates into local fields.
 
+`reminders/core/reminderSubmission.ts` resolves the latest editor text into saved
+reminder fields for both hosts, including recurrence removal before draft effects
+settle and preservation of an unchanged occurrence's exact timestamp. Adapters
+retain modal callbacks, split date/time inputs and API null/undefined encoding.
+Index and shared views reuse calendar membership rules in `reminderDate.ts` and
+`reminderSort.ts`; each index/repository query captures one time snapshot.
+
 The repeat grammar owns the cadence, weekday lists/ranges and monthly day. `reminderTime.ts` delegates the following time phrase to Chrono, retaining its complete span and time precision, so forms such as `every Monday at 9 in the morning` stay recurring. A bare `Monday 9` does not imply a time when Chrono leaves the number as text. Seconds, fractional seconds and timestamps follow Chrono's recognition. Repeat time ranges still cannot fit the single-time recurrence rule. Calendar dates following a repeat remain separate schedules, subject to the last-schedule rule.
 
 One-off calendar recognition also belongs to Chrono. Dates, times and timestamps are not prevalidated or partially masked: when Chrono returns no match, the full phrase remains title text. Durable reads use the same recognition and require recognized schedules to be absolute.
@@ -573,6 +585,11 @@ Sync deletes require both the acknowledged content hash and opaque file revision
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 
 Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public scope/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+
+`encryption/file-inventory.ts` validates shared encrypted inventory pages and bounds
+traversal independently of file counts. Reading and Reminders retain their own file
+limits, projections and sequence checks; each publishes its derived source cache
+only after a complete, confirmed load.
 
 `encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract and exact setting destinations; `encryption-folder-moves.ts` runs conversion and recovery through `SyncRuntime`'s existing configuration serialization.
 

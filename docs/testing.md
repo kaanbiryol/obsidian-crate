@@ -8,6 +8,11 @@ cursor cycles, and cumulative item, issue and request limits.
 preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
+`encryption/file-inventory.test.ts`, `reading/encrypted-api.test.ts` and
+`pwa/encrypted-reminder-api.test.ts` cover encrypted page validation, advancing
+empty-page limits, duplicate paths, cursor/sequence changes and retention of the
+previous decrypted cache after rejected loads.
+
 `manifest.test.ts`, `manifest-checkpoint.test.ts` and `checkpoint-validation.test.ts`
 retain entry-identity checks, checkpoint round trips, conflicting recovery metadata,
 torn-write recovery and overlapping saves. Content-verifier and pending-verification
@@ -18,6 +23,11 @@ bindings, including completed reminders, source conflicts and destination write
 failures. Unit tests retain lightweight reorder coverage without simulating the
 atomic SQL publication. Operation-expiry and upload-retry integration tests exercise
 the shared receipt cleanup owner, including monotonic floors and batch rollback.
+
+`maintenance/object-cleanup.test.ts` and `maintenance.test.ts` distinguish nonfatal
+post-commit cleanup from scheduled failure reporting. The corresponding
+`maintenance/object-cleanup.integration.ts` regression uses local D1/R2 bindings
+to retain failed cleanup and its diagnostic until a successful retry.
 
 ## Sync outcomes and reader action lifetimes
 
@@ -32,6 +42,12 @@ provenance and stable relative dates. PWA state tests retain recovery of a store
 time without a date. `tests/visual/reminder-draft.spec.ts` exercises the actual
 plugin draft hook in Shadow DOM in Chromium and WebKit, including title edits,
 picker changes and renders after the clock advances.
+
+`recurrenceTimezone.test.ts` compares final submission in both hosts before draft
+reconciliation, including recurrence removal/change and exact timestamps across a
+DST fold. `reminder-index/calendar.test.ts` compares index, embedded queries and
+shared views at midnight, timed deadlines and DST boundaries; it also advances
+the clock between repository query stages to verify one consistent snapshot.
 
 `engine-lifecycle.test.ts` distinguishes cancellation from successful completion
 across ordinary, initial and forced sync, while retaining cursor and baseline

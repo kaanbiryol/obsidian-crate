@@ -40,6 +40,16 @@ export function isReminderDueToday(input: {
   return input.dueDate === todayKey;
 }
 
+export function isReminderOverdue(input: {
+  dueDate?: string;
+  dueDatetime?: string;
+  completed: boolean;
+}, now = new Date()): boolean {
+  if (input.completed) return false;
+  if (input.dueDatetime) return new Date(input.dueDatetime) < now;
+  return !!input.dueDate && input.dueDate < formatLocalDateKey(now);
+}
+
 export function parseLocalDateKey(value: string): Date {
   const match = DATE_ONLY_PATTERN.exec(value);
   if (!match) {

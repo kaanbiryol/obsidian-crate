@@ -1,12 +1,5 @@
-import { preserveReminderInstant } from '../../utils/preserveReminderInstant';
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
-import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
-import {
-	buildStoredReminderDates,
-	parseReminderDateValue,
-	serializeReminderDateValue,
-} from '../../utils/reminderDate';
-import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '../../utils/recurrenceRule';
+import { resolveReminderSubmission } from '../../core/reminderSubmission';
 
 export interface ReminderSubmissionInput {
 	content: string;
@@ -56,56 +49,32 @@ export function buildReminderSubmission({
 	recurrence,
 	reminder,
 }: ReminderSubmissionInput): ReminderSubmission | null {
-	if (!content.trim()) {
-		return null;
-	}
-
-	const parsed = parseReminderEditorContent(content, projects);
-	if (parsed.dateError) throw new Error(parsed.dateError);
-	const finalContent = parsed.cleanContent.trim();
-	if (!finalContent) {
-		return null;
-	}
-
-	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
-	const finalProject = parsed.project || project;
-	// Pickers write their rule into the title. An absent marker is a removal,
-	// even if the draft effect has not cleared its previous recurrence yet.
-	const chosenRecurrence = preserveRecurrenceMetadata(parsed.recurrence, recurrence);
-  const finalRecurrence = normalizeRecurrenceRule(chosenRecurrence);
-	// The draft clears its occurrence when a repeat rule changes. Do not restore
-	// the original reminder's occurrence after that edit.
-	const finalDueDate = finalRecurrence ? (reminder && chosenRecurrence === recurrence ? dueDate ?? undefined : undefined) : parsed.dueDate
-		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
-		: recurrence ? undefined : dueDate ?? undefined;
-	const finalHasTime = finalRecurrence ? Boolean(finalDueDate && hasTime) : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
-	const storedDates = buildStoredReminderDates(
-		parseReminderDateValue(finalDueDate, finalHasTime),
-		finalHasTime,
-	);
-
-	const finalDescription = description?.trim() || undefined;
+	const resolved = resolveReminderSubmission({
+		content, description, projects, priority, project, dueDate, hasTime, recurrence,
+		mode: reminder ? 'edit' : 'create', originalDueDatetime: reminder?.dueDatetime,
+	});
+	if (!resolved) return null;
 
 	const submission: ReminderSubmission = {
-		content: finalContent,
-		description: finalDescription,
-		project: finalProject,
-		priority: finalPriority,
-		dueDate: finalDueDate,
-		hasTime: finalHasTime,
-		recurrence: finalRecurrence,
+		content: resolved.content,
+		description: resolved.description,
+		project: resolved.project,
+		priority: resolved.priority,
+		dueDate: resolved.dueDateValue,
+		hasTime: resolved.hasTime,
+		recurrence: resolved.recurrence,
 	};
 
 	if (reminder) {
 		submission.updatedReminder = {
 			...reminder,
-			content: finalContent,
-			description: finalDescription,
-			project: finalProject,
-			priority: finalPriority,
-			dueDatetime: preserveReminderInstant(storedDates.dueDatetime, reminder.dueDatetime, Boolean(parsed.dueDate)),
-			dueDate: storedDates.dueDate,
-			recurrence: finalRecurrence,
+			content: resolved.content,
+			description: resolved.description,
+			project: resolved.project,
+			priority: resolved.priority,
+			dueDatetime: resolved.dueDatetime,
+			dueDate: resolved.dueDate,
+			recurrence: resolved.recurrence,
 		};
 	}
 

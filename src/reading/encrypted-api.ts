@@ -9,8 +9,8 @@ import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } f
 import { readingCapturePath } from './core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { reminderRequestHash } from '@/encryption/reminder-receipt';
+import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile } from '@/encryption/file-inventory';
 
-interface WireFile { path: string; hash: string; size: number; revision: string }
 interface Source { file: WireFile; content: string; item: ReadingItem }
 interface Attempt { requestHash: string; body: string; generation?: number }
 interface EncryptedReadingOptions {
@@ -40,10 +40,10 @@ export class EncryptedReadingApi {
     return value;
   }
   private context(id: string) { return { vaultId: this.options.authority.vaultId, scopeId: this.options.authority.scopeId, objectId: id, purpose: 'reminder' as const }; }
-  private async source(file: WireFile): Promise<Source> {
+  private async source(file: WireFile, sources = this.sources): Promise<Source> {
     const folder = encodeURIComponent(this.options.folderPath);
-    let source = this.sources.get(file.path);
-    if (!source || source.file.revision !== file.revision || source.file.hash !== file.hash) {
+    let source = sources.get(file.path);
+    if (!source || source.file.revision !== file.revision || source.file.hash !== file.hash || source.file.size !== file.size) {
       const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`);
       if (!response.ok) throw new Error('Article changed or is unavailable. Refresh to retry.');
       if (file.size > 4 * 1024 * 1024) throw new Error('This Reading note is too large.');
@@ -57,11 +57,11 @@ export class EncryptedReadingApi {
       source = { file, content, item: { ...metadata, path: file.path } };
     }
 
-    this.sources.set(file.path, source);
-    let bytes = [...this.sources.values()].reduce((sum, value) => sum + value.content.length * 2, 0);
-    while (bytes > 16 * 1024 * 1024 || this.sources.size > 100) {
-      const first = this.sources.keys().next().value!;
-      bytes -= this.sources.get(first)!.content.length * 2; this.sources.delete(first);
+    sources.set(file.path, source);
+    let bytes = [...sources.values()].reduce((sum, value) => sum + value.content.length * 2, 0);
+    while (bytes > 16 * 1024 * 1024 || sources.size > 100) {
+      const first = sources.keys().next().value!;
+      bytes -= sources.get(first)!.content.length * 2; sources.delete(first);
     }
     return source;
   }
@@ -70,34 +70,36 @@ export class EncryptedReadingApi {
     const candidates: ReadingItem[] = [];
     const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
     const nextIndex = new Map<string, { file: WireFile; item: ReadingItem }>();
+    const nextSources = new Map(this.sources);
     const folder = encodeURIComponent(this.options.folderPath);
-    let count = 0, metadataBytes = 0;
+    const acceptPage = createEncryptedInventoryProgress({ maxFiles: 10_000, maxPages: 1000 });
+    let metadataBytes = 0;
     do {
-      const page: { files: WireFile[]; nextCursor: string | null; generation: number; sequence: number } = await this.json(`/reading/encrypted-files?folderPath=${folder}${cursor ? '&after=' + encodeURIComponent(cursor) : ''}`);
+      const page = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}${cursor ? '&after=' + encodeURIComponent(cursor) : ''}`), this.options.folderPath, this.options.generation);
       sequence ??= page.sequence;
-      if (!Number.isSafeInteger(page.sequence) || page.sequence !== sequence || page.generation !== this.options.generation || !Array.isArray(page.files) || (count += page.files.length) > 10_000) throw new Error('The encrypted Reading inventory changed or exceeds its limit.');
+      if (page.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
+      acceptPage(page);
       for (const file of page.files) {
-        if (typeof file.path !== 'string' || !file.path.startsWith(this.options.folderPath + '/') || file.path.split('/').some(p => p === '..' || p === '.') || typeof file.revision !== 'string' || !file.revision || typeof file.hash !== 'string' || !/^[a-f0-9]{64}$/.test(file.hash) || !Number.isSafeInteger(file.size) || file.size < 0) throw new Error('Invalid encrypted Reading inventory.');
         try {
           next.set(file.path, file);
           const cached = this.indexed.get(file.path);
           const item = cached?.file.revision === file.revision && cached.file.hash === file.hash && cached.file.size === file.size
-            ? cached.item : (await this.source(file)).item;
+            ? cached.item : (await this.source(file, nextSources)).item;
           metadataBytes += new TextEncoder().encode(JSON.stringify(item)).length;
           if (metadataBytes > 12 * 1024 * 1024) throw new Error('Reading metadata exceeds this device’s library limit.');
           candidates.push(item);
           nextIndex.set(file.path, { file, item });
         } catch (error) { issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' }); }
       }
-      if (page.nextCursor !== null && (typeof page.nextCursor !== 'string' || page.nextCursor <= (cursor ?? ''))) throw new Error('Reading inventory did not advance.');
       cursor = page.nextCursor;
     } while (cursor);
     if (metadataBytes > 12 * 1024 * 1024) throw new Error('Reading metadata exceeds this device’s library limit.');
-    const confirmed = await this.json<{ sequence: number; generation: number }>(`/reading/encrypted-files?folderPath=${folder}`);
-    if (confirmed.sequence !== sequence || confirmed.generation !== this.options.generation) throw new Error('Reading changed while loading. Refresh again.');
+    const confirmed = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}`), this.options.folderPath, this.options.generation);
+    if (confirmed.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
     this.files = next;
     this.indexed = nextIndex;
-    for (const path of this.sources.keys()) if (!next.has(path)) this.sources.delete(path);
+    for (const path of nextSources.keys()) if (!next.has(path)) nextSources.delete(path);
+    this.sources = nextSources;
     const counts = new Map<string, number>();
     for (const item of candidates) counts.set(item.crate_reading_id, (counts.get(item.crate_reading_id) ?? 0) + 1);
     const items = candidates.flatMap(item => {

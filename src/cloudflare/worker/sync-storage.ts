@@ -1,7 +1,6 @@
 import { portablePathKey } from '../../protocol/portable-path';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
-import { changedRows, queryRows } from './db';
-import { findReferencedStorageKeys, objectReference, type ObjectReference } from './storage-references';
+import { queryRows } from './db';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -11,7 +10,6 @@ export {
 	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
 } from '../../protocol/sync-limits';
 const MANAGED_FILES_PREFIX = '__crate__/files/';
-const CLEANUP_BATCH_LIMIT = 100;
 const MAX_D1_BOUND_PARAMETERS = 100;
 export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -69,89 +67,6 @@ export function collectCleanupKeys(previousFile: FileStorageRow | null, preserve
 	}
 
 	return Array.from(keys);
-}
-
-async function queueObjectCleanup(db: D1Database, objects: ObjectReference[]): Promise<void> {
-	if (!objects.length) return;
-  try {
-    await db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
-      SELECT json_extract(value, '$.storageKey'), json_extract(value, '$.path') FROM json_each(?)`)
-      .bind(JSON.stringify(objects)).run();
-	} catch {
-		// Cleanup must never turn an already-committed file mutation into a failure.
-	}
-}
-
-async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promise<number> {
-	if (keys.length === 0) return 0;
-  let removed = 0;
-
-	try {
-		for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
-			const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
-			const placeholders = chunk.map(() => '?').join(', ');
-			removed += changedRows(await db.prepare(
-				`DELETE FROM object_cleanup_queue WHERE storage_key IN (${placeholders})`,
-			).bind(...chunk).run());
-		}
-	} catch {
-		// A later drain will repeat the idempotent R2 deletion and clear the row.
-	}
-  return removed;
-}
-
-async function deleteQueuedBucketObjects(
-	bucket: R2Bucket,
-	db: D1Database,
-	objects: ObjectReference[],
-): Promise<number> {
-	const uniqueKeys = [...new Set(objects.map(object => object.storageKey).filter(Boolean))];
-	if (uniqueKeys.length === 0) return 0;
-
-	try {
-		const referenced = await findReferencedStorageKeys(db, objects);
-		const unused = uniqueKeys.filter(key => !referenced.has(key));
-		if (unused.length > 0) await bucket.delete(unused.length === 1 ? unused[0]! : unused);
-		// Referenced keys must leave this queue as well; their eventual expiry
-		// creates a new cleanup intent after the reference is removed.
-		await db.prepare('DELETE FROM staged_uploads WHERE storage_key IN (SELECT value FROM json_each(?))')
-      .bind(JSON.stringify(uniqueKeys)).run();
-    return await removeQueuedObjectCleanup(db, uniqueKeys);
-	} catch {
-		// The keys remain queued for the scheduled maintenance pass.
-	}
-  return 0;
-}
-
-export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
-	try {
-		const rows = await queryRows<{ storage_key: string; file_path: string | null }>(
-			db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
-				.bind(CLEANUP_BATCH_LIMIT),
-		);
-		return await deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));
-	} catch {
-		// The scheduled handler will retry on its next invocation.
-	}
-  return 0;
-}
-
-export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<void> {
-	await db.batch([
-		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
-			SELECT storage_key, path FROM file_versions WHERE expires_at <= ?`).bind(now),
-		db.prepare('DELETE FROM file_versions WHERE expires_at <= ?').bind(now),
-	]);
-}
-
-export async function deleteBucketObjectsOrQueue(
-	bucket: R2Bucket,
-	db: D1Database,
-	keys: Array<string | ObjectReference>,
-): Promise<void> {
-	const objects = keys.map(objectReference).filter(object => object.storageKey.length > 0);
-	await queueObjectCleanup(db, objects);
-	await deleteQueuedBucketObjects(bucket, db, objects);
 }
 
 export function storedObjectMatchesMetadata(

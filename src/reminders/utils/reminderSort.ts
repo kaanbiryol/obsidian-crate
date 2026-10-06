@@ -4,7 +4,7 @@
  */
 
 import type { Reminder } from '../types/reminder';
-import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, parseReminderDateValue } from './reminderDate';
+import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, isReminderOverdue, parseReminderDateValue } from './reminderDate';
 
 /**
  * Sort reminders by:
@@ -73,21 +73,13 @@ export function getCompletedTodayReminders(reminders: Reminder[], now = new Date
  * Get overdue reminders
  */
 export function getOverdueReminders(reminders: Reminder[], now = new Date()): Reminder[] {
-  const todayKey = formatLocalDateKey(now);
-
-  return reminders.filter(r => {
-    if (r.completed) return false;
-    if (r.dueDatetime) {
-      return new Date(r.dueDatetime) < now;
-    }
-    return !!r.dueDate && r.dueDate < todayKey;
-  });
+  return reminders.filter(reminder => isReminderOverdue(reminder, now));
 }
 
 /**
  * Get upcoming reminders (next N days)
  */
-export function getUpcomingReminders(reminders: Reminder[], days: number = 7, now = new Date()): Reminder[] {
+export function getUpcomingReminders<T extends Reminder>(reminders: T[], days: number = 7, now = new Date()): T[] {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startDate = new Date(todayStart);
   startDate.setDate(startDate.getDate() + 1);

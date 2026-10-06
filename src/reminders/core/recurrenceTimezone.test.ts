@@ -100,6 +100,39 @@ it('changing or deleting an explicit timezone recalculates the occurrence in bot
 });
 
 it.each([
+    ['removed', 'Call Sam', undefined],
+    ['changed', 'Call Sam every Tuesday 10:00 UTC', { frequency: 'weekly', daysOfWeek: [2], hour: 10, minute: 0, timezone: 'UTC' }],
+])('uses the %s repeat rule immediately before either editor reconciles its draft', (_edit, content, expectedRule) => {
+    vi.stubEnv('TZ', 'UTC'); resetLocalTimeZone();
+    const recurrence = { frequency: 'weekly' as const, daysOfWeek: [1], hour: 9, minute: 0,
+        timezone: 'UTC', count: 8, completedCount: 3 };
+    const reminder = { id: 'one', filePath: 'Reminders/Inbox.md', content: 'Call Alex', project: 'Inbox', priority: 4 as const,
+        completed: false, recurrence, dueDatetime: '2026-09-28T09:00:37.123Z' };
+    const plugin = buildReminderSubmission({ content, projects: ['Inbox'], project: 'Inbox', priority: 4,
+        dueDate: reminder.dueDatetime, hasTime: true, recurrence, reminder })!;
+    const pwa = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, mode: 'edit', projects: ['Inbox'], selectedProject: null,
+        draft: { ...buildModalDraft(reminder, null), content } });
+    expect(plugin.updatedReminder).toMatchObject({ content: 'Call Sam', recurrence: expectedRule, dueDate: undefined, dueDatetime: undefined });
+    expect(pwa).toMatchObject({ content: 'Call Sam', recurrence: expectedRule ?? null, dueDate: null, dueDatetime: null });
+});
+
+it.each(['2026-10-26T05:30:37.123Z', '2026-11-01T06:30:37.123Z'])(
+    'preserves the exact recurring occurrence on an immediate title edit in both editors: %s', instant => {
+        vi.stubEnv('TZ', 'America/New_York'); resetLocalTimeZone();
+        const recurrence = { frequency: 'daily' as const, hour: 1, minute: 30, timezone: 'America/New_York', count: 8, completedCount: 3 };
+        const reminder = { id: 'one', filePath: 'Reminders/Inbox.md', content: 'Call Alex', project: 'Inbox', priority: 4 as const,
+            completed: false, recurrence, dueDatetime: instant };
+        const content = buildInitialReminderContent(reminder, 'Inbox').replace('Call Alex', 'Call Sam');
+        const plugin = buildReminderSubmission({ content, projects: ['Inbox'], project: 'Inbox', priority: 4,
+            dueDate: instant, hasTime: true, recurrence, reminder })!;
+        const pwa = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, mode: 'edit', projects: ['Inbox'], selectedProject: null,
+            draft: { ...buildModalDraft(reminder, null), content } });
+        expect(plugin.updatedReminder).toMatchObject({ content: 'Call Sam', recurrence, dueDatetime: instant });
+        expect(pwa).toMatchObject({ content: 'Call Sam', recurrence, dueDatetime: instant });
+    },
+);
+
+it.each([
     ['UTC', '2026-09-28T09:00:30.123Z', '2026-10-05T09:00:30.123Z'],
     ['America/New_York', '2026-09-21T13:00:30.123Z', '2026-09-28T13:00:30.123Z'],
     ['-03:30', '2026-09-28T12:30:30.123Z', '2026-10-05T12:30:30.123Z'],

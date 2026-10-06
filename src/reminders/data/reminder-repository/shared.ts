@@ -10,6 +10,7 @@ export function getTodayReminderIds(
   overdue: IndexedReminder[],
   completed: IndexedReminder[],
   includeCompleted: boolean,
+  now: Date,
 ): Reminder[] {
   const combined = new Map<string, IndexedReminder>();
   for (const reminder of [...activeToday, ...overdue]) {
@@ -18,7 +19,7 @@ export function getTodayReminderIds(
 
   if (includeCompleted) {
     for (const reminder of completed) {
-      if (isReminderDueToday(reminder)) {
+      if (isReminderDueToday(reminder, now)) {
         combined.set(reminder.id, reminder);
       }
     }

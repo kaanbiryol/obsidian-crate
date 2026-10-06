@@ -1,8 +1,5 @@
-import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
-import { preserveReminderInstant } from '@/reminders/utils/preserveReminderInstant';
-import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
-import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
-import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/utils/recurrenceRule';
+import { assertReminderMutationInput, ReminderInputError } from '@/reminders/core/reminderMutationInput';
+import { resolveReminderSubmission } from '@/reminders/core/reminderSubmission';
 import type { ModalDraft, ModalMode, ReminderMutationBody, StoredConfig } from './types';
 
 export function buildReminderMutationBody({
@@ -21,37 +18,32 @@ export function buildReminderMutationBody({
 	const createDefaultProject = selectedProject ?? 'Inbox';
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const rawContent = draft.content.replace(/\s+/g, ' ').trim();
-	const parsed = parseReminderEditorContent(rawContent, projectOptions);
-	if (parsed.dateError) throw new Error(parsed.dateError);
-	const project = parsed.project || draft.project.trim() || createDefaultProject;
-	const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
-	const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
-	const parsedRule = preserveRecurrenceMetadata(parsed.recurrence, draft.recurrence);
-	const recurrence = normalizeRecurrenceRule(parsedRule || (parsed.dueDate ? undefined : draft.recurrence));
-	let dueDate: string | null = null;
-	let dueDatetime: string | null = null;
-
-	if (parsed.dueDate) {
-		const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
-		dueDate = parsedDates.dueDate ?? null;
-		dueDatetime = parsedDates.dueDatetime ?? null;
-	} else if (!recurrence || mode === 'edit') {
-		const rawDate = draft.dueDate.trim();
-		const rawTime = draft.dueTime.trim();
-		if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
-		else if (rawDate) dueDate = rawDate;
-	}
-
-  if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime, Boolean(parsed.dueDate)) ?? null;
+	const rawDate = draft.dueDate.trim();
+	const rawTime = draft.dueTime.trim();
+	const resolved = resolveReminderSubmission({
+		content: rawContent,
+		description: draft.description,
+		projects: projectOptions,
+		project: draft.project.trim() || createDefaultProject,
+		priority: draft.priority === 1 ? 1 : 4,
+		dueDate: rawDate && rawTime ? `${rawDate}T${rawTime}` : rawDate || null,
+		hasTime: Boolean(rawDate && rawTime),
+		recurrence: draft.recurrence,
+		mode,
+		originalDueDatetime: draft.originalDueDatetime,
+	});
+	if (!resolved) throw new ReminderInputError('content', 'Enter a reminder title.');
 	const body = {
 		folderPath: config.folderPath,
-		content,
-		description: draft.description.trim() || null,
-		project,
-		priority,
-		dueDate,
-		dueDatetime,
-		recurrence: recurrence ?? (mode === 'edit' ? null : undefined),
+		content: resolved.content.replace(/\s+/g, ' ').trim(),
+		description: resolved.description ?? null,
+		project: resolved.project,
+		priority: resolved.priority,
+		// Timed picker fields use dueDatetime alone; dates parsed from the title
+		// retain the API's existing companion date key.
+		dueDate: resolved.hasTime && resolved.dateSource !== 'text' ? null : resolved.dueDate ?? null,
+		dueDatetime: resolved.dueDatetime ?? null,
+		recurrence: resolved.recurrence ?? (mode === 'edit' ? null : undefined),
 	};
 	assertReminderMutationInput(body, mode === 'edit' ? 'update' : 'create');
 	return body;

@@ -3,7 +3,7 @@ import { readEncryptionState } from './encryption-state';
 import { cleanStagedUploads } from './maintenance/staged-upload-cleanup';
 import { cleanStagedBatches } from './maintenance/staged-batch-cleanup';
 import { pruneChangelog } from './db';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/index';
+import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './maintenance/object-cleanup';
 import type { Env } from './types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
 import { pruneFileDeletionReceipts } from './file-delete-audit';

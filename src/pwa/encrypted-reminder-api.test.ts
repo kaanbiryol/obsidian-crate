@@ -60,6 +60,70 @@ it('validates encryption generation before using the unchanged-snapshot shortcut
   await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('Invalid encrypted file inventory');
 });
 
+it('bounds empty advancing encrypted pages independently of the file budget', async () => {
+  const fetch = vi.fn(async () => Response.json(page(7, `cursor-${String(fetch.mock.calls.length).padStart(5, '0')}`)));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('limit');
+  expect(fetch).toHaveBeenCalledTimes(1000);
+});
+
+it.each([['A', 'A'], ['A', 'B', 'A']])('rejects an encrypted cursor cycle: %j', async (...cursors) => {
+  const fetch = vi.fn();
+  for (const cursor of cursors) fetch.mockResolvedValueOnce(Response.json(page(7, cursor)));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('did not advance');
+  expect(fetch).toHaveBeenCalledTimes(cursors.length);
+});
+
+it('rejects a malformed later page before downloading any files', async () => {
+  const fetch = vi.fn().mockResolvedValueOnce(Response.json(page(7, 'A')))
+    .mockResolvedValueOnce(Response.json({ ...page(7), files: [null] }));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('Invalid encrypted file');
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('rejects duplicate paths before downloading or projecting files', async () => {
+  const file = { path: 'Reminders/Inbox.md', hash: 'a'.repeat(64), revision: 'first', size: 12 };
+  const fetch = vi.fn().mockResolvedValueOnce(Response.json({ ...page(7, 'A'), files: [file] }))
+    .mockResolvedValueOnce(Response.json({ ...page(7), files: [file] }));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('repeated a file');
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('rejects repeated paths before acknowledging an unchanged inventory', async () => {
+  const file = { path: 'Reminders/Inbox.md', hash: 'a'.repeat(64), revision: 'first', size: 12 };
+  const fetch = vi.fn(async () => Response.json({ ...page(7), files: [file, file] }));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(7) } })).rejects.toThrow('repeated a file');
+  expect(fetch).toHaveBeenCalledOnce();
+});
+
+it('retains bounded retries when a sequence changes between pages', async () => {
+  const fetch = vi.fn();
+  for (let attempt = 0; attempt < 3; attempt++) fetch.mockResolvedValueOnce(Response.json(page(7, 'A'))).mockResolvedValueOnce(Response.json(page(8)));
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('changed while loading');
+  expect(fetch).toHaveBeenCalledTimes(6);
+});
+
+it('publishes decrypted cache entries only after the complete inventory is confirmed', async () => {
+  const path = 'Reminders/Inbox.md', authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const seal = (text: string) => sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority);
+  const original = await seal('- [ ] Original <!-- crate-id:task -->\n'), changed = await seal('- [ ] Changed <!-- crate-id:task -->\n');
+  const inventory = (sealed: typeof original) => ({ ...page(7), files: [{ path, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }] });
+  const fetch = vi.fn(async (route: string) => route.startsWith('/reminders/encrypted-file?') ? new Response(original.bytes) : Response.json(inventory(original)));
+  const api = new EncryptedReminderApi(keys, fetch);
+  await api.handle('/reminders/list?folderPath=Reminders');
+  fetch.mockResolvedValueOnce(Response.json(inventory(changed))).mockResolvedValueOnce(new Response(changed.bytes))
+    .mockResolvedValueOnce(Response.json({ ...page(7), nextCursor: {} }));
+  await expect(api.handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('Invalid encrypted file inventory');
+  fetch.mockClear();
+  const restored = await api.handle('/reminders/list?folderPath=Reminders');
+  expect(await restored!.json()).toMatchObject({ reminders: [{ content: 'Original' }] });
+  expect(fetch.mock.calls.every(([route]) => route.startsWith('/reminders/encrypted-files?'))).toBe(true);
+  fetch.mockClear();
+  fetch.mockImplementation(async route => route.startsWith('/reminders/encrypted-file?') ? new Response(changed.bytes) : Response.json(inventory(changed)));
+  const refreshed = await api.handle('/reminders/list?folderPath=Reminders');
+  expect(await refreshed!.json()).toMatchObject({ reminders: [{ content: 'Changed' }] });
+  expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
+});
+
 it('preserves queued semantic revisions across a folder rename while committing to the new path', async () => {
   const text = '- [ ] Queued task <!-- crate-id:task -->\n';
   const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };

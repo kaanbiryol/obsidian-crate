@@ -1,0 +1,72 @@
+import { changedRows, queryRows } from '../db';
+import { findReferencedStorageKeys, objectReference, type ObjectReference } from '../storage-references';
+
+const CLEANUP_BATCH_LIMIT = 100;
+const MAX_D1_BOUND_PARAMETERS = 100;
+
+async function queueObjectCleanup(db: D1Database, objects: ObjectReference[]): Promise<void> {
+	if (!objects.length) return;
+	await db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
+		SELECT json_extract(value, '$.storageKey'), json_extract(value, '$.path') FROM json_each(?)`)
+		.bind(JSON.stringify(objects)).run();
+}
+
+async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promise<number> {
+	let removed = 0;
+	for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
+		const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
+		const placeholders = chunk.map(() => '?').join(', ');
+		removed += changedRows(await db.prepare(
+			`DELETE FROM object_cleanup_queue WHERE storage_key IN (${placeholders})`,
+		).bind(...chunk).run());
+	}
+	return removed;
+}
+
+async function deleteQueuedBucketObjects(
+	bucket: R2Bucket,
+	db: D1Database,
+	objects: ObjectReference[],
+): Promise<number> {
+	const uniqueKeys = [...new Set(objects.map(object => object.storageKey).filter(Boolean))];
+	if (uniqueKeys.length === 0) return 0;
+
+	const referenced = await findReferencedStorageKeys(db, objects);
+	const unused = uniqueKeys.filter(key => !referenced.has(key));
+	if (unused.length > 0) await bucket.delete(unused.length === 1 ? unused[0]! : unused);
+	// Referenced keys must leave this queue as well; their eventual expiry
+	// creates a new cleanup intent after the reference is removed.
+	await db.prepare('DELETE FROM staged_uploads WHERE storage_key IN (SELECT value FROM json_each(?))')
+		.bind(JSON.stringify(uniqueKeys)).run();
+	return removeQueuedObjectCleanup(db, uniqueKeys);
+}
+
+/** Scheduled failures reach the maintenance error recorder; queued keys retry later. */
+export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
+	const rows = await queryRows<{ storage_key: string; file_path: string | null }>(
+		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
+			.bind(CLEANUP_BATCH_LIMIT),
+	);
+	return deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));
+}
+
+export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<void> {
+	await db.batch([
+		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
+			SELECT storage_key, path FROM file_versions WHERE expires_at <= ?`).bind(now),
+		db.prepare('DELETE FROM file_versions WHERE expires_at <= ?').bind(now),
+	]);
+}
+
+/** Cleanup must never turn an already-committed file mutation into a failure. */
+export async function deleteBucketObjectsOrQueue(
+	bucket: R2Bucket,
+	db: D1Database,
+	keys: Array<string | ObjectReference>,
+): Promise<void> {
+	const objects = keys.map(objectReference).filter(object => object.storageKey.length > 0);
+	try { await queueObjectCleanup(db, objects); }
+	catch { /* Still attempt reference-aware deletion if queueing is unavailable. */ }
+	try { await deleteQueuedBucketObjects(bucket, db, objects); }
+	catch { /* Queued cleanup and staged-upload maintenance retain retry ownership. */ }
+}

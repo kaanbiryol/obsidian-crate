@@ -16,9 +16,7 @@ import { requireCompatibleServer } from './server-compatibility';
 import type { StoredReminderKeys } from './encryption-keys';
 import type { ApiFetch, ReminderSourceIssue } from './types';
 import { routeFolderPath } from './encryption-folder-routing';
-
-interface RemoteFile { path: string; hash: string; size: number; revision: string }
-interface FilePage { files: RemoteFile[]; sequence: number; generation: number; nextCursor: string | null }
+import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
 
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {
@@ -30,7 +28,7 @@ async function json<T>(response: Response): Promise<T> {
 
 export class EncryptedReminderApi {
 	private readonly current = capturePwaSession();
-	private readonly cached = new Map<string, { file: RemoteFile; content: string; issue?: string }>();
+	private cached = new Map<string, { file: RemoteFile; content: string; issue?: string }>();
 	constructor(private readonly keys: StoredReminderKeys, private readonly fetch: ApiFetch) {}
 	private get localFolder() { return this.keys.localFolderPath ?? this.keys.folderPath; }
 	private authority(path: string) {
@@ -62,39 +60,29 @@ export class EncryptedReminderApi {
 	private async page(after?: string): Promise<FilePage> {
 		const query = new URLSearchParams({ folderPath: this.keys.folderPath });
 		if (after) query.set('after', after);
-		const page = await json<FilePage>(await this.fetch(`/reminders/encrypted-files?${query}`));
-		if (page.generation !== this.keys.generation || !Number.isSafeInteger(page.sequence) || page.sequence < 0
-			|| !Array.isArray(page.files) || page.files.length > 100 || (page.nextCursor !== null && typeof page.nextCursor !== 'string')) throw new Error('Invalid encrypted file inventory');
-		for (const file of page.files) {
-			if (!file || typeof file.path !== 'string' || typeof file.hash !== 'string' || !/^[a-f0-9]{64}$/.test(file.hash)
-				|| !Number.isSafeInteger(file.size) || file.size < 0 || typeof file.revision !== 'string' || !file.revision) throw new Error('Invalid encrypted file metadata');
-			this.authority(file.path);
-		}
-		return page;
+		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(`/reminders/encrypted-files?${query}`)), this.keys.folderPath, this.keys.generation);
 	}
 
 	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
 		const files: RemoteFile[] = [];
 		let cursor: string | undefined, sequence: number | undefined;
-		const seen = new Set<string>();
+		const acceptPage = createEncryptedInventoryProgress({ maxFiles: 20_000, maxPages: 1000 });
 		while (true) {
 			const page = first ?? await this.page(cursor);
 			first = undefined;
 			sequence ??= page.sequence;
 			if (page.sequence !== sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
+			acceptPage(page);
 			files.push(...page.files);
-			if (files.length > 20000) throw new Error('This reminders folder exceeds the web app file limit');
 			if (!page.nextCursor) break;
-			if (seen.has(page.nextCursor) || (cursor && page.nextCursor <= cursor)) throw new Error('Encrypted file pagination did not advance');
-			cursor = page.nextCursor; seen.add(cursor);
+			cursor = page.nextCursor;
 		}
-		if (new Set(files.map(file => file.path)).size !== files.length) throw new Error('Encrypted inventory repeated a file');
 		return { files, sequence: sequence };
 	}
 
-	private async read(file: RemoteFile): Promise<string> {
-		const cached = this.cached.get(file.revision);
-		if (cached && cached.file.path === file.path && cached.file.hash === file.hash) return cached.content;
+	private async read(file: RemoteFile, cache = this.cached): Promise<string> {
+		const cached = cache.get(file.revision);
+		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached.content;
 		if (file.size > 4 * 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.folderPath, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
@@ -107,11 +95,11 @@ export class EncryptedReminderApi {
 		validateEncryptedSchedules(opened.publicData);
 		const issue = opened.publicData.issue === 'scheduling-capacity' ? ENCRYPTED_SCHEDULING_CAPACITY_ISSUE : undefined;
 		this.assertCurrent();
-		this.cached.set(file.revision, { file, content, issue });
-		let bytesCached = [...this.cached.values()].reduce((bytes, entry) => bytes + entry.content.length * 2, 0);
-		while (bytesCached > 16 * 1024 * 1024 || this.cached.size > 1000) {
-			const first = this.cached.keys().next().value!;
-			bytesCached -= this.cached.get(first)!.content.length * 2; this.cached.delete(first);
+		cache.set(file.revision, { file, content, issue });
+		let bytesCached = [...cache.values()].reduce((bytes, entry) => bytes + entry.content.length * 2, 0);
+		while (bytesCached > 16 * 1024 * 1024 || cache.size > 1000) {
+			const first = cache.keys().next().value!;
+			bytesCached -= cache.get(first)!.content.length * 2; cache.delete(first);
 		}
 		return content;
 	}
@@ -125,13 +113,14 @@ export class EncryptedReminderApi {
 				const etag = `"e2ee-${this.keys.vaultId}-${this.keys.scopeId}-${this.keys.generation}-${first.sequence}"`;
 				if (etag === previousEtag) return new Response(null, { status: 304, headers: { ETag: etag } });
 				const inventory = await this.inventory(first);
+				const nextCache = new Map(this.cached);
 				const reminders: Awaited<ReturnType<typeof reminderCommandPayload>>[] = [], issues: ReminderSourceIssue[] = [];
 				const projects = new Set<string>();
 				for (const file of inventory.files) {
 					projects.add(getProjectFromPath(file.path, this.keys.folderPath));
 					try {
-						const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), await this.read(file), this.localFolder).reminders;
-						const issue = this.cached.get(file.revision)?.issue;
+						const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), await this.read(file, nextCache), this.localFolder).reminders;
+						const issue = nextCache.get(file.revision)?.issue;
 						if (issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: issue });
 						for (const reminder of scanned) reminders.push(await reminderCommandPayload(reminder));
 					} catch (error) {
@@ -144,6 +133,7 @@ export class EncryptedReminderApi {
 				for (const reminder of reminders) counts.set(reminder.id, (counts.get(reminder.id) ?? 0) + 1);
 				for (const reminder of reminders) if (counts.get(reminder.id)! > 1) issues.push({ path: reminder.filePath, reason: 'Duplicate reminder identity. Repair this note in Obsidian.' });
 				this.assertCurrent();
+				this.cached = nextCache;
 				return Response.json({ reminders: reminders.filter(reminder => counts.get(reminder.id) === 1), projects: [...projects].sort(), issues }, { headers: { ETag: etag } });
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;

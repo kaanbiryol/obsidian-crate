@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { deleteBucketObjectsOrQueue, drainObjectCleanupQueue } from './sync-storage';
+import { deleteBucketObjectsOrQueue, drainObjectCleanupQueue } from './object-cleanup';
 
 function createStatement(sql: string) {
 	const statement = {
@@ -17,6 +17,24 @@ function createStatement(sql: string) {
 
 describe('R2 object cleanup queue', () => {
 	afterEach(() => vi.restoreAllMocks());
+
+	it.each(['queueing', 'reference lookup', 'queue settlement'])('keeps post-commit cleanup nonfatal when %s fails', async failure => {
+		const error = new Error('D1 unavailable');
+		const db = {
+			prepare: vi.fn((sql: string) => {
+				const statement = createStatement(sql);
+				if (failure === 'queueing' && sql.startsWith('INSERT OR IGNORE INTO object_cleanup_queue')
+					|| failure === 'queue settlement' && sql.startsWith('DELETE FROM object_cleanup_queue')) statement.run.mockRejectedValue(error);
+				if (failure === 'reference lookup' && sql.startsWith('WITH input AS')) statement.all.mockRejectedValue(error);
+				return statement;
+			}),
+		};
+		const bucket = { delete: vi.fn(async () => {}) };
+
+		await expect(deleteBucketObjectsOrQueue(bucket as never, db as never, ['object-key'])).resolves.toBeUndefined();
+		if (failure === 'reference lookup') expect(bucket.delete).not.toHaveBeenCalled();
+		else expect(bucket.delete).toHaveBeenCalledWith('object-key');
+	});
 
 	it('queues an object key when immediate R2 deletion fails', async () => {
 		const prepared: ReturnType<typeof createStatement>[] = [];

@@ -2,7 +2,7 @@ import { portablePathKey } from '../../protocol/portable-path';
 import { uploadMutation } from './sync-mutations';
 import { bulkFileProjection } from './bulk-file-projection';
 import { decodeReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
-import { deleteBucketObjectsOrQueue } from './sync-storage';
+import { deleteBucketObjectsOrQueue } from './maintenance/object-cleanup';
 import type { UploadResult } from '@/protocol/sync-types';
 import { finishStagedBatches } from './staged-upload-batches';
 

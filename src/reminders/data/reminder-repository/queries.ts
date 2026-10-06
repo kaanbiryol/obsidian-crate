@@ -13,11 +13,13 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
     },
 
     getTodayReminders(includeCompleted = false) {
+      const now = new Date();
       return getTodayReminderIds(
-        index.getToday(),
-        index.getOverdue(),
+        index.getToday(now),
+        index.getOverdue(now),
         index.getCompleted(),
         includeCompleted,
+        now,
       );
     },
 

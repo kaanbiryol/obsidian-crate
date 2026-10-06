@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
 import { pruneChangelog } from './db';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './sync-storage';
+import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './maintenance/object-cleanup';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {

@@ -1,3 +1,4 @@
+import { deleteBucketObjectsOrQueue } from './maintenance/object-cleanup';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from './encryption-state';
 import type { EncryptionServerState } from '../../encryption/server-state';
@@ -16,7 +17,6 @@ import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt }
 import type { MutationAuditContext } from './request-diagnostics';
 import {
 	collectCleanupKeys,
-	deleteBucketObjectsOrQueue,
 	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 	type ExpectedFileHash,

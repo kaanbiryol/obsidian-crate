@@ -17,8 +17,10 @@ export const bundleBudgets = {
 		// measured 5.592 MB raw / 2.812 MB gzip, including the embedded app.
 		// Explicit cancellation and article-lifetime guards bring raw size to about
 		// 5.604 MB. Retain a small margin; the gzip ceiling stays unchanged.
+		// Shared inventory/submission guards measure 5.607 MB raw / 2.821 MB gzip,
+		// adding 0.42 KB gzip to the preceding build. Retain about 4.5 KB gzip margin.
 		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5610000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2820000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2825000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -41,7 +43,9 @@ export const bundleBudgets = {
 		// measured 5.24 MB raw / 1.80 MB gzip.
 		// 0.6.0 playback and shared UI bring the embedded app to 5.389 MB raw;
 		// gzip remains within the existing 1.85 MB ceiling.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5400000', 10),
+		// Inventory validation and cleanup reporting measure 5.402 MB raw,
+		// adding 1.22 KB to the preceding build. Retain about 8.5 KB raw margin.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5410000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1850000', 10),
 	}],
 	pwa: [{
@@ -59,7 +63,9 @@ export const bundleBudgets = {
 		// shared connection gate. Retain a small, explicit growth margin.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
 		// 0.6.0 settings and connection recovery: 1.157 MB raw / 392.7 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1165000', 10),
+		// Shared inventory/submission rules measure 1.167 MB raw / 397.0 KB gzip,
+		// adding 1.21 KB raw to the preceding build. Retain about 3.5 KB raw margin.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1170000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '397000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',

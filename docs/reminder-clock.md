@@ -6,4 +6,10 @@ Mounted reminder components share one timer. It runs at minute boundaries or imm
 
 Calendar views use local dates, including 23- and 25-hour DST days. Saved reminder dates, UTC instants, recurrence rules and notification policy are unchanged by these display updates. Browser and operating-system timer throttling can delay background rendering; returning to the app refreshes it.
 
+The index and shared views reuse the same today, overdue and upcoming rules.
+Index queries capture one time for the whole result; repository Today queries
+share that time across active, overdue and completed reminders so midnight cannot
+mix two calendar days in one result. View-specific completion and sorting rules
+remain unchanged.
+
 Six clock/model regressions cover midnight, exact timed deadlines, both DST day lengths, timezone-cache invalidation, clock jumps, resume and cleanup. The built-app browser gate verifies midnight plus real HTTP 304 responses, timed-deadline removal from Upcoming, overdue cards/header counts, relative labels and clock-jump recovery in Chromium and WebKit. Physical mobile background/resume acceptance remains a separate check.
