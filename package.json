@@ -146,7 +146,7 @@
 		"@lexical/plain-text": "0.52.0",
 		"@lexical/utils": "0.52.0",
 		"@noble/ciphers": "2.4.0",
-		"chrono-node": "^2.10.1",
+		"chrono-node": "^2.10.2",
 		"classnames": "^2.5.1",
 		"date-fns": "^4.4.0",
 		"defuddle": "0.19.4",
