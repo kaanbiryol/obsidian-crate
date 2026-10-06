@@ -16,11 +16,11 @@ import type { FileEntry } from '../protocol/sync-types';
 import { getPathEntry } from '../protocol/path-record';
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
+import type { FullSyncPlan } from './planner-types';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,
 	handleWorkflowError,
-	type FullSyncPlan,
 	type RemoteManifest,
 	type SyncStatus,
 } from './engine-workflow-shared';

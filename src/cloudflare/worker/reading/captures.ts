@@ -1,16 +1,14 @@
 import { readEncryptionState } from '../encryption-state';
 import { readingCapturePath } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
-import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { portablePathKey } from '@/protocol/portable-path';
 import { namespacePredicate } from '../file-namespace';
 import { stageMarkdownFile } from '../markdown-file-staging';
 import { commitStagedFile } from '../sync-mutations';
 import type { Env } from '../types';
 import { policy } from './common';
-import { managedArticle } from '@/reading/core/article';
+import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
-import { transcriptMetadata } from '@/reading/extraction/types';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
@@ -32,15 +30,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   const item = parseReadingNote(capture.note)!;
   // Turning fetching off while a request is in flight still produces a useful bookmark.
   if (!current.enabled) result = null;
-  const title = result?.title?.trim() && item.title === new URL(item.source_url).hostname ? result.title : item.title;
-  let content = patchReadingFrontmatter(capture.note, { title, extraction_status: result ? 'ready' : 'unavailable',
-    ...(result ? transcriptMetadata(result) : {}),
-    ...(result?.author ? { author: result.author } : {}), ...(result?.faviconUrl ? { favicon_url: result.faviconUrl } : {}),
-    ...(result && resolvedUrl ? { resolved_url: resolvedUrl } : {}) });
-  if (result) {
-    const block = managedArticle(content)!;
-    content = `${content.slice(0, block.start)}\n\n${result.markdown}\n\n${content.slice(block.end)}`;
-  }
+  const { content, title } = assembleReadingArticle(capture.note, item, { kind: 'capture', article: result, resolvedUrl });
   const path = await capturePath(env, current.folder_path, title, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
   const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null,

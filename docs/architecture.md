@@ -241,6 +241,8 @@ planner and transfer calls do not round-trip through engine forwarding methods.
 The ordered completion of the initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
 Planner cancellation checks, transfer baseline reads and workflow setup completion
 are required context dependencies, including in test fixtures.
+`sync/planner-types.ts` owns `FullSyncPlan`, shared by the planner and the workflow
+that applies its result.
 
 `ui/activity-modal.ts` owns the Activity view's subscriptions and rendering.
 `ui/activity/shared-history-loader.ts` owns request coalescing and disposal for each
@@ -410,6 +412,12 @@ download conditionally fills only that bookmark’s empty managed article block,
 preserving current metadata and personal notes outside the block. Deleted, replaced,
 modified article blocks, changed identities, duplicates, and stopped runtimes reject
 late publication. A failed or interrupted download remains a retryable bookmark.
+
+`reading/core/article.ts` owns article block assembly and extracted metadata updates
+for local downloads, new Worker captures and existing Worker notes. Each caller
+selects its publication policy, preserving the differences in metadata ownership,
+fallbacks and deferred transcripts. Source eligibility, revision checks, queue
+leases and storage commits remain with the local library and Worker workflows.
 
 HTML extraction lives in `src/reading/extraction/` and is shared with the Worker.
 Generic article extraction uses inert parsing and disables extractor network requests.
@@ -591,7 +599,7 @@ traversal independently of file counts. Reading and Reminders retain their own f
 limits, projections and sequence checks; each publishes its derived source cache
 only after a complete, confirmed load.
 
-`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract and exact setting destinations; `encryption-folder-moves.ts` runs conversion and recovery through `SyncRuntime`'s existing configuration serialization.
+`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
 
 `sync/encryption-conversion.ts` owns conversion sequencing, progress, server
 acknowledgments and activation. `encryption-conversion-content.ts` authenticates

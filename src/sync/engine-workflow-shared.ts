@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 import { getSyncIssues, recordSyncError } from './issues';
 import { errorMessage, type Logger } from '../plugin/logger';
-import type { DownloadDiff, FileDiff, SyncResult, SyncState, UploadDiff } from './types';
+import type { SyncResult, SyncState } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { AUTH_ERROR_MESSAGE, isAuthError } from './engine-constants';
 import {
@@ -17,16 +17,6 @@ export type SyncStatus = SyncState['status'];
 export interface RemoteManifest {
 	files: Record<string, FileEntry>;
 	lastSeq?: number;
-}
-
-export interface FullSyncPlan {
-	issues?: import('./types').SyncIssue[];
-	localFiles: Record<string, FileEntry>;
-	diffs: FileDiff[];
-	uploadDiffs: UploadDiff[];
-	downloadDiffs: DownloadDiff[];
-	remainingDiffs: FileDiff[];
-	errors: string[];
 }
 
 export function getStartFailureResult(context: {

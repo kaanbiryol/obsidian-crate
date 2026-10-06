@@ -41,6 +41,23 @@ export function writeFolderMoves(storage: SecretStorageService, value: FolderMov
   if ((storage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES) ?? '') !== raw) throw new Error('Could not save the encrypted folder move.');
 }
 
+function currentFolderMoveHead(storage: SecretStorageService, expectedId: string): FolderMoves {
+  const latest = readFolderMoves(storage);
+  if (latest.moves[0]?.id !== expectedId) throw new Error('The pending folder move changed. Reopen Manage encryption.');
+  return latest;
+}
+
+/** Re-read the tail so moves appended while the current job awaited I/O survive. */
+export function replaceFolderMoveHead(storage: SecretStorageService, move: FolderMove): void {
+  const latest = currentFolderMoveHead(storage, move.id);
+  writeFolderMoves(storage, { ...latest, moves: [move, ...latest.moves.slice(1)] });
+}
+
+export function completeFolderMoveHead(storage: SecretStorageService, expectedId: string): void {
+  const latest = currentFolderMoveHead(storage, expectedId);
+  writeFolderMoves(storage, { ...latest, moves: latest.moves.slice(1) });
+}
+
 /** A saved target may be the current bundle after a lost reply, or exactly its
  * proposed path change. Never replace keys using an unrelated checkpoint. */
 export function folderMoveTarget(keys: VaultKeyBundle, move: FolderMove): VaultKeyBundle {

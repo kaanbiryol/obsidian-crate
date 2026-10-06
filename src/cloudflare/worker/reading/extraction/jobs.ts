@@ -4,14 +4,12 @@ import { featureEnabled } from '../../feature-policy';
 import type { Env } from '../../types';
 import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
-import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
-import { managedArticle } from '@/reading/core/article';
+import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { projectReading } from '../projection';
 import { sha256Hex } from '../../auth';
 import { commitStagedFile } from '../../sync-mutations';
 import { stageMarkdownFile } from '../../markdown-file-staging';
 import type { extractDocument } from './document';
-import { transcriptMetadata } from '@/reading/extraction/types';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
 export interface Publication { job: Job; result: ReturnType<typeof extractDocument> | null; resolvedUrl?: string }
@@ -33,14 +31,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
     const source = await readSource(env, job.path), item = parseReadingNote(source.content), block = managedArticle(source.content);
     if (source.file.storageKey !== job.source_revision || item?.crate_reading_id !== job.item_id || item.capture_method !== 'url'
       || item.extraction_status !== 'pending' || item.source_url !== job.url || !block || await sha256Hex(block.text) !== job.block_hash) return;
-    let content = source.content;
-    if (result) content = `${content.slice(0, block.start)}\n\n${result.markdown}\n\n${content.slice(block.end)}`;
-    content = patchReadingFrontmatter(content, { extraction_status: result ? 'ready' : 'unavailable',
-      ...(result ? transcriptMetadata(result) : {}),
-      ...(result?.title && item.title === new URL(item.source_url).hostname ? { title: result.title } : {}),
-      ...(result?.author && !item.author ? { author: result.author } : {}),
-      ...(result?.faviconUrl && !item.favicon_url ? { favicon_url: result.faviconUrl } : {}),
-      ...(result && publication.resolvedUrl ? { resolved_url: publication.resolvedUrl } : {}) });
+    const { content } = assembleReadingArticle(source.content, item, { kind: 'extraction', article: result, block, resolvedUrl: publication.resolvedUrl });
     const staged = await stageMarkdownFile(env.BUCKET, env.DB, job.path, content, source.file.hash);
     await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: source.file, expectedRevision: source.file.storageKey });
   } finally {

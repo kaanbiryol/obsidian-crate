@@ -9,7 +9,8 @@ import { assertEncryptionKeys, convertEncryptedVault, readServerEncryption } fro
 import { startReading, stopReading, waitForStoppedReading } from '../reading/runtime';
 import { checkpointEncryptionRenames } from '../sync/encryption-rename-checkpoint';
 import { recoverMovedReadingCaptures } from '../reading/capture-folder-recovery';
-import { applyFolderSetting, folderMoveSettings, folderMoveTarget, movedPath, readFolderMoves, writeFolderMoves } from './encryption-folder-move-journal';
+import { folderMoveTarget, movedPath, readFolderMoves, writeFolderMoves } from './encryption-folder-move-journal';
+import { applyNextEncryptedFolderMove } from './encryption-folder-move-workflow';
 
 const running = new WeakMap<CratePlugin, Promise<void>>();
 
@@ -49,48 +50,16 @@ export function resumeEncryptedFolderMoves(plugin: CratePlugin, progress: (messa
     const http = new WorkerApiHttpClient(connection.origin, connection.token ?? '');
     http.setAbortSignal(connection.signal);
     if (!(await http.getServerInfo()).capabilities.includes(ENCRYPTION_FOLDER_MOVES_CAPABILITY)) throw new Error('Update your Crate server before moving encrypted folders.');
-    for (;;) {
-      connection.assertCurrent();
-      const job = readFolderMoves(plugin.secretStorage).moves[0];
-      if (!job) break;
-      await checkpointEncryptionRenames(plugin);
-      connection.assertCurrent();
-      if (job.scopeChange === false) {
-        if (readFolderMoves(plugin.secretStorage).moves.length === 1) await recoverMovedReadingCaptures(plugin);
-        const latest = readFolderMoves(plugin.secretStorage);
-        if (latest.moves[0]?.id !== job.id) throw new Error('The pending folder move changed. Reopen Manage encryption.');
-        writeFolderMoves(plugin.secretStorage, { ...latest, moves: latest.moves.slice(1) });
-        continue;
-      }
-      const keys = loadEncryptionKeys(plugin.secretStorage), recovery = plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
-      if (!keys || !recovery) throw new Error('Unlock this vault with its recovery key before resuming the folder move.');
-      const target = folderMoveTarget(keys, job);
-      if (!job.target || !job.settings) {
-        job.target = target;
-        job.settings ??= folderMoveSettings(job, target, plugin.settings.reading.folderPath, plugin.remindersSettings.remindersFolderPath);
-        const latest = readFolderMoves(plugin.secretStorage);
-        if (latest.moves[0]?.id !== job.id) throw new Error('The pending folder move changed. Reopen Manage encryption.');
-        writeFolderMoves(plugin.secretStorage, { ...latest, moves: [job, ...latest.moves.slice(1)] });
-      }
-      connection.assertCurrent(); saveEncryptionKeys(plugin.secretStorage, target, recovery);
-      await convertEncryptedVault(http, target, recovery, progress);
-      connection.assertCurrent();
-      // Each setting save is idempotent. Keep the journal until both succeeded.
-      const reading = plugin.settings.reading;
-      await plugin.writeSettings({ reading: { ...reading, folderPath: applyFolderSetting(reading.folderPath, job.settings.reading) } }, () => {
-        connection.assertCurrent();
-        if (plugin.settings.reading.folderPath !== reading.folderPath || plugin.settings.reading.enabled !== reading.enabled) throw new Error('Reading settings changed. Resume the saved folder move.');
-      });
-      await plugin.writeRemindersSettings(current => ({
-        remindersFolderPath: applyFolderSetting(current.remindersFolderPath, job.settings!.reminders),
-        ...(current.pendingServerFolder?.workerUrl === connection.origin ? { pendingServerFolder: undefined } : {}),
-      }), connection.assertCurrent);
-      connection.assertCurrent();
-      if (readFolderMoves(plugin.secretStorage).moves.length === 1) await recoverMovedReadingCaptures(plugin);
-      const latest = readFolderMoves(plugin.secretStorage);
-      if (latest.moves[0]?.id !== job.id) throw new Error('The pending folder move changed. Reopen Manage encryption.');
-      writeFolderMoves(plugin.secretStorage, { ...latest, moves: latest.moves.slice(1) });
-    }
+    while (await applyNextEncryptedFolderMove({
+      storage: plugin.secretStorage, origin: connection.origin, assertCurrent: connection.assertCurrent,
+      checkpointRenames: () => checkpointEncryptionRenames(plugin),
+      convertVault: (target, recovery) => convertEncryptedVault(http, target, recovery, progress),
+      recoverReadingCaptures: () => recoverMovedReadingCaptures(plugin),
+      getReadingSettings: () => plugin.settings.reading,
+      getRemindersFolderPath: () => plugin.remindersSettings.remindersFolderPath,
+      writeReadingSettings: (reading, assertCurrent) => plugin.writeSettings({ reading }, assertCurrent),
+      writeRemindersSettings: (update, assertCurrent) => plugin.writeRemindersSettings(update, assertCurrent),
+    })) { /* Drain all persisted moves before restarting the runtimes. */ }
   }); } while (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES));
     connection.assertCurrent();
     if (plugin.remindersSettings.enabled) await plugin.reinitializeWithFolder(plugin.remindersSettings.remindersFolderPath);
