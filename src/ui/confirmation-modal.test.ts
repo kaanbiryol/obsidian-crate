@@ -40,6 +40,8 @@ describe('openConfirmationModal', () => {
 		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Force full sync');
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('Overwrite the remote vault with local files?');
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('Remote-only files will be deleted.');
+		expect(MockSetting.instances[0]?.buttons[1]?.buttonEl.classNames.has('mod-destructive')).toBe(true);
+		expect(MockSetting.instances[0]?.buttons[1]?.buttonEl.classNames.has('mod-cta')).toBe(true);
 
 		MockSetting.instances[0]?.buttons[1]?.click();
 
@@ -75,6 +77,8 @@ it('starts the optional forget switch unchecked and reports changes without conf
 		checkbox: { label: 'Also forget the saved server connection', onChange },
 	});
 	const option = MockSetting.instances[0]!;
+	expect(MockSetting.instances[1]!.buttons[1]!.buttonEl.classNames.has('mod-cta')).toBe(true);
+	expect(MockSetting.instances[1]!.buttons[1]!.buttonEl.classNames.has('mod-destructive')).toBe(false);
 	expect(option.toggles[0]!.value).toBe(false);
 	expect(onChange).not.toHaveBeenCalled();
 	option.toggles[0]!.change(true);

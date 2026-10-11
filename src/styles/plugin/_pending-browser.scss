@@ -233,16 +233,6 @@ body.is-mobile .crate-pending-browser .crate-browser-actions .crate-browser-sync
         > p { margin: 0; line-height: 1.5; }
         > [role="status"]:empty { display: none; }
     }
-    .crate-discard-file-list {
-        max-height: 40vh;
-        overflow: auto;
-        margin: 0;
-
-        &:empty { display: none; }
-    }
-    .crate-discard-file { display: flex; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
-    .crate-discard-path { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-    .crate-discard-action { flex-shrink: 0; color: var(--text-muted); }
     .crate-discard-help { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 }
 

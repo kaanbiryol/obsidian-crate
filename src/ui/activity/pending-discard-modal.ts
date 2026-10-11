@@ -6,7 +6,7 @@ import { SharedModal } from '../plugin/SharedModal';
 export class PendingDiscardModal extends SharedModal {
     private active = true;
     private footer!: HTMLDivElement;
-    constructor(app: App, private load: () => Promise<PendingDiscardReview>, private onDiscarded: () => void, private paths: string[]) { super(app); }
+    constructor(app: App, private load: () => Promise<PendingDiscardReview>, private onDiscarded: () => void) { super(app); }
     onOpen(): void {
         this.openLayout('Discard changes?');
         this.modalEl.addClass('crate-pending-discard-modal');
@@ -14,15 +14,10 @@ export class PendingDiscardModal extends SharedModal {
         void this.render();
     }
     private async render(): Promise<void> {
+        this.setLayoutTitle('Discard changes?');
         this.bodyEl.empty();
         this.footer.empty();
         this.bodyEl.createEl('p', { text: 'Restore the last-synced versions. New local files move to trash.' });
-        const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list', attr: { 'aria-busy': 'true' } });
-        for (const path of this.paths) {
-            const row = list.createDiv({ cls: 'crate-discard-file' });
-            row.createSpan({ text: path, cls: 'crate-discard-path' });
-            row.createSpan({ text: 'Checking…', cls: 'crate-discard-action' });
-        }
         this.bodyEl.createEl('p', { text: 'Recovery copies of replaced files are saved on this device.', cls: 'crate-discard-help' });
         this.bodyEl.createDiv({ text: 'Checking selected files…', attr: { role: 'status' } });
         const buttons = this.footer.createDiv({ cls: 'crate-modal-actions' });
@@ -33,15 +28,11 @@ export class PendingDiscardModal extends SharedModal {
         try {
             const review = await this.load();
             if (!this.active) return;
+            const count = review.items.length;
+            this.setLayoutTitle(count ? `Discard ${count} ${count === 1 ? 'file' : 'files'}?` : 'Discard changes?');
             this.bodyEl.empty();
             this.footer.empty();
             this.bodyEl.createEl('p', { text: 'Restore the last-synced versions. New local files move to trash.' });
-            const list = this.bodyEl.createDiv({ cls: 'crate-discard-file-list' });
-            for (const item of review.items) {
-                const row = list.createDiv({ cls: 'crate-discard-file' });
-                row.createSpan({ text: item.path, cls: 'crate-discard-path' });
-                row.createSpan({ text: item.action === 'restore' ? 'Restore' : 'Move to trash', cls: 'crate-discard-action' });
-            }
             if (review.unchangedCount) this.bodyEl.createEl('p', { text: `${review.unchangedCount} unchanged files will be kept.`, cls: 'crate-discard-help' });
             if (!review.items.length) this.bodyEl.createEl('p', { text: 'No changes to discard.' });
             else this.bodyEl.createEl('p', { text: 'Recovery copies of replaced files are saved on this device.', cls: 'crate-discard-help' });
@@ -49,7 +40,7 @@ export class PendingDiscardModal extends SharedModal {
             const buttons = this.footer.createDiv({ cls: 'crate-modal-actions' });
             const cancel = buttons.createEl('button', { text: 'Cancel', cls: 'crate-action-button', attr: { type: 'button' } });
             cancel.addEventListener('click', () => this.close());
-            const confirm = buttons.createEl('button', { text: `Discard changes (${review.items.length})`, cls: 'mod-warning', attr: { type: 'button' } });
+            const confirm = buttons.createEl('button', { text: 'Discard changes', cls: 'mod-warning', attr: { type: 'button' } });
             confirm.disabled = review.items.length === 0;
             confirm.addEventListener('click', () => {
                 confirm.disabled = true; cancel.disabled = true;

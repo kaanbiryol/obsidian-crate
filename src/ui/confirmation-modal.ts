@@ -64,7 +64,7 @@ class ConfirmationModal extends SharedModal {
 			.addButton(button => {
 				button.setButtonText(confirmText);
 				if (warning) {
-					button.setDestructive();
+					button.setDestructive().setCta();
 				} else {
 					button.setCta();
 				}

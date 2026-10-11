@@ -50,7 +50,7 @@ export const obsidianDialogModule = `      export function setIcon(el) {
           this.settingEl.classList.add('mod-action');
           const button=this.controlEl.createEl('button');
           const api={buttonEl:button,setButtonText:v=>{button.textContent=v;return api;},setDisabled:v=>{button.disabled=v;return api;},
-            onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>{button.classList.add('mod-warning');return api;}};
+            onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>{button.classList.add('mod-destructive');return api;}};
           build(api);return this;
         }
       }

@@ -43,7 +43,7 @@ const { outputFiles } = await build({
                         return ({
                         items: keys.filter(key => window.allChanged || decodePendingChange(key).path.endsWith('appearance.json') || decodePendingChange(key).kind === 'delete').map(key => ({ path: decodePendingChange(key).path, action: 'restore' })),
                         unchangedCount: keys.filter(key => !window.allChanged && !decodePendingChange(key).path.endsWith('appearance.json') && decodePendingChange(key).kind !== 'delete').length, discard: async () => { window.discarded++; },
-                    }); }, () => {}, keys.map(key => decodePendingChange(key).path)).open();
+                    }); }, () => {}).open();
                 },
             };
             window.fail = false;
@@ -251,11 +251,14 @@ for (const browserType of [chromium, webkit]) {
                 await expect(highlighted).toHaveCount(6);
                 await page.evaluate(() => { window.delayDiscardReview = true; });
                 await page.getByRole('menuitem', { name: 'Discard 6 items…', exact: true }).click();
-                await expect(page.locator('.crate-discard-path')).toHaveCount(6);
+                await expect(page.locator('.fixture-modal .crate-discard-file-list')).toHaveCount(0);
+                await expect(page.locator('.fixture-modal')).not.toContainText('.obsidian/appearance.json');
                 await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeDisabled();
                 assert.equal(await page.evaluate(() => window.discarded), 0);
                 await page.evaluate(() => { window.delayDiscardReview = false; window.releaseDiscardReview(); });
-                await expect(page.getByRole('button', { name: 'Discard changes (2)' })).toBeEnabled();
+                await expect(page.locator('.fixture-modal .reminder-modal-header-title')).toHaveText('Discard 2 files?');
+                await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeEnabled();
+                await expect(page.locator('.fixture-modal')).not.toContainText('.obsidian/appearance.json');
                 await expect(page.getByText('4 unchanged files will be kept.', { exact: true })).toBeVisible();
                 assert.equal((await page.evaluate(() => window.discardKeys)).length, 6);
                 assert.equal(await page.evaluate(() => window.discarded), 0, 'No discard before confirmation');
@@ -296,9 +299,10 @@ for (const browserType of [chromium, webkit]) {
                 await checks.first().uncheck();
                 await first.click({ button: 'right' });
                 await page.getByRole('menuitem', { name: 'Discard 1 item…', exact: true }).click();
-                await expect(page.getByRole('button', { name: 'Discard changes (1)' })).toBeEnabled();
+                await expect(page.locator('.fixture-modal .reminder-modal-header-title')).toHaveText('Discard 1 file?');
+                await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeEnabled();
                 assert.deepEqual(await page.evaluate(() => window.discardKeys), ['.obsidian/appearance.json']);
-                await page.getByRole('button', { name: 'Discard changes (1)' }).click();
+                await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
                 await expect(page.locator('.fixture-modal')).toHaveCount(0);
                 assert.equal(await page.evaluate(() => window.discarded), 1);
                 await checks.first().check();
@@ -390,7 +394,8 @@ for (const browserType of [chromium, webkit]) {
                     await rows.nth(3).click({ button: 'right' });
                     await expect(highlighted).toHaveCount(1);
                     await page.getByRole('menuitem', { name: 'Discard 1 item…', exact: true }).click();
-                    await expect(page.getByRole('button', { name: 'Discard changes (0)' })).toBeDisabled();
+                    await expect(page.getByText('No changes to discard.', { exact: true })).toBeVisible();
+                    await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeDisabled();
                     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
                     await first.click();
                     await page.keyboard.press('Shift+ArrowDown');
@@ -454,7 +459,8 @@ for (const browserType of [chromium, webkit]) {
                 await expect(highlighted).toHaveCount(20);
                 await page.keyboard.press('Shift+F10');
                 await page.getByRole('menuitem', { name: 'Discard 20 items…', exact: true }).click();
-                await expect(page.getByRole('button', { name: 'Discard changes (20)' })).toBeEnabled();
+                await expect(page.locator('.fixture-modal .reminder-modal-header-title')).toHaveText('Discard 20 files?');
+                await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeEnabled();
                 assert.equal((await page.evaluate(() => window.discardKeys)).length, 20);
                 await page.getByRole('button', { name: 'Cancel', exact: true }).click();
                 // A filename beginning with "delete:" and a real deletion stay distinct.
@@ -484,7 +490,8 @@ for (const browserType of [chromium, webkit]) {
                     await row.click({ button: 'right' });
                     await page.getByRole('menuitem', { name: 'Discard 1 item…', exact: true }).click();
                     assert.deepEqual(await page.evaluate(() => window.discardKeys), [key]);
-                    await expect(page.getByRole('button', { name: 'Discard changes (1)', exact: true })).toBeEnabled();
+                    await expect(page.locator('.fixture-modal .reminder-modal-header-title')).toHaveText('Discard 1 file?');
+                    await expect(page.getByRole('button', { name: 'Discard changes', exact: true })).toBeEnabled();
                     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
                 }
                 // Large attachment queues do not make a request per image before reaching text.

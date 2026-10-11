@@ -61,7 +61,7 @@ const { outputFiles } = await build({
       } else if (scene==='rows') new RowDialog({}).open();
       else if(scene==='management') new Management({}).open();
       else if(scene==='confirmation') void openConfirmationModal({}, {title:'Disconnect this device',message:'Stop syncing this device?',details:['Other devices stay connected.'],confirmText:'Disconnect',warning:true,checkbox:{label:'Also forget the saved server connection',onChange:()=>{}}});
-      else if(scene==='discard') new PendingDiscardModal({},async()=>({items:[{path:'Notes/Review.md',action:'restore'}],unchangedCount:0,discard:async()=>{window.discarded=true;}}),()=>{},['Notes/Review.md']).open();
+      else if(scene==='discard') new PendingDiscardModal({},async()=>({items:[{path:'Notes/Review.md',action:'restore'}],unchangedCount:0,discard:async()=>{window.discarded=true;}}),()=>{}).open();
       else if(scene==='diagnostics') new SyncDiagnosticsModal({},'Fixture sync report\\n'.repeat(30)).open();
       else if(scene==='qr') new QRModal({},url).open();
       else if(scene==='external') openExternalBrowserModal({},url,{title:'Open Crate',message:'Open the web app in your browser.',linkText:'Open app',showCopyableUrl:true});
@@ -92,6 +92,7 @@ for (const browserType of [chromium,webkit]) {
       const errors=[]; page.on('pageerror',error=>errors.push(error.message));
       await page.route('https://dialog-ui.test/**',route=>route.fulfill({contentType:'text/html',body:`<html class="theme-${theme}"><head><style>${hostStyles}</style><style>${obsidianCss}</style><style>${css}</style></head><body class="theme-${theme} ${width<700?'is-mobile is-phone':''}"></body></html>`}));
       await page.goto('https://dialog-ui.test/');
+      await page.addStyleTag({content:'.crate-dialog-danger-probe{color:var(--crate-danger)}'});
       await page.evaluate(css=>{window.pluginCss=css;},css);
       await page.addScriptTag({content:outputFiles[0].text});
       await page.evaluate(()=>window.mount('rows'));
@@ -135,6 +136,20 @@ for (const browserType of [chromium,webkit]) {
           await expect(advanced).toHaveAttribute('open','');
           assert.equal(await advanced.locator(':scope > summary').evaluate(el=>getComputedStyle(el,'::after').gridColumnStart),'2','Disclosure uses the shared trailing chevron');
         }
+        if(scene==='confirmation' || scene==='reset') {
+          const destructive=modal.locator('.crate-modal-footer button.mod-destructive');
+          const danger=await destructive.evaluate(el=>{
+            const probe=document.createElement('span');probe.className='crate-dialog-danger-probe';el.append(probe);
+            const color=getComputedStyle(probe).color;probe.remove();return color;
+          });
+          if(scene==='confirmation') {
+            await expect(destructive).toHaveClass(/mod-cta/);
+            await expect(destructive,`${label}: destructive confirmation uses the danger fill`).toHaveCSS('background-color',danger);
+            await expect(modal.getByRole('button',{name:'Cancel',exact:true})).not.toHaveClass(/mod-destructive|mod-cta/);
+          } else {
+            await expect(destructive,`${label}: destructive secondary action retains danger text`).toHaveCSS('color',danger);
+          }
+        }
         if(scene==='delete') {
           await expect(modal.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
           await page.evaluate(()=>window.setDeleteBusy(true));
@@ -146,7 +161,10 @@ for (const browserType of [chromium,webkit]) {
           assert.equal(await page.evaluate(()=>window.deleteConfirmed),true);
         }
         if(scene==='discard') {
-          await modal.getByRole('button',{name:'Discard changes (1)',exact:true}).click();
+          await expect(modal).toHaveAttribute('aria-label','Discard 1 file?');
+          await expect(modal.getByRole('heading',{name:'Discard 1 file?',exact:true})).toBeVisible();
+          await expect(modal).not.toContainText('Notes/Review.md');
+          await modal.getByRole('button',{name:'Discard changes',exact:true}).click();
           assert.equal(await page.evaluate(()=>window.discarded),true);
           continue;
         }
