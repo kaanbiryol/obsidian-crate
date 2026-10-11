@@ -46,7 +46,8 @@ export async function trackSheetDismissal(sheet, { minimumSettleMs = 0, recedeCa
 		const frames = await recording.evaluate(async ({ frames, done }) => { await done; return frames; });
 		await recording.dispose();
 		const visible = frames.filter(frame => frame.alive);
-		expect(visible.some(frame => frame.sheet > .1 && frame.sheet < .9)).toBe(true);
+		expect(visible.some(frame => frame.sheet > .1 && frame.sheet < .9),
+			`Expected an intermediate dismissal frame: ${JSON.stringify(visible.map(({ time, sheet, canvas, backdrop }) => ({ time, sheet, canvas, backdrop })))}`).toBe(true);
 		expect(visible.at(-1).sheet).toBeGreaterThan(.98);
 		expect(visible.at(-1).canvas).toBeGreaterThan(.98);
 		for (const frame of frames) {

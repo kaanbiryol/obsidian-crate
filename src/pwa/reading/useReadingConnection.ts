@@ -117,28 +117,6 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
     return () => { cancelled = true; alive.current = false; lifetime.current++; };
   }, [startupReady, authority, run, hydrate]);
   useEffect(() => {
-    const current = session ?? lockedSession;
-    if (!current) return;
-    const reconcile = () => {
-      try { assertReadingSession(current); } catch { expire(); }
-    };
-    const changed = (event: StorageEvent) => {
-      if (event.key === READING_SESSION_KEY || event.key === AUTH_TOKEN_KEY || event.key === null) reconcile();
-    };
-    const resume = () => { if (document.visibilityState === 'visible') reconcile(); };
-    window.addEventListener('storage', changed);
-    window.addEventListener('crate-reading-change', reconcile);
-    window.addEventListener('pageshow', reconcile);
-    document.addEventListener('visibilitychange', resume);
-    reconcile();
-    return () => {
-      window.removeEventListener('storage', changed);
-      window.removeEventListener('crate-reading-change', reconcile);
-      window.removeEventListener('pageshow', reconcile);
-      document.removeEventListener('visibilitychange', resume);
-    };
-  }, [session, lockedSession, expire]);
-  useEffect(() => {
     if (!startupReady || !ready || session || lockedSession) return;
     const changed = (event: StorageEvent) => { if (event.key === AUTH_TOKEN_KEY || event.key === READING_SESSION_KEY || event.key === null) void connect(); };
     const retry = () => { void connect(); };

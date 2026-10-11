@@ -135,7 +135,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       localStorage.removeItem(key);
       window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue: null, storageArea: localStorage }));
     });
-    await expect(page.getByRole('heading', { name: 'Reconnect to Crate', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connect to Crate', exact: true })).toBeVisible();
     await expect(input).toHaveCount(0);
     assert.deepEqual(errors, []);
   } finally { await browser?.close(); if (server) await new Promise(resolve => server.close(resolve)); await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
