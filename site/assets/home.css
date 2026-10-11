@@ -1,4 +1,8 @@
 /* Homepage: one demonstration and a small set of previews per feature. */
+/* Frames retain their dimensions while screenshots decode, then fade in once. */
+.product-image img[loading] { transition:opacity 220ms ease-out; }
+.product-image img.is-loading { opacity:0; }
+@media(prefers-reduced-motion:reduce) { .product-image img[loading] { transition:none; } }
 .feature-label { color:var(--accent-text); font:12px ui-monospace,monospace; letter-spacing:.08em; }
 .sync-intro figcaption,.reading-intro { grid-template-columns:minmax(0,1fr); gap:16px; }
 .sync-intro figcaption { max-width:none; }
