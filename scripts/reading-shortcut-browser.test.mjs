@@ -130,7 +130,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     unavailable = false;
     await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();
     await expect(input).toHaveValue(/shortcut-exchange#/);
-    await page.evaluate(() => { localStorage.removeItem('crate-reading-session-v1'); window.dispatchEvent(new Event('storage')); });
+    await page.evaluate(() => {
+      const key = 'crate-reading-session-v1', oldValue = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue: null, storageArea: localStorage }));
+    });
     await expect(page.getByRole('heading', { name: 'Connect to Crate', exact: true })).toBeVisible();
     await expect(input).toHaveCount(0);
     assert.deepEqual(errors, []);

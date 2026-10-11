@@ -51,6 +51,27 @@ function start() {
 }
 
 describe('Reading enrollment authority', () => {
+  it.each(['removed', 'replaced', 'malformed', 'missed notification'] as const)('clears private rendered state when the active credential is %s', async change => {
+    vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://private.example/draft' });
+    const h = start();
+    await act(async () => { h.release(new Response(JSON.stringify(session))); });
+    const publisher = h.rendered.current;
+    expect(publisher.url).toBe('https://private.example/draft');
+    const draftWrites = vi.mocked(saveReadingDraft).mock.calls.length;
+    await act(async () => {
+      if (change === 'replaced') localStorage.setItem(READING_SESSION_KEY, JSON.stringify(replacement));
+      else if (change === 'malformed') localStorage.setItem(READING_SESSION_KEY, '{');
+      else localStorage.removeItem(READING_SESSION_KEY);
+      const event = new window.Event(change === 'missed notification' ? 'pageshow' : 'storage');
+      Object.assign(event, { key: READING_SESSION_KEY });
+      window.dispatchEvent(event);
+    });
+    expect(h.rendered.current).toMatchObject({ session: null, cache: null, pending: [], adding: false, url: '', issue: { kind: 'reconnect' } });
+    expect(publisher.isCurrentSession(session)).toBe(false);
+    expect(saveReadingDraft).toHaveBeenCalledTimes(draftWrites);
+    if (change === 'replaced') expect(localStorage.getItem(READING_SESSION_KEY)).toBe(JSON.stringify(replacement));
+  });
+
   it.each(['replacement', 'reset', 'unmount'] as const)('rejects stale state publications after %s', async change => {
     const h = start();
     await act(async () => { h.release(new Response(JSON.stringify(session))); });

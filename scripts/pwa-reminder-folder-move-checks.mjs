@@ -44,9 +44,10 @@ export async function verifyReminderFolderMove({ admin, page, origin, owner, set
   // Restore the durable offline state before reconnecting. Reconnecting
   // first starts refresh requests that an immediate reload would cancel.
   await page.reload();
-  await expect(page.getByText('Accepted before the folder moved', { exact: true })).toBeVisible();
+  const retainedReminder = page.getByRole('group', { name: 'Accepted before the folder moved. Press Enter to edit reminder.', exact: true });
+  await expect(retainedReminder).toBeVisible();
   await setOffline(false);
-  await expect(page.getByText('Accepted before the folder moved', { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(retainedReminder).toBeVisible({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).length), { timeout: 30000 }).toBe(0);
   assert.equal(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token')), token);
   await page.locator('[data-action="toggle-settings"]').click();

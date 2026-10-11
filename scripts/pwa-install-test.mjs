@@ -3,7 +3,7 @@ import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const { server } = await listenPwaPreviewServer({ port: 0, assets, folderPath: 'Tasks' });
 const origin = `http://127.0.0.1:${server.address().port}`;
 const cardName = 'Check this article. Press Enter to edit reminder.';
 const authKey = 'crate-reminders-auth-token';

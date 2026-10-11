@@ -4,6 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
+import { pendingChangeKey } from '../../sync/pending-change';
 
 let device: SyncTestDevice;
 beforeEach(async () => {
@@ -131,7 +132,7 @@ it.each([false, true])('preserves rename ordering with selected batched uploads 
 	device.engine.onFileRename({ path: 'new.md' } as never, 'old.md');
 	device.requests.length = 0;
 	if (fail) vi.spyOn(device.files, 'batchUpload').mockRejectedValueOnce(new Error('Upload unavailable'));
-	const result = await device.engine.syncSelected(['delete:old.md', 'new.md']);
+	const result = await device.engine.syncSelected([pendingChangeKey('delete', 'old.md'), 'new.md']);
 	expect(result.success).toBe(!fail);
 	if (fail) {
 		expect(device.requests).not.toContain('POST /sync/delete');
