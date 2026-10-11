@@ -1,3 +1,4 @@
+import type { DeleteRemoteFiles } from './transfer-delete';
 import { pendingChangeKey } from './pending-change';
 import { recordSyncError } from './issues';
 import {
@@ -28,6 +29,7 @@ import {
 const logger = createLogger('SyncEngine');
 
 export interface SyncWorkflowContext extends FullSyncUploadContext {
+	deleteRemoteFiles: DeleteRemoteFiles;
   finishInitialSetup(): Promise<void>;
   tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
@@ -184,10 +186,11 @@ export async function runSyncWorkflow(
 
 		context.throwIfDestroyed();
 
-		if (remainingDiffs.length) context.updateState({ work: { phase: 'applying' } });
-		for (const diff of remainingDiffs) {
+		const remoteDeletes = remainingDiffs.filter(diff => diff.action === 'delete');
+		const otherDiffs = remainingDiffs.filter(diff => diff.action !== 'delete');
+		if (otherDiffs.length) context.updateState({ work: { phase: 'applying' } });
+		for (const diff of otherDiffs) {
 			try {
-				if (diff.action === 'delete' && result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
 				const outcome = await context.processDiff(diff, localFiles, result);
 				if (outcome.status === 'deferred') {
 					recordSyncError(result, `${outcome.reason}`, diff.path);
@@ -199,6 +202,14 @@ export async function runSyncWorkflow(
 			current++;
 			progressCallback?.(current, total);
 		}
+
+		await context.deleteRemoteFiles(remoteDeletes.flatMap(diff => {
+			if (!diff.remoteHash) { recordSyncError(result, 'Missing remote version for delete', diff.path); return []; }
+			return [{ path: diff.path, expectedHash: diff.remoteHash, expectedRevision: diff.remoteRevision }];
+		}), result, {
+			onProcessed: count => { current += count; progressCallback?.(current, total); },
+		});
+		for (const path of result.deletedPaths) delete localFiles[path];
 
 		if (result.errors.length === 0) {
 			for (const [path, entry] of Object.entries(localFiles)) {

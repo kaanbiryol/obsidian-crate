@@ -716,6 +716,10 @@ const context = {
   pending adapter/API work, rather than replacing private engine contexts.
 - Test pagination directly with `incremental-changelog.test.ts`; incremental
   reconciliation tests cover late local edits, guarded deletes and cursor retention.
+- `engine-transfer-parity.test.ts` runs a mixed upload/delete workload through
+  selected, full, incremental, automatic and forced sync using real journals and
+  file operations. `transfer-delete.test.ts` checks bounded concurrency, progress,
+  upload failure gates, local absence and accepted sibling cancellation.
 
 ## Portable visual baselines
 

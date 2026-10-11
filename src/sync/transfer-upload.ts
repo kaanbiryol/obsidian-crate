@@ -4,13 +4,14 @@ import { arrayBufferToBase64 } from "./encoding";
 import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./transfer-prepare";
 import { isMarkdownPath } from "./markdown-base-cache";
 import type { TransferContext } from "./transfer-types";
-import type { BatchUploadFile } from '../protocol/sync-types';
+import type { BatchUploadFile, MutationFailure } from '../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from './types';
 import { BATCH_FILE_SIZE_LIMIT } from '../protocol/sync-limits';
 import { createLogger } from "../plugin/logger";
 import type { VaultFile } from "./file-discovery";
 import { HttpError } from './api';
 import { isQueueVersionConflict } from './queue-failure';
+import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 
 const logger = createLogger("SyncTransfer");
 
@@ -33,8 +34,14 @@ export async function prepareUploadsFromVaultFiles(
   return prepared.filter((upload): upload is PreparedUpload => upload !== null);
 }
 
+type UploadTransferContext = Pick<TransferContext, 'runConcurrent' | 'retryWithBackoff' | 'getModifiedIso'> & {
+  api: Pick<TransferContext['api'], 'uploadFile' | 'batchUpload'>;
+  localManifest: Pick<TransferContext['localManifest'], 'setEntry'>;
+  markdownBaseCache?: Pick<NonNullable<TransferContext['markdownBaseCache']>, 'putBase'>;
+};
+
 export async function uploadPreparedFiles(
-  context: TransferContext,
+  context: UploadTransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
   options: UploadPreparedFilesOptions,
@@ -84,7 +91,7 @@ export async function uploadPreparedFiles(
 
           if (fileResult.success) {
             if (fileResult.hash && fileResult.hash !== upload.hash) {
-              recordSyncError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`, upload.path);
+              recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`, upload.path, options);
               continue;
             }
 
@@ -102,20 +109,19 @@ export async function uploadPreparedFiles(
           } else if (fileResult.code === 'version_conflict' || isQueueVersionConflict(fileResult.status, fileResult.code)) {
             versionConflictPaths.add(upload.path);
           } else {
-            recordSyncError(result, `${fileResult.error || "Upload failed"}`, upload.path);
+            recordUploadError(result, new HttpError(fileResult.error || "Upload failed", fileResult.status ?? 503, null, fileResult.code), upload.path, options);
           }
         }
       } catch (error) {
         if (isAbortError(error)) throw error;
-        const uploadError = error instanceof Error ? error.message : "Batch upload failed";
         for (const upload of chunk) {
-          recordSyncError(result, `${uploadError}`, upload.path);
+          recordUploadError(result, error, upload.path, options);
         }
       }
       options.onProcessed?.(chunk.length);
     });
 
-    await context.runConcurrent(batchTasks, options.batchConcurrency ?? options.concurrency);
+    await context.runConcurrent(batchTasks, options.batchConcurrency ?? BATCH_UPLOAD_CONCURRENCY);
   }
 
   if (individual.length > 0) {
@@ -131,29 +137,30 @@ export async function uploadPreparedFiles(
       } catch (error) {
         if (isAbortError(error)) throw error;
         const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
-        for (const path of paths) recordSyncError(result, `${message}`, path);
+        for (const path of paths) recordUploadError(result, `${message}`, path, options);
       }
     } else {
       for (const path of paths) {
-        recordSyncError(result, `Remote file changed since it was read`, path);
+        recordUploadError(result, `Remote file changed since it was read`, path, options);
       }
     }
   }
 }
 
 export interface UploadPreparedFilesOptions {
-  concurrency: number;
+  concurrency?: number;
   retry: boolean;
   batchConcurrency?: number;
   onProcessed?: (count: number) => void;
+  onFailure?: (failure: MutationFailure) => void;
   onVersionConflicts?: (paths: string[], result: SyncResult) => Promise<void>;
 }
 
 async function uploadPreparedFilesIndividually(
-  context: TransferContext,
+  context: UploadTransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
-  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry' | 'onProcessed'>,
+  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry' | 'onProcessed' | 'onFailure'>,
 ): Promise<string[]> {
   const tasks = prepared.map((upload) => async () => {
     try {
@@ -171,7 +178,7 @@ async function uploadPreparedFilesIndividually(
 
       if (uploadResult.success) {
         if (uploadResult.hash && uploadResult.hash !== upload.hash) {
-          recordSyncError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`, upload.path);
+          recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`, upload.path, options);
           return null;
         }
 
@@ -192,20 +199,28 @@ async function uploadPreparedFilesIndividually(
       if (uploadResult.code === 'version_conflict' || isQueueVersionConflict(uploadResult.status, uploadResult.code)) {
         return upload.path;
       }
-      recordSyncError(result, `${uploadResult.error || "Upload failed"}`, upload.path);
+      recordUploadError(result, new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code), upload.path, options);
     } catch (error) {
       if (isAbortError(error)) throw error;
       if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
         return upload.path;
       }
-      const uploadError = error instanceof Error ? error.message : "Upload failed";
-      recordSyncError(result, `${uploadError}`, upload.path);
+      recordUploadError(result, error, upload.path, options);
     } finally {
       options.onProcessed?.(1);
     }
     return null;
   });
 
-  const versionConflicts = await context.runConcurrent(tasks, options.concurrency);
+  const versionConflicts = await context.runConcurrent(tasks, options.concurrency ?? UPLOAD_CONCURRENCY);
   return versionConflicts.filter((path): path is string => path !== null);
+}
+
+function recordUploadError(result: SyncResult, error: unknown, path: string, options: Pick<UploadPreparedFilesOptions, 'onFailure'>): void {
+  recordSyncError(result, error, path);
+  options.onFailure?.({
+    path,
+    error: error instanceof Error ? error.message : String(error),
+    ...(error instanceof HttpError ? { status: error.status, code: error.code as MutationFailure['code'] } : {}),
+  });
 }

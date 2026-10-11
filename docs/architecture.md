@@ -153,6 +153,13 @@ on `SyncApiClient`; the client retains HTTP, protocol and encryption concerns.
 Restore writes participate in engine shutdown draining, and the runtime only finishes
 a restore after successful reconciliation by the same engine.
 
+`sync/transfer-upload.ts` and `sync/transfer-delete.ts` own ordinary transfer
+execution across sync modes. Automatic queue adapters retain revision settlement
+and retry scheduling while delegating batching, concurrency, acknowledgements and
+manifest updates to these executors. `sync/delete-batches.ts` bounds deletion
+requests and drains accepted siblings on cancellation. Sync modes supply their
+planning and conflict-reconciliation policy.
+
 `sync/engine-exclusion-cleanup.ts` binds a cleanup review to its original paths,
 hashes, revisions and exclusions. The engine retains exclusive mutation admission
 and lifetime checks; the runtime rejects reviews from a replaced engine. Execution

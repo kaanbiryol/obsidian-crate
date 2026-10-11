@@ -1,3 +1,5 @@
+import type { BatchUploadFile } from '../protocol/sync-types';
+import { base64ToArrayBuffer } from './encoding';
 import { pendingChangeKey } from './pending-change';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from './runtime-test-harness';
@@ -15,6 +17,13 @@ describe('SyncEngine event queue behavior', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		harness = createHarness();
+		// Keep per-file fault/delay fixtures while the queue sends shared batches.
+		harness.api.batchUpload.mockImplementation(async (files: BatchUploadFile[]) => ({
+			success: true,
+			results: await Promise.all(files.map(file => harness.api.uploadFile(
+				file.path, base64ToArrayBuffer(file.content), file.hash, file.size, file.contentType,
+			))),
+		}));
 		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1700000000000 });
 	});
 

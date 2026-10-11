@@ -1,11 +1,10 @@
 import { pendingChangeKey } from './pending-change';
-import { createAbortError } from './abort';
 import type {
 	QueueDeleteCandidate,
 	QueueDeleteFailure,
 	QueueFlushContext,
 } from './queue-flush-types';
-import { deleteFilesInBatches } from './delete-batches';
+import { createEmptySyncResult } from './sync-result';
 import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
 
 export async function deletePendingFiles(
@@ -13,34 +12,21 @@ export async function deletePendingFiles(
 	deletes: QueueDeleteCandidate[],
 	completedQueueKeys: Set<string>,
 ): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[]; hasTerminalFailure: boolean }> {
-	const result = await deleteFilesInBatches(context.api, deletes, path => context.assertLocalFileAbsent(path));
-
-	for (const path of result.deleted) {
-		context.localManifest.removeEntry(path);
-		completedQueueKeys.add(pendingChangeKey('delete', path));
+	const result = createEmptySyncResult();
+	let failures: QueueDeleteFailure[];
+	try {
+		failures = await context.deleteRemoteFiles(deletes, result);
+	} finally {
+		for (const path of result.deletedPaths) completedQueueKeys.add(pendingChangeKey('delete', path));
 	}
-	if (result.outcome === 'cancelled') {
-		if (result.deleted.length) await context.localManifest.save();
-		throw createAbortError('Queued deletion cancelled');
-	}
-	if (result.success) {
-		return { failures: [], reconciliationPaths: [], hasTerminalFailure: false };
-	}
-
-	const deletedPaths = new Set(result.deleted);
-	const failures: QueueDeleteFailure[] = result.errors && result.errors.length > 0
-		? result.errors
-		: deletes
-			.filter(file => !deletedPaths.has(file.path))
-			.map(file => ({ path: file.path, error: 'Batch delete failed' }));
 
 	const reconciliationPaths: string[] = [];
 	let hasTerminalFailure = false;
 	for (const failure of failures) {
-		if (isQueueVersionConflict(failure.status)) {
+		if (isQueueVersionConflict(failure.status, failure.code)) {
 			reconciliationPaths.push(pendingChangeKey('delete', failure.path));
 		}
-		if (isQueueTerminalFailure(failure.status)) hasTerminalFailure = true;
+		if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
 	}
 	return { failures, reconciliationPaths, hasTerminalFailure };
 }

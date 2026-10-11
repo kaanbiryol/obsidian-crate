@@ -1,4 +1,4 @@
-import { decodePendingChange } from './pending-change';
+import { decodePendingChange, pendingChangeKey } from './pending-change';
 import { isAbortError } from './abort';
 import { recordSyncError } from './issues';
 import type { Vault } from 'obsidian';
@@ -13,6 +13,8 @@ import type { FileEntry } from '../protocol/sync-types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
+import type { DeleteRemoteFiles } from './transfer-delete';
+import type { ConditionalDeleteCandidate } from './delete-batches';
 
 const MAX_RECONCILE_ATTEMPTS = 3;
 
@@ -24,6 +26,7 @@ interface TargetedManifest {
 }
 
 export interface TargetedReconcileContext {
+	deleteRemoteFiles: DeleteRemoteFiles;
 	reportWork?(work: SyncWork): void;
 	vault: Vault;
 	localManifest: TargetedManifest;
@@ -57,8 +60,9 @@ export async function reconcileQueuePaths(
 		// Settle uploads and acknowledge matching server copies before deleting old
 		// rename sources. Queue insertion order puts the old name first.
 		const deletions: string[] = [];
+		const deleteCandidates = new Map<string, { file: ConditionalDeleteCandidate; keys: string[] }>();
 		const uploads = new Map<string, { diff: UploadDiff; keys: string[] }>();
-		async function reconcile(queueKey: string, allowDelete: boolean, firstAttempt = 1, collectUploads = false) {
+		async function reconcile(queueKey: string, allowDelete: boolean, firstAttempt = 1, collectUploads = false, collectDeletes = false) {
 			const path = decodePendingChange(queueKey).path;
 			if (context.shouldIgnore(path)) {
 				result.settledPaths.push(queueKey);
@@ -86,6 +90,13 @@ export async function reconcileQueuePaths(
 						deletionDeferred = true;
 						break;
 					}
+					if (decision?.action === 'delete' && collectDeletes) {
+						if (!decision.remoteHash) throw new Error('Missing remote version for delete');
+						const candidate = deleteCandidates.get(path) ?? { file: { path, expectedHash: decision.remoteHash, expectedRevision: decision.remoteRevision }, keys: [] };
+						candidate.keys.push(queueKey);
+						deleteCandidates.set(path, candidate);
+						return;
+					}
 					const localFiles = createPathRecord<FileEntry>();
 					if (localEntry) localFiles[path] = localEntry;
 
@@ -93,7 +104,18 @@ export async function reconcileQueuePaths(
 						if (decision.action === 'delete' && result.errors.length > 0) {
 							throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
 						}
-						const outcome = await context.processDiff(decision, localFiles, result);
+						let outcome: DiffApplyOutcome;
+						if (decision.action === 'delete') {
+							const failures = await context.deleteRemoteFiles([{ path, expectedHash: decision.remoteHash, expectedRevision: decision.remoteRevision }], result, { onVersionConflicts: async () => {} });
+							if (failures.length) {
+								const failure = failures[0]!;
+								if (isQueueVersionConflict(failure.status, failure.code)) {
+									throw new HttpError(failure.error, failure.status ?? 409, null, failure.code);
+								}
+								break;
+							}
+							outcome = { status: 'applied' };
+						} else outcome = await context.processDiff(decision, localFiles, result);
 						if (outcome.status === 'deferred') {
 							if (attempt < MAX_RECONCILE_ATTEMPTS) {
 								await refreshRemoteEntry(context, remoteEntries, path);
@@ -158,7 +180,29 @@ export async function reconcileQueuePaths(
 				}
 			}
 		}
-		for (const queueKey of deletions) await reconcile(queueKey, true);
+		for (const queueKey of deletions) await reconcile(queueKey, true, 1, false, true);
+		if (deleteCandidates.size) {
+			const retryKeys = new Set<string>();
+			await context.deleteRemoteFiles([...deleteCandidates.values()].map(candidate => candidate.file), result, {
+				onProcessed: count => { processed += count; },
+				onVersionConflicts: async keys => { for (const key of keys) retryKeys.add(key); },
+			});
+			const deleted = new Set(result.deletedPaths);
+			for (const [path, candidate] of deleteCandidates) {
+				if (retryKeys.has(pendingChangeKey('delete', path))) {
+					processed -= 1;
+					try {
+						await refreshRemoteEntry(context, remoteEntries, path);
+					} catch (error) {
+						if (isAbortError(error)) throw error;
+						recordSyncError(result, errorMessage(error), path);
+						processed++;
+						continue;
+					}
+					for (const key of candidate.keys) await reconcile(key, true, 2);
+				} else if (deleted.has(path)) result.settledPaths.push(...candidate.keys);
+			}
+		}
 
 		context.reportWork?.({ phase: 'saving' });
 		await context.localManifest.save();

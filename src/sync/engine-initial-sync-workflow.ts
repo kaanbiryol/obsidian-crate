@@ -4,10 +4,6 @@ import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from './sync-result';
-import {
-	BATCH_UPLOAD_CONCURRENCY,
-	UPLOAD_CONCURRENCY,
-} from './engine-constants';
 import { createLogger } from '../plugin/logger';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
@@ -36,7 +32,7 @@ export interface InitialSyncWorkflowContext {
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number; onProcessed?: (count: number) => void }
+		options: import('./transfer-upload').UploadPreparedFilesOptions
 	): Promise<void>;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	saveLocalManifest(): Promise<void>;
@@ -93,9 +89,7 @@ export async function runInitialSyncWorkflow(
 						uploadsProcessed += count;
 						context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
 					},
-					concurrency: UPLOAD_CONCURRENCY,
 					retry: true,
-					batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
 				});
 			}
 		}

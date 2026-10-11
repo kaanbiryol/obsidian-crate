@@ -1,12 +1,11 @@
+import type { DeleteRemoteFiles } from './transfer-delete';
 import type { Vault } from 'obsidian';
 import { recordSyncError } from './issues';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
-import { assertLocalFileAbsent } from './local-absence';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from './sync-result';
-import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { LocalManifestView } from './manifest';
 import { getPathEntry } from '../protocol/path-record';
@@ -42,11 +41,10 @@ export interface ForceSyncWorkflowContext {
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number; onProcessed?: (count: number) => void }
+		options: import('./transfer-upload').UploadPreparedFilesOptions
 	): Promise<void>;
 	throwIfDestroyed(): void;
-	deleteRemoteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<void>;
-	removeLocalManifestEntry(path: string): void;
+	deleteRemoteFiles: DeleteRemoteFiles;
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;
 }
@@ -105,7 +103,6 @@ export async function runForceFullSyncWorkflow(
 					uploadsProcessed += count;
 					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
 				},
-				concurrency: FORCE_SYNC_CONCURRENCY,
 				retry: true,
 			});
 			if (result.errors.length > 0) {
@@ -115,24 +112,11 @@ export async function runForceFullSyncWorkflow(
 
 		context.throwIfDestroyed();
 
-		if (remoteOnlyPaths.length) context.updateState({ work: { phase: 'applying' } });
-		for (const path of remoteOnlyPaths) {
-			try {
-				const remoteEntry = getPathEntry(remoteManifest.files, path);
-				const expectedHash = remoteEntry?.hash;
-				if (!expectedHash) throw new Error('Missing remote version for delete');
-				await assertLocalFileAbsent(context.vault, path);
-				await context.deleteRemoteFile(path, expectedHash, remoteEntry?.revision);
-				context.removeLocalManifestEntry(path);
-				result.deleted++;
-				result.deletedPaths.push(path);
-			} catch (error) {
-				if (context.isAbortError(error)) throw error;
-				recordSyncError(result, errorMessage(error), path);
-			}
-			current++;
-			progressCallback?.(current, total);
-		}
+		await context.deleteRemoteFiles(remoteOnlyPaths.flatMap(path => {
+			const entry = getPathEntry(remoteManifest.files, path);
+			if (!entry?.hash) { recordSyncError(result, 'Missing remote version for delete', path); return []; }
+			return [{ path, expectedHash: entry.hash, expectedRevision: entry.revision }];
+		}), result, { onProcessed: count => { current += count; progressCallback?.(current, total); } });
 
 		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();

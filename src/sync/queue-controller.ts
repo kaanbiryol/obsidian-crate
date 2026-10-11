@@ -20,22 +20,19 @@ import type { QueueFlushBatch } from './queue-flush-types';
 
 export interface SyncQueueControllerContext {
 	finishInitialSetup(): Promise<void>;
+	uploadPreparedFiles: QueueFlushContext['uploadPreparedFiles'];
+	deleteRemoteFiles: QueueFlushContext['deleteRemoteFiles'];
 	automaticSyncEnabled?(): boolean;
 	recoverUploads(): Promise<void>;
 	api: QueueFlushContext['api'];
 	getLocalManifest(): QueueFlushContext['localManifest'];
-	markdownBaseCache?: QueueFlushContext['markdownBaseCache'];
 	shouldIgnore(path: string): boolean;
 	updateState(updates: Partial<SyncState>): void;
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
-	assertLocalFileAbsent(path: string): Promise<void>;
-	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
-	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	getDebounceDelayMs(): number;
-	uploadConcurrency: number;
 	maxDebounceWaitMs: number;
 	reconcile(queueKeys: string[]): Promise<SyncResult>;
 	onFlushResult(result: SyncResult): void | Promise<void>;
@@ -150,6 +147,8 @@ export class SyncQueueController {
 		return {
 			recoverUploads: () => this.context.recoverUploads(),
 			finishInitialSetup: () => this.context.finishInitialSetup(),
+			uploadPreparedFiles: (...args) => this.context.uploadPreparedFiles(...args),
+			deleteRemoteFiles: (...args) => this.context.deleteRemoteFiles(...args),
 			getPendingPathCount: () => this.pendingPaths.size,
 			beginBatch: () => this.beginFlushBatch(),
 			api: this.context.api,
@@ -157,13 +156,7 @@ export class SyncQueueController {
 			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),
 			isDestroyed: () => this.context.isDestroyed(),
 			currentStatus: () => this.context.currentStatus(),
-			markdownBaseCache: this.context.markdownBaseCache,
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),
-			assertLocalFileAbsent: (path: string) => this.context.assertLocalFileAbsent(path),
-			runConcurrent: <T>(tasks: Array<() => Promise<T>>, concurrency: number) =>
-				this.context.runConcurrent(tasks, concurrency),
-			getModifiedIso: (path: string, fallbackMtime?: number) =>
-				this.context.getModifiedIso(path, fallbackMtime),
 			triggerDebouncedSync: () => this.debouncedSync(),
 			requestReconciliation: (queueKeys: string[]) => this.requestReconciliation(queueKeys),
 			onFlushResult: (result: SyncResult) => this.context.onFlushResult(result),
@@ -225,7 +218,7 @@ export class SyncQueueController {
 
 	private async processPendingChanges(): Promise<void> {
 		if (this.context.automaticSyncEnabled?.() === false) return;
-		const task = flushPendingQueueChanges(this.getQueueFlushContext(), this.context.uploadConcurrency);
+		const task = flushPendingQueueChanges(this.getQueueFlushContext());
 		this.flushTasks.add(task);
 		try { await task; } finally { this.flushTasks.delete(task); }
 	}

@@ -1,58 +1,31 @@
-import { isMarkdownPath } from './markdown-base-cache';
 import { pendingChangeKey } from './pending-change';
+import { createEmptySyncResult } from './sync-result';
 import type { PreparedUpload } from './types';
 import type { QueueFlushContext, QueueUploadFailure } from './queue-flush-types';
-import { HttpError } from './api';
-import { errorMessage } from '../plugin/logger';
-import { isAbortError } from './abort';
 
+/** Queue settlement is mode-specific; transfer and acknowledgement are shared. */
 export async function uploadPendingFiles(
 	context: QueueFlushContext,
 	uploads: PreparedUpload[],
 	completedQueueKeys: Set<string>,
-	uploadConcurrency: number,
+	onProcessed: (count: number) => void,
 ): Promise<QueueUploadFailure[]> {
-	const uploadTasks = uploads.map(upload => async () => {
-		try {
-			const result = await context.api.uploadFile(
-				upload.path,
-				upload.content,
-				upload.hash,
-				upload.size,
-				upload.contentType || 'application/octet-stream',
-				upload.expectedHash ?? null,
-			);
-			if (!result.success) {
-				if (result.status) throw new HttpError(result.error || `Upload failed: ${upload.path}`, result.status, null, result.code);
-				throw new Error(result.error || `Upload failed: ${upload.path}`);
-			}
-			if (result.hash && result.hash !== upload.hash) {
-				throw new Error(`Hash mismatch after upload for ${upload.path}`);
-			}
-
-			context.localManifest.setEntry(upload.path, {
-				hash: upload.hash,
-				revision: result.revision,
-				size: upload.size,
-				modified: await context.getModifiedIso(upload.path, upload.mtime),
-			});
-			if (isMarkdownPath(upload.path)) {
-				await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
-			}
-			completedQueueKeys.add(pendingChangeKey('upload', upload.path));
-			return null;
-		} catch (error) {
-			if (isAbortError(error)) {
-				throw error;
-			}
-			return {
-				path: upload.path,
-				error: errorMessage(error),
-				...(error instanceof HttpError ? { status: error.status, code: error.code } : {}),
-			};
-		}
-	});
-
-	const failures = await context.runConcurrent(uploadTasks, uploadConcurrency);
-	return failures.filter((failure): failure is QueueUploadFailure => failure !== null);
+	const result = createEmptySyncResult();
+	const conflicts: string[] = [];
+	const failures: QueueUploadFailure[] = [];
+	try {
+		await context.uploadPreparedFiles(uploads, result, {
+			retry: false,
+			onProcessed,
+			onFailure: failure => { failures.push(failure); },
+			onVersionConflicts: async paths => { conflicts.push(...paths); },
+		});
+	} finally {
+		// Preserve accepted siblings when another in-flight request is cancelled.
+		for (const path of result.uploadedPaths) completedQueueKeys.add(pendingChangeKey('upload', path));
+	}
+	return [
+		...failures,
+		...conflicts.map(path => ({ path, error: 'Remote file changed since it was read', status: 409, code: 'version_conflict' })),
+	];
 }

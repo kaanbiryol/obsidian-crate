@@ -5,6 +5,7 @@ import { computeHash } from './hasher';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import type { SyncResult } from './types';
+import { pendingChangeKey } from './pending-change';
 
 function bytes(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer;
@@ -12,12 +13,15 @@ function bytes(text: string): ArrayBuffer {
 
 async function createHarness(options: {
 	baseHash: string;
+	baseRevision?: string;
 	localText: string;
+	localPresent?: boolean;
 	remoteManifests: FileManifest[];
 }) {
 	const localContent = bytes(options.localText);
 	const baseEntry: FileEntry = {
 		hash: options.baseHash,
+		revision: options.baseRevision,
 		size: 4,
 		modified: '2026-02-15T00:00:00.000Z',
 	};
@@ -27,7 +31,7 @@ async function createHarness(options: {
 	};
 	const vault = {
 		adapter,
-		getAbstractFileByPath: vi.fn((path: string) => ({
+		getAbstractFileByPath: vi.fn((path: string) => options.localPresent === false ? null : ({
 			path,
 			extension: 'md',
 			stat: { size: localContent.byteLength, mtime: Date.parse('2026-02-15T00:00:00.000Z') },
@@ -54,6 +58,7 @@ async function createHarness(options: {
 	};
 	const context: TargetedReconcileContext = {
 		vault: vault as never,
+		deleteRemoteFiles: vi.fn(async () => []),
 		localManifest,
 		getRemoteEntries,
 		shouldIgnore: vi.fn(() => false),
@@ -63,6 +68,42 @@ async function createHarness(options: {
 }
 
 describe('reconcileQueuePaths', () => {
+	it('counts the delete batch attempt within the three-attempt version-race limit', async () => {
+		const path = 'old.md';
+		const h = await createHarness({ baseHash: 'base', baseRevision: 'r1', localText: '', localPresent: false, remoteManifests: [
+			{ version: 1, files: { [path]: { hash: 'base', revision: 'r1', size: 4, modified: 'now' } } },
+		] });
+		const deleteRemoteFiles = vi.fn<TargetedReconcileContext['deleteRemoteFiles']>(async (files, result, options) => {
+			await options?.onVersionConflicts?.(files.map(file => pendingChangeKey('delete', file.path)), result);
+			return files.map(file => ({ path: file.path, error: 'Remote changed again', status: 409, code: 'version_conflict' }));
+		});
+		h.context.deleteRemoteFiles = deleteRemoteFiles;
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', path)]);
+		expect(deleteRemoteFiles).toHaveBeenCalledTimes(3);
+		expect(h.getRemoteEntries).toHaveBeenCalledTimes(3);
+		expect(result.errors).toEqual(['old.md: Remote changed again']);
+		expect(result.settledPaths).toEqual([]);
+		expect(h.processDiff).not.toHaveBeenCalled();
+	});
+
+	it('replans a stale delete as a download when a remote edit wins the race', async () => {
+		const path = 'old.md';
+		const h = await createHarness({ baseHash: 'base', baseRevision: 'r1', localText: '', localPresent: false, remoteManifests: [
+			{ version: 1, files: { [path]: { hash: 'base', revision: 'r1', size: 4, modified: 'now' } } },
+			{ version: 1, files: { [path]: { hash: 'remote-edit', revision: 'r2', size: 11, modified: 'now' } } },
+		] });
+		const deleteRemoteFiles = vi.fn<TargetedReconcileContext['deleteRemoteFiles']>(async (_files, result, options) => {
+			await options?.onVersionConflicts?.([pendingChangeKey('delete', path)], result);
+			return [{ path, error: 'Changed', status: 409, code: 'version_conflict' }];
+		});
+		h.context.deleteRemoteFiles = deleteRemoteFiles;
+		const result = await reconcileQueuePaths(h.context, [pendingChangeKey('delete', path)]);
+		expect(deleteRemoteFiles).toHaveBeenCalledOnce();
+		expect(h.processDiff.mock.calls[0]?.[0]).toMatchObject({ path, action: 'download', remoteHash: 'remote-edit', cause: 'local-deleted' });
+		expect(result.success).toBe(true);
+		expect(result.settledPaths).toEqual([pendingChangeKey('delete', path)]);
+	});
+
 	it('keeps acknowledged results when a later path is cancelled', async () => {
 		const h = await createHarness({
 			baseHash: 'base', localText: 'local edit',

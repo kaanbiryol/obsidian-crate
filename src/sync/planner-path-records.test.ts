@@ -69,7 +69,7 @@ describe('literal path names in reconciliation', () => {
 		const processDiff = vi.fn<TargetedReconcileContext['processDiff']>()
 			.mockResolvedValueOnce({ status: 'deferred', reason: 'Remote changed' })
 			.mockResolvedValueOnce({ status: 'applied' });
-		const result = await reconcileQueuePaths({ ...context, getRemoteEntries, processDiff }, [path]);
+		const result = await reconcileQueuePaths({ ...context, getRemoteEntries, processDiff, deleteRemoteFiles: vi.fn(async () => []) }, [path]);
 		expect(processDiff.mock.calls.map(([diff]) => diff.action)).toEqual(['upload', 'conflict']);
 		expect(processDiff.mock.calls[1]![0]).toMatchObject({ remoteHash: entry.hash });
 		expect(Object.keys(processDiff.mock.calls[1]![1])).toEqual([path]);

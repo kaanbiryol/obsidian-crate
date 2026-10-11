@@ -1,3 +1,4 @@
+import { deleteRemoteFiles, type DeleteRemoteFiles } from './transfer-delete';
 import type { EngineFileOperations } from './engine-file-operations';
 import { PlannedContent } from './planned-content';
 import type { FileManager, Vault } from 'obsidian';
@@ -23,7 +24,7 @@ import {
 	uploadPreparedFiles as transferUploadPreparedFiles,
 } from './transfer';
 import { createByteBudgetedVaultFileChunks } from './transfer-budget';
-import { PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './engine-constants';
+import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './engine-constants';
 import type { CrateSettings } from '../plugin/settings-types';
 import { updateSyncProgress } from '../plugin/settings-persistence';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
@@ -70,7 +71,6 @@ export class SyncEngineContexts {
 
 	async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
 		return runIncrementalSync(this.incrementalPlanner(), {
-			uploadConcurrency: UPLOAD_CONCURRENCY,
 			progressCallback,
 		});
 	}
@@ -119,6 +119,13 @@ export class SyncEngineContexts {
 	): Promise<void> {
 		await transferUploadPreparedFiles(this.transfer(), prepared, result, options);
 	}
+
+	deleteRemoteFiles: DeleteRemoteFiles = (files, result, options) => deleteRemoteFiles({
+		api: this.dependencies.files,
+		vault: this.dependencies.vault,
+		localManifest: this.dependencies.getLocalManifest(),
+		reportWork: work => this.dependencies.updateState({ work }),
+	}, files, result, options);
 
 	private transfer() {
 		const dependencies = this.dependencies;
@@ -198,6 +205,7 @@ export class SyncEngineContexts {
       finishInitialSetup: () => this.finishInitialSetup(),
       tryInitialImport: (result: import('./types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			apiConfigured: () => dependencies.api.isConfigured(),
+			deleteRemoteFiles: this.deleteRemoteFiles,
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
@@ -277,6 +285,7 @@ export class SyncEngineContexts {
       finishInitialSetup: () => this.finishInitialSetup(),
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
+			deleteRemoteFiles: this.deleteRemoteFiles,
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
@@ -291,10 +300,6 @@ export class SyncEngineContexts {
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
-			deleteRemoteFile: async (path: string, expectedHash: string, expectedRevision?: string) => {
-				await dependencies.files.deleteFile(path, expectedHash, expectedRevision);
-			},
-			removeLocalManifestEntry: (path: string) => dependencies.getLocalManifest().removeEntry(path),
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),
 			setLastSync: (value: string) => {
 				updateSyncProgress(dependencies.getSettings(), { lastSync: value });

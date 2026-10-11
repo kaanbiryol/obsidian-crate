@@ -7,6 +7,7 @@ const labels: Record<SyncWork['phase'], string> = {
     preparing: 'Preparing files',
     uploading: 'Uploading files',
     downloading: 'Downloading files',
+    deleting: 'Deleting files',
     applying: 'Applying changes',
     saving: 'Saving sync progress',
     reminders: 'Preparing reminder schedules',
@@ -23,12 +24,13 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
             return `${label}: ${remainingSchedules} remaining`;
         }
         if (work.total !== undefined && work.total > 0 && work.current !== undefined) {
-            if (work.phase === 'uploading' || work.phase === 'downloading') {
-                return `${work.phase === 'uploading' ? 'Uploading' : 'Downloading'} ${work.current.toLocaleString()} of ${work.total.toLocaleString()} files`;
+            if (work.phase === 'uploading' || work.phase === 'downloading' || work.phase === 'deleting') {
+                const action = { uploading: 'Uploading', downloading: 'Downloading', deleting: 'Deleting' }[work.phase];
+                return `${action} ${work.current.toLocaleString()} of ${work.total.toLocaleString()} files`;
             }
             return `${label}: ${work.current}/${work.total}`;
         }
-        if (['uploading', 'downloading', 'applying'].includes(work.phase) && progress?.type === 'sync' && progress.total > 0) {
+        if (['uploading', 'downloading', 'deleting', 'applying'].includes(work.phase) && progress?.type === 'sync' && progress.total > 0) {
             return `${label}… ${progress.current}/${progress.total} changes processed`;
         }
         return `${label}…`;

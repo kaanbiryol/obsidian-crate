@@ -176,7 +176,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		});
 		harness.vault.getFiles.mockReturnValue([]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.api.deleteFile.mockRejectedValue(new Error('remote locked'));
+		harness.api.batchDelete.mockResolvedValue({ success: false, deleted: [], errors: [{ path: 'notes/remote-only.md', error: 'remote locked', status: 503 }] });
 
 		const result = await harness.engine.forceFullSync();
 		const state = harness.engine.getState();
@@ -208,15 +208,14 @@ describe('SyncEngine slice 5 safeguards', () => {
 		});
 		harness.vault.getFiles.mockReturnValue([]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		harness.api.deleteFile.mockResolvedValue({ success: true, path: 'notes/remote-only.md' });
 
 		const result = await harness.engine.forceFullSync();
 
 		expect(result.success).toBe(true);
 		expect(result.deleted).toBe(1);
-		expect(harness.api.deleteFile).toHaveBeenCalledTimes(1);
-		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md', 'remote-hash', 'version-1');
-		expect(harness.api.deleteFile).not.toHaveBeenCalledWith('.trash/old.md');
+		expect(harness.api.batchDelete).toHaveBeenCalledTimes(1);
+		expect(harness.api.batchDelete).toHaveBeenCalledWith(['notes/remote-only.md'], { 'notes/remote-only.md': 'remote-hash' }, { 'notes/remote-only.md': 'version-1' });
+		expect(harness.api.batchDelete).not.toHaveBeenCalledWith(expect.arrayContaining(['.trash/old.md']), expect.anything(), expect.anything());
 	});
 
 	it('does not reschedule debounced sync after destroy during a pending flush', async () => {
@@ -243,11 +242,11 @@ describe('SyncEngine slice 5 safeguards', () => {
 			return null;
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		harness.api.uploadFile.mockImplementation(async () => {
+		harness.api.batchUpload.mockImplementation(async () => {
 			signalUploadStarted();
 			harness.engine.onFileChange({ path: 'notes/b.md' } as never);
 			await uploadGate;
-			return { success: true, path: 'notes/a.md' };
+			return { success: true, results: [{ success: true, path: 'notes/a.md' }] };
 		});
 
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
@@ -259,7 +258,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		await harness.engine.waitForIdle();
 		await vi.advanceTimersByTimeAsync(60_000);
 
-		expect(harness.api.uploadFile).toHaveBeenCalledOnce();
+		expect(harness.api.batchUpload).toHaveBeenCalledOnce();
 		expect(harness.engine.getPendingPaths()).toEqual([]);
 	});
 });

@@ -32,6 +32,11 @@ async function harness(paths = ['a.md', 'b.md']) {
             case '/sync/metadata': return response(await remote.metadata((JSON.parse(request.body as string) as { paths: string[] }).paths));
             case '/sync/batch-upload': return response(await remote.batchUpload((JSON.parse(request.body as string) as { files: BatchUploadFile[] }).files));
             case '/sync/upload': return response(await remote.upload(url.searchParams.get('path')!));
+            case '/sync/batch-delete': {
+                const body = JSON.parse(request.body as string) as { files: Parameters<typeof remote.delete>[0][] };
+                for (const file of body.files) await remote.delete(file);
+                return response({ success: true, deleted: body.files.map(file => file.path) });
+            }
             case '/sync/delete': return response(await remote.delete(JSON.parse(request.body as string) as Parameters<typeof remote.delete>[0]));
             default: throw new Error(`Unexpected request: ${request.url}`);
         }

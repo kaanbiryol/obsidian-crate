@@ -26,7 +26,7 @@ import type { FileEntry } from '../protocol/sync-types';
 import { createPathRecord } from '../protocol/path-record';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
-import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
+import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY } from './engine-constants';
 import {
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
@@ -45,7 +45,6 @@ import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './engine-full-sync-upload';
 import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from './sync-result';
 import { mergeSyncResults } from './sync-result';
-import { assertLocalFileAbsent } from './local-absence';
 import { getCheckpointAuthority } from './worker-url';
 import { LocalContentVerifier } from './content-verifier';
 import { updateSyncProgress } from '../plugin/settings-persistence';
@@ -146,6 +145,8 @@ export class SyncEngine {
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
 			finishInitialSetup: () => this.contexts.finishInitialSetup(),
+			uploadPreparedFiles: (...args) => this.contexts.uploadPreparedFiles(...args),
+			deleteRemoteFiles: (...args) => this.contexts.deleteRemoteFiles(...args),
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
 				void this.retryReminderScope();
@@ -154,22 +155,15 @@ export class SyncEngine {
 			},
 			api: {
 				isConfigured: () => this.api.isConfigured(),
-				uploadFile: (...args) => this.files.uploadFile(...args),
-				batchDelete: (...args) => this.files.batchDelete(...args),
 			},
 			getLocalManifest: () => this.localManifest,
-			markdownBaseCache: this.markdownBaseCache,
 			shouldIgnore: this.shouldIgnore.bind(this),
 			updateState: this.updateState.bind(this),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
 			prepareUploadFromPath: (path: string) => this.contexts.prepareUploadFromPath(path),
-			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
-			runConcurrent: this.runConcurrent.bind(this),
-			getModifiedIso: this.getModifiedIso.bind(this),
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
-			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
 			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
@@ -691,6 +685,7 @@ export class SyncEngine {
 			vault: this.vault,
 			localManifest: this.localManifest,
 			getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,
+			deleteRemoteFiles: this.contexts.deleteRemoteFiles,
 			shouldIgnore: this.shouldIgnore.bind(this),
 			uploadDiffs: async (diffs, result) => {
 				const retryPaths: string[] = [];

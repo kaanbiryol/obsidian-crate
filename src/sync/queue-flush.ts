@@ -1,5 +1,5 @@
 import { pendingChangeKey, decodePendingChange } from './pending-change';
-import { prepareUploadChunks } from './transfer-budget';
+import { pipelineUploadChunks } from './transfer-budget';
 import { createAbortError } from './abort';
 import { createLogger } from '../plugin/logger';
 import { isAbortError } from './abort';
@@ -47,7 +47,6 @@ async function reportFlushResult(context: QueueFlushContext, result: SyncResult)
 
 export async function processPendingChanges(
 	context: QueueFlushContext,
-	uploadConcurrency: number,
 ): Promise<void> {
 	if (context.isDestroyed()) return;
 
@@ -85,14 +84,19 @@ export async function processPendingChanges(
 			const expectedHash = context.localManifest.getEntry(path)?.hash;
 			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
 		});
-		const chunks = prepareUploadChunks(uploadPaths, async path => {
+		const chunks = pipelineUploadChunks(uploadPaths, async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
 			return withSyncFileContext(path, () => context.prepareUploadFromPath(path));
 		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
+		let uploadsProcessed = 0;
 		for await (const chunk of chunks) {
 			uploads.push(...chunk.map(upload => ({ path: upload.path })));
-			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, uploadConcurrency);
+			context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
+			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, count => {
+				uploadsProcessed += count;
+				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: uploadPaths.length } });
+			});
 			for (const failure of uploadFailures) {
 				const key = pendingChangeKey('upload', failure.path);
 				batch.requeue([key]);
@@ -116,6 +120,7 @@ export async function processPendingChanges(
 			if (deleteResult.hasTerminalFailure) hasTerminalFailure = true;
 		}
 
+		context.updateState({ work: { phase: 'saving' } });
 		await context.localManifest.save();
 		batch.settle(completedQueueKeys);
 		if (failures.length > 0) {

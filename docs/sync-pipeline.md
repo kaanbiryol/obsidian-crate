@@ -227,23 +227,34 @@ Release and transfer values are also checked against source in [current contract
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
 | `UPLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
 | `DOWNLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
-| `FORCE_SYNC_CONCURRENCY` | 2 | `engine.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `engine-constants.ts` |
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer-budget.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine-constants.ts` |
+| `BATCH_DELETE_CONCURRENCY` | 2 | `engine-constants.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 
 ## Batching Strategy
 
-Files are split by size at the `BATCH_FILE_SIZE_LIMIT` (1 MB) threshold:
+Manual, selected-file, incremental, initial, forced and edit-triggered automatic
+sync use `transfer-upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
+are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (3) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. Per-path failures carry a stable code and status; version conflicts are sent through targeted three-way reconciliation instead of becoming generic upload errors. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
-- **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload` with retry.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Edited Markdown batches contain up to 3 files; assets allow 4, and eligible new-file imports allow 8 when the server supports them. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. The smaller mutation limits keep worst-case conditional-write cleanup below Workers Free D1 query limits.
+- **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload`, with up to 2 requests in flight. Each mode retains its retry policy.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into four-file requests; partial results are aggregated and stale deletes are targeted for reconciliation.
+Remote deletes in manual, selected-file, incremental, forced and automatic sync
+use `transfer-delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
+reconciliation to succeed, rechecks local absence, and uses `delete-batches.ts`
+to send up to 4 conditional deletes per request with 2 requests in flight.
+Rename preservation, expected hashes and revisions still guard every deletion.
+Accepted sibling requests drain before cancellation returns; acknowledged
+deletions are checkpointed. Activity reports **Deleting X of Y files** as batches
+complete. Queue settlement and conflict retries remain with the calling mode.
 
-Implementation: `transfer.ts:uploadPreparedFiles()`, `transfer.ts:createBatchUploadChunks()`
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
+
+Implementation: `transfer-upload.ts`, `transfer-prepare.ts`, `transfer-delete.ts`, `delete-batches.ts`
 
 ## Queue System
 
@@ -263,8 +274,8 @@ If a local Markdown file changes after an automatic merge has already been accep
 Implementation: `queue.ts`
 
 Selected-file sync classifies only the selected paths against current server
-metadata. Ordinary uploads use the same byte-bounded chunks, small-file batches,
-and bounded concurrency as full sync, with upload progress reported per batch.
+metadata. Ordinary uploads and deletes use the shared transfer executors and
+concurrency limits, with progress reported per batch.
 Only files that lose a conditional-write race fall back to individual
 reconciliation. Remote deletions still wait for successful uploads and rename
 preservation; unselected files and the global changelog cursor stay untouched.

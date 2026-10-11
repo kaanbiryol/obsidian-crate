@@ -13,7 +13,7 @@ export interface SyncIssue {
 }
 
 export interface SyncWork {
-	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving' | 'reminders';
+	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'deleting' | 'applying' | 'saving' | 'reminders';
 	reminderSetup?: import('../protocol/initial-import').ReminderSetupProgress;
 	current?: number;
 	total?: number;

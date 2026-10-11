@@ -1,6 +1,5 @@
 import { pendingChangeKey } from './pending-change';
 import { recordSyncError } from './issues';
-import { BATCH_UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
@@ -18,7 +17,7 @@ const logger = createLogger("SyncPlanner");
 export async function runIncrementalSync(
   context: IncrementalSyncPlannerContext,
   options: {
-    uploadConcurrency: number;
+    uploadConcurrency?: number;
     progressCallback?: (current: number, total: number) => void;
   },
 ): Promise<SyncResult | null> {
@@ -144,7 +143,6 @@ export async function runIncrementalSync(
           options.progressCallback?.(current, total);
         },
         concurrency: options.uploadConcurrency,
-        batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
         retry: true,
         ...(context.reconcileVersionConflicts ? {
           onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
@@ -163,11 +161,10 @@ export async function runIncrementalSync(
     }
 
     if (localOnlyDeletes.length > 0) {
-      context.reportWork?.('applying');
-      await applyIncrementalLocalDeletes(context, localOnlyDeletes, result);
-
-      current += localOnlyDeletes.length;
-      options.progressCallback?.(current, total);
+      await applyIncrementalLocalDeletes(context, localOnlyDeletes, result, count => {
+        current += count;
+        options.progressCallback?.(current, total);
+      });
     }
 
     context.reportWork?.('saving');

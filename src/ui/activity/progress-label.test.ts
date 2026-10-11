@@ -20,6 +20,10 @@ it('shows upload-specific counts instead of preparation or overall counters', ()
   expect(formatSyncProgress({ type: 'initial', current: 500, total: 500 }, { phase: 'uploading', current: 400, total: 500 }))
     .toBe('Uploading 400 of 500 files');
 });
+it('shows deletion-specific progress independently of completed uploads', () => {
+  expect(formatSyncProgress({ type: 'sync', current: 36, total: 60 }, { phase: 'deleting', current: 4, total: 24 }))
+    .toBe('Deleting 4 of 24 files');
+});
 
 it('shows remaining scheduling work without reusing upload counts', () => {
   expect(formatSyncProgress({ type: 'initial', current: 400, total: 400 }, {

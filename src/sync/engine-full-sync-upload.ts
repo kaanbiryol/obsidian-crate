@@ -1,7 +1,6 @@
 import { recordSyncError } from './issues';
 import { errorMessage } from '../plugin/logger';
 import type { FileEntry } from '../protocol/sync-types';
-import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import type { UploadDiff, PreparedUpload, SyncResult } from './types';
@@ -54,7 +53,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 				context.reportWork?.('uploading', processed, diffs.length);
 				for (let index = 0; index < count; index++) onCompleted();
 			},
-			concurrency: UPLOAD_CONCURRENCY, batchConcurrency: BATCH_UPLOAD_CONCURRENCY, retry: false,
+			retry: false,
 		});
 		for (let index = reported; index < chunk.length; index++) { processed++; onCompleted(); }
 		context.reportWork?.('uploading', processed, diffs.length);
