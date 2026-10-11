@@ -1,9 +1,10 @@
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { sortForList } from './pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets, folderPath: 'Tasks' });
+const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
 const cardName = 'Check this article. Press Enter to edit reminder.';
 const authKey = 'crate-reminders-auth-token';
@@ -16,6 +17,15 @@ async function createContext(browser, standalone = false, cookies = []) {
   await context.addCookies(cookies);
   // No preview authentication: exercise the production bootstrap from empty storage.
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
+  // This enrollment fixture changes scopes on renewal. Return valid paths for
+  // the requested scope, including the renewed and freshly enrolled folders.
+  await context.route('**/reminders/list?*', async route => {
+    const response = await route.fetch();
+    if (!response.ok()) return route.fulfill({ response });
+    const body = await response.json();
+    const folder = new URL(route.request().url()).searchParams.get('folderPath');
+    await route.fulfill({ response, json: { ...body, reminders: sortForList(body.reminders, folder) } });
+  });
   return context;
 }
 

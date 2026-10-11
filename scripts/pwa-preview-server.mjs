@@ -333,9 +333,9 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 	});
 }
 
-export async function listenPwaPreviewServer({ port, assets, failMutationPaths = [], folderPath = 'Reminders' }) {
+export async function listenPwaPreviewServer({ port, assets, failMutationPaths = [] }) {
 	const origin = `http://127.0.0.1:${port}`;
-	const server = createPwaPreviewServer({ assets, origin, failMutationPaths, folderPath });
+	const server = createPwaPreviewServer({ assets, origin, failMutationPaths });
 	await new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(port, '127.0.0.1', resolve);
