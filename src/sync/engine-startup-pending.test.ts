@@ -37,9 +37,11 @@ async function setup() {
 
 async function restore(h: Awaited<ReturnType<typeof setup>>) {
 	await h.engine.initialize();
+	expect(h.engine.getState().initializing).toBe(true);
 	expect(h.engine.getPendingPaths()).toEqual([]);
 	h.workspace.runLayoutReady();
 	await h.engine.waitForIdle();
+	expect(h.engine.getState().initializing).toBe(false);
 }
 
 describe('pending changes after restart with automatic sync off', () => {
@@ -106,6 +108,7 @@ describe('pending changes after restart with automatic sync off', () => {
 		try {
 			await h.engine.initialize();
 			h.workspace.runLayoutReady();
+			expect(h.engine.getState().initializing).toBe(true);
 			h.engine.onFileDelete({ path: 'edited.md' } as never);
 			reading.resolve(toArrayBuffer('modified'));
 			await h.engine.waitForIdle();

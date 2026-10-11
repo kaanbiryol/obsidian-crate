@@ -76,6 +76,7 @@ export class SyncEngine {
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private prepareReminderScope?: () => Promise<void>;
 	private rawEventRevisions = new Map<string, object>();
+	private rawVerificationTask: Promise<unknown> = Promise.resolve();
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private syncActivityRevision = 0;
@@ -162,16 +163,7 @@ export class SyncEngine {
 			updateState: this.updateState.bind(this),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
-			verifyPendingPaths: (keys, isCurrent) => {
-				const revision = this.syncActivityRevision;
-				return verifyUnchangedPendingPaths({
-					adapter: this.vault.adapter,
-					manifest: this.localManifest,
-					isCurrent: key => isCurrent(key) && revision === this.syncActivityRevision
-						&& this.localManifest.uploadJournal.pending().length === 0
-						&& this.files.getPendingRestores().length === 0,
-				}, keys);
-			},
+			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
 			prepareUploadFromPath: (path: string) => this.contexts.prepareUploadFromPath(path),
 			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
 			runConcurrent: this.runConcurrent.bind(this),
@@ -221,6 +213,7 @@ export class SyncEngine {
 	}
 
 	async initialize(): Promise<void> {
+		this.updateState({ initializing: true });
 		await this.localManifest.load();
 		try { await this.history().prune(this.settings.syncHistory.flatMap(entry => entry.historyCheckpoint ? [entry.historyCheckpoint] : [])); }
 		catch (error) { logger.warn('Could not prune old history checkpoints:', errorMessage(error)); }
@@ -231,10 +224,12 @@ export class SyncEngine {
 		this.plugin.app.workspace.onLayoutReady(() => {
 			this.scheduleConflictRecovery();
 			if (!this.settings.automaticSync) this.restoreStartupPendingChanges();
+			else this.updateState({ initializing: false });
 		});
 		this.seedMarkdownBaseCacheInBackground();
 
 		this.lifecycle.startPeriodicSync();
+		if (this.settings.automaticSync) this.updateState({ initializing: false });
 	}
 
 	setStateChangeCallback(callback: (state: SyncState) => void): void {
@@ -446,7 +441,11 @@ export class SyncEngine {
 	}
 
 	private restoreStartupPendingChanges(): void {
-		if (this.lifecycle.isDestroyed || this.state.status === 'syncing') return;
+		if (this.lifecycle.isDestroyed) return;
+		if (this.state.status === 'syncing') {
+			this.updateState({ initializing: false });
+			return;
+		}
 		const revision = this.syncActivityRevision;
 		void this.trackWork(async () => {
 			try {
@@ -464,6 +463,8 @@ export class SyncEngine {
 				if (!this.isAbortError(error) && revision === this.syncActivityRevision) {
 					this.updateState({ status: 'error', lastError: `Could not check local changes: ${errorMessage(error)}`, lastIssues: syncErrorIssues(error) });
 				}
+			} finally {
+				this.updateState({ initializing: false });
 			}
 		});
 	}
@@ -507,16 +508,43 @@ export class SyncEngine {
 		return isSyncAbortError(error);
 	}
 
+	private verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]> {
+		const revision = this.syncActivityRevision;
+		return verifyUnchangedPendingPaths({
+			adapter: this.vault.adapter,
+			manifest: this.localManifest,
+			isCurrent: key => isCurrent(key) && revision === this.syncActivityRevision
+				&& this.localManifest.uploadJournal.pending().length === 0
+				&& this.files.getPendingRestores().length === 0,
+		}, keys);
+	}
+
 	async onRawFileChange(path: string): Promise<void> {
 		const configDir = this.vault.configDir;
 		if (!isHiddenPath(path) && !path.startsWith(`${configDir}/`)) return;
 		if (this.lifecycle.isDestroyed || this.shouldIgnore(path)) return;
 		const revision = {};
 		this.rawEventRevisions.set(path, revision);
+		const isCurrent = () => !this.lifecycle.isDestroyed
+			&& this.rawEventRevisions.get(path) === revision && !this.shouldIgnore(path);
 		try {
 			assertLocalSyncPath(path);
 			const stat = await this.vault.adapter.stat(path);
-			if (this.lifecycle.isDestroyed || this.rawEventRevisions.get(path) !== revision || this.shouldIgnore(path)) return;
+			if (!isCurrent()) return;
+			if (stat?.type === 'file' && this.localManifest.hasFile(path)
+				&& this.state.status !== 'syncing' && !this.getPendingPaths().includes(path)) {
+				// Obsidian and iCloud can touch settings without changing their bytes.
+				// Check before publishing a pending entry; serialize reads to bound memory.
+				const activityRevision = this.syncActivityRevision;
+				const verification = this.rawVerificationTask.then(() => this.verifyPendingPaths([path],
+					() => isCurrent() && this.state.status !== 'syncing' && activityRevision === this.syncActivityRevision));
+				this.rawVerificationTask = verification.catch(() => {});
+				const settled = await this.trackWork(() => verification).catch((error): string[] => {
+					logger.warn('Could not verify changed configuration file:', errorMessage(error));
+					return [];
+				});
+				if (!isCurrent() || settled.includes(path)) return;
+			}
 			if (stat?.type === 'file') this.queueController.onFileChange({ path });
 			else if (!stat) this.queueController.onFileDelete({ path });
 		} catch (error) {

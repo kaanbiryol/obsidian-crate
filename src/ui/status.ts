@@ -144,6 +144,13 @@ export class StatusBarManager {
 					};
 				}
 
+				if (state.initializing) {
+					return {
+						text: 'Checking local files…',
+						tooltip: 'Loading sync state and checking local files before reporting sync status.',
+					};
+				}
+
 				if (state.pendingChanges > 0) {
 					return {
 						text: `${state.pendingChanges} change${state.pendingChanges === 1 ? '' : 's'} queued`,

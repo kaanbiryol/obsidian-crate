@@ -15,15 +15,19 @@ const { outputFiles } = await build({
     HTMLElement.prototype.toggle = function(visible) { visible ? this.show() : this.hide(); };
     const listeners = new Set();
     let status = 'idle';
+    let initializing = false;
+    let lastSync = null;
     const deps = {
-      getState: () => ({ status, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
+      getState: () => ({ status, initializing, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 }),
       getPendingPaths: () => [], getActiveConflicts: () => [],
       sync: async () => window.setSyncing(true),
       addStateChangeListener: fn => listeners.add(fn), removeStateChangeListener: fn => listeners.delete(fn),
     };
     window.setSyncing = syncing => { status = syncing ? 'syncing' : 'idle'; for (const fn of listeners) fn(); };
+    window.finishStartup = () => { initializing = false; for (const fn of listeners) fn(); };
     window.mount = scene => {
       window.currentModal?.close();
+      if (scene === 'startup') { initializing = true; lastSync = '2026-10-01T00:00:00Z'; }
       if (scene === 'conflict') new ConflictReviewModal({}, { originalPath: 'Note.md', conflictPath: 'Note.conflict.md' }, async () => ({
         currentText: 'Current note', savedText: 'Saved note', currentSize: 12, savedSize: 10,
         openVersion: async () => {}, resolve: async () => {},
@@ -98,6 +102,18 @@ for (const engine of [chromium, webkit]) {
         assert.ok(geometry.overflow <= 1, `${label}: unnecessary scrolling`);
         assert.equal(await page.getByRole('tabpanel').count(), 1);
       }
+      await page.evaluate(() => window.mount('startup'));
+      await expect(page.getByRole('button', { name: 'Checking…', exact: true })).toBeDisabled();
+      const startupPanel = page.getByRole('tabpanel', { name: 'Pending', exact: true });
+      await expect(startupPanel).toContainText('Checking local files…');
+      await expect(startupPanel).not.toContainText('All synced');
+      const indicator = page.locator('.crate-activity-subtitle .crate-sync-indicator');
+      await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
+      assert.equal(await indicator.locator('.crate-sync-indicator__dot').evaluate(el => getComputedStyle(el).fill), 'rgb(245, 158, 11)');
+      await page.evaluate(() => window.finishStartup());
+      await expect(startupPanel).toContainText('All synced');
+      await expect(indicator).toHaveAttribute('data-sync-state', 'synced');
+      await expect(sync).toBeEnabled();
       await sync.click();
       await expect(page.getByRole('button', { name: 'Syncing…', exact: true })).toBeDisabled();
       await page.evaluate(() => window.setSyncing(false));

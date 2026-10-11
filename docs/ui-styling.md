@@ -569,6 +569,14 @@ Knip ignores the `tailwindcss` dependency because its direct import is the Sass
 `@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.
 Keep that dependency while the stylesheet imports its theme.
 
+The Obsidian status bar and Sync activity share the sync indicator. A configured
+vault starts yellow while saved sync state loads and local startup checks run,
+including when automatic sync is off. Show **Checking local files…** in Sync
+activity until those checks finish; do not display **All synced** from an older
+saved timestamp during startup. Actual sync progress, errors, and offline warnings
+retain their own labels. This startup readiness flag belongs to the plugin runtime;
+the PWA continues to supply its own session and refresh state.
+
 ## Reading workspace
 
 `src/reading/ui/ReadingLibrary.tsx`, `Reader.tsx`, `ReadingDialog.tsx`, and

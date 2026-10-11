@@ -15,6 +15,13 @@ settings for compatibility with older clients; the current runtime does not use
 them to decide whether to sync. Tests that disable automatic work should set
 `automaticSync: false`.
 
+Configured vaults start with a yellow indicator while the saved sync state loads.
+With automatic sync off, it stays yellow through the local pending-file scan after
+layout readiness. With automatic sync on, it stays yellow through startup sync and
+its recovery probe. A saved last-sync timestamp does not show green before those
+checks finish. Sync activity shows **Checking local files…** during local startup
+checks; errors and server availability warnings remain visible.
+
 ## Sync Modes
 
 ### 1. Periodic Check
@@ -268,6 +275,12 @@ hash leave the pending list without a server request. The check refreshes their
 verified modification times in one checkpoint write. New edits, changed baselines,
 in-flight syncs, unreadable files, and outstanding durable mutations prevent stale
 checks from clearing pending work. Previews remain read-only.
+
+Raw notifications for tracked configuration and hidden files are checked locally
+before publishing a new pending entry. Timestamp-only touches therefore do not
+flash in Sync activity or change the sync indicator. These reads are serialized
+to bound memory; real edits, deletions, unreadable files, and interrupted mutations
+remain pending for ordinary sync and review.
 
 ## Local Manifest
 

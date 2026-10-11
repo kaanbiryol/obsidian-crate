@@ -6,10 +6,15 @@ import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState 
 import { decodePendingChange } from '../../sync/pending-change';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
-	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress);
+	const checking = state?.initializing && !hasError && state.status !== 'offline';
+	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress && !checking);
 	if (syncing || progress) {
         renderLoadingState(container, formatSyncProgress(progress, state?.work));
         return;
+	}
+	if (checking) {
+		renderLoadingState(container, 'Checking local files…');
+		return;
 	}
 	if (paths.length === 0) {
 		if (hasError) {

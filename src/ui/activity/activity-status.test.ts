@@ -24,6 +24,24 @@ it('keeps Stop sync enabled through completion work after the engine becomes idl
 	expect(describeActivityStatus(state, progress, 1, false, false, now).button).toMatchObject({ label: 'Syncing…', disabled: true });
 });
 
+it('does not report an older successful sync while local startup checks are unfinished', () => {
+	const checking = describeActivityStatus({ ...state, initializing: true }, null, 0, true, false, now);
+	expect(checking).toMatchObject({
+		text: 'Checking local files…', lastSyncLabel: 'Checking local files…', subtitleState: 'syncing',
+		indicatorState: { initializing: true }, checkingConflicts: true,
+		button: { label: 'Checking…', disabled: true },
+	});
+	expect(describeActivityStatus({ ...state, initializing: false }, null, 0, true, false, now)).toMatchObject({
+		text: 'Synced just now', subtitleState: 'synced', button: { label: 'Sync vault', disabled: false },
+	});
+});
+
+it.each(['error', 'offline'] as const)('keeps %s visible during startup checks', status => {
+	expect(describeActivityStatus({ ...state, status, initializing: true }, null, 0, true, false, now)).toMatchObject({
+		subtitleState: 'attention', button: { label: 'Sync vault', disabled: false },
+	});
+});
+
 it.each(['server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving', 'reminders'] as const)(
 	'keeps the header stable during %s and stops conflict checking after file transfer', phase => {
 		const status = describeActivityStatus({ ...state, status: 'syncing', work: { phase } }, null, 1, true, false, now);

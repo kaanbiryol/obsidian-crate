@@ -20,6 +20,8 @@ export interface SyncWork {
 }
 
 export interface SyncState {
+	/** Local startup checks are unfinished; a saved last sync is not current readiness. */
+	initializing?: boolean;
 	work?: SyncWork;
 	status: SyncStatus;
 	lastSync: string | null;

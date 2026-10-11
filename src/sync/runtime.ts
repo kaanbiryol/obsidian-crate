@@ -53,6 +53,7 @@ export class SyncRuntime {
 	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
+	private initializing: boolean;
 	private initializationError: string | null = null;
 	private initializationRevision = 0;
 	private stoppingWork: Promise<void> = Promise.resolve();
@@ -103,6 +104,7 @@ export class SyncRuntime {
 		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
     private prepareReminderScope?: () => Promise<void>,
 	) {
+		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
 			settings,
 			getClient: () => this.apiClient,
@@ -124,12 +126,14 @@ export class SyncRuntime {
 
 	getState(): SyncState {
 		if (this.syncEngine) {
-			const state = this.syncEngine.getState();
+			const state = { ...this.syncEngine.getState(), ...(this.initializing ? { initializing: true } : {}) };
 			return this.serverStatus.issue && state.status === 'idle'
 				? { ...state, status: 'offline', lastError: this.serverStatus.issue, lastIssues: undefined }
 				: state;
 		}
-		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0 };
+		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0,
+			...(this.initializing && !this.initializationError ? { initializing: true } : {}),
+		};
 	}
 
 	getPendingPaths(): string[] {
@@ -230,6 +234,7 @@ export class SyncRuntime {
 		logger.info('Initializing sync engine');
 
 		const initializationRevision = ++this.initializationRevision;
+		this.initializing = true;
 		this.initializationError = null;
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
@@ -327,17 +332,22 @@ export class SyncRuntime {
 				.finally(() => {
 					if (this.initializationRevision === initializationRevision && this.syncEngine === syncEngine) {
 						this.acceptingEvents = true;
+						this.initializing = false;
+						this.emitCurrentState();
 					}
 				});
 			return;
 		}
 
 		this.acceptingEvents = true;
+		this.initializing = false;
+		this.emitCurrentState();
 		if (!this.settings.automaticSync) this.scheduleServerCheck();
 	}
 
 	destroy(): void {
 		this.initializationRevision++;
+		this.initializing = false;
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();

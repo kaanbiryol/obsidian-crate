@@ -11,7 +11,7 @@ export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onCli
   const render = () => {
     const state = runtime.getState();
     // Initialization failures must remain visible even when there is no engine.
-    status.setEnabled(runtime.isInitialized() || state.status === 'error');
+    status.setEnabled(runtime.isInitialized() || state.initializing === true || state.status === 'error');
     const progress = runtime.getActivityProgress();
     if (progress) {
       status.update({ ...state, status: 'syncing', work: state.work ?? progress.work });

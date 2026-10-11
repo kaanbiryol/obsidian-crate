@@ -187,6 +187,22 @@ describe('SyncRuntime startup event handling', () => {
 		expectFileEventsAccepted(runtime, true);
 	});
 
+	it('keeps startup status through the local recovery probe after the first sync finishes', async () => {
+		const checked = createDeferred<boolean>();
+		const probe = vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockReturnValueOnce(checked.promise);
+		const { runtime } = createRuntimeHarness({ lastSync: '2026-10-01T00:00:00Z' });
+		await runtime.initialize();
+		expect(runtime.getState().initializing).toBe(true);
+		startupSync.resolve(createEmptySyncResult());
+		try {
+			await vi.waitFor(() => expect(probe).toHaveBeenCalledOnce());
+			expect(runtime.getActivityProgress()).toBeNull();
+			expect(runtime.getState().initializing).toBe(true);
+		} finally { checked.resolve(false); }
+		await runtime.waitForStartupSync();
+		expect(runtime.getState().initializing).toBeFalsy();
+	});
+
 	it('does not announce conflicts or report completion when the startup recovery pass is cancelled', async () => {
 		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
 		const sync = vi.spyOn(SyncEngine.prototype, 'sync');

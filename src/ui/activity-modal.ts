@@ -75,9 +75,10 @@ export class ActivityModal extends BaseUiModal {
 	private historyPanel!: HTMLDivElement;
 	private readonly onProgress = () => {
 		if (!this.pendingPanel) return;
+		const state = this.deps.getState();
 		// Manual sync records history after the engine's final state event.
 		// Its completion progress event must refresh history as well as pending files.
-		if (this.deps.getState().status !== 'syncing' && !this.deps.getActivityProgress?.()) {
+		if (state.status !== 'syncing' && !(state.initializing && state.status === 'idle') && !this.deps.getActivityProgress?.()) {
 			this.refresh();
             if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
 			return;
@@ -92,9 +93,9 @@ export class ActivityModal extends BaseUiModal {
         const progress = this.deps.getActivityProgress?.();
         const paths = this.deps.getPendingPaths();
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
-        if (loadingLabel && (state.status === 'syncing' || progress)) {
+        if (loadingLabel && (state.status === 'syncing' || progress || state.initializing && state.status === 'idle')) {
             // Keep the spinner mounted through frequent progress updates.
-            const text = formatSyncProgress(progress, state.work);
+            const text = state.status === 'syncing' || progress ? formatSyncProgress(progress, state.work) : 'Checking local files…';
             if (loadingLabel.textContent !== text) loadingLabel.textContent = text;
             loadingLabel.setAttribute('title', text);
             return;
@@ -117,7 +118,9 @@ export class ActivityModal extends BaseUiModal {
         this.updateSyncBtn();
 	}
 	private readonly onStateChange = () => {
-		if (this.deps.getState().status === 'syncing' && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
+		const state = this.deps.getState();
+		if ((state.status === 'syncing' || state.initializing && state.status === 'idle')
+			&& this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
 		else {
             this.refresh();
             if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();
