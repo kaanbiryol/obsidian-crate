@@ -23,6 +23,7 @@
 		"tests/reading-extraction/*.ts"
 	],
 	"ignoreDependencies": [
+		"@plugin-build/styles.css",
 		"cloudflare",
 		"electron",
 		"tailwindcss"
