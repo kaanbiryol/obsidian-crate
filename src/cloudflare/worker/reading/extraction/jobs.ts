@@ -1,4 +1,5 @@
 import { readEncryptionState } from '../../encryption-state';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../file-identity';
 import { publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled } from '../../feature-policy';
 import type { Env } from '../../types';
@@ -50,8 +51,8 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
   const current = await policy(env.DB);
   if (!current) return;
   try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
-  await env.DB.prepare('DELETE FROM reading_jobs WHERE generation != ? OR NOT EXISTS (SELECT 1 FROM files WHERE files.path=reading_jobs.path)')
-    .bind(current.generation).run();
+  await env.DB.prepare(`DELETE FROM reading_jobs WHERE generation != ? OR path NOT IN (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH})`)
+    .bind(current.generation, ...fileFolderArgs(current.folder_path)).run();
   const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
   if (job && current.enabled) {
     // Lease before network access: a crash or restart repeats safely after one minute.

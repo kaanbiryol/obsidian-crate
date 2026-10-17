@@ -1,4 +1,5 @@
 import { readEncryptionState } from '../encryption-state';
+import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from '../file-identity';
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
@@ -10,14 +11,15 @@ import type { Env } from '../types';
 export async function projectReading(env: Env, current: ReadingPolicy): Promise<'complete' | 'pending' | 'unavailable'> {
   if (await readEncryptionState(env.DB)) return 'complete';
   const db = env.DB;
-  await db.prepare(`DELETE FROM reading_sources WHERE generation != ? OR NOT EXISTS
-    (SELECT 1 FROM files WHERE path = reading_sources.path)`).bind(current.generation).run();
-  const { results } = await db.prepare(`SELECT f.path, f.storage_key AS revision FROM files f LEFT JOIN reading_sources s ON s.path = f.path
-    WHERE substr(f.path, 1, ?) = ? AND lower(substr(f.path, -3)) = '.md'
+  // Current-generation sources are inside the Reading folder, so its primary-key range replaces a vault scan.
+  await db.prepare(`DELETE FROM reading_sources WHERE generation != ? OR path NOT IN
+    (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(current.generation, ...fileFolderArgs(current.folder_path)).run();
+  const { results } = await db.prepare(`SELECT f.path, f.storage_key AS revision FROM (SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH}) f
+    LEFT JOIN reading_sources s ON s.path = f.path WHERE lower(substr(f.path, -3)) = '.md'
     AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 4) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
       AND json_extract(s.metadata_json, '$.capture_method')='url' AND NOT EXISTS(SELECT 1 FROM reading_jobs j WHERE j.path=f.path)
       AND (SELECT count(*) FROM reading_jobs)<1000)) ORDER BY f.path LIMIT 25`)
-    .bind(current.folder_path.length + 1, `${current.folder_path}/`, current.generation, current.enabled).all<{ path: string; revision: string }>();
+    .bind(...fileFolderArgs(current.folder_path), current.generation, current.enabled).all<{ path: string; revision: string }>();
   let complete = results.length < 25;
   let unavailable = false;
   for (const row of results) {
@@ -40,11 +42,11 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
     }
     await db.batch([
       db.prepare(`INSERT INTO reading_sources(path, revision, generation, item_id, url_identity, metadata_json, error)
-        SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)
+        SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
         ON CONFLICT(path) DO UPDATE SET revision=excluded.revision, generation=excluded.generation, item_id=excluded.item_id,
         url_identity=excluded.url_identity, metadata_json=excluded.metadata_json, error=excluded.error`)
         .bind(row.path, row.revision, current.generation, metadata?.crate_reading_id ?? null,
-          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: 4 }) : null, error, row.path, row.revision),
+          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: 4 }) : null, error, ...filePathArgs(row.path), row.revision),
       ...(job && metadata ? [db.prepare(`INSERT INTO reading_jobs(path, item_id, generation, source_revision, block_hash, url, available_at)
         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_sources WHERE path = ? AND revision = ?) AND (SELECT count(*) FROM reading_jobs)<1000
         ON CONFLICT(path) DO NOTHING`).bind(row.path, metadata.crate_reading_id, current.generation, row.revision, job.hash, job.url, Date.now(), row.path, row.revision)] : []),

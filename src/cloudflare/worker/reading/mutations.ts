@@ -6,6 +6,7 @@ import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
 import { stageMarkdownFile } from '../markdown-file-staging';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
 import { commitStagedFile } from '../sync-mutations';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../authenticate';
@@ -27,8 +28,9 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       current = { ...current, enabled: 1 };
     }
 
-    const { results } = await env.DB.prepare(`SELECT s.item_id FROM reading_sources s JOIN files f ON f.path=s.path AND f.storage_key=s.revision
-      WHERE s.generation=? AND s.url_identity=? LIMIT 2`).bind(current.generation, readingUrlIdentity(url)).all<{ item_id: string }>();
+    const { results } = await env.DB.prepare(`SELECT s.item_id FROM reading_sources s WHERE s.generation=? AND s.url_identity=?
+      AND (s.path, s.revision) IN (SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH}) LIMIT 2`)
+      .bind(current.generation, readingUrlIdentity(url), ...fileFolderArgs(current.folder_path)).all<{ item_id: string }>();
     if (results.length > 1) throw new ReadingError('Several notes use this link. Review them in Obsidian before saving again.', 409);
     if (results[0]) {
       await sourceById(env, current, results[0].item_id);

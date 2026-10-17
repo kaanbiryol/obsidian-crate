@@ -3,6 +3,7 @@ import { readingCapturePath } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
 import { portablePathKey } from '@/protocol/portable-path';
 import { namespacePredicate } from '../file-namespace';
+import { FILE_PATH_MATCH, filePathArgs } from '../file-identity';
 import { stageMarkdownFile } from '../markdown-file-staging';
 import { commitStagedFile } from '../sync-mutations';
 import type { Env } from '../types';
@@ -15,7 +16,8 @@ export interface PendingCapture { id: string; generation: string; url_identity: 
 export async function capturePath(env: Env, folder: string, title: string, id: string): Promise<string> {
   return readingCapturePath(folder, title, id, async path => {
     const predicate = namespacePredicate(path);
-    return Boolean(await env.DB.prepare(`SELECT 1 FROM files WHERE portable_path=? OR (${predicate.sql}) LIMIT 1`)
+    // Separate branches keep each lookup on the primary key; a top-level OR scans files.
+    return Boolean(await env.DB.prepare(`SELECT 1 FROM files WHERE portable_path=? UNION ALL SELECT 1 FROM files WHERE ${predicate.sql} LIMIT 1`)
       .bind(portablePathKey(path), ...predicate.args).first());
   });
 }
@@ -34,8 +36,8 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   const path = await capturePath(env, current.folder_path, title, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
   const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null,
-    effects: files => [env.DB.prepare('DELETE FROM reading_captures WHERE id=? AND generation=? AND EXISTS (SELECT 1 FROM files WHERE path=? AND storage_key=?)')
-      .bind(id, generation, files[0]!.path, files[0]!.storageKey)] });
+    effects: files => [env.DB.prepare(`DELETE FROM reading_captures WHERE id=? AND generation=? AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key=?)`)
+      .bind(id, generation, ...filePathArgs(files[0]!.path), files[0]!.storageKey)] });
   if (!committed.committed) throw new Error('Reading capture publication must retry.');
 }
 

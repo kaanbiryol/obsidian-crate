@@ -1,6 +1,7 @@
 import { sha256Hex } from '../auth';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
+import { FILE_PATH_MATCH, filePathArgs } from '../file-identity';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';
 import type { AuthPrincipal } from '../authenticate';
 import type { CommitEffects } from '../commit-effects';
@@ -31,5 +32,5 @@ export function operationStatement(db: D1Database, op: ReadingOperation, respons
 }
 export function operationEffects(db: D1Database, op: ReadingOperation, response: unknown): CommitEffects {
   return files => [operationStatement(db, op, response,
-    files.map(() => 'EXISTS (SELECT 1 FROM files WHERE path=? AND storage_key=?)').join(' AND '), files.flatMap(f => [f.path, f.storageKey]))];
+    files.map(() => `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key=?)`).join(' AND '), files.flatMap(f => [...filePathArgs(f.path), f.storageKey]))];
 }

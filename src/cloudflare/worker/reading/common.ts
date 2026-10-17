@@ -4,6 +4,7 @@ import type { AuthPrincipal } from '../authenticate';
 import { corsResponse } from '../cors';
 import { sha256Hex } from '../auth';
 import { getStoredFileRow } from '../sync-storage';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 import { apiRoutePolicy } from '../routes/policy';
@@ -41,8 +42,10 @@ export async function readSource(env: Env, path: string) {
 }
 export async function sourceById(env: Env, current: ReadingPolicy, id: unknown) {
   if (typeof id !== 'string' || id.length > 100) throw new ReadingError('Choose a saved link.');
-  const { results } = await env.DB.prepare(`SELECT s.path FROM reading_sources s JOIN files f ON f.path = s.path AND f.storage_key = s.revision
-    WHERE s.generation = ? AND s.item_id = ? LIMIT 2`).bind(current.generation, id).all<{ path: string }>();
+  // Current-generation sources are inside the Reading folder, so its primary-key range replaces a vault scan.
+  const { results } = await env.DB.prepare(`SELECT s.path FROM reading_sources s WHERE s.generation = ? AND s.item_id = ?
+    AND (s.path, s.revision) IN (SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH}) LIMIT 2`)
+    .bind(current.generation, id, ...fileFolderArgs(current.folder_path)).all<{ path: string }>();
   if (results.length !== 1) throw new ReadingError(results.length ? 'Several notes have this Reading ID. Fix the duplicate notes in Obsidian.' : 'This reading note was moved or deleted. Refresh your library.', 409);
   const path = results[0]!.path;
   const source = await readSource(env, path);
