@@ -12,7 +12,8 @@ import { policy, authority, readingResponse, ReadingError } from './common';
 import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess, handoffAuthority } from './access';
 import { mutateReading } from './mutations';
 import { projectReading } from './projection';
-import { readingItem, readingList } from './queries';
+import { readingItem, readingList, readingListEtag } from './queries';
+import { corsHeaders } from '../cors';
 
 export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState): Promise<Response> {
   try {
@@ -76,9 +77,13 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });
     if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
     if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
+    // The first list page is conditional, so an unchanged library is one cheap request.
+    const listTag = path === '/reading/list' && request.method === 'GET' && !url.searchParams.get('cursor')
+      ? await readingListEtag(env.DB, current, request.headers.get('If-None-Match')) : null;
+    if (listTag?.notModified) return new Response(null, { status: 304, headers: { ...corsHeaders(), 'Cache-Control': 'no-store', ETag: listTag.etag } });
     if (await projectReading(env, current) !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);
     if (path === '/reading/item' && request.method === 'GET') return readingResponse(await readingItem(env, current, url.searchParams.get('id')));
-    if (path === '/reading/list' && request.method === 'GET') return readingResponse(await readingList(env, current, url.searchParams.get('cursor') ?? ''));
+    if (path === '/reading/list' && request.method === 'GET') return readingResponse(await readingList(env, current, url.searchParams.get('cursor') ?? ''), 200, listTag ? { ETag: listTag.etag } : {});
     return readingResponse({ error: 'Not found' }, 404);
   } catch (error) {
     if (error instanceof ReadingError) return readingResponse({ error: error.message, code: error.code }, error.status);

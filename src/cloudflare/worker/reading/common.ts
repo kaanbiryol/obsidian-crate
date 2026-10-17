@@ -17,7 +17,7 @@ export function canPrepareReadingHandoff(scope: string): scope is AuthPrincipal[
 export class ReadingError extends Error {
   constructor(message: string, readonly status = 400, readonly code = 'reading_error') { super(message); }
 }
-export const readingResponse = (value: unknown, status = 200) => corsResponse(value, status, { 'Cache-Control': 'no-store' });
+export const readingResponse = (value: unknown, status = 200, headers: Record<string, string> = {}) => corsResponse(value, status, { 'Cache-Control': 'no-store', ...headers });
 export async function policy(db: D1Database): Promise<ReadingPolicy | null> {
   return db.prepare('SELECT enabled, folder_path, generation, revision FROM reading_policy WHERE id = 1').first<ReadingPolicy>();
 }

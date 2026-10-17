@@ -4,7 +4,8 @@ import { readingDatabase, readReadingValue } from './database';
 import { assertReadingSession, type ReadingSession } from './session';
 import { isReadingArticleCache, isReadingCache } from './storage-validation';
 
-export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number }
+/** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads. */
+export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; revision?: string }
 
 export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
   const value = await readReadingValue(`list:${session.id}`);

@@ -6,7 +6,7 @@ import type { Env } from '../../types';
 import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
 import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
-import { projectReading } from '../projection';
+import { invalidateReadingProjection, projectReading } from '../projection';
 import { sha256Hex } from '../../auth';
 import { commitStagedFile } from '../../sync-mutations';
 import { stageMarkdownFile } from '../../markdown-file-staging';
@@ -39,6 +39,7 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
     await env.DB.batch([
       env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision),
       env.DB.prepare('DELETE FROM reading_sources WHERE path=?').bind(job.path),
+      invalidateReadingProjection(env.DB),
     ]);
   }
 }
@@ -63,7 +64,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
       const source = await readSource(env, job.path);
       if (source.file.storageKey !== job.source_revision) {
         await env.DB.batch([env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision),
-          env.DB.prepare('DELETE FROM reading_sources WHERE path=?').bind(job.path)]);
+          env.DB.prepare('DELETE FROM reading_sources WHERE path=?').bind(job.path), invalidateReadingProjection(env.DB)]);
       } else {
         try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
         catch { if (job.attempts < 2) return; }

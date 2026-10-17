@@ -6,11 +6,27 @@ import { readingUrlIdentity } from '@/reading/core/model';
 import { ReadingError, readSource, type ReadingPolicy } from './common';
 import { sha256Hex } from '../auth';
 import type { Env } from '../types';
+import { vaultChangeToken } from '../vault-change-token';
+
+export const READING_PROJECTION_KEY = 'reading_projection';
+
+/** Rows are a pure function of the folder's file revisions and the policy, so a
+ * complete projection stays complete until a file write changes the vault token. */
+// Bump with the `_highlightIndex` row format below, so upgraded rows are rebuilt.
+const PROJECTION_FORMAT = 4;
+const projectionScope = (current: ReadingPolicy) => `reading:${current.generation}\nfolder:${current.folder_path}\nenabled:${current.enabled}\nformat:${PROJECTION_FORMAT}`;
+
+/** Removing a source row without a file write must request a new projection. */
+export const invalidateReadingProjection = (db: D1Database) => db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY);
 
 /** Rebuildable projection: all responses still verify the current immutable file revision. */
 export async function projectReading(env: Env, current: ReadingPolicy): Promise<'complete' | 'pending' | 'unavailable'> {
   if (await readEncryptionState(env.DB)) return 'complete';
   const db = env.DB;
+  // Every Reading read checks the projection. Skip the folder-wide checks when
+  // nothing changed since the last complete pass.
+  const token = await vaultChangeToken(db, projectionScope(current));
+  if ((await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).first<{ value: string }>())?.value === token) return 'complete';
   // Current-generation sources are inside the Reading folder, so its primary-key range replaces a vault scan.
   await db.prepare(`DELETE FROM reading_sources WHERE generation != ? OR path NOT IN
     (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(current.generation, ...fileFolderArgs(current.folder_path)).run();
@@ -51,6 +67,11 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_sources WHERE path = ? AND revision = ?) AND (SELECT count(*) FROM reading_jobs)<1000
         ON CONFLICT(path) DO NOTHING`).bind(row.path, metadata.crate_reading_id, current.generation, row.revision, job.hash, job.url, Date.now(), row.path, row.revision)] : []),
     ]);
+  }
+  // Pending extractions are queued only while fewer than 1,000 jobs exist, so a
+  // full queue must be revisited once it drains.
+  if (complete && !unavailable && ((await db.prepare('SELECT count(*) AS jobs FROM reading_jobs').first<{ jobs: number }>())?.jobs ?? 0) < 1000) {
+    await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(READING_PROJECTION_KEY, token).run();
   }
   return unavailable ? 'unavailable' : complete ? 'complete' : 'pending';
 }

@@ -4,10 +4,11 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import { handleReadingRoute } from './reading/routes';
-import { projectReading } from './reading/projection';
+import { projectReading, READING_PROJECTION_KEY } from './reading/projection';
 import { publishExtraction } from './reading/extraction/jobs';
 import type { Publication } from './reading/extraction/jobs';
 import { policy } from './reading/common';
+import { meterD1Usage } from './d1-usage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
@@ -189,6 +190,8 @@ it('rebuilds old projections from native markers and observes subsequent vault e
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
   await projectReading(env, (await policy(env.DB))!);
   await env.DB.prepare("UPDATE reading_sources SET metadata_json=json_set(json_remove(metadata_json, '$.highlights'), '$._highlightIndex', 2) WHERE path=?").bind(path).run();
+  // Rows from an older format were recorded under a different projection marker.
+  await env.DB.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).run();
   const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
   const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
   expect(projected.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['this passage']);
@@ -222,4 +225,28 @@ it('persists source-sensitive text highlights and notes through replay, projecti
   const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
   expect(readReadingFrontmatter(removed.content)!.body).toBe(markdown);
   expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
+});
+
+it('answers an unchanged library from its ETag and skips projection when nothing changed', async () => {
+  const path = 'Reading/Kept.md';
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, await adoptReadingClip('Kept.', path, '2026-09-26T00:00:00Z'), null);
+  const list = (etag?: string, db = env.DB) => handleReadingRoute(new Request('https://test/reading/list', { headers: etag ? { 'If-None-Match': etag } : {} }), { ...env, DB: db }, principal);
+  const first = await list();
+  const etag = first.headers.get('ETag')!;
+  expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}"$/);
+  const meter = meterD1Usage(env.DB);
+  const unchanged = await list(etag, meter.db);
+  expect(unchanged.status).toBe(304);
+  expect(meter.usage.rowsRead).toBeLessThan(20);
+  // A complete projection is reused for the next uncached read.
+  const projected = meterD1Usage(env.DB);
+  expect((await list(undefined, projected.db)).status).toBe(200);
+  expect(await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).first()).not.toBeNull();
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Elsewhere.md', 'Unrelated', null);
+  const refreshed = await list(etag);
+  expect(refreshed.status).toBe(304);
+  expect(refreshed.headers.get('ETag')).not.toBe(etag);
+  const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, source.content.replace('Kept.', 'Changed.'), source.hash);
+  expect((await list(refreshed.headers.get('ETag')!)).status).toBe(200);
 });

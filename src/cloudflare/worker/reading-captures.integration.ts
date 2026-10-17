@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { READING_PROJECTION_KEY } from './reading/projection';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
@@ -114,6 +115,8 @@ it('matches old queued YouTube identities and rebuilt source indexes without rew
   await publishCapture(env, row.id, row.generation, { title: 'Video', markdown: '## Transcript\n\n**0:42** · Saved passage.' });
   await list();
   await env.DB.prepare("UPDATE reading_sources SET url_identity=?, metadata_json=json_set(metadata_json, '$._highlightIndex', 3)").bind(body.url).run();
+  // Rows from an older format were recorded under a different projection marker.
+  await env.DB.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(READING_PROJECTION_KEY).run();
   const projected = await command('capture', { url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw&t=99', operationId: operation() });
   expect(await projected.json()).toMatchObject({ alreadySaved: true, id: row.id });
   expect(await env.DB.prepare('SELECT count(*) AS n FROM files').first()).toMatchObject({ n: 1 });

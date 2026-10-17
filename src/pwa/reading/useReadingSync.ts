@@ -13,6 +13,8 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
   const refreshing = useRef(false), refreshQueued = useRef<{ session: ReadingSession; mode: ReadingRetryMode } | null>(null);
+  // The last confirmed library, so a conditional reload can keep it without decoding storage.
+  const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -47,7 +49,12 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       let completed = false;
       try {
         const confirmed = await drainReading(current, mode, () => enabledRef.current);
-        data = confirmed ?? (navigator.onLine && enabledRef.current ? await loadReading(current) : await readReadingCache(current));
+        if (confirmed) data = confirmed;
+        else if (navigator.onLine && enabledRef.current) {
+          const previous = confirmedCache.current?.session === current ? confirmedCache.current.cache : await readReadingCache(current).catch(() => undefined);
+          data = await loadReading(current, previous);
+        } else data = await readReadingCache(current);
+        if (data) confirmedCache.current = { session: current, cache: data };
         completed = true;
       } finally {
         // Publish the latest durable queue even when refreshing the list fails.

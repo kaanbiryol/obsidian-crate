@@ -4,6 +4,8 @@ import { ReadingError, sourceById, type ReadingPolicy } from './common';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { validateReadingMetadata } from '@/reading/core/model';
+import { sha256Hex } from '../auth';
+import { parseChangeEtags, vaultChangeToken } from '../vault-change-token';
 
 /** Called only after route authorization and a complete Reading projection. */
 export async function readingItem(env: Env, current: ReadingPolicy, id: string | null) {
@@ -11,6 +13,23 @@ export async function readingItem(env: Env, current: ReadingPolicy, id: string |
   if (queued) return { item: { ...parseReadingNote(queued.note)!, path: '' }, markdown: '' };
   const source = await sourceById(env, current, id);
   return { item: { ...source.item, path: source.path }, markdown: readReadingFrontmatter(source.content)?.body ?? '' };
+}
+
+/** The library is a function of the folder's files and the capture queue. An
+ * unchanged vault token answers without listing; otherwise an unchanged folder
+ * revision still does, with a refreshed ETag. */
+export async function readingListEtag(db: D1Database, current: ReadingPolicy, ifNoneMatch: string | null): Promise<{ etag: string; notModified: boolean }> {
+  const captures = await db.prepare('SELECT count(*) AS n, COALESCE(max(available_at), 0) AS latest, COALESCE(sum(length(note)), 0) AS bytes FROM reading_captures WHERE generation=?')
+    .bind(current.generation).first<{ n: number; latest: number; bytes: number }>();
+  const scope = `reading-list:${current.generation}\nfolder:${current.folder_path}\nenabled:${current.enabled}\ncaptures:${captures?.n}:${captures?.latest}:${captures?.bytes}`;
+  const changeToken = await vaultChangeToken(db, scope);
+  const cached = parseChangeEtags(ifNoneMatch);
+  const unchanged = cached.find(tag => tag.changeToken === changeToken);
+  if (unchanged) return { etag: `"${unchanged.changeToken}.${unchanged.revision}"`, notModified: true };
+  const files = await db.prepare(`SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} ORDER BY portable_path`)
+    .bind(...fileFolderArgs(current.folder_path)).all<{ path: string; storage_key: string }>();
+  const revision = (await sha256Hex([scope, ...files.results.map(file => `${file.path}\0${file.storage_key}`)].join('\n'))).slice(0, 32);
+  return { etag: `"${changeToken}.${revision}"`, notModified: cached.some(tag => tag.revision === revision) };
 }
 
 export async function readingList(env: Env, current: ReadingPolicy, cursor: string) {

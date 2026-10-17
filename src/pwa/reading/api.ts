@@ -38,10 +38,10 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
 }
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
-async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string): Promise<Response> {
+async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
   if (session) assertReadingSession(session);
   const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal: AbortSignal.timeout(20_000),
-    headers: { ...(session ? { Authorization: `Bearer ${session.token}`, ...readingEncryptionHeaders() } : {}), 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) }, body });
+    headers: { ...(session ? { Authorization: `Bearer ${session.token}`, ...readingEncryptionHeaders() } : {}), 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), ...extraHeaders }, body });
   if (session) assertReadingSession(session);
   if (session && response.status === 401) {
     reportExpiredConnection(session.token);
@@ -88,17 +88,39 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
   if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
   return data;
 }
-const MAX_READING_LIST_ITEMS = 10_000;
-const MAX_READING_LIST_ISSUES = 10_000;
-const MAX_READING_LIST_PAGES = 1000;
+export const MAX_READING_LIST_ITEMS = 100_000;
+export const MAX_READING_LIST_ISSUES = 10_000;
+export const MAX_READING_LIST_PAGES = 1100;
 
-export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
+/** The first plaintext page carries the library ETag. An unchanged library
+ * answers 304, so polling does not page through and rewrite every item. */
+async function firstReadingListPage(session: ReadingSession, previous?: ReadingCache): Promise<{ unchanged: true } | { unchanged: false; response: unknown; revision?: string }> {
+  const unconditional = async () => ({ unchanged: false as const, response: await readingRequest<unknown>('/reading/list', session) });
+  if (await prepareReadingEncryption(session)) return unconditional();
+  let response: Response;
+  try { response = await rawReadingRequest('/reading/list', session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
+  catch (error) { if (error instanceof EncryptionScopeChangedError) return unconditional(); throw error; }
+  if (response.status === 304 && previous) return { unchanged: true };
+  const data = await response.json() as { error?: string; code?: string };
+  assertReadingSession(session);
+  if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading request failed.', response.status, data.code);
+  const revision = response.headers.get('ETag');
+  return { unchanged: false, response: data, ...(revision && revision.length <= 128 ? { revision } : {}) };
+}
+
+export async function loadReading(session: ReadingSession, previous?: ReadingCache): Promise<ReadingCache> {
   const cache: ReadingCache = { items: [], issues: [], savedAt: Date.now() }; let cursor: string | null = null;
   const seenCursors = new Set<string>();
   let pages = 0;
   do {
     if (++pages > MAX_READING_LIST_PAGES) throw new Error('Reading library response is too large or unreadable.');
-    const response = await readingRequest<unknown>(`/reading/list${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, session);
+    let response: unknown;
+    if (pages === 1) {
+      const first = await firstReadingListPage(session, previous);
+      if (first.unchanged) return previous!;
+      response = first.response;
+      if (first.revision) cache.revision = first.revision;
+    } else response = await readingRequest<unknown>(`/reading/list?cursor=${encodeURIComponent(cursor!)}`, session);
     const page = parseReadingListPage(response, session.folderPath);
     if (!page) throw new Error('Reading library response is unreadable.');
     if (cache.items.length + page.items.length > MAX_READING_LIST_ITEMS

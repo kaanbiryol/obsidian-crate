@@ -8,8 +8,7 @@ import {
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../reminder-cache';
 import { toReminderPayload } from '../scan';
-import { LAST_SEQ_SQL } from '../../sync-storage';
-import { SYNC_RESET_GENERATION_KEY } from '../../sync-reset-generation';
+import { parseChangeEtags, vaultChangeToken } from '../../vault-change-token';
 
 export async function handleListReminders(request: Request, env: Env): Promise<Response> {
 	const folderPath = parseFolderPath(new URL(request.url).searchParams.get('folderPath'));
@@ -27,8 +26,8 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		status: 304,
 		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag },
 	});
-	const changeToken = await vaultChangeToken(env.DB, folderPath);
-	const cached = requestEtags.map(parseListEtag);
+	const changeToken = await vaultChangeToken(env.DB, `parser:${REMINDER_CACHE_PARSER_VERSION}\nfolder:${folderPath}`);
+	const cached = requestEtags.map(value => parseChangeEtags(value)[0]);
 	const unchanged = requestEtags.find((_, index) => cached[index]?.changeToken === changeToken);
 	if (unchanged) return notModified(unchanged);
 
@@ -61,17 +60,3 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	});
 }
 
-function parseListEtag(value: string): { changeToken: string; revision: string } | null {
-	const match = /^"([a-f0-9]{32})\.([a-f0-9]{32})"$/.exec(value);
-	return match ? { changeToken: match[1]!, revision: match[2]! } : null;
-}
-
-/** Every file write advances the changelog, the initial import generation or the
- * reset generation, so an equal token proves the folder's files are unchanged. */
-async function vaultChangeToken(db: D1Database, folderPath: string): Promise<string> {
-	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
-		COALESCE((SELECT generation FROM initial_import WHERE id = 1), 0) AS importGeneration,
-		COALESCE((SELECT value FROM maintenance_state WHERE key = ?), '') AS resetGeneration`)
-		.bind(SYNC_RESET_GENERATION_KEY).first<{ seq: number; importGeneration: number; resetGeneration: string }>();
-	return (await sha256Hex(`parser:${REMINDER_CACHE_PARSER_VERSION}\nfolder:${folderPath}\nreset:${row?.resetGeneration}\nimport:${row?.importGeneration}\nseq:${row?.seq}`)).slice(0, 32);
-}

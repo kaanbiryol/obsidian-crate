@@ -223,7 +223,7 @@ Implemented routes:
 | `POST /reading/capture` | vault, reading, reading_capture | Durable bookmark commit or deduplicated result; operation ID required; exact retry replays its receipt |
 | `POST /reading/prepare` | reading_capture, reading, vault | Prepare one exact capture and return a five-minute browser handoff |
 | `POST /reading/handoff` | operation-bound capability | Commit the prepared operation or replay its minimal receipt |
-| `GET /reading/list` | reading, vault | Verified paginated metadata; filters and title/source/tag search run in the client |
+| `GET /reading/list` | reading, vault | Verified paginated metadata; filters and title/source/tag search run in the client. The first page returns an ETag (vault change token plus folder revision); `If-None-Match` on an unchanged library answers 304 without projection or listing |
 | `GET /reading/item?id=…` | reading, vault | Verified Markdown within the enrolled folder |
 | `POST /reading/update` | reading, vault | Archive/favorite/tag patch with semantic preconditions and operation ID |
 | `POST /reading/retry` | reading, vault | Explicit bounded extraction retry, preserving edited content |

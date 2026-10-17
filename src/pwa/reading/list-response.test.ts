@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { loadReading } from './api';
+import { loadReading, MAX_READING_LIST_ISSUES, MAX_READING_LIST_ITEMS, MAX_READING_LIST_PAGES } from './api';
 import { commitReadingCache, type ReadingCache, type ReadingSession } from './storage';
 
 vi.mock('./encryption-session', () => ({
@@ -78,14 +78,15 @@ it.each([['A', 'A'], ['A', 'B', 'A']])('stops a cursor cycle: %j', async (...cur
 it('bounds empty pages even when every cursor is different', async () => {
   network.mockImplementation(async () => Response.json({ items: [], issues: [], cursor: `page-${network.mock.calls.length}` }));
   await expect(loadReading(session)).rejects.toThrow('too large');
-  expect(network).toHaveBeenCalledTimes(1000);
+  expect(network).toHaveBeenCalledTimes(MAX_READING_LIST_PAGES);
   expect(commitReadingCache).not.toHaveBeenCalled();
 });
 
 it.each(['items', 'issues'] as const)('rejects cumulative %s overflow on the terminal page', async field => {
-  const records = field === 'items' ? Array.from({ length: 10_001 }, (_, index) => item(index)) : Array.from({ length: 10_001 }, () => issue);
-  respond({ items: [], issues: [], [field]: records.slice(0, 6000), cursor: 'next' },
-    { items: [], issues: [], [field]: records.slice(6000), cursor: null });
+  const limit = field === 'items' ? MAX_READING_LIST_ITEMS : MAX_READING_LIST_ISSUES;
+  const records = field === 'items' ? Array.from({ length: limit + 1 }, (_, index) => item(index)) : Array.from({ length: limit + 1 }, () => issue);
+  respond({ items: [], issues: [], [field]: records.slice(0, limit - 100), cursor: 'next' },
+    { items: [], issues: [], [field]: records.slice(limit - 100), cursor: null });
   await expect(loadReading(session)).rejects.toThrow('too large');
   expect(network).toHaveBeenCalledTimes(2);
   expect(commitReadingCache).not.toHaveBeenCalled();
@@ -106,4 +107,17 @@ it('retains duplicate-identity validation across otherwise valid pages', async (
   respond({ items: [item(1)], issues: [], cursor: 'next' }, { items: [item(1)], issues: [], cursor: null });
   await expect(loadReading(session)).rejects.toThrow('unreadable');
   expect(commitReadingCache).not.toHaveBeenCalled();
+});
+
+it('keeps the previous library when the server reports it unchanged', async () => {
+  const previous: ReadingCache = { items: [item(1)], issues: [], savedAt: 1, revision: '"etag"' };
+  network.mockResolvedValueOnce(new Response(null, { status: 304 }));
+  expect(await loadReading(session, previous)).toBe(previous);
+  expect(new Headers(network.mock.calls[0]![1]!.headers).get('If-None-Match')).toBe('"etag"');
+  expect(commitReadingCache).not.toHaveBeenCalled();
+});
+
+it('stores the first page ETag with a reloaded library', async () => {
+  network.mockResolvedValueOnce(Response.json({ items: [item(1)], issues: [], cursor: null }, { headers: { ETag: '"next"' } }));
+  expect(await loadReading(session, { items: [], issues: [], savedAt: 1, revision: '"old"' })).toMatchObject({ revision: '"next"', items: [{ path: 'Reading/1.md' }] });
 });
