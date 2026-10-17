@@ -34,6 +34,17 @@ export async function handleCoordinatorRequest(
     if (prepared instanceof Response) return prepared;
     return withStateLock(() => commitCoordinatedUpload(prepared, state, env));
   }
+  // Every poll ensures the projection coordinator. Once armed for this parser
+  // version, answer without queuing behind mutations or notification passes.
+  if (path === '/ensure' && request.method === 'POST'
+    && await state.storage.get<number>('projectionParserVersion') === REMINDER_CACHE_PARSER_VERSION) return new Response(null, { status: 204 });
+  // An already scheduled maintenance episode needs no state change; a running
+  // pass holds this object's lock, and mutations must not wait for it.
+  if (path === '/maintain' && request.method === 'POST' && await state.storage.get<boolean>('maintenanceCoordinator')
+    && await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
+  // Schedule cleanup before queuing, so a running maintenance pass delays only
+  // this request rather than every coordinated mutation behind it.
+  if (request.headers.get('X-Crate-Internal-Mutation') === '1') await scheduleMaintenance(env);
   return withStateLock(async () => {
     if (path === '/reading-wake' && request.method === 'POST') {
       await state.storage.put('readingCoordinator', true);
@@ -60,12 +71,15 @@ export async function handleCoordinatorRequest(
   });
 }
 
+async function scheduleMaintenance(env: Env): Promise<void> {
+	const maintenance = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/maintenance'));
+	const response = await maintenance.fetch('https://do/maintain', { method: 'POST' });
+	if (!response.ok) throw new Error('Unable to schedule server cleanup');
+}
+
 /** Internal endpoints; the caller holds the Durable Object's mutation lock. */
 async function handleLockedCoordinatorRequest(request: Request, state: DurableObjectState, env: Env): Promise<Response | null> {
 	if (request.headers.get('X-Crate-Internal-Mutation') === '1') {
-		const maintenance = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/maintenance'));
-		const response = await maintenance.fetch('https://do/maintain', { method: 'POST' });
-		if (!response.ok) throw new Error('Unable to schedule server cleanup');
 		const original = new Request(request);
 		original.headers.delete('X-Crate-Internal-Mutation');
 		return fetchWorkerRequest(original, env, { kind: 'coordinator', state });
