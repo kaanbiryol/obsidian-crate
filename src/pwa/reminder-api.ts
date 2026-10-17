@@ -19,6 +19,33 @@ export function parseReminderListResponse(value: unknown, folderPath: string): {
 	return { reminders: result.reminders, projects: result.projects, issues };
 }
 
+/** A delta replaces every reminder from `changedPaths` with `reminders`; other
+ * notes keep the base snapshot's records. Validated as strictly as a full list. */
+export function parseReminderDeltaResponse(value: unknown, folderPath: string): {
+	changedPaths: string[]; reminders: ReminderRecord[]; projects: string[];
+} | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value) || (value as { delta?: unknown }).delta !== true) return null;
+	const result = value as Record<string, unknown>;
+	const changedPaths = result.changedPaths;
+	if (!Array.isArray(changedPaths) || !changedPaths.every(path => typeof path === 'string' && path.startsWith(`${folderPath}/`))
+		|| !isReminderList(result.reminders, folderPath) || !Array.isArray(result.projects) || !result.projects.every(project => typeof project === 'string')
+		|| !Array.isArray(result.issues) || result.issues.length) return null;
+	const changed = new Set(changedPaths as string[]);
+	if (!result.reminders.every(reminder => changed.has(reminder.filePath))) return null;
+	return { changedPaths: changedPaths as string[], reminders: result.reminders, projects: result.projects };
+}
+
+/** Rebuild the full list in the server's order: notes by path, reminders by line. */
+export function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: string[]; reminders: ReminderRecord[] }): ReminderRecord[] {
+	const changed = new Set(delta.changedPaths);
+	const notes = new Map<string, ReminderRecord[]>();
+	for (const reminder of [...base.filter(reminder => !changed.has(reminder.filePath)), ...delta.reminders]) {
+		const note = notes.get(reminder.filePath);
+		if (note) note.push(reminder); else notes.set(reminder.filePath, [reminder]);
+	}
+	return [...notes.keys()].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).flatMap(path => notes.get(path)!);
+}
+
 const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 1000;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;
 const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 10 * 60_000;

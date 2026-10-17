@@ -145,16 +145,16 @@ describe('PWA reminder refresh around local writes', () => {
 		const issues = [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }];
 		await settle(0, new Response(JSON.stringify({ reminders: [original], projects: ['Inbox'], issues })), load());
 		expect(rendered.current.issues).toEqual(issues);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original], ['Inbox'], expect.any(Number), undefined, issues);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original], ['Inbox'], expect.any(Number), undefined, issues, undefined);
 		const corrected = { ...original, content: 'Healthy reminder stays editable' };
 		await commit([corrected]);
 		expect(rendered.current.reminders).toEqual([corrected]);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), undefined, issues);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), undefined, issues, undefined);
 		await settle(1, new Response(null, { status: 304 }), load());
 		expect(rendered.current.issues).toEqual(issues);
 		await settle(2, response([corrected]), load());
 		expect(rendered.current.issues).toEqual([]);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), 'latest-list', []);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), 'latest-list', [], undefined);
 	});
 
 	it('restores cached source issues after a network error and clears them on logout', async () => {
@@ -297,4 +297,48 @@ it('does not start reminder refreshes while paused, including retained callbacks
 	options.enabled = false; rendered.rerender();
 	await act(async () => retained());
 	expect(options.apiFetch).toHaveBeenCalledOnce();
+
+});
+
+describe('delta refresh', () => {
+	const work = (id: string) => reminder(id, { filePath: 'Reminders/Work.md', project: 'Work' });
+	const full = (reminders: ReminderRecord[]) => new Response(JSON.stringify({ reminders, projects: ['Inbox', 'Work'], issues: [] }),
+		{ headers: { ETag: 'first', 'X-Crate-Delta-Base': '7.base' } });
+
+	it('asks for notes changed since the confirmed snapshot and merges them in note order', async () => {
+		const { rendered, options, original, load, settle } = harness();
+		await settle(0, full([original, work('two')]), load());
+		const pending = load();
+		expect(options.apiFetch.mock.lastCall![0]).toBe('/reminders/list?folderPath=Reminders&since=7.base');
+		const edited = work('three');
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md', 'Reminders/Gone.md'], reminders: [edited], projects: ['Inbox', 'Work'], issues: [] }),
+			{ headers: { ETag: 'second', 'X-Crate-Delta-Base': '9.base' } }), pending);
+		expect(rendered.current.reminders).toEqual([original, edited]);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original, edited], ['Inbox', 'Work'], expect.any(Number), 'second', [], '9.base');
+	});
+
+	it('never reads a malformed delta as a full list and falls back to a full read', async () => {
+		const { rendered, options, original, load, settle } = harness();
+		await settle(0, full([original, work('two')]), load());
+		// A delta reminder outside its declared notes is rejected whole.
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [reminder('stray')], projects: [], issues: [] })), load());
+		expect(rendered.current.reminders).toEqual([original, work('two')]);
+		expect(rendered.current.error).toMatch(/invalid reminder data/);
+		const next = load();
+		expect(options.apiFetch.mock.lastCall![0]).toBe('/reminders/list?folderPath=Reminders');
+		await settle(2, full([original]), next);
+		expect(rendered.current.reminders).toEqual([original]);
+	});
+
+	it('advances the delta base from a 304 without rewriting the snapshot', async () => {
+		const { options, original, load, settle } = harness();
+		await settle(0, full([original]), load());
+		vi.mocked(saveCachedReminderSnapshot).mockClear();
+		await settle(1, new Response(null, { status: 304, headers: { ETag: 'refreshed', 'X-Crate-Delta-Base': '12.base' } }), load());
+		const pending = load();
+		expect(options.apiFetch.mock.lastCall![0]).toBe('/reminders/list?folderPath=Reminders&since=12.base');
+		expect(new Headers(options.apiFetch.mock.lastCall![1]!.headers).get('If-None-Match')).toBe('refreshed');
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+		await settle(2, new Response(null, { status: 304 }), pending);
+	});
 });

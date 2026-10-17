@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { fetchReadyReminderList, parseReminderListResponse, type ReminderIndexingProgress } from '../reminder-api';
+import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse, parseReminderListResponse, type ReminderIndexingProgress } from '../reminder-api';
+import { isReminderList } from '../reminder-storage-validation';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
@@ -64,6 +65,11 @@ export function useReminderSync({
 	const hydratedCacheRef = useRef(false);
 	const requestCoordinatorRef = useRef(createReminderRequestCoordinator());
 	const etagRef = useRef<string | undefined>(undefined);
+	// The ETag stored with the offline copy; 304 freshness is recorded against it.
+	const persistedEtagRef = useRef<string | undefined>(undefined);
+	// Server changelog position of the confirmed snapshot. Locally confirmed
+	// changes since then are in notes the next delta replaces, so it stays valid.
+	const deltaBaseRef = useRef<string | undefined>(undefined);
 	const lastCheckedAtRef = useRef<number | null>(null);
 	const activeReadRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
@@ -87,15 +93,17 @@ export function useReminderSync({
 	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
 	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
 
-	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string) => {
+	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string, deltaBase?: string) => {
 		const savedAt = Date.now();
 		publishSnapshot(nextReminders, nextProjects);
 		etagRef.current = etag;
+		persistedEtagRef.current = etag;
+		if (deltaBase !== undefined) deltaBaseRef.current = deltaBase;
 		lastCheckedAtRef.current = savedAt;
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
-		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current);
+		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current, deltaBaseRef.current);
 	}, [config.folderPath, publishSnapshot]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
@@ -105,6 +113,8 @@ export function useReminderSync({
 		issuesRef.current = snapshot.issues ?? [];
 		setIssues(issuesRef.current);
 		etagRef.current = snapshot.etag;
+		persistedEtagRef.current = snapshot.etag;
+		deltaBaseRef.current = snapshot.deltaBase;
 		lastCheckedAtRef.current = snapshot.savedAt;
 		setLastUpdatedAt(snapshot.savedAt);
 		setDataMode('cached');
@@ -136,9 +146,11 @@ export function useReminderSync({
 			try {
 				const headers = new Headers();
 				if (etagRef.current) headers.set('If-None-Match', etagRef.current);
+				// Ask for notes changed since a complete confirmed snapshot only.
+				const since = deltaBaseRef.current && issuesRef.current.length === 0 ? deltaBaseRef.current : undefined;
 				const response = await fetchReadyReminderList(
 					apiFetch,
-					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`,
+					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}${since ? `&since=${encodeURIComponent(since)}` : ''}`,
 					headers,
 					(remaining, total) => {
 						if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) {
@@ -148,6 +160,9 @@ export function useReminderSync({
 				);
 				if (response.status === 304) {
 					if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+					// Other vault changes refresh the ETag and delta base of unchanged reminders.
+					etagRef.current = response.headers.get('ETag') ?? etagRef.current;
+					deltaBaseRef.current = response.headers.get('X-Crate-Delta-Base') ?? deltaBaseRef.current;
 					const savedAt = Date.now();
 					lastCheckedAtRef.current = savedAt;
 					setLastUpdatedAt(savedAt);
@@ -156,13 +171,21 @@ export function useReminderSync({
 					void refreshCachedReminderSnapshot(
 						config.folderPath,
 						savedAt,
-						etagRef.current,
+						persistedEtagRef.current,
 					);
 					return;
 				}
 				if (!response.ok) throw new Error(await response.text());
-				const result = parseReminderListResponse(await response.json().catch(() => null), config.folderPath);
+				const body: unknown = await response.json().catch(() => null);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				// A delta lists only changed notes: it must never be read as a full list.
+				const isDelta = Boolean(body && typeof body === 'object' && (body as { delta?: unknown }).delta === true);
+				const delta = isDelta && since ? parseReminderDeltaResponse(body, config.folderPath) : null;
+				const merged = delta ? applyReminderDelta(snapshotRef.current.reminders, delta) : null;
+				const result = !isDelta ? parseReminderListResponse(body, config.folderPath)
+					: delta && merged && isReminderList(merged, config.folderPath) ? { reminders: merged, projects: delta.projects, issues: [] } : null;
+				// An unusable delta drops the base, so the next read is a full one.
+				if (isDelta && !result) deltaBaseRef.current = undefined;
 				if (!result) {
 					// A contract failure cannot replace a valid revision or its ETag,
 					// including with an older disk snapshot after a recent acknowledgement.
@@ -173,7 +196,8 @@ export function useReminderSync({
 				setError(null);
 				issuesRef.current = result.issues;
 				setIssues(result.issues);
-				void commitConfirmedSnapshot(result.reminders, result.projects, response.headers.get('ETag') ?? undefined);
+				void commitConfirmedSnapshot(result.reminders, result.projects, response.headers.get('ETag') ?? undefined,
+					response.headers.get('X-Crate-Delta-Base') ?? undefined);
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
@@ -207,6 +231,7 @@ export function useReminderSync({
 		const sessionCurrent = capturePwaSession();
 		if (!await rebuildCachedReminderSnapshot(config.folderPath) || !sessionCurrent()) return;
 		etagRef.current = undefined;
+		deltaBaseRef.current = undefined;
 		lastCheckedAtRef.current = null;
 		activeReadRef.current = null;
 		await loadReminders({ silent: true });
@@ -249,6 +274,8 @@ export function useReminderSync({
 		setIndexingProgress(null);
 		setLastUpdatedAt(null);
 		etagRef.current = undefined;
+		persistedEtagRef.current = undefined;
+		deltaBaseRef.current = undefined;
 		lastCheckedAtRef.current = null;
 	}, [publishSnapshot]);
 
