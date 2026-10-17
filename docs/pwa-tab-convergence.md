@@ -2,7 +2,7 @@
 
 Open tabs with the same server origin, authenticated session and exact reminders folder receive confirmed creations, edits, completions, deletions and reorders. Web Locks serialize pending commands. The sending tab publishes the confirmed result before removing its durable command, so peers replace their optimistic state with that result even while an earlier list request is delayed.
 
-Results carry their previous reminder revision or project order. A delayed confirmation cannot overwrite a newer confirmed base. Peers invalidate older reads and request a current list after confirmation; observing an external command removal also triggers a fresh read if the confirmation event was missed. Pending edits and editor drafts retain their existing recovery behavior.
+Results carry their previous reminder revision or project order. A delayed confirmation cannot overwrite a newer confirmed base. Peers invalidate older reads and request a current list after confirmation; observing an external command removal also triggers a fresh read if the confirmation event was missed. A hidden peer applies the confirmed result immediately but defers that read until it is shown, so one save does not download the list in every background tab. Pending edits and editor drafts retain their existing recovery behavior.
 
 The confirmation uses a transient local-storage entry scoped by a session-token hash and folder. It is removed immediately after publication, and explicit sign-out clears its private namespace. It introduces no external service or server endpoint. If browser storage fails during publication, the exact pending command and operation ID remain available for a safe receipt retry.
 

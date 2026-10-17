@@ -27,7 +27,18 @@ export function subscribeReminderOutboxEvents(options: {
 	let subscribed = true;
 	const isCurrent = () => subscribed && options.isCurrent();
 	const resume = () => { if (isCurrent()) options.resume(); };
-	const visible = () => { if (page.visibilityState === 'visible') resume(); };
+	// A hidden peer already applied the confirmed result. It defers the list read
+	// until it is shown, so one save does not download the list in every tab.
+	let refreshWhenVisible = false;
+	const refreshList = () => {
+		if (page.visibilityState === 'hidden') { refreshWhenVisible = true; return; }
+		void options.current().loadReminders({ silent: true });
+	};
+	const visible = () => {
+		if (page.visibilityState !== 'visible') return;
+		if (refreshWhenVisible && isCurrent()) { refreshWhenVisible = false; void options.current().loadReminders({ silent: true }); }
+		resume();
+	};
 	const storageChanged = (event: StorageEvent) => {
 		if (!isCurrent()) return;
 		if (event.key === settlement.key && event.newValue) {
@@ -40,7 +51,7 @@ export function subscribeReminderOutboxEvents(options: {
 					const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(snapshot.reminders, snapshot.projects, confirmed) : null;
 					if (next) await current.commitReminderState(next.reminders, next.projects);
 				} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
-				finally { finish(); if (isCurrent()) void options.current().loadReminders({ silent: true }); }
+				finally { finish(); if (isCurrent()) refreshList(); }
 			})();
 			return;
 		}
@@ -50,7 +61,7 @@ export function subscribeReminderOutboxEvents(options: {
 			if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
 				const finish = options.current().beginLocalMutation();
 				finish();
-				void options.current().loadReminders({ silent: true });
+				refreshList();
 			}
 			options.setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain();
 		} catch (error) { options.current().showToast('error', error instanceof Error ? error.message : String(error)); }

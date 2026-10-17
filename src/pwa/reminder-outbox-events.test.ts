@@ -75,3 +75,18 @@ it('detaches wakeups and storage listeners as a single subscription', () => {
 	expect(h.resume).toHaveBeenCalledTimes(2);
 	expect(h.commitReminderState).not.toHaveBeenCalled();
 });
+
+it('applies a peer confirmation while hidden and reads the list once it is shown', async () => {
+	const h = harness();
+	h.page.visibilityState = 'hidden';
+	h.storage('settled', 'receipt');
+	h.storage('pending', null, 'command');
+	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledTimes(2));
+	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox']);
+	expect(h.loadReminders).not.toHaveBeenCalled();
+	h.page.visibilityState = 'visible';
+	h.page.dispatchEvent(new Event('visibilitychange'));
+	expect(h.loadReminders).toHaveBeenCalledExactlyOnceWith({ silent: true });
+	h.page.dispatchEvent(new Event('visibilitychange'));
+	expect(h.loadReminders).toHaveBeenCalledOnce();
+});
