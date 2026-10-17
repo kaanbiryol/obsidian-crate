@@ -144,6 +144,28 @@ describe('Cloudflare runtime integration', () => {
 		expect(result.reminders).toHaveLength(25);
 	});
 
+	it('answers idle reminder polls from the vault change token and unrelated edits from the folder revision', async () => {
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/Inbox.md', '- [ ] Task <!-- crate-id:task -->', null);
+		const list = (etag?: string) => handleListReminders(new Request('https://worker.test/reminders/list?folderPath=Reminders',
+			{ headers: etag ? { 'If-None-Match': etag } : {} }), runtimeEnv);
+		const first = await list();
+		const etag = first.headers.get('ETag')!;
+		const idle = await list(etag);
+		expect(idle.status).toBe(304);
+		expect(idle.headers.get('ETag')).toBe(etag);
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Notes/Other.md', 'Unrelated', null);
+		const unrelated = await list(etag);
+		expect(unrelated.status).toBe(304);
+		const refreshed = unrelated.headers.get('ETag')!;
+		expect(refreshed).not.toBe(etag);
+		expect(refreshed.split('.')[1]).toBe(etag.split('.')[1]);
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/Next.md', '- [ ] Next <!-- crate-id:next -->', null);
+		expect((await list(refreshed)).status).toBe(200);
+		const otherFolder = await handleListReminders(new Request('https://worker.test/reminders/list?folderPath=Notes',
+			{ headers: { 'If-None-Match': refreshed } }), runtimeEnv);
+		expect(otherFolder.status).toBe(200);
+	});
+
 	it('keeps reminder folder matching case-sensitive', async () => {
 		await Promise.all([
 			writeCommittedMarkdownFile(

@@ -109,7 +109,7 @@ it('lists reminders from markdown files in the configured folder', async () => {
 			workspace.env as never,
 		);
 		const etag = firstResponse.headers.get('ETag');
-		expect(etag).toMatch(/^"[a-f0-9]{64}"$/);
+		expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}"$/);
 		expect(bucketGet).toHaveBeenCalledTimes(2);
 
 		const secondResponse = await handleListReminders(

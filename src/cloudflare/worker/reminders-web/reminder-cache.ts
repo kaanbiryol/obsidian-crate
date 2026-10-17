@@ -24,8 +24,9 @@ export async function loadIncrementalReminderIndex(
 	metadata: StoredMarkdownFileMetadata[],
 ): Promise<IncrementalReminderIndexResult> {
 	let cachedFiles = new Map<string, ReminderFileCacheEntry>();
+	let cachedPaths: string[] = [];
 	try {
-		cachedFiles = await loadReminderFileCache(env.DB, folderPath);
+		({ entries: cachedFiles, rowPaths: cachedPaths } = await loadReminderFileCache(env.DB, folderPath));
 	} catch {
 		// A missing cache table or transient D1 error falls back to reading R2.
 	}
@@ -51,7 +52,8 @@ export async function loadIncrementalReminderIndex(
 	try {
 		const writeResult = await writeReminderFileCacheEntries(env.DB, folderPath, freshEntries);
 		persistedFileCount = writeResult.persistedPaths.length;
-		await pruneReminderFileCache(env.DB, folderPath);
+		const current = new Set(metadata.map(file => file.path));
+		await pruneReminderFileCache(env.DB, folderPath, cachedPaths.filter(path => !current.has(path)));
 	} catch {
 		if (staleMetadata.length > freshEntries.length) {
 			throw new Error('Reminder index cache could not be warmed');

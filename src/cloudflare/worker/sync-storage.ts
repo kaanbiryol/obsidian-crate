@@ -129,8 +129,9 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 }
 
 // Separate indexed endpoints avoid scanning the entire retained changelog.
-export const CHANGELOG_BOUNDS_SQL = `SELECT MAX(COALESCE((SELECT MAX(seq) FROM changelog), 0),
-  COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS lastSeq,
+export const LAST_SEQ_SQL = `MAX(COALESCE((SELECT MAX(seq) FROM changelog), 0),
+  COALESCE((SELECT snapshot_seq FROM initial_import), 0))`;
+export const CHANGELOG_BOUNDS_SQL = `SELECT ${LAST_SEQ_SQL} AS lastSeq,
   (SELECT MIN(seq) FROM changelog) AS minSeq,
   COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq`;
 

@@ -8,6 +8,8 @@ import {
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../reminder-cache';
 import { toReminderPayload } from '../scan';
+import { LAST_SEQ_SQL } from '../../sync-storage';
+import { SYNC_RESET_GENERATION_KEY } from '../../sync-reset-generation';
 
 export async function handleListReminders(request: Request, env: Env): Promise<Response> {
 	const folderPath = parseFolderPath(new URL(request.url).searchParams.get('folderPath'));
@@ -15,25 +17,28 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		return corsResponse({ error: 'folderPath required' }, 400);
 	}
 
-	const metadata = await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath);
-	const revision = await sha256Hex([
-		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
-		...metadata.map((file) => `${file.path}\0${file.hash}\0${file.size}`),
-	].join('\n'));
-	const etag = `"${revision}"`;
+	// ETags pair a vault change token with the folder's content revision. An
+	// unchanged token proves no file changed anywhere, so idle polls skip the
+	// folder scan; otherwise an unchanged folder still answers 304.
 	const requestEtags = request.headers.get('If-None-Match')
 		?.split(',')
 		.map(value => value.trim()) ?? [];
-	if (requestEtags.includes('*') || requestEtags.includes(etag)) {
-		return new Response(null, {
-			status: 304,
-			headers: {
-				...corsHeaders(),
-				'Cache-Control': 'private, no-cache',
-				ETag: etag,
-			},
-		});
-	}
+	const notModified = (etag: string) => new Response(null, {
+		status: 304,
+		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag },
+	});
+	const changeToken = await vaultChangeToken(env.DB, folderPath);
+	const cached = requestEtags.map(parseListEtag);
+	const unchanged = requestEtags.find((_, index) => cached[index]?.changeToken === changeToken);
+	if (unchanged) return notModified(unchanged);
+
+	const metadata = await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath);
+	const revision = (await sha256Hex([
+		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
+		...metadata.map((file) => `${file.path}\0${file.hash}\0${file.size}`),
+	].join('\n'))).slice(0, 32);
+	const etag = `"${changeToken}.${revision}"`;
+	if (requestEtags.includes('*') || cached.some(value => value?.revision === revision)) return notModified(etag);
 
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata);
 	if (!workspace.ready) {
@@ -54,4 +59,19 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		'Cache-Control': 'private, no-cache',
 		...(workspace.issues.length === 0 ? { ETag: etag } : {}),
 	});
+}
+
+function parseListEtag(value: string): { changeToken: string; revision: string } | null {
+	const match = /^"([a-f0-9]{32})\.([a-f0-9]{32})"$/.exec(value);
+	return match ? { changeToken: match[1]!, revision: match[2]! } : null;
+}
+
+/** Every file write advances the changelog, the initial import generation or the
+ * reset generation, so an equal token proves the folder's files are unchanged. */
+async function vaultChangeToken(db: D1Database, folderPath: string): Promise<string> {
+	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
+		COALESCE((SELECT generation FROM initial_import WHERE id = 1), 0) AS importGeneration,
+		COALESCE((SELECT value FROM maintenance_state WHERE key = ?), '') AS resetGeneration`)
+		.bind(SYNC_RESET_GENERATION_KEY).first<{ seq: number; importGeneration: number; resetGeneration: string }>();
+	return (await sha256Hex(`parser:${REMINDER_CACHE_PARSER_VERSION}\nfolder:${folderPath}\nreset:${row?.resetGeneration}\nimport:${row?.importGeneration}\nseq:${row?.seq}`)).slice(0, 32);
 }

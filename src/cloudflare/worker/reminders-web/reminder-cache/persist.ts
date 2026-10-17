@@ -94,10 +94,11 @@ export async function writeReminderFileCacheEntries(
 	};
 }
 
-export async function pruneReminderFileCache(db: D1Database, folderPath: string): Promise<void> {
-  const rows = await db.prepare('SELECT file_path FROM reminder_file_cache WHERE folder_path = ?').bind(folderPath).all<{ file_path: string }>();
-  for (let offset = 0; offset < rows.results.length; offset += 100) {
-    const json = JSON.stringify(rows.results.slice(offset, offset + 100).map(row => ({ path: row.file_path, portable: portablePathKey(row.file_path) })));
+/** Deletes cached paths absent from the current folder listing. The statement
+ * rechecks `files`, so a note recreated meanwhile keeps its cache row. */
+export async function pruneReminderFileCache(db: D1Database, folderPath: string, stalePaths: string[]): Promise<void> {
+  for (let offset = 0; offset < stalePaths.length; offset += 500) {
+    const json = JSON.stringify(stalePaths.slice(offset, offset + 500).map(path => ({ path, portable: portablePathKey(path) })));
     await db.prepare(`DELETE FROM reminder_file_cache WHERE folder_path = ? AND file_path IN (
       SELECT json_extract(i.value, '$.path') FROM json_each(?) i WHERE NOT EXISTS (
         SELECT 1 FROM files WHERE portable_path = json_extract(i.value, '$.portable') AND path = json_extract(i.value, '$.path')))`)
