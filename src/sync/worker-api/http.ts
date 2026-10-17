@@ -66,6 +66,14 @@ export class HttpError extends Error {
 	}
 }
 
+/** The request did not reach the server or no response arrived in time. */
+export class SyncTransportError extends Error {
+	constructor(message: string, options?: { cause?: unknown }) {
+		super(message, options);
+		this.name = 'SyncTransportError';
+	}
+}
+
 export function getHeader(headers: Record<string, string>, headerName: string): string | null {
 	const normalizedHeaderName = headerName.toLowerCase();
 	for (const [key, value] of Object.entries(headers)) {
@@ -292,7 +300,7 @@ export class WorkerApiHttpClient {
 
 			externalSignal?.addEventListener('abort', onAbort, { once: true });
 			timeoutId = window.setTimeout(
-				() => rejectOnce(new Error(`Request timed out after ${timeout}ms`)),
+				() => rejectOnce(new SyncTransportError(`Request timed out after ${timeout}ms`)),
 				timeout,
 			);
 			void this.transport({
@@ -313,7 +321,7 @@ export class WorkerApiHttpClient {
 					rejectOnce(createAbortError('Sync request aborted'));
 					return;
 				}
-				rejectOnce(error);
+				rejectOnce(isAbortError(error) ? error : new SyncTransportError(errorMessage(error), { cause: error }));
 			});
 		});
 	}

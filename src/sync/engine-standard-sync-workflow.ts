@@ -44,8 +44,11 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	throwIfDestroyed(): void;
 	createFullSyncPlan(
 		remoteFiles: Record<string, FileEntry>,
-		concurrency: number
+		concurrency: number,
+		options?: { reuseUnchangedHashes?: boolean },
 	): Promise<FullSyncPlan>;
+	/** True when this device has synced before and holds a changelog cursor. */
+	hasSyncCursor?(): boolean;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -69,6 +72,7 @@ export async function runSyncWorkflow(
 	context.updateState({ status: 'syncing' });
 	logger.info('Sync started');
 	let result = createEmptySyncResult();
+	let recovering = false;
 
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
@@ -82,6 +86,7 @@ export async function runSyncWorkflow(
     }
 		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
+		recovering = context.hasSyncCursor?.() ?? false;
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
 			result = incrementalResult;
@@ -104,7 +109,7 @@ export async function runSyncWorkflow(
 		context.updateState({ work: { phase: 'server' } });
 		const remoteManifest = await context.getManifest();
 		context.updateState({ work: { phase: 'scanning' } });
-		const plan = await context.createFullSyncPlan(remoteManifest.files, PREPARE_CONCURRENCY);
+		const plan = await context.createFullSyncPlan(remoteManifest.files, PREPARE_CONCURRENCY, { reuseUnchangedHashes: recovering });
 
 		const {
 			localFiles,

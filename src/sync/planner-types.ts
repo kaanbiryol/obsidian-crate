@@ -38,6 +38,8 @@ interface PlannerApi {
 export interface LocalChangeScan {
   changes: Array<{ path: string; hash: string }>;
   discoveredPaths: ReadonlySet<string>;
+  /** Local files left out of sync, such as those over the size limit. */
+  skippedPaths?: string[];
 }
 
 export interface LocalDiffPlannerContext {

@@ -21,6 +21,16 @@ export class SyncIssueError extends Error {
 	constructor(message: string, readonly issues: SyncIssue[]) { super(message); }
 }
 
+export const OVERSIZED_LOCAL_FILE_MESSAGE = 'Skipped local file larger than 25MB; this file is not synced';
+
+/** A file sync deliberately leaves out. It is reported as an issue, but it is not a
+ * failure: it must not block the sync cursor, the queue or a completed sync. */
+export class SkippedFileError extends Error {
+	constructor(readonly path: string, message = OVERSIZED_LOCAL_FILE_MESSAGE) { super(message); }
+}
+
+export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE });
+
 export function normalizeSyncIssues(value: unknown, limit = 50): SyncIssue[] {
 	if (!Array.isArray(value)) return [];
 	return value.slice(0, limit).flatMap((issue): SyncIssue[] => {
@@ -44,6 +54,10 @@ export function syncErrorIssues(error: unknown, path?: string): SyncIssue[] {
 
 /** Keep the legacy text log and explicit file context together at the failure site. */
 export function recordSyncError(result: Pick<SyncResult, 'errors' | 'issues'>, error: unknown, path?: string): void {
+	if (error instanceof SkippedFileError) {
+		(result.issues ??= []).push({ path: path ?? error.path, message: error.message });
+		return;
+	}
 	const issues = syncErrorIssues(error, path);
 	result.errors.push(...issues.map(formatSyncIssue));
 	(result.issues ??= []).push(...issues);

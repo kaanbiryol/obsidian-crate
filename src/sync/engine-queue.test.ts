@@ -1,6 +1,7 @@
 import type { BatchUploadFile } from '../protocol/sync-types';
 import { base64ToArrayBuffer } from './encoding';
 import { pendingChangeKey } from './pending-change';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from './runtime-test-harness';
 import {
@@ -54,6 +55,21 @@ describe('SyncEngine event queue behavior', () => {
 		const pendingPaths = harness.engine.getPendingPaths();
 		expect(pendingPaths.includes(pendingChangeKey('delete', '.trash/note.md'))).toBe(false);
 		expect(pendingPaths.includes('notes/note.md')).toBe(true);
+	});
+
+	it('settles an oversized file without failing the rest of its queued batch', async () => {
+		const big = { path: 'notes/big.bin', extension: 'bin', stat: { size: MAX_FILE_SIZE_BYTES + 1, mtime: 1700000000000 } };
+		const small = { path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } };
+		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => path === big.path ? big : small);
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+		harness.engine.onFileChange({ path: big.path } as never);
+		harness.engine.onFileChange({ path: small.path } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getState()).toMatchObject({ status: 'idle' });
 	});
 
 	it('emits idle state after flush with no pending paths left', async () => {

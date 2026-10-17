@@ -1,4 +1,4 @@
-import { HttpError } from './api';
+import { HttpError, SyncTransportError } from './api';
 import { createLogger } from '../plugin/logger';
 import { createAbortError } from './abort';
 
@@ -9,6 +9,12 @@ const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export function isRetryableSyncError(error: unknown): boolean {
 	return !(error instanceof HttpError) || RETRYABLE_HTTP_STATUSES.has(error.status);
+}
+
+/** Only transport failures and retryable server statuses; local or protocol
+ * errors may need a full reconciliation. */
+export function isTransientSyncFailure(error: unknown): boolean {
+	return error instanceof SyncTransportError || (error instanceof HttpError && RETRYABLE_HTTP_STATUSES.has(error.status));
 }
 
 export async function runConcurrentTasks<T>(

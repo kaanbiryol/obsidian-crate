@@ -1,5 +1,5 @@
 import { computeHash } from "./hasher";
-import { withSyncFileContext } from './issues';
+import { skippedFileIssue, withSyncFileContext } from './issues';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "./file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
@@ -8,10 +8,14 @@ import type { FileEntry } from '../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
 import { prepareInitialConfigPull } from './initial-config-pull';
 
+/** `reuseUnchangedHashes` trusts the baseline hash when size and mtime match,
+ * as incremental sync does. Only automatic recovery from an expired or failed
+ * incremental cursor uses it; first and manual full syncs read every file. */
 export async function createFullSyncPlan(
   context: FullSyncPlannerContext,
   remoteFiles: Record<string, FileEntry>,
   prepareConcurrency: number,
+  options: { reuseUnchangedHashes?: boolean } = {},
 ): Promise<FullSyncPlan> {
   const localFiles = createPathRecord<FileEntry>();
   const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
@@ -23,6 +27,10 @@ export async function createFullSyncPlan(
   const hashTasks = eligible
     .map((file) => () => withSyncFileContext(file.path, async () => {
       context.throwIfDestroyed();
+      const baseline = options.reuseUnchangedHashes ? context.localManifest.getEntry(file.path) : undefined;
+      if (baseline && baseline.size === file.size && new Date(baseline.modified).getTime() === file.mtime) {
+        return { path: file.path, hash: baseline.hash, size: file.size, mtime: file.mtime };
+      }
       const content = await context.vault.adapter.readBinary(file.path);
       context.throwIfDestroyed();
       const hash = await computeHash(content);
@@ -61,8 +69,9 @@ export async function createFullSyncPlan(
     if (local.hash === remoteEntry?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteEntry.revision });
   }
 
-  const issues = [...largeLocalPaths].map(path => ({ path, message: 'Skipped local file larger than 25MB' }));
-  const errors: string[] = issues.map(issue => `${issue.path}: ${issue.message}`);
+  // Oversized local files are reported, not failures, so they never hold back the cursor.
+  const issues = [...largeLocalPaths].map(skippedFileIssue);
+  const errors: string[] = [];
   for (const [path, diff] of [...diffMap.entries()]) {
     const remoteEntry = getPathEntry(remoteFiles, path);
     if (context.shouldIgnore(path)) {

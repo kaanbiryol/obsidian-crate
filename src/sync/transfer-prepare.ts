@@ -1,5 +1,5 @@
 import { computeHash } from "./hasher";
-import { withSyncFileContext } from './issues';
+import { SkippedFileError, withSyncFileContext } from './issues';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "./file-discovery";
 import { isVaultTFileLike } from './planner-helpers';
 import type { VaultFile } from "./file-discovery";
@@ -24,7 +24,7 @@ export async function prepareUploadFromVaultFile(
   return withSyncFileContext(file.path, async () => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
       logger.warn("Skipping large file:", file.path);
-      throw new Error("Skipped local file larger than 25MB; this file is not synced");
+      throw new SkippedFileError(file.path);
     }
 
     let source = file;
@@ -32,7 +32,7 @@ export async function prepareUploadFromVaultFile(
     for (let attempt = 0; attempt < 2; attempt++) {
       if (content.byteLength > MAX_FILE_SIZE_BYTES) {
         logger.warn("Skipping large file:", file.path);
-        throw new Error("Skipped local file larger than 25MB; this file is not synced");
+        throw new SkippedFileError(file.path);
       }
 
       const stat = await context.vault.adapter.stat(file.path);

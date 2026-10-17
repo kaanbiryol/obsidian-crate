@@ -18,7 +18,9 @@ export async function findStartupPendingPaths(context: {
 	const changes = await context.runConcurrent(files.map(file => async () => {
 		context.throwIfDestroyed();
 		const entry = getPathEntry(context.baseline, file.path);
-		if (!entry || file.size > MAX_FILE_SIZE_BYTES) return pendingChangeKey('upload', file.path);
+		// Oversized files are skipped by sync, so they are never pending.
+		if (file.size > MAX_FILE_SIZE_BYTES) return null;
+		if (!entry) return pendingChangeKey('upload', file.path);
 		const hash = await computeHash(await context.vault.adapter.readBinary(file.path));
 		return hash === entry.hash ? null : pendingChangeKey('upload', file.path);
 	}), concurrency);

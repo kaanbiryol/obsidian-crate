@@ -1,7 +1,8 @@
 import { pendingChangeKey } from './pending-change';
-import { recordSyncError } from './issues';
+import { recordSyncError, skippedFileIssue } from './issues';
 import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
+import { isTransientSyncFailure } from "./engine-utils";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
@@ -39,7 +40,8 @@ export async function runIncrementalSync(
 
     context.reportWork?.('scanning');
     const unchangedPaths: string[] = [];
-    const { changes: localChanges, discoveredPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
+    const { changes: localChanges, discoveredPaths, skippedPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
+    if (skippedPaths?.length) (result.issues ??= []).push(...skippedPaths.map(skippedFileIssue));
     const localDeletes = await context.getLocalDeletes(discoveredPaths);
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
@@ -182,6 +184,14 @@ export async function runIncrementalSync(
       return cancelSyncResult(result);
     }
 
+    // A dropped connection or busy server is retried incrementally; falling back
+    // would re-read and hash the whole vault for a transient failure.
+    if (isTransientSyncFailure(error)) {
+      logger.warn("Incremental sync failed with a transient error:", errorMessage(error));
+      recordSyncError(result, error);
+      finalizeSyncResult(result);
+      return result;
+    }
     logger.warn("Incremental sync failed, falling back to full sync:", errorMessage(error));
     return null;
   }

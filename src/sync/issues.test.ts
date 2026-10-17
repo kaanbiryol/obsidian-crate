@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest';
 import { HttpError } from './api';
 import { createAbortError } from './abort';
-import { getSyncIssues, normalizeSyncIssues, recordSyncError, syncErrorIssues, withSyncFileContext } from './issues';
+import { getSyncIssues, normalizeSyncIssues, OVERSIZED_LOCAL_FILE_MESSAGE, recordSyncError, SkippedFileError, syncErrorIssues, withSyncFileContext } from './issues';
+import type { SyncIssue } from './types';
 import { createEmptySyncResult, mergeSyncResults } from './sync-result';
 import { recordSyncHistory } from './runtime-history';
 import { normalizeCrateSettings } from '../plugin/settings';
@@ -39,4 +40,11 @@ it('bounds saved and remote issues and removes unsafe file paths without losing 
     { message: 'unreadable', scope: 'reminders' }, { path: 'Notes/a.md', message: 'x'.repeat(4000) },
   ]);
   expect(normalizeSyncIssues(Array.from({ length: 60 }, () => ({ message: 'error' })))).toHaveLength(50);
+});
+
+it('reports skipped files as issues without failing the result', () => {
+	const result = { errors: [] as string[], issues: undefined as SyncIssue[] | undefined };
+	recordSyncError(result, new SkippedFileError('big.bin'));
+	expect(result.errors).toEqual([]);
+	expect(result.issues).toEqual([{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE }]);
 });

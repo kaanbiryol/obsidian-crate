@@ -46,7 +46,7 @@ import type { VaultKeyBundle } from '../encryption/key-bundle';
 import { createReminderProjection } from '../encryption/reminder-projection';
 import { readServerEncryption } from './encryption-conversion';
 
-export { HttpError } from './worker-api/http';
+export { HttpError, SyncTransportError } from './worker-api/http';
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }

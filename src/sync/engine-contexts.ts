@@ -215,8 +215,9 @@ export class SyncEngineContexts {
 			incrementalSync: this.incrementalSync.bind(this),
 			isAbortError: dependencies.isAbortError,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
-			createFullSyncPlan: (remoteFiles: Record<string, FileEntry>, concurrency: number) =>
-				createFullSyncPlan(this.fullSyncPlanner(), remoteFiles, concurrency),
+			hasSyncCursor: () => dependencies.getSettings().lastSeq > 0,
+			createFullSyncPlan: (remoteFiles: Record<string, FileEntry>, concurrency: number, options?: { reuseUnchangedHashes?: boolean }) =>
+				createFullSyncPlan(this.fullSyncPlanner(), remoteFiles, concurrency, options),
 			processDiff: this.processDiff.bind(this),
 			prepareFullSyncUpload: (diff: UploadDiff) => prepareTransferUploadFromPath(this.transfer(), diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),

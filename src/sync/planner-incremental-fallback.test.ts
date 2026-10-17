@@ -3,6 +3,7 @@ import { computeHash } from './hasher';
 import type { PreparedUpload } from './types';
 import { runIncrementalSync } from './planner';
 import { createSettings } from './planner-test-harness';
+import { HttpError, SyncTransportError } from './api';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -282,5 +283,97 @@ it('falls back to full sync when cursor is expired', async () => {
 
 		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
 		expect(result).toBeNull();
+	});
+
+	it('retries incrementally after SyncTransportError instead of falling back', async () => {
+		const context = {
+			settings: createSettings({ lastSeq: 2 }),
+			setLastSeq: vi.fn(),
+			fileManager: { trashFile: vi.fn(async () => {}) },
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => {
+					throw new SyncTransportError('Request timed out after 30000ms');
+				}),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+			},
+			localManifest: {
+				save: vi.fn(),
+				setEntry: vi.fn(),
+				removeEntry: vi.fn(),
+				getEntry: vi.fn(),
+				getAllPaths: vi.fn(() => []),
+				getManifest: vi.fn(() => ({ version: 1, files: {} })),
+			},
+			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		expect(result).toMatchObject({ success: false, outcome: 'failed' });
+		expect(result?.errors).toHaveLength(1);
+		expect(context.setLastSeq).not.toHaveBeenCalled();
+	});
+
+	it('retries incrementally after a retryable server status instead of falling back', async () => {
+		const context = {
+			settings: createSettings({ lastSeq: 2 }),
+			setLastSeq: vi.fn(),
+			fileManager: { trashFile: vi.fn(async () => {}) },
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => {
+					throw new HttpError('Service unavailable', 503);
+				}),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+			},
+			localManifest: {
+				save: vi.fn(),
+				setEntry: vi.fn(),
+				removeEntry: vi.fn(),
+				getEntry: vi.fn(),
+				getAllPaths: vi.fn(() => []),
+				getManifest: vi.fn(() => ({ version: 1, files: {} })),
+			},
+			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		expect(result).toMatchObject({ success: false, outcome: 'failed' });
+		expect(result?.errors).toHaveLength(1);
+		expect(context.setLastSeq).not.toHaveBeenCalled();
 	});
 });

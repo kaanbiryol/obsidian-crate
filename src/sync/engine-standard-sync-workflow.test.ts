@@ -78,6 +78,13 @@ function createContext(options: {
 }
 
 describe('runSyncWorkflow', () => {
+	it.each([[true, true], [false, false]])('reuses unchanged hashes in a fallback full sync only with a cursor (%s)', async (cursor, reuse) => {
+		const { context, spies } = createContext();
+		context.hasSyncCursor = () => cursor;
+		await runSyncWorkflow(context);
+		expect(spies.createFullSyncPlan).toHaveBeenCalledWith({}, expect.any(Number), { reuseUnchangedHashes: reuse });
+	});
+
 	it('retains acknowledged uploads and prior issues when a later transfer is cancelled', async () => {
 		const { context, spies } = createContext();
 		context.isAbortError = isAbortError;

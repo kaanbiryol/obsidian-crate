@@ -38,9 +38,9 @@ export async function getLocalChanges(
   await context.verifyContent?.(allFiles);
   context.throwIfDestroyed();
 
-  for (const file of allFiles) {
-    if (file.size > MAX_FILE_SIZE_BYTES) changes.push({ path: file.path, hash: context.localManifest.getEntry(file.path)?.hash ?? "" });
-  }
+  // Oversized files stay discovered (never local deletes) but are not changes:
+  // each would fail every sync and hold back the changelog cursor.
+  const skippedPaths = allFiles.filter(file => file.size > MAX_FILE_SIZE_BYTES).map(file => file.path);
 
   const candidates = allFiles.filter((file) => {
     if (file.size > MAX_FILE_SIZE_BYTES) return false;
@@ -83,5 +83,5 @@ export async function getLocalChanges(
     }
   }
 
-  return { changes, discoveredPaths: new Set(allFiles.map((file) => file.path)) };
+  return { changes, discoveredPaths: new Set(allFiles.map((file) => file.path)), skippedPaths };
 }

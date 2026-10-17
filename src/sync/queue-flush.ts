@@ -11,7 +11,8 @@ import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure'
 import { HttpError } from './api';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import type { SyncResult } from './types';
-import { recordSyncError, syncErrorIssues, formatSyncIssue, withSyncFileContext } from './issues';
+import { recordSyncError, syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from './issues';
+import type { SyncIssue } from './types';
 
 export type { QueueFlushContext } from './queue-flush-types';
 
@@ -71,6 +72,7 @@ export async function processPendingChanges(
 	const deletedPaths = changes.filter(change => change.kind === 'delete').map(change => change.path);
 	const completedQueueKeys = new Set<string>();
 	const reconciliationPaths = new Set<string>();
+	const skipped: SyncIssue[] = [];
 	let hasTerminalFailure = false;
 
 	logger.info(`Processing ${paths.length} pending changes`);
@@ -86,7 +88,15 @@ export async function processPendingChanges(
 		});
 		const chunks = pipelineUploadChunks(uploadPaths, async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
-			return withSyncFileContext(path, () => context.prepareUploadFromPath(path));
+			try { return await withSyncFileContext(path, () => context.prepareUploadFromPath(path)); }
+			catch (error) {
+				if (!(error instanceof SkippedFileError)) throw error;
+				// Settle a skipped file rather than failing its batch; a later edit
+				// queues it again and is reported the same way.
+				completedQueueKeys.add(pendingChangeKey('upload', path));
+				skipped.push({ path, message: error.message });
+				return null;
+			}
 		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		let uploadsProcessed = 0;
@@ -125,7 +135,7 @@ export async function processPendingChanges(
 		batch.settle(completedQueueKeys);
 		if (failures.length > 0) {
 			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
-			const issues = failures.map(failure => ({ path: failure.path, message: failure.error }));
+			const issues = [...failures.map(failure => ({ path: failure.path, message: failure.error })), ...skipped];
 			batch.release();
 			context.updateState({
 				status: 'error',
@@ -142,7 +152,7 @@ export async function processPendingChanges(
 		}
 
 		batch.release();
-		const didWork = uploads.length > 0 || deletes.length > 0;
+		const didWork = uploads.length > 0 || deletes.length > 0 || skipped.length > 0;
 		await context.finishInitialSetup();
 		context.updateState({
 			status: 'idle',
@@ -152,7 +162,7 @@ export async function processPendingChanges(
 		if (didWork) {
 			await reportFlushResult(
 				context,
-				buildQueueSyncResult(uploads, deletes, completedQueueKeys),
+				{ ...buildQueueSyncResult(uploads, deletes, completedQueueKeys), ...(skipped.length ? { issues: skipped } : {}) },
 			);
 		}
 	} catch (error) {

@@ -47,7 +47,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 5. Execute operations, preparing and uploading local files in bounded chunks
 6. Update local manifest and `lastSeq`
 
-Returns `null` to signal fallback to full sync (on error or cursor expiry).
+Returns `null` to signal fallback to full sync (on cursor expiry or a non-transient error). Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault.
 
 Entry point: `planner-incremental.ts:runIncrementalSync()` (exported through `planner.ts`).
 The coordinator retains phase ordering, progress, manifest saves and cursor
@@ -62,7 +62,7 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 
 1. Discover all local vault files
 2. Fetch the remote manifest in 2,000-file pages, then replay changes that landed after the first-page snapshot
-3. Compute hashes for local files (skip unchanged via manifest mtime/size)
+3. Compute hashes for local files. Automatic recovery from an expired or failed cursor reuses the baseline hash when size and mtime match; first and manual full syncs read every file
 4. 3-way diff using `reconciliation.ts:classifyPaths()`, which applies the same `classifyPath()` policy as incremental sync
 5. Execute uploads, downloads, conflicts, deletes
 
@@ -316,7 +316,7 @@ file. Unsupported checkpoints are rejected and preserved. Failed promotion keeps
 temporary checkpoint. A mutation revision ensures edits made during a save are
 included in a follow-up checkpoint before that save finishes.
 
-**Optimization:** during full sync, files whose size and mtime match the manifest entry skip re-hashing.
+**Optimization:** recovery full syncs skip re-hashing files whose size and mtime match the manifest entry. Manual and first syncs never trust timestamps.
 
 Implementation: `manifest.ts:LocalManifest`
 
@@ -331,7 +331,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Startup event recovery:** event capture resumes before a post-startup metadata probe; if the startup sync missed a local edit, one recovery sync runs without opening another event blind window
 - **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed
 - **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
-- **Large files:** files > 25 MB are skipped with error message, not crashed
+- **Large files:** local files > 25 MB are reported as skipped issues, not failures. They never become pending changes or local deletes, settle in the queue without failing their batch, and do not hold back the changelog cursor. A remote change to such a path still fails until the local file is reduced
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
 

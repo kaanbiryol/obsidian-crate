@@ -98,7 +98,9 @@ describe('createFullSyncPlan', () => {
 			{ path: 'notes/conflict.md', action: 'conflict' },
 			{ path: 'notes/deleted.md', action: 'delete', remoteHash: 'same-hash' },
 		]);
-		expect(plan.errors).toContain('notes/local-big.bin: Skipped local file larger than 25MB');
+		// A local file over the limit is reported but does not fail the sync.
+		expect(plan.errors).not.toContain(expect.stringContaining('notes/local-big.bin'));
+		expect(plan.issues).toContainEqual({ path: 'notes/local-big.bin', message: 'Skipped local file larger than 25MB; this file is not synced' });
 		expect(plan.errors).toContain('notes/remote-big.md: Skipped remote file larger than 25MB');
 		expect(removeEntry).toHaveBeenCalledWith('notes/orphan.md');
 	});
@@ -149,5 +151,54 @@ describe('createFullSyncPlan', () => {
 		expect(readBinary).toHaveBeenCalledTimes(4);
 		expect(readBinary).toHaveBeenCalledWith('notes/unchanged.md');
 		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(await computeHash(newContent));
+	});
+
+	it('reuses baseline hashes for matching metadata only during automatic recovery', async () => {
+		const unchangedContent = new TextEncoder().encode('unchanged').buffer;
+		const unchangedHash = await computeHash(unchangedContent);
+		const newContent = new TextEncoder().encode('new-file').buffer;
+
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
+			{ path: 'notes/unchanged.md', size: 9, mtime: 1000, extension: 'md' },
+			{ path: 'notes/new.md', size: 8, mtime: 2000, extension: 'md' },
+			{ path: 'notes/size-changed.md', size: 20, mtime: 1000, extension: 'md' },
+			{ path: 'notes/mtime-changed.md', size: 5, mtime: 3000, extension: 'md' },
+		]);
+		conflictMocks.classifyPaths.mockReturnValue([]);
+
+		const readBinary = vi.fn(async () => newContent);
+
+		const plan = await createFullSyncPlan(
+			{
+				vault: {
+					adapter: { readBinary },
+				} as never,
+				localManifest: {
+					getEntry: (path: string) => {
+						if (path === 'notes/unchanged.md') {
+							return { hash: unchangedHash, size: 9, modified: new Date(1000).toISOString() };
+						}
+						if (path === 'notes/size-changed.md') {
+							return { hash: 'old-hash', size: 10, modified: new Date(1000).toISOString() };
+						}
+						if (path === 'notes/mtime-changed.md') {
+							return { hash: 'old-hash', size: 5, modified: new Date(1000).toISOString() };
+						}
+						return undefined;
+					},
+					getManifest: () => ({ version: 1, files: {} }),
+					removeEntry: vi.fn(),
+				} as never,
+				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			},
+			{},
+			5,
+			{ reuseUnchangedHashes: true },
+		);
+
+		expect(readBinary).toHaveBeenCalledTimes(3);
+		expect(readBinary).not.toHaveBeenCalledWith('notes/unchanged.md');
+		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(unchangedHash);
 	});
 });
