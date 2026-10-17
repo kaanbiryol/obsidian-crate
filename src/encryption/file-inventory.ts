@@ -8,10 +8,14 @@ export interface EncryptedInventoryPage {
 	nextCursor: string | null;
 }
 
+/** Files per encrypted inventory page. Clients page the whole inventory after
+ * any vault change, so pages are large. */
+export const ENCRYPTED_INVENTORY_PAGE = 1000;
+
 /** Both encrypted feature endpoints expose the same bounded wire page. */
 export function parseEncryptedInventoryPage(value: unknown, folder: string, generation: number): EncryptedInventoryPage {
 	if (!isRecord(value) || value.generation !== generation || typeof value.sequence !== 'number' || !Number.isSafeInteger(value.sequence) || value.sequence < 0
-		|| !Array.isArray(value.files) || value.files.length > 100
+		|| !Array.isArray(value.files) || value.files.length > ENCRYPTED_INVENTORY_PAGE
 		|| !(value.nextCursor === null || typeof value.nextCursor === 'string' && value.nextCursor.length > 0 && value.nextCursor.length <= 4096)) {
 		throw new Error('Invalid encrypted file inventory');
 	}

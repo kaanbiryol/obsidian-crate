@@ -1,4 +1,6 @@
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../encryption/receipt-format';
+
+import { ENCRYPTED_INVENTORY_PAGE } from '../../encryption/file-inventory';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import { corsHeaders, corsResponse } from './cors';
 import { parseJsonObject, sanitizePath, isSha256Hex } from './utils';
@@ -38,11 +40,11 @@ export async function handleEncryptedReminders(request: Request, env: Env, path:
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
 		const sequence = await env.DB.prepare("SELECT MAX(COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'changelog'), 0), COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS seq").first<{ seq: number }>();
 		const rows = await env.DB.prepare(`SELECT path, hash, size, storage_key AS revision FROM files
-			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' AND path > ? ORDER BY path LIMIT 100`)
+			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' AND path > ? ORDER BY path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
 			.bind(...fileFolderArgs(folder), after).all<{ path: string; hash: string; size: number; revision: string }>();
 		const files = rows.results.filter(file => scopedPath(file.path, folder, state));
 		return corsResponse({ files, sequence: sequence?.seq ?? 0, generation: state.generation,
-			nextCursor: rows.results.length === 100 ? rows.results.at(-1)!.path : null });
+			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.path : null });
 	}
 	const filePath = scopedPath(params.get('path'), folder, state);
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);

@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
-import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryPage } from './file-inventory';
+import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE } from './file-inventory';
 
 const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision' });
 const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], sequence: 1, generation: 1, nextCursor: null, ...patch });
 
 it.each([
 	null, [], {}, page({ sequence: -1 }), page({ sequence: 1.5 }), page({ generation: 2 }),
-	{ ...page(), files: null }, { ...page(), files: [null] }, page({ files: Array.from({ length: 101 }, () => file()) }),
+	{ ...page(), files: null }, { ...page(), files: [null] }, page({ files: Array.from({ length: ENCRYPTED_INVENTORY_PAGE + 1 }, () => file()) }),
 	...[false, 5, '', 'x'.repeat(4097)].map(nextCursor => ({ ...page(), nextCursor })),
 	...['Elsewhere/Article.md', 'Reading//Article.md', 'Reading/../Article.md', 'Reading/./Article.md', 'Reading/Bad\\Path.md'].map(path => page({ files: [file(path)] })),
 	...[-1, 1.5, '12'].map(size => ({ ...page(), files: [{ ...file(), size }] })),

@@ -18,6 +18,10 @@ import type { ApiFetch, ReminderSourceIssue } from './types';
 import { routeFolderPath } from './encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
 
+const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
+type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
+interface ScannedNote { file: RemoteFile; reminders: ReminderPayload[]; issue?: string }
+
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {
 		const value = await response.json().catch(() => ({})) as { error?: string; code?: string };
@@ -29,6 +33,9 @@ async function json<T>(response: Response): Promise<T> {
 export class EncryptedReminderApi {
 	private readonly current = capturePwaSession();
 	private cached = new Map<string, { file: RemoteFile; content: string; issue?: string }>();
+	// Parsed reminders per immutable revision. Unlike the bounded content cache,
+	// this keeps every current note, so a change re-downloads only changed notes.
+	private scanned = new Map<string, ScannedNote>();
 	constructor(private readonly keys: StoredReminderKeys, private readonly fetch: ApiFetch) {}
 	private get localFolder() { return this.keys.localFolderPath ?? this.keys.folderPath; }
 	private authority(path: string) {
@@ -66,7 +73,7 @@ export class EncryptedReminderApi {
 	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
 		const files: RemoteFile[] = [];
 		let cursor: string | undefined, sequence: number | undefined;
-		const acceptPage = createEncryptedInventoryProgress({ maxFiles: 20_000, maxPages: 1000 });
+		const acceptPage = createEncryptedInventoryProgress({ maxFiles: MAX_ENCRYPTED_REMINDER_FILES, maxPages: 1000 });
 		while (true) {
 			const page = first ?? await this.page(cursor);
 			first = undefined;
@@ -116,13 +123,18 @@ export class EncryptedReminderApi {
 				const nextCache = new Map(this.cached);
 				const reminders: Awaited<ReturnType<typeof reminderCommandPayload>>[] = [], issues: ReminderSourceIssue[] = [];
 				const projects = new Set<string>();
+				const nextScanned = new Map<string, ScannedNote>();
 				for (const file of inventory.files) {
 					projects.add(getProjectFromPath(file.path, this.keys.folderPath));
 					try {
-						const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), await this.read(file, nextCache), this.localFolder).reminders;
-						const issue = nextCache.get(file.revision)?.issue;
-						if (issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: issue });
-						for (const reminder of scanned) reminders.push(await reminderCommandPayload(reminder));
+						const known = this.scanned.get(file.revision);
+						const entry: ScannedNote = known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size ? known : await (async () => {
+							const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), await this.read(file, nextCache), this.localFolder).reminders;
+							return { file, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: nextCache.get(file.revision)?.issue };
+						})();
+						nextScanned.set(file.revision, entry);
+						if (entry.issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.issue });
+						reminders.push(...entry.reminders);
 					} catch (error) {
 						if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
 						issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: error instanceof Error ? error.message : 'This note could not be decrypted' });
@@ -134,6 +146,7 @@ export class EncryptedReminderApi {
 				for (const reminder of reminders) if (counts.get(reminder.id)! > 1) issues.push({ path: reminder.filePath, reason: 'Duplicate reminder identity. Repair this note in Obsidian.' });
 				this.assertCurrent();
 				this.cached = nextCache;
+				this.scanned = nextScanned;
 				return Response.json({ reminders: reminders.filter(reminder => counts.get(reminder.id) === 1), projects: [...projects].sort(), issues }, { headers: { ETag: etag } });
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;

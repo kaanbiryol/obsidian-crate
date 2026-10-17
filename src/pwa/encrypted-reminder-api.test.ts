@@ -157,3 +157,31 @@ it('preserves queued semantic revisions across a folder rename while committing 
   const opened = await openFile(new TextEncoder().encode(commits[0]!.files[0]!.content), livePath, authority);
   expect(new TextDecoder().decode(opened.content)).toContain('- [x] Queued task');
 });
+
+it('downloads only changed notes even when the folder exceeds the content cache', async () => {
+  const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const count = 1050;
+  const notes = await Promise.all(Array.from({ length: count }, async (_, index) => {
+    const path = `Reminders/N${String(index).padStart(4, '0')}.md`;
+    return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+  }));
+  const byRevision = new Map(notes.map(note => [note.sealed.hash, note.sealed.bytes]));
+  let sequence = 7;
+  const fetch = vi.fn(async (route: string) => {
+    if (route.startsWith('/reminders/encrypted-file?')) return new Response(byRevision.get(new URL(route, 'https://x').searchParams.get('revision')!));
+    const after = new URL(route, 'https://x').searchParams.get('after') ?? '';
+    const files = notes.filter(note => note.path > after).slice(0, 1000);
+    return Response.json({ ...page(sequence, files.length === 1000 ? files.at(-1)!.path : null),
+      files: files.map(note => ({ path: note.path, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
+  });
+  const api = new EncryptedReminderApi(keys, fetch);
+  expect((await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: unknown[] }).reminders).toHaveLength(count);
+  const path = notes[0]!.path;
+  notes[0] = { path, sealed: await sealFile({ path, content: new TextEncoder().encode('- [x] Task 0 <!-- crate-id:t0 -->\n'), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+  byRevision.set(notes[0].sealed.hash, notes[0].sealed.bytes);
+  sequence = 8;
+  fetch.mockClear();
+  const refreshed = await (await api.handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: Array<{ id: string; completed: boolean }> };
+  expect(refreshed.reminders.find(reminder => reminder.id === 't0')?.completed).toBe(true);
+  expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
+}, 60_000);
