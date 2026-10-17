@@ -10,6 +10,7 @@ import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { VaultFile } from './file-discovery';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
+import type { LocalChangeScan } from './planner-types';
 import {
 	createFullSyncPlan,
 	getLocalChanges as planLocalChanges,
@@ -65,8 +66,8 @@ export class SyncEngineContexts {
 		return prepareTransferUploadFromPath(this.transfer(), path);
 	}
 
-	private async getLocalDeletes(): Promise<string[]> {
-		return planLocalDeletes(this.localDiffPlanner(), PREPARE_CONCURRENCY);
+	private async getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]> {
+		return planLocalDeletes(this.localDiffPlanner(), discoveredPaths, PREPARE_CONCURRENCY);
 	}
 
 	async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
@@ -75,7 +76,7 @@ export class SyncEngineContexts {
 		});
 	}
 
-	private async getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]> {
+	private async getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan> {
 		return planLocalChanges({
 			...this.localDiffPlanner(),
 			pendingPaths: new Set(this.dependencies.getPendingPaths()),

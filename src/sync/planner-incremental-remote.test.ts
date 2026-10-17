@@ -88,7 +88,7 @@ describe('runIncrementalSync', () => {
 			},
 			localManifest,
 			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
-			getLocalChanges: vi.fn(async () => []),
+			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),

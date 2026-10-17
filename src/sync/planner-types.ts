@@ -35,6 +35,11 @@ interface PlannerApi {
   }>;
 }
 
+export interface LocalChangeScan {
+  changes: Array<{ path: string; hash: string }>;
+  discoveredPaths: ReadonlySet<string>;
+}
+
 export interface LocalDiffPlannerContext {
   throwIfDestroyed(): void;
   pendingPaths?: ReadonlySet<string>;
@@ -58,8 +63,8 @@ export interface IncrementalSyncPlannerContext {
   api: PlannerApi;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
-  getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]>;
-  getLocalDeletes(): Promise<string[]>;
+  getLocalChanges(onUnchanged?: (path: string) => void): Promise<LocalChangeScan>;
+  getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]>;
   parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
   processDiff(
     diff: FileDiff,

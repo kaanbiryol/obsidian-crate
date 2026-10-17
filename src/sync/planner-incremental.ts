@@ -39,8 +39,8 @@ export async function runIncrementalSync(
 
     context.reportWork?.('scanning');
     const unchangedPaths: string[] = [];
-    const localChanges = await context.getLocalChanges(path => unchangedPaths.push(path));
-    const localDeletes = await context.getLocalDeletes();
+    const { changes: localChanges, discoveredPaths } = await context.getLocalChanges(path => unchangedPaths.push(path));
+    const localDeletes = await context.getLocalDeletes(discoveredPaths);
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 

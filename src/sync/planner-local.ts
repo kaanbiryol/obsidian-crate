@@ -2,18 +2,21 @@ import { pendingChangeKey } from './pending-change';
 import { withSyncFileContext } from './issues';
 import { computeHash } from "./hasher";
 import { getAllVaultFiles } from "./file-discovery";
-import type { LocalDiffPlannerContext } from "./planner-types";
+import type { LocalChangeScan, LocalDiffPlannerContext } from "./planner-types";
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export async function getLocalDeletes(
   context: LocalDiffPlannerContext,
+  discoveredPaths: ReadonlySet<string>,
   prepareConcurrency: number,
 ): Promise<string[]> {
-  const knownPaths = context.localManifest
+  // Discovery is complete or throws, so only paths it missed can be deletes.
+  // Each candidate is still confirmed with exists() before it counts.
+  const candidates = context.localManifest
     .getAllPaths()
-    .filter((path) => !context.shouldIgnore(path));
+    .filter((path) => !context.shouldIgnore(path) && !discoveredPaths.has(path));
 
-  const tasks = knownPaths.map((path) => async () => {
+  const tasks = candidates.map((path) => async () => {
     context.throwIfDestroyed();
     const exists = await withSyncFileContext(path, () => context.vault.adapter.exists(path));
     context.throwIfDestroyed();
@@ -29,7 +32,7 @@ export async function getLocalChanges(
   context: LocalDiffPlannerContext,
   prepareConcurrency: number,
   onUnchanged?: (path: string) => void,
-): Promise<Array<{ path: string; hash: string }>> {
+): Promise<LocalChangeScan> {
   const changes: Array<{ path: string; hash: string }> = [];
   const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
   await context.verifyContent?.(allFiles);
@@ -80,5 +83,5 @@ export async function getLocalChanges(
     }
   }
 
-  return changes;
+  return { changes, discoveredPaths: new Set(allFiles.map((file) => file.path)) };
 }

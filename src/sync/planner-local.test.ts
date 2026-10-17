@@ -27,25 +27,26 @@ describe('planner local diff helpers', () => {
 		fileDiscoveryMocks.getAllVaultFiles.mockReset();
 	});
 
-	it('finds local deletes for non-ignored manifest paths', async () => {
+	it('confirms only non-ignored manifest paths missing from discovery', async () => {
 		const adapter = {
-			exists: vi.fn(async (path: string) => path !== 'notes/missing.md'),
+			exists: vi.fn(async (path: string) => path === 'notes/unindexed.md'),
 		};
 
 		const result = await getLocalDeletes(
 			{
 				vault: { adapter } as never,
 				localManifest: {
-					getAllPaths: () => ['notes/missing.md', '.trash/ignore.md'],
+					getAllPaths: () => ['notes/present.md', 'notes/missing.md', 'notes/unindexed.md', '.trash/ignore.md'],
 				} as never,
 				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('.trash/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			},
+			new Set(['notes/present.md']),
 			5,
 		);
 
 		expect(result).toEqual(['notes/missing.md']);
-		expect(adapter.exists).toHaveBeenCalledTimes(1);
+		expect(adapter.exists.mock.calls.map(([path]) => path)).toEqual(['notes/missing.md', 'notes/unindexed.md']);
 	});
 
 	it('detects changed local files by hash and skips unchanged ones', async () => {
@@ -93,9 +94,10 @@ describe('planner local diff helpers', () => {
 			5,
 		);
 
-		expect(result).toHaveLength(2);
-		expect(result.find(file => file.path === 'notes/changed.md')?.hash).toHaveLength(64);
-    expect(result.find(file => file.path === 'notes/large.bin')).toBeDefined();
+		expect(result.changes).toHaveLength(2);
+		expect(result.changes.find(file => file.path === 'notes/changed.md')?.hash).toHaveLength(64);
+    expect(result.changes.find(file => file.path === 'notes/large.bin')).toBeDefined();
+		expect(result.discoveredPaths).toEqual(new Set(['notes/changed.md', 'notes/unchanged.md', 'notes/large.bin']));
 		expect(adapter.readBinary).toHaveBeenCalledTimes(2);
 	});
 });

@@ -80,7 +80,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		localManifest,
 		throwIfDestroyed: vi.fn(),
 		shouldIgnore: vi.fn(overrides.shouldIgnore ?? (() => false)),
-		getLocalChanges: vi.fn(async () => overrides.localChanges ?? []),
+		getLocalChanges: vi.fn(async () => ({ changes: overrides.localChanges ?? [], discoveredPaths: new Set<string>() })),
 		getLocalDeletes: vi.fn(async () => overrides.localDeletes ?? []),
 		parallelDownloadAndSaveFiles: vi.fn(async () => {}),
 		processDiff: vi.fn(async () => ({ status: 'applied' as const })),

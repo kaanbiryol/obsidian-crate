@@ -57,7 +57,7 @@ it.each(['single', 'batch', 'merge'])('syncs an edit made after %s apply even af
   const actualHash = await computeHash(content);
   expect(restarted.getEntry(path)?.hash).not.toBe(actualHash);
   expect(await hasLocalFileChanges(h.vault as never, restarted, () => false)).toBe(true);
-  expect(await getLocalChanges(resumed, 1)).toEqual([{ path, hash: actualHash }]);
+  expect((await getLocalChanges(resumed, 1)).changes).toEqual([{ path, hash: actualHash }]);
   await processDiff(resumed, { path, action: 'upload', localHash: actualHash, remoteHash: await computeHash(remote), cause: 'local-edited' }, {}, emptyResult());
   expect(await computeHash(remote)).toBe(actualHash);
 });

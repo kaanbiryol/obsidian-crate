@@ -50,7 +50,7 @@ describe('content verification independent of filesystem fingerprints', () => {
 		const restarted = new LocalManifest(h.app, h.plugin, 'https://server.example');
 		await restarted.load();
 		expect(restarted.getEntry('.hidden.md')?.modified).toBe('unverified');
-		expect(await getLocalChanges({ ...h.planner, localManifest: restarted }, 1)).toEqual([{ path: '.hidden.md', hash: await computeHash(toArrayBuffer('edit')) }]);
+		expect((await getLocalChanges({ ...h.planner, localManifest: restarted }, 1)).changes).toEqual([{ path: '.hidden.md', hash: await computeHash(toArrayBuffer('edit')) }]);
 	});
 
 	it('full reconciliation detects a same-size, same-time offline edit immediately', async () => {
