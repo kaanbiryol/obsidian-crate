@@ -217,3 +217,27 @@ it('pages conversion inventory with key cursors and indexed revision lookups', a
 	expect(download?.status).toBe(200);
 	expect(meter.usage.rowsRead).toBeLessThan(10);
 });
+
+it('resumes file conversion after a D1 limit failure without repeating converted files', async () => {
+	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const keys = await FileKeyAuthority.fromVault(bundle);
+	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
+	const headers = { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
+	const control = (path: string, method = 'GET', body?: string | Uint8Array<ArrayBuffer>) => handleEncryptionConversion(new Request(`https://test${path}`, { method, headers, body }), env, path.split('?')[0]!);
+	for (const name of ['a', 'b']) {
+		const content = `Note ${name}`;
+		await env.BUCKET.put(`rev-${name}`, content);
+		await env.DB.prepare('INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)')
+			.bind(`${name}.md`, `${name}.md`, await sha256Hex(content), content.length, `rev-${name}`).run();
+	}
+	expect((await control('/encryption/conversion', 'POST', JSON.stringify(state)))?.status).toBe(200);
+	const seal = async (name: string) => (await sealFile({ path: `${name}.md`, content: new TextEncoder().encode(`Note ${name}`), contentType: 'text/markdown', publicData: null }, keys.forPath(`${name}.md`))).bytes;
+	expect((await control('/encryption/conversion/file?revision=rev-a', 'PUT', await seal('a')))?.status).toBe(200);
+	// The Free plan's daily write limit fails D1 statements until the next day.
+	vi.spyOn(env.DB, 'batch').mockRejectedValueOnce(new Error('D1 exceeded its daily write limit'));
+	await expect(control('/encryption/conversion/file?revision=rev-b', 'PUT', await seal('b'))).rejects.toThrow('daily write limit');
+	const pending = await (await control('/encryption/conversion'))!.json() as { files: Array<{ revision: string }> };
+	expect(pending.files.map(file => file.revision)).toEqual(['rev-b']);
+	expect((await control('/encryption/conversion/file?revision=rev-b', 'PUT', await seal('b')))?.status).toBe(200);
+	expect((await (await control('/encryption/conversion'))!.json() as { files: unknown[] }).files).toEqual([]);
+});
