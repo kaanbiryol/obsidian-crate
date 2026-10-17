@@ -128,6 +128,7 @@ it('resumes an R2 replacement before D1 reconciliation and protects retained his
 	const finished = await control('/encryption/conversion/finish', 'POST', '{}');
 	expect(finished?.status, await finished?.clone().text()).toBe(200);
 	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
+	expect(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'files_conversion_storage_key_idx'").first()).toBeNull();
 	expect(await env.BUCKET.get('__crate__/files/orphan')).toBeNull();
 	expect(await (await control('/encryption/conversion/finish', 'POST', '{}'))!.json()).toMatchObject({ encryption: { mode: 'active' } });
 	const old = await env.BUCKET.get('old-version');
@@ -187,13 +188,14 @@ it('sweeps full conversion pages within the query budget and preserves live and 
 }, 60000);
 
 it('pages conversion inventory with key cursors and indexed revision lookups', async () => {
-	const { state } = await configure();
-	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(JSON.stringify({ ...state, mode: 'converting' }), ENCRYPTION_STATE_KEY).run();
+	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const state = createEncryptionState(bundle, await sealRecoveryBundle(bundle, await generateRecoveryCode()));
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
 		INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'note-'||x||'.md', 'note-'||x||'.md', 'hash', 1, 'key-'||printf('%05d', x) FROM n`).run();
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 500)
 		INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) SELECT 'old-'||printf('%05d', x), 'note-'||x||'.md', 'hash', 1, 'replaced', ? FROM n`).bind(Date.now() + 86400000).run();
 	const headers = { 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
+	expect((await handleEncryptionConversion(new Request('https://test/encryption/conversion', { method: 'POST', headers, body: JSON.stringify(state) }), env, '/encryption/conversion'))?.status).toBe(200);
 	const seen = new Set<string>();
 	let cursor: string | undefined;
 	for (let page = 0; page < 200; page++) {

@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS files (
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
 	storage_key TEXT NOT NULL
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS files_storage_key_idx ON files(storage_key);
 
 
 CREATE TABLE IF NOT EXISTS auth_tokens (

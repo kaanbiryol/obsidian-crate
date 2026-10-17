@@ -14,6 +14,7 @@ import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import type { Env } from './types';
 
 const CONVERSION_PAGE_SIZE = 25;
+const CONVERSION_INDEX = 'files_conversion_storage_key_idx';
 // R2's largest list page; reference checks use indexed key lookups.
 export const CONVERSION_SWEEP_PAGE_SIZE = 1000;
 
@@ -195,6 +196,9 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 			env.DB.prepare("DELETE FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'"),
 		] : []),
 		...(movingScopes ? prepareEncryptionScopeMove(env.DB, state, configuration) : []),
+		// Conversion looks files up by revision. Ordinary sync matches the primary
+		// key, so this index exists only until activation and adds no upload writes.
+		env.DB.prepare(`CREATE INDEX IF NOT EXISTS ${CONVERSION_INDEX} ON files(storage_key)`),
 		putValue(env, ENCRYPTION_STATE_KEY, configuration),
 		// Freeze alarms before any plaintext content is removed. The cancellation
 		// queue is drained explicitly before activation, including DO storage.
@@ -272,6 +276,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		// Projection only reads notes in the policy folder; a policy change requeues its folder.
 		...(policy ? [env.DB.prepare(`INSERT INTO notification_projection_jobs(path, job_token) SELECT path, lower(hex(randomblob(16))) FROM files
 			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'`).bind(...fileFolderArgs(policy.folder_path))] : []),
+		env.DB.prepare(`DROP INDEX IF EXISTS ${CONVERSION_INDEX}`),
 		putValue(env, ENCRYPTION_STATE_KEY, active),
 	]);
 	return corsResponse({ encryption: active });
