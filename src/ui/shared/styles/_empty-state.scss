@@ -35,7 +35,6 @@
     width: 88px;
     height: 88px;
     margin-bottom: 10px;
-    background: color-mix(in srgb, var(--empty-state-color) 10%, transparent);
     color: var(--empty-state-color);
 
     &.tone-secondary {
@@ -100,7 +99,6 @@
         width: 52px;
         height: 52px;
         margin-bottom: 8px;
-        background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
     }
 
     .reminders-empty-state-title {

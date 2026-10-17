@@ -44,10 +44,4 @@
 		@include empty-state.body;
 		padding-block: 16px calc(var(--pwa-dock-height) + 16px);
 	}
-
-	.reminders-empty-state-icon,
-	.crate-reading__empty .reminders-empty-state-icon,
-	.reminders-view.is-primary .reminders-empty-state-icon {
-		background: transparent;
-	}
 }
