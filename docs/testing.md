@@ -51,7 +51,9 @@ the shared receipt cleanup owner, including monotonic floors and batch rollback.
 `maintenance/object-cleanup.test.ts` and `maintenance.test.ts` distinguish nonfatal
 post-commit cleanup from scheduled failure reporting. The corresponding
 `maintenance/object-cleanup.integration.ts` regression uses local D1/R2 bindings
-to retain failed cleanup and its diagnostic until a successful retry.
+to retain failed cleanup and its diagnostic until a successful retry. It also
+drains 6,000 expired versions in 13 maintenance passes, each within the Free D1
+query limit, without sorting the queue, while referenced objects survive.
 
 ## Sync outcomes and reader action lifetimes
 

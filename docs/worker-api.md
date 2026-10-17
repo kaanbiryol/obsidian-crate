@@ -409,7 +409,7 @@ Reminder mutations replay a matching operation receipt before rereading a moved 
 
 ## Changelog Pruning
 
-Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Failures are recorded for diagnostics.
+Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions drain 500 objects per pass in queue order. While that queue advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Failures are recorded for diagnostics.
 
 When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
 

@@ -1,8 +1,9 @@
 import { changedRows, queryRows } from '../db';
 import { findReferencedStorageKeys, objectReference, type ObjectReference } from '../storage-references';
 
-const CLEANUP_BATCH_LIMIT = 100;
-const MAX_D1_BOUND_PARAMETERS = 100;
+// R2 deletes up to 1,000 keys per call. 500 keeps the reference lookup's single
+// JSON parameter below D1's 2 MB value limit, even with 1,024-character paths.
+const CLEANUP_BATCH_LIMIT = 500;
 
 async function queueObjectCleanup(db: D1Database, objects: ObjectReference[]): Promise<void> {
 	if (!objects.length) return;
@@ -11,16 +12,10 @@ async function queueObjectCleanup(db: D1Database, objects: ObjectReference[]): P
 		.bind(JSON.stringify(objects)).run();
 }
 
+/** One statement per batch keeps a maintenance pass within the Free plan's 50-query limit. */
 async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promise<number> {
-	let removed = 0;
-	for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
-		const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
-		const placeholders = chunk.map(() => '?').join(', ');
-		removed += changedRows(await db.prepare(
-			`DELETE FROM object_cleanup_queue WHERE storage_key IN (${placeholders})`,
-		).bind(...chunk).run());
-	}
-	return removed;
+	return changedRows(await db.prepare('DELETE FROM object_cleanup_queue WHERE storage_key IN (SELECT value FROM json_each(?))')
+		.bind(JSON.stringify(keys)).run());
 }
 
 async function deleteQueuedBucketObjects(
@@ -41,10 +36,11 @@ async function deleteQueuedBucketObjects(
 	return removeQueuedObjectCleanup(db, uniqueKeys);
 }
 
-/** Scheduled failures reach the maintenance error recorder; queued keys retry later. */
+/** Scheduled failures reach the maintenance error recorder; queued keys retry later.
+ * Rowid order is insertion order and reads the table without a sort. */
 export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
 	const rows = await queryRows<{ storage_key: string; file_path: string | null }>(
-		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
+		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY rowid LIMIT ?')
 			.bind(CLEANUP_BATCH_LIMIT),
 	);
 	return deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));

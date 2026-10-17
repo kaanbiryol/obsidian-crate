@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 9 and schema 2. The complete schema 2 is the pre-launch baseline with no registered migrations. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 10 and schema 2. The complete schema 2 is the pre-launch baseline with no registered migrations. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 

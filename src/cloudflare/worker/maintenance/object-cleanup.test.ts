@@ -77,7 +77,7 @@ describe('R2 object cleanup queue', () => {
 
 		expect(bucket.delete).toHaveBeenCalledWith('queued-key');
 		expect(prepared.at(-1)?.sql).toContain('DELETE FROM object_cleanup_queue');
-		expect(prepared.at(-1)?.args).toEqual(['queued-key']);
+		expect(prepared.at(-1)?.args).toEqual(['["queued-key"]']);
 		expect(prepared.at(-1)?.run).toHaveBeenCalledOnce();
 		expect(db.batch).not.toHaveBeenCalled();
 	});
