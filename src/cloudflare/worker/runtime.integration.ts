@@ -166,6 +166,25 @@ describe('Cloudflare runtime integration', () => {
 		expect(otherFolder.status).toBe(200);
 	});
 
+	it('returns only notes changed since a delta base, including deletions', async () => {
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/A.md', '- [ ] Alpha <!-- crate-id:alpha -->', null);
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/B.md', '- [ ] Beta <!-- crate-id:beta -->', null);
+		const list = (since?: string) => handleListReminders(new Request(`https://worker.test/reminders/list?folderPath=Reminders${since ? `&since=${encodeURIComponent(since)}` : ''}`), runtimeEnv);
+		const first = await list();
+		const base = first.headers.get('X-Crate-Delta-Base')!;
+		expect(base).toMatch(/^\d+\.[a-f0-9]{32}$/);
+		const b = (await readCommittedMarkdownFileVersion(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/B.md'))!;
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/B.md', '- [x] Beta <!-- crate-id:beta -->', b.hash);
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Notes/Elsewhere.md', 'Unrelated', null);
+		const delta = await list(base);
+		expect(await delta.json()).toMatchObject({ delta: true, changedPaths: ['Reminders/B.md'], reminders: [{ id: 'beta', completed: true }], issues: [] });
+		// A base from another view or a cursor the changelog cannot prove gets a full list.
+		const full = await (await list(`${base.split('.')[0]}.${'0'.repeat(32)}`)).json() as { delta?: boolean; reminders: unknown[] };
+		expect(full.delta).toBeUndefined();
+		expect(full.reminders).toHaveLength(2);
+		expect((await (await list(`999999.${base.split('.')[1]}`)).json() as { delta?: boolean }).delta).toBeUndefined();
+	});
+
 	it('keeps reminder folder matching case-sensitive', async () => {
 		await Promise.all([
 			writeCommittedMarkdownFile(

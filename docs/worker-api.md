@@ -283,6 +283,8 @@ Cold indexes are warmed in batches of at most 20 files and 2 MiB per request. Wh
 
 Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder includes its semantic `revision`. Oversized notes or cache records yield per-file issues while healthy reminders remain usable; responses with issues omit ETag. Warming responses include `totalFiles` and `Retry-After: 1`.
 
+Complete (issue-free) responses and 304s include `X-Crate-Delta-Base`: a changelog position bound to the folder, parser version, initial import and reset generation. A client holding that complete revision may send it as `since`. When the changelog can still prove every change since then, the response is `{ delta: true, changedPaths: [...], reminders: [...], projects: [...], issues: [] }`: the client replaces all reminders from `changedPaths` (written, renamed or deleted notes) with `reminders` and keeps the rest. A pruned or imported changelog, more than 20,000 vault changes, a different view, or a response with issues returns the full list instead.
+
 ### POST /reminders/create
 
 Creates a reminder in the selected project Markdown file, creating that file if needed.
