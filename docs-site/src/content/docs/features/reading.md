@@ -8,8 +8,8 @@ Save articles for later and keep their text in your Obsidian vault. Reading is i
 ## Save your first article
 
 1. Start with the default `Reading` folder. If you have connected a server, you can choose another under **Settings → Crate → Reading → Reading folder**.
-2. Run **Crate: Reading - add link** and paste an article URL.
-3. Run **Crate: Reading - open library** to find it in your inbox.
+2. Run **Crate: Add link to reading list** and paste an article URL.
+3. Run **Crate: Open reading library** to find it in your inbox.
 
 In Obsidian, Crate saves a bookmark first, then downloads the article on that device. This works without a Crate server connection. If downloading fails, the bookmark remains and the reader offers **Try again**.
 

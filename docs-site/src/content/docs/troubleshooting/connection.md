@@ -45,7 +45,7 @@ If the app contains pending saves or drafts, preserve them before signing out or
 
 ## Files are missing after connecting
 
-Connection does not transfer files. Run **Crate: Sync - sync now** on the original device, wait for completion, then sync the other device. Confirm both are connected to the same server and check ignore rules.
+Connection does not transfer files. Run **Crate: Sync now** on the original device, wait for completion, then sync the other device. Confirm both are connected to the same server and check ignore rules.
 
 Automatic sync starts off on each device. Enable **Settings → Crate → Sync → Automatic sync** if you expect files to transfer after editing. For missing articles or reminders, also check that the feature is enabled and its configured folder contains the notes. The [settings guide](/docs/features/settings/) explains these controls.
 

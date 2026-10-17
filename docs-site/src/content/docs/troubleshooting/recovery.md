@@ -9,7 +9,7 @@ Choose the smallest recovery that solves the problem: one file, a saved vault st
 
 Crate retains server versions of replaced and deleted files for 30 days.
 
-1. Open the file's context menu in Obsidian and select **File history**, or run **Crate: Sync - show file history** for the active file.
+1. Open the file's context menu in Obsidian and select **File history**, or run **Crate: Show file sync history** for the active file.
 2. Choose an earlier version and compare it with your current file.
 3. Restore the version you want, check the resulting note, then sync.
 

@@ -7,9 +7,9 @@ Crate keeps reminders as Markdown tasks in your vault. Work with them in Obsidia
 
 ## Create a reminder
 
-1. Open Obsidian's command palette and run **Crate: Reminders - create reminder**.
+1. Open Obsidian's command palette and run **Crate: Create reminder**.
 2. Enter a title such as “Send the proposal tomorrow at 12” and review the parsed date. You can set the date explicitly, choose a project, add a description, mark a priority, or make it repeat.
-3. Save the reminder, then run **Crate: Open sidebar** to see your reminders.
+3. Save the reminder, then run **Crate: Open reminders sidebar** to see your reminders.
 
 Reminders starts enabled and uses the `Reminders` folder. Once connected to a server, you can choose a different folder under **Settings → Crate → Reminders → Reminders folder**. Local reminders do not require a server; syncing and notifications do.
 
@@ -28,7 +28,7 @@ Page titles are fetched through your Crate server, which contacts the linked web
 - **Inbox** holds reminders to organize later.
 - **Today** brings together reminders due today and overdue items.
 - **Upcoming** helps you plan what is next.
-- **Projects** groups reminders by the work or part of life they belong to. Use **Crate: Reminders - open project** to jump to one in Obsidian.
+- **Projects** groups reminders by the work or part of life they belong to. Use **Crate: Open reminder project** to jump to one in Obsidian.
 
 Select a reminder to edit it, or its checkbox to complete it. Completing a repeating reminder advances the same task to its next occurrence. After its final occurrence it stays checked; earlier occurrences are not separate tasks in a completion history.
 

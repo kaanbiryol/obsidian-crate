@@ -29,9 +29,9 @@ When connecting another copy of this vault, select the existing server instead o
 
 ## Complete your first sync
 
-Connecting does not transfer files. Open Obsidian's command palette and select **Crate: Sync - sync now**.
+Connecting does not transfer files. Open Obsidian's command palette and select **Crate: Sync now**.
 
-Wait for sync to finish, then run **Crate: Sync - show activity** to check for errors or conflicts. Open a synced note to confirm the expected content.
+Wait for sync to finish, then run **Crate: Show sync activity** to check for errors or conflicts. Open a synced note to confirm the expected content.
 
 Automatic sync starts off. For ongoing transfers, enable **Settings → Crate → Sync → Automatic sync** on this device. You can now [connect another device or open the web app](/docs/getting-started/devices/).
 

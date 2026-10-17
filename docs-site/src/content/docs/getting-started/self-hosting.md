@@ -23,9 +23,9 @@ The first run builds the image from the repository. Wait for the log message con
 1. Find **Server address to paste into Obsidian** and **Pairing code** in the logs.
 2. In Obsidian, open **Settings → Crate → Connect to your server**.
 3. Enter the complete HTTPS address and the pairing code.
-4. Open the command palette and select **Crate: Sync - sync now**.
+4. Open the command palette and select **Crate: Sync now**.
 
-Wait for completion and check **Crate: Sync - show activity** for errors. Automatic sync starts off; enable **Settings → Crate → Sync → Automatic sync** if you want this device to continue syncing automatically.
+Wait for completion and check **Crate: Show sync activity** for errors. Automatic sync starts off; enable **Settings → Crate → Sync → Automatic sync** if you want this device to continue syncing automatically.
 
 Pairing codes work once and expire after ten minutes. If yours expires, [create another code](#create-another-pairing-code).
 

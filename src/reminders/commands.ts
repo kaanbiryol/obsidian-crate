@@ -27,7 +27,7 @@ class ProjectSuggestModal extends FuzzySuggestModal<string> {
 export function registerReminderCommands(plugin: CratePlugin) {
   plugin.addCommand({
     id: "create-reminder",
-    name: "Reminders - create reminder",
+    name: "Create reminder",
     callback: () => {
       if (!plugin.remindersSettings.enabled) { new Notice("Enable reminders in Crate settings first."); return; }
       openReminderCreationModal(plugin);
@@ -36,7 +36,7 @@ export function registerReminderCommands(plugin: CratePlugin) {
 
   plugin.addCommand({
     id: "open-project",
-    name: "Reminders - open project",
+    name: "Open reminder project",
     callback: () => {
       if (!plugin.remindersSettings.enabled) { new Notice("Enable reminders in Crate settings first."); return; }
       const projects = plugin.reminderRepository.getProjects();

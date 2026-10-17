@@ -11,7 +11,7 @@ Use the Obsidian plugin for a full vault on another device. Use the Crate web ap
 2. On the other device, open a local vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy, or back up an existing copy before combining changes.
 3. Connect to the **same server**. With Cloudflare, select **Connect with Cloudflare** and choose the existing server. With Docker, select **Connect to your server** and use a new [pairing code](/docs/getting-started/self-hosting/#create-another-pairing-code).
 4. If encryption is enabled, open **Manage encryption** in Crate’s Sync settings and enter your saved recovery key.
-5. Run **Crate: Sync - sync now** and wait for it to finish.
+5. Run **Crate: Sync now** and wait for it to finish.
 6. Open a note on both devices to confirm your changes have arrived. If both devices edited the same content, [review any conflicts](/docs/troubleshooting/conflicts/).
 7. If you want ongoing automatic transfers, enable **Settings → Crate → Sync → Automatic sync** on the new device. It starts off independently on each device.
 

@@ -51,7 +51,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 		}));
 	}));
 	plugin.addCommand({
-		id: 'show-file-history', name: 'Sync - show file history',
+		id: 'show-file-history', name: 'Show file sync history',
 		checkCallback: checking => {
 			const file = plugin.app.workspace.getActiveFile();
 			const available = plugin.syncRuntime.isConfigured() && file !== null;
@@ -61,7 +61,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	});
 	plugin.addCommand({
 		id: 'sync-now',
-		name: 'Sync - sync now',
+		name: 'Sync now',
 		checkCallback: (checking) => {
 			const available = plugin.syncRuntime.isConfigured();
 			if (!checking && available) {
@@ -73,7 +73,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 
 	plugin.addCommand({
 		id: 'stop-sync',
-		name: 'Sync - stop sync',
+		name: 'Stop sync',
 		checkCallback: checking => {
 			const available = plugin.syncRuntime.isConfigured();
 			if (!checking && available) {
@@ -87,7 +87,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 
 	plugin.addCommand({
 		id: 'show-activity',
-		name: 'Sync - show activity',
+		name: 'Show sync activity',
 		callback: () => {
 			new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 		},

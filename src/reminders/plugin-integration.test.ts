@@ -242,7 +242,7 @@ describe('initializeReminders', () => {
 		expect(registerReminderCommands).toHaveBeenCalledWith(plugin);
 		expect(plugin.addCommand).toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-view',
-			name: 'Open sidebar',
+			name: 'Open reminders sidebar',
 		}));
 		expect(plugin.addCommand).not.toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-fullscreen',

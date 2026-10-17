@@ -7,7 +7,7 @@ Crate syncs files between copies of your Obsidian vault through your server. Not
 
 ## Automatic and manual sync
 
-**Automatic sync is off by default on each device.** After [connecting your server](/docs/getting-started/hosting/), run **Crate: Sync - sync now** from Obsidian's command palette for your first sync. Connecting alone does not transfer files.
+**Automatic sync is off by default on each device.** After [connecting your server](/docs/getting-started/hosting/), run **Crate: Sync now** from Obsidian's command palette for your first sync. Connecting alone does not transfer files.
 
 To keep syncing automatically, turn on **Settings → Crate → Sync → Automatic sync**. Crate then syncs after file changes, on startup and resume, and when periodic checks find changes. Enable it separately on each Obsidian device.
 
@@ -22,13 +22,13 @@ Keep Obsidian open until sync finishes, especially on mobile. Sync cannot keep r
 
 ## Pause or resume
 
-For manual-only syncing on one device, turn off **Settings → Crate → Sync → Automatic sync**. A running sync can still finish. To stop it, use **Pause sync** in Sync activity or **Crate: Sync - stop sync**. Stopping also turns off automatic sync on that device until you enable it again.
+For manual-only syncing on one device, turn off **Settings → Crate → Sync → Automatic sync**. A running sync can still finish. To stop it, use **Pause sync** in Sync activity or **Crate: Stop sync**. Stopping also turns off automatic sync on that device until you enable it again.
 
 The web app and server notifications continue independently. Turning off automatic sync also leaves a small server availability check on startup and resume; that check does not transfer files.
 
 ## Review pending changes
 
-Run **Crate: Sync - show activity**, then select **Pending**. Select a file to compare your local edits with this device's last-synced copy. These comparisons do not include newer edits from another device.
+Run **Crate: Show sync activity**, then select **Pending**. Select a file to compare your local edits with this device's last-synced copy. These comparisons do not include newer edits from another device.
 
 - **Sync all** transfers all pending files.
 - Uncheck files and use **Sync selected** to transfer a subset. The other files remain pending.

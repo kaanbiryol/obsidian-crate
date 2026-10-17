@@ -57,7 +57,7 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 
 	plugin.addCommand({
 		id: 'open-reminders-view',
-		name: 'Open sidebar',
+		name: 'Open reminders sidebar',
 		callback: () => plugin.activateRemindersView(),
 	});
 

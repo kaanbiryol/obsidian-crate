@@ -9,7 +9,7 @@ Crate keeps your notes in your vault and lets you run the server yourself. These
 
 The plugin syncs while Obsidian is running and able to work. Do not rely on a phone completing sync after Obsidian has been closed or suspended. Before switching devices, let sync finish on the first one, then sync the second.
 
-**Automatic sync starts off on each device.** Enable it in **Settings → Crate → Sync**, or use **Crate: Sync - sync now**. Connecting a server does not perform your first file transfer.
+**Automatic sync starts off on each device.** Enable it in **Settings → Crate → Sync**, or use **Crate: Sync now**. Connecting a server does not perform your first file transfer.
 
 The web app and scheduled notifications use your server directly, so Obsidian can be closed after the relevant notes have synced. A server on your own hardware must stay awake and online.
 

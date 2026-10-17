@@ -25,7 +25,7 @@ One **Reading** library in Obsidian and the existing Crate web app, with two cap
 | Entry point | Capture and extraction | How it reaches the other devices |
 | --- | --- | --- |
 | iPhone **Share → Save to Crate**, Android **Share → Crate**, or paste a URL into the web app | The server commits a bookmark, then fetches the page and extracts Markdown with Defuddle | Normal vault sync downloads the note; the web app reads the server's verified Reading projection |
-| **Crate: Reading - add link** in desktop Obsidian | Save a local bookmark immediately, then fetch and extract on the device; failures remain retryable | Existing automatic/manual sync uploads the completed Markdown note |
+| **Crate: Add link to reading list** in desktop Obsidian | Save a local bookmark immediately, then fetch and extract on the device; failures remain retryable | Existing automatic/manual sync uploads the completed Markdown note |
 | Desktop Obsidian Web Clipper saving to the Reading folder | Clipper captures the loaded page into the configured vault folder | Crate adopts/indexes the note and syncs the exact captured body; the server does not extract it again |
 
 The initial library supports inbox/archive, favorites, tags, title/source/tag search, a reader, and offline saved text. Reading status lives in Markdown frontmatter. Opening a note does not mark it done. Permanent deletion uses Obsidian's existing file workflow. Keep RSS, AI, PDFs, transcripts, new highlight editing, automatic image downloads, and reading reminders outside this release.

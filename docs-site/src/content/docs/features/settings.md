@@ -35,9 +35,9 @@ These switches affect **all devices connected to this server**. Changing them re
 
 ## Pause sync on one device
 
-Turn off **Sync → Automatic sync** for manual-only syncing on that Obsidian device. You can still run **Crate: Sync - sync now**. A sync already in progress can finish.
+Turn off **Sync → Automatic sync** for manual-only syncing on that Obsidian device. You can still run **Crate: Sync now**. A sync already in progress can finish.
 
-To stop a running sync, use **Pause sync** in Sync activity or **Crate: Sync - stop sync**. This also turns automatic sync off; enable it again when you are ready.
+To stop a running sync, use **Pause sync** in Sync activity or **Crate: Stop sync**. This also turns automatic sync off; enable it again when you are ready.
 
 This does not pause other devices, the web app, or server notifications. To stop alerts everywhere, turn off **Notifications → Push notifications**.
 
