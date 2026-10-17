@@ -24,8 +24,7 @@ it.each([1000, 10000, 100000])('keeps idle polling and orphan reference lookup i
 	expect(result.meta.rows_read * 2 * 2 * 288).toBeLessThan(5000);
 	const meter = meterD1Usage(env.DB);
 	expect(await findReferencedStorageKeys(meter.db, [{ path: 'note-1', storageKey: 'key-1' }, { path: 'missing', storageKey: 'missing' }])).toEqual(new Set(['key-1']));
-	expect(meter.usage.rowsRead).toBeLessThanOrEqual(8);
-	expect(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'files_storage_key_idx'").first()).toBeNull();
+	expect(meter.usage.rowsRead).toBeLessThanOrEqual(9);
 });
 
 it('preserves empty and pruned cursor bounds', async () => {

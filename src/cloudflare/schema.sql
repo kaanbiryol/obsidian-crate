@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS files (
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
 	storage_key TEXT NOT NULL
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS files_storage_key_idx ON files(storage_key);
 
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -115,7 +116,6 @@ CREATE TABLE IF NOT EXISTS file_versions (
 );
 
 CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
-CREATE INDEX IF NOT EXISTS file_versions_path_idx ON file_versions(path, created_at DESC);
 CREATE INDEX IF NOT EXISTS file_versions_created_key_idx ON file_versions(created_at DESC, storage_key DESC);
 CREATE INDEX IF NOT EXISTS file_versions_path_created_key_idx ON file_versions(path, created_at DESC, storage_key DESC);
 

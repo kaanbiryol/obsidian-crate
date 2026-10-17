@@ -22,7 +22,8 @@ import { drainNotificationJobs } from './notification-outbox';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { parseEncryptedNotification } from '../../encryption/notification-format';
 import { handleEncryptionRoute } from './routes/encryption';
-import { handleEncryptionConversion } from './encryption-conversion';
+import { CONVERSION_SWEEP_PAGE_SIZE, handleEncryptionConversion } from './encryption-conversion';
+import { meterD1Usage } from './d1-usage';
 import { sha256Hex } from './auth';
 import { encryptJson } from '../../encryption/envelope';
 import { openFile } from '../../encryption/file-codec';
@@ -166,7 +167,8 @@ it('sweeps full conversion pages within the query budget and preserves live and 
 		if (index === 0) await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('note.bin', 'note.bin', ?, ?, ?)").bind(file.hash, file.bytes.length, key).run();
 		else await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES (?, 'note.bin', ?, ?, 'replaced', ?)").bind(key, file.hash, file.bytes.length, Date.now() + 86400000).run();
 	}
-	for (let index = 0; index < 225; index++) await env.BUCKET.put(`__crate__/files/orphan-${String(index).padStart(3, '0')}`, 'old plaintext');
+	const orphans = Array.from({ length: CONVERSION_SWEEP_PAGE_SIZE * 2 + 25 }, (_, index) => `__crate__/files/orphan-${String(index).padStart(4, '0')}`);
+	for (let offset = 0; offset < orphans.length; offset += 100) await Promise.all(orphans.slice(offset, offset + 100).map(key => env.BUCKET.put(key, 'old plaintext')));
 	const prepare = vi.spyOn(env.DB, 'prepare');
 	let pages = 0;
 	for (; pages < 4; pages++) {
@@ -182,4 +184,33 @@ it('sweeps full conversion pages within the query budget and preserves live and 
 	expect(pages).toBe(2);
 	expect((await env.BUCKET.list()).objects.map(object => object.key)).toEqual(retained);
 	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
+}, 60000);
+
+it('pages conversion inventory with key cursors and indexed revision lookups', async () => {
+	const { state } = await configure();
+	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(JSON.stringify({ ...state, mode: 'converting' }), ENCRYPTION_STATE_KEY).run();
+	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
+		INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'note-'||x||'.md', 'note-'||x||'.md', 'hash', 1, 'key-'||printf('%05d', x) FROM n`).run();
+	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 500)
+		INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) SELECT 'old-'||printf('%05d', x), 'note-'||x||'.md', 'hash', 1, 'replaced', ? FROM n`).bind(Date.now() + 86400000).run();
+	const headers = { 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
+	const seen = new Set<string>();
+	let cursor: string | undefined;
+	for (let page = 0; page < 200; page++) {
+		const meter = meterD1Usage(env.DB);
+		const query = cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`;
+		const response = await handleEncryptionConversion(new Request(`https://test/encryption/conversion${query}`, { headers }), { ...env, DB: meter.db }, '/encryption/conversion');
+		const body = await response!.json() as { files: Array<{ revision: string }>; cursor: string };
+		expect(meter.usage.rowsRead).toBeLessThan(250);
+		for (const file of body.files) { expect(seen.has(file.revision)).toBe(false); seen.add(file.revision); }
+		cursor = body.cursor;
+		if (!body.files.length) break;
+	}
+	expect(seen.size).toBe(2500);
+	expect((await handleEncryptionConversion(new Request('https://test/encryption/conversion?cursor=%7B', { headers }), env, '/encryption/conversion'))?.status).toBe(400);
+	await env.BUCKET.put('key-01999', 'plain');
+	const meter = meterD1Usage(env.DB);
+	const download = await handleEncryptionConversion(new Request('https://test/encryption/conversion/file?revision=key-01999', { headers }), { ...env, DB: meter.db }, '/encryption/conversion/file');
+	expect(download?.status).toBe(200);
+	expect(meter.usage.rowsRead).toBeLessThan(10);
 });

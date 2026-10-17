@@ -16,7 +16,8 @@ export const CONVERSION_FILES = `SELECT path, storage_key AS revision, hash, siz
 export async function convertFile(request: Request, env: Env, state: EncryptionServerState): Promise<Response> {
 	const revision = new URL(request.url).searchParams.get('revision');
 	if (!revision || revision.length > 1024) return corsResponse({ error: 'File revision required' }, 400);
-	const file = await env.DB.prepare(`SELECT * FROM (${CONVERSION_FILES}) WHERE revision = ? LIMIT 1`).bind(revision).first<ConversionFile>();
+	const file = await env.DB.prepare(`SELECT path, storage_key AS revision, hash, size FROM files WHERE storage_key = ?
+		UNION ALL SELECT path, storage_key AS revision, hash, size FROM file_versions WHERE storage_key = ? LIMIT 1`).bind(revision, revision).first<ConversionFile>();
 	if (!file) return corsResponse({ error: 'File version is unavailable' }, 404);
 	const object = await env.BUCKET.get(revision);
 	if (!object || object.size > MAX_ENCRYPTED_FILE_BYTES) return corsResponse({ error: 'File version contents are unavailable' }, 503);
@@ -54,7 +55,7 @@ export async function convertFile(request: Request, env: Env, state: EncryptionS
 	await env.DB.batch([
 		env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE storage_key = ?').bind(hash, content.byteLength, revision),
 		env.DB.prepare('UPDATE file_versions SET hash = ?, size = ? WHERE storage_key = ?').bind(hash, content.byteLength, revision),
-		env.DB.prepare('UPDATE changelog SET hash = ?, size = ? WHERE revision = ?').bind(hash, content.byteLength, revision),
+		// Sync stays fenced until finish replaces the changelog from `files`.
 		env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING')
 			.bind(ENCRYPTION_FILE_PREFIX + revision, JSON.stringify(descriptor)),
 	]);

@@ -148,7 +148,7 @@ class ArchiveTests(unittest.TestCase):
         # Repeating a completed restore recognizes the existing target exactly.
         recovery.restore(target, self.directory)
         self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
-    def test_current_schema_preserves_upload_receipts_without_storage_index(self):
+    def test_current_schema_preserves_upload_receipts_and_storage_index(self):
         self.remote.sql += b"\nINSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES ('e1_00020524_1234567890123456', 'hash', '{\"success\":true}');"
         recovery.backup(self.remote, self.directory)
         target = Remote(b'', {})
@@ -159,7 +159,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
         self.assertEqual(restored.execute('SELECT request_hash FROM upload_operations').fetchone()[0], 'hash')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
-        self.assertNotIn('files_storage_key_idx', indexes)
+        self.assertIn('files_storage_key_idx', indexes)
 
     def test_restore_discards_incomplete_upload_leases(self):
         self.remote.sql += b"\nINSERT INTO staged_uploads(storage_key, expires_at) VALUES ('unfinished', 1);"

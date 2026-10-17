@@ -10,7 +10,27 @@ import { parseJsonObject } from './utils';
 import { MAX_CONVERTED_RECEIPT_BYTES, isReceiptEnvelope } from '../../encryption/receipt-format';
 import { isEncryptionId } from '../../encryption/encoding';
 import { prepareEncryptedReceipt } from './encrypted-receipt-storage';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import type { Env } from './types';
+
+const CONVERSION_PAGE_SIZE = 25;
+// R2's largest list page; reference checks use indexed key lookups.
+export const CONVERSION_SWEEP_PAGE_SIZE = 1000;
+
+interface ConversionCursor { file: string; reminder: string; upload: string; reading: string }
+const EMPTY_CURSOR: ConversionCursor = { file: '', reminder: '', upload: '', reading: '' };
+
+function parseConversionCursor(value: string | null): ConversionCursor | null {
+	if (value === null) return EMPTY_CURSOR;
+	try {
+		const parsed: unknown = JSON.parse(value);
+		if (!parsed || typeof parsed !== 'object') return null;
+		const cursor = { ...EMPTY_CURSOR, ...parsed } as Record<string, unknown>;
+		return Object.keys(cursor).length === 4 && Object.values(cursor).every(item => typeof item === 'string' && item.length <= 1024) ? cursor as unknown as ConversionCursor : null;
+	} catch {
+		return null;
+	}
+}
 
 const putValue = (env: Env, key: string, value: unknown) => env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, JSON.stringify(value));
 
@@ -34,16 +54,32 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	if (path === '/encryption/conversion/reading-capture' && request.method === 'PUT') return convertReadingCapture(request, env, state);
 	if (path === '/encryption/conversion/file') return convertFile(request, env, state);
 	if (path === '/encryption/conversion' && request.method === 'GET') {
+		const url = new URL(request.url);
+		const cursor = parseConversionCursor(url.searchParams.get('cursor'));
+		if (!cursor) return corsResponse({ error: 'Invalid conversion cursor' }, 400);
 		// Read once per conversion/resume, rather than scanning the inventory on every page.
-		const counts = new URL(request.url).searchParams.get('includeProgress') === '1'
+		const counts = url.searchParams.get('includeProgress') === '1'
 			? await env.DB.prepare(`SELECT COUNT(*) AS remainingFiles FROM (${CONVERSION_FILES}) f WHERE NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || f.revision)`).bind(ENCRYPTION_FILE_PREFIX).first<{ remainingFiles: number }>() : null;
-		const files = await env.DB.prepare(`SELECT f.*, (SELECT value FROM maintenance_state WHERE key = 'e2ee:prior-file:' || f.revision) AS previous_descriptor FROM (${CONVERSION_FILES}) f WHERE NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || f.revision) ORDER BY revision LIMIT 25`).bind(ENCRYPTION_FILE_PREFIX).all();
-		const receipts = await env.DB.prepare("SELECT operation_id, request_hash, response_json FROM reminder_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT 25").all();
-		const uploads = await env.DB.prepare("SELECT operation_id, request_hash, response_json FROM upload_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT 25").all();
+		// Each page advances indexed key cursors, so a pass reads each row once.
+		const pending = (table: string) => `SELECT * FROM (SELECT path, storage_key AS revision, hash, size FROM ${table} WHERE storage_key > ?
+			AND NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || storage_key) ORDER BY storage_key LIMIT ${CONVERSION_PAGE_SIZE})`;
+		const files = await env.DB.prepare(`SELECT f.*, (SELECT value FROM maintenance_state WHERE key = 'e2ee:prior-file:' || f.revision) AS previous_descriptor
+			FROM (${pending('files')} UNION ${pending('file_versions')}) f ORDER BY revision LIMIT ${CONVERSION_PAGE_SIZE}`)
+			.bind(cursor.file, ENCRYPTION_FILE_PREFIX, cursor.file, ENCRYPTION_FILE_PREFIX).all<{ revision: string }>();
+		const legacy = (table: string, after: string) => env.DB.prepare(`SELECT operation_id, request_hash, response_json FROM ${table}
+			WHERE operation_id > ? AND json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT ${CONVERSION_PAGE_SIZE}`).bind(after).all<{ operation_id: string }>();
+		const receipts = await legacy('reminder_operations', cursor.reminder);
+		const uploads = await legacy('upload_operations', cursor.upload);
 		const folders = await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE scope = 'reminders' UNION SELECT folder_path FROM notification_policy").all();
-		const reading = await env.DB.prepare("SELECT operation_id, request_hash, response_json FROM reading_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL ORDER BY operation_id LIMIT 25").all();
-		const captures = await env.DB.prepare('SELECT c.id, c.note, p.folder_path FROM reading_captures c JOIN reading_policy p ON c.generation=p.generation LIMIT 25').all<{ id: string; note: string; folder_path: string }>();
-		return corsResponse({ ...(counts ?? {}), reading: reading.results, captures: captures.results.map(c => ({ id: c.id, note: c.note, path: convertedCapturePath(c.folder_path, c.id) })), files: files.results, receipts: receipts.results, uploads: uploads.results, folders: folders.results });
+		const reading = await legacy('reading_operations', cursor.reading);
+		const captures = await env.DB.prepare(`SELECT c.id, c.note, p.folder_path FROM reading_captures c JOIN reading_policy p ON c.generation=p.generation LIMIT ${CONVERSION_PAGE_SIZE}`).all<{ id: string; note: string; folder_path: string }>();
+		const next: ConversionCursor = {
+			file: files.results.at(-1)?.revision ?? cursor.file,
+			reminder: receipts.results.at(-1)?.operation_id ?? cursor.reminder,
+			upload: uploads.results.at(-1)?.operation_id ?? cursor.upload,
+			reading: reading.results.at(-1)?.operation_id ?? cursor.reading,
+		};
+		return corsResponse({ ...(counts ?? {}), reading: reading.results, captures: captures.results.map(c => ({ id: c.id, note: c.note, path: convertedCapturePath(c.folder_path, c.id) })), files: files.results, receipts: receipts.results, uploads: uploads.results, folders: folders.results, cursor: JSON.stringify(next) });
 	}
 	if (path === '/encryption/conversion/settings') {
 		if (request.method === 'GET') {
@@ -170,14 +206,21 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 	return corsResponse({ encryption: configuration });
 }
 
-async function finishConversion(env: Env, state: EncryptionServerState): Promise<Response> {
-	const unfinished = await env.DB.prepare(`SELECT 1 WHERE EXISTS (SELECT 1 FROM (${CONVERSION_FILES}) f WHERE NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || f.revision))
+async function hasUnfinishedConversion(env: Env): Promise<boolean> {
+	return Boolean(await env.DB.prepare(`SELECT 1 WHERE EXISTS (SELECT 1 FROM (${CONVERSION_FILES}) f WHERE NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? || f.revision))
     OR EXISTS (SELECT 1 FROM reading_captures)
     OR EXISTS (SELECT 1 FROM reading_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL)
     OR EXISTS (SELECT 1 FROM reminder_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL)
     OR EXISTS (SELECT 1 FROM upload_operations WHERE json_type(response_json, '$.e2eeLegacy') IS NULL)
-    OR NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = 'e2ee:settings-converted')`).bind(ENCRYPTION_FILE_PREFIX).first();
-	if (unfinished) return corsResponse({ error: 'Finish converting files, Reading captures, settings and saved responses first' }, 409);
+    OR NOT EXISTS (SELECT 1 FROM maintenance_state WHERE key = 'e2ee:settings-converted')`).bind(ENCRYPTION_FILE_PREFIX).first());
+}
+
+async function finishConversion(env: Env, state: EncryptionServerState): Promise<Response> {
+	const unfinishedError = () => corsResponse({ error: 'Finish converting files, Reading captures, settings and saved responses first' }, 409);
+	const cursor = (await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'").first<{ value: string }>())?.value;
+	// Conversion fences ordinary writes, so the inventory is checked before the
+	// sweep starts and once more before activation, not on every sweep page.
+	if (!cursor && await hasUnfinishedConversion(env)) return unfinishedError();
 	// The dispatch DO drains cancellation jobs in bounded batches. A lost reply is
 	// harmless: cancellation is token-checked and removes its private DO state.
 	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
@@ -187,8 +230,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 	if (await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first()) return corsResponse({ pending: true });
 	// Sweep every owned R2 object in bounded pages before activation. Checkpoints
 	// must already be encrypted. Unreferenced staged/retired content is disposable.
-	const cursor = (await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'e2ee:cleanup-cursor'").first<{ value: string }>())?.value;
-	const listing = await env.BUCKET.list({ limit: 100, ...(cursor ? { cursor: JSON.parse(cursor) as string } : {}) });
+	const listing = await env.BUCKET.list({ limit: CONVERSION_SWEEP_PAGE_SIZE, ...(cursor ? { cursor: JSON.parse(cursor) as string } : {}) });
 	const managedKeys = listing.objects.map(object => object.key)
 		.filter(key => key.startsWith('__crate__/files/') || key === '__crate__/settings.json');
 	// Bound queries independently of page size; per-object lookups can exhaust
@@ -210,7 +252,9 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		await putValue(env, 'e2ee:cleanup-cursor', listing.cursor).run();
 		return corsResponse({ pending: true });
 	}
+	if (cursor && await hasUnfinishedConversion(env)) return unfinishedError();
 	const active: EncryptionServerState = { ...state, mode: 'active' };
+	const policy = await env.DB.prepare('SELECT folder_path FROM notification_policy WHERE id = 1').first<{ folder_path: string }>();
 	await env.DB.batch([
 		...['reading_sources', 'reading_jobs', 'reading_handoffs', 'reading_enrollments', 'reminder_file_cache', 'reminder_projections', 'reminder_sources', 'reminder_source_state', 'notification_projection_jobs', 'notification_file_retries', 'file_deletion_receipts'].map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		// Verification rows and their scan progress are one rebuildable state.
@@ -225,7 +269,9 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		env.DB.prepare("INSERT INTO sqlite_sequence(name, seq) SELECT 'changelog', snapshot_seq FROM initial_import WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'changelog')"),
 		env.DB.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, (SELECT snapshot_seq FROM initial_import WHERE id = 1)) WHERE name = 'changelog'"),
 		env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) SELECT path, 'put', storage_key, hash, size FROM files"),
-		env.DB.prepare("INSERT INTO notification_projection_jobs(path, job_token) SELECT path, lower(hex(randomblob(16))) FROM files WHERE lower(path) LIKE '%.md'"),
+		// Projection only reads notes in the policy folder; a policy change requeues its folder.
+		...(policy ? [env.DB.prepare(`INSERT INTO notification_projection_jobs(path, job_token) SELECT path, lower(hex(randomblob(16))) FROM files
+			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'`).bind(...fileFolderArgs(policy.folder_path))] : []),
 		putValue(env, ENCRYPTION_STATE_KEY, active),
 	]);
 	return corsResponse({ encryption: active });

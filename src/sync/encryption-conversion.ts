@@ -49,9 +49,11 @@ export async function convertEncryptedVault(http: WorkerApiHttpClient, bundle: V
 	if (state.mode === 'active') return;
 	const keys = await FileKeyAuthority.fromVault(bundle);
 	const root = keys.forVaultMetadata();
-	let completed = 0, total: number | undefined, firstPage = true;
+	let completed = 0, total: number | undefined, firstPage = true, pageCursor: string | undefined;
 	while (true) {
-		const page = await http.requestJson<{ files: ConversionFile[]; receipts: ConversionReceipt[]; uploads: ConversionReceipt[]; reading?: ConversionReceipt[]; remainingFiles?: number; captures?: Array<{ id: string; path: string; note: string }> }>('/encryption/conversion' + (firstPage ? '?includeProgress=1' : ''));
+		const query = firstPage ? '?includeProgress=1' : `?cursor=${encodeURIComponent(pageCursor ?? '')}`;
+		const page = await http.requestJson<{ files: ConversionFile[]; receipts: ConversionReceipt[]; uploads: ConversionReceipt[]; reading?: ConversionReceipt[]; remainingFiles?: number; captures?: Array<{ id: string; path: string; note: string }>; cursor?: string }>('/encryption/conversion' + query);
+		pageCursor = page.cursor;
 		if (firstPage && Number.isSafeInteger(page.remainingFiles) && page.remainingFiles! >= page.files.length) total = page.remainingFiles;
 		firstPage = false;
 		if (!page.files.length && !page.receipts.length && !page.uploads.length && !page.reading?.length && !page.captures?.length) break;
