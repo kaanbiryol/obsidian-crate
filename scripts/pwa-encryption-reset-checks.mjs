@@ -69,11 +69,15 @@ async function resetAndReconnect({ admin, page, peer, origin, owner, runtime }) 
 			request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
 		});
 		try {
-			const snapshot = await new Promise((resolve, reject) => {
-				const request = database.transaction('snapshots').objectStore('snapshots').get('Reminders');
+			const read = (store, query) => new Promise((resolve, reject) => {
+				const request = query === undefined ? database.transaction(store).objectStore(store).getAll() : database.transaction(store).objectStore(store).get(query);
 				request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
 			});
-			return !snapshot?.encrypted && snapshot?.reminders.some(reminder => reminder.content === 'Saved from the open tab after reset');
+			// Metadata and per-note records are plaintext again after the reset.
+			const snapshot = await read('snapshots', 'Reminders');
+			const notes = await read('notes');
+			return Boolean(snapshot) && !snapshot.encrypted && notes.every(note => !note.encrypted)
+				&& notes.some(note => note.reminders?.some(reminder => reminder.content === 'Saved from the open tab after reset'));
 		} finally { database.close(); }
 	})).toBe(true);
 	await page.reload();

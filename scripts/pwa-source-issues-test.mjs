@@ -16,14 +16,16 @@ const issues = [
 ];
 const notice = page => page.getByRole('region', { name: 'Incomplete reminder list', exact: true });
 const cachedSnapshot = page => page.evaluate(() => new Promise(resolve => {
-  const request = indexedDB.open('crate-reminders', 2);
+  const request = indexedDB.open('crate-reminders', 3);
   request.onupgradeneeded = () => request.transaction.abort();
   request.onerror = () => resolve(null);
   request.onsuccess = () => {
     const database = request.result;
-    const tx = database.transaction('snapshots', 'readonly');
+    const tx = database.transaction(['snapshots', 'notes'], 'readonly');
     const read = tx.objectStore('snapshots').get('Reminders');
-    tx.oncomplete = () => { database.close(); resolve(read.result); };
+    const notes = tx.objectStore('notes').getAll(IDBKeyRange.bound(['Reminders'], ['Reminders', []]));
+    // Reminders live in per-note records next to the folder's metadata.
+    tx.oncomplete = () => { database.close(); resolve(read.result && { ...read.result, reminders: notes.result.flatMap(note => note.reminders ?? []) }); };
     tx.onerror = () => { database.close(); resolve(null); };
   };
 }));

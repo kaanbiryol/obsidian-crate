@@ -87,14 +87,16 @@ try {
    // Keep a valid but stale empty snapshot while the live list still has content.
    await page.evaluate(async () => {
     await new Promise((resolve, reject) => {
-     const request = indexedDB.open('crate-reminders', 2);
+     const request = indexedDB.open('crate-reminders', 3);
      request.onerror = () => reject(request.error);
      request.onsuccess = () => {
       const db = request.result;
-      const tx = db.transaction('snapshots', 'readwrite');
+      const tx = db.transaction(['snapshots', 'notes'], 'readwrite');
       const store = tx.objectStore('snapshots');
       const read = store.get('Reminders');
-      read.onsuccess = () => store.put({ ...read.result, reminders: [], projects: [] });
+      // A complete empty revision: no notes, and the digest of an empty inventory.
+      tx.objectStore('notes').delete(IDBKeyRange.bound(['Reminders'], ['Reminders', []]));
+      read.onsuccess = () => store.put({ ...read.result, projects: [], noteCount: 0, inventory: '811c9dc59747b28c:0' });
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => reject(tx.error);
      };
