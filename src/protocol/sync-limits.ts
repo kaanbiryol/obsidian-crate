@@ -18,3 +18,6 @@ export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
 export const BULK_NEW_UPLOAD_MAX_FILES = 8;
 export const BULK_NEW_UPLOAD_CAPABILITY = 'bulk-new-file-uploads-v1';
+
+/** Encrypted file descriptors returned by one `/encryption/metadata` request. */
+export const ENCRYPTION_METADATA_BATCH = 1000;

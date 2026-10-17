@@ -1,4 +1,5 @@
 import { readEncryptedReceipt } from '../encrypted-receipt-storage';
+import { ENCRYPTION_METADATA_BATCH } from '../../../protocol/sync-limits';
 import { handleEncryptionPairing } from '../encryption-pairing';
 import { readCaptureRecovery } from '../encrypted-capture-recovery';
 import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption-state';
@@ -57,8 +58,8 @@ export async function handleEncryptionRoute(request: Request, db: D1Database, pa
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
 	const revisions = parsed.value.revisions;
-	if (!Array.isArray(revisions) || revisions.length > 100 || revisions.some(id => typeof id !== 'string' || !id || id.length > 1024)) {
-		return corsResponse({ error: 'Up to 100 file revisions are required' }, 400);
+	if (!Array.isArray(revisions) || revisions.length > ENCRYPTION_METADATA_BATCH || revisions.some(id => typeof id !== 'string' || !id || id.length > 1024)) {
+		return corsResponse({ error: `Up to ${ENCRYPTION_METADATA_BATCH} file revisions are required` }, 400);
 	}
 	const rows = await db.prepare(`SELECT key, value FROM maintenance_state WHERE key IN (SELECT ? || value FROM json_each(?))`)
 		.bind(ENCRYPTION_FILE_PREFIX, JSON.stringify(revisions)).all<{ key: string; value: string }>();

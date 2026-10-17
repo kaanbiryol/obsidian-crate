@@ -12,8 +12,12 @@ import { validateEncryptedSettings, type EncryptedSettings } from '../encryption
 import type { RestoreIntent } from './restore-intent';
 import { parseFileVersions } from './worker-api/version-contract';
 import type { UploadResult } from '../protocol/sync-types';
+import { ENCRYPTION_METADATA_BATCH } from '../protocol/sync-limits';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
+const METADATA_CONCURRENCY = 4;
+// Reuse across the overlapping requests of one large inventory.
+const MAX_VERIFIED_METADATA = ENCRYPTION_METADATA_BATCH * METADATA_CONCURRENCY;
 type PublicDataBuilder = (path: string, content: ArrayBuffer) => Promise<unknown>;
 
 /** Boundary between ciphertext transport identities and local sync identities.
@@ -28,35 +32,43 @@ export class EncryptedFiles {
 	}
 
 	async metadata<T extends WireMetadata>(entries: Array<{ path: string; entry: T }>): Promise<T[]> {
-		const result: T[] = [];
 		// Bound both unverified descriptors and retained metadata during large
-		// inventories, not only after the entire vault has been processed.
-		for (let offset = 0; offset < entries.length; offset += 100) {
-			const chunk = entries.slice(offset, offset + 100);
-			const cached = new Map<string, PrivateFileMetadata>();
-			const missing = new Set<string>();
-			for (const { entry } of chunk) {
-				if (!entry.revision) throw new Error('Encrypted file metadata is missing its immutable revision');
-				const metadata = this.verifiedMetadata.get(entry.revision);
-				if (metadata) cached.set(entry.revision, metadata); else missing.add(entry.revision);
+		// inventories, while a few requests overlap their round trips.
+		const chunks: Array<Array<{ path: string; entry: T }>> = [];
+		for (let offset = 0; offset < entries.length; offset += ENCRYPTION_METADATA_BATCH) chunks.push(entries.slice(offset, offset + ENCRYPTION_METADATA_BATCH));
+		const results: T[][] = [];
+		for (let start = 0; start < chunks.length; start += METADATA_CONCURRENCY) {
+			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk)));
+			results.push(...group);
+		}
+		return results.flat();
+	}
+
+	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>): Promise<T[]> {
+		const result: T[] = [];
+		const cached = new Map<string, PrivateFileMetadata>();
+		const missing = new Set<string>();
+		for (const { entry } of chunk) {
+			if (!entry.revision) throw new Error('Encrypted file metadata is missing its immutable revision');
+			const metadata = this.verifiedMetadata.get(entry.revision);
+			if (metadata) cached.set(entry.revision, metadata); else missing.add(entry.revision);
+		}
+		const response = missing.size ? await this.http.requestJson<{ descriptors: Record<string, unknown> }>('/encryption/metadata', {
+			method: 'POST', body: JSON.stringify({ revisions: [...missing] }),
+		}) : null;
+		// The small snapshot remains usable if concurrent reads evict entries.
+		for (const { path, entry } of chunk) {
+			let metadata = cached.get(entry.revision!);
+			if (!metadata) {
+				const descriptor = response?.descriptors?.[entry.revision!];
+				validateFileDescriptor(descriptor);
+				metadata = await openFileMetadata(descriptor, path, this.keys.forPath(path));
+				cached.set(entry.revision!, metadata);
+				this.verifiedMetadata.set(entry.revision!, metadata);
+				while (this.verifiedMetadata.size > MAX_VERIFIED_METADATA) this.verifiedMetadata.delete(this.verifiedMetadata.keys().next().value!);
 			}
-			const response = missing.size ? await this.http.requestJson<{ descriptors: Record<string, unknown> }>('/encryption/metadata', {
-				method: 'POST', body: JSON.stringify({ revisions: [...missing] }),
-			}) : null;
-			// The small snapshot remains usable if concurrent reads evict entries.
-			for (const { path, entry } of chunk) {
-				let metadata = cached.get(entry.revision!);
-				if (!metadata) {
-					const descriptor = response?.descriptors?.[entry.revision!];
-					validateFileDescriptor(descriptor);
-					metadata = await openFileMetadata(descriptor, path, this.keys.forPath(path));
-					cached.set(entry.revision!, metadata);
-					this.verifiedMetadata.set(entry.revision!, metadata);
-					while (this.verifiedMetadata.size > 5000) this.verifiedMetadata.delete(this.verifiedMetadata.keys().next().value!);
-				}
-				if (metadata.path !== path) throw new Error('Encrypted file metadata does not match the requested file');
-				result.push({ ...entry, hash: metadata.hash, size: metadata.size });
-			}
+			if (metadata.path !== path) throw new Error('Encrypted file metadata does not match the requested file');
+			result.push({ ...entry, hash: metadata.hash, size: metadata.size });
 		}
 		return result;
 	}
