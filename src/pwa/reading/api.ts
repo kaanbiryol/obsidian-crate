@@ -96,7 +96,14 @@ export const MAX_READING_LIST_PAGES = 1100;
  * answers 304, so polling does not page through and rewrite every item. */
 async function firstReadingListPage(session: ReadingSession, previous?: ReadingCache): Promise<{ unchanged: true } | { unchanged: false; response: unknown; revision?: string }> {
   const unconditional = async () => ({ unchanged: false as const, response: await readingRequest<unknown>('/reading/list', session) });
-  if (await prepareReadingEncryption(session)) return unconditional();
+  if (await prepareReadingEncryption(session)) {
+    // The encrypted client answers an unchanged vault from its confirmed inventory.
+    const response = await readingRequest<unknown>('/reading/list', session);
+    const revision = response && typeof response === 'object' && typeof (response as { revision?: unknown }).revision === 'string'
+      ? (response as { revision: string }).revision : undefined;
+    if (revision && previous && previous.revision === revision) return { unchanged: true };
+    return { unchanged: false, response, ...(revision && revision.length <= 128 ? { revision } : {}) };
+  }
   let response: Response;
   try { response = await rawReadingRequest('/reading/list', session, undefined, previous?.revision ? { 'If-None-Match': previous.revision } : {}); }
   catch (error) { if (error instanceof EncryptionScopeChangedError) return unconditional(); throw error; }

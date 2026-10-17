@@ -64,9 +64,10 @@ it.each(['malformed later page', 'changed confirmation'])('retains the complete 
 	const { api, request } = harness(), original = await article('Original'), changed = await article('Changed');
 	request.mockImplementation(async path => path.startsWith('/reading/encrypted-file?') ? new Response(original.bytes) : Response.json(page([original.file])));
 	await expect(api.request('/reading/list')).resolves.toMatchObject({ items: [{ title: 'Original' }], issues: [] });
-	request.mockResolvedValueOnce(Response.json(page([changed.file], failure === 'malformed later page' ? 'A' : null)))
+	// Any change advances the vault sequence.
+	request.mockResolvedValueOnce(Response.json(page([changed.file], failure === 'malformed later page' ? 'A' : null, 2)))
 		.mockResolvedValueOnce(new Response(changed.bytes))
-		.mockResolvedValueOnce(Response.json(failure === 'malformed later page' ? { ...page(), nextCursor: {} } : page([], null, 2)));
+		.mockResolvedValueOnce(Response.json(failure === 'malformed later page' ? { ...page([], null, 2), nextCursor: {} } : page([], null, 3)));
 	await expect(api.request('/reading/list')).rejects.toThrow();
 	request.mockClear();
 	const restored = await api.request(`/reading/item?id=${itemId}`) as { item: { title: string }; markdown: string };
@@ -74,4 +75,14 @@ it.each(['malformed later page', 'changed confirmation'])('retains the complete 
 	expect(restored.markdown).toContain('Original text.');
 	// Both metadata and article bytes still belong to the last complete inventory.
 	expect(request.mock.calls.every(([path]) => path.startsWith('/reading/encrypted-files?'))).toBe(true);
+});
+
+it('answers an unchanged vault from the confirmed inventory in one request', async () => {
+	const { api, request } = harness(), original = await article('Original');
+	request.mockImplementation(async path => path.startsWith('/reading/encrypted-file?') ? new Response(original.bytes) : Response.json(page([original.file])));
+	const first = await api.request('/reading/list') as { revision: string };
+	request.mockClear();
+	expect(await api.request('/reading/list')).toEqual(first);
+	expect(request).toHaveBeenCalledOnce();
+	expect(first.revision).toMatch(/^"e2ee-reading-1-1"$/);
 });
