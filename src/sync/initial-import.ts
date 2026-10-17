@@ -1,5 +1,5 @@
 import { recordSyncError, SyncIssueError, withSyncFileContext } from './issues';
-import { importInventoryHash, INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
+import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from './api';
 import type { PreparedUpload, SyncResult, SyncWork } from './types';
@@ -102,7 +102,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
     await context.prepareReminderScope?.();
     context.throwIfDestroyed();
     context.report({ phase: 'saving' });
-    context.setLastSeq(await context.api.initialImport.finish(session.token, await importInventoryHash(inventory)));
+    context.setLastSeq(await context.api.initialImport.finish(session.token, inventory));
     await context.save();
     return result;
   } finally { await context.save(); }

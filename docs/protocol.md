@@ -86,8 +86,12 @@ The file pointer, changelog entry and exact result receipt commit in the same D1
 
 ## Initial import readiness
 
-`resumable-initial-import-v2` is included in protocol 1. `/sync/import/complete` seals the
-file inventory and, when a reminder policy exists, records pending reminder setup.
+`resumable-initial-import-v2` is included in protocol 1. `/sync/import/complete` verifies the
+file inventory in pages of up to 2,000 `[path, hash, size]` entries ordered by portable path
+(UTF-8 byte order). Each non-final page returns the next `after` cursor; progress is bound to
+the import generation, so an upload or prune between pages restarts verification. The `final`
+page also proves no extra files exist, then seals the inventory and, when a reminder policy
+exists, records pending reminder setup.
 `POST /sync/import/readiness` checks the selected-folder scan and durable source,
 projection and schedule queues, then atomically acknowledges readiness. Probes
 return `{ ready: false }` while work remains, optionally with an error requiring

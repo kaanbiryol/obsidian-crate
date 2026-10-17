@@ -1,4 +1,4 @@
-import { INITIAL_IMPORT_CAPABILITY, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
+import { INITIAL_IMPORT_CAPABILITY, importInventoryPages, type InitialImport, type ReminderSetupProgress, type ReminderSetupStatus } from '@/protocol/initial-import';
 import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
@@ -41,11 +41,21 @@ export class InitialImportApi {
     }
   }
 
-  async finish(token: string, inventoryHash: string): Promise<number> {
-    const result = await this.http.requestJson<{ lastSeq: number }>('/sync/import/complete', { method: 'POST', body: JSON.stringify({ token, inventoryHash }) });
-    if (!Number.isSafeInteger(result.lastSeq) || result.lastSeq < 1) throw new Error('Invalid initial import checkpoint');
+  async finish(token: string, inventory: Record<string, { hash: string; size: number }>): Promise<number> {
+    const pages = importInventoryPages(inventory);
+    let after = '', result: { lastSeq?: number; cursor?: string } = {};
+    for (const [index, entries] of pages.entries()) {
+      const final = index === pages.length - 1;
+      result = await this.http.requestJson<{ lastSeq?: number; cursor?: string }>('/sync/import/complete', { method: 'POST', body: JSON.stringify({ token, after, entries, final }) });
+      // A completed import (for example after a lost response) answers any page.
+      if (result.lastSeq !== undefined) break;
+      if (!final && typeof result.cursor !== 'string') throw new Error('Invalid initial import verification');
+      after = result.cursor ?? after;
+    }
+    const lastSeq = result.lastSeq;
+    if (lastSeq === undefined || !Number.isSafeInteger(lastSeq) || lastSeq < 1) throw new Error('Invalid initial import checkpoint');
     this.pendingSetup = { token, workerUrl: this.http.getWorkerUrl() };
-    return result.lastSeq;
+    return lastSeq;
   }
 
   isPreparingReminders(): boolean { return this.pendingSetup?.workerUrl === this.http.getWorkerUrl(); }

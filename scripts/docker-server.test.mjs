@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -89,7 +89,7 @@ console.log(JSON.stringify({status: response.status, body: await response.text()
 		const initial = await request('/sync/import', { method: 'POST', headers });
 		assert.equal(initial.status, 200);
 		assert.equal((await request('/sync/import/complete', { method: 'POST', headers, body: JSON.stringify({
-			token: JSON.parse(initial.body).import.token, inventoryHash: createHash('sha256').update('[]').digest('hex'),
+			token: JSON.parse(initial.body).import.token, after: '', entries: [], final: true,
 		}) })).status, 200);
 		const uploaded = await request('/sync/upload?path=docker.txt', { method: 'PUT', headers: { ...headers,
 			'Content-Type': 'text/plain', 'X-Crate-Expected-Hash': 'absent',

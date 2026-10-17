@@ -7,7 +7,8 @@ import { beginInitialImport, finishInitialImport } from './initial-import';
 import { uploadInitialFiles } from './initial-import-upload';
 import { pruneInitialImport } from './initial-import-prune';
 import { sha256Hex } from './auth';
-import { importInventoryHash, INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
+import { importInventoryPages, INITIAL_IMPORT_MAX_FILES, INITIAL_IMPORT_VERIFY_PAGE } from '@/protocol/initial-import';
+import { meterD1Usage } from './d1-usage';
 import { meterD1Writes } from './d1-write-meter-test-harness';
 import { handleGetChanges, handleGetManifest } from './sync-metadata-handlers';
 import { revalidateReminderSources } from './reminder-source-migration';
@@ -31,9 +32,19 @@ async function file(path: string, content = '# Note', expectedHash: string | nul
 async function send(token: string, files: Awaited<ReturnType<typeof file>>[], db = env.DB) {
   return (await uploadInitialFiles(new Request('https://test', { method: 'POST', headers: { 'X-Crate-Import': token }, body: JSON.stringify({ files }) }), env.BUCKET, db)).json() as Promise<BatchUploadResponse>;
 }
+async function finishInventory(token: string, inventory: Record<string, { hash: string; size: number }>, db = env.DB) {
+  const pages = importInventoryPages(inventory);
+  let after = '', response!: Response;
+  for (const [index, entries] of pages.entries()) {
+    response = await finishInitialImport(jsonRequest({ token, after, entries, final: index === pages.length - 1 }), db);
+    if (response.status !== 200 || index === pages.length - 1) break;
+    after = ((await response.clone().json()) as { cursor: string }).cursor;
+  }
+  return response;
+}
 async function finish(token: string, db = env.DB) {
   const rows = await env.DB.prepare('SELECT path, hash, size FROM files').all<{ path: string; hash: string; size: number }>();
-  return finishInitialImport(jsonRequest({ token, inventoryHash: await importInventoryHash(Object.fromEntries(rows.results.map(row => [row.path, row]))) }), db);
+  return finishInventory(token, Object.fromEntries(rows.results.map(row => [row.path, row])), db);
 }
 
 it('uses committed metadata to resume after a lost transaction response without writing receipts or reuploading bytes', async () => {
@@ -71,7 +82,8 @@ it('replaces changes and removes local deletions during a paused import without 
 
 it('publishes one baseline, rejects incomplete completion, and fences closed import requests', async () => {
   const token = await start(); await send(token, [await file('note.md')]);
-  expect((await finishInitialImport(jsonRequest({ token, inventoryHash: 'wrong' }), env.DB)).status).toBe(409);
+  expect((await finishInventory(token, {})).status).toBe(409);
+  expect((await finishInventory(token, { 'note.md': { hash: 'wrong', size: 6 } })).status).toBe(409);
   expect((await finish(token)).status).toBe(200);
   const manifest = await (await handleGetManifest(new Request('https://test'), env.DB)).json() as { lastSeq: number };
   expect(manifest.lastSeq).toBe(1);
@@ -243,6 +255,27 @@ it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with 
   expect((await finish(token, meter.db)).status).toBe(200);
   await revalidateReminderSources({ ...env, DB: meter.db }, 4);
   expect(meter.writes()).toBeLessThan(16000);
-  expect(meter.writes()).toBe(batchSize === 8 ? 15004 : 11256);
+  expect(meter.writes()).toBe(batchSize === 8 ? 15010 : 11262);
   console.info('Initial import D1 writes:', meter.writes());
 }, 120000);
+
+it('verifies a large inventory in bounded primary-key pages and restarts after a concurrent change', async () => {
+  const token = await start();
+  const count = INITIAL_IMPORT_VERIFY_PAGE * 2 + 17;
+  await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
+    INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'Notes/N'||x||'.md', 'notes/n'||x||'.md', 'hash', x, 'key-'||x FROM n`).bind(count).run();
+  const inventory = Object.fromEntries(Array.from({ length: count }, (_, index) => [`Notes/N${index + 1}.md`, { hash: 'hash', size: index + 1 }]));
+  const pages = importInventoryPages(inventory);
+  expect(pages).toHaveLength(3);
+  const first = await finishInitialImport(jsonRequest({ token, after: '', entries: pages[0], final: false }), env.DB);
+  const { cursor } = await first.json() as { cursor: string };
+  // A prune or upload between pages advances the generation and invalidates progress.
+  await env.DB.prepare('UPDATE initial_import SET generation = generation + 1').run();
+  expect((await finishInitialImport(jsonRequest({ token, after: cursor, entries: pages[1], final: false }), env.DB)).status).toBe(409);
+  const { [`Notes/N${count}.md`]: _omitted, ...missingOne } = inventory;
+  expect((await finishInventory(token, missingOne)).status).toBe(409);
+  const meter = meterD1Usage(env.DB);
+  expect((await finishInventory(token, inventory, meter.db)).status).toBe(200);
+  expect(meter.usage.rowsRead).toBeLessThan(count * 2);
+  expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key = 'initial_import_verification'").first()).toBeNull();
+});

@@ -37,10 +37,10 @@ the plugin require a fresh confirmation; failed requests remain eligible for ret
 
 ## Initial upload write budget
 
-The local workerd/D1 billing-metadata regression measures **11,256 row writes for
-10,000 ordinary notes**, including import setup and completion with 32-file batches.
+The local workerd/D1 billing-metadata regression measures **11,262 row writes for
+10,000 ordinary notes**, including import setup and paged completion with 32-file batches.
 The same fixture used 31,256 writes before the pre-release inventory redesign: a
-20,000-write (64%) reduction. Eight-file batches now cost 15,004 writes, down from
+20,000-write (64%) reduction. Eight-file batches now cost 15,010 writes, down from
 45,004 before these optimizations. Replaying a committed batch writes zero rows
 and uploads no R2 objects.
 
