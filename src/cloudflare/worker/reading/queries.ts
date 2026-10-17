@@ -32,6 +32,10 @@ export async function readingListEtag(db: D1Database, current: ReadingPolicy, if
   return { etag: `"${changeToken}.${revision}"`, notModified: cached.some(tag => tag.revision === revision) };
 }
 
+// A changed library is reloaded page by page; larger pages keep that to a few
+// requests for a 10,000-item library.
+export const READING_LIST_PAGE = 1000;
+
 export async function readingList(env: Env, current: ReadingPolicy, cursor: string) {
   if (cursor.length > 4096) throw new ReadingError('Invalid library cursor.');
   // Current-generation sources are inside the Reading folder, so its primary-key range replaces a vault scan.
@@ -39,10 +43,10 @@ export async function readingList(env: Env, current: ReadingPolicy, cursor: stri
   const { results } = await env.DB.prepare(`SELECT s.path, s.metadata_json, s.error,
     (SELECT count(*) FROM reading_sources d WHERE d.item_id=s.item_id AND d.generation=s.generation AND (d.path, d.revision) IN (${currentFiles})) AS copies
     FROM reading_sources s
-    WHERE s.generation=? AND s.path>? AND (s.item_id IS NOT NULL OR s.error IS NOT NULL) AND (s.path, s.revision) IN (${currentFiles}) ORDER BY s.path LIMIT 100`)
+    WHERE s.generation=? AND s.path>? AND (s.item_id IS NOT NULL OR s.error IS NOT NULL) AND (s.path, s.revision) IN (${currentFiles}) ORDER BY s.path LIMIT ${READING_LIST_PAGE}`)
     .bind(...folder, current.generation, cursor, ...folder).all<{ path: string; metadata_json: string | null; error: string | null; copies: number }>();
   const queued = cursor ? [] : (await env.DB.prepare('SELECT note FROM reading_captures WHERE generation=? ORDER BY available_at LIMIT 1000').bind(current.generation).all<{ note: string }>()).results;
   return { items: [...queued.map(row => ({ ...parseReadingNote(row.note)!, path: '' })), ...results.filter(row => row.metadata_json && row.copies === 1).map(row => ({ ...validateReadingMetadata(JSON.parse(row.metadata_json!) as Record<string, unknown>), path: row.path }))],
     issues: results.filter(row => row.error || row.copies > 1).map(row => ({ path: row.path, message: row.error ?? 'Several notes have this Reading ID. Fix the duplicates in Obsidian.' })),
-    cursor: results.length === 100 ? results.at(-1)!.path : null };
+    cursor: results.length === READING_LIST_PAGE ? results.at(-1)!.path : null };
 }

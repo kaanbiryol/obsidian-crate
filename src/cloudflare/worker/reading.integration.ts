@@ -8,6 +8,7 @@ import { projectReading, READING_PROJECTION_KEY } from './reading/projection';
 import { publishExtraction } from './reading/extraction/jobs';
 import type { Publication } from './reading/extraction/jobs';
 import { policy } from './reading/common';
+import { READING_LIST_PAGE } from './reading/queries';
 import { meterD1Usage } from './d1-usage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
@@ -30,29 +31,30 @@ beforeEach(async () => {
 afterEach(reset);
 it('paginates current sources, queues only the first page, and reports duplicate IDs across pages', async () => {
   let last = '';
-  for (let index = 0; index < 100; index++) {
-    const path = `Reading/${String(index).padStart(3, '0')}.md`;
+  const name = (index: number) => `Reading/${String(index).padStart(4, '0')}.md`;
+  for (let index = 0; index < READING_LIST_PAGE; index++) {
+    const path = name(index);
     last = await adoptReadingClip(`Note ${index}.`, path, '2026-09-26T00:00:00Z');
     await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, last, null);
   }
-  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/100.md', last, null);
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, name(READING_LIST_PAGE), last, null);
   const current = (await policy(env.DB))!;
-  for (let page = 0; page < 5; page++) await projectReading(env, current);
+  while (await projectReading(env, current) !== 'complete');
   const saved = await command('capture', { url: 'https://example.com/queued', operationId: id() });
   expect(saved.status).toBe(200);
   const queued = await saved.json() as { id: string };
   const get = (suffix: string) => handleReadingRoute(new Request(`https://test/reading/${suffix}`), env, principal);
   const first = await (await get('list')).json() as { items: ReadingItem[]; cursor: string; issues: Array<{ path: string }> };
-  expect(first.items).toHaveLength(100);
+  expect(first.items).toHaveLength(READING_LIST_PAGE);
   expect(first.items[0]).toMatchObject({ path: '', crate_reading_id: queued.id });
-  expect(first.cursor).toBe('Reading/099.md');
-  expect(first.issues).toMatchObject([{ path: 'Reading/099.md' }]);
-  expect(await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json()).toMatchObject({ items: [], cursor: null, issues: [{ path: 'Reading/100.md' }] });
+  expect(first.cursor).toBe(name(READING_LIST_PAGE - 1));
+  expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE - 1) }]);
+  expect(await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json()).toMatchObject({ items: [], cursor: null, issues: [{ path: name(READING_LIST_PAGE) }] });
   expect(await (await get(`item?id=${queued.id}`)).json()).toMatchObject({ item: { path: '', crate_reading_id: queued.id }, markdown: '' });
-  expect(await (await get(`item?id=${first.items[1]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: 'Reading/000.md' }, markdown: 'Note 0.' });
+  expect(await (await get(`item?id=${first.items[1]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: name(0) }, markdown: 'Note 0.' });
   expect((await get(`item?id=${parseReadingNote(last)!.crate_reading_id}`)).status).toBe(409);
   expect((await get(`list?cursor=${'x'.repeat(4097)}`)).status).toBe(400);
-}, 20_000);
+}, 180_000);
 
 it('preserves source bytes and HTTP error distinctions for rejected edits and retries', async () => {
   const path = 'Reading/Guarded.md', content = await adoptReadingClip('Original user text.', path, '2026-09-26T00:00:00Z');
