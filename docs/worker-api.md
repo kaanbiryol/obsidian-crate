@@ -277,7 +277,7 @@ Response: `{ success: true, settingsVersion }`. A stale version returns `409` in
 
 Query: `?folderPath=<reminders-folder>`
 
-Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects. Conditional requests use an ETag derived from file metadata and the reminder parser version. On an ETag miss, D1-cached parses are reused by file hash, so only new or changed Markdown objects are fetched from R2 and parsed.
+Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects. Conditional requests use an ETag that pairs a vault change token (changelog sequence, import and reset generations, folder and parser version) with the folder's file-metadata revision. An unchanged token answers 304 without listing the folder; an unchanged folder revision answers 304 with a refreshed ETag. On an ETag miss, D1-cached parses are reused by file hash, so only new or changed Markdown objects are fetched from R2 and parsed.
 
 Cold indexes are warmed in batches of at most 20 files and 2 MiB per request. While more files remain, the endpoint responds with `202` and `{ warming: true, remainingFiles }`; clients should repeat the request until it returns `200`. Individual reminder Markdown files must be no larger than 1 MiB.
 
@@ -437,8 +437,10 @@ Protocol 11 advertises `shared-history-checkpoints-v1`; safe ordinary protocol-7
 writes remain supported. Checkpoints store metadata in R2, not extra copies of vault
 files. Creation snapshots the complete server inventory, not a client-supplied list.
 The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
-Expired or evicted IDs receive 410. Captures are bounded to 20,000 files and 8 MiB of
-metadata (413 beyond that limit), and in-progress initial imports receive 409.
+Expired or evicted IDs receive 410. Captures are bounded to 100,000 files and 32 MiB of
+metadata (413 beyond that limit), and in-progress initial imports receive 409. The Worker
+encodes inventory pages as it reads them and streams stored documents after matching the
+object's metadata to the index, so neither path parses the whole inventory.
 All routes require vault credentials and return private, non-cacheable responses.
 See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
 retention, cleanup, restore validation, and older-server behavior.

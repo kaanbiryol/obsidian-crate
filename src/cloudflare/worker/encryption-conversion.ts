@@ -12,6 +12,9 @@ import { isEncryptionId } from '../../encryption/encoding';
 import { prepareEncryptedReceipt } from './encrypted-receipt-storage';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import type { Env } from './types';
+import { CHECKPOINT_PREFIX, storeEncryptedCheckpoint, streamCheckpointObject } from './history-checkpoints';
+import { MAX_ENCRYPTED_CHECKPOINT_BYTES } from '../../protocol/history-checkpoints';
+import { readLimitedRequestBody } from './body-reader';
 
 const CONVERSION_PAGE_SIZE = 25;
 const CONVERSION_INDEX = 'files_conversion_storage_key_idx';
@@ -120,27 +123,19 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	}
 	if (path === '/encryption/conversion/checkpoints') {
 		const cursor = new URL(request.url).searchParams.get('cursor') ?? undefined;
-		const listing = await env.BUCKET.list({ prefix: '__crate__/history/checkpoints/', limit: 20, ...(cursor ? { cursor } : {}) });
-		const documents = [];
-		for (const item of listing.objects) {
-			const object = await env.BUCKET.get(item.key);
-			if (!object || object.size > 12 * 1024 * 1024) throw new Error('Checkpoint is unavailable');
-			const document: unknown = JSON.parse(await object.text());
-			if (!document || typeof document !== 'object') throw new Error('Checkpoint is invalid');
-			if (!('encrypted' in document)) documents.push({ key: item.key, document });
-		}
-		return corsResponse({ documents, cursor: listing.truncated ? listing.cursor : null });
+		const listing = await env.BUCKET.list({ prefix: CHECKPOINT_PREFIX, limit: 100, include: ['customMetadata'], ...(cursor ? { cursor } : {}) });
+		const keys = listing.objects.filter(item => item.customMetadata?.encrypted !== '1').map(item => item.key);
+		return corsResponse({ keys, cursor: listing.truncated ? listing.cursor : null });
 	}
-	if (path === '/encryption/conversion/checkpoint' && request.method === 'PUT') {
-		const body = await parseJsonObject(request, 12 * 1024 * 1024);
-		if (!body.ok) return body.response;
-		const { key, encrypted } = body.value;
-		if (typeof key !== 'string' || !/^__crate__\/history\/checkpoints\/[a-f0-9-]{36}\.json$/.test(key) || typeof encrypted !== 'string' || encrypted.length > 12 * 1024 * 1024 || encrypted.split('.').length !== 5) return corsResponse({ error: 'Invalid encrypted checkpoint' }, 400);
-		const object = await env.BUCKET.get(key);
-		if (!object) return corsResponse({ error: 'Checkpoint is unavailable' }, 404);
-		const previous = JSON.parse(await object.text()) as { checkpoint: unknown; encrypted?: string };
-		if (!previous.encrypted) await env.BUCKET.put(key, JSON.stringify({ version: 1, checkpoint: previous.checkpoint, encrypted }), { httpMetadata: { contentType: 'application/json' } });
-		return corsResponse({ success: true });
+	if (path === '/encryption/conversion/checkpoint') {
+		const key = new URL(request.url).searchParams.get('key') ?? '';
+		if (!/^__crate__\/history\/checkpoints\/[a-f0-9-]{36}\.json$/.test(key)) return corsResponse({ error: 'Invalid checkpoint' }, 400);
+		if (request.method === 'GET') return streamCheckpointObject(env.BUCKET, key);
+		if (request.method === 'PUT') {
+			const body = await readLimitedRequestBody(request, MAX_ENCRYPTED_CHECKPOINT_BYTES, 'Encrypted checkpoint is too large');
+			if (!body.ok) return body.response;
+			return storeEncryptedCheckpoint(env.BUCKET, key, body.bytes);
+		}
 	}
 	if (path === '/encryption/conversion/finish' && request.method === 'POST') return finishConversion(env, state);
 	return corsResponse({ error: 'Unknown encryption conversion operation' }, 404);
@@ -234,7 +229,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 	if (await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first()) return corsResponse({ pending: true });
 	// Sweep every owned R2 object in bounded pages before activation. Checkpoints
 	// must already be encrypted. Unreferenced staged/retired content is disposable.
-	const listing = await env.BUCKET.list({ limit: CONVERSION_SWEEP_PAGE_SIZE, ...(cursor ? { cursor: JSON.parse(cursor) as string } : {}) });
+	const listing = await env.BUCKET.list({ limit: CONVERSION_SWEEP_PAGE_SIZE, include: ['customMetadata'], ...(cursor ? { cursor: JSON.parse(cursor) as string } : {}) });
 	const managedKeys = listing.objects.map(object => object.key)
 		.filter(key => key.startsWith('__crate__/files/') || key === '__crate__/settings.json');
 	// Bound queries independently of page size; per-object lookups can exhaust
@@ -244,11 +239,8 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		UNION SELECT storage_key FROM file_versions WHERE storage_key IN (SELECT value FROM json_each(?))`)
 		.bind(JSON.stringify(managedKeys), JSON.stringify(managedKeys)).all<{ storage_key: string }>() : null;
 	const referenced = new Set(references?.results.map(row => row.storage_key));
-	for (const object of listing.objects) {
-		if (object.key.startsWith('__crate__/history/checkpoints/')) {
-			const checkpoint = await env.BUCKET.get(object.key);
-			if (!checkpoint || !('encrypted' in JSON.parse(await checkpoint.text()))) return corsResponse({ error: 'Convert every retained checkpoint before finishing' }, 409);
-		}
+	if (listing.objects.some(object => object.key.startsWith(CHECKPOINT_PREFIX) && object.customMetadata?.encrypted !== '1')) {
+		return corsResponse({ error: 'Convert every retained checkpoint before finishing' }, 409);
 	}
 	const orphaned = managedKeys.filter(key => !referenced.has(key));
 	if (orphaned.length) await env.BUCKET.delete(orphaned);

@@ -7,7 +7,8 @@ import { SyncTestDevice } from './sync-engine-test-harness';
 import { SyncRuntime } from '../../sync/runtime';
 import type { SyncEngine } from '../../sync/engine';
 import type { SyncHistoryEntry } from '../../sync/types';
-import { createSharedCheckpoint, pruneSharedCheckpoints } from './history-checkpoints';
+import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints, storeEncryptedCheckpoint } from './history-checkpoints';
+import { parseSharedCheckpointDocument } from '../../protocol/history-checkpoints';
 import worker from './index';
 import { sha256Hex } from './auth';
 
@@ -154,7 +155,7 @@ it('caps the shared index at twenty checkpoints', async () => {
 });
 
 it('rejects a checkpoint if the server changes between inventory pages', async () => {
-    const paths = Array.from({ length: 2001 }, (_, i) => `file-${String(i).padStart(5, '0')}.md`);
+    const paths = Array.from({ length: CHECKPOINT_PAGE_SIZE + 1 }, (_, i) => `file-${String(i).padStart(5, '0')}.md`);
     await env.DB.prepare(`INSERT INTO files(path, portable_path, hash, size, storage_key)
         SELECT value, value, ?, 1, '__crate__/files/' || value FROM json_each(?)`).bind('a'.repeat(64), JSON.stringify(paths)).run();
     let pages = 0;
@@ -223,3 +224,23 @@ it.each(['update', 'delete'])('retains checkpoint bytes for thirty days from com
     const retained = await env.DB.prepare("SELECT expires_at FROM file_versions WHERE path='note.md'").first<{ expires_at: number }>();
     expect(retained!.expires_at).toBeGreaterThanOrEqual(checkpoint.expiresAt);
 });
+
+it('creates, streams and encrypts a checkpoint above the former 20,000-file limit', async () => {
+    const count = 25_000;
+    await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
+        INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'n/'||x||'.md', 'n/'||x||'.md', ?, x, '__crate__/files/k'||x FROM n`)
+        .bind(count, 'a'.repeat(64)).run();
+    const created = await createSharedCheckpoint(env.BUCKET, env.DB);
+    expect(created.status, await created.clone().text()).toBe(200);
+    const { checkpoint } = await created.json() as { checkpoint: { id: string } };
+    const streamed = await getSharedCheckpoint(new Request(`https://test/sync/checkpoint?id=${checkpoint.id}`), env.BUCKET);
+    const document = parseSharedCheckpointDocument(await streamed.json());
+    expect(document.checkpoint.fileCount).toBe(count);
+    expect(document.files['n/7.md']).toMatchObject({ size: 7, revision: '__crate__/files/k7' });
+    const key = `__crate__/history/checkpoints/${checkpoint.id}.json`;
+    expect((await storeEncryptedCheckpoint(env.BUCKET, key, new TextEncoder().encode('a.b.c.d"'))).status).toBe(400);
+    expect((await storeEncryptedCheckpoint(env.BUCKET, key, new TextEncoder().encode('aa.bb.cc.dd.ee'))).status).toBe(200);
+    const stored = await env.BUCKET.get(key);
+    expect(stored?.customMetadata).toMatchObject({ encrypted: '1' });
+    expect(JSON.parse(await stored!.text())).toMatchObject({ version: 1, checkpoint: { id: checkpoint.id }, encrypted: 'aa.bb.cc.dd.ee' });
+}, 60_000);

@@ -5,8 +5,10 @@ import type { FileEntry } from './sync-types';
 export const SHARED_CHECKPOINT_CAPABILITY = 'shared-history-checkpoints-v1';
 export const MAX_SHARED_CHECKPOINTS = 20;
 export const CHECKPOINT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-export const MAX_CHECKPOINT_FILES = 20_000;
-export const MAX_CHECKPOINT_BYTES = 8 * 1024 * 1024;
+export const MAX_CHECKPOINT_FILES = 100_000;
+export const MAX_CHECKPOINT_BYTES = 32 * 1024 * 1024;
+/** Encrypted documents expand the plaintext by base64url and envelope overhead. */
+export const MAX_ENCRYPTED_CHECKPOINT_BYTES = 48 * 1024 * 1024;
 export const isCheckpointId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 
 export interface SharedCheckpoint {

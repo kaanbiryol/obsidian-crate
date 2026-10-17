@@ -49,6 +49,7 @@ interface R2ListOptions {
 	prefix?: string;
 	limit?: number;
 	cursor?: string;
+	include?: Array<'httpMetadata' | 'customMetadata'>;
 }
 
 interface R2ListResult {

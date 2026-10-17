@@ -35,6 +35,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /encryption/conversion/file': { scopes: VAULT, execution: COORDINATOR },
 	'GET /encryption/conversion/settings': { scopes: VAULT, execution: COORDINATOR },
 	'GET /encryption/conversion/checkpoints': { scopes: VAULT, execution: COORDINATOR },
+	'GET /encryption/conversion/checkpoint': { scopes: VAULT, execution: COORDINATOR },
 	'POST /encryption/metadata': { scopes: VAULT },
 	'POST /encryption/reset': { scopes: VAULT, execution: COORDINATOR },
 	'POST /encryption/conversion': { scopes: VAULT, execution: COORDINATOR },

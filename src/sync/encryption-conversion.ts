@@ -91,11 +91,13 @@ export async function convertEncryptedVault(http: WorkerApiHttpClient, bundle: V
 	progress('Encrypting history checkpoints');
 	let cursor: string | null = null;
 	do {
-		const page: { documents: Array<{ key: string; document: unknown }>; cursor: string | null } = await http.requestJson('/encryption/conversion/checkpoints' + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''));
-		for (const item of page.documents) {
-			const document = parseSharedCheckpointDocument(item.document);
+		const page: { keys: string[]; cursor: string | null } = await http.requestJson('/encryption/conversion/checkpoints' + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''));
+		// One checkpoint at a time bounds memory on both peers.
+		for (const key of page.keys) {
+			const route = `/encryption/conversion/checkpoint?key=${encodeURIComponent(key)}`;
+			const document = parseSharedCheckpointDocument(await http.requestJson(route, {}, TRANSFER_TIMEOUT_MS));
 			const encrypted = await encryptJson(document, root.key, { vaultId: bundle.vaultId, scopeId: 'vault', objectId: document.checkpoint.id, purpose: 'settings' });
-			await http.requestJson('/encryption/conversion/checkpoint', { method: 'PUT', body: JSON.stringify({ key: item.key, encrypted }) }, TRANSFER_TIMEOUT_MS);
+			await http.requestJson(route, { method: 'PUT', body: encrypted, contentType: 'text/plain' }, TRANSFER_TIMEOUT_MS);
 		}
 		cursor = page.cursor;
 	} while (cursor);
