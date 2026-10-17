@@ -74,6 +74,7 @@ export async function processPendingChanges(
 	const reconciliationPaths = new Set<string>();
 	const skipped: SyncIssue[] = [];
 	let hasTerminalFailure = false;
+	let flushFailed = false;
 
 	logger.info(`Processing ${paths.length} pending changes`);
 	context.updateState({ status: 'syncing', pendingChanges: context.getPendingPathCount() });
@@ -134,6 +135,7 @@ export async function processPendingChanges(
 		await context.localManifest.save();
 		batch.settle(completedQueueKeys);
 		if (failures.length > 0) {
+			flushFailed = true;
 			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
 			const issues = [...failures.map(failure => ({ path: failure.path, message: failure.error })), ...skipped];
 			batch.release();
@@ -152,6 +154,7 @@ export async function processPendingChanges(
 		}
 
 		batch.release();
+		context.flushSucceeded?.();
 		const didWork = uploads.length > 0 || deletes.length > 0 || skipped.length > 0;
 		await context.finishInitialSetup();
 		context.updateState({
@@ -173,6 +176,7 @@ export async function processPendingChanges(
 			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.getPendingPathCount() });
 			logger.info('Queue processing aborted');
 		} else {
+			flushFailed = true;
 			const retryable = isRetryableSyncError(error);
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
 			if (!retryable) {
@@ -209,7 +213,8 @@ export async function processPendingChanges(
 			&& reconciliationPaths.size === 0
 			&& !hasTerminalFailure
 		) {
-			context.triggerDebouncedSync();
+			if (flushFailed && context.retryAfterFailure) context.retryAfterFailure();
+			else context.triggerDebouncedSync();
 		}
 	}
 }

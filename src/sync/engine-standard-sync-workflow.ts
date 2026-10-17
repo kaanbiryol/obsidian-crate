@@ -172,15 +172,16 @@ export async function runSyncWorkflow(
 					progressCallback?.(current, total);
 				},
 			);
+			const downloaded = new Set(result.downloadedPaths);
 			for (const diff of downloadDiffs) {
 				if (
 					diff.cause === 'local-deleted'
-					&& result.downloadedPaths.includes(diff.path)
+					&& downloaded.has(diff.path)
 					&& !hasUnresolvedConflict(result, diff.path)
 				) {
 					recordResolvedRace(result, diff.path, 'kept-remote-edit');
 				}
-				if (result.downloadedPaths.includes(diff.path)) {
+				if (downloaded.has(diff.path)) {
 					const manifestEntry = context.getLocalManifestEntry(diff.path);
 					if (manifestEntry) localFiles[diff.path] = manifestEntry;
 				}

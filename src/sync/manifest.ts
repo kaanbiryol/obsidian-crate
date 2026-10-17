@@ -255,7 +255,10 @@ export class LocalManifest {
 			if (old === next) this.renameDependencies.delete(old);
 			else this.renameDependencies.set(old, next);
 		}
-		for (const path of this.getAllPaths()) {
+		// Obsidian reports a folder move as one event per file. A tracked file
+		// moves alone, so only an untracked source needs the prefix scan.
+		const sources = getPathEntry(this.manifest.files, source) ? [source] : this.getAllPaths();
+		for (const path of sources) {
 			const target = move(path);
 			if (target !== path && !this.renameDependencies.has(path)) this.renameDependencies.set(path, target);
 		}

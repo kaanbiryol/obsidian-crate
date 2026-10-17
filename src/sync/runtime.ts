@@ -32,6 +32,7 @@ import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
 import { RuntimeServerStatus } from './runtime-server-status';
 
+const CHECKPOINT_INTERVAL_PER_FILE_MS = 360;
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
 export const FOREGROUND_SYNC_COOLDOWN_MS = 30_000;
@@ -96,6 +97,7 @@ export class SyncRuntime {
 	}
 	getPendingRestores(): RemoteFileVersion[] { return this.syncEngine?.getPendingRestores() ?? []; }
 	private lastForegroundSyncAt: number | null = null;
+	private lastCheckpointAt = 0;
 
 	constructor(
 		private plugin: Plugin,
@@ -601,9 +603,10 @@ export class SyncRuntime {
 		});
 		const attachCheckpoint = (checkpoint: Pick<SyncHistoryEntry, 'sharedCheckpoint' | 'historyCheckpoint'>) => {
 			if (this.syncEngine !== engine) return;
+			this.lastCheckpointAt = Date.now();
 			updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, ...checkpoint } : entry) });
 		};
-		if (result.success && !result.conflicts.length) {
+		if (result.success && !result.conflicts.length && this.checkpointDue(type, engine, latest)) {
 			try {
                 const shared = await engine.saveSharedHistoryCheckpoint();
                 if (this.syncEngine !== engine) return;
@@ -615,6 +618,17 @@ export class SyncRuntime {
             }
 			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
 		}
+	}
+
+	/** A checkpoint reads the whole server inventory. Ordinary syncs space them by
+	 * vault size, about 2.4 inventory reads a day at any size (100,000 files: every
+	 * 10 hours; 1,000 files: every 6 minutes). Initial and full syncs always save one. */
+	private checkpointDue(type: SyncHistoryEntry['type'], engine: SyncEngine, latest: SyncHistoryEntry): boolean {
+		if (type !== 'sync') return true;
+		// History keeps 20 entries; remember the last checkpoint beyond that window.
+		const previous = this.settings.syncHistory.find(entry => entry !== latest && (entry.sharedCheckpoint || entry.historyCheckpoint) && entry.checkpointFileCount === undefined);
+		const last = Math.max(previous ? Date.parse(previous.timestamp) : 0, this.lastCheckpointAt);
+		return !last || Date.now() - last >= engine.trackedFileCount() * CHECKPOINT_INTERVAL_PER_FILE_MS;
 	}
 
 	private emitCurrentState(): void {

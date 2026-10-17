@@ -47,16 +47,18 @@ export class LocalContentVerifier {
 	private async check(vault: Vault, manifest: VerificationManifest, files: VaultFile[], signal: AbortSignal): Promise<boolean> {
 		signal.throwIfAborted();
 		await this.loadProgress();
-		const eligible = files.filter(file => file.size <= MAX_FILE_SIZE_BYTES)
-			.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-		let start = eligible.findIndex(file => file.path > this.cursor);
-		if (start < 0) start = 0;
+		// The next files in path order after the cursor, wrapping to the start,
+		// selected without sorting the whole vault on every check.
+		const eligible = (file: VaultFile) => file.size <= MAX_FILE_SIZE_BYTES;
+		const cursor = this.cursor;
+		const after = smallestByPath(files, VERIFICATION_FILE_BUDGET, file => eligible(file) && file.path > cursor);
+		const rotation = [...after, ...smallestByPath(files, VERIFICATION_FILE_BUDGET - after.length, file => eligible(file) && file.path <= cursor)];
 		let bytes = 0;
 		let changed = false;
 		try {
-			for (let count = 0; count < Math.min(eligible.length, VERIFICATION_FILE_BUDGET); count++) {
+			for (let count = 0; count < rotation.length; count++) {
 				signal.throwIfAborted();
-				const file = eligible[(start + count) % eligible.length]!;
+				const file = rotation[count]!;
 				// One larger eligible file may exceed the byte budget; it must not starve.
 				if (count > 0 && bytes + file.size > VERIFICATION_BYTE_BUDGET) break;
 				this.cursor = file.path;
@@ -83,4 +85,19 @@ export class LocalContentVerifier {
 		}
 		return changed;
 	}
+}
+
+/** Up to `limit` matching files in ascending path order, in one pass. */
+function smallestByPath(files: VaultFile[], limit: number, include: (file: VaultFile) => boolean): VaultFile[] {
+	const selected: VaultFile[] = [];
+	if (limit <= 0) return selected;
+	for (const file of files) {
+		if (!include(file)) continue;
+		if (selected.length === limit && file.path >= selected[limit - 1]!.path) continue;
+		let index = selected.length;
+		while (index > 0 && selected[index - 1]!.path > file.path) index--;
+		selected.splice(index, 0, file);
+		if (selected.length > limit) selected.pop();
+	}
+	return selected;
 }

@@ -34,6 +34,27 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(runtime.getActivityProgress()).toBeNull();
 	});
 
+	it('spaces ordinary sync checkpoints by vault size but always saves one for full syncs', async () => {
+		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
+		try {
+			const { runtime } = createRuntimeHarness();
+			const saveSharedHistoryCheckpoint = vi.fn(async () => ({ id: crypto.randomUUID() }));
+			await initializeRuntime(runtime, {
+				sync: vi.fn(async () => createEmptySyncResult()), forceFullSync: vi.fn(async () => createEmptySyncResult()),
+				saveSharedHistoryCheckpoint, trackedFileCount: () => 10_000,
+			} as never);
+			await runtime.sync();
+			await runtime.sync();
+			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce();
+			await runtime.forceFullSync();
+			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledTimes(2);
+			// 10,000 tracked files space ordinary checkpoints one hour apart.
+			vi.setSystemTime(Date.parse('2026-10-17T11:00:01Z'));
+			await runtime.sync();
+			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledTimes(3);
+		} finally { vi.useRealTimers(); }
+	});
+
 	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const checkpoint = createDeferred<string>();

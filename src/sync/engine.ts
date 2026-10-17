@@ -292,6 +292,7 @@ export class SyncEngine {
     }
 
     async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
+    trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
 
     async saveHistoryCheckpoint(): Promise<string | undefined> { return this.trackWork(() => this.history().saveLocal()); }
 

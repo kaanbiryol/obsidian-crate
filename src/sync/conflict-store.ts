@@ -33,6 +33,10 @@ export class ConflictStore {
 	private data: ConflictStoreData = { version: 1, conflicts: [] };
 	private dirty = false;
 	private mutationChain: Promise<void> = Promise.resolve();
+	private pendingRecords?: RecordConflictInput[];
+	private pendingRecordsDone?: Promise<void>;
+	private pendingRecordsSequence = 0;
+	private enqueuedMutations = 0;
 	private closed = false;
 
 	constructor(
@@ -150,20 +154,38 @@ export class ConflictStore {
 			.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 	}
 
+	/** Records queued while an earlier mutation runs share one durable save; each
+	 * caller still resolves only after its record is written. */
 	record(input: RecordConflictInput): Promise<void> {
-		return this.enqueueMutation(async () => {
-			const existing = this.data.conflicts.find((conflict) => conflict.conflictPath === input.conflictPath);
-			const record: ConflictRecord = {
-				...input,
-				createdAt: existing?.createdAt ?? new Date().toISOString(),
-				status: 'active',
-			};
-			if (existing) Object.assign(existing, record);
-			else this.data.conflicts.push(record);
+		// Join only the newest queued mutation, so other mutations keep their order.
+		if (this.pendingRecords && this.pendingRecordsSequence === this.enqueuedMutations) {
+			this.pendingRecords.push(input);
+			return this.pendingRecordsDone!;
+		}
+		const pending = this.pendingRecords = [input];
+		const done = this.pendingRecordsDone = this.enqueueMutation(async () => {
+			this.pendingRecords = undefined;
+			this.pendingRecordsDone = undefined;
+			const byPath = new Map(this.data.conflicts.map(conflict => [conflict.conflictPath, conflict]));
+			for (const entry of pending) {
+				const existing = byPath.get(entry.conflictPath);
+				const record: ConflictRecord = {
+					...entry,
+					createdAt: existing?.createdAt ?? new Date().toISOString(),
+					status: 'active',
+				};
+				if (existing) Object.assign(existing, record);
+				else {
+					this.data.conflicts.push(record);
+					byPath.set(record.conflictPath, record);
+				}
+			}
 			this.dirty = true;
 			await this.save();
 			this.notifyCountChanged();
 		});
+		this.pendingRecordsSequence = this.enqueuedMutations;
+		return done;
 	}
 
 	markResolved(conflictPath: string): Promise<void> {
@@ -257,11 +279,12 @@ export class ConflictStore {
 	}
 
 	private notifyCountChanged(): void {
-		this.onActiveCountChange?.(this.getActiveConflicts().length);
+		this.onActiveCountChange?.(this.data.conflicts.reduce((count, conflict) => count + (conflict.status === 'active' ? 1 : 0), 0));
 	}
 
 	private enqueueMutation(task: () => Promise<void>): Promise<void> {
 		if (this.closed) return Promise.reject(createAbortError('Conflict store closed'));
+		this.enqueuedMutations++;
 		const next = this.mutationChain.then(task, task);
 		this.mutationChain = next.catch(() => {});
 		return next;

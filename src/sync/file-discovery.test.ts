@@ -22,6 +22,26 @@ describe('file-discovery helpers', () => {
 });
 
 describe('getAllVaultFiles', () => {
+	it('overlaps visible folder listings and returns nested hidden files in path order', async () => {
+		const folders = Array.from({ length: 20 }, (_, index) => `F${String(index).padStart(2, '0')}`);
+		let active = 0, peak = 0;
+		const list = vi.fn(async (path: string) => {
+			active++; peak = Math.max(peak, active);
+			await new Promise(resolve => setTimeout(resolve, 1));
+			active--;
+			if (path === '') return { files: [], folders };
+			if (path.endsWith('/.cfg')) return { files: [`${path}/a.json`], folders: [] };
+			return { files: [], folders: [`${path}/.cfg`] };
+		});
+		const vault = {
+			getFiles: vi.fn(() => []),
+			adapter: { list, stat: vi.fn(async () => ({ type: 'file', size: 1, mtime: 1 })) },
+		} as unknown as Vault;
+		const files = await getAllVaultFiles(vault, () => false);
+		expect(peak).toBeGreaterThan(1);
+		expect(files.map(file => file.path)).toEqual(folders.map(folder => `${folder}/.cfg/a.json`));
+	});
+
 	it('skips root and nested Git repositories before listing their contents', async () => {
 		const listings: Record<string, { files: string[]; folders: string[] }> = {
 			'': { files: ['.gitignore'], folders: ['.git', 'Projects'] },

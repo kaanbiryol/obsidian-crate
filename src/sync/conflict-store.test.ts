@@ -38,6 +38,20 @@ describe('ConflictStore', () => {
 		getAllVaultFilesMock.mockResolvedValue([]);
 	});
 
+	it('writes concurrently recorded conflicts in one save and keeps mutation order', async () => {
+		const harness = createHarness();
+		await harness.store.load();
+		harness.adapter.write.mockClear();
+		const conflict = (index: number) => ({ originalPath: `notes/${index}.md`, conflictPath: `notes/${index} (conflict).md`, cause: 'concurrent-edit' as const, localHash: 'local', remoteHash: 'remote', baseHash: 'base' });
+		await Promise.all(Array.from({ length: 200 }, (_, index) => harness.store.record(conflict(index))));
+		// One temporary and one final write for the whole batch.
+		expect(harness.adapter.write).toHaveBeenCalledTimes(2);
+		expect(harness.store.getActiveConflicts()).toHaveLength(200);
+		expect(harness.counts.at(-1)).toBe(200);
+		await Promise.all([harness.store.markResolved(conflict(0).conflictPath), harness.store.record(conflict(0))]);
+		expect(harness.store.getActiveConflicts().some(entry => entry.conflictPath === conflict(0).conflictPath)).toBe(true);
+	});
+
 	it('persists the original path and hashes for an active conflict', async () => {
 		const harness = createHarness();
 		await harness.store.load();

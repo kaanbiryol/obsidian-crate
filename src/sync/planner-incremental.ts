@@ -87,8 +87,9 @@ export async function runIncrementalSync(
         context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
         options.progressCallback?.(current, total);
       });
+      const downloaded = new Set(result.downloadedPaths);
       for (const path of restoreDeletedPaths) {
-        if (result.downloadedPaths.includes(path) && !hasUnresolvedConflict(result, path)) {
+        if (downloaded.has(path) && !hasUnresolvedConflict(result, path)) {
           recordResolvedRace(result, path, "kept-remote-edit");
         }
       }
@@ -156,8 +157,9 @@ export async function runIncrementalSync(
       current += chunk.length - reported;
       options.progressCallback?.(current, total);
     }
+    const uploaded = new Set(result.uploadedPaths);
     for (const path of resurrectPaths) {
-      if (result.uploadedPaths.includes(path)) {
+      if (uploaded.has(path)) {
         recordResolvedRace(result, path, "kept-local-edit");
       }
     }

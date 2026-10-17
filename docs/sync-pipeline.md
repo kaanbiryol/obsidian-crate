@@ -372,11 +372,14 @@ inventory. R2 holds the inventories and an ETag-protected index; no file content
 are duplicated and no D1 schema migration is required. Checkpoints are visible on
 all connected devices, including devices without local activity history. The index
 keeps the newest 20 distinct server generations for at most 30 days. Repeated or
-concurrent saves of the same generation resolve to the same checkpoint.
+concurrent saves of the same generation resolve to the same checkpoint. Initial and
+full syncs always save one; ordinary syncs wait 360 ms per tracked file since the
+last checkpoint (one hour at 10,000 files, ten hours at 100,000), keeping inventory
+reads near 2.4 per day on the Cloudflare Free plan.
 
 The server reads the inventory in bounded pages and verifies the monotonic changelog
 generation before and after capture. An incomplete initial import or concurrent
-mutation rejects capture. Current limits are 20,000 files and 8 MiB of metadata;
+mutation rejects capture. Current limits are 100,000 files and 32 MiB of metadata;
 exceeding them never publishes a partial inventory. The small shared index is
 published conditionally only after its immutable inventory exists. Uncertain writes
 retain their possible committed objects; a bounded, cursor-based maintenance sweep

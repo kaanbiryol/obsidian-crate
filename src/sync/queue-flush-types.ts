@@ -44,6 +44,10 @@ export interface QueueFlushContext {
 	currentStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	triggerDebouncedSync(): void;
+	/** Schedule the next attempt after a failed flush, backing off while it keeps failing. */
+	retryAfterFailure?(): void;
+	/** Reset the failure backoff after a flush succeeds. */
+	flushSucceeded?(): void;
 	requestReconciliation(queueKeys: string[]): void;
 	onFlushResult?(result: SyncResult): void | Promise<void>;
 }

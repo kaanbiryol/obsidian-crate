@@ -101,10 +101,8 @@ export async function getAllVaultFiles(
 		const name = folder.split('/').pop() ?? '';
 		return !name.startsWith('.');
 	});
-	for (const folder of visibleRootFolders) {
-		if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
-		await walkForNestedHiddenFolders(vault, folder, shouldIgnore, seen, result, assertActive);
-	}
+	await walkForNestedHiddenFolders(vault, visibleRootFolders.filter(folder => !shouldIgnore(folder) && !shouldIgnore(folder + '/')),
+		shouldIgnore, seen, result, assertActive);
 
 	// Include hidden files at the root level (e.g. `.gitignore`)
 	for (const filePath of root.files) {
@@ -170,34 +168,46 @@ async function walkHiddenFolder(
 	}
 }
 
+// Folder listings are slow bridge calls on mobile; a bounded pool overlaps them.
+const LISTING_CONCURRENCY = 8;
+
 /**
- * Walk non-hidden folders and recurse into hidden descendants only.
+ * Walk non-hidden folders and recurse into hidden descendants only. Listings run
+ * concurrently; hidden folders are then walked in path order, so results stay
+ * deterministic.
  */
 async function walkForNestedHiddenFolders(
 	vault: Vault,
-	folderPath: string,
+	folderPaths: string[],
 	shouldIgnore: (path: string) => boolean,
 	seen: Set<string>,
 	result: VaultFile[],
 	assertActive?: () => void,
 ): Promise<void> {
-	const pendingFolders = [folderPath];
+	const pendingFolders = [...folderPaths];
 	const visitedFolders = new Set<string>();
-	while (pendingFolders.length > 0) {
-		const currentFolder = pendingFolders.pop();
-		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
-		visitedFolders.add(currentFolder);
-		const listing = await safeList(vault, currentFolder, assertActive);
-
-		for (const subfolder of listing.folders) {
-			if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
-			const name = subfolder.split('/').pop() ?? '';
-			if (name.startsWith('.')) {
-				await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result, assertActive);
-			} else {
-				pendingFolders.push(subfolder);
+	const hiddenFolders: string[] = [];
+	const worker = async () => {
+		while (pendingFolders.length > 0) {
+			const currentFolder = pendingFolders.pop()!;
+			if (visitedFolders.has(currentFolder)) continue;
+			visitedFolders.add(currentFolder);
+			const listing = await safeList(vault, currentFolder, assertActive);
+			for (const subfolder of listing.folders) {
+				if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
+				const name = subfolder.split('/').pop() ?? '';
+				if (name.startsWith('.')) hiddenFolders.push(subfolder);
+				else pendingFolders.push(subfolder);
 			}
 		}
+	};
+	// Workers that find the queue empty exit; a worker that lists more folders
+	// keeps draining them, so start new workers until the queue settles.
+	while (pendingFolders.length > 0) {
+		await Promise.all(Array.from({ length: Math.min(LISTING_CONCURRENCY, pendingFolders.length) }, worker));
+	}
+	for (const folder of hiddenFolders.sort()) {
+		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result, assertActive);
 	}
 }
 

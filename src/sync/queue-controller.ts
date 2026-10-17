@@ -38,8 +38,11 @@ export interface SyncQueueControllerContext {
 	onFlushResult(result: SyncResult): void | Promise<void>;
 }
 
+const MAX_RETRY_DELAY_MS = 5 * 60_000;
+
 export class SyncQueueController {
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private consecutiveFailures = 0;
 	private maxWaitStart: number | null = null;
 	private pendingPaths: Set<string> = new Set();
 	private inFlightPaths: Set<string> = new Set();
@@ -158,6 +161,8 @@ export class SyncQueueController {
 			currentStatus: () => this.context.currentStatus(),
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),
 			triggerDebouncedSync: () => this.debouncedSync(),
+			retryAfterFailure: () => this.retryAfterFailure(),
+			flushSucceeded: () => { this.consecutiveFailures = 0; },
 			requestReconciliation: (queueKeys: string[]) => this.requestReconciliation(queueKeys),
 			onFlushResult: (result: SyncResult) => this.context.onFlushResult(result),
 		};
@@ -214,6 +219,17 @@ export class SyncQueueController {
 			this.context.getDebounceDelayMs(),
 			this.context.maxDebounceWaitMs,
 		);
+	}
+
+	/** Offline or failing flushes back off exponentially to five minutes, so a
+	 * dropped connection does not re-read pending files every few seconds. A new
+	 * local event still schedules an ordinary debounced attempt. */
+	private retryAfterFailure(): void {
+		this.consecutiveFailures++;
+		this.context.updateState({ pendingChanges: this.pendingPaths.size });
+		if (this.context.automaticSyncEnabled?.() === false) return;
+		const delay = Math.min(this.context.getDebounceDelayMs() * 2 ** (this.consecutiveFailures - 1), MAX_RETRY_DELAY_MS);
+		runDebouncedQueueSync(this.getQueueDebounceContext(), delay);
 	}
 
 	private async processPendingChanges(): Promise<void> {
