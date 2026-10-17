@@ -1,5 +1,5 @@
 {
-  "baselineCommit": "69ecf85de0fbe3055e92ec433a3968005826d01b",
-  "reason": "Pre-launch compatibility cleanup retires development migrations. Schema 2 is the fresh baseline; earlier development releases and installations are not upgrade sources. Preserve the current candidate revision.",
-  "initialRevision": 8
+  "baselineCommit": "fd1a2a45707844c0c507c550558e8524fe1b232e",
+  "reason": "Pre-launch: 0.7.0 and earlier betas are not upgrade sources. Schema 2 remains the fresh baseline and may change in place until the first public release. Preserve the current candidate revision.",
+  "initialRevision": 10
 }
