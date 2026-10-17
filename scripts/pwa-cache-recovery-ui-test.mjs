@@ -66,7 +66,7 @@ async function verify(browser) {
 		await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
 		await expect(cacheNotice(page)).toHaveCount(0);
 		const rawCache = () => page.evaluate(() => new Promise((resolve, reject) => {
-			const request = indexedDB.open('crate-reminders', 2);
+			const request = indexedDB.open('crate-reminders', 3);
 			request.onsuccess = () => {
 				const db = request.result; const tx = db.transaction('snapshots', 'readonly');
 				const read = tx.objectStore('snapshots').get('Reminders');
@@ -78,11 +78,12 @@ async function verify(browser) {
 		await expect.poll(async () => (await rawCache())?.sessionScope).toBe(sessionScope);
 		available = false;
 		await page.evaluate(sessionScope => new Promise((resolve, reject) => {
-			const request = indexedDB.open('crate-reminders', 2);
+			const request = indexedDB.open('crate-reminders', 3);
 			request.onsuccess = () => {
 				const db = request.result; const tx = db.transaction('snapshots', 'readwrite');
-				tx.objectStore('snapshots').put({ folderPath: 'Reminders', reminders: [null], projects: ['Inbox'], savedAt: Date.now(),
-					etag: 'damaged-etag', issues: [], sessionScope });
+				// Metadata promising notes that are not stored: the whole copy is damaged.
+				tx.objectStore('snapshots').put({ folderPath: 'Reminders', layout: 'notes', projects: ['Inbox'], savedAt: Date.now(),
+					etag: 'damaged-etag', issues: [], noteCount: 99, inventory: 'damaged', sessionScope });
 				tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error);
 			};
 			request.onerror = () => reject(request.error);
@@ -92,13 +93,13 @@ async function verify(browser) {
 		await expect(cacheNotice(page)).toContainText('saved copy is damaged');
 		await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 		await expect(cacheNotice(page).getByRole('button')).toBeDisabled();
-		expect((await rawCache()).reminders).toEqual([null]);
+		expect((await rawCache()).noteCount).toBe(99);
 		expect(reads.length).toBeGreaterThan(0);
 		expect(reads.every(etag => etag === undefined)).toBe(true);
 		available = true;
 		await page.evaluate(() => window.dispatchEvent(new Event('online')));
 		await expect(cacheNotice(page)).toHaveCount(0);
-		await expect.poll(async () => (await rawCache())?.reminders[0]?.id).toBeTruthy();
+		await expect.poll(async () => (await rawCache())?.noteCount).not.toBe(99);
 		expect(await page.evaluate(key => localStorage.getItem(key), pendingKey)).toBe(saved.pending);
 		expect(await page.evaluate(() => sessionStorage.getItem('crate-reminder-draft:Reminders:new'))).toBe(saved.draft);
 		await page.locator('[data-action="open-create-modal"]').click();

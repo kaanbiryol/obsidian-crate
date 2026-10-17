@@ -49,6 +49,8 @@ export interface CachedReminderSnapshot {
 	projects: string[];
 	savedAt: number;
 	etag?: string;
+	/** Server changelog position for requesting only notes changed since this snapshot. */
+	deltaBase?: string;
 	issues?: ReminderSourceIssue[];
 }
 

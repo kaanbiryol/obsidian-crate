@@ -12,6 +12,8 @@ export function normalizeSnapshot(value: unknown, folderPath: string): CachedRem
 	if (issues === null || snapshot.folderPath !== folderPath || !isReminderList(snapshot.reminders, folderPath)
 		|| !Array.isArray(snapshot.projects) || !snapshot.projects.every(project => typeof project === 'string')
 		|| typeof snapshot.savedAt !== 'number' || !Number.isFinite(snapshot.savedAt) || snapshot.savedAt < 0
-		|| (snapshot.etag !== undefined && typeof snapshot.etag !== 'string')) return null;
-	return { folderPath, reminders: snapshot.reminders, projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag, issues };
+		|| (snapshot.etag !== undefined && typeof snapshot.etag !== 'string')
+		|| (snapshot.deltaBase !== undefined && (typeof snapshot.deltaBase !== 'string' || snapshot.deltaBase.length > 128))) return null;
+	return { folderPath, reminders: snapshot.reminders, projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag,
+		...(snapshot.deltaBase === undefined ? {} : { deltaBase: snapshot.deltaBase }), issues };
 }

@@ -48,6 +48,12 @@ for (const browserType of [chromium, webkit]) {
 				const db = await open(1, db => db.createObjectStore('snapshots', { keyPath: 'folderPath' }));
 				await put(db, snapshot); return db;
 			};
+			// Version 2 held whole-folder snapshots; upgrading clears that disposable copy.
+			await cache.clearCachedReminderSnapshots();
+			const versionTwo = await open(2, db => { db.createObjectStore('snapshots', { keyPath: 'folderPath' }); db.createObjectStore('freshness', { keyPath: 'folderPath' }); });
+			await put(versionTwo, snapshot); versionTwo.close();
+			const upgraded = await cache.loadCachedReminderSnapshot('Reminders');
+			const afterUpgrade = await inspect();
 			let old = await seedLegacy(); old.close();
 			const migrated = await cache.loadCachedReminderSnapshot('Reminders');
 			const migration = await inspect();
@@ -114,7 +120,7 @@ for (const browserType of [chromium, webkit]) {
 
 			// A future client owns this format: current code cannot migrate or reset it.
 			await cache.clearCachedReminderSnapshots();
-			db = await open(3, db => {
+			db = await open(4, db => {
 				db.createObjectStore('snapshots', { keyPath: 'folderPath' });
 				db.createObjectStore('future-store');
 			});
@@ -130,12 +136,14 @@ for (const browserType of [chromium, webkit]) {
 			db.close();
 			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 400, 'four');
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
-			return { snapshot, migrated, migration, blocked, blockedMs, blockedProblem, afterAbandonedOpen, unblocked,
+			return { snapshot, upgraded, afterUpgrade, migrated, migration, blocked, blockedMs, blockedProblem, afterAbandonedOpen, unblocked,
 				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota,
 				abortedWriteProblem, afterAbortedWrite, abortedRead, abortedReadProblem, denied, deniedProblem, otherSession,
 				future, futureProblem, futureReset, futurePreserved, blockedClear, afterClear,
 				pending: localStorage.getItem('crate-reminder-outbox:recovery-fixture'), draft: sessionStorage.getItem('crate-reminder-draft:recovery-fixture') };
 		});
+		assert.equal(results.upgraded, null);
+		assert.deepEqual(results.afterUpgrade, { version: 3, stores: ['freshness', 'notes', 'snapshots'], raw: [] });
 		assert.equal(results.migrated, null);
 		assert.deepEqual(results.migration, { version: 1, stores: ['snapshots'], raw: [results.snapshot] });
 		assert.equal(results.blocked, null); assert.equal(results.blockedProblem, 'blocked'); assert.ok(results.blockedMs < 2_000);
@@ -152,10 +160,10 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(results.abortedRead, null); assert.equal(results.abortedReadProblem, 'unavailable');
 		assert.equal(results.denied, null); assert.equal(results.deniedProblem, 'unavailable'); assert.equal(results.otherSession, null);
 		assert.equal(results.future, null); assert.equal(results.futureProblem, 'unsupported'); assert.equal(results.futureReset, false);
-		assert.deepEqual(results.futurePreserved, { version: 3, stores: ['future-store', 'snapshots'], raw: [results.snapshot] });
+		assert.deepEqual(results.futurePreserved, { version: 4, stores: ['future-store', 'snapshots'], raw: [results.snapshot] });
 		assert.equal(results.blockedClear, false); assert.equal(results.afterClear.savedAt, 400);
 		assert.equal(results.pending, 'local-only text must survive'); assert.equal(results.draft, results.pending);
 		assert.deepEqual(errors, [], 'Cache failures must not leak unhandled promise rejections');
-		console.log(`${browserType.name()}: native IndexedDB unsupported-format preservation, blocking, corruption, quota, session isolation and future-format preservation passed`);
+		console.log(`${browserType.name()}: native IndexedDB version-2 upgrade, unsupported-format preservation, blocking, corruption, quota, session isolation and future-format preservation passed`);
 	} finally { await browser.close(); }
 }
