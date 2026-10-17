@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { App, PluginManifest } from 'obsidian';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { LocalManifest } from './manifest';
+import { encodeCheckpoint, parseCheckpoint } from './manifest-checkpoint';
+import { replayManifestLog } from './manifest-log';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -12,6 +14,7 @@ type MockAdapter = {
 	read: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>;
 	write: ReturnType<typeof vi.fn<(path: string, data: string) => Promise<void>>>;
 	remove: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
+	append: ReturnType<typeof vi.fn<(path: string, data: string) => Promise<void>>>;
 };
 
 function createMockAdapter(): MockAdapter {
@@ -21,7 +24,23 @@ function createMockAdapter(): MockAdapter {
 		read: vi.fn(),
 		write: vi.fn().mockResolvedValue(undefined),
 		remove: vi.fn().mockResolvedValue(undefined),
+		append: vi.fn().mockResolvedValue(undefined),
 	};
+}
+
+/** Rebuild the files the mock adapter received, then load them as a restart would. */
+function readPersisted(adapter: MockAdapter): Record<string, unknown> {
+	const events = [
+		...adapter.write.mock.calls.map((call, index) => ({ order: adapter.write.mock.invocationCallOrder[index]!, apply: (disk: Map<string, string>) => disk.set(call[0], call[1]) })),
+		...adapter.append.mock.calls.map((call, index) => ({ order: adapter.append.mock.invocationCallOrder[index]!, apply: (disk: Map<string, string>) => disk.set(call[0], (disk.get(call[0]) ?? '') + call[1]) })),
+		...adapter.remove.mock.calls.map((call, index) => ({ order: adapter.remove.mock.invocationCallOrder[index]!, apply: (disk: Map<string, string>) => disk.delete(call[0]) })),
+	].sort((a, b) => a.order - b.order);
+	const disk = new Map<string, string>();
+	for (const event of events) event.apply(disk);
+	const checkpoint = parseCheckpoint(JSON.parse(disk.get(`${PLUGIN_DIR}/file-manifest.json`)!));
+	const log = disk.get(`${PLUGIN_DIR}/file-manifest.log`);
+	if (log) replayManifestLog(checkpoint, log);
+	return JSON.parse(encodeCheckpoint(checkpoint)) as Record<string, unknown>;
 }
 
 function createLocalManifest(adapter: MockAdapter): LocalManifest {
@@ -65,7 +84,7 @@ describe('LocalManifest', () => {
 		expect(manifest.getEntry('note.md')).not.toBe(baseline);
 		expect(baseline?.modified).toBe(original.modified);
 		await manifest.save();
-		const persisted = JSON.parse(adapter.write.mock.lastCall![1]) as FileManifest;
+		const persisted = readPersisted(adapter) as unknown as FileManifest;
 		expect(persisted.files['note.md']).toEqual(view.files['note.md']);
 	});
 
@@ -139,9 +158,7 @@ describe('LocalManifest', () => {
 			manifest.setEntry('b.md', { ...entry, hash: 'b'.repeat(64) });
 		});
 		await manifest.save();
-		const mainWrites = adapter.write.mock.calls.filter(([path]) => path.endsWith('.json'));
-		expect(mainWrites).toHaveLength(2);
-		expect(JSON.parse(mainWrites[1]![1])).toMatchObject({ generation: 2, files: { 'b.md': { hash: 'b'.repeat(64) } } });
+		expect(readPersisted(adapter)).toMatchObject({ generation: 2, files: { 'a.md': { hash: 'a'.repeat(64) }, 'b.md': { hash: 'b'.repeat(64) } } });
 	});
 
 	it('serializes overlapping saves', async () => {
@@ -299,14 +316,7 @@ describe('LocalManifest', () => {
 		manifest.removeEntry('note.md');
 		await manifest.save();
 
-		// Find the last write to the main manifest path (not tmp)
-		const mainWrites = adapter.write.mock.calls.filter(
-			(call: [string, string]) => call[0].endsWith('file-manifest.json') && !call[0].endsWith('.tmp'),
-		);
-		const lastWrite = mainWrites.at(-1);
-		expect(lastWrite).toBeDefined();
-		const [, lastPayload] = lastWrite!;
-		expect(JSON.parse(lastPayload)).toEqual({
+		expect(readPersisted(adapter)).toEqual({
 			generation: 2,
 			version: 3,
 			files: {},
@@ -318,5 +328,85 @@ describe('LocalManifest', () => {
 		manifest.setEntry('original.md', entry);
 		expect(() => manifest.replaceManifest({ version: 1, files: { 'bad.md': { ...entry, size: -1 } }, lastSeq: -5 })).toThrow();
 		expect(manifest.getManifest().files).toEqual({ 'original.md': entry });
+	});
+
+	describe('change log', () => {
+		const entry = (hash: string) => ({ hash: hash.repeat(64), size: 1, modified: '2026-01-01T00:00:00Z' });
+		function diskAdapter(disk: Map<string, string>) {
+			adapter.exists.mockImplementation(async path => disk.has(path));
+			adapter.read.mockImplementation(async path => disk.get(path)!);
+			adapter.write.mockImplementation(async (path, data) => { disk.set(path, data); });
+			adapter.append.mockImplementation(async (path, data) => { disk.set(path, (disk.get(path) ?? '') + data); });
+			adapter.remove.mockImplementation(async path => { disk.delete(path); });
+		}
+		const reload = async () => { const next = createLocalManifest(adapter); await next.load(); return next; };
+		const log = `${PLUGIN_DIR}/file-manifest.log`, main = `${PLUGIN_DIR}/file-manifest.json`;
+
+		it('appends only changed entries after the first full checkpoint and replays them on load', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			for (let index = 0; index < 5000; index++) manifest.setEntry(`notes/${index}.md`, entry('a'));
+			await manifest.save();
+			const fullBytes = disk.get(main)!.length;
+			adapter.write.mockClear();
+			manifest.setEntry('notes/1.md', entry('b'));
+			manifest.removeEntry('notes/2.md');
+			await manifest.save();
+			manifest.setEntry('notes/new.md', entry('c'));
+			await manifest.save();
+			// Neither save rewrote the checkpoint, and each record stays small.
+			expect(adapter.write.mock.calls.filter(([path]) => path === main)).toHaveLength(0);
+			expect(disk.get(log)!.length).toBeLessThan(fullBytes / 100);
+			const restored = await reload();
+			expect(restored.getFileCount()).toBe(5000);
+			expect(restored.getEntry('notes/1.md')?.hash).toBe('b'.repeat(64));
+			expect(restored.getEntry('notes/2.md')).toBeUndefined();
+			expect(restored.getEntry('notes/new.md')?.hash).toBe('c'.repeat(64));
+		});
+
+		it('drops a torn final record and compacts before appending again', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			manifest.setEntry('b.md', entry('b'));
+			await manifest.save();
+			disk.set(log, `${disk.get(log)!}{"generation":3,"set":{"c.md"`);
+			const restored = await reload();
+			expect(restored.getEntry('b.md')).toBeDefined();
+			expect(restored.getEntry('c.md')).toBeUndefined();
+			adapter.write.mockClear();
+			restored.setEntry('d.md', entry('d'));
+			await restored.save();
+			expect(adapter.write.mock.calls.some(([path]) => path === main)).toBe(true);
+			expect((await reload()).getAllPaths().sort()).toEqual(['a.md', 'b.md', 'd.md']);
+		});
+
+		it('ignores a log left from before a completed compaction', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			manifest.setEntry('b.md', entry('b'));
+			await manifest.save();
+			const stale = disk.get(log)!;
+			// A crash after a compaction's checkpoint write but before its next record.
+			manifest.replaceManifest({ version: 1, files: { 'c.md': entry('c') } });
+			await manifest.save();
+			disk.set(log, stale);
+			expect((await reload()).getAllPaths()).toEqual(['c.md']);
+		});
+
+		it('rejects a damaged record before the end of the log', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			manifest.setEntry('b.md', entry('b'));
+			await manifest.save();
+			const [header, record] = disk.get(log)!.split('\n');
+			disk.set(log, `${header}\n{"broken"\n${record}\n`);
+			await expect(reload()).rejects.toThrow('Invalid manifest change log');
+		});
 	});
 });

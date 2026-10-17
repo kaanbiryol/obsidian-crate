@@ -316,6 +316,16 @@ file. Unsupported checkpoints are rejected and preserved. Failed promotion keeps
 temporary checkpoint. A mutation revision ensures edits made during a save are
 included in a follow-up checkpoint before that save finishes.
 
+**Change log:** after a full checkpoint, saves append one JSON line to
+`file-manifest.log` with only the changed or removed entries and the small recovery
+state, so a queue flush in a large vault no longer rewrites the whole baseline. The
+log's header names the base checkpoint generation; loading applies its consecutive
+records only when that base is the selected main checkpoint, so a log left behind by
+an interrupted compaction is ignored. An interrupted append can only tear the final
+line, which is dropped and forces the next save to compact. A damaged earlier record
+stops loading. The log compacts into a new full checkpoint at 8 MiB. Durable uploads
+also checkpoint every 64 receipts, removing their journal copies during long syncs.
+
 **Optimization:** recovery full syncs skip re-hashing files whose size and mtime match the manifest entry. Manual and first syncs never trust timestamps.
 
 Implementation: `manifest.ts:LocalManifest`

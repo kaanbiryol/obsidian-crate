@@ -110,6 +110,7 @@ export class PersistentTestVault {
 			read: async (path: string) => this.text(path),
 			readBinary: async (path: string) => this.read(path),
 			write: async (path: string, text: string) => { this.write(path, text); },
+			append: async (path: string, text: string) => { this.write(path, (this.files.has(path) ? this.text(path) : '') + text); },
 			writeBinary: async (path: string, content: ArrayBuffer) => { this.write(path, content); },
 			remove: async (path: string) => { this.remove(path); },
 			rmdir: async (path: string, recursive: boolean) => {

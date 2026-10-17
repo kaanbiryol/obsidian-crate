@@ -14,6 +14,7 @@ const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
 type MockAdapter = {
 	read: ReturnType<typeof vi.fn>;
 	write: ReturnType<typeof vi.fn>;
+	append: ReturnType<typeof vi.fn>;
 	readBinary: ReturnType<typeof vi.fn<(path: string) => Promise<ArrayBuffer>>>;
 	stat: ReturnType<typeof vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>>;
 	exists: ReturnType<typeof vi.fn>;
@@ -81,6 +82,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	const adapter: MockAdapter = {
 		read: vi.fn(async (path: string) => stored.get(path)),
 		write: vi.fn(async (path: string, content: string) => { stored.set(path, content); }),
+		append: vi.fn(async (path: string, content: string) => { stored.set(path, (stored.get(path) ?? '') + content); }),
 		readBinary: vi.fn<(path: string) => Promise<ArrayBuffer>>(),
 		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
 		exists: vi.fn(async (path: string) => stored.has(path)),

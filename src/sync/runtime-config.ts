@@ -17,7 +17,7 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
   const adapter = plugin.app.vault.adapter;
   const mainPath = `${plugin.manifest.dir}/file-manifest.json`;
   const checkpoints: Array<{ path: string; content: string; backupPath?: string }> = [];
-  for (const path of [mainPath, `${mainPath}.tmp`]) {
+  for (const path of [mainPath, `${mainPath}.tmp`, `${plugin.manifest.dir}/file-manifest.log`]) {
     if (await adapter.exists(path)) {
       signal?.throwIfAborted();
       checkpoints.push({ path, content: await adapter.read(path) });

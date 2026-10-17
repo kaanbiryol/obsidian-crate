@@ -5,6 +5,8 @@ import { SyncEngine } from '../../sync/engine';
 import type { EngineFileOperations } from '../../sync/engine-file-operations';
 import type { ApiHttpTransport } from '../../sync/worker-api/http';
 import type { FileManifest } from '../../protocol/sync-types';
+import { parseCheckpoint, type ManifestCheckpoint } from '../../sync/manifest-checkpoint';
+import { replayManifestLog } from '../../sync/manifest-log';
 import { sha256Hex } from './auth';
 import worker from './index';
 import type { Env } from './types';
@@ -49,8 +51,17 @@ export class SyncTestDevice {
 
 	close(): void { this.engine?.destroy(); }
 
+	/** The persisted baseline, including records appended since the last full checkpoint. */
 	checkpoint(): FileManifest {
-		return JSON.parse(this.disk.text(`${TEST_PLUGIN_DIR}/file-manifest.json`)) as FileManifest;
+		return this.checkpointState().manifest;
+	}
+
+	/** Every persisted checkpoint field, as a restart would load it. */
+	checkpointState(): ManifestCheckpoint {
+		const checkpoint = parseCheckpoint(JSON.parse(this.disk.text(`${TEST_PLUGIN_DIR}/file-manifest.json`)));
+		const log = `${TEST_PLUGIN_DIR}/file-manifest.log`;
+		if (this.disk.has(log)) replayManifestLog(checkpoint, this.disk.text(log));
+		return checkpoint;
 	}
 
 	pauseNextUploadResponse(): { committed: Promise<void>; release(): void } {

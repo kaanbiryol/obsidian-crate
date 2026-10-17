@@ -4,7 +4,6 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { SyncTestDevice } from './sync-engine-test-harness';
-import { TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 const paths = ['app', 'appearance', 'community-plugins', 'core-plugins'].map(name => `.obsidian/${name}.json`);
 const appearance = '.obsidian/appearance.json';
@@ -60,7 +59,7 @@ it('pulls server settings without setup conflicts, then preserves real concurren
 	expect(second.disk.text('note.md')).toBe('vault from a');
 	expect(second.disk.text('.obsidian/themes/Minimal/theme.css')).toBe('body { color: red; }');
 	expect((await first.api.getManifest()).files).toEqual(before.files);
-	expect(JSON.parse(second.disk.text(`${TEST_PLUGIN_DIR}/file-manifest.json`))).not.toHaveProperty('initialConfigPull');
+	expect(second.checkpointState().initialConfigPull).toBeUndefined();
 
 	first.disk.write(appearance, '{"setting":"a edited"}');
 	second.disk.write(appearance, '{"setting":"b edited"}');
@@ -84,7 +83,7 @@ it.each([false, true])('resumes a partial first pull after restart without overw
 	expect(second.disk.text('note.md')).toBe('vault from a');
 	expect(second.disk.text(appearance)).toBe(setupText);
 	expect(second.settings.lastSync).toBeNull();
-	expect(JSON.parse(second.disk.text(`${TEST_PLUGIN_DIR}/file-manifest.json`))).toHaveProperty('initialConfigPull');
+	expect(second.checkpointState().initialConfigPull).toBeDefined();
 	second.close();
 	await second.open();
 	if (edited) second.disk.write(appearance, '{"setting":"edited after interruption"}');
@@ -93,7 +92,7 @@ it.each([false, true])('resumes a partial first pull after restart without overw
 	expect(resumed.unresolvedConflicts).toHaveLength(edited ? 1 : 0);
 	expect(second.disk.text(appearance)).toBe(remoteText);
 	if (edited) expect(second.disk.text(resumed.unresolvedConflicts[0]!.conflictPath)).toBe('{"setting":"edited after interruption"}');
-	expect(JSON.parse(second.disk.text(`${TEST_PLUGIN_DIR}/file-manifest.json`))).not.toHaveProperty('initialConfigPull');
+	expect(second.checkpointState().initialConfigPull).toBeUndefined();
 });
 
 it('defers an initial settings replacement when the user edits during download', async () => {

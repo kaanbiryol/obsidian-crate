@@ -1,4 +1,5 @@
 import { encodeCheckpoint, parseCheckpoint, parseLocalManifest, sameCheckpointRecoveryState } from './manifest-checkpoint';
+import { encodeLogHeader, encodeLogRecord, replayManifestLog } from './manifest-log';
 import { UploadJournal } from './upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from './restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
@@ -18,6 +19,10 @@ const logger = createLogger('Manifest');
 
 const MANIFEST_FILENAME = 'file-manifest.json';
 const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
+const MANIFEST_LOG_FILENAME = 'file-manifest.log';
+// Compact into a full checkpoint once replaying the log costs about as much as
+// a small rewrite; the log also caps the work of the next load.
+const MAX_LOG_BYTES = 8 * 1024 * 1024;
 
 /** Live baseline view. Only the owner may replace entries and mark them dirty. */
 export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
@@ -31,6 +36,12 @@ export class LocalManifest {
 	private app: App;
 	private manifestPath: string;
 	private tmpPath: string;
+	private logPath: string;
+	/** Paths whose entries changed since the last persisted checkpoint or log record. */
+	private changedPaths = new Set<string>();
+	/** The log on disk extends the current base checkpoint; otherwise the next save compacts. */
+	private logActive = false;
+	private logBytes = 0;
 	private manifest: FileManifest;
 	private dirty: boolean;
 	private revision = 0;
@@ -47,6 +58,7 @@ export class LocalManifest {
 		this.uploadJournal = new UploadJournal(app.vault.adapter, `${pluginManifest.dir}/pending-uploads`, authority);
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
 		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
+		this.logPath = `${pluginManifest.dir}/${MANIFEST_LOG_FILENAME}`;
 		this.manifest = { version: 1, files: createPathRecord() };
 		this.dirty = false;
 	}
@@ -89,6 +101,13 @@ export class LocalManifest {
 		}
 		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
 		const selected = recoverTmp ? tmp : main;
+		if (selected && !recoverTmp && await adapter.exists(this.logPath)) {
+			const log = await adapter.read(this.logPath);
+			if (this.closed) return;
+			// A recovered tmp postdates any log, so only the main checkpoint extends one.
+			this.logActive = replayManifestLog(selected, log)?.appendable ?? false;
+			this.logBytes = this.logActive ? log.length : 0;
+		}
 		if (!selected && (await adapter.exists(this.manifestPath) || await adapter.exists(this.tmpPath))) {
 			throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before resetting sync.');
 		}
@@ -158,18 +177,70 @@ export class LocalManifest {
 	}
 
 	private async persist(): Promise<void> {
-		const adapter = this.app.vault.adapter;
 		while (this.dirty && !this.closed) {
 			const revision = this.revision;
-			this.generation++;
-			const data = this.serialize();
-			await adapter.write(this.tmpPath, data);
+			const changed = this.changedPaths;
+			this.changedPaths = new Set();
+			try {
+				if (!await this.appendChanges(changed)) await this.compact();
+			} catch (error) {
+				for (const path of changed) this.changedPaths.add(path);
+				throw error;
+			}
 			if (this.closed) return;
-			await adapter.write(this.manifestPath, data);
-			if (this.closed) return;
-			try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
 			this.dirty = revision !== this.revision;
 		}
+	}
+
+	/** Append one record when the active log has room; false requests compaction. */
+	private async appendChanges(changed: ReadonlySet<string>): Promise<boolean> {
+		if (!this.logActive) return false;
+		const set = createPathRecord<FileEntry>();
+		const deleted: string[] = [];
+		for (const path of changed) {
+			const entry = getPathEntry(this.manifest.files, path);
+			if (entry) set[path] = entry;
+			else deleted.push(path);
+		}
+		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state: this.recoveryState() });
+		if (this.logBytes + record.length > MAX_LOG_BYTES) return false;
+		// The first record after a compaction replaces any older log with its header.
+		if (this.logBytes === 0) {
+			const header = encodeLogHeader(this.generation, this.authority);
+			await this.app.vault.adapter.write(this.logPath, header + record);
+			this.logBytes = header.length;
+		} else await this.app.vault.adapter.append(this.logPath, record);
+		this.generation++;
+		this.logBytes += record.length;
+		return true;
+	}
+
+	/** Write a full checkpoint, then start a new log bound to its generation. */
+	private async compact(): Promise<void> {
+		const adapter = this.app.vault.adapter;
+		this.logActive = false;
+		this.generation++;
+		const data = this.serialize();
+		await adapter.write(this.tmpPath, data);
+		if (this.closed) return;
+		await adapter.write(this.manifestPath, data);
+		if (this.closed) return;
+		try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
+		// A stale log stays until the next record replaces it; its header names an
+		// older base, so loading ignores it.
+		this.logBytes = 0;
+		this.logActive = true;
+	}
+
+	private recoveryState() {
+		return {
+			settledUploads: this.uploadJournal.completedSnapshot(),
+			renames: this.renameDependencies,
+			appliedRename: this.appliedRename,
+			uploadDiagnostics: this.uploadDiagnostics,
+			restoreIntents: this.restoreIntents,
+			initialConfigPull: this.initialConfigPull,
+		};
 	}
 
 	/** Preserve entry identity so readers can detect replacement across awaited I/O. */
@@ -183,6 +254,7 @@ export class LocalManifest {
 	setEntry(path: string, entry: Readonly<FileEntry>): void {
 		const previous = this.getEntry(path);
 		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
+		this.changedPaths.add(path);
 		this.revision++;
 		this.dirty = true;
 	}
@@ -193,6 +265,7 @@ export class LocalManifest {
 	removeEntry(path: string): void {
 		this.renameDependencies.delete(path);
 		delete this.manifest.files[path];
+		this.changedPaths.add(path);
 		this.revision++;
 		this.dirty = true;
 	}
@@ -283,6 +356,7 @@ export class LocalManifest {
 	 */
 	replaceManifest(manifest: LocalManifestView): void {
 		this.manifest = parseLocalManifest(manifest);
+		this.logActive = false;
 		this.revision++;
 		this.dirty = true;
 	}
@@ -314,6 +388,7 @@ export class LocalManifest {
 	 */
 	clear(): void {
 		this.manifest = { version: 1, files: createPathRecord() };
+		this.logActive = false;
 		this.revision++;
 		this.dirty = true;
 	}

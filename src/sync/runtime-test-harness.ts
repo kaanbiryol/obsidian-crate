@@ -91,6 +91,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 					read: vi.fn(),
 					remove: vi.fn(),
 					write: vi.fn(),
+					append: vi.fn(),
 					stat: vi.fn(),
 					list: vi.fn(async () => ({ files: [], folders: [] })),
 					readBinary: vi.fn(),

@@ -20,7 +20,10 @@ interface UploadTransport {
 	uploadFile(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId?: string): Promise<UploadResult>;
 }
 
+const RECEIPTS_PER_CHECKPOINT = 64;
+
 export class DurableUploads {
+	private unsavedReceipts = 0;
 	private recovering: Promise<void> | null = null;
 	private active = new Set<string>();
 	private serverDay?: { day: number; expires: number };
@@ -169,7 +172,16 @@ export class DurableUploads {
 				...(file.intent.kind === 'local' ? { revision: result.revision } : {}) });
 		}
 		if (this.definitive(result)) await this.trace(file, 'rejected');
-		if (result.success || this.definitive(result)) this.manifest.completeUpload(file.operationId);
+		if (result.success || this.definitive(result)) {
+			this.manifest.completeUpload(file.operationId);
+			// Each journal file holds a full copy of its upload until a checkpoint
+			// records the receipt. Checkpoint periodically, so a large sync does
+			// not keep every uploaded byte on disk twice until it finishes.
+			if (++this.unsavedReceipts >= RECEIPTS_PER_CHECKPOINT) {
+				this.unsavedReceipts = 0;
+				await this.manifest.save();
+			}
+		}
 	}
 
 	private async trace(file: JournalUpload, phase: UploadPhase): Promise<void> {

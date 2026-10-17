@@ -151,3 +151,18 @@ it('keeps the whole batch when its receipt list is invalid', async () => {
   expect(progress).toHaveBeenCalledExactlyOnceWith(0, 2);
   expect(manifest.uploadJournal.pending()).toHaveLength(2); await manifest.close();
 });
+
+it('prunes journal copies periodically during a long run of uploads', async () => {
+	const { disk, create, file } = fixture();
+	const manifest = create();
+	const uploads = new DurableUploads(manifest, {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }),
+		uploadFile: async (path: string, _content: ArrayBuffer, hash: string) => ({ success: true, path, hash, revision: `revision-${path}` }),
+		batchUpload: vi.fn(),
+	}, { putBase: vi.fn(async () => {}) } as never, crypto.randomUUID());
+	for (let index = 0; index < 70; index++) await uploads.single({ ...file, path: `notes/${index}.md` });
+	// 64 receipts were checkpointed and their copies removed; the rest wait for the next save.
+	expect((await disk.vault.adapter.list(`${TEST_PLUGIN_DIR}/pending-uploads`)).files).toHaveLength(6);
+	expect(manifest.uploadJournal.pending()).toEqual([]);
+	await manifest.close();
+});
