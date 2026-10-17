@@ -43,7 +43,7 @@ describe('scheduled Worker maintenance', () => {
 		};
 		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
-			await expect(runScheduledMaintenance({ DB: db, BUCKET: bucket } as never)).resolves.toBe(0);
+			await expect(runScheduledMaintenance({ DB: db, BUCKET: bucket } as never)).resolves.toEqual({ removedObjects: 0, backlog: false });
 			expect(statements.find(statement => statement.sql.includes("VALUES ('last_error'"))?.args)
 				.toEqual(['drain object cleanup: Cleanup unavailable']);
 			expect(statements.some(statement => statement.sql === "DELETE FROM maintenance_state WHERE key = 'last_error'"))

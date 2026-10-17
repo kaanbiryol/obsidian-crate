@@ -12,12 +12,17 @@ export function changedRows(result: unknown): number {
 	return typeof changes === 'number' ? changes : 0;
 }
 
-export async function pruneChangelog(db: D1Database): Promise<void> {
-	await db.prepare(
-			`DELETE FROM changelog
+export const MAINTENANCE_DELETE_LIMIT = 5000;
+
+/** Deletes the oldest expired rows in (created_at, seq) index order, so the
+ * retained changelog stays contiguous. Returns true when more rows may remain. */
+export async function pruneChangelog(db: D1Database): Promise<boolean> {
+	const result = await db.prepare(
+			`DELETE FROM changelog WHERE seq IN (SELECT seq FROM changelog
 			WHERE created_at < datetime('now', '-' || ? || ' days')
-			AND seq < (SELECT MAX(seq) FROM changelog)`,
-	).bind(CHANGELOG_RETENTION_DAYS).run();
+			AND seq < (SELECT MAX(seq) FROM changelog) ORDER BY created_at, seq LIMIT ?)`,
+	).bind(CHANGELOG_RETENTION_DAYS, MAINTENANCE_DELETE_LIMIT).run();
+	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
 }
 
 export async function queryRows<T = Record<string, unknown>>(statement: D1PreparedStatement): Promise<T[]> {

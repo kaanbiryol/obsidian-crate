@@ -10,7 +10,7 @@ import { reminderRequestHash } from '../../encryption/reminder-receipt';
 import { ENCRYPTION_STATE_KEY } from './encryption-state';
 import { handleEncryptionConversion } from './encryption-conversion';
 import { handleEncryptionRoute } from './routes/encryption';
-import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks } from './encrypted-receipt-storage';
+import { prepareEncryptedReceipt, readEncryptedReceipt, pruneEncryptedReceiptChunks, RECEIPT_CHUNK_PAGE } from './encrypted-receipt-storage';
 import { beginReminderOperation, reminderOperationEffects } from './reminders-web/operations';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
@@ -87,7 +87,7 @@ it('keeps small responses inline and retains upload chunks until their parent is
 });
 
 it('bounds orphan cleanup and resumes its cursor on the next pass', async () => {
-	const keys = Array.from({ length: 105 }, (_, index) => `e2ee:receipt:reminder:orphan${String(index).padStart(3, '0')}:000`);
+	const keys = Array.from({ length: RECEIPT_CHUNK_PAGE + 5 }, (_, index) => `e2ee:receipt:reminder:orphan${String(index).padStart(5, '0')}:000`);
 	await env.DB.prepare("INSERT INTO maintenance_state(key, value) SELECT value, 'ciphertext' FROM json_each(?)").bind(JSON.stringify(keys)).run();
 	await pruneEncryptedReceiptChunks(env.DB); expect(await chunkCount()).toBe(5);
 	await pruneEncryptedReceiptChunks(env.DB); expect(await chunkCount()).toBe(0);

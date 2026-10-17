@@ -46,12 +46,18 @@ export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database):
 	return deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));
 }
 
-export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<void> {
-	await db.batch([
+// The queue drains 500 objects per pass; larger batches only grow its backlog.
+const EXPIRED_VERSION_BATCH = 1000;
+
+/** Moves the oldest expired versions in one transaction. Returns true when more may remain. */
+export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<boolean> {
+	const expired = `SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`;
+	const [, removed] = await db.batch([
 		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
-			SELECT storage_key, path FROM file_versions WHERE expires_at <= ?`).bind(now),
-		db.prepare('DELETE FROM file_versions WHERE expires_at <= ?').bind(now),
+			SELECT storage_key, path FROM file_versions WHERE storage_key IN (${expired})`).bind(now),
+		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired})`).bind(now),
 	]);
+	return changedRows(removed) === EXPIRED_VERSION_BATCH;
 }
 
 /** Cleanup must never turn an already-committed file mutation into a failure. */

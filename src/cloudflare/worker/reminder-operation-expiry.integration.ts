@@ -8,7 +8,7 @@ import { beginReminderOperation } from './reminders-web/operations';
 import { handleCreateReminder } from './reminders-web/routes/create';
 import { handleSetReminderCompleted } from './reminders-web/routes/complete';
 import { handleUpdateReminder } from './reminders-web/routes/update';
-import { pruneOperationReceipts } from './maintenance/operation-receipts';
+import { pruneOperationReceipts, RECEIPT_BATCH } from './maintenance/operation-receipts';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import type { ReminderRecord } from '@/pwa/types';
 
@@ -118,12 +118,12 @@ it('replays legacy receipts only while retained and preserves finite legacy and 
 });
 
 it('bounds receipt cleanup, retains a monotonic floor and rolls back a failed pruning batch', async () => {
-	const ids = Array.from({ length: 501 }, () => createReminderOperationId(day - REMINDER_RETRY_DAYS));
+	const ids = Array.from({ length: RECEIPT_BATCH + 1 }, () => createReminderOperationId(day - REMINDER_RETRY_DAYS));
 	await db.prepare("INSERT INTO reminder_operations (operation_id, request_hash, response_json) SELECT value, 'hash', '{}' FROM json_each(?)").bind(JSON.stringify(ids)).run();
 	const batch = db.batch.bind(db);
 	vi.spyOn(db, 'batch').mockImplementationOnce(statements => batch([...statements, db.prepare("INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES ('failure', 'hash', NULL)")]));
 	await expect(pruneOperationReceipts(db)).rejects.toThrow('NOT NULL');
-	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: 501 });
+	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: RECEIPT_BATCH + 1 });
 	expect(await db.prepare("SELECT * FROM maintenance_state WHERE key = 'reminder_operation_floor'").first()).toBeNull();
 	await pruneOperationReceipts(db);
 	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: 1 });

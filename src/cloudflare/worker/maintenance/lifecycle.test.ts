@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { runMaintenanceEpisode } from './lifecycle';
 import { runScheduledMaintenance } from '../maintenance';
-vi.mock('../maintenance', () => ({ runScheduledMaintenance: vi.fn(async () => 0) }));
+vi.mock('../maintenance', () => ({ runScheduledMaintenance: vi.fn(async () => ({ removedObjects: 0, backlog: false })) }));
 beforeEach(() => { vi.clearAllMocks(); });
 
 function fixture(advancing: 'queue' | 'staged' | null) {
@@ -31,4 +31,11 @@ it('does not retry a stuck backlog automatically', async () => {
   const { state, env, storage } = fixture(null);
   await runMaintenanceEpisode(state, env);
   expect(storage.setAlarm).not.toHaveBeenCalled();
+});
+it('continues a pruning backlog within the ten-pass episode budget', async () => {
+  vi.mocked(runScheduledMaintenance).mockResolvedValue({ removedObjects: 0, backlog: true });
+  const { state, env, storage } = fixture(null);
+  for (let pass = 0; pass < 12; pass++) await runMaintenanceEpisode(state, env);
+  expect(runScheduledMaintenance).toHaveBeenCalledTimes(10);
+  expect(storage.setAlarm).toHaveBeenCalledTimes(9);
 });

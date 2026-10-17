@@ -40,11 +40,14 @@ export async function readEncryptedReceipt(db: D1Database, kind: ReceiptKind, id
 
 /** Expiry removes parents first. A bounded cursor eventually reclaims their
  * chunks; a concurrent transaction publishing a parent prevents deletion. */
+// Candidates are checked by receipt primary key.
+export const RECEIPT_CHUNK_PAGE = 1000;
+
 export async function pruneEncryptedReceiptChunks(db: D1Database): Promise<void> {
 	const cursorKey = 'e2ee:receipt-cleanup-cursor';
 	const cursor = (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(cursorKey).first<{ value: string }>())?.value ?? PREFIX;
-	const page = await db.prepare('SELECT key FROM maintenance_state WHERE key > ? AND key >= ? AND key < ? ORDER BY key LIMIT 100')
-		.bind(cursor, PREFIX, 'e2ee:receipt;').all<{ key: string }>();
+	const page = await db.prepare('SELECT key FROM maintenance_state WHERE key > ? AND key >= ? AND key < ? ORDER BY key LIMIT ?')
+		.bind(cursor, PREFIX, 'e2ee:receipt;', RECEIPT_CHUNK_PAGE).all<{ key: string }>();
 	const candidates = page.results.flatMap(({ key }) => {
 		const match = /^e2ee:receipt:(reminder|upload|reading):([A-Za-z0-9_-]{1,128}):\d{3}$/.exec(key);
 		return match ? [{ key, kind: match[1], id: match[2] }] : [];
@@ -57,7 +60,7 @@ export async function pruneEncryptedReceiptChunks(db: D1Database): Promise<void>
 				AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE c.kind = 'upload' AND operation_id = c.id)
 				AND NOT EXISTS (SELECT 1 FROM reading_operations WHERE c.kind = 'reading' AND operation_id = c.id))`)
 			.bind(JSON.stringify(candidates)),
-		page.results.length === 100
+		page.results.length === RECEIPT_CHUNK_PAGE
 			? db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(cursorKey, page.results.at(-1)!.key)
 			: db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey),
 	]);

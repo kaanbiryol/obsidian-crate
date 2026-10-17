@@ -5,7 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
-import { pruneChangelog } from './db';
+import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './db';
 import { drainNotificationJobs } from './notification-outbox';
 import type { Env } from './types';
 import { handleListReminders } from './reminders-web/routes/list';
@@ -191,6 +191,18 @@ describe('Cloudflare runtime integration', () => {
 			'SELECT seq, path FROM changelog ORDER BY seq',
 		).all<{ seq: number; path: string }>();
 		expect(retained.results).toEqual([{ seq: latestBeforePrune?.seq, path: 'latest.md' }]);
+	});
+
+	it('prunes a large expired changelog in bounded oldest-first batches', async () => {
+		const count = MAINTENANCE_DELETE_LIMIT + 250;
+		await runtimeEnv.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
+			INSERT INTO changelog (path, action, created_at) SELECT 'n'||x, 'put', datetime('now', '-60 days', '+'||x||' seconds') FROM n`).bind(count).run();
+		expect(await pruneChangelog(runtimeEnv.DB)).toBe(true);
+		const bounds = await runtimeEnv.DB.prepare('SELECT MIN(seq) AS min, MAX(seq) AS max, COUNT(*) AS rows FROM changelog').first<{ min: number; max: number; rows: number }>();
+		// The retained range stays contiguous, so cursor expiry remains exact.
+		expect(bounds).toEqual({ min: MAINTENANCE_DELETE_LIMIT + 1, max: count, rows: 250 });
+		expect(await pruneChangelog(runtimeEnv.DB)).toBe(false);
+		expect((await runtimeEnv.DB.prepare('SELECT COUNT(*) AS rows FROM changelog').first<{ rows: number }>())?.rows).toBe(1);
 	});
 
 	it('fences an unprojected alarm in real Durable Object storage', async () => {

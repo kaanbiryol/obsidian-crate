@@ -17,18 +17,18 @@ async function position(db: D1Database) {
     batch: batch && batch.expires_at <= Date.now() ? batch.id : undefined, batchAt: batch?.expires_at };
 }
 
-/** Continue only while a bounded storage backlog advances, at most ten passes per
- * episode unless the object cleanup queue head is still moving. */
+/** Continue only while a bounded storage or pruning backlog advances, at most ten
+ * passes per episode unless the object cleanup queue head is still moving. */
 export async function runMaintenanceEpisode(state: DurableObjectState, env: Env): Promise<void> {
   const pass = (await state.storage.get<number>('maintenancePass') ?? 0) + 1;
   await state.storage.put('maintenancePass', pass);
   if (pass > MAX_DRAIN_PASSES || pass > MAX_PASSES && !await state.storage.get<boolean>('maintenanceDraining')) return;
   const before = await position(env.DB);
-  const removed = await runScheduledMaintenance(env);
+  const { removedObjects: removed, backlog } = await runScheduledMaintenance(env);
   const after = await position(env.DB);
   const draining = Boolean(after.queued && after.queued !== before.queued);
   await state.storage.put('maintenanceDraining', draining);
-  const advancing = Boolean(after.staged && (removed > 0 || after.staged !== before.staged))
+  const advancing = backlog || Boolean(after.staged && (removed > 0 || after.staged !== before.staged))
     || Boolean(after.batch && (removed > 0 || after.batch !== before.batch))
     || Boolean(after.queued && (removed > 0 || after.queued !== before.queued));
   if (pass < (draining ? MAX_DRAIN_PASSES : MAX_PASSES)) {

@@ -78,7 +78,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 	if (await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first()) return corsResponse(receipt);
 	// Delete from the start each time. No cursor can skip objects after deletion,
 	// and a timeout after R2 deletion simply retries the remaining page.
-	const objects = await env.BUCKET.list({ limit: 100 });
+	const objects = await env.BUCKET.list({ limit: 1000 });
 	if (objects.objects.length) {
 		await env.BUCKET.delete(objects.objects.map(object => object.key));
 		return corsResponse(receipt);

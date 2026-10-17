@@ -12,11 +12,15 @@ import { pruneOperationReceipts } from './maintenance/operation-receipts';
 import { pruneEncryptedReceiptChunks } from './encrypted-receipt-storage';
 import { pruneEncryptionMetadata } from './maintenance/encryption-metadata';
 
-export async function runScheduledMaintenance(env: Env): Promise<number> {
-  if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return 0;
-	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return 0;
+export interface MaintenanceResult { removedObjects: number; backlog: boolean }
+
+/** `backlog` reports a bounded pruning task that filled its batch. */
+export async function runScheduledMaintenance(env: Env): Promise<MaintenanceResult> {
+  if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return { removedObjects: 0, backlog: false };
+	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return { removedObjects: 0, backlog: false };
 	const errors: string[] = [];
-  let removedObjects = 0;
+  let removedObjects = 0, backlog = false;
+  const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
 	const tasks: Array<[string, () => Promise<unknown>]> = [
     ['recover Reading work', async () => {
       if (await env.DB.prepare('SELECT 1 FROM reading_policy WHERE enabled=1').first()) {
@@ -25,12 +29,12 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
       }
     }],
         ['prune shared checkpoints', () => pruneSharedCheckpoints(env.BUCKET, env.DB)],
-		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
+		['expire file versions', bounded(() => enqueueExpiredFileVersions(env.DB))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
-		['prune changelog', () => pruneChangelog(env.DB)],
-		['prune file deletion receipts', () => pruneFileDeletionReceipts(env.DB)],
+		['prune changelog', bounded(() => pruneChangelog(env.DB))],
+		['prune file deletion receipts', bounded(() => pruneFileDeletionReceipts(env.DB))],
 		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(env.DB)],
-		['prune expired operation receipts', () => pruneOperationReceipts(env.DB)],
+		['prune expired operation receipts', bounded(() => pruneOperationReceipts(env.DB))],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],
@@ -48,5 +52,5 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 		}
 	}
 	await recordMaintenanceRun(env.DB, errors);
-  return removedObjects;
+  return { removedObjects, backlog };
 }

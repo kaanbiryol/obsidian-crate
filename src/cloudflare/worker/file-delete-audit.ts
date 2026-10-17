@@ -1,3 +1,4 @@
+import { changedRows, MAINTENANCE_DELETE_LIMIT } from './db';
 import type { MutationAuditContext } from './request-diagnostics';
 
 export interface FileDeletionReceipt {
@@ -28,6 +29,8 @@ export async function findFileDeletionReceipt(db: D1Database, path: string, hash
 		.bind(consumedRevision, path, hash).first<FileDeletionReceipt>();
 }
 
-export async function pruneFileDeletionReceipts(db: D1Database): Promise<void> {
-	await db.prepare("DELETE FROM file_deletion_receipts WHERE created_at < datetime('now', '-30 days')").run();
+export async function pruneFileDeletionReceipts(db: D1Database): Promise<boolean> {
+	const result = await db.prepare(`DELETE FROM file_deletion_receipts WHERE rowid IN (SELECT rowid FROM file_deletion_receipts
+		WHERE created_at < datetime('now', '-30 days') ORDER BY created_at LIMIT ?)`).bind(MAINTENANCE_DELETE_LIMIT).run();
+	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
 }

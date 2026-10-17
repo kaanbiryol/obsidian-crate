@@ -19,13 +19,13 @@ it('retains failed cleanup and its diagnostic until a successful retry', async (
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 	vi.spyOn(env.BUCKET, 'delete').mockRejectedValueOnce(new Error('R2 unavailable'));
 
-	expect(await runScheduledMaintenance(env)).toBe(0);
+	expect((await runScheduledMaintenance(env)).removedObjects).toBe(0);
 	expect(await env.BUCKET.get(key)).not.toBeNull();
 	expect(await env.DB.prepare('SELECT storage_key FROM object_cleanup_queue').first()).toEqual({ storage_key: key });
 	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first())
 		.toEqual({ value: 'drain object cleanup: R2 unavailable' });
 
-	expect(await runScheduledMaintenance(env)).toBe(1);
+	expect((await runScheduledMaintenance(env)).removedObjects).toBe(1);
 	expect(await env.BUCKET.get(key)).toBeNull();
 	expect(await env.DB.prepare('SELECT storage_key FROM object_cleanup_queue').first()).toBeNull();
 	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first()).toBeNull();

@@ -1,11 +1,17 @@
+import { changedRows } from '../db';
 import { OPERATION_FLOOR } from '../operation-expiry';
 import { pruneEncryptionPairings } from '../encryption-pairing';
 
 /** Publish the retry floor and prune receipts in the same transaction. */
-export async function pruneOperationReceipts(db: D1Database): Promise<void> {
+// Primary-key range deletes; uploads create one receipt each, so a pass must
+// outpace a busy day's growth.
+export const RECEIPT_BATCH = 5000;
+
+/** Returns true when an expired upload or reminder receipt range may remain. */
+export async function pruneOperationReceipts(db: D1Database): Promise<boolean> {
 	await pruneEncryptionPairings(db);
 	const prefix = `'e1_' || printf('%08d', ${OPERATION_FLOOR}) || '_'`;
-	await db.batch([
+	const results = await db.batch([
 		db.prepare(`DELETE FROM reading_operations WHERE day < ${OPERATION_FLOOR}`),
 		db.prepare('DELETE FROM reading_handoffs WHERE expires_at < ?').bind(Date.now()),
 		db.prepare('DELETE FROM reading_enrollments WHERE expires_at < ?').bind(Date.now()),
@@ -13,10 +19,10 @@ export async function pruneOperationReceipts(db: D1Database): Promise<void> {
 			ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`),
 		db.prepare(`DELETE FROM reminder_operations WHERE operation_id IN (
 			SELECT operation_id FROM reminder_operations WHERE operation_id >= 'e1_' AND operation_id < ${prefix}
-			ORDER BY operation_id LIMIT 500)`),
+			ORDER BY operation_id LIMIT ${RECEIPT_BATCH})`),
 		db.prepare(`DELETE FROM upload_operations WHERE operation_id IN (
 			SELECT operation_id FROM upload_operations WHERE operation_id >= 'e1_' AND operation_id < ${prefix}
-			ORDER BY operation_id LIMIT 500)`),
+			ORDER BY operation_id LIMIT ${RECEIPT_BATCH})`),
 		// Legacy callers are fenced by protocol 6. Their finite history remains
 		// replayable until cleanup, then a missing unversioned ID always fails.
 		db.prepare(`DELETE FROM reminder_operations WHERE operation_id IN (
@@ -28,4 +34,5 @@ export async function pruneOperationReceipts(db: D1Database): Promise<void> {
 			AND NOT EXISTS (SELECT 1 FROM reminder_sources s WHERE s.reminder_id = i.reminder_id)
 			ORDER BY i.reminder_id LIMIT 500)`),
 	]);
+	return changedRows(results[4]) === RECEIPT_BATCH || changedRows(results[5]) === RECEIPT_BATCH;
 }
