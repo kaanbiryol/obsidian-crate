@@ -1,4 +1,4 @@
-import { refreshSharedFeatures, registerSharedFeatures } from './feature-settings';
+import { registerSharedFeatures } from './feature-settings';
 import { Notice } from "obsidian";
 import { registerReading } from '../reading/register-integrations';
 import { stopReading } from '../reading/runtime';
@@ -35,8 +35,8 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
     return;
   }
 
-  await refreshSharedFeatures(plugin, false).catch(() => { /* Use cached settings while offline or before a server upgrade. */ });
-  if (signal.aborted) return;
+  // Start from cached feature settings; registerSharedFeatures applies the
+  // server's policy once it responds, without delaying startup when offline.
   registerCheckpointBackupCleanup(plugin, signal);
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
@@ -122,8 +122,10 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
     const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
     if (signal.aborted) return;
     if (!plugin.remindersSettings.enabled || !plugin.reminderIndex) return;
+    // Sync writes visible notes through the vault, so the watcher saw each
+    // change; scans deferred while syncing are flushed instead of a full reload.
     if (startupSyncRan) {
-      await plugin.reminderIndex.load();
+      await plugin.reminderIndex.flushDeferredScans();
     }
     if (signal.aborted) return;
     await ensureReminderNotificationPolicy(plugin);

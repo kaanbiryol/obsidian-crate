@@ -328,3 +328,16 @@ it('rejects a stale modal update and delete even when the current index is fresh
   expect(spies.updateReminder).not.toHaveBeenCalled();
   expect(spies.deleteReminder).not.toHaveBeenCalled();
 });
+
+it('keeps converted reminders identical until their indexed record changes', () => {
+	const record: IndexedReminder = { id: 'one', content: 'Task', priority: 4, completed: false, filePath: 'Reminders/A.md',
+		project: 'A', lineNumber: 0, rawLine: '- [ ] Task', contentHash: 'hash' };
+	const repository = createReminderRepository(createIndex({ getAll: () => [record] }), {} as MarkdownWriter);
+	const first = repository.getAll()[0];
+	expect(repository.getAll()[0]).toBe(first);
+	// The index moves records in place when a note is renamed.
+	record.project = 'B';
+	const moved = repository.getAll()[0];
+	expect(moved).not.toBe(first);
+	expect(moved?.project).toBe('B');
+});

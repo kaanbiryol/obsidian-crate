@@ -258,7 +258,7 @@ describe('bootstrapPlugin', () => {
 		);
 	});
 
-	it('reloads the reminder index and initializes policy only after startup sync finishes', async () => {
+	it('flushes deferred reminder scans and initializes policy only after startup sync finishes', async () => {
 		const { bootstrapPlugin } = await loadLifecycleModule();
 		let finishStartupSync!: (ran: boolean) => void;
 		const startupSync = new Promise<boolean>((resolve) => {
@@ -266,7 +266,7 @@ describe('bootstrapPlugin', () => {
 		});
 		const reminderIndexLoad = vi.fn(async () => undefined);
 		const plugin = createPlugin({
-			reminderIndex: { load: reminderIndexLoad },
+			reminderIndex: { flushDeferredScans: reminderIndexLoad },
 		});
 
 		initializeSyncManagers.mockImplementation((target) => {

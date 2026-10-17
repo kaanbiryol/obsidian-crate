@@ -18,6 +18,7 @@ import { RemindersLoading } from "../RemindersLoading";
 import "../reminders-view.scss";
 
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
+import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
 import { ObsidianIcon } from '@/reminders/components/obsidian-icon';
 interface RemindersViewContentProps {
     plugin: CratePlugin;
@@ -83,7 +84,8 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     }, [plugin, updateReminders]);
 
     return (
-        <ThemeIconProvider renderer={ObsidianIcon}><PluginRemindersAppShell
+        // Large folders render in pages, matching the web app.
+        <ReminderPageSizeContext.Provider value={200}><ThemeIconProvider renderer={ObsidianIcon}><PluginRemindersAppShell
             listStyle={listStyle}
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -120,6 +122,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                     />
                 </>
             ) : undefined}
-        /></ThemeIconProvider>
+        /></ThemeIconProvider></ReminderPageSizeContext.Provider>
     );
 };

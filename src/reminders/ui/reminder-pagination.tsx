@@ -1,7 +1,7 @@
 import { Button as BaseButton } from '@base-ui/react/button';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-/** Hosts opt in to bounded rendering; the Obsidian plugin retains its full lists. */
+/** Hosts bound rendering to pages of this size; null renders full lists. */
 export const ReminderPageSizeContext = createContext<number | null>(null);
 
 interface ReminderPage {

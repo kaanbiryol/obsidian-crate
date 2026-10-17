@@ -34,7 +34,7 @@ interface ReminderCardWrapperProps {
  * Provides Obsidian-specific handlers for toggle, delete, and edit operations.
  * Optimistic updates are handled by ReminderIndex.
  */
-export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
+export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
   reminder,
   onUpdate,
   onToggleCompleteOverride,
@@ -42,7 +42,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   index,
   hideProject = false,
   colorScheme = 'dark',
-}) => {
+}: ReminderCardWrapperProps) {
   const plugin = PluginContext.use();
   const listStyle = useRemindersSettingsStore(state => state.listStyle);
   const isTogglingRef = useRef(false);
@@ -132,4 +132,4 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       />
     </div>
   );
-};
+});

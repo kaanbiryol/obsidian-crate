@@ -16,6 +16,12 @@ import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
+import { readVaultMarkdown } from '../vault-markdown';
+
+async function contentDigest(content: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 const log = createLogger("ReminderIndex");
 
@@ -88,8 +94,13 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
   let scanQueue: Promise<unknown> = Promise.resolve();
   let structureRevision = 0;
   const pendingFileScans = new Set<{ path: string; current: boolean }>();
+  // Content digests from the last successful single-file scan. A writer rescans
+  // its own edit immediately and the watcher reports it again; an unchanged note
+  // skips the identity rebuild and listener notification.
+  const scannedDigests = new Map<string, string>();
   function invalidateScans(...paths: string[]): void {
     structureRevision++;
+    for (const path of paths) scannedDigests.delete(path);
     for (const scan of pendingFileScans) if (paths.includes(scan.path)) scan.current = false;
   }
   let deferredLoad = false;
@@ -222,6 +233,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       discoveredProjects = new Set(result.discoveredProjects);
 
       lookupStore.rebuild(reminders);
+      scannedDigests.clear();
       notifyListeners();
 
       log.info(` Index loaded with ${reminders.length} reminders from ${result.filesScanned} files`);
@@ -243,6 +255,10 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
           deferredPaths.add(filePath);
           return;
         }
+        // A read failure here is reported by the full scan below.
+        const digest = await readVaultMarkdown(app, file).then(contentDigest, () => undefined);
+        if (signal?.aborted || !scan.current || file.path !== scan.path) return;
+        if (digest && scannedDigests.get(filePath) === digest && !sourceIssues.has(filePath)) return;
 
         log.info(` Rescanning file: ${filePath}`);
 
@@ -254,6 +270,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
         if (signal?.aborted || !scan.current || file.path !== scan.path) return;
         if (result.deferred) { deferredPaths.add(filePath); return; }
         if (result.error) {
+          scannedDigests.delete(filePath);
           sourceIssues.set(filePath, { path: filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });
           log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
           notifyListeners();
@@ -261,6 +278,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
         }
 
         sourceIssues.delete(filePath);
+        if (digest) scannedDigests.set(filePath, digest);
 
         discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
 

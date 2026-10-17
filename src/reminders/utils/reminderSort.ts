@@ -15,6 +15,12 @@ import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, isReminderOve
  * This ensures consistent sorting in the plugin.
  */
 export function sortReminders(reminders: Reminder[]): Reminder[] {
+  // Parse each due date once rather than in every comparison.
+  const times = new Map<Reminder, number | null>();
+  for (const reminder of reminders) {
+    const date = reminder.dueDatetime || reminder.dueDate;
+    times.set(reminder, date ? parseReminderDateValue(date, !isDateOnlyString(date))?.getTime() ?? 0 : null);
+  }
   return [...reminders].sort((a, b) => {
     // 1. Sort by completion status (incomplete first)
     if (a.completed !== b.completed) {
@@ -22,17 +28,15 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
     }
 
     // 2. Sort by due date (earliest first, no date goes last)
-    const dateA = a.dueDatetime || a.dueDate;
-    const dateB = b.dueDatetime || b.dueDate;
+    const timeA = times.get(a)!;
+    const timeB = times.get(b)!;
 
     // If only one has a date, prioritize the one with a date
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
+    if (timeA !== null && timeB === null) return -1;
+    if (timeA === null && timeB !== null) return 1;
 
     // If both have dates, compare them
-    if (dateA && dateB) {
-      const timeA = parseReminderDateValue(dateA, !isDateOnlyString(dateA))?.getTime() ?? 0;
-      const timeB = parseReminderDateValue(dateB, !isDateOnlyString(dateB))?.getTime() ?? 0;
+    if (timeA !== null && timeB !== null) {
       const dateDiff = timeA - timeB;
       if (dateDiff !== 0) return dateDiff;
     }

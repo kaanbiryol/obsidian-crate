@@ -133,3 +133,21 @@ it('keeps all read views consistent through rename, a failed rescan and recovery
   index.removeFile(newPath);
   expect(views()).toEqual({ all: [], byId: undefined, oldFile: [], newFile: [], oldProject: [], newProject: [], projects: [] });
 });
+
+it('skips a repeated rescan of unchanged note content without notifying listeners', async () => {
+  let bytes = new TextEncoder().encode('- [ ] Task');
+  const index = createReminderIndex({ vault: { adapter: { readBinary: async () => bytes.buffer.slice(0) } } } as unknown as App, 'Reminders');
+  vi.mocked(scanVault).mockResolvedValue(snapshot([reminder()]));
+  await index.load();
+  const file = Object.assign(new TFile(), { path: oldPath, extension: 'md' });
+  vi.mocked(scanFile).mockResolvedValue({ filePath: oldPath, reminders: [reminder()], lineCount: 1 });
+  const listener = vi.fn();
+  index.onIndexChange(listener);
+  await index.rescanFile(file);
+  await index.rescanFile(file);
+  expect(scanFile).toHaveBeenCalledOnce();
+  expect(listener).toHaveBeenCalledOnce();
+  bytes = new TextEncoder().encode('- [x] Task');
+  await index.rescanFile(file);
+  expect(scanFile).toHaveBeenCalledTimes(2);
+});
