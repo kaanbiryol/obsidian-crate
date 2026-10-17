@@ -4,7 +4,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_ENCRYPTED_FILE_BYT
 import { EncryptionStateError, validateUploadEncryption } from './encryption-state';
 import { beginUploadOperation } from './upload-operations';
 import { sha256HexBytes } from './auth';
-import { readLimitedRequestBody } from './body-reader';
+import { exactArrayBuffer, readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
 import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from './utils';
 import { commitFileDelete } from './sync-mutations';
@@ -66,10 +66,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			return corsResponse({ error: 'File size does not match X-File-Size header' }, 400);
 		}
 
-		const computedHash = await sha256HexBytes(body.buffer.slice(
-			body.byteOffset,
-			body.byteOffset + body.byteLength,
-		));
+		const computedHash = await sha256HexBytes(body);
 		if (hashHeader && hashHeader !== computedHash) {
 			return corsResponse({ error: 'File hash does not match X-File-Hash header' }, 400);
 		}
@@ -104,7 +101,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				hash,
 				size,
 				objectKey,
-				content: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+				content: exactArrayBuffer(body),
 				expectedHash: expectedRemoteHash,
 				previousFile,
 				operation,
