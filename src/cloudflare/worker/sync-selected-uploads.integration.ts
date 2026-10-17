@@ -135,12 +135,12 @@ it.each([false, true])('preserves rename ordering with selected batched uploads 
 	const result = await device.engine.syncSelected([pendingChangeKey('delete', 'old.md'), 'new.md']);
 	expect(result.success).toBe(!fail);
 	if (fail) {
-		expect(device.requests).not.toContain('POST /sync/delete');
+		expect(device.requests).not.toContain('POST /sync/batch-delete');
 		expect(Object.keys((await device.api.getManifest()).files)).toEqual(['old.md']);
 		expect(new TextDecoder().decode((await device.api.downloadFile('old.md')).content)).toBe('Keep this note.\n');
 	} else {
 		expect(device.requests).toContain('POST /sync/batch-upload');
-		expect(device.requests.indexOf('POST /sync/batch-upload')).toBeLessThan(device.requests.indexOf('POST /sync/delete'));
+		expect(device.requests.indexOf('POST /sync/batch-upload')).toBeLessThan(device.requests.indexOf('POST /sync/batch-delete'));
 		expect(Object.keys((await device.api.getManifest()).files)).toEqual(['new.md']);
 		expect(new TextDecoder().decode((await device.api.downloadFile('new.md')).content)).toBe('Keep this note.\n');
 	}
