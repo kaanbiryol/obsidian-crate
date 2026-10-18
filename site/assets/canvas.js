@@ -59,7 +59,7 @@ window.addEventListener('resize', updateNavigation);
 updateNavigation();
 
 // Hold the last frame, then fade the video over its stationary phone backdrop.
-document.querySelectorAll('.reminder-recording video').forEach((recording) => {
+document.querySelectorAll('.reminder-recording video, .notification-preview video').forEach((recording) => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const isGalleryPreview = Boolean(recording.closest('a[data-gallery-video]'));
   const replayDelay = Number(recording.dataset.replayDelay) || 3000;
@@ -153,4 +153,16 @@ document.querySelectorAll('[data-copy-target]').forEach((button) => {
       }, 4000);
     }
   });
+});
+
+// Reveal the notification banners once their stage scrolls into view.
+document.querySelectorAll('.notify-stage').forEach((stage) => {
+  if (!('IntersectionObserver' in window)) return;
+  stage.classList.add('is-pending');
+  const observer = new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting) return;
+    stage.classList.remove('is-pending');
+    observer.disconnect();
+  }, { threshold: 0.35 });
+  observer.observe(stage);
 });

@@ -11,29 +11,12 @@
 #sync > .reminder-recording,#reminders > .reminder-recording { margin-top:0; }
 #reminders > .reminder-recording h2 { margin-bottom:18px; }
 .overview-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:36px; --gallery-media-height:220px; }
-.feature-links { display:flex; align-items:center; flex-wrap:wrap; gap:12px 28px; margin-top:28px; font-size:14px; color:var(--muted); }
-.feature-links a,.section-guide { display:inline-flex; align-items:center; min-height:44px; color:var(--accent-text); font-size:14px; }
+.section-guide { display:inline-flex; align-items:center; min-height:44px; color:var(--accent-text); font-size:14px; }
 .reminders-mobile { margin-block:40px; }
 .mobile-gallery { display:flex; flex-wrap:wrap; justify-content:center; gap:32px 24px; --gallery-media-height:280px; }
 .mobile-gallery > .feature-preview { flex:0 1 calc((100% - 72px)/4); max-width:230px; }
 .mobile-gallery + .mobile-gallery { margin-top:40px; }
 .mobile-gallery figcaption,.reading-previews figcaption { text-align:center; }
-.reminder-extras { display:grid; grid-template-columns:1fr; gap:40px; align-items:stretch; }
-.reminder-extras .embedded-reminders { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr); align-items:center; gap:32px; width:100%; max-width:1040px; margin:0 auto; padding:28px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
-.reminder-extras .notification-story { width:100%; }
-.reminder-extras .embed-heading { min-width:0; margin:0; }
-.reminder-extras .embed-heading p { margin:16px 0 12px; }
-.reminder-extras .section-guide { gap:6px; }
-.reminder-extras .embedded-reminders h3 { font-size:24px; margin:0; }
-.reminder-extras .embed-demo { display:block; min-width:0; }
-/* Fit the complete note screenshot inside the existing preview frame. */
-.reminder-extras .embedded-note-image {
- display:block; position:relative; aspect-ratio:1680 / 1040;
- overflow:hidden; border:0; border-radius:10px;
-}
-.reminder-extras .embedded-note-image img {
- position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
-}
 .hosting-option p { margin-bottom:18px; }
 .hosting-option .hosting-guide { padding-top:10px; }
 .hosting-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:48px; align-items:center; }
@@ -46,8 +29,6 @@
 @media(max-width:850px) {
  .mobile-gallery > .feature-preview { flex-basis:calc((100% - 24px)/2); }
  .overview-grid { --gallery-media-height:170px; }
- .reminder-extras { gap:16px; }
- .reminder-extras .embedded-reminders { padding:22px; }
 }
 @media(max-width:600px) {
  .hero-devices { justify-items:center; margin-top:12px; }
@@ -57,10 +38,119 @@
  .mobile-gallery { --gallery-media-height:260px; gap:28px 16px; }
  .mobile-gallery > .feature-preview { flex-basis:calc((100% - 16px)/2); }
  .reading-previews { grid-template-columns:1fr; --gallery-media-height:340px; gap:32px; }
- .reminder-extras { grid-template-columns:1fr; }
- .reminder-extras .embedded-reminders { grid-template-columns:1fr; gap:20px; padding:20px; }
- .feature-links { gap:8px 20px; }
 }
 
-/* Use the same lossless source for the notification replay backdrop. */
-.plugin-notification-demo .gallery-video-trigger { background-image:url("/assets/screenshots/lossless/plugin-notifications-idle.webp"); }
+
+/* Consistent section labels: one monospace label style per section. */
+.hosting-intro .feature-label,.install-intro .feature-label { margin:0 0 6px; }
+/* Give recording headings room so they wrap like the other section headings. */
+/* Sync and Reminders lead with the heading, then the full-width recording below. */
+#sync > .reminder-recording,#reminders > .reminder-recording { grid-template-columns:minmax(0,1fr); gap:48px; }
+#sync > .reminder-recording figcaption,#reminders > .reminder-recording figcaption { max-width:680px; }
+#sync > .reminder-recording figcaption p:not(.feature-label),#reminders > .reminder-recording figcaption p:not(.feature-label) { max-width:560px; font-size:17px; }
+@media(max-width:600px) { #sync > .reminder-recording,#reminders > .reminder-recording { gap:28px; } }
+
+/* Hero secondary action. */
+.hero-copy .actions { gap:12px; }
+.button--secondary { background:transparent; color:var(--text); border-color:var(--line-strong); }
+.button--secondary:hover { background:#ffffff0a; }
+
+/* Internal links use →; external links keep ↗. The arrow nudges on hover. */
+.section-guide,.hosting-guide,.encryption-guide { gap:8px; }
+.section-guide > span,.hosting-guide > span,.encryption-guide > span { transition:transform 150ms ease; }
+.section-guide:hover > span,.hosting-guide:hover > span,.encryption-guide:hover > span { transform:translateX(3px); }
+.section-guide:hover { color:var(--text); }
+
+/* Hosting diagram: hub, stem, and branches drawn like the encryption flow. */
+.sync-map-hub > .icon { box-sizing:content-box; width:26px; height:26px; padding:14px; margin-bottom:8px; border:1px solid #bca7ef33; border-radius:12px; background:#1c1826; }
+.sync-map-branches { width:50%; height:44px; margin:0 auto; padding:0; font-size:0; }
+.sync-map-branches::before { inset:18px 0 0; height:auto; border-radius:12px 12px 0 0; }
+.sync-map-branches::after { content:""; position:absolute; top:0; left:50%; width:1px; height:18px; background:linear-gradient(var(--accent-text),var(--line-strong)); }
+.sync-map-branches span { position:absolute; bottom:-3px; width:5px; height:5px; border-radius:50%; background:var(--accent-text); }
+.sync-map-branches span:first-child { left:-2px; }
+.sync-map-branches span:last-child { right:-2px; }
+.sync-map-devices { column-gap:0; }
+.sync-map-devices .icon { box-sizing:content-box; width:23px; height:23px; padding:15px; margin-bottom:9px; border:1px solid var(--line-strong); border-radius:12px; background:#16161b; }
+
+/* Alternate section backgrounds so the page has structure while scrolling. */
+main { overflow-x:clip; }
+#reminders,#setup { position:relative; isolation:isolate; }
+#reminders::before,#setup::before { content:""; position:absolute; inset:0 calc(50% - 50vw); z-index:-1; pointer-events:none; }
+#reminders::before { background:radial-gradient(ellipse 55% 320px at 50% 0,#8b5cf60f,transparent),#101013; border-block:1px solid var(--line); }
+#setup::before { background:radial-gradient(ellipse 50% 70% at 30% 50%,#8b5cf612,transparent); }
+
+
+
+/* Reading has no side visual, so its intro centers over the phone row. */
+.reading-intro { justify-items:center; text-align:center; }
+.reading-intro .body-copy { margin-inline:auto; }
+
+/* Sync previews: lift the cards off the page so the dark captures read clearly. */
+.overview-grid .feature-preview-media { border-color:#bca7ef1f; background:radial-gradient(ellipse at 50% 0,#8b5cf614,transparent 70%),#17171c; transition:border-color 150ms ease,background-color 150ms ease; }
+.overview-grid .feature-preview-media:hover { border-color:#bca7ef40; }
+
+/* Spacing rhythm: the main features get more room than hosting and setup. */
+#sync,#reminders,#reading { padding-block:112px; }
+#hosting > .section,#setup { padding-block:80px; }
+@media(max-width:600px) { #sync,#reminders,#reading { padding-block:72px; } #hosting > .section,#setup { padding-block:56px; } }
+
+/* A soft accent glow behind each section's main visual, echoing the hero. */
+#sync > .reminder-recording .recording-media,#reminders > .reminder-recording .recording-media,.reading-previews { position:relative; isolation:isolate; }
+#sync > .reminder-recording .recording-media::before,#reminders > .reminder-recording .recording-media::before,.reading-previews::before { content:""; position:absolute; inset:-14% -10%; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at center,#8b5cf61c,transparent 62%); }
+
+/* Notification spotlight: the lock screen recording flanked by reminder banners.
+   The video draws its own phone; the idle phone stays visible while it fades for replay. */
+.notify-spotlight { position:relative; isolation:isolate; margin-top:96px; text-align:center; }
+.notify-spotlight::before { content:""; position:absolute; inset:18% 10% 0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at center,#8b5cf624,transparent 62%); }
+.notify-intro h3 { margin:0 0 16px; font-size:clamp(28px,3vw,36px); font-weight:500; letter-spacing:-.035em; line-height:1.2; }
+.notify-intro p { max-width:520px; margin:0 auto; color:var(--muted); font-size:16px; line-height:1.7; }
+.notify-stage { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:40px; margin-top:48px; }
+.notification-preview { margin:0; }
+.notify-phone { display:block; height:440px; background:url("/assets/screenshots/lossless/plugin-notifications-idle.webp") center / contain no-repeat; }
+.notification-preview video { display:block; width:auto; height:100%; opacity:1; transition:opacity 350ms ease; }
+.notification-preview video.is-restarting { opacity:0; }
+.notify-column { display:flex; flex-direction:column; gap:28px; margin:0; padding:0; list-style:none; }
+.notify-column--left { align-items:flex-end; }
+.notify-column--right { align-items:flex-start; }
+/* Stagger the banners so they read as arriving, not as a table. */
+.notify-column--left .notify-banner:nth-child(2) { margin-right:36px; }
+.notify-column--right .notify-banner:nth-child(1) { margin-left:36px; }
+.notify-banner { display:flex; gap:12px; width:min(100%,300px); padding:12px 14px; text-align:left; border:1px solid #ffffff14; border-radius:18px; background:#1d1d23d9; box-shadow:0 18px 40px #00000059; backdrop-filter:blur(14px); }
+.notify-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:9px; background:#0c0c0f; }
+.notify-body { display:flex; flex:1; flex-direction:column; gap:2px; min-width:0; }
+.notify-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.notify-head time { flex:none; color:var(--faint); font-size:12px; }
+.notify-body > span:not(.notify-head) { color:var(--muted); font-size:13px; line-height:1.35; }
+.notify-banner strong { color:var(--text); font-size:14px; font-weight:550; line-height:1.4; }
+/* Banners slide in toward the phone once the stage scrolls into view. */
+.notify-stage.is-pending .notify-banner { opacity:0; }
+.notify-stage .notify-banner { transition:opacity 500ms ease,transform 500ms cubic-bezier(.2,.8,.2,1); }
+.notify-stage.is-pending .notify-column--left .notify-banner { transform:translateX(-24px); }
+.notify-stage.is-pending .notify-column--right .notify-banner { transform:translateX(24px); }
+.notify-column .notify-banner:nth-child(2) { transition-delay:150ms; }
+.notify-column--right .notify-banner:nth-child(1) { transition-delay:300ms; }
+.notify-column--right .notify-banner:nth-child(2) { transition-delay:450ms; }
+@media(prefers-reduced-motion:reduce) { .notify-stage .notify-banner,.notification-preview video { transition:none; } }
+@media(max-width:900px) {
+ .notify-stage { grid-template-columns:minmax(0,1fr); gap:20px; justify-items:center; }
+ .notification-preview { order:-1; margin-bottom:8px; }
+ .notify-column,.notify-column--left,.notify-column--right { align-items:center; gap:12px; width:100%; }
+ .notify-column .notify-banner { margin:0 !important; width:min(100%,340px); }
+ .notify-column--right .notify-banner:nth-child(2),.notify-column--left .notify-banner:nth-child(2) { display:none; }
+ .notify-stage.is-pending .notify-column .notify-banner { transform:translateY(16px); }
+}
+@media(max-width:600px) { .notify-spotlight { margin-top:72px; } .notify-phone { height:380px; } }
+
+/* Sync previews: size each card by its width and give every capture the same
+   even inset, so the dialog sits centered with equal space around it. */
+.overview-grid .feature-preview-media { height:auto; aspect-ratio:4 / 3; padding:16px; container-type:size; overflow:hidden; }
+.overview-grid .feature-preview-media .product-image--dialog { width:min(calc(100cqw - 2 * var(--dialog-frame-gutter)),calc((100cqh - 2 * var(--dialog-frame-gutter)) * var(--dialog-width) / var(--dialog-height))); }
+
+/* Each feature links to its guide right under the description. */
+.intro-guide { margin-top:12px; }
+.intro-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px 24px; margin-top:16px; }
+.button--small { min-height:40px; padding:.55rem .95rem; font-size:13px; }
+
+/* Install steps: a direct link into Obsidian and a closing note. */
+.install-steps .install-open { margin-top:12px; text-decoration:none; color:var(--text); }
+.install-steps .install-done { margin-top:14px; padding:10px 14px; border:1px solid #bca7ef26; border-radius:8px; background:#8b5cf60d; color:var(--text); }
