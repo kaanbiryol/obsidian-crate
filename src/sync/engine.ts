@@ -10,7 +10,7 @@ import { SyncTimingRecorder } from './timings';
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
-import { type Plugin, type TAbstractFile, type Vault } from 'obsidian';
+import { TFolder, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
@@ -579,7 +579,7 @@ export class SyncEngine {
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (this.lifecycle.isDestroyed) return;
-		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path);
+		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path, file instanceof TFolder ? 'folder' : 'file');
 		if (isConflictFile(oldPath)) {
 			void this.trackWork(() => this.conflictStore.markResolved(oldPath)).catch((error) => {
 				logger.warn('Failed to resolve renamed conflict copy:', errorMessage(error));

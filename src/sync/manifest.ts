@@ -32,6 +32,9 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
 	private renameDependencies = new Map<string, string>();
+	/** Current path -> baseline paths that now live there, so one file's rename
+	 * updates only its own dependencies instead of scanning all of them. */
+	private renameTargets = new Map<string, Set<string>>();
 	private appliedRename?: string;
 	private app: App;
 	private manifestPath: string;
@@ -121,6 +124,7 @@ export class LocalManifest {
 			this.restoreIntents = selected.restoreIntents;
 			this.initialConfigPull = selected.initialConfigPull;
 			this.renameDependencies = selected.renames;
+			this.indexRenameTargets();
 			this.appliedRename = selected.appliedRename;
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
@@ -263,7 +267,7 @@ export class LocalManifest {
 	 * Remove file entry
 	 */
 	removeEntry(path: string): void {
-		this.renameDependencies.delete(path);
+		this.deleteRenameDependency(path);
 		delete this.manifest.files[path];
 		this.changedPaths.add(path);
 		this.revision++;
@@ -314,29 +318,69 @@ export class LocalManifest {
 	applyJournalRenames(moves: Array<{ id: string; from: string; to: string; rename?: boolean; priorRenames?: Record<string, string> }>): void {
 		const start = moves.findIndex(move => move.id === this.appliedRename) + 1;
 		for (const move of moves.slice(start)) {
-			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.renameDependencies.set(source, target);
+			for (const [source, target] of Object.entries(move.priorRenames ?? {})) this.setRenameDependency(source, target);
 			if (move.rename !== false) this.recordRename(move.from, move.to);
 			this.appliedRename = move.id;
 			this.revision++; this.dirty = true;
 		}
 	}
 
-	recordRename(source: string, destination: string): void {
+	/**
+	 * Obsidian reports a folder move as one event for the folder plus one per
+	 * file. A file moves alone, so only folder events (or callers that cannot
+	 * tell, for an untracked source) scan every path below the source.
+	 */
+	recordRename(source: string, destination: string, kind?: 'file' | 'folder'): void {
 		const move = (path: string) => path === source ? destination : path.startsWith(`${source}/`) ? destination + path.slice(source.length) : path;
-		for (const [old, target] of this.renameDependencies) {
-			const next = move(target);
-			if (old === next) this.renameDependencies.delete(old);
-			else this.renameDependencies.set(old, next);
+		const tracked = Boolean(getPathEntry(this.manifest.files, source));
+		const folder = kind ? kind === 'folder' : !tracked;
+		const affected = folder
+			? [...this.renameDependencies].filter(([, target]) => move(target) !== target).map(([old]) => old)
+			: [...this.renameTargets.get(source) ?? []];
+		for (const old of affected) {
+			const next = move(this.renameDependencies.get(old)!);
+			if (old === next) this.deleteRenameDependency(old);
+			else this.setRenameDependency(old, next);
 		}
-		// Obsidian reports a folder move as one event per file. A tracked file
-		// moves alone, so only an untracked source needs the prefix scan.
-		const sources = getPathEntry(this.manifest.files, source) ? [source] : this.getAllPaths();
+		const sources = folder ? this.getAllPaths() : tracked ? [source] : [];
 		for (const path of sources) {
 			const target = move(path);
-			if (target !== path && !this.renameDependencies.has(path)) this.renameDependencies.set(path, target);
+			if (target !== path && !this.renameDependencies.has(path)) this.setRenameDependency(path, target);
 		}
 		this.revision++;
 		this.dirty = true;
+	}
+
+	private setRenameDependency(old: string, target: string): void {
+		// Updating in place keeps checkpoint key order unchanged.
+		const previous = this.renameDependencies.get(old);
+		if (previous !== undefined) {
+			const olds = this.renameTargets.get(previous);
+			olds?.delete(old);
+			if (olds?.size === 0) this.renameTargets.delete(previous);
+		}
+		this.renameDependencies.set(old, target);
+		const olds = this.renameTargets.get(target) ?? new Set<string>();
+		olds.add(old);
+		this.renameTargets.set(target, olds);
+	}
+
+	private deleteRenameDependency(old: string): void {
+		const target = this.renameDependencies.get(old);
+		if (target === undefined) return;
+		this.renameDependencies.delete(old);
+		const olds = this.renameTargets.get(target);
+		olds?.delete(old);
+		if (olds?.size === 0) this.renameTargets.delete(target);
+	}
+
+	private indexRenameTargets(): void {
+		this.renameTargets = new Map();
+		for (const [old, target] of this.renameDependencies) {
+			const olds = this.renameTargets.get(target) ?? new Set<string>();
+			olds.add(old);
+			this.renameTargets.set(target, olds);
+		}
 	}
 
 	/**
