@@ -59,17 +59,16 @@ probes write zero rows and use bounded indexed reads. Schedule dispatch handles
 up to five commands in a separate invocation of the existing Durable Object class;
 it adds one internal request per coordinator pass and no extra D1 records.
 
-Schema 6 uses the normalized portable path as the `WITHOUT ROWID` primary key.
+The schema uses the normalized portable path as the `WITHOUT ROWID` primary key.
 The original path remains metadata and is checked on exact-path reads and writes.
 This preserves spelling, case/Unicode collision protection and file/folder guards
 without a separate portable-path index. Manifest pages follow portable-key order
-and still return original names and original-name continuation cursors. The one-time migration advances the snapshot baseline so a manifest started before the ordering change must restart safely. An empty, never-imported vault remains eligible for the cheap initial-import path.
+and still return original names and original-name continuation cursors. An empty, never-imported vault remains eligible for the cheap initial-import path.
 
 Staging and cleanup records carry the owning file path. Current-object checks use
 that primary key and immutable object revision; retained-object checks use the
-existing version primary key. The current-file storage-key index is removed.
-Legacy intents without an owner use a conservative whole-inventory scan only in
-cleanup, never on the normal initial-upload path. Immutable keys are never
+existing version primary key. There is no current-file storage-key index.
+Immutable keys are never
 transferred to another file or reused by a restore.
 
 The per-file inventory write is now the main cost. Cutting the remaining 1,256
@@ -86,7 +85,7 @@ folder are skipped by the portable primary key.
 
 This measurement uses the new database layout: `WITHOUT ROWID` for file metadata,
 upload receipts, staging records, reminder verification, and projection jobs.
-This layout is now the first-release baseline, with no historical inventory migration. These
+This layout is the schema-1 baseline. These
 figures exclude device setup, actual reminder indexing, failures and cleanup, and
 other activity sharing the account's daily quota. They do not guarantee that every
 10,000-file vault consumes the same allowance.

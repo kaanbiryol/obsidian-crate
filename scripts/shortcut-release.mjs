@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 export const shortcutName = 'Save to Crate.shortcut';
-export const assetName = 'save-to-crate-ios-27-v2.shortcut';
-export const metadataName = 'reading-shortcut-v2.json';
+export const assetName = 'save-to-crate-ios-27-v1.shortcut';
+export const metadataName = 'reading-shortcut-v1.json';
 const sources = ['docs/shortcuts/save-to-crate.plist', 'src/reading/shortcut-contract.json', 'scripts/reading-shortcut-template.mjs', 'scripts/reading-shortcut-first-run.mjs', 'scripts/sign-reading-shortcut.mjs'];
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');

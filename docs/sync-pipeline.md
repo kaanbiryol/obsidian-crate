@@ -10,9 +10,7 @@ remote files and retained versions are converted on the client. Pending local
 changes and upload receipts reconcile on the next encrypted sync. Explicitly saved preferences are preserved when upgrading or restarting.
 
 `automaticSync` is the device-local control for startup, foreground, periodic and
-edit-triggered sync. `syncOnStartup` and `syncOnResume` remain in saved/shared
-settings for compatibility with older clients; the current runtime does not use
-them to decide whether to sync. Tests that disable automatic work should set
+edit-triggered sync. Tests that disable automatic work should set
 `automaticSync: false`.
 
 Configured vaults start with a yellow indicator while the saved sync state loads.
@@ -377,9 +375,9 @@ newer server changes are still discovered by the next normal sync.
 ## Returning to a history checkpoint
 
 Successful syncs without unresolved conflicts or pending restore/upload intents ask
-servers advertising `shared-history-checkpoints-v1` to save a complete server file
+the server (`shared-history-checkpoints-v1`) to save a complete server file
 inventory. R2 holds the inventories and an ETag-protected index; no file contents
-are duplicated and no D1 schema migration is required. Checkpoints are visible on
+are duplicated. Checkpoints are visible on
 all connected devices, including devices without local activity history. The index
 keeps the newest 20 distinct server generations for at most 30 days. Repeated or
 concurrent saves of the same generation resolve to the same checkpoint. Initial and
@@ -402,11 +400,7 @@ check the live index and exact current/retained D1 path and revision ownership; 
 client verifies size and SHA-256 against the checkpoint before staging. Unlike text
 previews, these reads support the full 25 MiB sync-file limit.
 
-Older servers keep the local `history-checkpoints/` fallback and History explains
-that an update is needed for sharing. Existing local-only checkpoints stay local;
-new shared checkpoints begin after the server update and a successful sync.
-Unreferenced local inventories are pruned at startup. Local legacy checkpoints
-remain bound to their original server and exclusion rules. Shared checkpoints
+Unreferenced local inventories are pruned at startup. Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current
 excluded files and rejects exclusion changes during review.
 

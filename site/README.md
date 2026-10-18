@@ -16,14 +16,14 @@ invalidate cached images.
 
 ## iPhone shortcut downloads
 
-The public install page is `/shortcuts/v2/`. The homepage, Reading documentation,
+The public install page is `/shortcuts/v1/`. The homepage, Reading documentation,
 and app setup link to this page. Its download serves the signed `.shortcut` file
 directly from the Crate website.
 
 GitHub releases retain the versioned source artifacts. During deployment, Pages
-runs `node scripts/download-release-shortcut.mjs published site/shortcuts/v2 --install-page`
+runs `node scripts/download-release-shortcut.mjs published site/shortcuts/v1 --install-page`
 to copy the published shortcut into the site after checking its release metadata,
-Apple archive framing, and checksum. Without a published v2 shortcut, it generates
+Apple archive framing, and checksum. Without a published shortcut, it generates
 an unavailable page with a manual-save alternative. Incomplete releases or failed
 verification stop deployment. Do not commit the generated page or signed file.
 

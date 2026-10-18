@@ -411,7 +411,7 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 discovery, guarded reads/writes, and file-event revisions. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
 `ReadingLibrary.close()` closes admission and drains its accepted mutation and
-capture queues. Runtime shutdown waits for it alongside refreshes and outbox work;
+capture queues. Runtime shutdown waits for it alongside refreshes;
 replacement libraries defer vault access until the previous runtime has drained.
 `reading/core/mutation-policy.ts` shares edited-field preconditions and empty
 capture checks across the library, encrypted client and plaintext Worker.
@@ -565,7 +565,7 @@ feature and encryption guards, while public assets and Shortcut compatibility
 handling retain their existing admission behavior. Reading handoff redemption
 checks issuer scopes against the preparation route's policy.
 
-The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 2 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
+The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 1 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 

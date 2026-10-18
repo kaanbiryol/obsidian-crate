@@ -67,7 +67,7 @@ Highlights sync with the note. Ordinary passages use Obsidian's `==highlight==` 
 
 On iPhone with iOS 27 or later, **Reading settings → Set up iPhone shortcut** walks you through installing and pairing **Save to Crate**. Pairing codes are single-use and expire after ten minutes. Once paired, use **Share → Save to Crate**; the shortcut needs a connection.
 
-You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v2/). Select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut is not available yet, use **Reading → Save a link** until it is published.
+You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/). Select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut is not available yet, use **Reading → Save a link** until it is published.
 
 After enabling encryption, reinstall the current shortcut. Sharing opens the link in Crate; unlock Reading if asked, then select **Save**.
 

@@ -28,9 +28,8 @@ in the article's `highlights` frontmatter. Offsets remain UTF-16 offsets in read
 text, preserving the queued mutation contract. Context helps reattach metadata
 after preceding text changes. Ambiguous matches are not guessed.
 
-`highlight_format: markdown-v1` distinguishes this format from legacy frontmatter
-overlays. Matching legacy highlights migrate when the note is next saved through
-Crate. Unmatched legacy excerpts and annotations whose passage was removed or
+`highlight_format: markdown-v1` marks notes that use this format. Unmatched
+excerpts and annotations whose passage was removed or
 changed are retained in `highlight_recovery`, shown under **Highlights** in the
 article. Removing inline markers in Obsidian removes the corresponding active
 highlight; metadata does not repaint a deleted canonical marker. An unresolved

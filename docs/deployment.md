@@ -144,9 +144,9 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 ## Supported protocol and schema
 
-App writes use the current protocol range in [the release contract](current-contract.md). Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Native capture uses the separate [Shortcut contract](reading-shortcuts.md), including narrow adapters for released templates.
+App writes use the current protocol range in [the release contract](current-contract.md). Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Native capture uses the separate [Shortcut contract](reading-shortcuts.md).
 
-Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 2, the first supported baseline. There are no registered migrations. Existing supported schema-2 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
+Provisioning initializes empty databases from the hash-verified `src/cloudflare/schema.sql` at version 1, the current baseline. There are no registered migrations. Existing schema-1 databases receive no DDL. Unsupported schemas and missing saved databases stop without replacing storage.
 
 The ordered server revision and schema identity are recorded in D1 after live verification. Different stable artifacts sharing a server revision cannot replace each other. Explicitly targeted development builds use a separate ordered build number and may promote to stable; see [development deployments](server-upgrades.md#testing-development-deployments). Updates preserve the database and bucket bindings, file references, history and receipts. The deployment fence stays held until the exact Worker, database version and metadata endpoint are verified.
 
@@ -183,7 +183,7 @@ python3 scripts/crate-deployment-fence.py inspect \
 
 If another device is still working, let it finish. For an abandoned operation, stop **every** deployment/reset client for this server and revoke the credentials they were using. Then establish that no already accepted or in-flight provider mutations can still complete: inspect the live Worker version, bindings, resource state, and provider activity; use Cloudflare support when an outstanding request's outcome cannot be established. Revoking a token or waiting a fixed interval alone does not cancel an already accepted request. Keep the fence held while that outcome is uncertain.
 
-Only after establishing quiescence, inspect again. Use `settle` with the exact inspected owner to retain the lock and allow permanent deletion. To preserve data during an update, recover it using its matching plugin build. Legacy reset recovery may use `release`; terminal deletion refuses release because its storage must finish being removed.
+Only after establishing quiescence, inspect again. Use `settle` with the exact inspected owner to retain the lock and allow permanent deletion. To preserve data during an update, recover it using its matching plugin build. Reset recovery may use `release`; terminal deletion refuses release because its storage must finish being removed.
 
 ```bash
 python3 scripts/crate-deployment-fence.py settle \
@@ -222,13 +222,9 @@ Remote files, retained versions, recovery history, shared server settings, devic
 
 If a request or local save fails, use **Resume server deletion** under **Advanced server actions**. Keep this vault’s saved plugin settings. The checkpoint identifies the original resources, and regular connection and update actions remain blocked until deletion finishes. Do not manually change its Cloudflare resources or rename unrelated resources to bypass an ownership check.
 
-The separate rebuild action has been removed. An unfinished rebuild from an earlier release can be resumed using that release to preserve its behavior, or superseded by terminal deletion for a fresh start. No obsolete build is required just to delete the selected server.
+### Start fresh
 
-### Start fresh after the development numbering reset
-
-Crate 0.4.0 uses launch protocol 1. Retired development servers reporting protocols such as 10 may also have higher server revisions and unrelated database formats. Reconnecting registers device access to that existing server; it does not publish a new Worker or migrate its database. Retrying the connection test cannot resolve this incompatibility.
-
-If the local vault is the source for a fresh server, stop old clients and select **Crate settings → Advanced server actions → Delete server and all data**. Crate verifies ownership and can take over a settled update checkpoint as described above. After deletion finishes, select **Connect with Cloudflare**, create a new server, and select **Crate: Sync now**. Local vault files are kept; the old server's remote data is permanently removed. Keeping remote-only data instead requires the matching old build and its backup/recovery tools.
+If the local vault is the source for a fresh server, stop old clients and select **Crate settings → Advanced server actions → Delete server and all data**. Crate verifies ownership and can take over a settled update checkpoint as described above. After deletion finishes, select **Connect with Cloudflare**, create a new server, and select **Crate: Sync now**. Local vault files are kept; the old server's remote data is permanently removed. Back up any remote-only data before deleting.
 
 If deletion still needs review, retain its technical details and inspect the held operation using the command above. An unresolved provider request requires confirmed quiescence before `settle --owner <inspected-owner-id> --confirm-quiescent`; then retry deletion. Do not lower schema/revision markers or erase the fence to make the old deployment appear compatible. Automated coverage includes `server-delete.test.ts`, `server-delete-worker.integration.ts`, `deployment-lifecycle.test.ts`, and `plugin-integration.test.ts`. Hosted deletion and physical-device acceptance still require manual verification.
 

@@ -21,7 +21,7 @@ export async function downloadShortcut(args, { getReleases = releases, downloadR
       await mkdir(destination, { recursive: true });
       await writeFile(join(destination, 'index.html'), shortcutInstallPage(false));
     }
-    console.log(`No published v2 shortcut exists yet.`);
+    console.log(`No published v1 shortcut exists yet.`);
     return;
   }
   if (release.draft !== (mode === 'draft')) throw new Error(`Expected a ${mode} release.`);

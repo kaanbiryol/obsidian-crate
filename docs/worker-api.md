@@ -80,7 +80,7 @@ tokens and scoped PWA enrollment keep their current behavior.
 
 ### Page titles
 
-`POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached. Older servers return an error and clients retain the URL label.
+`POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached.
 
 Self-hosted title requests use the native public-network binding, including every
 redirect. A rejected connection returns `title: null` without retrying through
@@ -98,8 +98,8 @@ an incomplete index. Background storage-failure retries use a 30-second delay;
 ordinary bounded indexing backlog can continue immediately. Verified malformed or
 oversized notes instead produce stable source issues until the source changes.
 
-`POST /reading/prepare` accepts vault, reminders, Reading, and capture credentials
-when the Reading library is configured and available. Its five-minute launch URL
+`POST /reading/shortcut/v1/prepare` accepts only capture credentials when the
+Reading library is configured and available. Its five-minute launch URL
 contains an opaque capability in the fragment. `POST /reading/handoff` redeems it
 through `X-Crate-Capture`, using the same issuer-scope policy. Redemption checks
 issuer revocation/expiry, capability expiry, the Reading folder generation, and
@@ -122,11 +122,11 @@ updateAvailable, downloadUrl }`. Preparation successes return the opaque launch
 URL; failures return an error launch URL even for authentication, admission, or
 compatibility rejection. Its fragment contains only allowlisted diagnostic
 fields. A newer unsupported capture contract receives 426
-`server_update_required`; a retired contract/template receives 426
-`shortcut_update_required`. The live, uncached save page performs the handoff
+`server_update_required`; a contract or template below the supported minimum
+receives 426 `shortcut_update_required`. The live, uncached save page performs the handoff
 with the server's current app wire protocol.
 
-Only the versioned shortcut routes bypass the general app protocol. Unversioned routes enforce the normal protocol checks.
+Only the versioned shortcut routes bypass the general app protocol. Other routes enforce the normal protocol checks.
 
 See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
 
@@ -136,7 +136,7 @@ Request: `{ token }`, using the completed initial-import token. Returns `{ ready
 optional `{ progress: { scanning, remainingFiles, remainingSchedules } }`, and an
 `error` string when reminder setup needs attention. Source failures additionally
 return `issues: [{ path, message }]` (up to 20 notes) and `moreIssues`. These fields
-are additive; clients must accept older responses containing only `error`.
+are additive; responses without source failures contain only `error`.
 Paths identify vault notes; malformed description messages include a one-based
 source line. Repairing a note and syncing again resumes setup without repeating
 completed file uploads. See [initial import readiness](protocol.md#initial-import-readiness).
@@ -259,17 +259,16 @@ Response: `{ success: true }`
 
 Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
 
-Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
+Response: `{ settings: { ignorePatterns, syncInterval, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
 
-`syncOnStartup` and `syncOnResume` are retained compatibility fields. Current
-plugins use the device-local `automaticSync` preference for automatic triggers;
+Plugins use the device-local `automaticSync` preference for automatic triggers;
 that preference is not part of this shared-settings contract.
 
 ### PUT /settings
 
 Stores shared plugin preferences to R2.
 
-Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, pushEnabled: false }, expectedVersion }`
+Request: `{ settings: { ignorePatterns: [...], syncInterval: 300, pushEnabled: false }, expectedVersion }`
 
 Response: `{ success: true, settingsVersion }`. A stale version returns `409` instead of overwriting another device's edit.
 
@@ -399,7 +398,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 database schema
 
-The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 5; schemas 2/3/4 upgrade additively during provisioning. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
+The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 1; no migrations are registered. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
 
 The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy, projections, and delivery jobs; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
 
@@ -421,7 +420,7 @@ See `docs/architecture.md` for the full bindings table. When adding new bindings
 
 ### Retained file history pagination
 
-`GET /sync/versions` returns `{ versions, hasMore, nextCursor? }`. `path` is an optional exact filename and `search` is an optional literal substring (ASCII case insensitive), including folder names. Results sort by `(created_at, storage_key)` descending, and `nextCursor` continues that ordering without offset shifts when newer rows arrive. Reuse the same search and path with the opaque cursor; a changed query or malformed cursor receives HTTP 400. Expired versions are omitted from every page. The plugin’s **File history** view requests pages for one exact file path; search remains available in the API. Older Workers lacking pagination must be updated before this client will present their history as complete. Restores retain their existing conditional-write and integrity checks.
+`GET /sync/versions` returns `{ versions, hasMore, nextCursor? }`. `path` is an optional exact filename and `search` is an optional literal substring (ASCII case insensitive), including folder names. Results sort by `(created_at, storage_key)` descending, and `nextCursor` continues that ordering without offset shifts when newer rows arrive. Reuse the same search and path with the opaque cursor; a changed query or malformed cursor receives HTTP 400. Expired versions are omitted from every page. The plugin’s **File history** view requests pages for one exact file path; search remains available in the API. Restores retain their existing conditional-write and integrity checks.
 
 Authoritative manifest, targeted metadata and changelog reads are validated at runtime, including required maps, version and cursor framing, path/hash/size/date fields and ordering. Missing or malformed state aborts synchronization before file changes. A valid empty map remains an explicit empty state. Known historical changelog entries may lack revisions; current file metadata must include one.
 
@@ -429,14 +428,13 @@ Authoritative manifest, targeted metadata and changelog reads are validated at r
 
 Vault-authenticated, read-only access to one unexpired retained version. Query parameters `path` and `storageKey` must identify the same retained record. Returns integrity-verified binary content with `X-File-Hash`, `Content-Length`, and `Cache-Control: private, no-store`. Missing, expired, or mismatched entries return 404; versions larger than 256 KB return 413; missing or corrupt content returns 503. Arbitrary R2 keys are never served. No file, changelog, or retention state is modified.
 
-File history decodes text locally and compares the saved version with a snapshot of the current local file. Binary/large files can still be restored without a preview. Older servers may not support previews; browsing and existing durable restore operations remain available. Deploy server revision 46 or later to enable previews.
+File history decodes text locally and compares the saved version with a snapshot of the current local file. Binary/large files can still be restored without a preview.
 
 The **History** view groups retained update/deletion versions by day, rather than presenting whole-vault snapshots or inferring restore events. **Files** reads the existing paginated manifest and replays subsequent changes to list current synced files, including those with no retained versions. Its current preview reads targeted metadata and downloads the remote copy only for text files up to 256 KB, verifying the size, hash and revision before display. It never substitutes unsynced local contents. The file list renders in batches of 200; **Refresh files** refreshes the remote inventory. Historical comparisons continue to use the local snapshot and never modify the sync manifest or queue.
 
 ### Shared history checkpoints
 
-Protocol 11 advertises `shared-history-checkpoints-v1`; safe ordinary protocol-7
-writes remain supported. Checkpoints store metadata in R2, not extra copies of vault
+The server advertises `shared-history-checkpoints-v1`. Checkpoints store metadata in R2, not extra copies of vault
 files. Creation snapshots the complete server inventory, not a client-supplied list.
 The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
 Expired or evicted IDs receive 410. Captures are bounded to 100,000 files and 32 MiB of
@@ -445,7 +443,7 @@ encodes inventory pages as it reads them and streams stored documents after matc
 object's metadata to the index, so neither path parses the whole inventory.
 All routes require vault credentials and return private, non-cacheable responses.
 See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
-retention, cleanup, restore validation, and older-server behavior.
+retention, cleanup, and restore validation.
 
 ### Reading shortcut pairing
 
@@ -473,8 +471,7 @@ inline code and complete autolinks. Partial or multiline inline code and code-bl
 anchored metadata, preserving the code bytes. Code anchors can authorize only
 matching code characters, never unmarked prose. A rebuildable projection
 collects native markers, including changes made in Obsidian, and associates stored
-metadata by text and surrounding context. Matching legacy frontmatter highlights
-migrate on the next Crate save. Unmatched excerpts and orphaned personal annotations
+metadata by text and surrounding context. Unmatched excerpts and orphaned personal annotations
 remain in `highlight_recovery` and are visible in the article's Highlights view.
 Unresolved code and text anchors also retain their excerpts for recovery. Text
 anchors can paint exact, contextually resolved visible excerpts while leaving the
@@ -485,13 +482,13 @@ See [Reading highlights](reading-highlights.md).
 
 ### Article fetching permission
 
-Server revision 2 advertises `reading-fetching-consent-v1`. Reading libraries remain
-accessible when article fetching is off. The legacy `reading_policy.enabled` field
-now controls extraction only; existing permissions are preserved. A newly configured
+The server advertises `reading-fetching-consent-v1`. Reading libraries remain
+accessible when article fetching is off. The `reading_policy.enabled` field
+controls extraction only. A newly configured
 plugin initializes extraction when Reading is enabled. A library capture with
 `fetchArticle: true` also enables extraction as part of that explicit save.
-Capture-only credentials cannot enable it. The plugin no longer exposes a separate
-fetching switch; the endpoint remains supported for existing clients.
+Capture-only credentials cannot enable it. The plugin does not expose a separate
+fetching switch.
 
 `GET /reading/fetching` returns `{ enabled, revision }`. `POST /reading/fetching`
 accepts `{ enabled: boolean, revision }` and returns the updated state. Vault, Reading,
@@ -502,11 +499,11 @@ With fetching off, new URL captures become bookmarks (`extraction_status: unavai
 existing articles remain readable and editable, and retries are rejected. Capture
 requests may also supply `fetchArticle: false` to save a bookmark regardless of the
 shared permission, including when an offline save is replayed later. Omitting the
-field preserves existing client and Shortcut behavior under the shared permission.
+field applies the shared permission.
 
 ### Shared feature policy
 
-Revision 3 advertises `shared-features-v1`. `GET /features` returns
+The server advertises `shared-features-v1`. `GET /features` returns
 `{ reading: boolean, reminders: boolean, revision: string | null }`. Vault,
 Reading-library and reminders credentials can read; only vault credentials can
 POST `{ feature: "reading" | "reminders", enabled: boolean, revision }`. Capture-only
@@ -516,7 +513,7 @@ background work; reads return the last committed policy without entering the
 coordinator. Both features default on until explicitly changed.
 
 Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
-access remain available. Legacy Reading policy/capture operations cannot override
+access remain available. Reading policy and capture operations cannot override
 the shared pause. Push opt-in remains unchanged by reminder pause/resume. Queued
 operations, saved content, library identity, and scoped credentials are retained.
 
@@ -545,19 +542,17 @@ account-wide billing caps. Keep Cloudflare account usage alerts enabled.
 Ordinary Reading requests authenticate and authorize before entering the shared
 coordinator. Public one-use Reading grants enter it after admission because
 redemption and capture must be serialized together.
-## Encryption API (protocol 2)
+## Encryption API
 
 `GET /encryption` returns public configuration and an encrypted recovery bundle to vault credentials. Reminders credentials receive their own scope metadata plus the same encrypted recovery envelope; `/reading/encryption` does the same after validating Reading enrollment. The user’s recovery code decrypts the bundle locally and is never uploaded. Session route permissions remain scoped; sharing this ciphertext does not grant sync, settings or device-management access. `GET /encryption/folders` inventories existing enrollment folders for setup.
 
-Vault-only `POST /encryption/conversion` starts a frozen, resumable conversion. `GET /encryption/conversion` pages unfinished files and stored receipts. Its optional `includeProgress=1` query adds `remainingFiles`, a count of unfinished live and retained file objects. Clients request it once at the start of each conversion or resume; it performs one read and no additional writes. Clients remain compatible with servers that omit the count by showing activity without a percentage. The `/file`, `/settings`, `/receipt`, `/checkpoints` and `/checkpoint` conversion endpoints read originals and accept encrypted replacements; `POST /encryption/conversion/finish` completes bounded cleanup and activates encryption. Matching vault and generation headers are required after start. Ordinary reads/writes are blocked while converting. Original hashes and sizes distinguish plaintext from interrupted encrypted replacements, including plaintext that begins with `CRATE-E2EE/1` or uses the encrypted MIME type.
+Vault-only `POST /encryption/conversion` starts a frozen, resumable conversion. `GET /encryption/conversion` pages unfinished files and stored receipts. Its optional `includeProgress=1` query adds `remainingFiles`, a count of unfinished live and retained file objects. Clients request it once at the start of each conversion or resume; it performs one read and no additional writes. The `/file`, `/settings`, `/receipt`, `/checkpoints` and `/checkpoint` conversion endpoints read originals and accept encrypted replacements; `POST /encryption/conversion/finish` completes bounded cleanup and activates encryption. Matching vault and generation headers are required after start. Ordinary reads/writes are blocked while converting. Original hashes and sizes distinguish plaintext from interrupted encrypted replacements, including plaintext that begins with `CRATE-E2EE/1` or uses the encrypted MIME type.
 
-`POST /encryption/metadata` returns descriptors for up to 100 revisions. `GET /encryption/upload-receipt?operationId=…` returns an encrypted legacy receipt plus retry-window validity; `/encryption/deletion-precondition?path=…&revision=…` resolves an accepted encrypted deletion. Shared `/settings` becomes a conditional encrypted envelope endpoint.
+`POST /encryption/metadata` returns descriptors for up to 100 revisions. `GET /encryption/upload-receipt?operationId=…` returns a converted pre-encryption receipt plus retry-window validity; `/encryption/deletion-precondition?path=…&revision=…` resolves an accepted encrypted deletion. Shared `/settings` becomes a conditional encrypted envelope endpoint.
 
-`GET /encryption/capture-recovery?operationId=…` is a vault-only, non-cacheable read for queued plugin Reading captures. It returns encrypted Reading/reminder receipts and retry-window validity. Converted receipts retain the original request hash inside their vault envelope; the public hash becomes `e2ee-legacy`. Clients authenticate the original capture intent and any saved ciphertext attempt before recovering notes across folder changes. The route performs no writes and never receives the private capture URL.
+Encrypted settings support all preferences accepted by the plaintext API's 1 MiB request limit. The envelope allowance is `ceil(1 MiB × 4 / 3) + 4096` characters for base64url and JWE overhead; encrypted settings requests allow another 4096 bytes for the JSON wrapper. Conversion checks the stored plaintext settings size before freezing the vault and rejects unsupported oversized data with `413`, leaving ordinary settings edits available.
 
-Encrypted settings support all preferences accepted by the plaintext API's 1 MiB request limit. The envelope allowance is `ceil(1 MiB × 4 / 3) + 4096` characters for base64url and JWE overhead; encrypted settings requests allow another 4096 bytes for the JSON wrapper. Conversion checks the stored plaintext settings size before freezing the vault and rejects unsupported oversized data with `413`, leaving ordinary settings edits available. A conversion interrupted by the former smaller encrypted-settings limit can resume with its existing keys.
-
-Scoped reminders use `GET /reminders/encrypted-files?folderPath=…&after=…` (1,000 files/page in portable-path order; `after` is the previous page's opaque `nextCursor`), `GET /reminders/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reminders/encrypted-commit`, and `GET /reminders/encrypted-receipt?folderPath=…&operationId=…`. Every route checks the enrolled folder. Commits contain an operation ID, encrypted acknowledgment and one or two encrypted Markdown replacements with hash/revision preconditions. Whole-note bytes are encrypted on the client. Encrypted acknowledgments allow the JSON/base64 expansion of a 1 MiB reminder note (`ceil((6 MiB + 16 KiB) × 4 / 3) + 4096` characters); commit requests are capped at 24 MiB. Legacy receipt conversion requests allow 6 MiB for vault and folder copies. Responses above 512 KiB are stored in bounded ciphertext chunks in `maintenance_state`, committed atomically with the receipt and file changes. Retries reconstruct the exact original response; missing chunks fail without replaying the mutation. Scheduled maintenance removes chunks only after their parent receipt expires. Legacy semantic mutation and server URL-title routes are unavailable after activation.
+Scoped reminders use `GET /reminders/encrypted-files?folderPath=…&after=…` (1,000 files/page in portable-path order; `after` is the previous page's opaque `nextCursor`), `GET /reminders/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reminders/encrypted-commit`, and `GET /reminders/encrypted-receipt?folderPath=…&operationId=…`. Every route checks the enrolled folder. Commits contain an operation ID, encrypted acknowledgment and one or two encrypted Markdown replacements with hash/revision preconditions. Whole-note bytes are encrypted on the client. Encrypted acknowledgments allow the JSON/base64 expansion of a 1 MiB reminder note (`ceil((6 MiB + 16 KiB) × 4 / 3) + 4096` characters); commit requests are capped at 24 MiB. Pre-encryption receipt conversion requests allow 6 MiB for vault and folder copies. Responses above 512 KiB are stored in bounded ciphertext chunks in `maintenance_state`, committed atomically with the receipt and file changes. Retries reconstruct the exact original response; missing chunks fail without replaying the mutation. Scheduled maintenance removes chunks only after their parent receipt expires. Plaintext semantic mutation and server URL-title routes are unavailable after activation.
 
 Uploads to an active encrypted vault validate both the encrypted content type and file envelope before registering staging leases or writing to R2. Single and batch uploads reject plaintext, malformed envelopes, and mismatched encryption keys with an encryption error; rejected batches stage no candidate files. Encryption identity and reset generation are rechecked transactionally at staging and publication.
 
@@ -592,7 +587,7 @@ actor, owner, vault state and generation. Closed, expired, revoked or mismatched
 requests cannot publish a new packet. See [the approval protocol](e2ee-implementation.md#app-approval-protocol)
 for key derivation and comparison requirements.
 
-### Destructive encryption reset (protocol 2)
+### Destructive encryption reset
 
 Servers advertise `e2ee-reset-v1`. Vault-only `POST /encryption/reset?id=<unique-id>` starts a reset with current vault/generation headers and `{ "confirmation": "delete-remote-data", "replacementToken": "<new 64-character lowercase hex token>" }`. The client durably saves that identity and token before dispatch. The transaction switches encryption to `resetting`, replaces all credentials with the supplied vault token, removes enrollment grants/subscriptions, queues alarm cancellation, and invalidates upload leases. Upload staging/publication checks both the encryption identity and a persistent reset generation captured atomically at authentication. The reset generation survives encryption removal, fencing even plaintext requests delayed across encryption activation and reset. These checks apply to single, batch and bulk uploads without new client headers.
 
@@ -600,12 +595,12 @@ Using the replacement token, `GET /encryption/reset?id=…` reads the receipt an
 
 ### Encrypted Reading
 
-Servers advertising `e2ee-reading-v1` support Reading scopes (`purpose: "reading"`) under protocol 2. Authenticated `GET /reading/encryption` discovers only the authorized Reading scope. It and the public feature/session control-plane reads can bootstrap without encryption headers; content operations still require the current vault and generation.
+Servers advertising `e2ee-reading-v1` support Reading scopes (`purpose: "reading"`). Authenticated `GET /reading/encryption` discovers only the authorized Reading scope. It and the public feature/session control-plane reads can bootstrap without encryption headers; content operations still require the current vault and generation.
 
 `GET /reading/encrypted-files?folderPath=…&after=…`, `GET /reading/encrypted-file?folderPath=…&path=…&revision=…`, and `POST /reading/encrypted-commit` reuse the conditional encrypted-file protocol above. Reading authority additionally fixes the folder to the current Reading policy and rejects capture-only credentials. `GET /reading/encrypted-receipt?operationId=…` returns only the current Reading scope's converted receipt for the current policy generation. Reading plaintext list/item/capture/update/retry, prepare/handoff and background extraction paths fail closed while any encryption state exists.
 
-Conversion pages include `reading` legacy receipts and `captures` queued notes. `PUT /encryption/conversion/reading-capture` publishes one encrypted queued bookmark and removes the original atomically. Receipt conversion accepts `kind: "reading"`. Activation requires both inventories to be converted. An active configuration can enter conversion through a narrow Reading-scope extension: same vault/root keys and existing scopes, one additional Reading scope, and generation incremented by one. Saved original descriptors authenticate interrupted scope replacements. Reset clears Reading policy, sources, jobs, receipts, captures, enrollments and handoffs at both boundaries.
+Conversion pages include `reading` pre-encryption receipts and `captures` queued notes. `PUT /encryption/conversion/reading-capture` publishes one encrypted queued bookmark and removes the original atomically. Receipt conversion accepts `kind: "reading"`. Activation requires both inventories to be converted. An active configuration can enter conversion through a narrow Reading-scope extension: same vault/root keys and existing scopes, one additional Reading scope, and generation incremented by one. Saved original descriptors authenticate interrupted scope replacements. Reset clears Reading policy, sources, jobs, receipts, captures, enrollments and handoffs at both boundaries.
 
 With `e2ee-folder-moves-v1`, `POST /encryption/conversion` also accepts changed paths for existing scopes: same vault/root key, scope count, scope IDs, purposes and data/notification key IDs, with generation incremented by one. It atomically updates matching feature-policy paths and preserves original descriptors for live and retained files under both old and new prefixes. An unchanged scope access identity plus an encrypted `binding` retains browser credentials, Reading policy generation and push subscriptions, updating their folder paths atomically. Selecting a different folder supplies a new `accessId` and revokes previous credentials/subscriptions. Unused setup links and handoffs are invalidated. Clients verify the scope binding before following a moved path. Conversion re-encrypts those files using the destination path's current authority; it does not rename file records. Normal conditional sync performs local file moves afterward. This API does not rotate content keys.
 
-Encrypted browser wire attempts retain their generation. After a generation change, `GET /reading/encrypted-receipt?operationId=…&wire=1` returns the converted encrypted-file receipt from the shared operation ledger; the ordinary Reading receipt endpoint continues to serve legacy Reading semantic receipts. Clients authenticate both the exact wire hash and the inner semantic acknowledgment before settling a save. Reminders uses its existing encrypted receipt endpoint for the same recovery.
+Encrypted browser wire attempts retain their generation. After a generation change, `GET /reading/encrypted-receipt?operationId=…&wire=1` returns the converted encrypted-file receipt from the shared operation ledger; the ordinary Reading receipt endpoint continues to serve Reading semantic receipts. Clients authenticate both the exact wire hash and the inner semantic acknowledgment before settling a save. Reminders uses its existing encrypted receipt endpoint for the same recovery.

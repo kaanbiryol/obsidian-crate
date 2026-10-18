@@ -162,7 +162,7 @@ it connects to this server and remembers its own capture-only access. Codes work
 once and expire after 10 minutes. The download comes from Crate’s public website
 and contains no credentials; pairing stays on your server. In Obsidian, **Set up
 shortcut → Copy phone setup link** opens this flow on a newly connected phone.
-**Share → Save to Crate** opens the link in Crate using a private URL fragment. Unlock Reading if asked, then select **Save**. Reinstall the current v2 shortcut after enabling E2EE. For unencrypted vaults, Android browsers supporting Web Share Target
+**Share → Save to Crate** opens the link in Crate using a private URL fragment. Unlock Reading if asked, then select **Save**. Reinstall the current shortcut after enabling E2EE. For unencrypted vaults, Android browsers supporting Web Share Target
 can use **Share → Crate** after installing the web app. Pasting a link works in
 both the plugin and web library.
 
@@ -175,9 +175,7 @@ and can be revoked in connected devices.
 
 See the [setup and testing guide](docs/read-it-later-testing.md),
 [implementation status](docs/read-it-later-plan.md#implementation-status), and
-[feature spec](docs/read-it-later-spec.md). Server revision 66 includes a schema
-upgrade with a verified backup; self-hosted users must run the stopped-server
-upgrade command before starting existing data with the new build.
+[feature spec](docs/read-it-later-spec.md).
 
 ## How It Works
 
@@ -195,7 +193,7 @@ Cloudflare deployment and device connection use OAuth Authorization Code + PKCE.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 2 and upgrades supported schema-1 databases through a verified backup and migration. Unsupported schemas are rejected without modification. Deployment code is never fetched at runtime.
+- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 1; no migrations are registered. Unsupported schemas are rejected without modification. Deployment code is never fetched at runtime.
 - Cloudflare-hosted vault devices are authorized through the owning Cloudflare account. Locally hosted vault devices use tokens issued by the server operator.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
@@ -285,7 +283,7 @@ The OAuth deployment uses the build-time Worker and current schema included in t
 
 To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. For a vault without a saved server connection, Obsidian always asks which server to use, even if the account has only one. Reconnecting a previously configured vault reuses its saved server.
 
-Server choices show the vault name saved when the server was created. The name is stored in your Cloudflare Worker settings so other devices can see it; server addresses and storage IDs stay unchanged. Older servers show **Unnamed vault** until you select **Save vault name** in Crate’s server settings from the original vault (or update its server). Duplicate names include a short ID to distinguish them.
+Server choices show the vault name saved when the server was created. The name is stored in your Cloudflare Worker settings so other devices can see it; server addresses and storage IDs stay unchanged. Servers without a saved name show **Unnamed vault** until you select **Save vault name** in Crate’s server settings from the original vault. Duplicate names include a short ID to distinguish them.
 
 Multiple separate vaults can use the same Cloudflare account: create a separate Crate server for each vault. Connecting two vaults to the same server combines their files during sync; local vault names do not separate remote data.
 
@@ -300,7 +298,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 - Automatic sync is off by default on this device. When enabled under **Settings → Crate → Sync → Automatic sync**, Crate syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. While automatic sync is off, Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not transfer vault files. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
 - Crate syncs files inside the vault, including attachments. New attachments download automatically; updates to existing binary files are saved as incoming copies for review in **Activity → Conflicts**. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
-- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, `.DS_Store`, `._*`, `Thumbs.db`, `desktop.ini`, `*.swp`, and `*.swo`. Saved lists that still match the original defaults receive these additions; customized lists are kept. The `.git/` rule also excludes nested Git repositories' internals and `.git` pointer files. Git configuration files such as `.gitignore`, `.gitattributes`, and `.gitmodules` remain eligible for sync. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.
+- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, `.DS_Store`, `._*`, `Thumbs.db`, `desktop.ini`, `*.swp`, and `*.swo`. The `.git/` rule also excludes nested Git repositories' internals and `.git` pointer files. Git configuration files such as `.gitignore`, `.gitattributes`, and `.gitmodules` remain eligible for sync. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.
 - Other plugins and their settings sync with the vault, including `main.js`, `manifest.json`, `styles.css`, and `data.json`. Install and connect Crate separately on each device. After syncing finishes, restart Obsidian to load downloaded plugins and settings. Files transfer individually; retry any failed sync before restarting.
 - Plugin settings may include credentials or device-specific paths. To keep a plugin local, add its folder (for example, `.obsidian/plugins/plugin-id/`) to ignore patterns, using your vault's configuration folder if different.
 - Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
@@ -354,13 +352,13 @@ Vault files larger than 25 MiB produce a visible sync error and are left on the 
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies, even when only the other device edited the file. In **Activity → Conflicts**, compare **Local file** and **Incoming server copy**, then select **Use incoming copy** and **Apply choice** to accept the server version. Recovery preserves the displaced file in the vault's local trash and keeps recovery copies. If a file is recreated during replacement, Crate stops and keeps that file; reload the review before retrying. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-The current wire protocol is 1, with oldest compatible version 1. Retired development protocols are unsupported. See the checked [current contract](docs/current-contract.md). File restores require the new durable restore capability. Follow the [upgrade order](docs/compatibility.md#upgrade-order), update the plugin/server and reload older web tabs before editing. Uploads are journaled locally before dispatch, and retries recover the original result before starting new work; see [upload recovery and rename preservation](docs/upload-recovery.md). Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+The current wire protocol is 1, with oldest compatible version 1. See the checked [current contract](docs/current-contract.md). File restores require the durable restore capability. Follow the [upgrade order](docs/compatibility.md#upgrade-order), update the plugin/server and reload open web tabs before editing. Uploads are journaled locally before dispatch, and retries recover the original result before starting new work; see [upload recovery and rename preservation](docs/upload-recovery.md). Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
 
-Crate automatically removes retired upload backups (`upload-*.previous-*` in its plugin folder) only after verifying their saved content still exists in the corresponding local file. It checks after startup, after sync returns to idle, and daily. Different or missing files, distinct merge preimages, unsupported or damaged records, and previous manifest checkpoints are preserved for recovery; age alone never deletes them. These private backups can contain note content and are excluded from sync.
+Crate automatically removes superseded upload backups (`upload-*.previous-*` in its plugin folder) only after verifying their saved content still exists in the corresponding local file. It checks after startup, after sync returns to idle, and daily. Different or missing files, distinct merge preimages, unsupported or damaged records, and previous manifest checkpoints are preserved for recovery; age alone never deletes them. These private backups can contain note content and are excluded from sync.
 
-New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. Uncommitted requests from older clients also require review after upgrading. See the [retry and retention policy](docs/reminder-retention.md).
+New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. See the [retry and retention policy](docs/reminder-retention.md).
 
-Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 1 or 2. Schema-1 databases upgrade through the declared Reading migration after a verified paired D1/R2 checkpoint; existing schema-2 databases receive no implicit DDL. Self-hosted upgrades require the explicit stopped-server upgrade command. Other schemas are rejected without modification. Recovery tools preserve source archives and restore supported schemas into isolated resources. See the [compatibility matrix and rollback policy](docs/compatibility.md).
+Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 1; existing schema-1 databases receive no implicit DDL. Self-hosted upgrades require the explicit stopped-server upgrade command. Other schemas are rejected without modification. Recovery tools preserve source archives and restore supported schemas into isolated resources. See the [compatibility matrix and rollback policy](docs/compatibility.md).
 
 ## Development
 

@@ -1,4 +1,4 @@
-> Historical implementation plan. The current pre-launch cleanup uses the complete schema-2 baseline with no registered migrations. Migration requirements below describe the earlier implementation, not a supported upgrade path.
+> Historical implementation plan. Crate now uses the complete schema-1 baseline with no registered migrations. Migration requirements below describe the original implementation work, not a supported upgrade path.
 
 # Read-it-later implementation plan
 
@@ -8,7 +8,7 @@ Planning baseline: 2026-09-21, `master` at `48b9a902`, plugin 0.3.0 / server rev
 
 Implemented on `codex/read-it-later`: local Reading and automatic folder adoption; server policy and scoped enrollment; durable bookmark/metadata operations; bounded background Defuddle extraction; independent web Reading with cached article text and a persistent outbox; branded iPhone handoff; signed shortcut source/build command; and Android share-target storage and capture.
 
-Server revision 66 uses schema 2 and protocol 11. The migration preserves existing file/version/token rows. Cloudflare upgrades create a verified paired D1/R2 checkpoint under a database write guard before migrating. Local upgrades require a stopped server and a new, verified backup. Recovery can download the cloud checkpoint into the existing archive format. No production server has been changed.
+Reading is part of the schema-1 baseline with protocol 1. Future Cloudflare upgrades create a verified paired D1/R2 checkpoint under a database write guard before migrating. Local upgrades require a stopped server and a new, verified backup. Recovery can download the cloud checkpoint into the archive format. No production server has been changed.
 
 The extraction prototype is now production code. Defuddle 0.19.4 performs HTML extraction and Markdown conversion through its public `createMarkdownContent` export. Crate validates URLs and removes remote media before conversion; there are no Crate Markdown formatting rules or direct Turndown dependency. A shared build adapter supplies linkedom's DOMParser inside the Defuddle module and removes source-content diagnostics. Conversion failures retain a saved link instead of publishing the library's raw-HTML fallback. Async fallback extraction is disabled. Cloudflare uses `global_fetch_strictly_public`; self-hosted workerd uses a native public-only network binding that rejects private destinations after resolution. This replaces the socket experiment, which encountered hosted TLS/SNI and Cloudflare-address restrictions.
 

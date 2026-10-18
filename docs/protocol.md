@@ -1,18 +1,16 @@
 # Protocol contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The launch protocol is 1, with oldest compatible protocol 1. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 1, with oldest compatible protocol 1. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
 
 Native Shortcuts use a separate stable capture contract at
 `/reading/shortcut/v1/{exchange,prepare}`. App protocol bumps do not change it.
-The server also adapts the exact released capture requests using app headers 1
-and 11; this does not enable retired protocols for vault writes or unrelated
-routes. The browser confirmation uses the live server's app protocol.
+The browser confirmation uses the live server's app protocol.
 See [shortcut maintenance](reading-shortcuts.md) for the supported payloads,
 template revisions, update guidance, and failure diagnostics.
 
 ## Files
 
-R2 stores immutable bytes under opaque object keys. D1 commits `files`, changelog, retained versions, and Markdown projection intent together. An uncertain database response never authorizes deletion of staged bytes. Each upload records a 24-hour publication lease before writing R2. Cleanup claims expired leases and checks live and retained references before removing objects; claimed uploads cannot publish afterward. Cleanup uses tracked uploads and explicit cleanup queues without bucket-wide legacy scans. Replaced/deleted versions are retained for 30 days.
+R2 stores immutable bytes under opaque object keys. D1 commits `files`, changelog, retained versions, and Markdown projection intent together. An uncertain database response never authorizes deletion of staged bytes. Each upload records a 24-hour publication lease before writing R2. Cleanup claims expired leases and checks live and retained references before removing objects; claimed uploads cannot publish afterward. Cleanup uses tracked uploads and explicit cleanup queues without bucket-wide scans. Replaced/deleted versions are retained for 30 days.
 
 Manifest and metadata entries, changelog puts, upload acknowledgements, and batch downloads include `revision`; individual downloads expose `X-Crate-Revision`. The revision identifies a file incarnation independently of its hash. Deletes require `expectedHash` and `expectedRevision`, captured from the acknowledged baseline. Missing revisions require reconciliation; a same-content recreation rejects an older delete. Uploads retain content-hash preconditions.
 
@@ -64,7 +62,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 11, IndexedDB version 2, generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments remain supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-2 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 1, IndexedDB version 1, version-1 generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered version-1 upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments are also supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-1 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -80,13 +78,13 @@ Enrollment consumption, replacement-session creation and previous-session revoca
 
 ## Retained-version restore
 
-`POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 3 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipt table and its 180-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
+`POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 1 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipt table and its 180-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
 
 The file pointer, changelog entry and exact result receipt commit in the same D1 transaction. A retry reads that receipt before looking up retained bytes, so expiry of the retained version or a subsequent edit/delete cannot cause replay. A changed precondition is also recorded as a terminal result. The recovery dialog offers **Resume restore** for pending intents even when their original history entry has expired. Remote confirmation and local sync completion are separate: a failed local sync keeps the committed intent until a later successful sync. Expired unresolved operations require preserving the checkpoint and comparing the current remote state; never replace their operation IDs to force a retry.
 
 ## Initial import readiness
 
-`resumable-initial-import-v2` is included in protocol 1. `/sync/import/complete` verifies the
+`resumable-initial-import-v1` is included in protocol 1. `/sync/import/complete` verifies the
 file inventory in pages of up to 2,000 `[path, hash, size]` entries ordered by portable path
 (UTF-8 byte order). Each non-final page returns the next `after` cursor; progress is bound to
 the import generation, so an upload or prune between pages restarts verification. The `final`
@@ -97,7 +95,7 @@ projection and schedule queues, then atomically acknowledges readiness. Probes
 return `{ ready: false }` while work remains, optionally with an error requiring
 attention. Source errors include the affected note path. An additive `issues` array
 contains up to 20 `{ path, message }` entries in path order; `moreIssues: true` means
-more notes need repair. The legacy `error` string remains available to older clients.
+more notes need repair. Responses still include the `error` string.
 Plugin sync results and saved history keep explicit file context alongside their
 text errors, enabling safe file-opening actions without parsing filenames from messages.
 `/sync/import` returns
@@ -114,17 +112,16 @@ index, capped at 20 states and 30 days. Creation rejects a changing inventory;
 publication retries deduplicate by monotonic server generation. No database schema
 change or duplicate file-content storage is introduced. Retained-version expiry is
 computed no earlier than 30 days after the D1 commit, preventing an older request
-start time from expiring bytes before a checkpoint. New clients connected to older
-servers retain local checkpoints and show an update message for shared history.
+start time from expiring bytes before a checkpoint.
 
 ## End-to-end encryption
 
-Protocol 2 advertises `e2ee-v1`. Encryption is opt-in; activation raises the oldest compatible protocol to 2 and requires matching `X-Crate-Encryption-Vault` and `X-Crate-Encryption-Generation` headers. Servers store ciphertext hashes and sizes. Clients authenticate/decrypt private descriptors before sync planning. Existing bulk initial-import paths are disabled after activation; ordinary encrypted uploads retain their immutable receipt contract.
+The server advertises `e2ee-v1`. Encryption is opt-in; an encrypted vault requires matching `X-Crate-Encryption-Vault` and `X-Crate-Encryption-Generation` headers. Servers store ciphertext hashes and sizes. Clients authenticate/decrypt private descriptors before sync planning. Existing bulk initial-import paths are disabled after activation; ordinary encrypted uploads retain their immutable receipt contract.
 
 Encrypted reminder clients read folder-scoped ciphertext and publish one or two conditional note replacements plus encrypted operation acknowledgments. Scheduling sidecars publish only current IDs, completion and due values plus encrypted display envelopes. The server cannot validate their semantic correspondence to private Markdown; client decryption authenticates the sidecar digest. See [encryption format, conversion and boundaries](e2ee-implementation.md).
 
-Protocol 2 adds `e2ee-reset-v1`: a destructive, resumable transition from an encrypted vault to an empty unencrypted server. A durable replacement credential, revoked old sessions, exact encryption-identity upload guards and completed reset receipts fence old clients and response-loss retries. The initiating device uploads its local vault; other devices reconnect and PWAs explicitly discard their previous session. See [encryption reset](e2ee-implementation.md#turn-encryption-off).
+`e2ee-reset-v1` adds a destructive, resumable transition from an encrypted vault to an empty unencrypted server. A durable replacement credential, revoked old sessions, exact encryption-identity upload guards and completed reset receipts fence old clients and response-loss retries. The initiating device uploads its local vault; other devices reconnect and PWAs explicitly discard their previous session. See [encryption reset](e2ee-implementation.md#turn-encryption-off).
 
-`e2ee-reading-v1` adds Reading-purpose folder scopes, scoped ciphertext listing/file/commit endpoints, encrypted legacy Reading receipts and queued-capture conversion. Reading has no public scheduling projection. Existing vaults can add exactly one Reading scope per resumable conversion while preserving prior scopes/root keys and increasing the encryption generation. Plaintext Reading mutation/extraction paths reject encrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+`e2ee-reading-v1` adds Reading-purpose folder scopes, scoped ciphertext listing/file/commit endpoints, converted pre-encryption Reading receipts and queued-capture conversion. Reading has no public scheduling projection. Existing vaults can add exactly one Reading scope per resumable conversion while preserving prior scopes/root keys and increasing the encryption generation. Plaintext Reading mutation/extraction paths reject encrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
 
-`e2ee-folder-moves-v1` permits a frozen conversion that changes existing scope paths while preserving every scope/key identity and incrementing generation by exactly one. Original descriptors preserve authenticated access to old scope keys during interrupted replacements. Policies move atomically with the new configuration. Same-folder renames retain browser credentials, Reading policy generation and notification subscriptions; selecting different content changes the scope access identity and revokes old connections. Each scope carries an encrypted generation/path/access binding authenticated by its data key. Browsers verify that binding before following a new path, preserving their original durable local namespace and encrypted local-state key. Local upload journals record the encryption generation so older accepted operations recover converted receipts and unaccepted older operations reconcile against current files. The generation is local journal metadata and is not part of the immutable upload wire payload. Older journals without it look up converted receipts before retrying still-valid ciphertext.
+`e2ee-folder-moves-v1` permits a frozen conversion that changes existing scope paths while preserving every scope/key identity and incrementing generation by exactly one. Original descriptors preserve authenticated access to old scope keys during interrupted replacements. Policies move atomically with the new configuration. Same-folder renames retain browser credentials, Reading policy generation and notification subscriptions; selecting different content changes the scope access identity and revokes old connections. Each scope carries an encrypted generation/path/access binding authenticated by its data key. Browsers verify that binding before following a new path, preserving their original durable local namespace and encrypted local-state key. Local upload journals record the encryption generation so accepted operations from an earlier generation recover converted receipts and unaccepted ones reconcile against current files. The generation is local journal metadata and is not part of the immutable upload wire payload.

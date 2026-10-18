@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 10 and schema 2. The complete schema 2 is the pre-launch baseline with no registered migrations. See the checked [current contract](current-contract.md). Databases from the retired, pre-reset development sequence are unsupported: preserve their data with the matching old build before creating a fresh deployment. **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 1 and schema 1, with no registered migrations. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -8,8 +8,8 @@ The current candidate uses server revision 10 and schema 2. The complete schema 
 
 - `revision` is the public server release number. Advance it exactly once from the last published release when server inputs change, and keep it fixed throughout development of that release. Never distribute different stable server artifacts under the same revision. The plugin package version can change independently.
 - `schemaVersion` identifies the complete persisted database shape. Increment it for any change to `schema.sql`, including indexes. Never silently apply the fresh schema to an existing database.
-- `minimumSchemaVersion` is the oldest supported database source, currently 2. Future released migration history remains immutable.
-- `migrations` is an ordered, contiguous registry. It is empty for the pre-launch baseline. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
+- `minimumSchemaVersion` is the oldest supported database source, currently 1. Future released migration history remains immutable.
+- `migrations` is an ordered, contiguous registry. It is currently empty. Once released, their IDs, SQL bytes and SHA-256 checksums are immutable.
 
 The artifact fingerprint includes the Worker/PWA bundle, fresh schema and release manifest. Migration files are checked against manifest checksums at build time and again before execution. D1 stores the successfully deployed revision, fingerprint, schema version and schema hash in `crate_release`. An older revision, a different stable fingerprint at the same revision, or a changed schema hash at the same schema version is rejected before deployment. Development builds additionally store a fingerprint-bound identity in `maintenance_state`, in the same transaction as the verified release record.
 
@@ -30,11 +30,11 @@ Acquiring or taking over the fence atomically records a confirmed acquisition ch
 
 A definite Cloudflare rejection while acquiring ownership preserves the provider error, including D1 quota and permission failures. It does not imply an interrupted update: recovery can correctly report no held lock while the rejected write remains blocked. Timeouts, transport failures and server errors still require recovery because ownership may have been recorded.
 
-When recovery cannot establish a safe checkpoint, the app offers **Check again** to perform a fresh check and **Cancel** to close the result. Diagnostics stay in the technical details disclosure. It does not ask users to attest provider quiescence or settle an uncertain upload through a checkbox; unresolved legacy operations retain the operator recovery workflow below.
+When recovery cannot establish a safe checkpoint, the app offers **Check again** to perform a fresh check and **Cancel** to close the result. Diagnostics stay in the technical details disclosure. It does not ask users to attest provider quiescence or settle an uncertain upload through a checkbox; unresolved uncertain uploads retain the operator recovery workflow below.
 
 New Worker uploads store a fresh random `uploadTag` in the durable checkpoint before dispatch, and send it as Cloudflare's `workers/tag` version annotation. Each tag is used for one request only; the transport must never retry that upload. **Check and recover update** can acknowledge a lost response when the live Worker has that exact tag, version, fingerprint, and original storage bindings. It conditionally changes only the inspected checkpoint to confirmed, retains the fence, and resumes the exact artifact through normal verification. A concurrent ownership change stops recovery. A crash during acknowledgment is recoverable on the next check.
 
-A matching fingerprint without the unique tag is not sufficient. Legacy uploads, mismatched tags, unpublished requests, and a different installed artifact remain blocked. Hosted acceptance must test a published upload with a lost client response and verify that the live settings return its tag before distributing this flow. Cloudflare documents these [version annotations](https://developers.cloudflare.com/workers/configuration/multipart-upload-metadata/).
+A matching fingerprint without the unique tag is not sufficient. Mismatched tags, unpublished requests, and a different installed artifact remain blocked. Hosted acceptance must test a published upload with a lost client response and verify that the live settings return its tag before distributing this flow. Cloudflare documents these [version annotations](https://developers.cloudflare.com/workers/configuration/multipart-upload-metadata/).
 
 A timed-out provider request remains uncertain. Do not infer completion from elapsed time or from a matching annotation. After an operator has stopped old deployment clients and established that all in-flight requests have settled, `scripts/crate-deployment-fence.py settle ... --confirm-quiescent` marks only the inspected owner as settled while retaining the fence. Then use **Check and recover update**. The script refuses to release an update that still needs verification.
 
@@ -50,7 +50,7 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 ## Release evidence
 
-`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the pre-launch source baseline and initial public revision 8. Later published releases define the baseline for subsequent candidates. All development releases at or before that baseline are retired. The unpublished baseline may discard development migration entries; after publication, migration immutability and schema/revision checks apply normally. Keep the baseline fixed after launch. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
+`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source baseline and initial public revision 1. Later published releases define the baseline for subsequent candidates. Until the first publication, schema 1 may change in place; after publication, migration immutability and schema/revision checks apply normally. Keep the baseline fixed after launch. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
 A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
 
@@ -72,13 +72,12 @@ Development updates retain schema checks, migration receipts, verified backups w
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.
 
-## Experimental cloud safety compatibility
+## Experimental cloud safety namespace
 
-Revision 59 preserves the experimental `CloudSafety` SQLite namespace as an inactive
+The Worker keeps the experimental `CloudSafety` SQLite namespace as an inactive
 export, including in the reset Worker. No application binding calls it and it does
-not schedule alarms or modify its stored ledger. This permits updates from the
-experimental safety build without deleting its namespace. Cloud safety enforcement
-is not enabled by this compatibility export.
+not schedule alarms or modify its stored ledger. Cloud safety enforcement
+is not enabled by this export.
 
 ## Saved revision in plugin settings
 
@@ -106,23 +105,21 @@ publication. Cached revision numbers alone cannot authorize that replacement.
 Matching live artifacts still route to publication recovery when saved deployment
 metadata has not been confirmed.
 
-## Revision 2: optional local features and full article saves
+## Optional local features and full article saves
 
 Reading and Reminders start enabled in the plugin; explicit disabled preferences
 are preserved. Their switches stop local scanning without changing other devices.
 Reading saves request full article extraction. A library client's explicit full
-article save also enables extraction on servers with a legacy disabled policy.
-Capture-only Shortcut credentials cannot change that policy. Existing article
-access and legacy bookmark-only capture requests remain supported. No schema
-migration is needed.
+article save also enables extraction when the server policy has it disabled.
+Capture-only Shortcut credentials cannot change that policy. Bookmark-only
+capture requests remain supported.
 
-## Revision 3: shared feature pause/resume
+## Shared feature pause/resume
 
-`shared-features-v1` adds a server-authoritative policy independent of push and
+`shared-features-v1` is a server-authoritative policy independent of push and
 article-extraction preferences. Both features default on. The policy is stored in
-`maintenance_state` under `crate_feature_policy`; no schema migration is needed.
-Plugin switches require this capability and do not pretend an older server was
-paused. Local enabled flags cache the server state rather than overwriting it.
+`maintenance_state` under `crate_feature_policy`. Local enabled flags cache the
+server state rather than overwriting it.
 
 Pausing stops server APIs and background work without deleting sources, indexes,
 credentials, or queued work. Reading checks before fetching and publication;
@@ -132,14 +129,12 @@ completed deliveries, and wakes pending projections and extraction. Notification
 retry-age limits remain in effect; a pause does not make old notifications valid
 indefinitely. Requests already sent to websites or push providers cannot be recalled.
 
-## Revision 4: stable shortcut capture and diagnostics
+## Stable shortcut capture and diagnostics
 
 `reading-shortcut-transport-v1` separates native capture requests from the app
-wire protocol. The Worker retains narrow adapters for the released preparation
-headers 1 and 11, so existing paired shortcuts resume saving after the server
-update. No schema migration or new library credential is required.
+wire protocol.
 
-Template revision 2 uses the versioned capture API and presents a public fallback
+Template revision 1 uses the versioned capture API and presents a public fallback
 when no usable launch URL is returned. The live save page provides update,
 reconnect, and retry guidance, copyable private-data-free diagnostics, and a
 GitHub issue draft. It reports success only after the durable handoff receipt.
@@ -154,9 +149,8 @@ rules in `src/cloudflare/restore/restore-policy.json`. Both run the fixture in
 are discarded while queued captures and operation receipts survive. Each adapter
 keeps its own schema migration and destination publication workflow.
 
-The in-app restore adapter supports source schema 2 into the current
-schema-2 database. Schema 2 adds only the durable Reading capture queue, so restore
-preserves queued captures (including their retry state and notes) alongside the
-Reading policy and generation. Schema-1 archives are unsupported. Credentials and derived extraction jobs are still reset, and migration
+The in-app restore adapter supports source schema 1 into the current
+schema-1 database. Restore preserves queued Reading captures (including their
+retry state and notes) alongside the Reading policy and generation. Credentials and derived extraction jobs are still reset, and migration
 receipts are validated before creating destination resources. Future target
 schemas remain blocked until their recovery adapter is implemented.

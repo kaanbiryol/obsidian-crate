@@ -42,8 +42,8 @@ waits for an existing branch verification before dispatch, avoiding a duplicate
 full test run. Existing local or remote tags resume their exact commit and are
 never moved. Ordinary pushes refuse divergent branches and tags.
 
-The private-fragment v2 assets are `save-to-crate-ios-27-v2.shortcut` and
-`reading-shortcut-v2.json`. Shortcut metadata records the signed file's SHA-256 and the source fingerprint.
+The private-fragment v1 assets are `save-to-crate-ios-27-v1.shortcut` and
+`reading-shortcut-v1.json`. Shortcut metadata records the signed file's SHA-256 and the source fingerprint.
 No file is selected by modification time, and stale files in the original checkout's
 `dist/` are never used. Retries reuse an existing draft shortcut only after its tag,
 source and checksum pass verification; `--resign` explicitly signs a replacement.
@@ -94,8 +94,7 @@ without `release_tag` force-deploys `master` for independent website fixes.
 
 The website build selects the most recently published
 release containing shortcut metadata, including prereleases, verifies the download,
-and serves it at `shortcuts/v2/Save to Crate.shortcut`. Retired development shortcut
-downloads are no longer distributed.
+and serves it at `shortcuts/v1/Save to Crate.shortcut`.
 Plugin-only releases do not replace that selection. An incomplete or corrupted
 shortcut release fails deployment instead of silently serving another version.
 

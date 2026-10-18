@@ -916,7 +916,7 @@ and Obsidian rendering still requires device verification.
 
 After `npm run build:worker`, run
 `node --test scripts/reading-consent.browser.test.mjs` for Chromium and WebKit
-coverage of the full article save disclosure, automatic extraction, legacy permission migration,
+coverage of the full article save disclosure, automatic extraction,
 and library access after fetching is disabled. Light/dark phone screenshots are
 written to `test-results/reading-consent/`. This uses a real local Worker; physical
 iPhone keyboard and VoiceOver checks remain separate.
@@ -958,9 +958,9 @@ The storage harness also queues real database opens behind blocked native deleti
 
 `node scripts/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, folder isolation, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
 
-`CRATE_PWA_PREBUILT=1 node scripts/pwa-encryption-regressions-test.mjs` checks long reminder completion, large legacy receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
+`CRATE_PWA_PREBUILT=1 node scripts/pwa-encryption-regressions-test.mjs` checks long reminder completion, large pre-encryption receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
 
-Worker `encrypted-source-rebuild.integration.ts` covers conversion of previously indexed folders, parser upgrades repairing missing/quarantined encrypted sources, notes exceeding the former 1 MiB source and 2 MiB reparse limits, and atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens.
+Worker `encrypted-source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
 
 Worker `encrypted-sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and cross-key-scope rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
 
@@ -996,7 +996,7 @@ check retains wrong-key, edit and stale-result coverage.
 - `encryption-reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
 - `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
 - `node scripts/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
-- `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic legacy migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
+- `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic plaintext-to-encrypted migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
 - `node scripts/pwa-web-app-unlock-test.mjs`: shared recovery-key unlock for Reading/Reminders in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
 - Native iOS Shortcut signing/import and physical iOS/Android offline/push delivery remain manual acceptance. Test encrypted Android after reinstalling its changed manifest. Hosted quota validation must use an explicitly budgeted disposable deployment; do not run local test fixtures against hosted D1.
 

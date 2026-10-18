@@ -21,7 +21,7 @@ Under **Sync activity → History**, select a checkpoint and use **Return to thi
 
 The latest 20 shared checkpoints are available across connected devices for up to 30 days. Restoration keeps local recovery copies, and files excluded on the restoring device remain untouched.
 
-If shared checkpoints are unavailable, [update the server](/docs/troubleshooting/updates/) and complete a successful sync. Older local-only checkpoints remain on the device that created them.
+If shared checkpoints are unavailable, [update the server](/docs/troubleshooting/updates/) and complete a successful sync.
 
 Before a broad restore, back up the current vault and let pending browser edits finish. Pause automatic sync on other devices while you inspect and verify the restored state.
 

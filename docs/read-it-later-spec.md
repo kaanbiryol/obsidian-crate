@@ -1,4 +1,4 @@
-> Historical design notes. The current pre-launch baseline is schema 2 with no registered migrations; see [current contract](current-contract.md). Earlier upgrade requirements below are historical.
+> Historical design notes. The current baseline is schema 1 with no registered migrations; see [current contract](current-contract.md). Upgrade requirements below are historical design notes, not a supported upgrade path.
 
 # Read it later
 
@@ -52,7 +52,7 @@ Reading is on by default. **Settings → Crate → Reading** can disable it or s
 
 Validate the folder against portable sync paths and ignore rules. Do not allow overlap with the configured reminders folder. Adopt every Markdown note in the selected folder and its subfolders; never adopt notes outside it. Initial release folder changes require Reading to be disabled and pending work resolved; no automatic migration of notes or grants. Re-enabling for another folder requires fresh web/capture enrollment.
 
-Local Reading notes and views work without a server. Server extraction and phone-to-server capture require a connected, compatible deployment. With a configured server, local URL saves persist in a device outbox until the final note arrives through sync. Without a server, a local save creates a bookmark immediately; Web Clipper supplies its own extracted content.
+Local Reading notes and views work without a server. Server extraction and phone-to-server capture require a connected, compatible deployment. With a configured server, local URL saves are captured directly by the server, and the final note arrives through sync. Without a server, a local save creates a bookmark immediately; Web Clipper supplies its own extracted content.
 
 ### Save and read
 
@@ -70,7 +70,7 @@ One-time setup: set Obsidian Web Clipper's destination to the configured Reading
 
 Daily flow: **Web Clipper → Add to Obsidian**. Crate detects the saved note, registers it as an inbox item, and existing automatic sync uploads it. It then appears in the enrolled web app on refresh/reconciliation. With automatic sync disabled, select **Crate: Sync now**. Saving through Clipper is a local save; it does not confirm a server save.
 
-Folder membership is sufficient to adopt Markdown. Existing `crate_reading_import: web-clipper-v1` templates remain compatible but are no longer generated or required. The local normalizer fills missing canonical metadata and identity using a conditional vault update, preserving filenames, bodies, and custom properties. Derive the initial UUID deterministically from the existing versioned namespace plus the normalized initial vault-relative path and exact pre-adoption bytes. Once persisted, never derive the ID again. Invalid or ambiguous imports remain intact and show a source issue. Debounce create/modify events and retry only against unchanged input.
+Folder membership is sufficient to adopt Markdown. `crate_reading_import: web-clipper-v1` markers are accepted but are not generated or required. The local normalizer fills missing canonical metadata and identity using a conditional vault update, preserving filenames, bodies, and custom properties. Derive the initial UUID deterministically from the existing versioned namespace plus the normalized initial vault-relative path and exact pre-adoption bytes. Once persisted, never derive the ID again. Invalid or ambiguous imports remain intact and show a source issue. Debounce create/modify events and retry only against unchanged input.
 
 Read source URLs from `source_url`, `source`, or `url`, in that order. If absent, store an empty `source_url` and show a vault note without original/share actions. Fall back to the filename for title and the file modification timestamp for saved date. Normalize Clipper author lists to display text and scalar tags to a list. A normalized import has `capture_method: web-clipper`, `reading_status: inbox`, `favorite: false`, and `extraction_status: ready` when it has saved text; otherwise use `unavailable`. Preserve explicit valid reading values. The Worker indexes normalized notes only and never fetches imported notes, even those without text.
 
@@ -106,7 +106,7 @@ The logo can be visible as soon as the page renders; the Shortcut's preliminary 
 
 #### Shortcut-to-browser handoff
 
-The authenticated Shortcut sends the selected URL to `POST /reading/prepare`. The server assigns a stable operation ID and durably binds that exact intent to a short-lived, single-operation capability (five minutes). Preparing a handoff is not a saved bookmark. Opening the page alone is not a mutation; its script uses an explicit POST to commit the prepared operation through the same atomic capture/receipt path as direct URL saves.
+The authenticated Shortcut sends the selected URL to `POST /reading/shortcut/v1/prepare`. The server assigns a stable operation ID and durably binds that exact intent to a short-lived, single-operation capability (five minutes). Preparing a handoff is not a saved bookmark. Opening the page alone is not a mutation; its script uses an explicit POST to commit the prepared operation through the same atomic capture/receipt path as direct URL saves.
 
 Return only a same-origin HTTPS launch URL with an opaque handoff capability in its fragment. This narrowly scoped, short-lived capability is the sole credential allowed in that handoff URL; the long-lived Shortcut credential never leaves the Shortcut. The page removes the fragment with `history.replaceState` before loading optional content or issuing API requests, uses `Referrer-Policy: no-referrer`, and sends the capability only in the `X-Crate-Capture` header to `POST /reading/handoff`. Keep the prepared URL/title on the server, not in launch query parameters. Redact capabilities from diagnostics, serve private responses with `no-store`, use no third-party page resources, and never cache private handoff state in the service worker.
 
@@ -303,6 +303,6 @@ New article captures persist in `reading_captures` with their full UUID and an a
 
 The full `crate_reading_id` remains in frontmatter. Existing notes, Clipper filenames, manual renames, and retry extraction keep their paths. No automatic filename migration occurs. Capture publication and queue removal share the file transaction; repeated or lost responses cannot recreate a deleted completed note. Disabling fetching turns outstanding captures into fallback bookmarks, and folder changes wait for the queue to finish.
 
-The PWA retains its existing durable offline outbox until the server accepts the save. Obsidian stores immutable pending requests under its plugin directory in `reading-captures/`, bound to server credentials and the Reading folder, and retries the exact operation until normal sync brings the note into the vault. These records survive plugin reloads and network failures. Damaged or differently scoped records remain in place for recovery and block dispatch. The `reading-deferred-captures-v1` capability gates plugin dispatch to compatible servers.
+The PWA retains its durable offline outbox until the server accepts the save. Obsidian sends captures directly to the server, and normal sync brings the note into the vault.
 
-The schema-2 launch baseline includes the durable queue. Backup and restore retain pending captures; extraction jobs for existing files remain rebuildable projections.
+The schema-1 baseline includes the durable queue. Backup and restore retain pending captures; extraction jobs for existing files remain rebuildable projections.
