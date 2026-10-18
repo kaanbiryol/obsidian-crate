@@ -12,8 +12,7 @@ export type UploadIntent = { kind: 'local' } | { kind: 'merge'; preimage: Upload
 export type IntendedUpload = BatchUploadFile & { intent: UploadIntent };
 export interface EncryptedUploadWire {
 	format: 'crate-e2ee-v1';
-	/** Absent only in journals written before folder-move support. */
-	generation?: number;
+	generation: number;
 	content: string;
 	hash: string;
 	size: number;
@@ -50,7 +49,7 @@ export async function validateUploadIntent(value: unknown): Promise<void> {
 	if (value.encryptedWire !== undefined) {
 		const wire = value.encryptedWire;
 		if (!isRecord(wire) || wire.format !== 'crate-e2ee-v1' || wire.contentType !== ENCRYPTED_FILE_CONTENT_TYPE
-			|| (wire.generation !== undefined && (typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1))
+			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
 			|| !(wire.expectedHash === null || isSyncHash(wire.expectedHash))) throw new Error('Invalid encrypted upload journal');
 		await validateBytes(wire, MAX_ENCRYPTED_FILE_BYTES);
 		parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content as string)));

@@ -1,11 +1,13 @@
 import { expect, it } from 'vitest';
 import { addReminderScope, createReminderKeyGrant, createVaultKeyBundle } from '../encryption/key-bundle';
+import type { RecoveryEnvelope } from '../encryption/key-bundle';
 import { assertScopeGrant, parseScopedEncryptionState } from './encryption-scope';
 
 function fixture(purpose?: 'reading') {
   const grant = createReminderKeyGrant(addReminderScope(createVaultKeyBundle(), 'Private', purpose), 'Private');
   const state = { version: 1 as const, vaultId: grant.vaultId, generation: grant.generation, mode: 'active' as const,
-    scope: { id: grant.scope.id, folderPath: grant.scope.folderPath, keyId: grant.scope.data.id, notificationKeyId: grant.scope.notifications.id, purpose } };
+    scope: { id: grant.scope.id, folderPath: grant.scope.folderPath, keyId: grant.scope.data.id, notificationKeyId: grant.scope.notifications.id, purpose },
+    recovery: { version: 1, vaultId: grant.vaultId, envelope: 'a.b.c.d.e' } as RecoveryEnvelope };
   return { grant, state };
 }
 

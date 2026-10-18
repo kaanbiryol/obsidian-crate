@@ -247,19 +247,13 @@ export class SyncWorkerApi {
 		const wire = file.encryptedWire;
 		if (!wire) return this.encryption.resolveLegacyOperation(file.operationId,
 			{ path: file.path, hash: file.hash, size: file.size, contentType: file.contentType, expectedHash: file.expectedHash });
-		if (wire.generation !== undefined && wire.generation > this.encryption.generation) throw new Error('Unlock the original vault keys before resuming this upload');
+		if (wire.generation > this.encryption.generation) throw new Error('Unlock the original vault keys before resuming this upload');
 		const descriptor = parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content))).descriptor;
 		if (descriptor.vaultId !== this.encryption.keys.vaultId) throw new Error('Unlock the original vault keys before resuming this upload');
-		const current = this.encryption.keys.forPath(file.path);
-		const payload = { path: file.path, hash: wire.hash, size: wire.size, contentType: wire.contentType, expectedHash: wire.expectedHash };
 		// A generation fence proves that an older in-flight write can no longer
 		// commit. Recover its exact receipt, or reconcile without replaying it.
-		if (wire.generation !== undefined || descriptor.scopeId !== current.scopeId || descriptor.keyId !== current.key.id) {
-			return this.encryption.resolveLegacyOperation(file.operationId, payload);
-		}
-		// Older journal formats do not record generation. Only a converted receipt
-		// proves settlement; otherwise retain their normal exact-body retry.
-		return this.encryption.resolveLegacyOperation(file.operationId, payload, true);
+		return this.encryption.resolveLegacyOperation(file.operationId,
+			{ path: file.path, hash: wire.hash, size: wire.size, contentType: wire.contentType, expectedHash: wire.expectedHash });
 	}
 	async resolveLegacyRestore(intent: RestoreIntent): Promise<UploadResult | null> {
 		if (!this.encryption || intent.encryptedWire?.generation === this.encryption.generation) return null;

@@ -178,8 +178,7 @@ export class EncryptedReminderApi {
 		const semanticHash = await computeHash(new TextEncoder().encode(JSON.stringify([action, source])).buffer);
 		let attempt = await loadEncryptedReminderAttempt(key);
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
-		const movedAttempt = attempt && (attempt.generation !== undefined ? attempt.generation !== this.keys.generation
-			: (JSON.parse(attempt.body) as { folderPath: string }).folderPath !== this.keys.folderPath);
+		const movedAttempt = attempt && attempt.generation !== this.keys.generation;
 		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.data, this.context(body.operationId)));
 		if (!attempt || movedAttempt) {
 			const query = new URLSearchParams({ folderPath: this.keys.folderPath, operationId: body.operationId });

@@ -15,7 +15,6 @@ export async function createObjectOwnershipCheck(api: ResetApi, accountId: strin
 		const columns = (await api.queryD1(accountId, databaseId, `PRAGMA table_info(${table});`))
 			.flatMap(result => result.results ?? []).map(row => row.name);
 		if (columns.includes('storage_key')) sources.push({ table, column: 'storage_key' });
-		else if (table === 'files' && columns.includes('path')) sources.push({ table, column: 'path' });
 		else throw new ResetBlockedError('could not verify Crate file references.');
 	}
 	return async key => {

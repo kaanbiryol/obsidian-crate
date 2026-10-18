@@ -126,7 +126,7 @@ async function verifyLogout(browser) {
 			const cipher = await t.unlockLocalState(keys);
 			t.unlockPrivateStorage(cipher, keys.folderPath, localStorage, sessionStorage);
 			sessionStorage.setItem('crate-reminder-draft:Reminders:test', cipher.seal('new unsent draft', 'test-draft'));
-			await t.saveEncryptedReminderAttempt(`${keys.vaultId}:${keys.scopeId}:test-attempt`, { semanticHash: 'a'.repeat(64), body: 'original immutable request' }, undefined, t.capturePwaSession());
+			await t.saveEncryptedReminderAttempt(`${keys.vaultId}:${keys.scopeId}:test-attempt`, { semanticHash: 'a'.repeat(64), body: 'original immutable request', generation: 1 }, undefined, t.capturePwaSession());
 		}, grant);
 		await leaving.evaluate(async () => { window.releaseCache(); await window.logout; });
 		await peer.reload();

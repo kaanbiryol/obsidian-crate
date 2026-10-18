@@ -9,7 +9,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 		const cipher = await t.unlockLocalState(keys);
 		t.unlockPrivateStorage(cipher, 'Reminders', localStorage, sessionStorage);
 		const key = `${grant.vaultId}:${grant.scope.id}`, attemptKey = `${key}:blocked-attempt`;
-		const attempt = { semanticHash: 'a'.repeat(64), body: 'Preserve this exact request' };
+		const attempt = { semanticHash: 'a'.repeat(64), body: 'Preserve this exact request', generation: 1 };
 		await t.saveEncryptedReminderAttempt(attemptKey, attempt, undefined, () => true);
 		const draft = cipher.seal('Preserve this draft', 'blocked-draft');
 		sessionStorage.setItem('crate-reminder-draft:Reminders:blocked', draft);
@@ -36,7 +36,8 @@ export async function verifyBlockedEncryptionStorage(page) {
 				await new Promise(resolve => { request.onblocked = resolve; });
 			}
 			localStorage.setItem(t.AUTH_TOKEN_KEY, 'blocked-session');
-			const scoped = { version: 1, vaultId: grant.vaultId, generation: grant.generation, mode: 'active', scope: {
+			// Servers always include the recovery bundle; its shape is all this check needs.
+			const scoped = { version: 1, vaultId: grant.vaultId, generation: grant.generation, mode: 'active', recovery: { version: 1, vaultId: grant.vaultId, envelope: 'a.b.c.d.e' }, scope: {
 				id: grant.scope.id, folderPath: 'Reminders', keyId: grant.scope.data.id, notificationKeyId: grant.scope.notifications.id,
 			} };
 			const rejectBlocked = promise => promise.then(() => { throw new Error('Blocked storage was treated as available or empty'); }, error => {

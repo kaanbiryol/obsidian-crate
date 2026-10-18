@@ -27,7 +27,7 @@ No unsupported database or checkpoint is silently interpreted as empty. Signing 
 
 Encrypted vaults additionally require matching vault/generation headers. Their content envelopes use `crate-e2ee-v1`; browser private records use `crate-local-e2ee-v1`. Existing upload and reminder receipts are converted so accepted pre-encryption work remains recoverable. Encryption cannot be rolled back by deploying an older server. See [encryption](e2ee-implementation.md).
 
-Enrolled folder moves require `e2ee-folder-moves-v1`. Older servers leave the device's move checkpoint pending and its saved keys unchanged until the server is updated. Ordinary file moves use existing encrypted sync. Scope moves retain keys but change generation: other Obsidian devices recover the updated bundle using the same recovery key, and web apps need fresh setup links. No schema migration is added. Upload journals without generation metadata remain readable and recover converted receipts before retrying valid ciphertext.
+Enrolled folder moves require `e2ee-folder-moves-v1`. Older servers leave the device's move checkpoint pending and its saved keys unchanged until the server is updated. Ordinary file moves use existing encrypted sync. Scope moves retain keys but change generation: other Obsidian devices recover the updated bundle using the same recovery key, and web apps need fresh setup links. No schema migration is added. Encrypted upload journals and saved encrypted attempts always record their key generation (every encryption release has written it); an older generation recovers its converted receipt before any retry.
 
 ## Upgrade order
 

@@ -59,17 +59,16 @@ it('supports an enrollment for one feature without depending on sibling session 
   expect(rememberReminderKeys).toHaveBeenCalledOnce();
 });
 
-it.each(['wrong key', 'tampered bundle', 'generation', 'scope', 'access identity', 'data key', 'notification key', 'converting', 'resetting', 'old server'] as const)('rejects %s before persisting keys', async change => {
+it.each(['wrong key', 'tampered bundle', 'generation', 'scope', 'access identity', 'data key', 'notification key', 'converting', 'resetting'] as const)('rejects %s before persisting keys', async change => {
   const f = await fixture();
   if (change === 'wrong key') f.code = await generateRecoveryCode();
-  if (change === 'tampered bundle') f.expected.recovery!.envelope += 'a';
+  if (change === 'tampered bundle') f.expected.recovery.envelope += 'a';
   if (change === 'generation') f.expected.generation++;
   if (change === 'scope') f.expected.scope.id = crypto.randomUUID();
   if (change === 'access identity') f.expected.scope.accessId = crypto.randomUUID();
   if (change === 'data key') f.expected.scope.keyId = crypto.randomUUID();
   if (change === 'notification key') f.expected.scope.notificationKeyId = crypto.randomUUID();
   if (change === 'converting' || change === 'resetting') f.expected.mode = change;
-  if (change === 'old server') delete f.expected.recovery;
   await expect(rememberRecoveryKey(f.code, f.expected, 'Reminders', () => true)).rejects.toThrow();
   expect(rememberReminderKeys).not.toHaveBeenCalled();
 });
@@ -115,7 +114,7 @@ it('does not guess a sibling folder when several scopes exist after a rename', a
 
 async function pairingFixture() {
   const f = await fixture();
-  const state = await bindEncryptionScopes(createEncryptionState(f.bundle, f.expected.recovery!), f.bundle);
+  const state = await bindEncryptionScopes(createEncryptionState(f.bundle, f.expected.recovery), f.bundle);
   f.expected.scope = state.scopes[0]!;
   return f;
 }

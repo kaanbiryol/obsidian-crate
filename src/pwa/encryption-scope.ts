@@ -6,8 +6,7 @@ import type { EncryptionScope } from '../encryption/server-state';
 export interface ScopedEncryptionState {
   version: 1; vaultId: string; generation: number; mode: 'active' | 'converting' | 'resetting';
   scope: EncryptionScope;
-  /** Optional for already-unlocked clients connected to an older server. */
-  recovery?: RecoveryEnvelope;
+  recovery: RecoveryEnvelope;
 }
 
 export function parseScopedEncryptionState(value: unknown, feature: 'reading' | 'reminders'): ScopedEncryptionState {
@@ -20,7 +19,7 @@ export function parseScopedEncryptionState(value: unknown, feature: 'reading' | 
     || state.scope.binding !== undefined && (typeof state.scope.binding !== 'string' || state.scope.binding.length > 8192)) {
     throw new Error('Invalid encrypted enrollment configuration');
   }
-  if (state.recovery !== undefined && (!state.recovery || state.recovery.version !== 1 || state.recovery.vaultId !== state.vaultId
+  if ((!state.recovery || state.recovery.version !== 1 || state.recovery.vaultId !== state.vaultId
     || typeof state.recovery.envelope !== 'string' || state.recovery.envelope.length > 256 * 1024 || state.recovery.envelope.split('.').length !== 5)) {
     throw new Error('Invalid encrypted recovery bundle');
   }

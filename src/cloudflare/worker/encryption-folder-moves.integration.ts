@@ -148,9 +148,6 @@ it('settles accepted uploads and restores from their original receipts after a f
   expect(await transport.resolveLegacyUpload(accepted)).toEqual(response);
   expect(await transport.resolveLegacyUpload(unsent)).toMatchObject({ success: false, status: 409, code: 'version_conflict' });
   expect(await transport.resolveLegacyRestore(restore)).toEqual(restored);
-  // Legacy journal records without generation still recover an accepted receipt.
-  delete accepted.encryptedWire!.generation;
-  expect(await transport.resolveLegacyUpload(accepted)).toEqual(response);
   expect(await env.DB.prepare('SELECT 1 FROM files WHERE path=?').bind(unsent.path).first()).toBeNull();
 });
 

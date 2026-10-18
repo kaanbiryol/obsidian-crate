@@ -21,7 +21,7 @@ interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path
 interface Source { file: WireFile; content: string; item: ReadingItem }
 /** Authenticated metadata for one encrypted note, reusable while its file is unchanged. */
 export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem }
-interface Attempt { requestHash: string; body: string; generation?: number }
+interface Attempt { requestHash: string; body: string; generation: number }
 interface EncryptedReadingOptions {
   folderPath: string; generation: number; authority: FileEncryptionAuthority;
   captureArticle?(url: string): Promise<CapturedArticle>;
@@ -173,8 +173,7 @@ export class EncryptedReadingApi {
     const saved = await this.options.readAttempt(id) as Attempt | undefined;
     if (saved && (saved.requestHash !== requestHash || typeof saved.body !== 'string')) throw new Error('This encrypted Reading attempt belongs to a different change.');
     let attempt = saved;
-    if (attempt && (attempt.generation !== undefined ? attempt.generation !== this.options.generation
-      : (JSON.parse(attempt.body) as { folderPath: string }).folderPath !== this.options.folderPath)) {
+    if (attempt && attempt.generation !== this.options.generation) {
       const legacy = await this.json<{ envelope: string | null }>(`/reading/encrypted-receipt?operationId=${encodeURIComponent(id)}&wire=1`);
       if (legacy.envelope) {
         const receipt = await decryptJson(legacy.envelope, this.options.authority.key, this.context(id)) as { requestHash: string; response: { encrypted?: string } };

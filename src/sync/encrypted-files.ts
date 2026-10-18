@@ -162,13 +162,10 @@ export class EncryptedFiles {
 		const plain = await this.download(file.path, base64ToArrayBuffer(file.encryptedWire.content), file.encryptedWire);
 		if (plain.metadata.hash !== file.hash || plain.metadata.size !== file.size) throw new Error('Encrypted upload does not match its saved local content');
 	}
-	async resolveLegacyOperation(operationId: string, payload: Record<string, unknown>, retryMissing: true): Promise<UploadResult | null>;
-	async resolveLegacyOperation(operationId: string, payload: Record<string, unknown>, retryMissing?: false): Promise<UploadResult>;
-	async resolveLegacyOperation(operationId: string, payload: Record<string, unknown>, retryMissing = false): Promise<UploadResult | null> {
+	async resolveLegacyOperation(operationId: string, payload: Record<string, unknown>): Promise<UploadResult> {
 		const saved = await this.http.requestJson<{ envelope: string | null; retryValid: boolean }>(`/encryption/upload-receipt?operationId=${encodeURIComponent(operationId)}`);
 		if (!saved.envelope) {
 			if (!saved.retryValid) throw new Error('This old upload is outside its retry window. Preserve local files and compare the server before resetting sync.');
-			if (retryMissing) return null;
 			// No receipt existed when plaintext publication was permanently fenced.
 			// Reconciliation can prepare a fresh encrypted operation from local data.
 			return { success: false, path: String(payload.path), status: 409, code: 'version_conflict', error: 'Encryption was enabled before this upload committed. Reconcile before preparing an encrypted upload.' };

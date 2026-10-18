@@ -11,7 +11,7 @@ export async function verifyEncryptedAttemptCleanup(page, grant, serverDay) {
 		const old = serverDay - 180;
 		const operation = (label, day = old) => `e1_${String(day).padStart(8, '0')}_${label.padEnd(20, '_')}`;
 		const ids = Object.fromEntries(['settled', 'pending', 'uncertain', 'rejected', 'damaged', 'future', 'boundary'].map(label => [label, operation(label, label === 'boundary' ? serverDay - 179 : old)]));
-		const attempt = { semanticHash: 'a'.repeat(64), body: 'exact encrypted request', acknowledgment: 'saved acknowledgment' };
+		const attempt = { semanticHash: 'a'.repeat(64), body: 'exact encrypted request', generation: 1, acknowledgment: 'saved acknowledgment' };
 		for (const [label, id] of Object.entries(ids)) {
 			const value = label === 'uncertain' ? { ...attempt, acknowledgment: undefined }
 				: label === 'rejected' ? { ...attempt, rejected: true }

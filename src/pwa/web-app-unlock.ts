@@ -39,7 +39,6 @@ async function storeBrowserGrants(grants: ReminderKeyGrant[], expected: ScopedEn
 /** Open the recovery bundle locally, then retain only browser feature keys.
  * Neither the recovery code nor the full vault key is persisted in the PWA. */
 export async function rememberRecoveryKey(code: string, expected: ScopedEncryptionState, localFolder: string, sessionCurrent: () => boolean): Promise<void> {
-  if (!expected.recovery) throw new Error('Update your Crate server in Obsidian before unlocking with the recovery key.');
   const current = connectionGuard(sessionCurrent);
   if (!current()) throw new Error('The web app connection changed. Retry unlocking.');
   const bundle = await openRecoveryBundle(expected.recovery, code);
