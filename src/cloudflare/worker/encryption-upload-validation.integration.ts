@@ -107,3 +107,23 @@ it('accepts valid encrypted uploads and replays their exact receipt through the 
 	expect(objects).toHaveLength(1);
 	expect(await sha256HexBytes(await (await env.BUCKET.get(objects[0]!.key))!.arrayBuffer())).toBe(file.hash);
 });
+
+it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload without reading it back from R2', async kind => {
+	const file = await sealFile({ path: 'note.md', content: new TextEncoder().encode('# Private'), contentType: 'text/markdown' }, keys.forPath('note.md'));
+	const get = env.BUCKET.get.bind(env.BUCKET);
+	let reads = 0;
+	env.BUCKET.get = ((...args: Parameters<R2Bucket['get']>) => { reads += 1; return get(...args); });
+	try {
+		const response = await worker.fetch(new Request(kind === 'single' ? 'https://test/sync/upload?path=note.md' : 'https://test/sync/batch-upload', {
+			method: kind === 'single' ? 'PUT' : 'POST',
+			body: kind === 'single' ? file.bytes : JSON.stringify({ files: [{ path: 'note.md', content: btoa(String.fromCharCode(...file.bytes)),
+				contentType: ENCRYPTED_FILE_CONTENT_TYPE, hash: file.hash, size: file.bytes.length, expectedHash: null, operationId: operationId() }] }),
+			headers: { ...headers(), 'Content-Type': kind === 'single' ? ENCRYPTED_FILE_CONTENT_TYPE : 'application/json', 'X-File-Hash': file.hash,
+				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
+		}), env);
+		expect(response.status, await response.clone().text()).toBe(200);
+	} finally { env.BUCKET.get = get; }
+	expect(reads).toBe(0);
+	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'note.md' });
+	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).not.toBeNull();
+});

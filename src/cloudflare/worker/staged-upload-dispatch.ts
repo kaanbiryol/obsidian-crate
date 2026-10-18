@@ -15,6 +15,29 @@ type UploadMetadata = Pick<UploadParams,
   'path' | 'hash' | 'size' | 'objectKey' | 'expectedHash' | 'expectedRevision'
   | 'previousFile' | 'encryptionState' | 'resetGeneration' | 'operation'>;
 
+// Encrypted Markdown commits carry their bytes, framed after the metadata, so
+// the coordinator validates them without reading the staged object back from R2.
+const FRAMED_CONTENT_HEADER = 'X-Crate-Framed-Content';
+
+function frameUpload(metadata: UploadMetadata, content: string | ArrayBuffer): Uint8Array<ArrayBuffer> {
+  const head = new TextEncoder().encode(JSON.stringify(metadata));
+  const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
+  const frame = new Uint8Array(4 + head.length + bytes.length);
+  new DataView(frame.buffer).setUint32(0, head.length);
+  frame.set(head, 4);
+  frame.set(bytes, 4 + head.length);
+  return frame;
+}
+
+type CoordinatedUploadMetadata = UploadMetadata & { reminderPolicyRevision?: string | null };
+
+async function readUpload(request: Request): Promise<{ metadata: CoordinatedUploadMetadata; content?: ArrayBuffer }> {
+  if (request.headers.get(FRAMED_CONTENT_HEADER) !== '1') return { metadata: await request.json() as CoordinatedUploadMetadata };
+  const frame = await request.arrayBuffer();
+  const length = new DataView(frame).getUint32(0);
+  return { metadata: JSON.parse(new TextDecoder().decode(new Uint8Array(frame, 4, length))) as CoordinatedUploadMetadata, content: frame.slice(4 + length) };
+}
+
 /** File transfer and hashing finish before acquiring the coordinator lock. */
 export function coordinatedUpload(env: Env): CommitUpload {
   return async (bucket, db, params) => {
@@ -26,7 +49,9 @@ export function coordinatedUpload(env: Env): CommitUpload {
       resetGeneration: params.resetGeneration, operation: params.operation,
     };
     const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
-    const response = await stub.fetch('https://do/commit-upload', { method: 'POST', body: JSON.stringify(metadata) });
+    const response = await stub.fetch('https://do/commit-upload', params.encryptionState
+      ? { method: 'POST', body: frameUpload(metadata, params.content), headers: { [FRAMED_CONTENT_HEADER]: '1' } }
+      : { method: 'POST', body: JSON.stringify(metadata) });
     if (!response.ok) {
       const failure = await response.json() as { code?: string; path?: string; conflictingPath?: string };
       if (failure.code === 'namespace_conflict') throw new FileNamespaceConflictError(failure.path!, failure.conflictingPath!);
@@ -38,9 +63,13 @@ export function coordinatedUpload(env: Env): CommitUpload {
 
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
   // Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
-  const metadata = await request.json() as UploadMetadata & { reminderPolicyRevision?: string | null };
+  const { metadata, content: framed } = await readUpload(request);
   const policy = await getNotificationPolicy(env.DB);
   metadata.reminderPolicyRevision = policy?.revision ?? null;
+  if (framed) {
+    if (framed.byteLength !== metadata.size) return Response.json({ error: 'Staged upload size mismatch' }, { status: 400 });
+    return { ...metadata, content: framed };
+  }
   if (!isReminderPath(metadata.path, policy?.folderPath ?? null) && !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
   const object = await env.BUCKET.get(metadata.objectKey);
   if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
