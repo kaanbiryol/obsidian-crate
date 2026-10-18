@@ -238,3 +238,15 @@ it('does not start a mutation or list fetch when paused during a session check',
   expect(rendered.current.error).toBeNull();
   expect(rendered.current.syncedSession).toBeNull();
 });
+
+it('refreshes the library on open and when shown again, never on a timer', async () => {
+  stored.queue = [];
+  renderSync();
+  await act(async () => {});
+  expect(loadReading).toHaveBeenCalledOnce();
+  // Before: another full library load every 30 seconds while visible.
+  await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+  expect(loadReading).toHaveBeenCalledOnce();
+  await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
+  expect(loadReading).toHaveBeenCalledTimes(2);
+});

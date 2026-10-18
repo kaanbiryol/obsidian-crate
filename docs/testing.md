@@ -292,7 +292,7 @@ also starts transient work during asynchronous storage checks before activation
 and reload.
 
 Run `node scripts/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
-version detection from a Reading-only launch, foreground polling, navigation,
+version detection from a Reading-only launch, foreground checks, navigation,
 direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
 Screenshots are written to `test-results/update-notice/`.
 `node scripts/pwa-update-test.mjs` exercises real service-worker preparation,

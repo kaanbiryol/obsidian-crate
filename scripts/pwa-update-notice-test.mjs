@@ -5,6 +5,8 @@ import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 import { switchFeature } from './pwa-feature-navigation.mjs';
 
 const version = 'notice-before';
+// Update checks run on launch, foreground and reconnect, not on a timer.
+const returnToForeground = page => page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
 const assets = await buildPwaPreviewAssets({ assetVersion: version });
 const { server } = await listenPwaPreviewServer({ port: 0, assets });
 const origin = `http://127.0.0.1:${server.address().port}`;
@@ -30,7 +32,7 @@ try {
         await expect(pill).toHaveCount(0);
         available = 'notice-after';
         const beforeCheck = checks;
-        await page.clock.fastForward(5 * 60_000);
+        await returnToForeground(page);
         await expect(pill).toBeVisible();
         expect(checks).toBeGreaterThan(beforeCheck);
         await expect(page.locator('.pwa-update-floating')).toHaveCount(0);
@@ -53,10 +55,10 @@ try {
         await switchFeature(page, 'Reading');
         await page.reload();
         await expect(page.locator('.crate-reading__mobile-nav')).toBeVisible();
-        await page.clock.fastForward(5 * 60_000);
+        await returnToForeground(page);
         await expect(pill).toBeVisible();
         available = 'notice-next';
-        await page.clock.fastForward(5 * 60_000);
+        await returnToForeground(page);
         await expect(pill).toBeVisible();
         await page.setViewportSize({ width: 320, height: 568 });
         const narrow = await pill.boundingBox();
@@ -80,7 +82,7 @@ try {
         await expect(pill).toBeEnabled();
         expect(errors).toEqual([]);
         await context.close();
-        console.log(`${engine.name()} ${colorScheme}: global detection, polling, direct updates, offline blocking, Settings and compact layout passed`);
+        console.log(`${engine.name()} ${colorScheme}: global detection, foreground checks, direct updates, offline blocking, Settings and compact layout passed`);
       }
     } finally { await browser.close(); }
   }

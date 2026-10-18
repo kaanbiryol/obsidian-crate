@@ -366,7 +366,7 @@ Dock morphs use the shared collapsed height.
 
 `PwaUpdateProvider` in the shared feature shell owns version detection,
 preparation, and update activation for both features. It checks on launch,
-foreground/pageshow, reconnect, and every five minutes while visible and online.
+foreground/pageshow and reconnect while visible and online, never on a timer.
 `PwaUpdateButton` shows a compact **Update** pill in the Reminders and Reading
 headers, to the left of sync and Settings. Selecting **Update** immediately starts
 applying the update without a confirmation sheet. Offline or pending work disables

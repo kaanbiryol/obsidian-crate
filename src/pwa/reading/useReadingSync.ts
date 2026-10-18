@@ -102,9 +102,9 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       if (event.key === AUTH_TOKEN_KEY || event.key === READING_SESSION_KEY || event.key === PWA_LOGOUT_KEY || event.key === null) changed();
     };
     reload();
-    const timer = window.setInterval(reload, 30_000);
+    // Refresh on open, foreground, reconnect and explicit refresh; never on a timer.
     window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
-    return () => { clearInterval(timer); window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
+    return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
   }, [enabled, session, ready, refresh, run, resetSession]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };
