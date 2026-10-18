@@ -314,12 +314,11 @@ describe('debouncedSync', () => {
 		vi.useRealTimers();
 	});
 
-	it('updates pending count and triggers flush after delay', async () => {
+	it('triggers flush after delay', async () => {
 		vi.useFakeTimers();
 		const pendingPaths = new Set(['notes/a.md']);
 		let timer: ReturnType<typeof setTimeout> | null = null;
 		let maxWaitStart: number | null = null;
-		const updateState = vi.fn();
 		const processPending = vi.fn(async () => {});
 
 		debouncedSync(
@@ -334,13 +333,11 @@ describe('debouncedSync', () => {
 				setMaxWaitStart: value => {
 					maxWaitStart = value;
 				},
-				updateState,
 				processPendingChanges: processPending,
 			},
 			25,
 		);
 
-		expect(updateState).toHaveBeenCalledWith({ pendingChanges: 1 });
 		expect(timer).not.toBeNull();
 
 		await vi.advanceTimersByTimeAsync(25);
@@ -351,7 +348,6 @@ describe('debouncedSync', () => {
 	});
 
 	it('no-ops when queue is destroyed', () => {
-		const updateState = vi.fn();
 		const processPending = vi.fn(async () => {});
 
 		debouncedSync(
@@ -362,13 +358,11 @@ describe('debouncedSync', () => {
 				setDebounceTimer: vi.fn(),
 				getMaxWaitStart: () => null,
 				setMaxWaitStart: vi.fn(),
-				updateState,
 				processPendingChanges: processPending,
 			},
 			25,
 		);
 
-		expect(updateState).not.toHaveBeenCalled();
 		expect(processPending).not.toHaveBeenCalled();
 	});
 

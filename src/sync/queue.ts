@@ -10,7 +10,6 @@ export interface QueueDebounceContext {
 	setDebounceTimer(timer: ReturnType<typeof setTimeout> | null): void;
 	getMaxWaitStart(): number | null;
 	setMaxWaitStart(time: number | null): void;
-	updateState(updates: Partial<SyncState>): void;
 	processPendingChanges(): Promise<void>;
 }
 
@@ -19,7 +18,8 @@ export interface QueueEventContext {
 	shouldIgnore(path: string): boolean;
 	markPending(path: string): void;
 	clearPending(path: string): void;
-	triggerDebouncedSync(): void;
+	/** `pendingChanged` is false when the event left the pending set as it was. */
+	triggerDebouncedSync(pendingChanged: boolean): void;
 }
 
 export interface QueueReconcileContext {
@@ -29,26 +29,26 @@ export interface QueueReconcileContext {
 	updateState(updates: Partial<SyncState>): void;
 }
 
-function addPendingPath(context: QueueEventContext, change: PendingChange): void {
+/** Returns whether the pending set changed. */
+function addPendingPath(context: QueueEventContext, change: PendingChange): boolean {
 	const path = pendingChangeKey(change.kind, change.path);
 	const oppositePath = pendingChangeKey(change.kind === 'delete' ? 'upload' : 'delete', change.path);
-	context.pendingPaths.delete(oppositePath);
+	const changed = context.pendingPaths.delete(oppositePath) || !context.pendingPaths.has(path);
 	context.clearPending(oppositePath);
 	context.pendingPaths.add(path);
 	context.markPending(path);
+	return changed;
 }
 
 export function onFileChange(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
-		addPendingPath(context, { kind: 'upload', path: file.path });
-		context.triggerDebouncedSync();
+		context.triggerDebouncedSync(addPendingPath(context, { kind: 'upload', path: file.path }));
 	}
 }
 
 export function onFileDelete(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
-		addPendingPath(context, { kind: 'delete', path: file.path });
-		context.triggerDebouncedSync();
+		context.triggerDebouncedSync(addPendingPath(context, { kind: 'delete', path: file.path }));
 	}
 }
 
@@ -63,13 +63,9 @@ export function onFileRename(
 	const newIgnored = context.shouldIgnore(file.path);
 	if (oldIgnored && newIgnored) return;
 
-	if (!oldIgnored) {
-		addPendingPath(context, { kind: 'delete', path: oldPath });
-	}
-	if (!newIgnored) {
-		addPendingPath(context, { kind: 'upload', path: file.path });
-	}
-	context.triggerDebouncedSync();
+	const deleted = !oldIgnored && addPendingPath(context, { kind: 'delete', path: oldPath });
+	const uploaded = !newIgnored && addPendingPath(context, { kind: 'upload', path: file.path });
+	context.triggerDebouncedSync(deleted || uploaded);
 }
 
 export function debouncedSync(
@@ -78,8 +74,6 @@ export function debouncedSync(
 	maxWaitMs?: number,
 ): void {
 	if (context.isDestroyed()) return;
-
-	context.updateState({ pendingChanges: context.pendingPaths.size });
 
 	const existingTimer = context.getDebounceTimer();
 

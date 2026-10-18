@@ -132,7 +132,7 @@ export class SyncQueueController {
 				this.pendingRevisions.delete(path);
 				this.verificationKeys.delete(path);
 			},
-			triggerDebouncedSync: () => this.debouncedSync(),
+			triggerDebouncedSync: (pendingChanged: boolean) => this.debouncedSync(pendingChanged),
 		};
 	}
 
@@ -148,7 +148,6 @@ export class SyncQueueController {
 			setMaxWaitStart: (time: number | null) => {
 				this.maxWaitStart = time;
 			},
-			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),
 			processPendingChanges: () => this.processPendingChanges(),
 		};
 	}
@@ -217,8 +216,9 @@ export class SyncQueueController {
 		if (this.pendingPaths.size > 0) this.debouncedSync();
 	}
 
-	private debouncedSync(): void {
-		this.context.updateState({ pendingChanges: this.pendingPaths.size });
+	/** Re-saving an already pending file only restarts the countdown. */
+	private debouncedSync(pendingChanged = true): void {
+		if (pendingChanged) this.context.updateState({ pendingChanges: this.pendingPaths.size });
 		this.schedulePendingVerification();
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		runDebouncedQueueSync(

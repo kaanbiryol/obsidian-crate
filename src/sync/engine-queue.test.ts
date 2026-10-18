@@ -41,6 +41,21 @@ describe('SyncEngine event queue behavior', () => {
 		expect(harness.engine.getPendingPaths()).toContain('notes/a.md');
 	});
 
+	it('notifies state listeners only when a file event changes the pending set', () => {
+		const states: number[] = [];
+		harness.engine.setStateChangeCallback(state => states.push(state.pendingChanges));
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		expect(states).toEqual([1]);
+		// Autosaves of an already pending file only restart the countdown.
+		for (let save = 0; save < 5; save++) harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		expect(states).toEqual([1]);
+		// A delete replacing the pending upload changes the set at the same count.
+		harness.engine.onFileDelete({ path: 'notes/a.md' } as never);
+		harness.engine.onFileChange({ path: 'notes/b.md' } as never);
+		expect(states).toEqual([1, 1, 2]);
+		expect(harness.engine.getPendingPaths()).toEqual([pendingChangeKey('delete', 'notes/a.md'), 'notes/b.md']);
+	});
+
 	it('queues remote delete when renaming from syncable path into ignored path', () => {
 		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
 
