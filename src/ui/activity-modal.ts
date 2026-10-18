@@ -38,6 +38,8 @@ export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
     createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
 	createConflictReview?(record: ConflictRecord): Promise<ConflictReview>;
 	getPendingPaths(): string[];
+	/** Pending count without copying the pending list on every progress tick. */
+	getPendingChangeCount?(): number;
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
 	getActivityProgress?(): SyncActivityProgress | null;
@@ -72,6 +74,7 @@ export class ActivityModal extends BaseUiModal {
 	private pendingPanel!: HTMLDivElement;
 	private readonly pendingBrowserState: PendingBrowserState = {};
 	private conflictsPanel!: HTMLDivElement;
+	private renderedCheckingConflicts: boolean | undefined;
 	private historyPanel!: HTMLDivElement;
 	private readonly onProgress = () => {
 		if (!this.pendingPanel) return;
@@ -83,15 +86,16 @@ export class ActivityModal extends BaseUiModal {
             if (this.currentTabIndex === 2) void this.sharedHistory?.refresh();
 			return;
 		}
-		this.updateSyncBtn();
-		this.updateSyncStatusText();
-        if (this.deps.getActiveConflicts().length === 0) this.renderConflicts();
+		const status = this.getActivityStatus();
+		this.updateSyncBtn(status);
+		this.updateSyncStatusText(status);
+        // The empty conflicts panel only changes with its checking state.
+        if (this.deps.getActiveConflicts().length === 0 && status.checkingConflicts !== this.renderedCheckingConflicts) this.renderConflicts(status);
 		this.renderPending();
 	};
 	private renderPending(): void {
 		const state = this.deps.getState();
         const progress = this.deps.getActivityProgress?.();
-        const paths = this.deps.getPendingPaths();
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress || state.initializing && state.status === 'idle')) {
             // Keep the spinner mounted through frequent progress updates.
@@ -100,6 +104,7 @@ export class ActivityModal extends BaseUiModal {
             loadingLabel.setAttribute('title', text);
             return;
         }
+        const paths = this.deps.getPendingPaths();
         this.pendingBrowserState.dispose?.();
         this.pendingBrowserState.startChecks = undefined;
         this.pendingBrowserState.pauseChecks = undefined;
@@ -218,13 +223,16 @@ export class ActivityModal extends BaseUiModal {
         this.updateSyncStatusText();
 	}
 
-    private getActivityStatus() {
-        return describeActivityStatus(this.deps.getState(), this.deps.getActivityProgress?.() ?? null,
-            this.deps.getPendingPaths().length, !!this.deps.stopSync, this.stoppingSync);
+    private pendingChangeCount(): number {
+        return this.deps.getPendingChangeCount?.() ?? this.deps.getPendingPaths().length;
     }
 
-    private updateSyncStatusText(): void {
-        const status = this.getActivityStatus();
+    private getActivityStatus() {
+        return describeActivityStatus(this.deps.getState(), this.deps.getActivityProgress?.() ?? null,
+            this.pendingChangeCount(), !!this.deps.stopSync, this.stoppingSync);
+    }
+
+    private updateSyncStatusText(status = this.getActivityStatus()): void {
         if (this.subtitleLabelEl.textContent !== status.text) this.subtitleLabelEl.setText(status.text);
         this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, { state: status.indicatorState }));
         this.subtitleEl.setAttribute('title', status.text);
@@ -233,7 +241,7 @@ export class ActivityModal extends BaseUiModal {
 
 
 	private updateTabCounts(): void {
-		const pendingLen = this.deps.getPendingPaths().length;
+		const pendingLen = this.pendingChangeCount();
 		const conflictLen = this.deps.getActiveConflicts().length;
 
 		this.pendingCount.setText(pendingLen > 0 ? String(pendingLen) : '');
@@ -246,8 +254,8 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
-	private updateSyncBtn(): void {
-		const button = this.getActivityStatus().button;
+	private updateSyncBtn(status = this.getActivityStatus()): void {
+		const button = status.button;
 		this.syncBtn.disabled = button.disabled;
 		this.syncBtn.hidden = false;
 		this.syncBtn.setAttribute('aria-label', button.label);
@@ -288,9 +296,11 @@ export class ActivityModal extends BaseUiModal {
         if (this.currentTabIndex === 2) this.renderHistory();
     }
 
-    private renderConflicts(): void {
+    private renderConflicts(status = this.getActivityStatus()): void {
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.getActivityStatus().checkingConflicts, this.deps.createConflictReview ? conflict => {
+		const conflicts = this.deps.getActiveConflicts();
+		this.renderedCheckingConflicts = conflicts.length ? undefined : status.checkingConflicts;
+		renderConflictsPanel(this.conflictsPanel, conflicts, status.checkingConflicts, this.deps.createConflictReview ? conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
 		} : undefined);
     }

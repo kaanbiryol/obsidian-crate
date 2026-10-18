@@ -61,3 +61,28 @@ it('shows the reachability warning without treating it as a failed sync', () => 
     expect(internal.errorTitleEl.textContent).toBe('Server unavailable');
     expect((internal.errorIssuesEl as unknown as FakeElement).collectText()).toContain('temporary tunnel address');
 });
+
+it('updates progress without copying the pending list or rebuilding the empty conflicts panel', () => {
+    const pending = Array.from({ length: 5000 }, (_, index) => `note-${index}.md`);
+    const state = { status: 'syncing', lastSync: null, lastError: null, pendingChanges: pending.length, conflictCount: 0 } as SyncState;
+    const getPendingPaths = vi.fn(() => [...pending]);
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, {
+        getState: () => state, getActivityProgress: () => null, getPendingPaths, getPendingChangeCount: () => pending.length,
+        getActiveConflicts: () => [], sync: vi.fn(), addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+    });
+    const internal = modal as unknown as {
+        pendingPanel: FakeElement; conflictsPanel: FakeElement; syncBtn: FakeElement; syncBtnLabel: FakeElement;
+        subtitleEl: FakeElement; subtitleLabelEl: FakeElement; onProgress(): void; renderConflicts(): void;
+    };
+    internal.pendingPanel = new FakeElement('div');
+    internal.pendingPanel.createSpan({ cls: 'crate-activity-loading-label' });
+    for (const key of ['conflictsPanel', 'syncBtn', 'syncBtnLabel', 'subtitleEl', 'subtitleLabelEl'] as const) internal[key] = new FakeElement('div');
+    const renderConflicts = vi.spyOn(internal, 'renderConflicts');
+
+    for (let tick = 0; tick < 100; tick++) internal.onProgress();
+
+    // Before: about 4 full copies per tick and a conflicts rebuild on every tick.
+    expect(getPendingPaths).not.toHaveBeenCalled();
+    expect(renderConflicts).toHaveBeenCalledOnce();
+    expect(internal.subtitleLabelEl.textContent).toBe('Syncing…');
+});

@@ -64,6 +64,13 @@ export class SyncQueueController {
 		return Array.from(combined);
 	}
 
+	/** `getPendingPaths().length` without copying the pending set. */
+	getPendingChangeCount(): number {
+		let count = this.pendingPaths.size;
+		for (const path of this.inFlightPaths) if (!this.pendingPaths.has(path)) count++;
+		return count;
+	}
+
 	getPendingPathCount(): number {
 		return this.pendingPaths.size;
 	}

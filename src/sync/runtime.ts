@@ -142,6 +142,10 @@ export class SyncRuntime {
 		return this.syncEngine?.getPendingPaths() ?? [];
 	}
 
+	getPendingChangeCount(): number {
+		return this.syncEngine?.getPendingChangeCount() ?? 0;
+	}
+
 	async loadPendingDiff(path: string, deleted: boolean) {
 		const engine = this.syncEngine;
 		if (!engine) throw new Error('Sync is not initialized');

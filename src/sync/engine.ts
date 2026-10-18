@@ -278,6 +278,10 @@ export class SyncEngine {
 		return this.queueController.getPendingPaths();
 	}
 
+	getPendingChangeCount(): number {
+		return this.queueController.getPendingChangeCount();
+	}
+
     private history() {
         return createEngineHistory({
             vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
