@@ -185,6 +185,35 @@ describe('Cloudflare runtime integration', () => {
 		expect((await (await list(`999999.${base.split('.')[1]}`)).json() as { delta?: boolean }).delta).toBeUndefined();
 	});
 
+	it('answers 304 without listing the folder after writes elsewhere in the vault', async () => {
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/A.md', '- [ ] Alpha <!-- crate-id:alpha -->', null);
+		const first = await handleListReminders(new Request('https://worker.test/reminders/list?folderPath=Reminders'), runtimeEnv);
+		const etag = first.headers.get('ETag')!, base = first.headers.get('X-Crate-Delta-Base')!;
+		const list = async (since: string) => {
+			const prepare = runtimeEnv.DB.prepare.bind(runtimeEnv.DB);
+			const statements: string[] = [];
+			runtimeEnv.DB.prepare = (sql: string) => { statements.push(sql); return prepare(sql); };
+			try {
+				const response = await handleListReminders(new Request(`https://worker.test/reminders/list?folderPath=Reminders&since=${encodeURIComponent(since)}`,
+					{ headers: { 'If-None-Match': etag } }), runtimeEnv);
+				return { response, listed: statements.some(sql => sql.includes('FROM files')), offset: statements.some(sql => sql.includes('OFFSET')) };
+			} finally { runtimeEnv.DB.prepare = prepare; }
+		};
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Notes/Elsewhere.md', 'Unrelated', null);
+		const elsewhere = await list(base);
+		expect(elsewhere).toMatchObject({ listed: false, offset: false });
+		expect(elsewhere.response.status).toBe(304);
+		expect(elsewhere.response.headers.get('ETag')!.split('.')[1]).toBe(etag.split('.')[1]);
+		// A base the ETag was not issued at falls back to listing the folder.
+		const mismatched = await list(`${Number(base.split('.')[0]) + 1}.${base.split('.')[1]}`);
+		expect(mismatched).toMatchObject({ listed: true });
+		expect(mismatched.response.status).toBe(304);
+		await writeCommittedMarkdownFile(runtimeEnv.BUCKET, runtimeEnv.DB, 'Reminders/B.md', '- [ ] Beta <!-- crate-id:beta -->', null);
+		const changed = await list(base);
+		expect(changed.response.status).toBe(200);
+		expect(await changed.response.json()).toMatchObject({ delta: true, changedPaths: ['Reminders/B.md'] });
+	});
+
 	it('keeps reminder folder matching case-sensitive', async () => {
 		await Promise.all([
 			writeCommittedMarkdownFile(

@@ -46,8 +46,9 @@ const MAX_DELTA_CHANGES = 20_000;
  * changelog cannot prove completeness (pruned, imported, or too many changes). */
 export async function changedPathsSince(db: D1Database, folderPath: string, seq: number): Promise<string[] | null> {
 	const bounds = await getChangelogBounds(db);
-	if (seq > bounds.lastSeq || seq < bounds.snapshotSeq || (bounds.minSeq !== null && seq < bounds.minSeq - 1)) return null;
-	if (await db.prepare('SELECT 1 FROM changelog WHERE seq > ? ORDER BY seq LIMIT 1 OFFSET ?').bind(seq, MAX_DELTA_CHANGES).first()) return null;
+	// Retained sequence numbers are contiguous, so this bounds the rows to replay.
+	if (seq > bounds.lastSeq || seq < bounds.snapshotSeq || (bounds.minSeq !== null && seq < bounds.minSeq - 1)
+		|| bounds.lastSeq - seq > MAX_DELTA_CHANGES) return null;
 	const rows = await db.prepare('SELECT DISTINCT path FROM changelog WHERE seq > ? AND path >= ? AND path < ?')
 		.bind(seq, `${folderPath}/`, `${folderPath}0`).all<{ path: string }>();
 	return rows.results.map(row => row.path);
