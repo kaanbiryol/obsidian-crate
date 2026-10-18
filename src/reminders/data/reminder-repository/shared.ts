@@ -11,6 +11,7 @@ export function getTodayReminderIds(
   completed: IndexedReminder[],
   includeCompleted: boolean,
   now: Date,
+  convert: (reminder: IndexedReminder) => Reminder = toReminder,
 ): Reminder[] {
   const combined = new Map<string, IndexedReminder>();
   for (const reminder of [...activeToday, ...overdue]) {
@@ -25,7 +26,7 @@ export function getTodayReminderIds(
     }
   }
 
-  return Array.from(combined.values()).map(toReminder);
+  return Array.from(combined.values()).map(convert);
 }
 
 export function buildCreatedReminderFallback(params: {
