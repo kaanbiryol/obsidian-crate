@@ -46,8 +46,9 @@ export const bundleBudgets = {
 		// gzip remains within the existing 1.85 MB ceiling.
 		// Inventory validation and cleanup reporting measure 5.402 MB raw,
 		// adding 1.22 KB to the preceding build. Retain about 8.5 KB raw margin.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5410000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1850000', 10),
+		// The 2026-10 performance pass measures 5.417 MB raw / 1.849 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5430000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1860000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
