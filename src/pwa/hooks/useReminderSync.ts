@@ -5,6 +5,7 @@ import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse,
 import { isReminderList } from '../reminder-storage-validation';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
+import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
 
 export interface ConfirmedReminderSnapshot {
@@ -132,6 +133,7 @@ export function useReminderSync({
 
 		const requestKey = `${config.folderPath}\0${authToken}`;
 		if (activeReadRef.current?.key === requestKey) return activeReadRef.current.promise;
+		requestSharedFeaturesRefresh();
 
 		const promise = (async () => {
 			const session = capturePwaSession();

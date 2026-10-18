@@ -510,9 +510,10 @@ Revision 3 advertises `shared-features-v1`. `GET /features` returns
 `{ reading: boolean, reminders: boolean, revision: string | null }`. Vault,
 Reading-library and reminders credentials can read; only vault credentials can
 POST `{ feature: "reading" | "reminders", enabled: boolean, revision }`. Capture-only
-credentials cannot access this policy. Stale writes return 409. Reads and writes
-are serialized through the projection coordinator, and a successful write wakes
-background work. Both features default on until explicitly changed.
+credentials cannot access this policy. Stale writes return 409. Writes are
+serialized through the projection coordinator, and a successful write wakes
+background work; reads return the last committed policy without entering the
+coordinator. Both features default on until explicitly changed.
 
 Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
 access remain available. Legacy Reading policy/capture operations cannot override

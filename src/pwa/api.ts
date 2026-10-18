@@ -8,6 +8,7 @@ import { preparePwaEncryption, encryptionSnapshot } from './encryption-session';
 import type { EncryptedReminderApi } from './encrypted-reminder-api';
 import type { StoredReminderKeys } from './encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from './encryption-folder-routing';
+import { requestSharedFeaturesRefresh } from './shared-features';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleServer();
@@ -68,6 +69,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
 		if (keys && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
+		if (response.status === 423) requestSharedFeaturesRefresh(true);
 		return response;
 	}
 	function ready(refresh = false): Promise<void> {

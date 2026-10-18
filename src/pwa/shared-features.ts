@@ -5,6 +5,13 @@ import { readingSession } from './reading/storage';
 export interface SharedFeatures { reading: boolean; reminders: boolean }
 const CACHE_KEY = 'crate-shared-features';
 const defaults: SharedFeatures = { reading: true, reminders: true };
+// Data refreshes can repeat often; paused responses always check immediately.
+const REFRESH_INTERVAL_MS = 5 * 60_000;
+const refreshListeners = new Set<(immediate: boolean) => void>();
+/** Re-read the shared policy after a data refresh, or at once after a paused response. */
+export function requestSharedFeaturesRefresh(immediate = false): void {
+  for (const listener of refreshListeners) listener(immediate);
+}
 export const SharedFeaturesContext = createContext(defaults);
 export const useSharedFeatures = () => useContext(SharedFeaturesContext);
 export function useServerFeatures(): SharedFeatures {
@@ -17,10 +24,11 @@ export function useServerFeatures(): SharedFeatures {
     return defaults;
   });
   useEffect(() => {
-    let alive = true, busy = false;
+    let alive = true, busy = false, checkedAt = 0;
     const refresh = async () => {
       if (busy) return;
       busy = true;
+      checkedAt = Date.now();
       try {
         const token = localStorage.getItem(AUTH_TOKEN_KEY) ?? readingSession()?.token;
         if (!token) return;
@@ -28,15 +36,21 @@ export function useServerFeatures(): SharedFeatures {
         if (!response.ok) return;
         const next = await response.json() as SharedFeatures;
         const currentToken = localStorage.getItem(AUTH_TOKEN_KEY) ?? readingSession()?.token;
-        if (alive && currentToken === token && typeof next.reading === 'boolean' && typeof next.reminders === 'boolean') { setFeatures(next); localStorage.setItem(CACHE_KEY, JSON.stringify(next)); }
+        if (alive && currentToken === token && typeof next.reading === 'boolean' && typeof next.reminders === 'boolean') {
+          const value = { reading: next.reading, reminders: next.reminders };
+          const serialized = JSON.stringify(value);
+          if (localStorage.getItem(CACHE_KEY) !== serialized) localStorage.setItem(CACHE_KEY, serialized);
+          setFeatures(current => current.reading === value.reading && current.reminders === value.reminders ? current : value);
+        }
       } catch { /* Keep confirmed state while offline. Older servers retain both features. */ }
       finally { busy = false; }
     };
-    const check = () => { void refresh(); };
-    check();
-    const timer = window.setInterval(check, 15_000);
-    window.addEventListener('focus', check); window.addEventListener('online', check);
-    return () => { alive = false; clearInterval(timer); window.removeEventListener('focus', check); window.removeEventListener('online', check); };
+    const requested = (immediate: boolean) => {
+      if (immediate || Date.now() - checkedAt >= REFRESH_INTERVAL_MS) void refresh();
+    };
+    void refresh();
+    refreshListeners.add(requested);
+    return () => { alive = false; refreshListeners.delete(requested); };
   }, []);
   return features;
 }

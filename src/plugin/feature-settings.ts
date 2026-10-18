@@ -1,4 +1,5 @@
 import type CratePlugin from './CratePlugin';
+import type { SyncState } from '../sync/types';
 import { captureServerConnection, serverRequest } from './server-request';
 import { startReading, stopReading } from '../reading/runtime';
 import { getPluginLifecycleSignal } from './lifecycle-state';
@@ -65,8 +66,13 @@ export function registerSharedFeatures(plugin: CratePlugin): void {
     refreshing = true;
     void refreshSharedFeatures(plugin).catch(() => { /* Keep the last confirmed state offline. */ }).finally(() => { refreshing = false; });
   };
-  plugin.registerInterval(window.setInterval(refresh, 30_000));
-  plugin.registerDomEvent(window, 'focus', refresh);
-  plugin.registerDomEvent(window, 'online', refresh);
+  // Changes from other devices arrive with sync; the server enforces them meanwhile.
+  let wasSyncing = false;
+  const listener = (state: SyncState) => {
+    if (wasSyncing && state.status === 'idle') refresh();
+    wasSyncing = state.status === 'syncing';
+  };
+  plugin.syncRuntime.addStateChangeListener(listener);
+  plugin.register(() => plugin.syncRuntime.removeStateChangeListener(listener));
   refresh();
 }

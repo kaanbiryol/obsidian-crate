@@ -12,6 +12,7 @@ export { ReadingApiError } from './api-error';
 import { isReadingCache } from './storage-validation';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption-folder-routing';
+import { requestSharedFeaturesRefresh } from '../shared-features';
 
 export async function connectReadingFromReminders(): Promise<ReadingSession | null> {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -22,6 +23,7 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
   const data = await response.json() as { id?: unknown; folderPath?: unknown; generation?: unknown; expiresAt?: unknown; error?: string; code?: string };
   if (!sessionCurrent() || localStorage.getItem(AUTH_TOKEN_KEY) !== token) return readingSession();
   if (response.status === 401) reportExpiredConnection(token);
+  if (response.status === 423) requestSharedFeaturesRefresh(true);
   if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status, data.code);
   if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
     || typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
@@ -48,6 +50,7 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
     throw new ReadingApiError(SESSION_RECOVERY_MESSAGE, 401);
   }
   if (response.status === 428 && path !== '/reading/encryption') throw new EncryptionScopeChangedError('The encrypted Reading folder changed.');
+  if (response.status === 423) requestSharedFeaturesRefresh(true);
   return response;
 }
 export async function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {

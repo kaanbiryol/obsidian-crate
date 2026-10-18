@@ -4,6 +4,7 @@ import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../confi
 import { connectReadingFromReminders, loadReading } from './api';
 import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
 import type { useReadingSession } from './useReadingSession';
+import { requestSharedFeaturesRefresh } from '../shared-features';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
 export function useReadingSync({ session, ready, pending, publishSyncResult, isCurrentSession, run, resetSession }: Pick<ReturnType<typeof useReadingSession>,
@@ -34,6 +35,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       return;
     }
     refreshing.current = true; setSyncing(true); setSyncedSession(null);
+    requestSharedFeaturesRefresh();
     try {
       // Enrollment checks share the refresh lock. Foreground and cross-tab
       // events can arrive together while the previous check is still pending.

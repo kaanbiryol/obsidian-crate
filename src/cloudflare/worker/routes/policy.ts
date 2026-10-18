@@ -58,7 +58,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /diagnostics': { scopes: VAULT },
 	'GET /settings': { scopes: VAULT },
 	'PUT /settings': { scopes: VAULT, execution: COORDINATOR },
-	'GET /features': { scopes: LIBRARY, execution: { kind: 'coordinator', wake: false } },
+	'GET /features': { scopes: LIBRARY },
 	'POST /features': { scopes: VAULT, execution: COORDINATOR },
 	'GET /auth/tokens': { scopes: VAULT },
 	'DELETE /auth/tokens': { scopes: VAULT, execution: COORDINATOR },

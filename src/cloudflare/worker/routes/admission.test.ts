@@ -32,7 +32,7 @@ it.each([
 	['POST', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
 	['POST', '/notifications/reminders-enrollment-token', ['vault'], { kind: 'coordinator', wake: true }],
-	['GET', '/features', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
+	['GET', '/features', ['vault', 'reminders', 'reading'], undefined],
 	['POST', '/features', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
