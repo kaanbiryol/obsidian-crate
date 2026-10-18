@@ -84,7 +84,7 @@ it('answers an unchanged vault from the confirmed inventory in one request', asy
 	request.mockClear();
 	expect(await api.request('/reading/list')).toEqual(first);
 	expect(request).toHaveBeenCalledOnce();
-	expect(first.revision).toMatch(/^"e2ee-reading-1-1"$/);
+	expect(first.revision).toMatch(/^"e2ee-reading-1-[0-9a-f]{32}"$/);
 });
 
 async function notes(count: number, revision = 'r1') {
@@ -157,4 +157,35 @@ it('reuses the saved index after a reload and downloads only changed notes', asy
 	expect(downloads(changed.request)).toBe(1);
 	expect(saveIndex).toHaveBeenCalledTimes(2);
 	expect(stored?.find(entry => entry.file.path === edited[3]!.file.path)?.file.revision).toBe('r2');
+});
+
+it('keeps the library label and result after edits elsewhere in the vault', async () => {
+	const { api, request } = harness(), saved = await notes(5);
+	serve(request, saved, 1);
+	const first = await api.request('/reading/list') as { revision: string };
+	// Before: the label was the vault sequence, so any note edit made the web
+	// app rewrite and redraw its whole saved library.
+	serve(request, saved, 2);
+	const after = await api.request('/reading/list') as { revision: string };
+	expect(after).toBe(first);
+	expect(downloads(request)).toBe(5);
+});
+
+it('changes the library label when an article changes or stops failing', async () => {
+	const { api, request } = harness(), saved = await notes(3);
+	serve(request, saved, 1);
+	const serveFile = request.getMockImplementation()!;
+	request.mockImplementation(async path => path.includes(encodeURIComponent(saved[1]!.file.path)) ? new Response(null, { status: 503 }) : serveFile(path));
+	const failing = await api.request('/reading/list') as { revision: string; issues: unknown[] };
+	expect(failing.issues).toHaveLength(1);
+
+	serve(request, saved, 2);
+	const recovered = await api.request('/reading/list') as { revision: string; issues: unknown[] };
+	expect(recovered.issues).toHaveLength(0);
+	expect(recovered.revision).not.toBe(failing.revision);
+
+	const edited = [saved[0]!, saved[1]!, { ...saved[2]!, file: { ...saved[2]!.file, revision: 'r2' } }];
+	serve(request, edited, 3);
+	const changed = await api.request('/reading/list') as { revision: string };
+	expect(changed.revision).not.toBe(recovered.revision);
 });

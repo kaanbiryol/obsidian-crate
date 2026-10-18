@@ -15,7 +15,7 @@ const MAX_READING_FILES = 100_000;
 const MAX_READING_METADATA_BYTES = 64 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
-/** `revision` changes with the vault sequence a complete inventory was confirmed at. */
+/** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
 interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
 
 interface Source { file: WireFile; content: string; item: ReadingItem }
@@ -148,7 +148,11 @@ export class EncryptedReadingApi {
       if (counts.get(item.crate_reading_id) === 1) return [item];
       issues.push({ path: item.path, message: 'Several notes have this Reading ID. Resolve the duplicates in Obsidian.' }); return [];
     });
-    const result: EncryptedReadingInventory = { items, issues, cursor: null, revision: `"e2ee-reading-${this.options.generation}-${sequence}"` };
+    // Unrelated vault edits advance the sequence; an unchanged fingerprint lets
+    // callers keep their saved library instead of rewriting and redrawing it.
+    const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message])]);
+    const revision = `"e2ee-reading-${this.options.generation}-${(await hash(fingerprint)).slice(0, 32)}"`;
+    const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result : { items, issues, cursor: null, revision };
     this.confirmed = { sequence: sequence, result };
     if (downloaded || removed) await this.options.saveIndex?.([...nextIndex.values()]).catch(() => { /* The index is only a cache. */ });
     return result;
