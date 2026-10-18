@@ -132,3 +132,16 @@ it.each([409, 401, 503])('only handles version conflicts when encrypted batch pr
 	expect(manifest.uploadJournal.pending()).toEqual([]);
 	await manifest.close();
 });
+
+it('uses a batch-resolved precondition once instead of asking the server per file', async () => {
+	const { file } = await fixture();
+	const requestJson = vi.fn(async () => { throw new Error('Unexpected precondition request'); });
+	const encryption = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
+	const journal = { ...file, expectedHash: 'plain-baseline', operationId: crypto.randomUUID() } as unknown as JournalUpload;
+	const cipher = 'c'.repeat(64);
+	(encryption as unknown as { preloaded: Map<string, unknown> }).preloaded.set(file.path, { expected: 'plain-baseline', result: cipher });
+	await expect(encryption.prepare(journal)).resolves.toMatchObject({ expectedHash: cipher });
+	expect(requestJson).not.toHaveBeenCalled();
+	// Consumed: a second preparation must check the server again.
+	await expect(encryption.prepare(journal)).rejects.toThrow('Unexpected precondition request');
+});

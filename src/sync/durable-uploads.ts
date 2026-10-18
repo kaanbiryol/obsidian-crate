@@ -14,6 +14,8 @@ interface UploadTransport {
 	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;
 	resolveLegacyUpload?(file: JournalUpload): Promise<UploadResult | null>;
 	prepareUploadWire?: PrepareUploadWire;
+	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
+	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<void>;
 	assertPreparedUpload?(file: JournalUpload): Promise<void>;
 	getServerInfo(): Promise<{ reminderOperationDay?: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
@@ -32,15 +34,21 @@ export class DurableUploads {
 	async batch(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
 		const durable: JournalUpload[] = [];
 		const rejected: UploadResult[] = [];
-		for (const file of files) {
-			try {
-				durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }]));
-			} catch (error) {
-				// Encryption resolves the plaintext precondition before journaling.
-				// A stale file has not been dispatched and can reconcile independently.
-				if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
-				rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
+		try {
+			await this.transport.preloadUploadPreconditions?.(files);
+			for (const file of files) {
+				try {
+					durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }]));
+				} catch (error) {
+					// Encryption resolves the plaintext precondition before journaling.
+					// A stale file has not been dispatched and can reconcile independently.
+					if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
+					rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
+				}
 			}
+		} finally {
+			// Unconsumed results must not satisfy a later upload.
+			await this.transport.preloadUploadPreconditions?.([]);
 		}
 		const response = durable.length ? await this.sendBatch(durable) : { success: true, results: [] };
 		const results = new Map([...response.results, ...rejected].map(result => [result.path, result]));

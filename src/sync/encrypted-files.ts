@@ -12,18 +12,27 @@ import { validateEncryptedSettings, type EncryptedSettings } from '../encryption
 import type { RestoreIntent } from './restore-intent';
 import { parseFileVersions } from './worker-api/version-contract';
 import type { UploadResult } from '../protocol/sync-types';
-import { ENCRYPTION_METADATA_BATCH } from '../protocol/sync-limits';
+import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../protocol/sync-limits';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
 // Reuse across the overlapping requests of one large inventory.
 const MAX_VERIFIED_METADATA = ENCRYPTION_METADATA_BATCH * METADATA_CONCURRENCY;
 type PublicDataBuilder = (path: string, content: ArrayBuffer) => Promise<unknown>;
+interface VerifiedRevision { metadata: PrivateFileMetadata; wireHash: string }
+/** A plaintext precondition to translate into the server's ciphertext hash. */
+export interface ExpectedHashRequest { path: string; expected: string | null; revision?: string | null }
+
+function conflictError(): HttpError {
+	return new HttpError('Remote file changed; sync again before writing', 409, null, 'version_conflict');
+}
 
 /** Boundary between ciphertext transport identities and local sync identities.
  * Never substitute a decrypted hash into an R2 or conditional-write request. */
 export class EncryptedFiles {
-	private readonly verifiedMetadata = new Map<string, PrivateFileMetadata>();
+	private readonly verifiedMetadata = new Map<string, VerifiedRevision>();
+	// Batch-resolved upload preconditions, each consumed once by `prepare`.
+	private readonly preloaded = new Map<string, { expected: string; result: string | HttpError }>();
 	private constructor(private readonly http: WorkerApiHttpClient, readonly keys: FileKeyAuthority,
 		readonly generation: number, private readonly publicData: PublicDataBuilder) {}
 
@@ -50,8 +59,8 @@ export class EncryptedFiles {
 		const missing = new Set<string>();
 		for (const { entry } of chunk) {
 			if (!entry.revision) throw new Error('Encrypted file metadata is missing its immutable revision');
-			const metadata = this.verifiedMetadata.get(entry.revision);
-			if (metadata) cached.set(entry.revision, metadata); else missing.add(entry.revision);
+			const verified = this.verifiedMetadata.get(entry.revision);
+			if (verified) cached.set(entry.revision, verified.metadata); else missing.add(entry.revision);
 		}
 		const response = missing.size ? await this.http.requestJson<{ descriptors: Record<string, unknown> }>('/encryption/metadata', {
 			method: 'POST', body: JSON.stringify({ revisions: [...missing] }),
@@ -64,7 +73,7 @@ export class EncryptedFiles {
 				validateFileDescriptor(descriptor);
 				metadata = await openFileMetadata(descriptor, path, this.keys.forPath(path));
 				cached.set(entry.revision!, metadata);
-				this.verifiedMetadata.set(entry.revision!, metadata);
+				this.verifiedMetadata.set(entry.revision!, { metadata, wireHash: entry.hash });
 				while (this.verifiedMetadata.size > MAX_VERIFIED_METADATA) this.verifiedMetadata.delete(this.verifiedMetadata.keys().next().value!);
 			}
 			if (metadata.path !== path) throw new Error('Encrypted file metadata does not match the requested file');
@@ -74,29 +83,72 @@ export class EncryptedFiles {
 	}
 
 	async expectedHash(path: string, expected: string | null, revision?: string | null): Promise<string | null> {
-		if (expected === null) return null;
-		const raw = parseFileMetadata(await this.http.requestJson('/sync/metadata', {
-			method: 'POST', body: JSON.stringify({ paths: [path] }),
-		}), [path]).files[path];
-		if (!raw) {
-			if (revision) {
-				const result = await this.http.requestJson<{ receipt: { hash: string } | null }>(`/encryption/deletion-precondition?${new URLSearchParams({ path, revision })}`);
-				if (result.receipt) {
-					const [plain] = await this.metadata([{ path, entry: { hash: result.receipt.hash, size: 0, revision } }]);
-					if (plain?.hash === expected) return result.receipt.hash;
-				}
+		return (await this.expectedHashes([{ path, expected, revision }]))[0]!;
+	}
+
+	/** Ciphertext preconditions for several files, throwing on the first conflict. */
+	async expectedHashes(requests: ExpectedHashRequest[]): Promise<Array<string | null>> {
+		const results = await this.resolveExpected(requests);
+		const conflict = results.find(result => result instanceof HttpError);
+		if (conflict) throw conflict;
+		return results as Array<string | null>;
+	}
+
+	/** Resolve one upload batch's preconditions together; `prepare` consumes each result once. */
+	async preloadExpected(requests: ExpectedHashRequest[]): Promise<void> {
+		this.preloaded.clear();
+		const pending = requests.filter(request => request.expected !== null);
+		const results = await this.resolveExpected(pending);
+		pending.forEach((request, index) => this.preloaded.set(request.path, { expected: request.expected!, result: results[index]! }));
+	}
+
+	private async resolveExpected(requests: ExpectedHashRequest[]): Promise<Array<string | null | HttpError>> {
+		const results = new Array<string | null | HttpError>(requests.length);
+		const remote: number[] = [];
+		for (const [index, request] of requests.entries()) {
+			if (request.expected === null) { results[index] = null; continue; }
+			const verified = request.revision ? this.verifiedMetadata.get(request.revision) : undefined;
+			// A verified revision names exact ciphertext, and the server still checks
+			// hash and revision together at commit, so no preflight is needed.
+			if (verified && verified.metadata.path === request.path && verified.metadata.hash === request.expected) results[index] = verified.wireHash;
+			else remote.push(index);
+		}
+		for (let offset = 0; offset < remote.length; offset += BATCH_DOWNLOAD_MAX_FILES) {
+			const chunk = remote.slice(offset, offset + BATCH_DOWNLOAD_MAX_FILES);
+			const paths = chunk.map(index => requests[index]!.path);
+			const files = parseFileMetadata(await this.http.requestJson('/sync/metadata', {
+				method: 'POST', body: JSON.stringify({ paths }),
+			}), paths).files;
+			const present = chunk.filter(index => files[requests[index]!.path]);
+			const plain = await this.metadata(present.map(index => ({ path: requests[index]!.path, entry: files[requests[index]!.path]! })));
+			const plainByIndex = new Map(present.map((index, position) => [index, plain[position]!]));
+			for (const index of chunk) {
+				const { path, expected, revision } = requests[index]!;
+				const raw = files[path];
+				if (!raw) { results[index] = await this.absentExpectedHash(path, expected!, revision); continue; }
+				results[index] = plainByIndex.get(index)?.hash !== expected || (revision && raw.revision !== revision) ? conflictError() : raw.hash;
 			}
-			throw new HttpError('Remote file changed; sync again before writing', 409, null, 'version_conflict');
 		}
-		const [plain] = await this.metadata([{ path, entry: raw }]);
-		if (plain?.hash !== expected || (revision && raw.revision !== revision)) {
-			throw new HttpError('Remote file changed; sync again before writing', 409, null, 'version_conflict');
+		return results;
+	}
+
+	private async absentExpectedHash(path: string, expected: string, revision?: string | null): Promise<string | HttpError> {
+		if (revision) {
+			const result = await this.http.requestJson<{ receipt: { hash: string } | null }>(`/encryption/deletion-precondition?${new URLSearchParams({ path, revision })}`);
+			if (result.receipt) {
+				const [plain] = await this.metadata([{ path, entry: { hash: result.receipt.hash, size: 0, revision } }]);
+				if (plain?.hash === expected) return result.receipt.hash;
+			}
 		}
-		return raw.hash;
+		return conflictError();
 	}
 
 	async prepare(file: JournalUpload): Promise<EncryptedUploadWire> {
-		const expectedHash = await this.expectedHash(file.path, file.expectedHash);
+		const preloaded = this.preloaded.get(file.path);
+		if (preloaded) this.preloaded.delete(file.path);
+		const resolved = preloaded && preloaded.expected === file.expectedHash ? preloaded.result : undefined;
+		if (resolved instanceof HttpError) throw resolved;
+		const expectedHash = resolved ?? await this.expectedHash(file.path, file.expectedHash);
 		const content = base64ToArrayBuffer(file.content);
 		const sealed = await sealFile({ path: file.path, content: new Uint8Array(content), contentType: file.contentType,
 			publicData: await this.publicData(file.path, content) }, this.keys.forPath(file.path));

@@ -48,6 +48,9 @@ export class SyncWorkerApi {
 	private encryption?: EncryptedFiles;
 	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
 	prepareUploadWire(file: JournalUpload) { return this.encryption?.prepare(file) ?? Promise.resolve(undefined); }
+	async preloadUploadPreconditions(files: Array<{ path: string; expectedHash: string | null }>): Promise<void> {
+		await this.encryption?.preloadExpected(files.map(file => ({ path: file.path, expected: file.expectedHash })));
+	}
 	prepareRestoreWire(intent: RestoreIntent) { return this.encryption?.prepareRestore(intent) ?? Promise.resolve(undefined); }
 	assertPreparedRestore(intent: RestoreIntent): void {
 		if (!!this.encryption !== !!intent.encryptedWire || (this.encryption && (intent.encryptedWire!.vaultId !== this.encryption.keys.vaultId
@@ -367,7 +370,8 @@ export class SyncWorkerApi {
 			return { path, expectedHash, expectedRevision };
 		});
 		if (this.encryption) {
-			for (const file of files) file.expectedHash = (await this.encryption.expectedHash(file.path, file.expectedHash, file.expectedRevision))!;
+			const hashes = await this.encryption.expectedHashes(files.map(file => ({ path: file.path, expected: file.expectedHash, revision: file.expectedRevision })));
+			files.forEach((file, index) => { file.expectedHash = hashes[index]!; });
 		}
 		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
