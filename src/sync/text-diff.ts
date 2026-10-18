@@ -10,8 +10,9 @@ export interface ChangeHunk {
 const MAX_EDIT_LENGTH = 2_000;
 
 /** Adapt jsdiff's token changes to the base-relative ranges used by Crate's merge rules. */
-export function diffSequence(base: string[], target: string[]): ChangeHunk[] | null {
-	const changes = diffArrays(base, target, { maxEditLength: MAX_EDIT_LENGTH });
+export function diffSequence(base: string[], target: string[], options: { timeout?: number } = {}): ChangeHunk[] | null {
+	// Sync merges never pass a timeout; display-only callers may bound UI time.
+	const changes = diffArrays(base, target, { maxEditLength: MAX_EDIT_LENGTH, ...options });
 	if (!changes) return null;
 
 	const hunks: ChangeHunk[] = [];

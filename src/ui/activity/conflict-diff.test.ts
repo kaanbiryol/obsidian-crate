@@ -30,3 +30,17 @@ describe('conflict comparison', () => {
         expect(rows[4]?.saved?.text).toBe('');
     });
 });
+
+it('bounds total highlighting time for large conflicts', () => {
+    let seed = 7;
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const current = Array.from({ length: 200 }, () => Array.from({ length: 600 }, () => `w${Math.floor(random() * 50)}`).join(' '));
+    const saved = current.map(line => line.split(' ').map(word => random() < 0.3 ? `x${Math.floor(random() * 50)}` : word).join(' '));
+    const started = performance.now();
+    const { rows, limited } = buildConflictDiff(current.join('\n'), saved.join('\n'));
+    // Before: about 1.9 seconds for this 455 KB file on an M-series Mac.
+    expect(performance.now() - started).toBeLessThan(300);
+    expect(limited).toBe(false);
+    expect(rows).toHaveLength(200);
+    expect(rows.every(row => row.current?.changed && row.saved?.changed)).toBe(true);
+});

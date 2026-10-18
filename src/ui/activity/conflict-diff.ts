@@ -13,15 +13,18 @@ export interface ConflictDiffRow { current?: ConflictDiffLine; saved?: ConflictD
 /** Pair replacements and reserve empty rows for additions/deletions. */
 export function buildConflictDiff(current: string, saved: string): { rows: ConflictDiffRow[]; limited: boolean } {
     const left = current.split('\n'), right = saved.split('\n');
-    const hunks = diffSequence(left, right);
+    // Bound both the line search and the total word highlighting on the UI thread.
+    const hunks = diffSequence(left, right, { timeout: 50 });
+    const wordDeadline = Date.now() + 50;
     const rows: ConflictDiffRow[] = [];
     let l = 0, r = 0;
     const append = (leftCount: number, rightCount: number, changed: boolean) => {
         for (let i = 0; i < Math.max(leftCount, rightCount); i++) {
             const a: ConflictDiffLine | undefined = i < leftCount ? { number: l + 1, text: left[l++]!, changed } : undefined;
             const b: ConflictDiffLine | undefined = i < rightCount ? { number: r + 1, text: right[r++]!, changed } : undefined;
-            if (changed && a && b && a.text.length + b.text.length <= 10_000) {
-                const words = diffWordsWithSpace(a.text, b.text, { maxEditLength: 500, timeout: 20 });
+            const wordTime = wordDeadline - Date.now();
+            if (changed && a && b && a.text.length + b.text.length <= 10_000 && wordTime > 0) {
+                const words = diffWordsWithSpace(a.text, b.text, { maxEditLength: 500, timeout: Math.min(20, wordTime) });
                 if (words) {
                     a.words = words.filter(word => !word.added).map(word => ({ text: word.value, changed: !!word.removed }));
                     b.words = words.filter(word => !word.removed).map(word => ({ text: word.value, changed: !!word.added }));
