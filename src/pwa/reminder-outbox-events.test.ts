@@ -51,16 +51,16 @@ it.each(['logout', 'dispose'] as const)('settles an already dispatched commit wi
 	expect(h.outbox.refresh).not.toHaveBeenCalled();
 });
 
-it('invalidates reads when a peer removes a command without a confirmation', () => {
+it('invalidates reads when a peer removes a command without a confirmation', async () => {
 	const h = harness();
 	h.storage('unrelated', null, 'value');
 	expect(h.beginLocalMutation).not.toHaveBeenCalled();
 	h.storage('pending', null, 'command');
 	expect(h.beginLocalMutation).toHaveBeenCalledOnce();
 	expect(h.finish).toHaveBeenCalledOnce();
-	expect(h.loadReminders).toHaveBeenCalledWith({ silent: true });
 	expect(h.setRecoveryChanges).toHaveBeenCalledWith([]);
 	expect(h.outbox.drain).toHaveBeenCalledOnce();
+	await vi.waitFor(() => expect(h.loadReminders).toHaveBeenCalledWith({ silent: true }));
 });
 
 it('detaches wakeups and storage listeners as a single subscription', () => {
@@ -89,4 +89,14 @@ it('applies a peer confirmation while hidden and reads the list once it is shown
 	expect(h.loadReminders).toHaveBeenCalledExactlyOnceWith({ silent: true });
 	h.page.dispatchEvent(new Event('visibilitychange'));
 	expect(h.loadReminders).toHaveBeenCalledOnce();
+});
+
+it('reads the list once for a peer save that confirms and removes its command', async () => {
+	const h = harness();
+	h.storage('pending', null, 'command');
+	h.storage('settled', 'receipt');
+	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledTimes(2));
+	await new Promise(resolve => setTimeout(resolve, 150));
+	// Before: one read per storage event.
+	expect(h.loadReminders).toHaveBeenCalledExactlyOnceWith({ silent: true });
 });

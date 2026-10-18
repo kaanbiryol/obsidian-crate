@@ -4,6 +4,8 @@ import type { createReminderOutbox } from './reminder-outbox';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { CachedReminderSnapshot, LoadReminders, ReminderRecord, ShowToast } from './types';
 
+const PEER_REFRESH_DELAY_MS = 100;
+
 /** Browser wakeups and peer confirmations share one subscription lifetime. */
 export function subscribeReminderOutboxEvents(options: {
 	isCurrent: () => boolean;
@@ -30,9 +32,15 @@ export function subscribeReminderOutboxEvents(options: {
 	// A hidden peer already applied the confirmed result. It defers the list read
 	// until it is shown, so one save does not download the list in every tab.
 	let refreshWhenVisible = false;
+	// One remote save arrives as a confirmation and a command removal; read once.
+	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 	const refreshList = () => {
 		if (page.visibilityState === 'hidden') { refreshWhenVisible = true; return; }
-		void options.current().loadReminders({ silent: true });
+		clearTimeout(refreshTimer);
+		refreshTimer = setTimeout(() => {
+			refreshTimer = undefined;
+			if (isCurrent()) void options.current().loadReminders({ silent: true });
+		}, PEER_REFRESH_DELAY_MS);
 	};
 	const visible = () => {
 		if (page.visibilityState !== 'visible') return;
@@ -71,6 +79,7 @@ export function subscribeReminderOutboxEvents(options: {
 	browser.addEventListener('storage', storageChanged);
 	return () => {
 		subscribed = false;
+		clearTimeout(refreshTimer);
 		browser.removeEventListener('online', resume);
 		page.removeEventListener('visibilitychange', visible);
 		browser.removeEventListener('storage', storageChanged);
