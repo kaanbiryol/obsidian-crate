@@ -12,7 +12,7 @@ export interface ReminderLookupStore {
 export function createReminderLookupStore(): ReminderLookupStore {
   let byId = new Map<string, IndexedReminder>();
   let byFile = new Map<string, IndexedReminder[]>();
-  let byProject = new Map<string, IndexedReminder[]>();
+  let projectCounts = new Map<string, number>();
 
   function addReminder(reminder: IndexedReminder): void {
     byId.set(reminder.id, reminder);
@@ -25,9 +25,7 @@ export function createReminderLookupStore(): ReminderLookupStore {
       return;
     }
 
-    const projectReminders = byProject.get(reminder.project) || [];
-    projectReminders.push(reminder);
-    byProject.set(reminder.project, projectReminders);
+    projectCounts.set(reminder.project, (projectCounts.get(reminder.project) ?? 0) + 1);
   }
 
   function removeReminderFromProject(reminder: IndexedReminder): void {
@@ -35,16 +33,11 @@ export function createReminderLookupStore(): ReminderLookupStore {
       return;
     }
 
-    const projectReminders = byProject.get(reminder.project);
-    if (!projectReminders) {
-      return;
-    }
-
-    const filtered = projectReminders.filter((existing) => existing.id !== reminder.id);
-    if (filtered.length > 0) {
-      byProject.set(reminder.project, filtered);
+    const count = projectCounts.get(reminder.project) ?? 0;
+    if (count > 1) {
+      projectCounts.set(reminder.project, count - 1);
     } else {
-      byProject.delete(reminder.project);
+      projectCounts.delete(reminder.project);
     }
   }
 
@@ -52,7 +45,7 @@ export function createReminderLookupStore(): ReminderLookupStore {
     rebuild(reminders: IndexedReminder[]) {
       byId = new Map();
       byFile = new Map();
-      byProject = new Map();
+      projectCounts = new Map();
 
       for (const reminder of reminders) {
         addReminder(reminder);
@@ -85,7 +78,7 @@ export function createReminderLookupStore(): ReminderLookupStore {
     },
 
     getProjects(discoveredProjects: Set<string>) {
-      return Array.from(new Set([...byProject.keys(), ...discoveredProjects])).sort();
+      return Array.from(new Set([...projectCounts.keys(), ...discoveredProjects])).sort();
     },
   };
 }
