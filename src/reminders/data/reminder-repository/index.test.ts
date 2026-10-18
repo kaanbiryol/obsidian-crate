@@ -84,7 +84,6 @@ describe('reminderRepository.create', () => {
 			filePath,
 			lineNumber: 2,
 			rawLine: '- [ ] Task A',
-			contentHash: 'hash',
 		};
 		const index = createIndex({
 			getById: (id: string) => {
@@ -190,7 +189,6 @@ describe('reminderRepository.update and today view', () => {
 			filePath: 'Reminders/Work.md',
 			lineNumber: 2,
 			rawLine: '- [ ] Task A every day',
-			contentHash: 'hash',
 		};
 		const index = createIndex({
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
@@ -225,7 +223,6 @@ describe('reminderRepository.update and today view', () => {
 				filePath: 'Reminders/Inbox.md',
 				lineNumber: 2,
 				rawLine: '- [ ] Active today',
-				contentHash: 'hash-a',
 				dueDate: '2026-01-10',
 			}],
 			getOverdue: () => [],
@@ -238,7 +235,6 @@ describe('reminderRepository.update and today view', () => {
 				filePath: 'Reminders/Inbox.md',
 				lineNumber: 3,
 				rawLine: '- [x] Done today',
-				contentHash: 'hash-b',
 				dueDate: '2026-01-10',
 			}],
 		});
@@ -260,7 +256,6 @@ describe('reminderRepository.update and today view', () => {
 			filePath: 'Reminders/Work.md',
 			lineNumber: 2,
 			rawLine: '- [ ] Task A',
-			contentHash: 'hash',
 		};
 		const index = createIndex({
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
@@ -297,7 +292,6 @@ describe('reminderRepository.update and today view', () => {
 			filePath: 'Reminders/Work.md',
 			lineNumber: 2,
 			rawLine: '- [x] Task A',
-			contentHash: 'hash',
 		};
 		const index = createIndex({
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
@@ -318,7 +312,7 @@ describe('reminderRepository.update and today view', () => {
 });
 
 it('rejects a stale modal update and delete even when the current index is fresh', async () => {
-  const original = { id: 'one', content: 'Original', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 1, rawLine: '- [ ] Original', contentHash: 'hash' } as IndexedReminder;
+  const original = { id: 'one', content: 'Original', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 1, rawLine: '- [ ] Original' } as IndexedReminder;
   const expectedRevision = await reminderRevision(toReminder(original));
   const index = createIndex({ getById: () => ({ ...original, content: 'Changed on another device' }) });
   const { writer, spies } = createWriter();
@@ -331,7 +325,7 @@ it('rejects a stale modal update and delete even when the current index is fresh
 
 it('keeps converted reminders identical until their indexed record changes', () => {
 	const record: IndexedReminder = { id: 'one', content: 'Task', priority: 4, completed: false, filePath: 'Reminders/A.md',
-		project: 'A', lineNumber: 0, rawLine: '- [ ] Task', contentHash: 'hash' };
+		project: 'A', lineNumber: 0, rawLine: '- [ ] Task' };
 	const repository = createReminderRepository(createIndex({ getAll: () => [record] }), {} as MarkdownWriter);
 	const first = repository.getAll()[0];
 	expect(repository.getAll()[0]).toBe(first);

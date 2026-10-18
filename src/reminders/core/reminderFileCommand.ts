@@ -15,7 +15,7 @@ export class ReminderCommandError extends Error {
 }
 type ScannedReminder = ReturnType<typeof scanReminderMarkdownContent>['reminders'][number];
 export async function reminderCommandPayload(reminder: ScannedReminder) {
-	const { rawLine: _rawLine, contentHash: _contentHash, ...value } = reminder;
+	const { rawLine: _rawLine, ...value } = reminder;
 	return { ...value, revision: await reminderRevision(reminder) };
 }
 

@@ -1,6 +1,7 @@
 import { TFile, type App } from 'obsidian';
 import { parseCheckboxLine } from '../utils/checkboxParser';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
+import { extractReminderId } from '../core/reminderIdentity';
 import { readVaultMarkdown } from './vault-markdown';
 
 export interface ReminderIdentityOwner { id: string; filePath: string }
@@ -14,11 +15,14 @@ export function addReminderIdentityOwners(owners: ReminderIdentityOwners, remind
 	}
 }
 
-function contentIds(content: string): Set<string> {
+/** Only lines whose marker is wanted are parsed; the marker alone rules out the rest. */
+function contentIds(content: string, wanted: (id: string) => boolean): Set<string> {
 	const ids = new Set<string>();
 	const lines = content.split('\n');
 	for (const index of markdownTaskContexts(lines).keys()) {
 		const line = lines[index]!;
+		const marker = extractReminderId(line);
+		if (!marker || !wanted(marker)) continue;
 		const parsed = parseCheckboxLine(line);
 		if (parsed?.reminderId && parsed.parsed.cleanContent.trim()) ids.add(parsed.reminderId);
 	}
@@ -33,7 +37,8 @@ export async function resolveReminderIdentityOwners(
 	owners: ReminderIdentityOwners,
 ): Promise<{ reservedIds: Set<string>; releasedOwners: ReminderIdentityOwner[]; isCurrent: () => boolean }> {
 	const candidates = new Map<string, Set<string>>();
-	for (const id of contentIds(content)) {
+	const ownedElsewhere = (id: string) => [...owners.get(id) ?? []].some(path => path !== filePath);
+	for (const id of contentIds(content, ownedElsewhere)) {
 		for (const ownerPath of owners.get(id) ?? []) {
 			if (ownerPath === filePath) continue;
 			const ids = candidates.get(ownerPath) ?? new Set<string>();
@@ -49,7 +54,7 @@ export async function resolveReminderIdentityOwners(
 		const owner = app.vault.getAbstractFileByPath(ownerPath);
 		observedFiles.set(ownerPath, owner instanceof TFile ? version(owner) : null);
 		// A failed read must fail the scan, never authorize replacing an identity.
-		const currentIds = owner instanceof TFile ? contentIds(await readVaultMarkdown(app, owner)) : new Set<string>();
+		const currentIds = owner instanceof TFile ? contentIds(await readVaultMarkdown(app, owner), id => ids.has(id)) : new Set<string>();
 		for (const id of ids) {
 			if (currentIds.has(id)) reservedIds.add(id);
 			else releasedOwners.push({ id, filePath: ownerPath });

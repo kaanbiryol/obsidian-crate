@@ -1,4 +1,4 @@
-import { parseCheckboxLine } from '../utils/checkboxParser';
+import { parseCheckboxLine, type ParsedCheckbox } from '../utils/checkboxParser';
 import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
 import { formatLocalDateKey } from '../utils/reminderDate';
 import { calculateFirstOccurrence } from '../utils/recurrenceCalculator';
@@ -8,9 +8,12 @@ import { setReminderIdMarker } from './reminderIdentity';
 import { recurrenceToText } from '../utils/rruleConverter';
 
 /** Resolve draft syntax once on the user's device before indexing/syncing it. */
-export function normalizeReminderScheduleLine(line: string): string {
+export function normalizeReminderScheduleLine(
+	line: string,
+	parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
+): string {
 	try {
-		parseCheckboxLine(line, { persisted: true });
+		parsePersisted(line);
 		return line;
 	} catch (error) {
 		if (!(error instanceof UnresolvedReminderScheduleError)) throw error;

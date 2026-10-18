@@ -11,7 +11,7 @@ vi.mock('../vaultScanner', () => ({
 const oldPath = 'Reminders/Old.md', newPath = 'Reminders/New.md';
 function reminder(filePath = oldPath): IndexedReminder {
   return { id: 'one', content: 'Task', priority: 4, completed: false, filePath,
-    project: filePath === oldPath ? 'Old' : 'New', lineNumber: 0, rawLine: '- [ ] Task', contentHash: 'hash' };
+    project: filePath === oldPath ? 'Old' : 'New', lineNumber: 0, rawLine: '- [ ] Task' };
 }
 function snapshot(reminders: IndexedReminder[]): ScanResult {
   return { reminders, issues: [], filesScanned: reminders.length, totalLines: reminders.length,

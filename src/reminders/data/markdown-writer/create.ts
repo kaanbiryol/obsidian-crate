@@ -1,6 +1,5 @@
 import { processVaultMarkdown } from '../vault-markdown';
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
-import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import { createReminderId } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
 import {
@@ -39,7 +38,6 @@ export async function createReminderInMarkdown(
     reminderId: stableReminderId,
   });
 
-  const contentHash = generateContentHash(content);
   const optimisticReminder: IndexedReminder = {
     id: stableReminderId,
     content,
@@ -53,7 +51,6 @@ export async function createReminderInMarkdown(
     filePath: file.path,
     lineNumber: -1,
     rawLine: mutation.checkboxLine,
-    contentHash,
   };
 
   context.index.applyOptimisticCreate(optimisticReminder);

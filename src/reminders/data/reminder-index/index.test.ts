@@ -41,7 +41,6 @@ function makeReminder(overrides: Partial<IndexedReminder>): IndexedReminder {
     filePath: overrides.filePath || 'Reminders/Work.md',
     lineNumber: overrides.lineNumber ?? 0,
     rawLine: overrides.rawLine || '- [ ] Task',
-    contentHash: overrides.contentHash || 'hash',
   };
 }
 

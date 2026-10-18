@@ -1,6 +1,5 @@
 import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
 import { processVaultMarkdown } from '../vault-markdown';
-import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
 import {
@@ -90,7 +89,6 @@ export async function updateReminderInMarkdown(
       filePath: newFile.path,
       lineNumber: -1,
       rawLine: movedMutation.checkboxLine,
-      contentHash: generateContentHash(movedMutation.content),
     };
 
     context.index.applyOptimisticUpdate(reminder.id, movedReminder);

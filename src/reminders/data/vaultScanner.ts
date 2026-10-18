@@ -15,7 +15,7 @@ import {
   scanReminderMarkdownContent,
 } from "@/reminders/core/markdownScan";
 import { createReminderId, setReminderIdMarker } from "@/reminders/core/reminderIdentity";
-import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
+import { createPersistedCheckboxParses, parseCheckboxLine, type ParsedCheckbox } from "@/reminders/utils/checkboxParser";
 import { createLogger } from "@/reminders/utils/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
@@ -71,6 +71,7 @@ function createUniqueReminderId(usedIds: Set<string>): string {
 export function normalizeReminderIds(
   content: string,
   reservedIds: ReadonlySet<string> = new Set(),
+  parsePersisted?: (line: string) => ParsedCheckbox | null,
 ): ReminderIdNormalizationResult {
   const lines = content.split("\n");
   const usedIds = new Set(reservedIds);
@@ -87,7 +88,7 @@ export function normalizeReminderIds(
     const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
       ? parsed.reminderId : createUniqueReminderId(usedIds);
     usedIds.add(reminderId);
-    const normalized = setReminderIdMarker(normalizeReminderScheduleLine(line), reminderId);
+    const normalized = setReminderIdMarker(normalizeReminderScheduleLine(line, parsePersisted), reminderId);
     if (normalized !== line) {
       lines[index] = normalized;
       remindersUpdated++;
@@ -170,6 +171,8 @@ export async function scanFile(
   try {
     const originalContent = await readVaultMarkdown(app, file);
     if (signal?.aborted) return cancelled;
+    // Schedule normalization and the scan below parse the same unchanged lines.
+    const parses = createPersistedCheckboxParses();
     const deferred = (): FileScanResult => ({
       filePath,
       ...scanReminderMarkdownContent(filePath, originalContent, remindersFolderPath, { skipUnresolvedSchedules: true }),
@@ -181,7 +184,7 @@ export async function scanFile(
     const currentReservedIds = new Set([...reservedIds, ...(ownership?.reservedIds ?? [])]);
     if (currentReservedIds.size && shouldDeferCollisionRepair()) return deferred();
     if (ownership && !ownership.isCurrent()) return deferred();
-    let normalized = normalizeReminderIds(originalContent, currentReservedIds);
+    let normalized = normalizeReminderIds(originalContent, currentReservedIds, parses.remember);
     if (normalized.remindersUpdated > 0) {
       let remindersUpdated = 0;
       let targetChanged = false;
@@ -194,7 +197,7 @@ export async function scanFile(
         }
         if (signal?.aborted || shouldDeferNormalization() || currentReservedIds.size && shouldDeferCollisionRepair()
           || ownership && !ownership.isCurrent()) return currentContent;
-        const currentNormalization = normalizeReminderIds(currentContent, currentReservedIds);
+        const currentNormalization = normalizeReminderIds(currentContent, currentReservedIds, parses.remember);
         remindersUpdated = currentNormalization.remindersUpdated;
         return currentNormalization.content;
       });
@@ -207,7 +210,7 @@ export async function scanFile(
     if (signal?.aborted) return cancelled;
     if (shouldDeferNormalization() || currentReservedIds.size && shouldDeferCollisionRepair()
       || ownership && !ownership.isCurrent()) return deferred();
-    const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath);
+    const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath, { parsePersisted: parses.take });
 
     return {
       filePath,

@@ -13,7 +13,6 @@ export interface RemoteReminderRecord {
 	filePath: string;
 	lineNumber: number;
 	rawLine: string;
-	contentHash: string;
 }
 
 export interface ReminderMutationWorkspace {

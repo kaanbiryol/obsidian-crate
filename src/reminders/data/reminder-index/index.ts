@@ -40,7 +40,6 @@ export interface IndexedReminder {
   filePath: string;
   lineNumber: number;
   rawLine: string;
-  contentHash: string;
 }
 
 export interface ReminderIndex {

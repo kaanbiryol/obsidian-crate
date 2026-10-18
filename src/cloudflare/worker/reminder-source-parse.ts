@@ -36,7 +36,7 @@ export function parseReminderSource(path: string, content: string | ArrayBuffer,
 				if (item.notification.vaultId !== packet.descriptor.vaultId || item.notification.scopeId !== packet.descriptor.scopeId) throw new Error('Notification scope mismatch');
 				return { id: item.id, completed: item.completed, dueDate: item.dueDate, dueDatetime: item.dueDatetime,
 					content: ENCRYPTED_NOTIFICATION_PREFIX + JSON.stringify(item.notification), project: '',
-					priority: 4, filePath: path, lineNumber: 0, rawLine: '', contentHash: '' };
+					priority: 4, filePath: path, lineNumber: 0, rawLine: '' };
 			}) };
 		} catch { return { reminders: [], issue: 'Encrypted reminder scheduling metadata is invalid. Sync this note from an unlocked device.' }; }
 	}

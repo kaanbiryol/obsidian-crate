@@ -13,7 +13,7 @@ afterEach(() => {
 
 function reminder(dates: Partial<IndexedReminder>): IndexedReminder {
   return { id: 'task', content: 'Task', completed: false, priority: 4, project: 'Inbox',
-    filePath: 'Reminders/Inbox.md', lineNumber: 0, rawLine: '- [ ] Task', contentHash: 'hash', ...dates };
+    filePath: 'Reminders/Inbox.md', lineNumber: 0, rawLine: '- [ ] Task', ...dates };
 }
 
 it.each([

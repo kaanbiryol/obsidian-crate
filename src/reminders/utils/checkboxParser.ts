@@ -80,6 +80,28 @@ export function parseCheckboxLine(line: string, options: { persisted?: boolean }
 }
 
 /**
+ * Share the persisted parse of a line between schedule normalization and the
+ * scan that follows it. Each remembered result is handed out once, so identical
+ * lines never share parsed objects; failures are not remembered.
+ */
+export function createPersistedCheckboxParses() {
+  const remembered = new Map<string, ParsedCheckbox | null>();
+  return {
+    remember: (line: string): ParsedCheckbox | null => {
+      const parsed = parseCheckboxLine(line, { persisted: true });
+      remembered.set(line, parsed);
+      return parsed;
+    },
+    take: (line: string): ParsedCheckbox | null => {
+      if (!remembered.has(line)) return parseCheckboxLine(line, { persisted: true });
+      const parsed = remembered.get(line)!;
+      remembered.delete(line);
+      return parsed;
+    },
+  };
+}
+
+/**
  * Rebuild a checkbox line with updated data
  *
  * @param indentation - Leading whitespace
@@ -139,21 +161,3 @@ export function rebuildCheckboxLine(
  * @param filePath - Full file path (e.g., "folder/My Notes.md")
  * @returns Project name (e.g., "My Notes")
  */
-/**
- * Generate a deterministic content hash for tracking line identity
- * Used to detect when lines are moved vs edited
- */
-export function generateContentHash(content: string, options: { persisted?: boolean } = {}): string {
-  const withoutMetadata = stripReminderIdMarker(content);
-  const parsedCheckbox = parseCheckboxLine(withoutMetadata, options);
-  const hashSource = parsedCheckbox ? parsedCheckbox.rawContent : withoutMetadata;
-  // Simple hash based on cleaned content (ignoring dates/priority which change)
-  const cleaned = parseReminderContent(hashSource, undefined, options).cleanContent.toLowerCase().trim();
-  let hash = 0;
-  for (let i = 0; i < cleaned.length; i++) {
-    const char = cleaned.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(36);
-}
