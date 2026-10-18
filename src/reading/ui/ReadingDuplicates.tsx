@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/ui/shared/Button';
 import type { ReadingItem } from '../core/model';
 import { duplicateReadingGroups } from '../core/duplicates';
@@ -7,7 +7,7 @@ export function ReadingDuplicates({ items, onOpen, onEnrich, busy }: {
 	items: ReadingItem[]; onOpen: (item: ReadingItem) => void;
 	onEnrich?: (target: ReadingItem, source: ReadingItem) => void; busy: boolean;
 }) {
-	const groups = duplicateReadingGroups(items);
+	const groups = useMemo(() => duplicateReadingGroups(items), [items]);
 	if (!groups.length) return null;
 	return <details className="crate-reading__notice"><summary>Review {groups.length} duplicate {groups.length === 1 ? 'source' : 'sources'}</summary>
 		<p>These notes save the same source. Open each to compare. In Obsidian, move any extra note outside Reading after keeping the content you want.</p>

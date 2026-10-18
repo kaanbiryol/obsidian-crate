@@ -256,3 +256,24 @@ it('reuses a clipped video for equivalent URL saves and safely enriches a bookma
   expect((await other.library.read(bookmark)).markdown).toContain('**0:42**');
   await expect(other.library.enrich(bookmark, clip)).rejects.toThrow('empty bookmark');
 });
+
+it('does not republish an unchanged library after a rescan', async () => {
+	const note = createReadingNote({ id: 'a1b2c3d4-5678-4abc-9def-123456789abc', url: 'https://example.com/article', savedAt: '2026-09-28T00:00:00Z' });
+	let revision = 'one';
+	const read = vi.fn(async () => note);
+	const vault: ReadingVault = { files: () => [{ path: 'Reading/Article.md', size: note.length, modifiedAt: 1, revision }],
+		read, process: vi.fn(), create: vi.fn() };
+	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal, () => false);
+	const published = vi.fn();
+	library.subscribe(published);
+	await library.refresh();
+	const first = library.getSnapshot();
+	// Before: every rescan published a new snapshot with new item objects.
+	await library.refresh(); await library.refresh();
+	expect(published).toHaveBeenCalledOnce();
+	expect(library.getSnapshot()).toBe(first);
+	expect(read).toHaveBeenCalledOnce();
+	revision = 'two';
+	await library.refresh();
+	expect(published).toHaveBeenCalledTimes(2);
+});

@@ -34,7 +34,8 @@ export class ReadingLibrary {
 	private captures = new Map<string, Promise<void>>();
 	private captureErrors = new Map<string, string>();
 	private captureQueue: Promise<void> = Promise.resolve();
-	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null }>();
+	// The cached item keeps its identity while the note is unchanged.
+	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null; item?: ReadingItem }>();
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
 		private canAdopt: () => boolean = () => true, startAfter: Promise<void> = Promise.resolve()) {
 		this.queue = startAfter;
@@ -79,7 +80,7 @@ export class ReadingLibrary {
 				if (file.size > MAX_READING_BYTES) { issues.push({ path: file.path, message: 'File exceeds the 1 MB reading limit.' }); continue; }
 				const cached = this.cache.get(file.path);
 				if (cached && file.revision && cached.revision === file.revision) {
-					if (cached.metadata) items.push({ ...cached.metadata, path: file.path });
+					if (cached.metadata) items.push(cached.item ??= { ...cached.metadata, path: file.path });
 					continue;
 				}
 				try {
@@ -96,8 +97,9 @@ export class ReadingLibrary {
 					}
 					const metadata = parseReadingNote(content);
 					if (metadata) {
-						items.push({ ...metadata, path: file.path });
-						if (file.revision) this.cache.set(file.path, { revision: file.revision, metadata });
+						const item = { ...metadata, path: file.path };
+						items.push(item);
+						if (file.revision) this.cache.set(file.path, { revision: file.revision, metadata, item });
 					}
 					else issues.push({ path: file.path, message: 'Note is waiting for import after sync.' });
 				} catch (error) {
@@ -122,7 +124,13 @@ export class ReadingLibrary {
 				return false;
 			});
 			unique.sort((a, b) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id));
-			this.publish({ items: unique, issues, loading: false, error: null });
+			// Rescans after unrelated changes find the same notes; keep listeners quiet.
+			const previous = this.snapshot;
+			if (previous.loading || previous.error !== null || previous.items.length !== unique.length || previous.issues.length !== issues.length
+				|| previous.items.some((item, index) => item !== unique[index])
+				|| previous.issues.some((issue, index) => issue.path !== issues[index]!.path || issue.message !== issues[index]!.message)) {
+				this.publish({ items: unique, issues, loading: false, error: null });
+			}
 		} catch (error) {
 			if (this.closed || this.signal.aborted) return;
 			this.publish({ ...this.snapshot, loading: false, error: error instanceof Error ? error.message : 'Could not load reading notes.' });

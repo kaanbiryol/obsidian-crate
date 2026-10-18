@@ -30,10 +30,12 @@ export function stopReading(plugin: CratePlugin): void {
 }
 export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> { await stopping.get(plugin); }
 
+// Compiled patterns are keyed by their text, so one cache serves every check.
+const readingPatternCache = new Map<string, RegExp>();
 function allowedReadingPath(plugin: CratePlugin, path: string): boolean {
 	return !shouldIgnoreSyncPath(path, {
 		ignoredDirPrefixes: [...plugin.settings.ignorePatterns.filter(pattern => pattern.endsWith('/')), `${plugin.app.vault.configDir}/`],
-		ignorePatterns: plugin.settings.ignorePatterns, patternCache: new Map(),
+		ignorePatterns: plugin.settings.ignorePatterns, patternCache: readingPatternCache,
 	});
 }
 
