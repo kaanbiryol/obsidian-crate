@@ -45,6 +45,16 @@ it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens
   expect(process).toHaveBeenCalledTimes(boundary === 'read' ? 0 : 1);
 });
 
+it('reads a changed reminder note once per rescan', async () => {
+  const file = makeMockFile('Reminders/Inbox.md');
+  const read = vi.fn(async () => '- [ ] Task <!-- crate-id:rem-1 -->');
+  const index = createReminderIndex(withBinaryReads({ vault: { read } } as unknown as App), 'Reminders');
+  await index.rescanFile(file);
+  // Before: once for the change digest and again for the scan.
+  expect(read).toHaveBeenCalledOnce();
+  expect(index.getByFile(file.path).map(reminder => reminder.id)).toEqual(['rem-1']);
+});
+
 describe('vaultScanner', () => {
 	it.each(['file', 'vault'] as const)('preserves description diagnostics through a %s scan and index refresh', async mode => {
 		const file = makeMockFile('Reminders/Inbox.md');

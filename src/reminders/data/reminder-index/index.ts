@@ -255,7 +255,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
           return;
         }
         // A read failure here is reported by the full scan below.
-        const digest = await readVaultMarkdown(app, file).then(contentDigest, () => undefined);
+        const content = await readVaultMarkdown(app, file).catch(() => undefined);
+        const digest = content === undefined ? undefined : await contentDigest(content);
         if (signal?.aborted || !scan.current || file.path !== scan.path) return;
         if (digest && scannedDigests.get(filePath) === digest && !sourceIssues.has(filePath)) return;
 
@@ -265,7 +266,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
         addReminderIdentityOwners(identityOwners, reminders);
         addReminderIdentityOwners(identityOwners, ambiguousOwners);
         const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners,
-          () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath), shouldDeferCollisionRepair);
+          () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath), shouldDeferCollisionRepair, content);
         if (signal?.aborted || !scan.current || file.path !== scan.path) return;
         if (result.deferred) { deferredPaths.add(filePath); return; }
         if (result.error) {

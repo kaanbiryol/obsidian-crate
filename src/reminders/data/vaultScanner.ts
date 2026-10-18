@@ -161,6 +161,8 @@ export async function scanFile(
   identityOwners?: ReminderIdentityOwners,
   shouldDeferNormalization: (filePath?: string) => boolean = () => false,
   shouldDeferCollisionRepair = () => false,
+  /** Content the caller just read; writes still verify it as their preimage. */
+  preread?: string,
 ): Promise<FileScanResult> {
   const filePath = file.path;
   const cancelled = { filePath, reminders: [], lineCount: 0 };
@@ -169,7 +171,7 @@ export async function scanFile(
   if (signal?.aborted || isConflictFile(filePath)) return cancelled;
 
   try {
-    const originalContent = await readVaultMarkdown(app, file);
+    const originalContent = preread ?? await readVaultMarkdown(app, file);
     if (signal?.aborted) return cancelled;
     // Schedule normalization and the scan below parse the same unchanged lines.
     const parses = createPersistedCheckboxParses();
