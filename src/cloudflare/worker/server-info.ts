@@ -13,7 +13,7 @@ import { corsResponse } from './cors';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
 import { readEncryptionState } from './encryption-state';
-import { ENCRYPTION_CAPABILITY, ENCRYPTION_PROTOCOL, READING_ENCRYPTION_CAPABILITY, ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../../encryption/server-state';
+import { ENCRYPTION_CAPABILITY, READING_ENCRYPTION_CAPABILITY, ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../../encryption/server-state';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 
@@ -37,7 +37,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
     INITIAL_IMPORT_CAPABILITY,
 		BATCH_ASSET_UPLOAD_CAPABILITY,
 		BULK_NEW_UPLOAD_CAPABILITY,
-		'sync-v3',
+		'sync-v1',
 		'file-revision-deletes',
 		'upload-operation-receipts',
 		'restore-operation-receipts',
@@ -62,8 +62,7 @@ export async function handleServerInfo(env: Env): Promise<Response> {
 		throw error;
 	});
 	return corsResponse({ ...CRATE_SERVER_INFO,
-		...(encryption ? { protocol: { ...CRATE_PLUGIN_PROTOCOL, oldestCompatible: ENCRYPTION_PROTOCOL },
-			capabilities: CRATE_SERVER_INFO.capabilities.filter(value => value !== INITIAL_IMPORT_CAPABILITY && value !== BULK_NEW_UPLOAD_CAPABILITY) } : {}),
+		...(encryption ? { capabilities: CRATE_SERVER_INFO.capabilities.filter(value => value !== INITIAL_IMPORT_CAPABILITY && value !== BULK_NEW_UPLOAD_CAPABILITY) } : {}),
 		shortcut: { version: READING_SHORTCUT_CONTRACT.version, revision: READING_SHORTCUT_CONTRACT.revision, minimumRevision: READING_SHORTCUT_CONTRACT.minimumRevision }, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT,
 		reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

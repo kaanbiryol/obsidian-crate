@@ -46,7 +46,7 @@ try {
   const type = process.env.CRATE_TEST_BROWSER === 'webkit' ? webkit : chromium;
   browser = await type.launch();
   await verifyReadingPlaintextTransition({ t, browser, origin, owner, bundle, recovery });
-  const headers = { Authorization: `Bearer ${owner.token}`, 'Content-Type': 'application/json', 'X-Crate-Protocol': '2', 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
+  const headers = { Authorization: `Bearer ${owner.token}`, 'Content-Type': 'application/json', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) };
   const path = 'Reading/Article.md';
   const note = t.createReadingNote({ id: '3eecb772-ac6a-4890-9dea-1e989849c920', url: 'https://example.invalid/private-reading', title: 'Encrypted Reading article', savedAt: new Date().toISOString() })
     .replace('extraction_status: "pending"', 'extraction_status: "ready"')

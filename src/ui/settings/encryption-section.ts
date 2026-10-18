@@ -8,7 +8,7 @@ import { loadEncryptionKeys, saveEncryptionKeys } from '../../plugin/encryption-
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
 import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../sync/encryption-conversion';
-import { isReadingScopeExtension, READING_ENCRYPTION_CAPABILITY, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
+import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { errorMessage } from '../../plugin/logger';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { normalizeWorkerUrl } from '../../sync/worker-url';
@@ -163,7 +163,6 @@ class EncryptionModal extends SharedModal {
 		let bundle = keys;
 		let recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
 		if (!bundle) {
-			if (!(await this.http.getServerInfo()).capabilities.includes(READING_ENCRYPTION_CAPABILITY)) throw new Error('Update your Crate server before encrypting Reading.');
 			bundle = createVaultKeyBundle();
 			const { folders, readingFolder } = await this.http.requestJson<{ folders: string[]; readingFolder?: string | null }>('/encryption/folders');
 			for (const folder of new Set([...folders, this.plugin.remindersSettings.remindersFolderPath])) bundle = addReminderScope(bundle, folder);
@@ -240,7 +239,6 @@ class EncryptionModal extends SharedModal {
         try {
           const recovery = this.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RECOVERY);
           if (!recovery) throw new Error('Recover this vault with your saved recovery key first.');
-          if (!(await this.http.getServerInfo()).capabilities.includes(READING_ENCRYPTION_CAPABILITY)) throw new Error('Update your Crate server before encrypting Reading.');
           const bundle = addReminderScope(keys, this.plugin.settings.reading.folderPath, 'reading');
           await this.plugin.syncRuntime.runEncryptionSetup(async () => {
             this.assertCurrentConnection(); saveEncryptionKeys(this.plugin.secretStorage, bundle, recovery);

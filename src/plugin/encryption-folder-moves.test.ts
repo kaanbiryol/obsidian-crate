@@ -35,15 +35,14 @@ async function setup() {
 it('preserves ordered offline moves and applies them after reconnecting', async () => {
   const h = await setup();
   expect(queueEncryptedFolderMove(h.plugin, 'Reminders', 'Tasks')).toBe(true);
-  mocks.info.mockRejectedValueOnce(new Error('offline'));
+  mocks.convert.mockRejectedValueOnce(new Error('offline'));
   await expect(resumeEncryptedFolderMoves(h.plugin)).rejects.toThrow('offline');
-  expect(loadEncryptionKeys(h.plugin.secretStorage)).toEqual(h.keys);
   expect(queueEncryptedFolderMove(h.plugin, 'Tasks', 'Personal/Tasks')).toBe(true);
   await resumeEncryptedFolderMoves(h.plugin);
   expect(loadEncryptionKeys(h.plugin.secretStorage)?.scopes[0]?.folderPath).toBe('Personal/Tasks');
   expect(h.plugin.remindersSettings.remindersFolderPath).toBe('Personal/Tasks');
   expect(h.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)).toBeNull();
-  expect(mocks.convert).toHaveBeenCalledTimes(2);
+  expect(mocks.convert).toHaveBeenCalledTimes(3);
 });
 it('gives a folder selection a new access identity and keeps it across later renames', async () => {
   const h = await setup();
@@ -108,16 +107,10 @@ it('refuses a saved target belonging to a different vault before replacing this 
   expect(loadEncryptionKeys(h.plugin.secretStorage)).toEqual(h.keys);
   expect(mocks.convert).not.toHaveBeenCalled();
 });
-it('does not change keys on unsupported servers and does not journal ordinary file renames', async () => {
+it('does not journal ordinary file renames', async () => {
   const h = await setup();
   expect(queueEncryptedFolderMove(h.plugin, 'Reminders/Note.md', 'Reminders/Renamed.md')).toBe(false);
   expect(h.fake.syncRuntime.destroy).not.toHaveBeenCalled();
-  queueEncryptedFolderMove(h.plugin, 'Reading', 'Articles');
-  mocks.info.mockResolvedValue({ capabilities: [] });
-  await expect(resumeEncryptedFolderMoves(h.plugin)).rejects.toThrow('Update your Crate server');
-  expect(loadEncryptionKeys(h.plugin.secretStorage)).toEqual(h.keys);
-  expect(mocks.convert).not.toHaveBeenCalled();
-  expect(h.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_FOLDER_MOVES)).not.toBeNull();
 });
 
 it.each(['initialization', 'reminders'])('drains a rename arriving during %s before resolving', async phase => {

@@ -38,10 +38,6 @@ export async function runEncryptionReset(
 	}
 	if (!reset) {
 		if (!state) throw new Error('No encryption reset is pending');
-		const probe = new WorkerApiHttpClient(expected.workerUrl, expected.authToken);
-		if (signal) probe.setAbortSignal(signal);
-		if (!(await probe.getServerInfo()).capabilities.includes('e2ee-reset-v1')) throw new Error('Update your Crate server before turning encryption off');
-		verify();
 		if (expected.workerUrl !== settings.workerUrl || expected.authToken !== secretStorage.get(SECRET_KEYS.AUTH_TOKEN)) throw new Error('The server connection changed. Reopen Manage encryption.');
 		reset = createEncryptionReset(settings.workerUrl, expected.authToken, state, settings.automaticSync);
 		saveEncryptionReset(secretStorage, reset);

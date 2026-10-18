@@ -29,21 +29,19 @@ async function fixture() {
   const controller = new AbortController();
   return { bundle, state, plugin, values, context, controller };
 }
-it('checks capability once and releases only the configured browser scopes', async () => {
+it('releases only the configured browser scopes', async () => {
   const f = await fixture();
   const session = await openWebAppPairing(f.plugin, f.controller.signal);
   expect(mocks.state).not.toHaveBeenCalled();
   await session.transport.read(); await session.transport.read();
-  expect(mocks.info).toHaveBeenCalledOnce();
   const payload = await session.payload(f.context);
   expect(payload.grants.map(grant => grant.scope.folderPath)).toEqual(['Reminders','Reading']);
   expect(JSON.stringify(payload)).not.toContain(f.bundle.vault.secret);
   expect(JSON.stringify(payload)).not.toContain(f.bundle.scopes[2]!.data.secret);
 });
-it.each(['locked', 'old server', 'changed token', 'changed folder', 'changed keys', 'closed', 'wrong origin', 'new generation', 'resetting'] as const)('refuses key release for %s', async problem => {
+it.each(['locked', 'changed token', 'changed folder', 'changed keys', 'closed', 'wrong origin', 'new generation', 'resetting'] as const)('refuses key release for %s', async problem => {
   const f = await fixture();
   if (problem === 'locked') f.values.delete(SECRET_KEYS.ENCRYPTION_KEYS);
-  if (problem === 'old server') mocks.info.mockResolvedValue({capabilities:[]});
   const work = async () => {
     const session = await openWebAppPairing(f.plugin, f.controller.signal);
     if (problem === 'changed token') f.values.set(SECRET_KEYS.AUTH_TOKEN, 'other');

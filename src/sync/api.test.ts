@@ -400,7 +400,7 @@ describe('SyncApiClient', () => {
 describe('asset batch negotiation', () => {
   beforeEach(() => { vi.stubGlobal('window', { setTimeout, clearTimeout }); });
   afterEach(() => { vi.unstubAllGlobals(); });
-it.each([false, true, 'bulk'] as const)('negotiates larger asset uploads with server support=%s', async supported => {
+it.each([true, 'bulk'] as const)('negotiates larger asset uploads with server support=%s', async supported => {
   const batches: Array<Array<{ path: string; operationId: string }>> = [];
   const transport: ApiHttpTransport = async request => {
     let value: unknown;
@@ -420,7 +420,7 @@ it.each([false, true, 'bulk'] as const)('negotiates larger asset uploads with se
     path: `${index}.svg`, content: btoa('x'), size: 1, hash: 'h', contentType: 'image/svg+xml', expectedHash: null,
   })));
   expect(response.results).toHaveLength(8);
-  expect(batches.map(batch => batch.length)).toEqual(supported === 'bulk' ? [8] : supported ? [4, 4] : [3, 3, 2]);
+  expect(batches.map(batch => batch.length)).toEqual(supported === 'bulk' ? [8] : [4, 4]);
   expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(8);
 });
 

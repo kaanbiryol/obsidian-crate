@@ -1,5 +1,5 @@
 import { portablePathKey } from './portable-path';
-export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v2';
+export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v1';
 // Initial imports omit the history/projection statements used by normal uploads.
 // Leave room for authentication, staging and cleanup within D1's 50-query limit.
 export const INITIAL_IMPORT_MAX_FILES = 32;

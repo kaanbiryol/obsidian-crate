@@ -15,7 +15,7 @@ const remote = vi.hoisted(() => vi.fn<(_reset: EncryptionReset) => Promise<void>
 vi.mock('./encryption-reset', async importOriginal => ({ ...await importOriginal<typeof import('./encryption-reset')>(), resetRemoteEncryption: remote }));
 beforeEach(() => {
 	remote.mockReset().mockResolvedValue(undefined);
-	vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ service: 'crate', serverVersion: 'test', protocol: { current: 2, oldestCompatible: 2 }, capabilities: ['e2ee-reset-v1'] });
+	vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-reset-v1'] });
 	vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 	vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(createEmptySyncResult());
 	vi.spyOn(SyncEngine.prototype, 'forceFullSync').mockRejectedValue(new Error('Reset must never force overwrite'));
@@ -149,31 +149,6 @@ it('keeps the upload checkpoint when shutdown interrupts reset initialization', 
 	expect(loadEncryptionReset(h.secretStorage as never)?.phase).toBe('upload');
 	expect(h.settings.automaticSync).toBe(false);
 	expect(h.runtime.getApiClient()).toBeNull();
-});
-
-it('leaves sync and credentials intact when the server does not support reset', async () => {
-	const h = await setup();
-	vi.mocked(WorkerApiHttpClient.prototype.getServerInfo).mockResolvedValue({ service: 'crate', serverVersion: 'old', protocol: { current: 2, oldestCompatible: 2 }, capabilities: ['e2ee-v1'] });
-	const destroy = vi.spyOn(h.runtime, 'destroy');
-	await expect(h.run()).rejects.toThrow('Update your Crate server');
-	expect(h.values.has(SECRET_KEYS.ENCRYPTION_RESET)).toBe(false);
-	expect(h.values.has(SECRET_KEYS.ENCRYPTION_KEYS)).toBe(true);
-	expect(h.settings.automaticSync).toBe(true);
-	expect(destroy).not.toHaveBeenCalled();
-	expect(remote).not.toHaveBeenCalled();
-});
-
-it('does not start a reset after being stopped during the server capability check', async () => {
-	const h = await setup();
-	const probe = createDeferred<Awaited<ReturnType<WorkerApiHttpClient['getServerInfo']>>>();
-	vi.mocked(WorkerApiHttpClient.prototype.getServerInfo).mockReturnValueOnce(probe.promise);
-	const running = h.run();
-	await vi.waitFor(() => expect(WorkerApiHttpClient.prototype.getServerInfo).toHaveBeenCalled());
-	h.runtime.destroy();
-	probe.resolve({ service: 'crate', serverVersion: 'new', protocol: { current: 2, oldestCompatible: 2 }, capabilities: ['e2ee-reset-v1'] });
-	await expect(running).rejects.toMatchObject({ name: 'AbortError' });
-	expect(h.values.has(SECRET_KEYS.ENCRYPTION_RESET)).toBe(false);
-	expect(remote).not.toHaveBeenCalled();
 });
 
 it('releases a definitively rejected start so the device can disconnect and reconnect', async () => {

@@ -1,5 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol';
-import { ENCRYPTION_PROTOCOL, type EncryptionServerState } from '../../encryption/server-state';
+import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './cors';
 import { EncryptionStateError } from './encryption-state';
 import { shortcutCompatibility, type ShortcutTransport } from './reading/shortcut-transport';
@@ -29,7 +29,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 	// Feature visibility is authenticated public policy, not private vault content.
 	if (encryption && !(['/features', '/reading/encryption', '/reading/session'].includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
 		const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
-		if (!Number.isInteger(protocol) || protocol < ENCRYPTION_PROTOCOL || protocol > CRATE_PLUGIN_PROTOCOL.current) {
+		if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 			throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
 		}
 		if (request.headers.get('X-Crate-Encryption-Vault') !== encryption.vaultId

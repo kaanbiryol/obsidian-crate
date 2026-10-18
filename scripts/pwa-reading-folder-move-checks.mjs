@@ -39,7 +39,7 @@ export async function verifyReadingFolderMove({ t, page, origin, owner, bundle, 
       `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${crypto.randomUUID()}`);
     const old = (await api.getFileMetadata([oldPath])).files[oldPath];
     await api.deleteFile(oldPath, old.hash, old.revision);
-    assert.equal((await fetch(origin + '/reading/encryption', { headers: { Authorization: `Bearer ${oldSession.token}`, 'X-Crate-Protocol': '2' } })).status, 200);
+    assert.equal((await fetch(origin + '/reading/encryption', { headers: { Authorization: `Bearer ${oldSession.token}`, 'X-Crate-Protocol': '1' } })).status, 200);
     // The same open PWA follows the rename on refresh, without another link/key.
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();

@@ -1,4 +1,4 @@
-import { SHARED_CHECKPOINT_CAPABILITY, parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
+import { parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { isRecord } from '../../platform/validation';
 import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
@@ -10,15 +10,12 @@ export class SharedHistoryApi {
     constructor(private http: WorkerApiHttpClient) {}
     private encryption?: EncryptedFiles;
     setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
-    async supported(): Promise<boolean> { return (await this.http.getServerInfo()).capabilities.includes(SHARED_CHECKPOINT_CAPABILITY); }
     async save(): Promise<SharedCheckpoint | undefined> {
-        if (!await this.supported()) return undefined;
         const result: unknown = await this.http.requestJson('/sync/checkpoints', { method: 'POST', body: '{}' }, TRANSFER_TIMEOUT_MS);
         if (!isRecord(result)) throw new Error('Invalid shared checkpoint response');
         return parseSharedCheckpoint(result.checkpoint);
     }
     async list(): Promise<SharedCheckpoint[]> {
-        if (!await this.supported()) throw new Error('Update the Crate server to share history checkpoints across your devices.');
         return parseSharedCheckpointList(await this.http.requestJson('/sync/checkpoints'));
     }
     async load(id: string) {

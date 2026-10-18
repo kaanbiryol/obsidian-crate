@@ -6,10 +6,7 @@ import { getPluginLifecycleSignal } from './lifecycle-state';
 
 interface Features { reading: boolean; reminders: boolean; revision: string | null }
 function requestFeatures(plugin: CratePlugin, body?: unknown): Promise<Features> {
-  return serverRequest(plugin, '/features', body, {
-    timeout: 5_000,
-    capabilities: { 'shared-features-v1': 'Update your Crate server to share feature settings.' },
-  });
+  return serverRequest(plugin, '/features', body, { timeout: 5_000 });
 }
 const tasks = new WeakMap<CratePlugin, Promise<void>>();
 async function apply(plugin: CratePlugin, policy: Features, activate: boolean, assertCurrent: () => void): Promise<void> {

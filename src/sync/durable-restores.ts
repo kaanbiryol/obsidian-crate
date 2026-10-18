@@ -30,7 +30,7 @@ export class DurableRestores {
 		let intent = this.manifest.getRestoreIntents().find(item => item.request.storageKey === version.storage_key);
 		if (intent?.phase === 'committed') return;
 		const info = await this.transport.getServerInfo();
-		if (!info.capabilities.includes('restore-operation-receipts') || info.reminderOperationDay === undefined) {
+		if (info.reminderOperationDay === undefined) {
 			throw new Error('Update the Crate server before restoring files. This server cannot safely confirm restore retries.');
 		}
 		if (!intent) {

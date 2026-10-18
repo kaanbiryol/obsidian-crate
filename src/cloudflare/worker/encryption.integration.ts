@@ -139,7 +139,7 @@ it('resumes an R2 replacement before D1 reconciliation and protects retained his
 it('fences old clients and keeps scoped sessions away from vault keys, history and sibling files', async () => {
 	const { bundle, state } = await configure();
 	for (const [id, scope, folder] of [['root', 'vault', null], ['web', 'reminders', 'Reminders']] as const) await env.DB.prepare('INSERT INTO auth_tokens(id, token_hash, scope, folder_path) VALUES (?, ?, ?, ?)').bind(id, await sha256Hex(id), scope, folder).run();
-	const request = (path: string, token: string, encrypted = true, protocol = '2') => worker.fetch(new Request(`https://test${path}`, { headers: {
+	const request = (path: string, token: string, encrypted = true, protocol = '1') => worker.fetch(new Request(`https://test${path}`, { headers: {
 		Authorization: `Bearer ${token}`, 'X-Crate-Protocol': protocol, ...(encrypted ? { 'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation) } : {}),
 	} }), env);
 	expect((await request('/sync/manifest', 'root', false)).status).toBe(428);

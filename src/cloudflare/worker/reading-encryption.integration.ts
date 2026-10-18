@@ -38,7 +38,7 @@ async function setup(mode: 'active' | 'converting' = 'active', readingScope = tr
     env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','policy','revision')"),
     env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reading','Reading','policy')").bind(await sha256Hex('reader-token')),
   ]);
-  const headers = { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '2', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
+  const headers = { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
   const request = (path: string, body?: string) => worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', headers, body }), env);
   const attempts = new Map<string, unknown>(), requests: string[] = [];
   let loseReply = false;
@@ -98,7 +98,7 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 });
 it('allows scoped encryption discovery but rejects plaintext saves and sibling-folder access', async () => {
   const h = await setup();
-  const response = await worker.fetch(new Request('https://test/reading/encryption', { headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '2' } }), env);
+  const response = await worker.fetch(new Request('https://test/reading/encryption', { headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1' } }), env);
   expect(response.status).toBe(200); const metadata = await response.text(); expect(metadata).not.toContain(h.bundle.vault.id); expect(metadata).not.toContain(h.bundle.vault.secret);
   expect(JSON.parse(metadata)).toMatchObject({ encryption: { recovery: h.state.recovery } });
   expect((await h.request('/sync/manifest')).status).toBe(403);

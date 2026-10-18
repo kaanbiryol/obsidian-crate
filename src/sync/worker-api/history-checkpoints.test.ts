@@ -6,12 +6,6 @@ function harness(capabilities = [SHARED_CHECKPOINT_CAPABILITY]) {
     const http = { getServerInfo: vi.fn(async () => ({ capabilities })), requestJson: vi.fn(), requestBinary: vi.fn() };
     return { http, api: new SharedHistoryApi(http as never) };
 }
-it('preserves older-server sync while explaining that shared history needs an update', async () => {
-    const { http, api } = harness([]);
-    expect(await api.save()).toBeUndefined();
-    await expect(api.list()).rejects.toThrow('Update');
-    expect(http.requestJson).not.toHaveBeenCalled();
-});
 it('validates shared history instead of accepting incomplete inventories', async () => {
     const { http, api } = harness();
     http.requestJson.mockResolvedValue({ version: 1, checkpoint: { ...checkpoint, fileCount: 1 }, files: {} });

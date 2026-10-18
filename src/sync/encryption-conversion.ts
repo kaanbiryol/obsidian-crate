@@ -4,7 +4,7 @@ import { openFileMetadata, sealFile } from '../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE, type EncryptedFileDescriptor } from '../encryption/file-format';
 import { encryptJson } from '../encryption/envelope';
 import { createReminderProjection } from '../encryption/reminder-projection';
-import { createEncryptionState, validateEncryptionState, isReadingScopeExtension, isEncryptionScopeMove, ENCRYPTION_FOLDER_MOVES_CAPABILITY, READING_ENCRYPTION_CAPABILITY, type EncryptionServerState } from '../encryption/server-state';
+import { createEncryptionState, validateEncryptionState, isReadingScopeExtension, isEncryptionScopeMove, type EncryptionServerState } from '../encryption/server-state';
 import { sealRecoveryBundle, type VaultKeyBundle } from '../encryption/key-bundle';
 import { parseSharedCheckpointDocument } from '../protocol/history-checkpoints';
 import { prepareConversionFile, prepareConversionReceipt, type ConversionFile, type ConversionReceipt } from './encryption-conversion-content';
@@ -32,11 +32,9 @@ export function assertEncryptionKeys(state: EncryptionServerState, bundle: Vault
  * retains the first encrypted replacement and reconciles interrupted R2/D1 work. */
 export async function convertEncryptedVault(http: WorkerApiHttpClient, bundle: VaultKeyBundle, recoveryCode: string, progress: EncryptionProgress): Promise<void> {
 	progress('Preparing encrypted storage');
-	if (bundle.scopes.some(scope => scope.purpose === 'reading') && !(await http.getServerInfo()).capabilities.includes(READING_ENCRYPTION_CAPABILITY)) throw new Error('Update your Crate server before encrypting Reading.');
 	let state = await readServerEncryption(http);
 	const proposed = state && createEncryptionState(bundle, state.recovery);
 	const moving = state && proposed && isEncryptionScopeMove(state, proposed);
-	if (moving && !(await http.getServerInfo()).capabilities.includes(ENCRYPTION_FOLDER_MOVES_CAPABILITY)) throw new Error('Update your Crate server before moving encrypted folders.');
 	if (state && proposed && (moving || isReadingScopeExtension(state, proposed))) {
 		state = await bindEncryptionScopes(createEncryptionState(bundle, await sealRecoveryBundle(bundle, recoveryCode)), bundle);
 		await http.requestJson('/encryption/conversion', { method: 'POST', body: JSON.stringify(state) });

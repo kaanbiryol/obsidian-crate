@@ -3,7 +3,6 @@ import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
 import { SECRET_KEYS } from './settings-types';
 import { captureServerConnection } from './server-request';
 import { moveEncryptionScopes, openRecoveryBundle } from '../encryption/key-bundle';
-import { ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../encryption/server-state';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertEncryptionKeys, convertEncryptedVault, readServerEncryption } from '../sync/encryption-conversion';
 import { startReading, stopReading, waitForStoppedReading } from '../reading/runtime';
@@ -49,7 +48,6 @@ export function resumeEncryptedFolderMoves(plugin: CratePlugin, progress: (messa
     await waitForStoppedReading(plugin); connection.assertCurrent();
     const http = new WorkerApiHttpClient(connection.origin, connection.token ?? '');
     http.setAbortSignal(connection.signal);
-    if (!(await http.getServerInfo()).capabilities.includes(ENCRYPTION_FOLDER_MOVES_CAPABILITY)) throw new Error('Update your Crate server before moving encrypted folders.');
     while (await applyNextEncryptedFolderMove({
       storage: plugin.secretStorage, origin: connection.origin, assertCurrent: connection.assertCurrent,
       checkpointRenames: () => checkpointEncryptionRenames(plugin),

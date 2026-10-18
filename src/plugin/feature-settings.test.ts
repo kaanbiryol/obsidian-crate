@@ -41,7 +41,7 @@ it('pulls paused state before initialization without writing stale local flags b
   await refreshSharedFeatures(plugin as unknown as CratePlugin, false);
   expect(plugin.settings.reading.enabled).toBe(false);
   expect(plugin.remindersSettings.enabled).toBe(false);
-  expect(serverRequest).toHaveBeenCalledExactlyOnceWith(plugin, '/features', undefined, expect.objectContaining({ capabilities: { 'shared-features-v1': 'Update your Crate server to share feature settings.' } }));
+  expect(serverRequest).toHaveBeenCalledExactlyOnceWith(plugin, '/features', undefined, { timeout: 5_000 });
   expect(plugin.setRemindersEnabled).not.toHaveBeenCalled();
   expect(startReading).not.toHaveBeenCalled();
 });

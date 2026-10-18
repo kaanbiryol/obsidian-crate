@@ -7,7 +7,6 @@ export const READING_ENCRYPTION_CAPABILITY = 'e2ee-reading-v1';
  * so clients can skip probing /encryption before plaintext requests. */
 export const ENCRYPTION_STATE_HEADER = 'X-Crate-Encryption-State';
 export const ENCRYPTION_FOLDER_MOVES_CAPABILITY = 'e2ee-folder-moves-v1';
-export const ENCRYPTION_PROTOCOL = 2;
 
 export interface EncryptionScope {
 	purpose?: 'reading';

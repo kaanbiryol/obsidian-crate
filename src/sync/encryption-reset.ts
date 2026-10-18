@@ -91,8 +91,6 @@ export async function resetRemoteEncryption(reset: EncryptionReset, progress: (m
 		if (!(error instanceof HttpError) || error.status !== 401) throw error;
 		verify();
 		const original = createHttp(reset.oldToken);
-		if (!(await original.getServerInfo()).capabilities.includes('e2ee-reset-v1')) throw new Error('Update your Crate server before turning encryption off');
-		verify();
 		original.setEncryptionAuthority(reset.vaultId, reset.generation);
 		const firstAttempt = reset.beginState === 'prepared';
 		reset.beginState = 'attempted';

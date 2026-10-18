@@ -164,7 +164,7 @@ it.each(['before', 'after'] as const)('recovers a Reading edit interrupted %s co
       const commit = path === '/reading/encrypted-commit';
       if (commit && interrupt && phase === 'before') { interrupt = false; throw new Error('Interrupted'); }
       const response = await worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', body, headers: {
-        Authorization: 'Bearer reader', 'X-Crate-Protocol': '2', 'Content-Type': 'application/json',
+        Authorization: 'Bearer reader', 'X-Crate-Protocol': '1', 'Content-Type': 'application/json',
         'X-Crate-Encryption-Vault': bundle.vaultId, 'X-Crate-Encryption-Generation': String(bundle.generation),
       } }), env);
       if (commit && response.ok) {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 import { checkServerReachability } from './server-reachability';
 
-const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v3'] };
+const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v1'] };
 const signal = () => new AbortController().signal;
 
 beforeEach(() => vi.stubGlobal('window', globalThis));

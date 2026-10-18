@@ -81,16 +81,6 @@ it('rejects invalid metadata before dispatching the feature request', async () =
 	expect(transport).toHaveBeenCalledOnce();
 });
 
-it.each([
-	['/reading/policy', [], 'web Reading'],
-	['/reading/fetching', ['reading-v1'], 'article fetching'],
-	['/reading/capture', ['reading-v1'], 'pending Reading saves'],
-] as const)('keeps Reading capability requirements on %s', async (path, capabilities, message) => {
-	const { plugin } = harness([...capabilities]);
-	await expect(readingServerRequest(plugin, path, {})).rejects.toThrow(message);
-	expect(transport).toHaveBeenCalledOnce();
-});
-
 it('does not dispatch when the plugin is already unloaded', async () => {
 	const { plugin, change } = harness();
 	change('unload');

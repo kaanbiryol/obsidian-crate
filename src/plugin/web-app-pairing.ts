@@ -2,7 +2,7 @@ import type CratePlugin from './CratePlugin';
 import { captureServerConnection } from './server-request';
 import { loadEncryptionKeys } from './encryption-storage';
 import { createReminderKeyGrant, sameVaultKeyBundle } from '../encryption/key-bundle';
-import { PAIRING_CAPABILITY, PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
+import { PAIRING_PATH, type PairingContext, type PairingTransport } from '../encryption/pairing/protocol';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertEncryptionKeys, readServerEncryption } from '../sync/encryption-conversion';
 
@@ -21,8 +21,6 @@ export async function openWebAppPairing(plugin: CratePlugin, signal: AbortSignal
   });
   http.setAbortSignal(AbortSignal.any([signal, connection.signal]));
   http.setEncryptionAuthority(keys.vaultId, keys.generation);
-  if (!(await http.getServerInfo()).capabilities.includes(PAIRING_CAPABILITY)) throw new Error('Update your Crate server before connecting an app without its recovery key.');
-  current();
   const transport: PairingTransport = {
     read: id => http.requestJson(`${PAIRING_PATH}${id ? `?id=${encodeURIComponent(id)}` : ''}`, undefined, 10_000),
     write: body => http.requestJson(PAIRING_PATH, { method: 'POST', body: JSON.stringify(body) }, 10_000),

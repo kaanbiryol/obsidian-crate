@@ -6,7 +6,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryptio
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -307,7 +307,7 @@ export class SyncWorkerApi {
 		const info = await this.getServerInfo();
 		const bulkNew = !this.encryption && files.every(file => file.expectedHash === null) && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
 		const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES
-			: files.every(file => !file.path.toLowerCase().endsWith('.md')) && info.capabilities.includes(BATCH_ASSET_UPLOAD_CAPABILITY)
+			: files.every(file => !file.path.toLowerCase().endsWith('.md'))
 				? BATCH_ASSET_UPLOAD_MAX_FILES : BATCH_UPLOAD_MAX_FILES;
 		if (files.length > maxFiles) {
 			const results: BatchUploadResponse['results'] = [];

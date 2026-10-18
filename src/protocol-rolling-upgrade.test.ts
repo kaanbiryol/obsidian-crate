@@ -1,7 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient } from './sync/worker-api/http';
 import { makeApiFetch } from './pwa/api';
-import { DurableRestores } from './sync/durable-restores';
 
 vi.mock('./pwa/session-label', () => ({ detectWebSessionName: () => 'Compatibility test' }));
 // Frozen launch protocol-1 wire metadata: do not derive this fixture from current code.
@@ -31,11 +30,3 @@ it('the current PWA negotiates protocol 1 without altering a saved operation bod
 	expect(init?.body).toBe(body);
 });
 
-it('refuses unsafe restore on the baseline server before reading a new precondition or dispatching', async () => {
-	const transport = { getServerInfo: async () => baselineServer, getFileMetadata: vi.fn(), restoreFileVersion: vi.fn() };
-	const manifest = { getRestoreIntents: () => [] };
-	const journal = new DurableRestores(manifest as never, transport);
-	await expect(journal.restore({ storage_key: 'retained' } as never)).rejects.toThrow('Update the Crate server');
-	expect(transport.getFileMetadata).not.toHaveBeenCalled();
-	expect(transport.restoreFileVersion).not.toHaveBeenCalled();
-});
