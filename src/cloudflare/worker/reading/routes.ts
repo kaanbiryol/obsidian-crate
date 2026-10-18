@@ -7,6 +7,7 @@ import { armNotificationCoordinator } from '../notification-lifecycle';
 import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../authenticate';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject } from '../utils';
 import { policy, authority, readingResponse, ReadingError } from './common';
 import { issueReadingAccess, prepareHandoff, updatePolicy, exchangeReadingAccess, handoffAuthority } from './access';
@@ -15,10 +16,11 @@ import { projectReading } from './projection';
 import { readingItem, readingList, readingListEtag } from './queries';
 import { corsHeaders } from '../cors';
 
-export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState): Promise<Response> {
+export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, state?: DurableObjectState, authenticatedEncryption?: EncryptionServerState | null): Promise<Response> {
   try {
     const url = new URL(request.url), path = url.pathname;
-    const encryption = await readEncryptionState(env.DB);
+    // Authentication loads the encryption state with the token.
+    const encryption = authenticatedEncryption !== undefined ? authenticatedEncryption : await readEncryptionState(env.DB);
     const shortcut = shortcutTransport(request);
     if (path.startsWith('/reading/encrypted-')) {
       if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);

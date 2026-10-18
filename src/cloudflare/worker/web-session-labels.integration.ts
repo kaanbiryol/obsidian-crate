@@ -65,3 +65,13 @@ it('does not rename anything for an invalid credential', async () => {
 	expect((await authenticateWorkerRequest(request('invalid', encodeURIComponent('iPhone · Safari')), env.DB)).response?.status).toBe(401);
 	expect(await env.DB.prepare('SELECT device_name FROM auth_tokens').first()).toEqual({ device_name: 'iPhone' });
 });
+
+it('refreshes activity once it is older than the refresh interval', async () => {
+	await addSession('safari');
+	await env.DB.prepare("UPDATE auth_tokens SET last_seen_at = datetime('now', '-7 hours')").run();
+	const before = await env.DB.prepare('SELECT last_seen_at FROM auth_tokens').first<{ last_seen_at: string }>();
+	await authenticateWorkerRequest(request('safari'), env.DB);
+	const after = await env.DB.prepare('SELECT last_seen_at FROM auth_tokens').first<{ last_seen_at: string }>();
+	expect(after!.last_seen_at > before!.last_seen_at).toBe(true);
+	expect(await env.DB.prepare('SELECT device_name FROM auth_tokens').first()).toEqual({ device_name: 'iPhone' });
+});

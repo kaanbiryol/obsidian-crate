@@ -1,4 +1,4 @@
-import { featureEnabled, handleFeaturePolicy } from './feature-policy';
+import { featureEnabled, handleFeaturePolicy, parseFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
 import { parseJsonObject } from './utils';
@@ -46,6 +46,7 @@ export async function handleAuthenticatedRoute(
 	resetGeneration: string | null,
 	requestId?: string,
 	encryption?: EncryptionServerState | null,
+	featurePolicyValue?: string | null,
 ): Promise<Response | null> {
 	if (!isAuthenticatedRouteAllowed(principal, path, method)) {
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
@@ -55,7 +56,10 @@ export async function handleAuthenticatedRoute(
 		const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
 		return limited ?? handleFeaturePolicy(request, env.DB);
 	}
-	if (path.startsWith('/reminders/') && !await featureEnabled(env.DB, 'reminders')) return corsResponse({ error: 'Reminders are paused. Enable them in Crate settings.', code: 'feature_paused' }, 423);
+	const remindersEnabled = async () => featurePolicyValue === undefined
+		? await featureEnabled(env.DB, 'reminders')
+		: parseFeaturePolicy(featurePolicyValue).reminders;
+	if (path.startsWith('/reminders/') && !await remindersEnabled()) return corsResponse({ error: 'Reminders are paused. Enable them in Crate settings.', code: 'feature_paused' }, 423);
 	if (principal.scope === 'reminders' && path.startsWith('/reminders/')) {
 		let folder: unknown = new URL(request.url).searchParams.get('folderPath');
 		if (method !== 'GET') {
@@ -65,7 +69,7 @@ export async function handleAuthenticatedRoute(
 		}
 		if (!principal.folderPath || folder !== principal.folderPath) return corsResponse({ error: 'This session is limited to its enrolled reminders folder' }, 403);
 	}
-	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal);
+	if (path.startsWith('/reading/')) return handleReadingRoute(request, env, principal, undefined, encryption);
 	const db = env.DB;
 	const limited = await limitNotificationAction(request, db, principal.tokenId);
 	if (limited) return limited;

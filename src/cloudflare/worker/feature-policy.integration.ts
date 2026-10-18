@@ -16,7 +16,9 @@ import { handleNotificationPolicy } from './notification-policy';
 import { drainNotificationProjections } from './notification-projection';
 import { ReminderAlarm } from './notifications/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
-import { isAuthenticatedRouteAllowed } from './router';
+import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
+import { authenticateWorkerRequest } from './authenticate';
+import { sha256Hex } from './auth';
 vi.mock('./notifications/push', () => ({ listPushSubscriptionIds: vi.fn(async () => ['sub']), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
   await env.DB.batch(schema.split(';').map(s => s.trim()).filter(Boolean).map(s => env.DB.prepare(s)));
@@ -38,6 +40,16 @@ it('defaults on, rejects stale edits, and limits writes to vault credentials', a
   expect(isAuthenticatedRouteAllowed({ tokenId: 'browser', scope: 'reminders' }, '/features', 'GET')).toBe(true);
   expect(isAuthenticatedRouteAllowed({ tokenId: 'browser', scope: 'reminders' }, '/features', 'POST')).toBe(false);
   expect(isAuthenticatedRouteAllowed({ tokenId: 'shortcut', scope: 'reading_capture' }, '/features', 'GET')).toBe(false);
+});
+it('gates reminder routes on the feature policy loaded with the token', async () => {
+  await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('device', ?)").bind(await sha256Hex('device-token')).run();
+  await toggle('reminders', false);
+  const request = new Request('https://test/reminders/list', { headers: { Authorization: 'Bearer device-token' } });
+  const auth = await authenticateWorkerRequest(request, env.DB);
+  if (auth.response) throw new Error('Authentication failed');
+  expect(JSON.parse(auth.featurePolicyValue!)).toMatchObject({ reminders: false });
+  const response = await handleAuthenticatedRoute(request, env, {} as never, '/reminders/list', 'GET', auth.principal, auth.resetGeneration, undefined, null, auth.featurePolicyValue);
+  expect(response?.status).toBe(423);
 });
 it('blocks capture and publication while paused and resumes the retained article job', async () => {
   await reading('policy', { enabled: true, folderPath: 'Reading', revision: null });

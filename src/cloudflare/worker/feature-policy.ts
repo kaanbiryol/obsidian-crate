@@ -2,11 +2,15 @@ import { corsResponse } from './cors';
 import { parseJsonObject } from './utils';
 
 export interface FeaturePolicy { reading: boolean; reminders: boolean; revision: string | null }
-const FEATURE_POLICY_KEY = 'crate_feature_policy';
+export const FEATURE_POLICY_KEY = 'crate_feature_policy';
 export async function featurePolicy(db: D1Database): Promise<FeaturePolicy> {
   const row = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(FEATURE_POLICY_KEY).first<{ value: string }>();
-  if (!row) return { reading: true, reminders: true, revision: null };
-  const value = JSON.parse(row.value) as FeaturePolicy;
+  return parseFeaturePolicy(row?.value ?? null);
+}
+/** Parses a stored policy row value; authentication loads it with the token. */
+export function parseFeaturePolicy(stored: string | null): FeaturePolicy {
+  if (stored === null) return { reading: true, reminders: true, revision: null };
+  const value = JSON.parse(stored) as FeaturePolicy;
   if (typeof value.reading !== 'boolean' || typeof value.reminders !== 'boolean' || typeof value.revision !== 'string') throw new Error('Invalid feature policy');
   return value;
 }
