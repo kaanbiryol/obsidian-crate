@@ -2,7 +2,7 @@ import { ResetBlockedError } from './reset-errors';
 import type { ResetApi } from './reset-ownership';
 
 // Include orphaned uploads with Crate's generated key format, retained versions,
-// shared settings, recovery backups, history checkpoints, and legacy keys
+// shared settings, recovery backups, history checkpoints, and any other keys
 // explicitly referenced by Crate's database. Match generated formats only.
 const MANAGED_OBJECT = /^__crate__\/files\/[a-f0-9]{64}\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
 const UPGRADE_BACKUP_OBJECT = /^__crate__\/backups\/schema-upgrade-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\/(?:archive\.json|database\.sql|objects\/[a-f0-9]{64})$/;

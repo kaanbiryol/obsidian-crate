@@ -19,7 +19,7 @@ afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 const expire = () => env.DB.prepare('UPDATE staged_upload_batches SET expires_at = 0 WHERE expires_at IS NOT NULL').run();
 async function batch(keys: string[]) {
-  const id = await trackStagedBatch(env.DB, keys);
+  const id = await trackStagedBatch(env.DB, keys.map(key => ({ storageKey: key, path: `${key}.md` })));
   await Promise.all(keys.map(key => env.BUCKET.put(key, 'content')));
   return id!;
 }
@@ -66,12 +66,12 @@ it('cleans expired keys and prevents a delayed bulk commit from publishing them'
 
 it('retains missing keys to collect a late R2 upload without risking committed files', async () => {
   await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles });
-  const live = await env.DB.prepare('SELECT storage_key FROM files LIMIT 1').first<{ storage_key: string }>();
-  const id = await trackStagedBatch(env.DB, [live!.storage_key, 'late-key']);
+  const live = await env.DB.prepare('SELECT storage_key, path FROM files LIMIT 1').first<{ storage_key: string; path: string }>();
+  const id = await trackStagedBatch(env.DB, [{ storageKey: live!.storage_key, path: live!.path }, { storageKey: 'late-key', path: 'late.md' }]);
   await expire();
   expect(await cleanStagedBatches(env.BUCKET, env.DB)).toBe(1);
   expect(await env.DB.prepare('SELECT storage_keys, state FROM staged_upload_batches WHERE id = ?').bind(id).first())
-    .toEqual({ storage_keys: '[{"storageKey":"late-key"}]', state: 'deleting' });
+    .toEqual({ storage_keys: '[{"storageKey":"late-key","path":"late.md"}]', state: 'deleting' });
   expect(await env.BUCKET.head(live!.storage_key)).not.toBeNull();
   await env.BUCKET.put('late-key', 'late bytes');
   await expire();
@@ -92,7 +92,7 @@ it('retries a failed R2 delete and bounds work to two batches per pass', async (
 });
 
 it('pauses missing keys after eight attempts and includes them in diagnostics', async () => {
-  await trackStagedBatch(env.DB, ['missing-key']);
+  await trackStagedBatch(env.DB, [{ storageKey: 'missing-key', path: 'missing.md' }]);
   for (let i = 0; i < 8; i++) { await expire(); await cleanStagedBatches(env.BUCKET, env.DB); }
   expect(await env.DB.prepare('SELECT attempts, expires_at FROM staged_upload_batches').first())
     .toEqual({ attempts: 8, expires_at: null });

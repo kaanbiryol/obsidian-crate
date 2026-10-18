@@ -123,24 +123,6 @@ describe('Crate server reset boundaries', () => {
 		expect(h.api.deleteR2Objects).toHaveBeenCalledOnce();
 	});
 
-	it('upgrades an old retirement stub under the fence before continuing deletion', async () => {
-		const h = harness();
-		h.api.deleteR2Objects.mockRejectedValueOnce(new Error('offline'));
-		await expect(deleteLegacyResetData(h.input)).rejects.toThrow('uncertain outcome');
-		h.worker.bindings = h.worker.bindings!.filter(binding => binding.name !== 'CRATE_RESET_ID');
-		const [row] = await h.api.queryD1(h.metadata.accountId!, h.metadata.d1DatabaseId!, 'SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence']);
-		const previous = row!.results[0]!.value as string;
-		const legacy = { ...JSON.parse(previous), step: 'deleteR2Object' } as Record<string, unknown>;
-		delete legacy.resetId;
-		delete legacy.cleanupTokenHash;
-		delete legacy.batchHash;
-		await h.api.queryD1(h.metadata.accountId!, h.metadata.d1DatabaseId!, 'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;', [JSON.stringify(legacy), 'crate_deployment_fence', previous]);
-		await deleteLegacyResetData(h.input);
-		expect(h.api.retireCrateWorker).toHaveBeenCalledTimes(2);
-		expect(h.api.retireCrateWorker).toHaveBeenLastCalledWith(h.metadata.accountId, h.metadata.workerName, h.metadata.reset!.id, h.metadata.d1DatabaseId, h.metadata.r2BucketName, true);
-		expect(h.objects.size).toBe(0);
-	});
-
 	it('allows unrelated Workers with separate databases', async () => {
 		const { input, api, worker, metadata } = harness();
 		api.listWorkers.mockResolvedValue([{ id: metadata.workerName }, { id: 'other-app' }]);

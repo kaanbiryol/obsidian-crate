@@ -17,7 +17,7 @@ afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 async function expiredObject(content = 'data') {
   const hash = await sha256Hex(content);
   const key = createManagedObjectKey(hash);
-  await trackStagedUpload(env.DB, key);
+  await trackStagedUpload(env.DB, key, 'Late.bin');
   await env.BUCKET.put(key, content);
   await env.DB.prepare('UPDATE staged_uploads SET expires_at = 0 WHERE storage_key = ?').bind(key).run();
   return { key, hash };
@@ -42,7 +42,7 @@ it('keeps objects referenced by a live file or retained version', async () => {
   const previous = await getStoredFileRow(env.DB, 'Note.md');
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'New', previous!.hash);
   const current = await getStoredFileRow(env.DB, 'Note.md');
-  for (const key of [previous!.storageKey, current!.storageKey]) await trackStagedUpload(env.DB, key);
+  for (const key of [previous!.storageKey, current!.storageKey]) await trackStagedUpload(env.DB, key, 'Note.md');
   await env.DB.prepare('UPDATE staged_uploads SET expires_at = 0').run();
   expect(await cleanStagedUploads(env.BUCKET, env.DB)).toBe(2);
   expect(await env.BUCKET.head(previous!.storageKey)).not.toBeNull();
@@ -50,7 +50,7 @@ it('keeps objects referenced by a live file or retained version', async () => {
 });
 it('retains a missing-object record and later cleans a late upload', async () => {
   const key = createManagedObjectKey(await sha256Hex('late'));
-  await trackStagedUpload(env.DB, key);
+  await trackStagedUpload(env.DB, key, 'Late.md');
   await env.DB.prepare('UPDATE staged_uploads SET expires_at = 0').run();
   expect(await cleanStagedUploads(env.BUCKET, env.DB)).toBe(0);
   expect(await env.DB.prepare('SELECT state, attempts FROM staged_uploads').first()).toEqual({ state: 'deleting', attempts: 1 });
@@ -60,7 +60,7 @@ it('retains a missing-object record and later cleans a late upload', async () =>
   expect(await env.BUCKET.head(key)).toBeNull();
 });
 it('pauses after eight inconclusive cleanup attempts and keeps the record', async () => {
-  await trackStagedUpload(env.DB, createManagedObjectKey('missing'));
+  await trackStagedUpload(env.DB, createManagedObjectKey('missing'), 'Missing.md');
   for (let i = 0; i < 8; i++) {
     await env.DB.prepare('UPDATE staged_uploads SET expires_at = 0 WHERE expires_at IS NOT NULL').run();
     await cleanStagedUploads(env.BUCKET, env.DB);

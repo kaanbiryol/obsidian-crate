@@ -23,7 +23,7 @@ it('retains the current revision when another same-content save finished during 
   expect(current!.storageKey).not.toBe(staleSnapshot!.storageKey);
   const hash = await sha256Hex('New');
   const objectKey = createManagedObjectKey(hash);
-  await trackStagedUpload(env.DB, objectKey);
+  await trackStagedUpload(env.DB, objectKey, path);
   await env.BUCKET.put(objectKey, 'New');
   const result = await coordinatedUpload(env)(env.BUCKET, env.DB, {
     path, hash, size: 3, objectKey, content: 'New', expectedHash: first.hash, previousFile: staleSnapshot,

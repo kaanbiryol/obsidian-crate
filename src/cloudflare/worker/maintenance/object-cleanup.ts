@@ -1,5 +1,5 @@
 import { changedRows, queryRows } from '../db';
-import { findReferencedStorageKeys, objectReference, type ObjectReference } from '../storage-references';
+import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
 
 // R2 deletes up to 1,000 keys per call. 500 keeps the reference lookup's single
 // JSON parameter below D1's 2 MB value limit, even with 1,024-character paths.
@@ -39,7 +39,7 @@ async function deleteQueuedBucketObjects(
 /** Scheduled failures reach the maintenance error recorder; queued keys retry later.
  * Rowid order is insertion order and reads the table without a sort. */
 export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
-	const rows = await queryRows<{ storage_key: string; file_path: string | null }>(
+	const rows = await queryRows<{ storage_key: string; file_path: string }>(
 		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY rowid LIMIT ?')
 			.bind(CLEANUP_BATCH_LIMIT),
 	);
@@ -64,9 +64,9 @@ export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now(
 export async function deleteBucketObjectsOrQueue(
 	bucket: R2Bucket,
 	db: D1Database,
-	keys: Array<string | ObjectReference>,
+	keys: ObjectReference[],
 ): Promise<void> {
-	const objects = keys.map(objectReference).filter(object => object.storageKey.length > 0);
+	const objects = keys.filter(object => object.storageKey.length > 0);
 	try { await queueObjectCleanup(db, objects); }
 	catch { /* Still attempt reference-aware deletion if queueing is unavailable. */ }
 	try { await deleteQueuedBucketObjects(bucket, db, objects); }

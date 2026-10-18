@@ -78,8 +78,8 @@ describe('uncertain commits preserve live content', () => {
 	it('does not delete live or retained content accidentally queued for cleanup', async () => {
 		const first = await writeCommittedMarkdownFile(bucket, db, 'note.md', 'first', null);
 		await writeCommittedMarkdownFile(bucket, db, 'note.md', 'second', first.hash);
-		const rows = await db.prepare('SELECT storage_key FROM files UNION SELECT storage_key FROM file_versions').all<{ storage_key: string }>();
-		for (const row of rows.results) await db.prepare('INSERT INTO object_cleanup_queue (storage_key) VALUES (?)').bind(row.storage_key).run();
+		const rows = await db.prepare('SELECT storage_key, path FROM files UNION SELECT storage_key, path FROM file_versions').all<{ storage_key: string; path: string }>();
+		for (const row of rows.results) await db.prepare('INSERT INTO object_cleanup_queue (storage_key, file_path) VALUES (?, ?)').bind(row.storage_key, row.path).run();
 		await drainObjectCleanupQueue(bucket, db);
 		for (const row of rows.results) expect(await bucket.get(row.storage_key)).not.toBeNull();
 		expect((await db.prepare('SELECT COUNT(*) AS count FROM object_cleanup_queue').first<{ count: number }>())?.count).toBe(0);

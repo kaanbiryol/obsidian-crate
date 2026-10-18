@@ -4,7 +4,7 @@ import { STAGED_UPLOAD_TTL_MS } from '../staged-uploads';
 
 /** Claim before checking R2: expired leases cannot publish after this point. */
 export async function cleanStagedUploads(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<number> {
-  const rows = await queryRows<{ storage_key: string; file_path: string | null }>(db.prepare(`UPDATE staged_uploads SET state = 'deleting'
+  const rows = await queryRows<{ storage_key: string; file_path: string }>(db.prepare(`UPDATE staged_uploads SET state = 'deleting'
     WHERE storage_key IN (SELECT storage_key FROM staged_uploads WHERE expires_at <= ?
       ORDER BY expires_at, storage_key LIMIT 10) RETURNING storage_key, file_path`).bind(now));
   const keys = rows.map(row => row.storage_key);

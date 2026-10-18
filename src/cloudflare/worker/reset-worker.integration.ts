@@ -96,11 +96,11 @@ it('validates all objects before deleting any, including a valid key mixed with 
 	expect(await env.BUCKET.get(object(0))).not.toBeNull();
 });
 
-it('accepts exact legacy references from current files, versions and pending cleanup', async () => {
+it('accepts exact references from current files, versions and pending cleanup', async () => {
 	const h = await harness(['legacy #é.md', 'old-version', 'orphan-upload', '__crate__/settings.json']);
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('legacy.md', 'legacy.md', 'legacy #é.md')").run();
 	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('old-version', 'legacy.md', 'hash', 1, 'replaced', 1)").run();
-	await env.DB.prepare("INSERT INTO object_cleanup_queue(storage_key) VALUES ('orphan-upload')").run();
+	await env.DB.prepare("INSERT INTO object_cleanup_queue(storage_key, file_path) VALUES ('orphan-upload', 'orphan.md')").run();
 	expect((await h.fetch()).status).toBe(200);
 	expect(h.bucket.delete).toHaveBeenCalledOnce();
 });

@@ -179,7 +179,7 @@ describe('provisionCloudflareDeployment', () => {
   it('rejects a retired development schema baseline before upload', async () => {
     const api = createApi();
     api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-    api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 1 }] }]);
+    api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 0 }] }]);
     const metadata = createMetadata();
     await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
       .rejects.toThrow('Unsupported database schema baseline');

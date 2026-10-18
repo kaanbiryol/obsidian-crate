@@ -253,13 +253,6 @@ it('preserves queued schema-2 captures and their policy across a restore', async
   expect(f.databases.get(destination)!.prepare('SELECT generation FROM reading_policy').get()).toEqual({ generation: 'generation' });
 });
 
-it('rejects a retired schema-1 archive before allocating destination resources', async () => {
-  const f = await fixture();
-  await f.rewriteSQL(sql => sql.replace(`VALUES (1,${SERVER_RELEASE.schemaVersion},${SERVER_RELEASE.schemaVersion})`, 'VALUES (1,1,1)'));
-  await expect(f.run()).rejects.toThrow('Unsupported database schema');
-  expect(f.api.createD1Database).not.toHaveBeenCalled();
-});
-
 it('rejects a future restore target before allocating destination resources', async () => {
   const f = await fixture();
   const rows = parseBackupRows(new TextDecoder().decode(f.buckets.get(source.bucket)!.get(`${f.choice.prefix}/database.sql`)));

@@ -99,22 +99,12 @@ it.each(['completion', 'move'] as const)('rolls back the entire %s publication i
 	expect((await mutate(request(body), env)).status).toBe(410);
 });
 
-it('replays legacy receipts only while retained and preserves finite legacy and active identity reservations', async () => {
-	const legacyId = crypto.randomUUID();
-	const body = { operationId: legacyId };
-	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ action: 'create', body })));
-	const requestHash = Array.from(new Uint8Array(hash), value => value.toString(16).padStart(2, '0')).join('');
-	await db.prepare('INSERT INTO reminder_operations VALUES (?, ?, ?, ?)').bind(legacyId, requestHash, '{"success":true}', '2000-01-01 00:00:00').run();
-	await db.prepare('INSERT INTO reminder_identities VALUES (?, ?)').bind('legacy-reminder', legacyId).run();
+it('preserves identity reservations still owned by a reminder source', async () => {
 	const active = createReminderOperationId(day - REMINDER_RETRY_DAYS);
 	await db.prepare('INSERT INTO reminder_identities VALUES (?, ?)').bind(active, active).run();
 	await db.prepare('INSERT INTO reminder_sources VALUES (?, ?, ?, 1)').bind('Reminders/Quarantined.md', active, '').run();
-	const retained = await beginReminderOperation(db, body, 'create');
-	expect(retained).toBeInstanceOf(Response);
-	expect((retained as Response).status).toBe(200);
 	await pruneOperationReceipts(db);
-	expect((await beginReminderOperation(db, body, 'create') as Response).status).toBe(410);
-	expect((await db.prepare('SELECT reminder_id FROM reminder_identities').all()).results).toHaveLength(2);
+	expect((await db.prepare('SELECT reminder_id FROM reminder_identities').all()).results).toHaveLength(1);
 });
 
 it('bounds receipt cleanup, retains a monotonic floor and rolls back a failed pruning batch', async () => {

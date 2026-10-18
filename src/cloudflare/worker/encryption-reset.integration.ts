@@ -74,7 +74,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('old', 'remote-only.md', 'hash', 1, 'replaced', 9999999999999)").run();
 	await env.DB.prepare("INSERT INTO web_enrollment_tokens(token_hash, expires_at) VALUES ('grant', 9999999999999)").run();
 	await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
-	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, expires_at) VALUES ('late-object', 9999999999999)").run();
+	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path, expires_at) VALUES ('late-object', 'late.md', 9999999999999)").run();
 	for (let index = 0; index < 14; index++) await env.DB.prepare("INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime) VALUES (?, 'schedule', 'encrypted', '2099-01-01T00:00:00.000Z')").bind(`alarm-${index}`).run();
 	for (let index = 0; index < 205; index++) await env.BUCKET.put(`object-${index}`, 'old encrypted bytes');
 	const begin = await start();

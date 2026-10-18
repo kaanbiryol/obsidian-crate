@@ -23,12 +23,6 @@ export async function pruneOperationReceipts(db: D1Database): Promise<boolean> {
 		db.prepare(`DELETE FROM upload_operations WHERE operation_id IN (
 			SELECT operation_id FROM upload_operations WHERE operation_id >= 'e1_' AND operation_id < ${prefix}
 			ORDER BY operation_id LIMIT ${RECEIPT_BATCH})`),
-		// Legacy callers are fenced by protocol 6. Their finite history remains
-		// replayable until cleanup, then a missing unversioned ID always fails.
-		db.prepare(`DELETE FROM reminder_operations WHERE operation_id IN (
-			SELECT operation_id FROM reminder_operations WHERE created_at < datetime('now', '-180 days')
-			AND operation_id NOT GLOB 'e1_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*'
-			ORDER BY created_at LIMIT 500)`),
 		db.prepare(`DELETE FROM reminder_identities WHERE reminder_id IN (
 			SELECT i.reminder_id FROM reminder_identities i WHERE i.reminder_id >= 'e1_' AND i.reminder_id < ${prefix}
 			AND NOT EXISTS (SELECT 1 FROM reminder_sources s WHERE s.reminder_id = i.reminder_id)

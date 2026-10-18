@@ -27,7 +27,7 @@ it('removes only old unreferenced descriptors and preserves data, receipts, and 
 	await env.DB.prepare("INSERT INTO changelog(path, action, revision) VALUES ('changed.md', 'put', 'changelog')").run();
 	await env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id) VALUES ('deletion', 'deleted', 1, 'deleted.md', 'hash', 'request')").run();
 	await env.DB.prepare(`INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES ('operation', 'hash', '{"revision":"receipt"}')`).run();
-	await env.DB.prepare("INSERT INTO staged_uploads(storage_key) VALUES ('upload')").run();
+	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path) VALUES ('upload', 'upload.md')").run();
 	await env.DB.prepare(`INSERT INTO staged_upload_batches(id, storage_keys) VALUES ('batch', '["batch-legacy", {"storageKey":"batch-owned"}]')`).run();
 	await pruneEncryptionMetadata(env.DB);
 	expect(await retained()).toEqual([...references, 'new'].sort());

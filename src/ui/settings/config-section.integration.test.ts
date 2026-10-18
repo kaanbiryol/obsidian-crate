@@ -392,28 +392,6 @@ it.each([undefined, 'copying', 'complete'])('offers restore, resume or review fr
 });
 
 
-it('allows an installed revision 1 server to update to the current bundle', async () => {
-  const { renderServerUpdateNotice } = await loadConfigSectionModule();
-  const plugin = {
-    settings: {
-      workerUrl: 'https://crate-0123456789abcdef.example.workers.dev',
-      cloudflareDeployment: {
-        workerName: 'crate-0123456789abcdef', workersSubdomain: 'example',
-        lastKnownRevision: 1, lastDeployedVersion: embeddedArtifact.version,
-        lastDeployedFingerprint: 'a'.repeat(64),
-      },
-    },
-    syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn() },
-  };
-  renderServerUpdateNotice({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
-  const row = getSettingByName('Cloudflare update available');
-  expect(row.descEl.textContent).toContain('Current version: 1');
-  row.buttons[0]!.click();
-  expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin);
-  expect(plugin.syncRuntime.getVersionInfo).not.toHaveBeenCalled();
-});
-
-
 it.each(['older development', 'stable', 'newer development', 'missing fingerprint', 'offline'])('checks automatically and preserves upgrade guards: %s', async live => {
   const worker = 'crate-0123456789abcdef';
   embeddedArtifact.development = { number: 3, worker };

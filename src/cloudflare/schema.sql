@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 2, 2);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS web_enrollment_tokens_expires_at_idx ON web_enrollmen
 
 CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
-  file_path TEXT,
+  file_path TEXT NOT NULL,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -216,7 +216,7 @@ CREATE INDEX IF NOT EXISTS notification_file_retries_due_idx
  ON notification_file_retries(available_at, path) WHERE available_at IS NOT NULL;
 CREATE TABLE IF NOT EXISTS staged_uploads (
  storage_key TEXT PRIMARY KEY,
- file_path TEXT,
+ file_path TEXT NOT NULL,
  expires_at INTEGER,
  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
  attempts INTEGER NOT NULL DEFAULT 0,

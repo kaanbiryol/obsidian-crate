@@ -9,7 +9,7 @@ function createStatement(sql: string) {
 			statement.args = args;
 			return statement;
 		}),
-		all: vi.fn(async () => ({ results: [] as Array<{ storage_key: string }> })),
+		all: vi.fn(async () => ({ results: [] as Array<{ storage_key: string; file_path: string }> })),
 		run: vi.fn(async () => ({})),
 	};
 	return statement;
@@ -31,7 +31,7 @@ describe('R2 object cleanup queue', () => {
 		};
 		const bucket = { delete: vi.fn(async () => {}) };
 
-		await expect(deleteBucketObjectsOrQueue(bucket as never, db as never, ['object-key'])).resolves.toBeUndefined();
+		await expect(deleteBucketObjectsOrQueue(bucket as never, db as never, [{ storageKey: 'object-key', path: 'note.md' }])).resolves.toBeUndefined();
 		if (failure === 'reference lookup') expect(bucket.delete).not.toHaveBeenCalled();
 		else expect(bucket.delete).toHaveBeenCalledWith('object-key');
 	});
@@ -50,11 +50,11 @@ describe('R2 object cleanup queue', () => {
 			delete: vi.fn(async () => { throw new Error('R2 unavailable'); }),
 		};
 
-		await deleteBucketObjectsOrQueue(bucket as never, db as never, ['object-key']);
+		await deleteBucketObjectsOrQueue(bucket as never, db as never, [{ storageKey: 'object-key', path: 'note.md' }]);
 
 		expect(db.batch).not.toHaveBeenCalled();
 		expect(prepared[0]?.sql).toContain('INSERT OR IGNORE INTO object_cleanup_queue');
-		expect(prepared[0]?.args).toEqual(['[{"storageKey":"object-key"}]']);
+		expect(prepared[0]?.args).toEqual(['[{"storageKey":"object-key","path":"note.md"}]']);
 		expect(prepared[0]?.run).toHaveBeenCalledOnce();
 	});
 
@@ -64,7 +64,7 @@ describe('R2 object cleanup queue', () => {
 			prepare: vi.fn((sql: string) => {
 				const statement = createStatement(sql);
 				if (sql.startsWith('SELECT storage_key, file_path FROM object_cleanup_queue')) {
-					statement.all.mockResolvedValue({ results: [{ storage_key: 'queued-key' }] });
+					statement.all.mockResolvedValue({ results: [{ storage_key: 'queued-key', file_path: 'queued.md' }] });
 				}
 				prepared.push(statement);
 				return statement;

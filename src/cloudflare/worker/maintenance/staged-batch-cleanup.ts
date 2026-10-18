@@ -1,4 +1,4 @@
-import { findReferencedStorageKeys, objectReference, type ObjectReference } from '../storage-references';
+import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
 import { STAGED_UPLOAD_TTL_MS } from '../staged-uploads';
 
 /** Two batches bound both D1 work and R2 requests during a maintenance pass. */
@@ -8,7 +8,7 @@ export async function cleanStagedBatches(bucket: R2Bucket, db: D1Database, now =
     RETURNING id, storage_keys`).bind(now).all<{ id: string; storage_keys: string }>();
   let finished = 0;
   for (const row of rows.results) {
-    const objects = (JSON.parse(row.storage_keys) as Array<string | ObjectReference>).map(objectReference);
+    const objects = JSON.parse(row.storage_keys) as ObjectReference[];
     const keys = objects.map(object => object.storageKey);
     const referenced = await findReferencedStorageKeys(db, objects);
     const visible: string[] = [];

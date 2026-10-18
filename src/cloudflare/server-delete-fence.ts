@@ -28,7 +28,7 @@ export async function inspectTerminalDeletionFence(api: DeleteApi, metadata: Clo
 	// Only this terminal workflow can repeat deletion while a request is still
 	// in flight. It never recreates the original Worker, bucket, or database.
 	if (record.kind !== 'delete' || record.resetId !== metadata.deletion?.id || record.stepState !== 'started') throw blocked();
-	if (['delete-worker', 'deleteR2Object', 'deleteR2Objects', 'deleteR2Bucket', 'deleteD1Database', 'enable-deletion-address'].includes(String(record.step))) return value;
+	if (['delete-worker', 'deleteR2Objects', 'deleteR2Bucket', 'deleteD1Database', 'enable-deletion-address'].includes(String(record.step))) return value;
 	if (record.step === 'upload-worker' && typeof record.uploadTag === 'string') {
 		const helper = await deletionWorkerSettings(api, account, metadata.deletion!.helperName);
 		if (helper) {
