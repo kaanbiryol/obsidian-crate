@@ -30,7 +30,7 @@ it('follows initialization, stop and restart, and unsubscribes on plugin unload'
   await initializeRuntime(runtime);
   expect(status.setEnabled).toHaveBeenLastCalledWith(true);
   runtime.destroy();
-  expect(status.setEnabled).toHaveBeenLastCalledWith(false);
+  await vi.waitFor(() => expect(status.setEnabled).toHaveBeenLastCalledWith(false));
   await initializeRuntime(runtime);
   expect(status.setEnabled).toHaveBeenLastCalledWith(true);
   dispose();
@@ -72,7 +72,7 @@ it('keeps an initialization failure visible until the runtime stops', async () =
     expect(status.setEnabled).toHaveBeenLastCalledWith(true);
     expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'error', lastError: 'Manifest unavailable' }));
     runtime.destroy();
-    expect(status.setEnabled).toHaveBeenLastCalledWith(false);
+    await vi.waitFor(() => expect(status.setEnabled).toHaveBeenLastCalledWith(false));
   } finally { initialize.mockRestore(); }
 });
 
@@ -85,10 +85,30 @@ it('shows transfer and saving progress until persistence finishes, then restores
   } });
   persistSettings.mockReturnValue(saved.promise);
   const syncing = runtime.sync();
-  expect(status.setSyncProgress).toHaveBeenCalledWith(2, 3);
+  await vi.waitFor(() => expect(status.setSyncProgress).toHaveBeenCalledWith(2, 3));
   await vi.waitFor(() => expect(persistSettings).toHaveBeenCalledOnce());
   expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'syncing', work: { phase: 'saving' } }));
   saved.resolve();
   await syncing;
   expect(status.update).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'idle' }));
+});
+
+it('renders a burst of state and progress events once', async () => {
+  const { runtime } = mountStatus();
+  await initializeRuntime(runtime);
+  await Promise.resolve();
+  status.update.mockClear();
+  const listeners = { state: [] as Array<() => void>, progress: [] as Array<() => void> };
+  const register = vi.fn<(cleanup: () => void) => void>();
+  registerSyncStatus({ register } as never, {
+    isInitialized: () => true, getState: () => runtime.getState(), getActivityProgress: () => null,
+    addStateChangeListener: listener => listeners.state.push(listener as () => void),
+    addProgressListener: listener => listeners.progress.push(listener as () => void),
+    removeStateChangeListener: vi.fn(), removeProgressListener: vi.fn(),
+  }, vi.fn());
+  status.update.mockClear();
+  // Before: one render per event, four per synced file.
+  for (let event = 0; event < 4; event++) [...listeners.state, ...listeners.progress].forEach(listener => listener());
+  await Promise.resolve();
+  expect(status.update).toHaveBeenCalledOnce();
 });

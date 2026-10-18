@@ -21,11 +21,19 @@ export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onCli
       status.update(state);
     }
   };
-  runtime.addStateChangeListener(render);
-  runtime.addProgressListener(render);
+  // A file's state change and progress tick arrive together; render them once.
+  let scheduled = false, disposed = false;
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => { scheduled = false; if (!disposed) render(); });
+  };
+  runtime.addStateChangeListener(schedule);
+  runtime.addProgressListener(schedule);
   plugin.register(() => {
-    runtime.removeStateChangeListener(render);
-    runtime.removeProgressListener(render);
+    disposed = true;
+    runtime.removeStateChangeListener(schedule);
+    runtime.removeProgressListener(schedule);
     status.destroy();
   });
   render();
