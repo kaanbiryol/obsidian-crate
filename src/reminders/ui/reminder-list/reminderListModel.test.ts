@@ -97,7 +97,6 @@ describe("buildRemindersListPresentation", () => {
     expect(presentation.activeCount).toBe(2);
     expect(presentation.completedCount).toBe(0);
     expect(presentation.overdueCount).toBe(1);
-    expect(presentation.dateGroups).toBeNull();
   });
 
   it("builds grouped upcoming date sections and empty-state copy", () => {
@@ -111,10 +110,7 @@ describe("buildRemindersListPresentation", () => {
     });
 
     expect(presentation.supportsReorder).toBe(false);
-    expect(presentation.dateGroups?.map((group) => group.reminders.map((reminder) => reminder.id))).toEqual([
-      ["soon"],
-      ["later"],
-    ]);
+    expect(presentation.reminders.map((reminder) => reminder.id)).toEqual(["soon", "later"]);
     expect(presentation.emptyMessage).toBe("No reminders in the next 5 days");
   });
 });

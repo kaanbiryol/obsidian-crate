@@ -26,6 +26,8 @@ import {
 import { RemindersLoading } from "../RemindersLoading";
 import "./styles.scss";
 import { useReminderClock } from '../useReminderClock';
+import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../reminder-pagination';
+import { groupRemindersByDate } from "@/reminders/utils/reminderSort";
 
 type Props = {
   projectFilter?: string; // If provided, only show reminders for this project
@@ -37,7 +39,9 @@ type Props = {
 
 export const RemindersList: React.FC<Props> = props => {
   const enabled = useRemindersSettingsStore(state => state.enabled);
-  return enabled ? <ActiveRemindersList {...props} /> : <p>Reminders are disabled on this device.</p>;
+  return enabled
+    ? <ReminderPageSizeContext.Provider value={200}><ActiveRemindersList {...props} /></ReminderPageSizeContext.Provider>
+    : <p>Reminders are disabled on this device.</p>;
 };
 
 const ActiveRemindersList: React.FC<Props> = ({
@@ -61,6 +65,8 @@ const ActiveRemindersList: React.FC<Props> = ({
   // State for reminders (needed because getAll is async when showCompleted is true)
   const [{ rawReminders, isInitialLoadComplete }, setLoadedReminders] = useState<{ rawReminders: Reminder[]; isInitialLoadComplete: boolean }>({ rawReminders: [], isInitialLoadComplete: false });
   const clock = useReminderClock(rawReminders);
+  // Only Today and Upcoming queries depend on the current time.
+  const loadClock = showToday || showUpcoming ? clock : null;
 
   // Load reminders - always use markdown index (markdown-first mode)
   useEffect(() => {
@@ -78,7 +84,7 @@ const ActiveRemindersList: React.FC<Props> = ({
     };
     void loadReminders();
     return () => { active = false; };
-  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, clock]);
+  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, loadClock]);
 
   const presentation = useMemo(() => buildRemindersListPresentation({
     rawReminders,
@@ -106,6 +112,10 @@ const ActiveRemindersList: React.FC<Props> = ({
     setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: plugin.reminderIndex.isInitialLoadComplete });
   }, [plugin, presentation.effectiveProject, triggerRefresh, showToday, showUpcoming, showCompletedState, effectiveDays]);
   const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
+  const pagination = useReminderPagination(presentation.reminders);
+  const pagedDateGroups = useMemo(() => showUpcoming ? groupRemindersByDate(pagination.items) : null, [showUpcoming, pagination.items]);
+  const completedReminders = useMemo(() => presentation.reminders.filter(r => r.completed), [presentation.reminders]);
+  const completedPagination = useReminderPagination(completedReminders);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (
     <ReminderCardWrapper
@@ -181,10 +191,11 @@ const ActiveRemindersList: React.FC<Props> = ({
           <ObsidianIcon size="l" id="calendar-check" />
           <p>{presentation.emptyMessage}</p>
         </div>
-      ) : showUpcoming && presentation.dateGroups ? (
+      ) : pagedDateGroups ? (
         <LayoutGroup>
+          <ReminderPagination pagination={pagination} label="Reminders" />
           <div className="reminders-list reminders-list-grouped">
-            {presentation.dateGroups.map((group, groupIndex) => (
+            {pagedDateGroups.map((group, groupIndex) => (
               <div key={group.date.toISOString()} className="reminders-date-group">
                 {groupIndex > 0 && <div className="reminders-date-divider" />}
                 <h3 className="reminders-date-header">{formatDateHeader(group.date)}</h3>
@@ -219,7 +230,8 @@ const ActiveRemindersList: React.FC<Props> = ({
                 onDragActiveChange={order.onDragChange}
                 renderCard={renderCard}
               />
-              {showCompletedState && presentation.reminders.filter(r => r.completed).map((reminder) => (
+              {showCompletedState && <ReminderPagination pagination={completedPagination} label="Completed reminders" />}
+              {showCompletedState && completedPagination.items.map((reminder) => (
                 <ReminderCardWrapper
                   key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
                   reminder={reminder}
@@ -229,14 +241,17 @@ const ActiveRemindersList: React.FC<Props> = ({
               ))}
             </>
           ) : (
-            presentation.reminders.map((reminder) => (
-              <ReminderCardWrapper
-                key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-                reminder={reminder}
-                onUpdate={triggerRefresh}
-                colorScheme={colorScheme}
-              />
-            ))
+            <>
+              <ReminderPagination pagination={pagination} label="Reminders" />
+              {pagination.items.map((reminder) => (
+                <ReminderCardWrapper
+                  key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
+                  reminder={reminder}
+                  onUpdate={triggerRefresh}
+                  colorScheme={colorScheme}
+                />
+              ))}
+            </>
           )}
         </div>
       )}

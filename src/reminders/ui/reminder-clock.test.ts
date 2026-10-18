@@ -101,3 +101,29 @@ it('catches clock jumps and prolonged suspension on resume, sharing and cleaning
 	window.dispatchEvent(new Event('focus'));
 	expect(current.getSnapshot()).toBe(stopped);
 });
+
+it('tracks thousands of card deadlines in linear time and reschedules after early removals', () => {
+	vi.setSystemTime(new Date('2026-09-08T12:00:00Z'));
+	const current = clock();
+	const count = 20_000;
+	const started = performance.now();
+	// Descending deadlines move the timer earlier on every card.
+	const stops = Array.from({ length: count }, (_, i) => current.track([new Date(Date.parse('2026-09-08T12:00:30Z') + (count - i) * 1000).toISOString()]));
+	for (const stop of stops.slice(1)) stop();
+	cleanups.push(stops[0]!);
+	// Before: about 1.3 seconds to mount and 1.5 seconds to unmount 20,000 cards on an M-series Mac.
+	expect(performance.now() - started).toBeLessThan(300);
+	expect(vi.getTimerCount()).toBe(1);
+	// The removed 12:00:31 deadline causes one early refresh, then the
+	// remaining far deadline leaves the next wake-up at the minute boundary.
+	const before = current.getSnapshot();
+	vi.advanceTimersByTime(31_000);
+	expect(current.getSnapshot()).toBe(before);
+	vi.advanceTimersByTime(1);
+	const early = current.getSnapshot();
+	expect(early).not.toBe(before);
+	vi.advanceTimersByTime(28_998);
+	expect(current.getSnapshot()).toBe(early);
+	vi.advanceTimersByTime(1);
+	expect(current.getSnapshot()).not.toBe(early);
+});

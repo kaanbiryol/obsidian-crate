@@ -14,9 +14,15 @@ export function createReminderClock() {
 		snapshot = { now: new Date(), timezone };
 		for (const listener of listeners) listener();
 	};
-	const schedule = () => {
+	let scheduledAt = Infinity;
+	const setTimer = (at: number, now: number) => {
 		window.clearTimeout(timer);
-		if (!listeners.size) return;
+		scheduledAt = at;
+		timer = window.setTimeout(refresh, Math.max(1, at - now));
+	};
+	const stopTimer = () => { window.clearTimeout(timer); scheduledAt = Infinity; };
+	const schedule = () => {
+		if (!listeners.size) return stopTimer();
 		const now = Date.now();
 		// Calendar boundaries, manual clock changes and timezone changes are
 		// checked at least once a minute. Timed reminders can expire sooner.
@@ -24,7 +30,7 @@ export function createReminderClock() {
 		for (const values of deadlines.values()) for (const deadline of values) {
 			if (deadline >= now) next = Math.min(next, deadline + 1);
 		}
-		timer = window.setTimeout(refresh, Math.max(1, next - now));
+		setTimer(next, now);
 	};
 	const refresh = () => { update(); schedule(); };
 	return {
@@ -40,18 +46,27 @@ export function createReminderClock() {
 			return () => {
 				listeners.delete(listener);
 				if (!listeners.size) {
-					window.clearTimeout(timer);
+					stopTimer();
 					window.removeEventListener('focus', refresh);
 					window.removeEventListener('pageshow', refresh);
 					document.removeEventListener('visibilitychange', refresh);
 				}
 			};
 		},
+		// Every card tracks its own deadline. A new deadline can only move the
+		// timer earlier, so tracking does not rescan all cards. A removed
+		// deadline causes at most one early refresh, which reschedules.
 		track(dueTimes: readonly (string | undefined)[]) {
 			const key = Symbol();
-			deadlines.set(key, dueTimes.map(value => value ? Date.parse(value) : NaN).filter(Number.isFinite));
-			schedule();
-			return () => { deadlines.delete(key); schedule(); };
+			const values = dueTimes.map(value => value ? Date.parse(value) : NaN).filter(Number.isFinite);
+			deadlines.set(key, values);
+			if (listeners.size) {
+				const now = Date.now();
+				for (const deadline of values) {
+					if (deadline >= now && deadline + 1 < scheduledAt) setTimer(deadline + 1, now);
+				}
+			}
+			return () => { deadlines.delete(key); };
 		},
 	};
 }

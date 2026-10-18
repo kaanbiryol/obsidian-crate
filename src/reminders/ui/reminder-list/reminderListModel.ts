@@ -1,6 +1,5 @@
 import {
   getUpcomingReminders,
-  groupRemindersByDate,
   sortReminders,
   sortRemindersByFileOrder,
 } from "@/reminders/utils/reminderSort";
@@ -34,7 +33,6 @@ export interface RemindersListPresentation {
   supportsReorder: boolean;
   effectiveProject: string;
   emptyMessage: string;
-  dateGroups: Array<{ date: Date; reminders: Reminder[] }> | null;
 }
 
 export async function loadRemindersListData(options: RemindersListLoadOptions): Promise<Reminder[]> {
@@ -92,7 +90,6 @@ export function buildRemindersListPresentation(
     supportsReorder,
     effectiveProject,
     emptyMessage: buildEmptyMessage({ showToday, showUpcoming, effectiveDays, projectFilter }),
-    dateGroups: showUpcoming ? groupRemindersByDate(reminders) : null,
   };
 }
 
