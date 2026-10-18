@@ -1,7 +1,7 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
-import { EncryptedReadingApi } from '@/reading/encrypted-api';
+import type { EncryptedReadingApi } from '@/reading/encrypted-api';
 import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -65,6 +65,8 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
     if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
       const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.scopeId, keys.generation]);
       const indexIdentity = JSON.stringify([keys.vaultId, keys.scopeId, keys.generation, keys.folderPath]);
+      // Only encrypted vaults need this client; keep it out of the startup bundle.
+      const { EncryptedReadingApi } = await import('@/reading/encrypted-api');
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
         captureArticle: async url => (await import('./capture-article')).captureBrowserArticle(url),
         folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },

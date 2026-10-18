@@ -66,8 +66,9 @@ export const bundleBudgets = {
 		// Shared inventory/submission rules measure 1.167 MB raw / 397.0 KB gzip,
 		// adding 1.21 KB raw to the preceding build. Retain about 3.5 KB raw margin.
 		// 0.7.0 startup assets measure 397.1 KB gzip; retain less than 1 KB margin.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '1170000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '398000', 10),
+		// Loading the encrypted Reading client on demand: 935.3 KB raw / 316.7 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '945000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '320000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
