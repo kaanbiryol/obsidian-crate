@@ -38,3 +38,25 @@ it('does not send a private URL while an encrypted device is waiting for key rec
 	expect(transport.mock.calls[0]?.[0].body).toBeUndefined();
 	expect(transport.mock.calls[0]?.[0].url).toBe('https://crate.test/encryption');
 });
+
+it('skips the encryption probe while server responses confirm the vault is unencrypted', async () => {
+	let enabled = false;
+	const state = () => ({ 'X-Crate-Encryption-State': enabled ? 'on' : 'off' });
+	const transport = vi.fn<ApiHttpTransport>(async request => {
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/encryption')) return { ...response({ encryption: enabled ? { mode: 'active' } : null }), headers: state() };
+		// The server rejects plaintext once encryption is enabled.
+		if (enabled) return { ...response({ error: 'Unlock this vault', code: 'encryption_required' }), status: 428, headers: state() };
+		return { ...response({ success: true }), headers: state() };
+	});
+	const http = new WorkerApiHttpClient('https://crate.test', 'token', transport);
+	const probes = () => transport.mock.calls.filter(([request]) => request.url.endsWith('/encryption')).length;
+	for (let write = 0; write < 3; write++) await http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Plain' });
+	// Before: one probe per write.
+	expect(probes()).toBe(1);
+	enabled = true;
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'Raced' })).rejects.toMatchObject({ status: 428 });
+	await expect(http.requestJson('/sync/upload?path=note.md', { method: 'PUT', body: 'After' })).rejects.toMatchObject({ code: 'encryption_required' });
+	expect(probes()).toBe(2);
+	expect(transport.mock.calls.every(([request]) => request.body !== 'After')).toBe(true);
+});

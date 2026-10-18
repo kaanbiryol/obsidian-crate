@@ -9,7 +9,7 @@ import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
 import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../request-diagnostics';
 import { isAbortError } from '../abort';
-import { ENCRYPTION_CAPABILITY } from '../../encryption/server-state';
+import { ENCRYPTION_CAPABILITY, ENCRYPTION_STATE_HEADER } from '../../encryption/server-state';
 
 const logger = createLogger('ApiClient');
 
@@ -149,9 +149,12 @@ export class WorkerApiHttpClient {
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 	private requestGeneration = 0;
+	/** The server's last response said this vault is not encrypted. */
+	private encryptionOff = false;
 
 	private invalidateRequests(): void {
 		this.requestGeneration++;
+		this.encryptionOff = false;
 		this.serverInfo = undefined;
 		this.serverInfoRequest = undefined;
 	}
@@ -228,10 +231,12 @@ export class WorkerApiHttpClient {
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 			const route = path.split('?')[0]!;
-			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders['X-Crate-Encryption-Vault']
+			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders['X-Crate-Encryption-Vault'] && !this.encryptionOff
 				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix)) || route === '/settings')) {
 				// Another device may have enabled encryption since this client last
-				// synced. Probe without a private body before dispatching plaintext.
+				// synced. Probe without a private body before dispatching plaintext,
+				// unless the previous response already confirmed it is still off; the
+				// server rejects plaintext into an encrypted vault either way.
 				const state = await this.requestJson<{ encryption: unknown }>('/encryption', {}, Math.min(timeout, 30_000));
 				if (state.encryption !== null) throw new HttpError('Unlock this vault in Manage encryption before sending changes', 428, null, 'encryption_required');
 			}
@@ -283,6 +288,8 @@ export class WorkerApiHttpClient {
 				settled = true;
 				cleanup();
 				record('response', response);
+				const encryptionState = getHeader(response.headers, ENCRYPTION_STATE_HEADER);
+				if (encryptionState === 'off' || encryptionState === 'on') this.encryptionOff = encryptionState === 'off';
 				resolve(response);
 			};
 			const rejectOnce = (error: unknown) => {

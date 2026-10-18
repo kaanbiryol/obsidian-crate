@@ -3,6 +3,9 @@ import { isEncryptionFolderPath, type RecoveryEnvelope, type VaultKeyBundle } fr
 
 export const ENCRYPTION_CAPABILITY = 'e2ee-v1';
 export const READING_ENCRYPTION_CAPABILITY = 'e2ee-reading-v1';
+/** Authenticated responses say whether the vault is encrypted ('on' or 'off'),
+ * so clients can skip probing /encryption before plaintext requests. */
+export const ENCRYPTION_STATE_HEADER = 'X-Crate-Encryption-State';
 export const ENCRYPTION_FOLDER_MOVES_CAPABILITY = 'e2ee-folder-moves-v1';
 export const ENCRYPTION_PROTOCOL = 2;
 

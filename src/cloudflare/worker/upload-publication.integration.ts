@@ -85,6 +85,7 @@ it('confirms coordinator setup once per Worker instance across sync checks', asy
 			headers: { Authorization: 'Bearer owner', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) },
 		}), runtime);
 		expect(response.status, await response.clone().text()).toBe(200);
+		expect(response.headers.get('X-Crate-Encryption-State')).toBe('off');
 	}
 	expect(ensures).toHaveLength(1);
 });

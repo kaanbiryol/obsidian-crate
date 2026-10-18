@@ -2,7 +2,7 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
-App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics. Authenticated responses also carry `X-Crate-Encryption-State: on|off`; clients skip the `/encryption` probe before plaintext requests while it reports `off`, and the server still rejects plaintext into an encrypted vault with 428.
 
 ## Authentication
 

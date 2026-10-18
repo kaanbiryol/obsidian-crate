@@ -9,6 +9,7 @@ import type { EncryptedReminderApi } from './encrypted-reminder-api';
 import type { StoredReminderKeys } from './encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from './encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from './shared-features';
+import { ENCRYPTION_STATE_HEADER } from '@/encryption/server-state';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	const protocol = await requireCompatibleServer();
@@ -35,6 +36,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	let keys: StoredReminderKeys | null = null;
 	let encrypted: EncryptedReminderApi | null = null;
 	let preparing: Promise<void> | undefined;
+	// The server's last response said this vault is not encrypted.
+	let encryptionOff = false;
 	async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		if (!authToken) throw new ConnectionError('reconnect', 'Not authenticated');
@@ -68,12 +71,17 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			onUnauthorized();
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
 		}
-		if (keys && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
+		const encryptionState = response.headers.get(ENCRYPTION_STATE_HEADER);
+		if (encryptionState === 'off' || encryptionState === 'on') encryptionOff = encryptionState === 'off';
+		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
+		if ((keys || encryptionState === 'on') && response.status === 428 && path !== '/encryption') throw new EncryptionScopeChangedError('The encrypted folder changed.');
 		if (response.status === 423) requestSharedFeaturesRefresh(true);
 		return response;
 	}
 	function ready(refresh = false): Promise<void> {
 		if (!authToken) return Promise.resolve();
+		// Unencrypted vaults skip the probe while responses confirm it stays off.
+		if (!refresh && encryptionOff && !keys) return Promise.resolve();
 		if (refresh) preparing = undefined;
 		return preparing ??= preparePwaEncryption(authToken, rawFetch, refresh).then(async value => {
 			const Constructor = value ? (await import('./encrypted-reminder-api')).EncryptedReminderApi : null;

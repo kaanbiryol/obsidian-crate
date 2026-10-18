@@ -56,6 +56,7 @@ it.each(['single markdown', 'single binary', 'batch', 'mixed batch'] as const)('
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(428);
 	expect(await response.json()).toMatchObject({ code: 'encryption_required' });
+	expect(response.headers.get('X-Crate-Encryption-State')).toBe('on');
 	await expectNoPublication();
 });
 
@@ -122,6 +123,7 @@ it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload w
 				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operationId() },
 		}), env);
 		expect(response.status, await response.clone().text()).toBe(200);
+		expect(response.headers.get('X-Crate-Encryption-State')).toBe('on');
 	} finally { env.BUCKET.get = get; }
 	expect(reads).toBe(0);
 	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'note.md' });
