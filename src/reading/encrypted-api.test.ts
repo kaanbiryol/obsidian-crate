@@ -2,7 +2,7 @@ import { beforeAll, expect, it, vi } from 'vitest';
 import { generateEncryptionSecret, importEncryptionSecret } from '@/encryption/envelope';
 import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import type { EncryptedInventoryFile } from '@/encryption/file-inventory';
-import { EncryptedReadingApi } from './encrypted-api';
+import { EncryptedReadingApi, type EncryptedReadingIndexEntry } from './encrypted-api';
 import { createReadingNote } from './core/notes';
 
 let authority: FileEncryptionAuthority;
@@ -85,4 +85,76 @@ it('answers an unchanged vault from the confirmed inventory in one request', asy
 	expect(await api.request('/reading/list')).toEqual(first);
 	expect(request).toHaveBeenCalledOnce();
 	expect(first.revision).toMatch(/^"e2ee-reading-1-1"$/);
+});
+
+async function notes(count: number, revision = 'r1') {
+	return Promise.all(Array.from({ length: count }, async (_, i) => {
+		const id = `00000000-0000-4000-8000-${String(i + 100).padStart(12, '0')}`;
+		const path = `Reading/Note ${String(i).padStart(3, '0')}.md`;
+		const text = createReadingNote({ id, url: `https://example.com/${i}`, title: `Note ${i}`, savedAt: '2026-10-01T12:00:00Z' });
+		const sealed = await sealFile({ path, content: new TextEncoder().encode(text), contentType: 'text/markdown', publicData: null }, authority);
+		return { bytes: sealed.bytes, file: { path, hash: sealed.hash, size: sealed.bytes.length, revision } };
+	}));
+}
+function serve(request: ReturnType<typeof harness>['request'], saved: Awaited<ReturnType<typeof notes>>, sequence = 1) {
+	const bytes = new Map(saved.map(note => [note.file.path, note.bytes]));
+	request.mockImplementation(async path => {
+		if (!path.startsWith('/reading/encrypted-file?')) return Response.json(page(saved.map(note => note.file), null, sequence));
+		return new Response(bytes.get(new URL(path, 'https://crate.invalid').searchParams.get('path')!));
+	});
+}
+const downloads = (request: ReturnType<typeof harness>['request']) => request.mock.calls.filter(([path]) => path.startsWith('/reading/encrypted-file?')).length;
+
+it('downloads changed notes a few at a time and keeps page order', async () => {
+	const { api, request } = harness(), saved = await notes(20);
+	serve(request, saved);
+	let active = 0, peak = 0;
+	const serveFile = request.getMockImplementation()!;
+	request.mockImplementation(async path => {
+		if (!path.startsWith('/reading/encrypted-file?')) return serveFile(path);
+		active++; peak = Math.max(peak, active);
+		await new Promise(resolve => setTimeout(resolve, 1));
+		active--;
+		return serveFile(path);
+	});
+	const list = await api.request('/reading/list') as { items: Array<{ title: string }> };
+	expect(list.items.map(item => item.title)).toEqual(saved.map((_, i) => `Note ${i}`));
+	// Before: one note at a time.
+	expect(peak).toBe(6);
+	expect(downloads(request)).toBe(20);
+});
+
+it('reuses the saved index after a reload and downloads only changed notes', async () => {
+	const saved = await notes(10);
+	let stored: EncryptedReadingIndexEntry[] | undefined;
+	const saveIndex = vi.fn(async (entries: EncryptedReadingIndexEntry[]) => { stored = structuredClone(entries); });
+	const reload = () => {
+		const request = vi.fn<(path: string) => Promise<Response>>();
+		const api = new EncryptedReadingApi({ folderPath: 'Reading', generation: 1, authority, request, loadIndex: async () => stored, saveIndex,
+			readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
+		return { api, request };
+	};
+
+	const first = reload();
+	serve(first.request, saved);
+	await first.api.request('/reading/list');
+	expect(downloads(first.request)).toBe(10);
+	expect(saveIndex).toHaveBeenCalledOnce();
+
+	// Unchanged library after reload: listing only, no note downloads, no rewrite.
+	const unchanged = reload();
+	serve(unchanged.request, saved, 2);
+	await expect(unchanged.api.request('/reading/list')).resolves.toMatchObject({ items: saved.map((_, i) => ({ title: `Note ${i}` })) });
+	expect(downloads(unchanged.request)).toBe(0);
+	expect(saveIndex).toHaveBeenCalledOnce();
+
+	// One edited note: only that note is downloaded, and the index is refreshed.
+	const edited = [...saved];
+	edited[3] = (await notes(4, 'r2'))[3]!;
+	const changed = reload();
+	serve(changed.request, edited, 3);
+	await changed.api.request('/reading/list');
+	expect(downloads(changed.request)).toBe(1);
+	expect(saveIndex).toHaveBeenCalledTimes(2);
+	expect(stored?.find(entry => entry.file.path === edited[3]!.file.path)?.file.revision).toBe('r2');
 });

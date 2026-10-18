@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from './outbox';
 import { assertReadingSession, exportReadingData, pendingReading, readReadingCache, readReadingDraft, readingSession, READING_SESSION_KEY,
-  saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, type ReadingSession } from './storage';
+  saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex, type ReadingSession } from './storage';
+import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
@@ -119,4 +120,14 @@ it('rejects malformed cache envelopes and drafts without overwriting either', as
   expect(values.get(`list:${session.id}`)).toBe(cache);
   expect(values.get(`draft:${session.id}`)).toEqual({ url: { private: 'saved text' } });
   expect(isReadingCache({ items: [], issues: [], savedAt: 1 }, 'Reading')).toBe(true);
+});
+
+it('reuses the encrypted Reading index only for the same encryption identity and valid entries', async () => {
+  const item = parseReadingNote(createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.com/a', title: 'A', savedAt: '2026-10-01T12:00:00Z' }))!;
+  const entry = { file: { path: 'Reading/A.md', hash: 'hash', size: 10, revision: 'r1' }, item: { ...item, path: 'Reading/A.md' } };
+  await writeEncryptedReadingIndex(session, 'identity-a', [entry]);
+  await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toEqual([entry]);
+  await expect(readEncryptedReadingIndex(session, 'identity-b', 'Reading')).resolves.toBeUndefined();
+  await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Reading/Other.md' } }]);
+  await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
 });

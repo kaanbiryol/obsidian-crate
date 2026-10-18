@@ -13,10 +13,14 @@ import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type Enc
 
 const MAX_READING_FILES = 100_000;
 const MAX_READING_METADATA_BYTES = 64 * 1024 * 1024;
+// Changed notes download in parallel, a few at a time, in page order.
+const SOURCE_CONCURRENCY = 6;
 /** `revision` changes with the vault sequence a complete inventory was confirmed at. */
 interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
 
 interface Source { file: WireFile; content: string; item: ReadingItem }
+/** Authenticated metadata for one encrypted note, reusable while its file is unchanged. */
+export interface EncryptedReadingIndexEntry { file: WireFile; item: ReadingItem }
 interface Attempt { requestHash: string; body: string; generation?: number }
 interface EncryptedReadingOptions {
   folderPath: string; generation: number; authority: FileEncryptionAuthority;
@@ -24,7 +28,20 @@ interface EncryptedReadingOptions {
   request(path: string, body?: string): Promise<Response>;
   readAttempt(id: string): Promise<unknown>;
   writeAttempt(id: string, attempt: Attempt): Promise<void>;
+  /** Optional local copy of the index, so a reload only downloads changed notes. */
+  loadIndex?(): Promise<EncryptedReadingIndexEntry[] | undefined>;
+  saveIndex?(entries: EncryptedReadingIndexEntry[]): Promise<void>;
   error(message: string, status: number, code?: string): Error;
+}
+function sameFile(a: WireFile, b: WireFile): boolean {
+  return a.revision === b.revision && a.hash === b.hash && a.size === b.size;
+}
+async function mapBounded<T, R>(values: readonly T[], limit: number, map: (value: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  const worker = async () => { while (next < values.length) { const index = next++; results[index] = await map(values[index]!); } };
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+  return results;
 }
 async function hash(value: string | Uint8Array<ArrayBuffer>): Promise<string> {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
@@ -36,7 +53,8 @@ async function hash(value: string | Uint8Array<ArrayBuffer>): Promise<string> {
 export class EncryptedReadingApi {
   private sources = new Map<string, Source>();
   private files = new Map<string, WireFile>();
-  private indexed = new Map<string, { file: WireFile; item: ReadingItem }>();
+  private indexed = new Map<string, EncryptedReadingIndexEntry>();
+  private indexLoaded = false;
   // The last complete inventory and the vault sequence it was confirmed at. An
   // unchanged first page answers from it, so polling is one request.
   private confirmed?: { sequence: number; result: EncryptedReadingInventory };
@@ -51,7 +69,7 @@ export class EncryptedReadingApi {
   private async source(file: WireFile, sources = this.sources): Promise<Source> {
     const folder = encodeURIComponent(this.options.folderPath);
     let source = sources.get(file.path);
-    if (!source || source.file.revision !== file.revision || source.file.hash !== file.hash || source.file.size !== file.size) {
+    if (!source || !sameFile(source.file, file)) {
       const response = await this.options.request(`/reading/encrypted-file?folderPath=${folder}&path=${encodeURIComponent(file.path)}&revision=${encodeURIComponent(file.revision)}`);
       if (!response.ok) throw new Error('Article changed or is unavailable. Refresh to retry.');
       if (file.size > 4 * 1024 * 1024) throw new Error('This Reading note is too large.');
@@ -77,10 +95,16 @@ export class EncryptedReadingApi {
     const folder = encodeURIComponent(this.options.folderPath);
     let first: EncryptedInventoryPage | undefined = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}`), this.options.folderPath, this.options.generation);
     if (this.confirmed?.sequence === first.sequence) return this.confirmed.result;
+    if (!this.indexLoaded) {
+      this.indexLoaded = true;
+      try { if (!this.indexed.size) for (const entry of await this.options.loadIndex?.() ?? []) this.indexed.set(entry.file.path, entry); }
+      catch { /* A missing or unreadable local index only costs downloads. */ }
+    }
     let cursor: string | null = null, sequence: number | undefined;
     const candidates: ReadingItem[] = [];
     const next = new Map<string, WireFile>(), issues: Array<{ path: string; message: string }> = [];
-    const nextIndex = new Map<string, { file: WireFile; item: ReadingItem }>();
+    const nextIndex = new Map<string, EncryptedReadingIndexEntry>();
+    let downloaded = false;
     const nextSources = new Map(this.sources);
     const acceptPage = createEncryptedInventoryProgress({ maxFiles: MAX_READING_FILES, maxPages: 1000 });
     let metadataBytes = 0;
@@ -90,12 +114,18 @@ export class EncryptedReadingApi {
       sequence ??= page.sequence;
       if (page.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
       acceptPage(page);
-      for (const file of page.files) {
+      const loaded = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
+        const cached = this.indexed.get(file.path);
+        if (cached && sameFile(cached.file, file)) return { item: cached.item };
+        try { const { item } = await this.source(file, nextSources); downloaded = true; return { item }; }
+        catch (error) { return { error }; }
+      });
+      for (const [index, file] of page.files.entries()) {
         try {
           next.set(file.path, file);
-          const cached = this.indexed.get(file.path);
-          const item = cached?.file.revision === file.revision && cached.file.hash === file.hash && cached.file.size === file.size
-            ? cached.item : (await this.source(file, nextSources)).item;
+          const result = loaded[index]!;
+          if ('error' in result) throw result.error;
+          const item = result.item;
           metadataBytes += new TextEncoder().encode(JSON.stringify(item)).length;
           if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
           candidates.push(item);
@@ -107,6 +137,7 @@ export class EncryptedReadingApi {
     if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
     const confirmed = parseEncryptedInventoryPage(await this.json(`/reading/encrypted-files?folderPath=${folder}`), this.options.folderPath, this.options.generation);
     if (confirmed.sequence !== sequence) throw new Error('Reading changed while loading. Refresh again.');
+    const removed = [...this.indexed.keys()].some(path => !nextIndex.has(path));
     this.files = next;
     this.indexed = nextIndex;
     for (const path of nextSources.keys()) if (!next.has(path)) nextSources.delete(path);
@@ -119,6 +150,7 @@ export class EncryptedReadingApi {
     });
     const result: EncryptedReadingInventory = { items, issues, cursor: null, revision: `"e2ee-reading-${this.options.generation}-${sequence}"` };
     this.confirmed = { sequence: sequence, result };
+    if (downloaded || removed) await this.options.saveIndex?.([...nextIndex.values()]).catch(() => { /* The index is only a cache. */ });
     return result;
   }
   async request(path: string, rawBody?: string): Promise<unknown> {

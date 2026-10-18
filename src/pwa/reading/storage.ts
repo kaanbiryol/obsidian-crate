@@ -6,7 +6,7 @@ import { readingDatabase, readReadingValue, writeReadingValue } from './database
 import { assertReadingSession, READING_SESSION_KEY, type ReadingSession } from './session';
 
 export { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from './session';
-export { readReadingCache, readReadingArticle, commitReadingCache, cacheReadingArticle, type ReadingCache } from './cache';
+export { readReadingCache, readReadingArticle, commitReadingCache, cacheReadingArticle, readEncryptedReadingIndex, writeEncryptedReadingIndex, type ReadingCache } from './cache';
 
 // Feature callers use these scoped operations; database keys remain inside storage.
 interface ReadingDraft { url: string }

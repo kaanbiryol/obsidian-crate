@@ -2,7 +2,7 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders } from './encryption-session';
 import { EncryptedReadingApi } from '@/reading/encrypted-api';
-import { readReadingAttempt, writeReadingAttempt } from './storage';
+import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
 import { AUTH_TOKEN_KEY } from '../config';
 import { capturePwaSession } from '../session-generation';
@@ -64,12 +64,15 @@ async function preparedReadingRequest<T>(path: string, session: ReadingSession |
     const keys = await prepareReadingEncryption(session, refresh);
     if (keys && /^\/reading\/(list|item|capture|update|retry)(?:\?|$)/.test(path)) {
       const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.scopeId, keys.generation]);
+      const indexIdentity = JSON.stringify([keys.vaultId, keys.scopeId, keys.generation, keys.folderPath]);
       if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
         captureArticle: async url => (await import('./capture-article')).captureBrowserArticle(url),
         folderPath: keys.folderPath, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data },
         request: (route, wire) => rawReadingRequest(route, session, wire),
         readAttempt: id => readReadingAttempt(session, id),
         writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
+        loadIndex: () => readEncryptedReadingIndex(session, indexIdentity, keys.folderPath),
+        saveIndex: entries => writeEncryptedReadingIndex(session, indexIdentity, entries),
         error: (message, status, code) => new ReadingApiError(message, status, code),
       }) };
       const value = await encryptedClient.api.request(path, body); assertReadingSession(session);
