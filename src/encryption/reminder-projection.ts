@@ -31,9 +31,18 @@ export async function createReminderProjection(bundle: VaultKeyBundle | Reminder
 	const scope = scopes.filter(scope => path.startsWith(`${scope.folderPath}/`))
 		.sort((left, right) => right.folderPath.length - left.folderPath.length)[0];
 	if (!scope || scope.purpose === 'reading' || !path.toLowerCase().endsWith('.md')) return null;
-	return createReminderProjectionWithKeys(bundle.vaultId, scope, await importEncryptionSecret(scope.notifications),
-		await importNotificationFingerprintKey(bundle.vaultId, scope), path, bytes);
+	let keys = projectionKeys.get(scope);
+	if (!keys) {
+		keys = Promise.all([importEncryptionSecret(scope.notifications), importNotificationFingerprintKey(bundle.vaultId, scope)]);
+		projectionKeys.set(scope, keys);
+		keys.catch(() => projectionKeys.delete(scope));
+	}
+	const [key, fingerprintKey] = await keys;
+	return createReminderProjectionWithKeys(bundle.vaultId, scope, key, fingerprintKey, path, bytes);
 }
+
+/** Bundles are immutable, so each scope's imported keys serve every file it projects. */
+const projectionKeys = new WeakMap<ScopeKeys, Promise<[EncryptionKey, CryptoKey]>>();
 
 export async function importNotificationFingerprintKey(vaultId: string, scope: ScopeKeys): Promise<CryptoKey> {
 	const raw = decodeBase64Url(scope.notifications.secret, 32);

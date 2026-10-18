@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { addReminderScope, createVaultKeyBundle } from './key-bundle';
 import { createReminderProjection, openNotification } from './reminder-projection';
 import { importEncryptionSecret } from './envelope';
@@ -49,3 +49,16 @@ it.each([3000, 10001])('keeps a %i-reminder note convertible when notification m
 	expect(opened.content).toEqual(content);
 	expect(opened.publicData).toEqual(publicData);
 }, 15000);
+
+it('imports a scope\'s notification keys once for many projected files', async () => {
+	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const importKey = vi.spyOn(crypto.subtle, 'importKey');
+	try {
+		for (let file = 0; file < 5; file++) {
+			await createReminderProjection(bundle, `Reminders/Note ${file}.md`, new TextEncoder().encode(`- [ ] Task ${file} <!-- crate-id:task-${file} -->`).buffer);
+		}
+		// Each notice envelope still derives its own key (two imports per file).
+		// Before: 20, because the scope keys were imported again for every file.
+		expect(importKey).toHaveBeenCalledTimes(2 + 5 * 2);
+	} finally { importKey.mockRestore(); }
+});
