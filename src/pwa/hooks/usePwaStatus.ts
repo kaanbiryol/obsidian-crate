@@ -55,8 +55,19 @@ export function usePwaStatus({
 	const [statusNow, setStatusNow] = useState(() => Date.now());
 
 	useEffect(() => {
-		const timer = window.setInterval(() => setStatusNow(Date.now()), 30_000);
-		return () => window.clearInterval(timer);
+		// The relative "updated" label only needs refreshing while it can be seen.
+		let timer: number | undefined;
+		const start = () => { timer = window.setInterval(() => setStatusNow(Date.now()), 30_000); };
+		const onVisibilityChange = () => {
+			window.clearInterval(timer);
+			timer = undefined;
+			if (document.visibilityState === 'hidden') return;
+			setStatusNow(Date.now());
+			start();
+		};
+		if (document.visibilityState !== 'hidden') start();
+		document.addEventListener('visibilitychange', onVisibilityChange);
+		return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange); };
 	}, []);
 
 	const readOnlyMessage = useMemo(() => {

@@ -1,5 +1,5 @@
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { newReminderOperationId } from '../reminder-operation-id';
 import { applyReminderChanges, predictReminderCompletion } from '../reminder-optimistic-state';
@@ -144,6 +144,12 @@ export function useReminderMutations(options: {
 		modal.recovery = true;
 		return modal;
 	};
+	// Cards and lists memoize on these handlers, so keep their identity stable
+	// and run the latest closures through a ref.
+	const latest = useRef({ toggleReminderCompleted, persistReorder });
+	useLayoutEffect(() => { latest.current = { toggleReminderCompleted, persistReorder }; });
+	const stableToggleCompleted = useCallback((id: string, completed: boolean) => latest.current.toggleReminderCompleted(id, completed), []);
+	const stablePersistReorder = useCallback((project: string, orderedIds: string[]) => latest.current.persistReorder(project, orderedIds), []);
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
+	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

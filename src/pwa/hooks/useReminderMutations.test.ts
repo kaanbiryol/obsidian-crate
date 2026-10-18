@@ -62,6 +62,17 @@ function harness() {
 function body(change: PendingReminderChange): Record<string, unknown> { return JSON.parse(change.body) as Record<string, unknown>; }
 
 describe('PWA optimistic mutations', () => {
+	it('keeps card handlers stable across renders while using the latest state', async () => {
+		const { hook, render, outbox, remindersRef } = harness();
+		remindersRef.current = [...remindersRef.current, { ...remindersRef.current[0]!, id: 'three', content: 'three' }];
+		const next = render();
+		// Before: new functions on every render, so every memoized card re-rendered.
+		expect(next.toggleReminderCompleted).toBe(hook.toggleReminderCompleted);
+		expect(next.persistReorder).toBe(hook.persistReorder);
+		await act(async () => { await hook.toggleReminderCompleted('three', false); });
+		expect(outbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({ kind: 'complete', recordId: 'three' }));
+	});
+
 	it('tracks commands being prepared before enqueue', async () => {
 		const { hook } = harness();
 		let complete!: Promise<void>, reorder!: Promise<void>;
