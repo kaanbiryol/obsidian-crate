@@ -19,31 +19,7 @@ function harness() {
 const clip = '---\ncrate_reading_import: web-clipper-v1\ntitle: A clip\nsource_url: https://example.com\nsaved_at: 2026-09-21T12:00:00Z\n---\n\nExact clipped text.\n';
 
 describe('local Reading library', () => {
-	it('keeps queued captures outside the vault until their final note syncs', async () => {
-		const h = harness();
-		const note = createReadingNote({ id: 'a1b2c3d4-5678-4abc-9def-123456789abc', url: 'https://example.com/article', savedAt: '2026-09-28T00:00:00Z' });
-		const item = { ...parseReadingNote(note)!, path: '' };
-		const queueCapture = vi.fn(async () => item);
-		h.vault.queueCapture = queueCapture;
-		h.vault.pendingCaptures = async () => queueCapture.mock.calls.length ? [item] : [];
-		expect((await h.library.add(item.source_url)).item).toEqual(item);
-		expect(h.files.size).toBe(0);
-		expect((await h.library.add(item.source_url)).duplicate).toBe(true);
-		await expect(h.library.update(item, { favorite: true })).rejects.toThrow('still being saved');
-		h.files.set('Reading/Actual title - a1b2c3d4.md', note.replace('title: "example.com"', 'title: "Actual title"').replace('"pending"', '"ready"'));
-		await h.library.refresh();
-		expect(h.library.getSnapshot().items).toHaveLength(1);
-		expect(h.library.getSnapshot().items[0]).toMatchObject({ path: 'Reading/Actual title - a1b2c3d4.md', title: 'Actual title', crate_reading_id: item.crate_reading_id });
-	});
 
-	it('keeps vault notes readable when pending capture storage needs recovery', async () => {
-		const h = harness();
-		h.files.set('Reading/Note.md', 'Personal note.');
-		h.vault.pendingCaptures = async () => { throw new Error('Pending saves need recovery'); };
-		await h.library.refresh();
-		expect(h.library.getSnapshot().items).toHaveLength(1);
-		expect(h.library.getSnapshot().issues).toEqual([{ path: 'Reading', message: 'Pending saves need recovery' }]);
-	});
 	it('saves local-only bookmarks when no capture queue is configured', async () => {
 		const { library } = harness();
 		expect((await library.add('https://example.com/bookmark', undefined, false)).item.extraction_status).toBe('unavailable');
@@ -187,11 +163,9 @@ describe('local article downloads', () => {
   it('saves before downloading, skips server capture and preserves metadata and personal notes', async () => {
     const h = harness(), pending = deferred<typeof article>();
     h.vault.captureArticle = vi.fn(() => pending.promise);
-    const queueCapture = vi.fn(); h.vault.queueCapture = queueCapture;
     const { item } = await h.library.add('https://example.com/article');
     expect(h.files.has(item.path)).toBe(true);
     expect(parseReadingNote(h.files.get(item.path)!)?.extraction_status).toBe('unavailable');
-    expect(queueCapture).not.toHaveBeenCalled();
     expect(h.library.isCapturing(item)).toBe(true);
     const finished = h.library.retryCapture(item);
     await h.library.update(item, { favorite: true });

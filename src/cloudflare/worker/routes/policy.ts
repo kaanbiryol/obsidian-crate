@@ -26,7 +26,6 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /encryption/pairing': { scopes: LIBRARY },
 	'POST /encryption/pairing': { scopes: LIBRARY },
 	'GET /encryption': { scopes: REMINDERS },
-	'GET /encryption/capture-recovery': { scopes: VAULT },
 	'GET /encryption/upload-receipt': { scopes: VAULT },
 	'GET /encryption/deletion-precondition': { scopes: VAULT },
 	'GET /encryption/folders': { scopes: VAULT },

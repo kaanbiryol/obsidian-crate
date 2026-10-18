@@ -55,14 +55,6 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
   const updateItem = async (item: ReadingItem, changes: ReadingChanges, article?: { item: ReadingItem; markdown: string | null }) => {
     if (!session) return;
     await withPreparation(async () => {
-      // Keep the Markdown parser out of app startup while preparing stable legacy
-      // highlight metadata before a following annotation queues.
-      if (!item.highlight_format && item.highlights?.length && changes.highlights === undefined
-        && article?.item.crate_reading_id === item.crate_reading_id && article.markdown !== null
-        && !pending.some(op => op.action !== 'capture' && op.intent.id === item.crate_reading_id)) {
-        const { writeMarkdownHighlights } = await import('@/reading/core/markdown-highlights');
-        changes = { ...changes, highlights: writeMarkdownHighlights(article.markdown, item.highlights).highlights };
-      }
       validateReadingMetadata({ ...item, ...changes });
       const before = Object.fromEntries(Object.keys(changes).map(key => [key, item[key as keyof ReadingChanges]]));
       await persistChange({ action: 'update', intent: { id: item.crate_reading_id, changes, before } });

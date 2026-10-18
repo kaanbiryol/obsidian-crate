@@ -19,7 +19,6 @@ interface FolderMoveWorkflowContext {
   assertCurrent: () => void;
   checkpointRenames(): Promise<void>;
   convertVault(target: VaultKeyBundle, recovery: string): Promise<void>;
-  recoverReadingCaptures(): Promise<void>;
   getReadingSettings(): ReadingSettings;
   getRemindersFolderPath(): string;
   writeReadingSettings(settings: ReadingSettings, assertCurrent: () => void): Promise<void>;
@@ -34,7 +33,6 @@ export async function applyNextEncryptedFolderMove(context: FolderMoveWorkflowCo
   await context.checkpointRenames();
   context.assertCurrent();
   if (job.scopeChange === false) {
-    if (readFolderMoves(context.storage).moves.length === 1) await context.recoverReadingCaptures();
     completeFolderMoveHead(context.storage, job.id);
     return true;
   }
@@ -63,7 +61,6 @@ export async function applyNextEncryptedFolderMove(context: FolderMoveWorkflowCo
     ...(current.pendingServerFolder?.workerUrl === context.origin ? { pendingServerFolder: undefined } : {}),
   }), context.assertCurrent);
   context.assertCurrent();
-  if (readFolderMoves(context.storage).moves.length === 1) await context.recoverReadingCaptures();
   completeFolderMoveHead(context.storage, job.id);
   return true;
 }

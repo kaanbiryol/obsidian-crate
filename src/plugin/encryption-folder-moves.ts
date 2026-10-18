@@ -7,7 +7,6 @@ import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { assertEncryptionKeys, convertEncryptedVault, readServerEncryption } from '../sync/encryption-conversion';
 import { startReading, stopReading, waitForStoppedReading } from '../reading/runtime';
 import { checkpointEncryptionRenames } from '../sync/encryption-rename-checkpoint';
-import { recoverMovedReadingCaptures } from '../reading/capture-folder-recovery';
 import { folderMoveTarget, movedPath, readFolderMoves, writeFolderMoves } from './encryption-folder-move-journal';
 import { applyNextEncryptedFolderMove } from './encryption-folder-move-workflow';
 
@@ -52,7 +51,6 @@ export function resumeEncryptedFolderMoves(plugin: CratePlugin, progress: (messa
       storage: plugin.secretStorage, origin: connection.origin, assertCurrent: connection.assertCurrent,
       checkpointRenames: () => checkpointEncryptionRenames(plugin),
       convertVault: (target, recovery) => convertEncryptedVault(http, target, recovery, progress),
-      recoverReadingCaptures: () => recoverMovedReadingCaptures(plugin),
       getReadingSettings: () => plugin.settings.reading,
       getRemindersFolderPath: () => plugin.remindersSettings.remindersFolderPath,
       writeReadingSettings: (reading, assertCurrent) => plugin.writeSettings({ reading }, assertCurrent),
@@ -112,7 +110,7 @@ export async function useServerEncryptionFolders(plugin: CratePlugin): Promise<v
     await plugin.writeSettings({ reading: { ...reading, folderPath: mapFolder(reading.folderPath, 'reading') } }, assertCurrent);
     await plugin.writeRemindersSettings(current => ({ remindersFolderPath: mapFolder(current.remindersFolderPath, 'reminders'), pendingServerFolder: undefined }), assertCurrent);
     assertCurrent(); saveEncryptionKeys(plugin.secretStorage, bundle, recovery);
-    await recoverMovedReadingCaptures(plugin); assertCurrent();
+    assertCurrent();
     writeFolderMoves(plugin.secretStorage, { version: 1, moves: [] });
   });
   connection.assertCurrent();

@@ -13,8 +13,6 @@ export interface ReadingFile { path: string; size: number; modifiedAt: number; r
 export interface ReadingVault {
 	privateFilenames?(): boolean;
 	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
-	pendingCaptures?(): Promise<ReadingItem[]>;
-	queueCapture?(url: string, title?: string): Promise<ReadingItem>;
 	occupied?(path: string): boolean;
 	files(): ReadingFile[];
 	read(file: ReadingFile): Promise<string>;
@@ -108,14 +106,6 @@ export class ReadingLibrary {
 					issues.push({ path: file.path, message: error instanceof Error ? error.message : 'Could not read this note.' });
 				}
 			}
-			try {
-				for (const pending of await this.vault.pendingCaptures?.() ?? []) {
-					if (!items.some(item => item.crate_reading_id === pending.crate_reading_id || item.source_url && readingUrlIdentity(item.source_url) === readingUrlIdentity(pending.source_url))) items.push(pending);
-				}
-			} catch (error) {
-				this.assertActive();
-				issues.push({ path: this.folder, message: error instanceof Error ? error.message : 'Pending Reading saves need recovery.' });
-			}
 			const counts = new Map<string, number>();
 			for (const item of items) counts.set(item.crate_reading_id, (counts.get(item.crate_reading_id) ?? 0) + 1);
 			const unique = items.filter(item => {
@@ -145,11 +135,6 @@ export class ReadingLibrary {
 			if (matches.length > 1) throw new Error('Multiple notes already save this link. Open reading to choose one.');
 			const existing = matches[0];
 			if (existing) return { item: existing, duplicate: true };
-			if (fetchArticle && !this.vault.captureArticle && this.vault.queueCapture) {
-				const item = await this.vault.queueCapture(url, title);
-				await this.scan();
-				return { item, duplicate: false };
-			}
 			const id = crypto.randomUUID();
 			const note = createReadingNote({ id, url, title, savedAt: new Date().toISOString() });
 			const content = patchReadingFrontmatter(note, { extraction_status: 'unavailable' });

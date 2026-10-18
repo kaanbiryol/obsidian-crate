@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({ convert: vi.fn(), info: vi.fn(), state: vi.fn(
 vi.mock('../sync/encryption-conversion', async importOriginal => ({ ...await importOriginal<object>(), convertEncryptedVault: mocks.convert, readServerEncryption: mocks.state }));
 vi.mock('../sync/worker-api/http', () => ({ WorkerApiHttpClient: class { setAbortSignal() {} getServerInfo = mocks.info; } }));
 vi.mock('../sync/encryption-rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
-vi.mock('../reading/capture-folder-recovery', () => ({ recoverMovedReadingCaptures: vi.fn(async () => {}) }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
 vi.mock('./server-request', () => ({ captureServerConnection: () => ({ origin: 'https://crate.test', token: 'token', signal: new AbortController().signal, assertCurrent: () => {} }) }));
 afterEach(() => vi.resetAllMocks());

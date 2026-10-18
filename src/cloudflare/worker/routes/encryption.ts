@@ -1,7 +1,6 @@
 import { readEncryptedReceipt } from '../encrypted-receipt-storage';
 import { ENCRYPTION_METADATA_BATCH } from '../../../protocol/sync-limits';
 import { handleEncryptionPairing } from '../encryption-pairing';
-import { readCaptureRecovery } from '../encrypted-capture-recovery';
 import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption-state';
 import { validateFileDescriptor } from '../../../encryption/file-format';
 import { parseJsonObject } from '../utils';
@@ -16,7 +15,6 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
  * The recovery key never leaves the client; API permissions remain scoped. */
 export async function handleEncryptionRoute(request: Request, db: D1Database, path: string, principal: AuthPrincipal, authenticatedState?: EncryptionServerState | null): Promise<Response | null> {
   if (path === '/encryption/pairing') return handleEncryptionPairing(request, db, principal, authenticatedState === undefined ? await readEncryptionState(db) : authenticatedState);
-	if (path === '/encryption/capture-recovery' && request.method === 'GET' && principal.scope === 'vault') return readCaptureRecovery(request, db);
 	if (path === '/encryption/upload-receipt' && request.method === 'GET' && principal.scope === 'vault') {
 		const id = new URL(request.url).searchParams.get('operationId') ?? '';
 		const day = reminderOperationDay(id);

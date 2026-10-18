@@ -1,4 +1,3 @@
-import { youtubeVideoId } from '@/reading/core/youtube';
 import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
@@ -39,18 +38,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
       return readingResponse(response);
     }
     const identity = readingUrlIdentity(url);
-    let queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
+    const queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
       .bind(current.generation, identity).first<{ id: string }>();
-    // Only legacy video variants need a bounded fallback. Preserve their
-    // operation identities and original note bytes; ordinary saves use the index.
-    if (!queued && youtubeVideoId(url)) {
-      const pending = await env.DB.prepare('SELECT id, note FROM reading_captures WHERE generation=? LIMIT 1000')
-        .bind(current.generation).all<{ id: string; note: string }>();
-      queued = pending.results.find(capture => {
-        const item = parseReadingNote(capture.note);
-        return item?.source_url && readingUrlIdentity(item.source_url) === identity;
-      }) ?? null;
-    }
     if (queued) {
       const response = { saved: true, alreadySaved: true, id: queued.id };
       await env.DB.batch([operationStatement(env.DB, op, response)]);

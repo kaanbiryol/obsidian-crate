@@ -1,6 +1,4 @@
 import { loadEncryptionKeys } from '../plugin/encryption-storage';
-import { captureAuthority, ReadingCaptureOutbox } from './data/capture-outbox';
-import { getCheckpointAuthority } from '../sync/worker-url';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { readingServerRequest } from './server';
 import { captureServerConnection } from '../plugin/server-request';
@@ -63,51 +61,17 @@ export function startReading(plugin: CratePlugin): void {
 	let policyChecked = !plugin.settings.workerUrl;
  let checkedAt = 0;
 	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
-	let outboxPromise: Promise<ReadingCaptureOutbox> | undefined;
-	const outbox = () => outboxPromise ??= (async () => {
-		const origin = plugin.settings.workerUrl, token = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
-		const scope = loadEncryptionKeys(plugin.secretStorage) ? getCheckpointAuthority(plugin.settings) : origin;
-		const authority = await captureAuthority(scope, token), alias = await captureAuthority(origin, token);
-		controller.signal.throwIfAborted();
-		const directory = `${vault.configDir}/plugins/${plugin.manifest.id}/reading-captures`;
-		const guard = () => {
-			controller.signal.throwIfAborted();
-			if (getCheckpointAuthority(plugin.settings) !== scope || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== token) throw new Error('The Reading server connection changed. Reopen Reading.');
-		};
-		return new ReadingCaptureOutbox({
-			list: async () => { guard(); return await vault.adapter.exists(directory) ? (await vault.adapter.list(directory)).files.filter(path => path.endsWith('.json')).map(path => path.slice(directory.length + 1)) : []; },
-			read: async key => { guard(); return vault.adapter.read(`${directory}/${key}`); },
-			write: async (key, value) => {
-				guard(); if (!await vault.adapter.exists(directory)) await vault.adapter.mkdir(directory);
-				guard(); await vault.adapter.write(`${directory}/${key}`, value);
-				if (await vault.adapter.read(`${directory}/${key}`) !== value) throw new Error('Could not verify the saved Reading link.');
-			},
-			remove: async (key, operationId) => {
-				guard();
-				const { removeEncryptedReadingCapture } = await import('./encrypted-capture');
-				await removeEncryptedReadingCapture(plugin, operationId);
-				guard(); await vault.adapter.remove(`${directory}/${key}`);
-			},
-		}, authority, folder, controller.signal, [alias]);
-	})();
 	// Keep replacement views synchronous, but start their vault work after the old library drains.
 	const library = new ReadingLibrary({ ...readingVault, privateFilenames: () => Boolean(loadEncryptionKeys(plugin.secretStorage)),
 		...{ captureArticle: async (url: string, signal: AbortSignal) => {
 			const { captureDesktopArticle } = await import('./desktop-capture');
 			return captureDesktopArticle(url, signal);
 		} },
-		...(plugin.settings.workerUrl ? {
-			pendingCaptures: async () => (await outbox()).list(),
-			queueCapture: async (url: string, title?: string) => { const item = await (await outbox()).add(url, title); schedule(); return item; },
-		} : {}),
 	}, folder, controller.signal, canAdopt, stopping.get(plugin));
 	let timer: number | undefined;
 	let lastErrorAt = 0;
-	let draining = false;
   const refreshes = new Set<Promise<void>>();
   const attemptedArticles = new Set<string>();
-	const polling = plugin.settings.workerUrl ? window.setInterval(() => { if (library.getSnapshot().items.some(item => !item.path)) schedule(); }, 15_000) : undefined;
-	if (polling !== undefined) plugin.registerInterval(polling);
 	const refresh = () => {
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
 
@@ -135,10 +99,7 @@ export function startReading(plugin: CratePlugin): void {
         const item = library.getSnapshot().items.find(item => item.path && item.extraction_status === 'pending' && !attemptedArticles.has(item.crate_reading_id));
         if (item) { attemptedArticles.add(item.crate_reading_id); void library.retryCapture(item).catch(() => {}).finally(schedule); }
       }
-			if (!plugin.settings.workerUrl || !policyChecked || controller.signal.aborted || draining) return;
-			draining = true;
-			try { await (await outbox()).drain(library.getSnapshot().items, body => readingServerRequest(plugin, '/reading/capture', body)); } finally { draining = false; }
-		}).catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not finish pending Reading saves.'); } });
+		}).catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
     refreshes.add(work); void work.finally(() => refreshes.delete(work));
 	};
 	const schedule = () => {
@@ -160,11 +121,11 @@ export function startReading(plugin: CratePlugin): void {
 	for (const ref of refs) plugin.registerEvent(ref);
 	plugin.syncRuntime.addStateChangeListener(schedule);
 	const stop = () => {
-		controller.abort(); window.clearTimeout(timer); window.clearInterval(polling);
+		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
 		plugin.syncRuntime.removeStateChangeListener(schedule);
 		lifetime.removeEventListener('abort', onAbort);
-    return Promise.allSettled([library.close(), ...refreshes, outboxPromise?.then(box => box.waitForIdle())]).then(() => {});
+    return Promise.allSettled([library.close(), ...refreshes]).then(() => {});
 	};
   const onAbort = () => { void stop(); };
 	lifetime.addEventListener('abort', onAbort, { once: true });

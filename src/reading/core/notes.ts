@@ -9,7 +9,7 @@ export function parseReadingNote(markdown: string): ReadingMetadata | null {
 	if (!parsed || !Object.prototype.hasOwnProperty.call(parsed.value, 'crate_reading_version')) return null;
 	const metadata = validateReadingMetadata(parsed.value);
 	if (!metadata.highlights?.length && !parsed.body.includes('==')) return metadata;
-	const { highlights, recovery } = readMarkdownHighlights(parsed.body, metadata.highlights, !metadata.highlight_format);
+	const { highlights, recovery } = readMarkdownHighlights(parsed.body, metadata.highlights);
 	return { ...metadata, highlights, ...(recovery.length ? { highlight_recovery: [...(metadata.highlight_recovery ?? []), ...recovery] } : {}) };
 }
 
@@ -32,7 +32,7 @@ export function updateReadingNote(markdown: string, id: string, changes: Reading
 		...(changes.tags === undefined ? {} : { tags: changes.tags }),
 	};
 	validateReadingMetadata({ ...metadata, ...allowed });
-	if (changes.highlights !== undefined || (!metadata.highlight_format && metadata.highlights?.length)) {
+	if (changes.highlights !== undefined) {
 		const parsed = readReadingFrontmatter(markdown)!;
 		const written = writeMarkdownHighlights(parsed.body, allowed.highlights ?? metadata.highlights ?? []);
 		markdown = markdown.slice(0, markdown.length - parsed.body.length) + written.markdown;

@@ -4,7 +4,7 @@ import { readingHighlights, matchingHighlights } from './highlights';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './notes';
 import { paintHighlights, resizeHighlight } from '../ui/reader-highlights';
 import { readingDocument } from './markdown';
-import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
+import { readReadingFrontmatter } from './frontmatter';
 import { adoptReadingClip } from './notes';
 
 const highlight = { start: 0, end: 5, text: 'Hello' };
@@ -35,47 +35,6 @@ it('persists exact code highlights in note metadata while preserving the code', 
 		expect(readReadingFrontmatter(updated)!.body).toBe(body);
 		expect(parseReadingNote(updateReadingNote(updated, metadata.crate_reading_id, { favorite: true }))!.highlights).toEqual(parsed.highlights);
 		expect(parseReadingNote(updateReadingNote(updated, metadata.crate_reading_id, { highlights: [] }))!.highlights).toEqual([]);
-});
-it('migrates legacy code selections into literal code anchors', async () => {
-	const note = await adoptReadingClip('Use `DSButton`.', 'Reading/Legacy code.md', '2026-09-26T00:00:00Z');
-	const legacy = patchReadingFrontmatter(note, { highlights: [{ start: 6, end: 12, text: 'Button' }] });
-	const updated = updateReadingNote(legacy, parseReadingNote(note)!.crate_reading_id, { favorite: true });
-		expect(parseReadingNote(updated)?.highlights?.[0]).toMatchObject({ text: 'Button', codeAnchor: true });
-		expect(readReadingFrontmatter(updated)!.body).toBe('Use `DSButton`.');
-});
-it('migrates and round trips legacy HTML selections as synced text annotations', async () => {
-	const body = '<div>Hello <strong>world</strong>!</div>\n';
-	const note = await adoptReadingClip(body, 'Reading/HTML.md', '2026-09-26T00:00:00Z');
-	const id = parseReadingNote(note)!.crate_reading_id;
-	const legacy = patchReadingFrontmatter(note, { highlights: [highlight], custom: 'Keep this' });
-	const migrated = updateReadingNote(legacy, id, { favorite: true });
-	const parsed = parseReadingNote(migrated)!;
-	expect(parsed).toMatchObject({ highlight_format: 'markdown-v1', highlights: [{ ...highlight, textAnchor: true }] });
-	expect(readReadingFrontmatter(migrated)!.body).toBe(body);
-	expect(readReadingFrontmatter(migrated)!.value.custom).toBe('Keep this');
-	const annotated = updateReadingNote(migrated, id, { highlights: [{ ...parsed.highlights![0]!, note: 'My annotation' }] });
-	expect(parseReadingNote(annotated)!.highlights?.[0]).toMatchObject({ ...parsed.highlights![0]!, note: 'My annotation' });
-	expect(readReadingFrontmatter(annotated)!.body).toBe(body);
-	expect(parseReadingNote(updateReadingNote(annotated, id, { highlights: [] }))!.highlights).toEqual([]);
-});
-it('migrates matching legacy highlights on save and retains unmatched excerpts', async () => {
-	const note = await adoptReadingClip('Hello **world**!', 'Reading/Migration.md', '2026-09-26T00:00:00Z');
-	const missing = { start: 30, end: 37, text: 'Missing' };
-	const legacy = patchReadingFrontmatter(note, { highlights: [highlight, missing], custom: 'keep me' });
-	const id = parseReadingNote(note)!.crate_reading_id;
-	const migrated = updateReadingNote(legacy, id, { favorite: true });
-	expect(migrated.endsWith('==Hello== **world**!')).toBe(true);
-	expect(parseReadingNote(migrated)).toMatchObject({ highlight_format: 'markdown-v1', highlight_recovery: [missing], favorite: true });
-	expect(readReadingFrontmatter(migrated)?.value.custom).toBe('keep me');
-	const edited = migrated.replace('==Hello==', 'Hello');
-	expect(parseReadingNote(edited)?.highlights).toEqual([]);
-});
-it('migrates overlapping legacy selections as one passage without blocking ordinary edits', async () => {
-	const note = await adoptReadingClip('Hello world!', 'Reading/Overlap.md', '2026-09-26T00:00:00Z');
-	const legacy = patchReadingFrontmatter(note, { highlights: [highlight, { start: 3, end: 11, text: 'lo world' }] });
-	const updated = updateReadingNote(legacy, parseReadingNote(note)!.crate_reading_id, { favorite: true });
-	expect(updated.endsWith('==Hello world==!')).toBe(true);
-	expect(parseReadingNote(updated)?.highlights).toHaveLength(1);
 });
 it('highlights across formatting and paragraphs without altering text or links', () => {
 	const { document } = parseHTML('<html><body><div>Hello <em>world</em>!</div><p>Next paragraph.</p></body></html>');

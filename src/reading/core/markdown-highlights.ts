@@ -32,21 +32,19 @@ function samePassage(document: MarkdownDocument, highlight: ReadingHighlight): b
 }
 
 /** Inline markers own prose; explicit anchors preserve source-sensitive excerpts. */
-export function readMarkdownHighlights(markdown: string, stored: ReadingHighlight[] = [], legacy = false) {
+export function readMarkdownHighlights(markdown: string, stored: ReadingHighlight[] = []) {
 	const document = readingDocument(markdown), highlights: ReadingHighlight[] = [], recovery: ReadingHighlight[] = [];
 	for (const entry of stored) {
 		const match = anchored(document.text, entry);
-		if (match && (legacy || samePassage(document, match))) highlights.push(anchorHighlight(document.text, match));
-		else if (legacy || entry.note || entry.codeAnchor || entry.textAnchor) recovery.push(entry);
+		if (match && samePassage(document, match)) highlights.push(anchorHighlight(document.text, match));
+		else if (entry.note || entry.codeAnchor || entry.textAnchor) recovery.push(entry);
 	}
-	if (!legacy) {
-		// After deleting a repeated passage, several old annotations can resolve
-		// to the same remaining marker. Preserve them without guessing ownership.
-		const ambiguous = new Set(highlights.filter((entry, index) => highlights.some((other, otherIndex) => otherIndex !== index
-			&& other.start < entry.end && entry.start < other.end)));
-		recovery.push(...[...ambiguous].filter(entry => entry.note || entry.codeAnchor || entry.textAnchor));
-		for (let i = highlights.length - 1; i >= 0; i--) if (ambiguous.has(highlights[i]!)) highlights.splice(i, 1);
-	}
+	// After deleting a repeated passage, several old annotations can resolve
+	// to the same remaining marker. Preserve them without guessing ownership.
+	const ambiguous = new Set(highlights.filter((entry, index) => highlights.some((other, otherIndex) => otherIndex !== index
+		&& other.start < entry.end && entry.start < other.end)));
+	recovery.push(...[...ambiguous].filter(entry => entry.note || entry.codeAnchor || entry.textAnchor));
+	for (let i = highlights.length - 1; i >= 0; i--) if (ambiguous.has(highlights[i]!)) highlights.splice(i, 1);
 	for (const mark of document.marks) {
 		if (highlights.some(entry => entry.start <= mark.start && entry.end >= mark.end)) continue;
 		const text = document.text.slice(mark.start, mark.end);
@@ -59,10 +57,7 @@ export function readMarkdownHighlights(markdown: string, stored: ReadingHighligh
 	for (let i = 1; i < highlights.length;) {
 		const previous = highlights[i - 1]!, current = highlights[i]!;
 		if (current.start >= previous.end) { i++; continue; }
-		const end = Math.max(previous.end, current.end);
-		if (legacy && end - previous.start <= 4000 && !current.note && !previous.note) {
-			highlights[i - 1] = anchorHighlight(document.text, { ...previous, end, text: document.text.slice(previous.start, end) });
-		} else if (legacy || current.note || current.codeAnchor || current.textAnchor) recovery.push(current);
+		if (current.note || current.codeAnchor || current.textAnchor) recovery.push(current);
 		highlights.splice(i, 1);
 	}
 	return { highlights: readingHighlights(highlights), recovery };

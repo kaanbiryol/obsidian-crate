@@ -12,13 +12,11 @@ import { SyncRuntime } from '../sync/runtime';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { convertEncryptedVault } from '../sync/encryption-conversion';
 import { startReading } from '../reading/runtime';
-import { recoverMovedReadingCaptures } from '../reading/capture-folder-recovery';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
 vi.mock('../reminders/ui/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
-vi.mock('../reading/capture-folder-recovery', () => ({ recoverMovedReadingCaptures: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption-rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption-conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
 
@@ -84,7 +82,6 @@ it.each([
   expect(f.plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_KEYS)).toBe(keys);
   expect({ reading: f.plugin.settings.reading, reminders: f.plugin.remindersSettings }).toEqual(settingsBefore);
   expect(f.saveData).toHaveBeenCalledTimes(phase === 'conversion' ? 0 : phase === 'reading save' ? 1 : 2);
-  expect(recoverMovedReadingCaptures).not.toHaveBeenCalled();
   expect(f.initialize).not.toHaveBeenCalled();
   expect(f.reinitialize).not.toHaveBeenCalled();
   expect(startReading).not.toHaveBeenCalled();

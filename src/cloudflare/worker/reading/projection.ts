@@ -13,7 +13,7 @@ export const READING_PROJECTION_KEY = 'reading_projection';
 /** Rows are a pure function of the folder's file revisions and the policy, so a
  * complete projection stays complete until a file write changes the vault token. */
 // Bump with the `_highlightIndex` row format below, so upgraded rows are rebuilt.
-const PROJECTION_FORMAT = 4;
+const PROJECTION_FORMAT = 1;
 const projectionScope = (current: ReadingPolicy) => `reading:${current.generation}\nfolder:${current.folder_path}\nenabled:${current.enabled}\nformat:${PROJECTION_FORMAT}`;
 
 /** Removing a source row without a file write must request a new projection. */
@@ -32,7 +32,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
     (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(current.generation, ...fileFolderArgs(current.folder_path)).run();
   const { results } = await db.prepare(`SELECT f.path, f.storage_key AS revision FROM (SELECT path, storage_key FROM files WHERE ${FILE_FOLDER_MATCH}) f
     LEFT JOIN reading_sources s ON s.path = f.path WHERE lower(substr(f.path, -3)) = '.md'
-    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT 4) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
+    AND (s.revision IS NULL OR s.revision != f.storage_key OR s.generation != ? OR (s.metadata_json IS NOT NULL AND json_extract(s.metadata_json, '$._highlightIndex') IS NOT ${PROJECTION_FORMAT}) OR (? = 1 AND s.error IS NULL AND json_extract(s.metadata_json, '$.extraction_status')='pending'
       AND json_extract(s.metadata_json, '$.capture_method')='url' AND NOT EXISTS(SELECT 1 FROM reading_jobs j WHERE j.path=f.path)
       AND (SELECT count(*) FROM reading_jobs)<1000)) ORDER BY f.path LIMIT 25`)
     .bind(...fileFolderArgs(current.folder_path), current.generation, current.enabled).all<{ path: string; revision: string }>();
@@ -62,7 +62,7 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
         ON CONFLICT(path) DO UPDATE SET revision=excluded.revision, generation=excluded.generation, item_id=excluded.item_id,
         url_identity=excluded.url_identity, metadata_json=excluded.metadata_json, error=excluded.error`)
         .bind(row.path, row.revision, current.generation, metadata?.crate_reading_id ?? null,
-          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: 4 }) : null, error, ...filePathArgs(row.path), row.revision),
+          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: PROJECTION_FORMAT }) : null, error, ...filePathArgs(row.path), row.revision),
       ...(job && metadata ? [db.prepare(`INSERT INTO reading_jobs(path, item_id, generation, source_revision, block_hash, url, available_at)
         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_sources WHERE path = ? AND revision = ?) AND (SELECT count(*) FROM reading_jobs)<1000
         ON CONFLICT(path) DO NOTHING`).bind(row.path, metadata.crate_reading_id, current.generation, row.revision, job.hash, job.url, Date.now(), row.path, row.revision)] : []),

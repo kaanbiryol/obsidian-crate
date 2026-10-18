@@ -191,17 +191,3 @@ it.each([false, true])('opens an existing shared link and guards delayed complet
   expect(hook.current.connection.pending).toEqual([]);
 });
 
-it('queues stable legacy highlight metadata with the original values during a favorite edit', async () => {
-  const h = await harness();
-  const item = { ...article, highlights: [{ start: 0, end: 5, text: 'Hello', note: 'Keep this' }] };
-  let updated!: Promise<void>;
-  act(() => {
-    updated = h.hook.current.updateItem(item, { favorite: true }, { item, markdown: 'Hello world.' });
-    expect(pwaSyncState(h.store.getSnapshot()).canUpdate).toBe(false);
-  });
-  await act(async () => { h.release(); await updated; });
-  expect(h.hook.current.connection.pending).toMatchObject([{ action: 'update', intent: {
-    id: article.crate_reading_id, before: { favorite: false, highlights: item.highlights },
-    changes: { favorite: true, highlights: [{ id: expect.any(String) as string, text: 'Hello', note: 'Keep this' }] },
-  } }]);
-});

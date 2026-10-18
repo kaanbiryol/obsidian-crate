@@ -8,9 +8,7 @@ import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex } from './auth';
-import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncryptionScopes, sealRecoveryBundle } from '@/encryption/key-bundle';
-import { recoverCaptureReceipt, type CaptureRecoveryReceipt } from '@/reading/capture-recovery-receipt';
-import type { CaptureRecord } from '@/reading/data/capture-outbox';
+import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '@/encryption/key-bundle';
 import { createEncryptionState } from '@/encryption/server-state';
 import { FileKeyAuthority } from '@/encryption/file-authority';
 import { EncryptedReadingApi } from '@/reading/encrypted-api';
@@ -49,35 +47,6 @@ async function setup(mode: 'active' | 'converting' = 'active', readingScope = tr
   });
   return { bundle, recovery, keys, state, headers, request, api, attempts, requests, loseNextReply: () => { loseReply = true; } };
 }
-it('authenticates exact capture receipts before and after folder conversion using vault-only reads', async () => {
-  vi.stubGlobal('window', { setTimeout, clearTimeout });
-  const h = await setup(), id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope) VALUES ('owner',?,'vault')").bind(await sha256Hex('owner-token')).run();
-  const body = { captureId: id, operationId: operation(), url: 'https://private.example/queued', fetchArticle: true as const, destinationFolder: 'Reading' };
-  const record: CaptureRecord = { version: 1, authority: 'local', folder: 'Reading', body, note: createReadingNote({ id, url: body.url, savedAt: new Date().toISOString() }) };
-  h.loseNextReply(); await expect(h.api().request('/reading/capture', JSON.stringify(body))).rejects.toThrow('Lost reply');
-  const path = `/encryption/capture-recovery?operationId=${body.operationId}`;
-  expect((await h.request(path)).status).toBe(403);
-  const http = new WorkerApiHttpClient('https://test', 'owner-token', async input => {
-    const response = await worker.fetch(new Request(input.url, { method: input.method, body: input.body, headers: { ...input.headers, ...(input.contentType ? { 'Content-Type': input.contentType } : {}) } }), env);
-    const bytes = await response.arrayBuffer(); return { status: response.status, headers: Object.fromEntries(response.headers), arrayBuffer: bytes, text: new TextDecoder().decode(bytes) };
-  });
-  const attempt = h.attempts.get(body.operationId) as { requestHash: string; body: string };
-  const before = await http.requestJson<CaptureRecoveryReceipt>(path);
-  expect(await recoverCaptureReceipt(record, before, h.bundle, attempt)).toBe(id);
-  const moved = moveEncryptionScopes(h.bundle, 'Reading', 'Articles');
-  await convertEncryptedVault(http, moved, h.recovery, () => {});
-  const after = await http.requestJson<CaptureRecoveryReceipt>(path);
-  expect(after.receipts[0]?.envelope).toBeTruthy();
-  expect(await recoverCaptureReceipt(record, after, moved, attempt)).toBe(id);
-  expect(await recoverCaptureReceipt(record, after, moved)).toBe(id);
-  await expect(recoverCaptureReceipt({ ...record, body: { ...body, url: 'https://other.example' } }, after, moved, attempt)).rejects.toThrow('does not match');
-  await expect(recoverCaptureReceipt(record, after, moved, { ...attempt, body: attempt.body.replace('Reading', 'Articles') })).rejects.toThrow('does not match');
-  const expired = await http.requestJson<CaptureRecoveryReceipt>(`/encryption/capture-recovery?operationId=${createReminderOperationId(1)}`);
-  expect(expired).toEqual({ receipts: [], retryValid: false });
-  await expect(recoverCaptureReceipt(record, expired, moved)).rejects.toThrow('too old');
-  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first<{ count: number }>())?.count).toBe(1);
-});
 it('keeps Reading captures, content, edits and replay receipts encrypted across a lost response', async () => {
   const h = await setup(), body = JSON.stringify({ operationId: operation(), url: 'https://private.example/confidential-article', title: 'Private Reading title' });
   h.loseNextReply(); await expect(h.api().request('/reading/capture', body)).rejects.toThrow('Lost reply');
