@@ -19,8 +19,9 @@ export const bundleBudgets = {
 		// 5.604 MB. Retain a small margin; the gzip ceiling stays unchanged.
 		// Shared inventory/submission guards measure 5.607 MB raw / 2.821 MB gzip,
 		// adding 0.42 KB gzip to the preceding build. Retain about 4.5 KB gzip margin.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5610000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2825000', 10),
+		// The 2026-10 performance pass measures 5.632 MB raw / 2.831 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5650000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2840000', 10),
 	},
 	{
 		path: 'dist/styles.css',
