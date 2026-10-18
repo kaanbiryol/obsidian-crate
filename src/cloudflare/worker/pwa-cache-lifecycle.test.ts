@@ -64,20 +64,22 @@ function runtimeHarness() {
 	return { dispatch, put, matchShell, matchAsset, fetch, open, showNotification, matchClients, openWindow, skipWaiting };
 }
 
-it('prepares the complete shell in order and leaves a failed install waiting', async () => {
+it('prepares the complete shell and leaves a failed install waiting', async () => {
 	const harness = runtimeHarness();
 	await harness.dispatch('install');
 	const urls = ['/notifications', ...['app.js', 'theme-bootstrap.js', 'crate-icon-192.png', 'crate-icon-512.png',
 		'crate-mark-256.png', 'apple-touch-icon-180.png'].map(name => `/notifications/${name}?v=${PWA_ASSET_VERSION}`)];
+	// Downloads start in order, four at a time, so they may finish in any order.
 	expect(harness.fetch.mock.calls.map(call => call[0])).toEqual(urls);
-	expect(harness.put.mock.calls.map(call => call[0])).toEqual(urls);
+	expect(harness.put.mock.calls.map(call => call[0] as string).sort()).toEqual([...urls].sort());
 	expect(harness.open).toHaveBeenCalledWith(`crate-reminders-shell-${PWA_ASSET_VERSION}`);
 	expect(harness.skipWaiting).not.toHaveBeenCalled();
 	harness.fetch.mockClear(); harness.put.mockClear();
 	harness.fetch.mockResolvedValueOnce(new Response('shell')).mockResolvedValueOnce(new Response('', { status: 503 }));
 	await expect(harness.dispatch('install')).rejects.toThrow('Offline asset unavailable');
-	expect(harness.fetch).toHaveBeenCalledTimes(2);
-	expect(harness.put).toHaveBeenCalledTimes(1);
+	// A failure stops new downloads; only the four already in flight ran.
+	expect(harness.fetch).toHaveBeenCalledTimes(4);
+	expect(harness.put.mock.calls.map(call => call[0])).not.toContain(urls[1]);
 	expect(harness.skipWaiting).not.toHaveBeenCalled();
 });
 
