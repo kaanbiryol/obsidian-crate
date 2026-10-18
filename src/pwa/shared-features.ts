@@ -48,9 +48,12 @@ export function useServerFeatures(): SharedFeatures {
     const requested = (immediate: boolean) => {
       if (immediate || Date.now() - checkedAt >= REFRESH_INTERVAL_MS) void refresh();
     };
+    // Returning to the app or reconnecting checks at once; there is no timer.
+    const check = () => { void refresh(); };
     void refresh();
     refreshListeners.add(requested);
-    return () => { alive = false; refreshListeners.delete(requested); };
+    window.addEventListener('focus', check); window.addEventListener('online', check);
+    return () => { alive = false; refreshListeners.delete(requested); window.removeEventListener('focus', check); window.removeEventListener('online', check); };
   }, []);
   return features;
 }
