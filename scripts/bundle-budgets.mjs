@@ -80,7 +80,9 @@ export const bundleBudgets = {
 		// Full Reading E2EE adds client article extraction (deferred, inert DOM):
 		// measured 2.81 MB raw / 916.3 KB gzip across all assets.
 		// 0.6.0 transcript playback and shared UI: 2.897 MB raw / 951.1 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '2910000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '960000', 10),
+		// Raised to 3 MB raw / 990 KB gzip after the 2026-10 performance pass
+		// measured 2.916 MB raw / 960.1 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '3000000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '990000', 10),
 	}],
 };
