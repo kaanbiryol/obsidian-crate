@@ -44,7 +44,8 @@ it.each([
 	['revoked issuer', "DELETE FROM auth_tokens WHERE id='issuer'", 410],
 	['expired issuer', "UPDATE auth_tokens SET expires_at=1 WHERE id='issuer'", 410],
 	['expired capability', 'UPDATE reading_handoffs SET expires_at=1', 410],
-	['changed generation', "UPDATE reading_policy SET generation='new'", 410],
+	// A Shortcut credential is bound to the Reading generation, so the credential itself expires.
+	['changed generation', "UPDATE reading_policy SET generation='new'", 401],
 	['paused Reading', `INSERT INTO maintenance_state(key,value) VALUES ('crate_feature_policy','{"reading":false,"reminders":true,"revision":"r"}')`, 423],
 ] as const)('rejects Shortcut handoffs after %s without writing a note', async (_name, sql, status) => {
 	const token = await prepare('reading_capture');

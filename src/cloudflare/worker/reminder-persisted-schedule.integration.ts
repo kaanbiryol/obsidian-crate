@@ -184,10 +184,9 @@ it.each(['[Weekly report](https://example.com/report)', '[Review ! #work](https:
 	expect(await created.json()).toMatchObject({ reminder: { id: operationId, content, priority: 4, dueDatetime, recurrence } });
 	const file = await env.DB.prepare('SELECT storage_key, hash FROM files WHERE path = ?').bind(path).first<{ storage_key: string; hash: string }>();
 	const bytes = await (await env.BUCKET.get(file!.storage_key))!.text();
-	// Parser 6 could quarantine this file or save a title/priority derived from
-	// literal link text. Neither disposable cache nor durable authority is reused.
-	await env.DB.prepare("UPDATE reminder_file_cache SET parser_version = 6, reminders_json = '[]'").run();
-	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 6, verified = 0').run();
+	// Rows from an older parser are neither reused as cache nor as durable authority.
+	await env.DB.prepare("UPDATE reminder_file_cache SET parser_version = ?, reminders_json = '[]'").bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
+	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = ?, verified = 0').bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
 	await revalidateReminderSources(env, 3);
 	expect(await (await handleListReminders(request(), env)).json()).toMatchObject({ reminders: [{ content, priority: 4, dueDatetime, recurrence }], issues: [] });
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });

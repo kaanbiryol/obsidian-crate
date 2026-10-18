@@ -71,8 +71,8 @@ it.each([64, 800_000])('rebuilds previously indexed notification sources after c
 
 it.each(['quarantined', 'missing'])('repairs already-active vaults with %s source verification', async failure => {
 	const { path } = await fixture(800_000);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('reminder_source_scan_portable_v10:Reminders', '')").run();
-	if (failure === 'quarantined') await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 10, verified = 0').run();
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')").bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION - 1}:Reminders`).run();
+	if (failure === 'quarantined') await env.DB.prepare('UPDATE reminder_source_state SET parser_version = ?, verified = 0').bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
 	else await env.DB.prepare('DELETE FROM reminder_source_state').run();
 	await env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES (?, 1, -1, 'old size limit')").bind(path).run();
 	await revalidateReminderSources(env, 2);
