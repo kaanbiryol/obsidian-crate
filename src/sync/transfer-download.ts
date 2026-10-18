@@ -31,7 +31,7 @@ export async function validateDownloadedContent(
   declaredSize: number,
   declaredHash: string,
   expectedRemoteHash: string,
-): Promise<void> {
+): Promise<string> {
   if (declaredSize !== content.byteLength) {
     throw new Error(`Download size mismatch (expected ${declaredSize}, got ${content.byteLength})`);
   }
@@ -42,6 +42,7 @@ export async function validateDownloadedContent(
   if (expectedRemoteHash && expectedRemoteHash !== computedHash) {
     throw new RemoteVersionChangedError(path);
   }
+  return computedHash;
 }
 
 export async function downloadAndSaveFile(
@@ -55,11 +56,11 @@ export async function downloadAndSaveFile(
   if (content.byteLength > MAX_FILE_SIZE_BYTES) {
     return { status: "deferred", reason: "Skipped remote file larger than 25MB" };
   }
-  await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash);
+  const hash = await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash);
   const outcome = await applyRemoteContentIfUnchanged(context, path, content, request.expectedLocalHash);
   if (outcome.status === "deferred") return outcome;
 
-  await recordAppliedContent(context, path, content, response.revision);
+  await recordAppliedContent(context, path, content, response.revision, hash);
   result.downloaded++;
   result.downloadedPaths.push(path);
   return { status: "applied" };
@@ -123,7 +124,7 @@ export async function parallelDownloadAndSaveFiles(
             }
 
             const content = base64ToArrayBuffer(file.content);
-            await validateDownloadedContent(
+            const hash = await validateDownloadedContent(
               file.path,
               content,
               file.size,
@@ -140,7 +141,7 @@ export async function parallelDownloadAndSaveFiles(
               recordSyncError(result, `${outcome.reason}`, file.path);
               continue;
             }
-            await recordAppliedContent(context, file.path, content, file.revision);
+            await recordAppliedContent(context, file.path, content, file.revision, hash);
             result.downloaded++;
             result.downloadedPaths.push(file.path);
           } catch (error) {

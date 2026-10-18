@@ -8,6 +8,7 @@ import type { SyncQueueController } from './queue-controller';
 import type { SyncResult } from './types';
 import { assertLocalSyncPath } from './local-path-safety';
 import { readLocalFileEntry } from './local-file-entry';
+import { UNVERIFIED_MODIFIED } from './applied-content';
 import { loadRemotePendingBase } from './pending-baseline';
 import { loadPendingDiff } from './pending-diff';
 import { createPendingDiscard } from './pending-discard';
@@ -94,6 +95,18 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
                 if (!applied.has(path)) continue;
                 const baseline = context.manifest.getEntry(path);
                 try {
+                    if (baseline && baseline.modified !== UNVERIFIED_MODIFIED) {
+                        // Applying the bytes verified them together with this modification
+                        // time, so an unchanged stat settles the event without rereading.
+                        const stat = await context.vault.adapter.stat(path);
+                        if (context.isDestroyed()) return;
+                        if (context.manifest.getEntry(path) !== baseline) continue;
+                        if (stat?.type === 'file' && stat.size === baseline.size
+                            && new Date(stat.mtime).toISOString() === baseline.modified) {
+                            settled.settledPaths.push(key);
+                            continue;
+                        }
+                    }
                     const local = await readLocalFileEntry(context.vault, path);
                     if (context.isDestroyed()) return;
                     if (context.manifest.getEntry(path) !== baseline) continue;

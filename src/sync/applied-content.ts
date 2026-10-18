@@ -12,8 +12,10 @@ export async function recordAppliedContent(
   path: string,
   content: ArrayBuffer,
   revision?: string,
+  // Callers that already verified these bytes pass their hash to skip rehashing.
+  knownHash?: string,
 ): Promise<FileEntry> {
-  const hash = await computeHash(content);
+  const hash = knownHash ?? await computeHash(content);
   let modified = UNVERIFIED_MODIFIED;
   try {
     const before = await context.getModifiedIso(path);
