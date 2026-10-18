@@ -6,9 +6,11 @@ import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 import type { DownloadRequest } from './transfer-download';
 import { recordSyncError } from './issues';
-import type { ChangelogEntry } from '../protocol/sync-types';
+import type { ChangelogEntry, FileEntry } from '../protocol/sync-types';
 import type { FileDiff, SyncResult } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import { isVaultTFileLike } from './planner-helpers';
+import { assertLocalSyncPath } from './local-path-safety';
 
 export interface IncrementalRemoteReconciliation {
 	discoveredLocalChanges: Array<{ path: string; hash: string }>;
@@ -108,7 +110,9 @@ export async function reconcileIncrementalRemoteChanges(
 				continue;
 			}
 
-			const localEntry = await readLocalFileEntry(context.vault, path);
+			const localEntry = localChangedPaths.has(path)
+				? await readLocalFileEntry(context.vault, path)
+				: await readUnchangedLocalEntry(context, path);
 			if (!localEntry) {
 				downloadRequests.push({
 					path,
@@ -162,4 +166,21 @@ export async function reconcileIncrementalRemoteChanges(
 		downloadRequests,
 		conflicts,
 	};
+}
+
+/** The local scan trusts matching metadata, so a file it found unchanged reuses
+ * its baseline hash while a fresh stat still matches. Edits since the scan
+ * change that metadata and are read again. */
+async function readUnchangedLocalEntry(context: IncrementalSyncPlannerContext, path: string): Promise<FileEntry | undefined> {
+	assertLocalSyncPath(path);
+	const baseline = context.localManifest.getEntry(path);
+	if (baseline) {
+		const file = context.vault.getAbstractFileByPath(path);
+		const stat = isVaultTFileLike(file) ? file.stat : await context.vault.adapter.stat(path);
+		if (stat && (!('type' in stat) || stat.type === 'file') && stat.size === baseline.size
+			&& Date.parse(baseline.modified) === stat.mtime) {
+			return { hash: baseline.hash, size: baseline.size, modified: baseline.modified };
+		}
+	}
+	return readLocalFileEntry(context.vault, path);
 }

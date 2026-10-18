@@ -54,6 +54,27 @@ describe('runIncrementalSync', () => {
     if (action === 'delete') expect(prepared.expectedHash).toBeNull();
   });
 
+	it('reuses the baseline hash for a remote put when the unchanged file still matches its metadata', async () => {
+		const path = 'notes/unchanged.md';
+		const modified = '2026-02-06T10:00:00.000Z';
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 10 }, lastSeq: 11,
+			changes: [{ seq: 11, path, action: 'put', hash: 'remote', size: 6, created_at: '2026-02-06T12:00:00Z' }],
+		});
+		harness.localManifest.getEntry.mockReturnValue({ hash: 'base', size: 4, modified });
+		harness.vault.adapter.exists.mockResolvedValue(true);
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 4, mtime: Date.parse(modified) });
+		const download = vi.fn(async () => {});
+		harness.context.parallelDownloadAndSaveFiles = download;
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2 });
+
+		expect(result?.success).toBe(true);
+		expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
+		expect(download).toHaveBeenCalledWith(
+			[{ path, expectedLocalHash: 'base', expectedRemoteHash: 'remote', remoteSize: 6 }], expect.anything(), expect.any(Function));
+	});
+
 	it('returns fast success and advances cursor when nothing changed', async () => {
 		const settings = createSettings({ lastSeq: 5 });
 		const localManifest = {

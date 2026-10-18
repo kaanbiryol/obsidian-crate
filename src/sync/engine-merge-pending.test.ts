@@ -150,10 +150,10 @@ describe('downloaded file verification cost', () => {
 			expect(result.errors).toEqual([]);
 			expect(result.downloadedPaths).toHaveLength(50);
 			expect(h.engine.getPendingPaths()).toEqual([]);
-			// Per file: reconciliation, the pre-write check and post-write verification,
-			// plus one rotating content check. Settling events no longer rereads (was 4 per file).
+			// Per file: the pre-write check and post-write verification, plus one
+			// rotating content check. Reconciliation and settling no longer reread (was 4 per file).
 			const reads = h.vault.adapter.readBinary.mock.calls.filter(([candidate]) => candidate.startsWith('notes/'));
-			expect(reads).toHaveLength(50 * 3 + VERIFICATION_FILE_BUDGET);
+			expect(reads).toHaveLength(50 * 2 + VERIFICATION_FILE_BUDGET);
 		} finally { h.engine.destroy(); }
 	});
 });
