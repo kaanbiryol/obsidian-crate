@@ -32,9 +32,13 @@ type WidgetHost = HTMLDivElement & {
   crateShadowRoot?: ShadowRoot;
   crateMountPoint?: HTMLDivElement;
   crateDisposed?: boolean;
+  /** The widget currently holding this DOM; edits above the block replace it. */
+  crateWidget?: RemindersBlockWidget;
+  crateToggle?: (newValue: boolean) => void;
+  crateRenderedOptions?: string;
 };
 
-class RemindersBlockWidget extends WidgetType {
+export class RemindersBlockWidget extends WidgetType {
   private readonly plugin: CratePlugin;
   private options: ReminderQueryOptions; // Made mutable for updateDOM
   private readonly currentFilePath: string | undefined;
@@ -94,6 +98,7 @@ class RemindersBlockWidget extends WidgetType {
 
     // Re-render React component with new props
     const host = dom as WidgetHost;
+    host.crateWidget = this;
     const root = host.crateReactRoot;
     const shadowRoot = host.crateShadowRoot;
     const mountPoint = host.crateMountPoint;
@@ -107,21 +112,29 @@ class RemindersBlockWidget extends WidgetType {
         }
       }
 
-      root.render(
-        <PluginContext.Provider value={this.plugin}>
-          <RemindersList
-            projectFilter={newOptions.projectFilter}
-            showCompleted={newOptions.showCompleted}
-            showToday={newOptions.showToday}
-            showUpcoming={newOptions.showUpcoming}
-            onToggleShowCompleted={this.toggleShowCompleted}
-          />
-        </PluginContext.Provider>,
-      );
+      // Typing above the block only moves it; the list itself is unchanged.
+      if (host.crateRenderedOptions !== JSON.stringify(newOptions)) this.render(host, root);
       return true; // Successfully updated in place
     }
 
     return !!shadowRoot; // Initial render may still be waiting on stylesheet attachment
+  }
+
+  private render(host: WidgetHost, root: Root): void {
+    host.crateRenderedOptions = JSON.stringify(this.options);
+    // Stable across position-only updates; it edits the block where it is now.
+    host.crateToggle ??= (newValue: boolean) => host.crateWidget?.toggleShowCompleted(newValue);
+    root.render(
+      <PluginContext.Provider value={this.plugin}>
+        <RemindersList
+          projectFilter={this.options.projectFilter}
+          showCompleted={this.options.showCompleted}
+          showToday={this.options.showToday}
+          showUpcoming={this.options.showUpcoming}
+          onToggleShowCompleted={host.crateToggle}
+        />
+      </PluginContext.Provider>,
+    );
   }
 
   private toggleShowCompleted = (newValue: boolean) => {
@@ -154,6 +167,7 @@ class RemindersBlockWidget extends WidgetType {
 
     container.crateShadowRoot = mount.shadowRoot;
     container.crateMountPoint = mount.mountPoint;
+    container.crateWidget = this;
 
     void this.initializeRoot(container, mount);
 
@@ -181,17 +195,7 @@ class RemindersBlockWidget extends WidgetType {
     }
 
     host.crateReactRoot = root;
-    root.render(
-      <PluginContext.Provider value={this.plugin}>
-        <RemindersList
-          projectFilter={this.options.projectFilter}
-          showCompleted={this.options.showCompleted}
-          showToday={this.options.showToday}
-          showUpcoming={this.options.showUpcoming}
-          onToggleShowCompleted={this.toggleShowCompleted}
-        />
-      </PluginContext.Provider>,
-    );
+    (host.crateWidget ?? this).render(host, root);
   }
 }
 
