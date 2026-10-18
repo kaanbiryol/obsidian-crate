@@ -102,3 +102,20 @@ describe('scheduled Worker maintenance', () => {
 		);
 	});
 });
+
+it('checks unused encryption descriptors only on the first pass of an episode', async () => {
+	const statements: ReturnType<typeof createStatement>[] = [];
+	const db = {
+		prepare: vi.fn((sql: string) => { const statement = createStatement(sql); statements.push(statement); return statement; }),
+		batch: vi.fn(async (batch: Array<{ run(): Promise<unknown> }>) => Promise.all(batch.map(statement => statement.run()))),
+	};
+	const bucket = { delete: vi.fn(async () => {}), get: vi.fn(async () => null), list: vi.fn(async () => ({ objects: [], truncated: false })) };
+	const descriptorChecks = () => statements.filter(statement => statement.sql.includes('consumed_revision FROM file_deletion_receipts')).length;
+
+	await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass: true });
+	expect(descriptorChecks()).toBe(1);
+	// Before: every backlog pass (up to 200 per episode) rescanned the referencing tables.
+	await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass: false });
+	expect(descriptorChecks()).toBe(1);
+	expect(statements.filter(statement => statement.sql.startsWith('DELETE FROM request_rate_limits')).length).toBe(2);
+});

@@ -14,8 +14,9 @@ import { pruneEncryptionMetadata } from './maintenance/encryption-metadata';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
-/** `backlog` reports a bounded pruning task that filled its batch. */
-export async function runScheduledMaintenance(env: Env): Promise<MaintenanceResult> {
+/** `backlog` reports a bounded pruning task that filled its batch. `firstPass`
+ * is false for the follow-up passes of one maintenance episode. */
+export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
   if (await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key='crate_deployment_fence'").first()) return { removedObjects: 0, backlog: false };
 	if (['converting', 'resetting'].includes((await readEncryptionState(env.DB))?.mode ?? '')) return { removedObjects: 0, backlog: false };
 	const errors: string[] = [];
@@ -40,8 +41,10 @@ export async function runScheduledMaintenance(env: Env): Promise<MaintenanceResu
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, env.DB); }],
 		['prune expired encrypted response chunks', () => pruneEncryptedReceiptChunks(env.DB)],
-		['prune unused encryption metadata', () => pruneEncryptionMetadata(env.DB)],
 	];
+	// Its reference check scans several whole tables, so run it once per episode
+	// rather than on every backlog pass; unused descriptors are small and harmless.
+	if (firstPass) tasks.push(['prune unused encryption metadata', () => pruneEncryptionMetadata(env.DB)]);
 	for (const [name, task] of tasks) {
 		try {
 			await task();
