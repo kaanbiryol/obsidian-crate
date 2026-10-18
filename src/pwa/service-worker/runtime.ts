@@ -28,6 +28,9 @@ interface PushPayload extends PushNotification {
 type DeclarativePushEvent = PushEvent & { notification?: PushNotification };
 type NavigableNotificationOptions = NotificationOptions & { navigate?: string };
 
+const HASHED_CHUNK = /^\/notifications\/assets\/chunk-[a-z0-9-]+\.js$/i;
+const PRECACHE_CONCURRENCY = 4;
+
 /** Register the complete runtime after the Worker supplies the final asset version. */
 export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorkerConfig): void {
 	const shellCache = `crate-reminders-shell-${config.version}`;
@@ -46,11 +49,20 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 	scope.addEventListener('install', event => {
 		event.waitUntil(caches.open(shellCache).then(async cache => {
 			// Keep installation conditional on a complete shell and bound traffic.
-			for (const url of precacheUrls) {
-				const response = await fetch(url, { cache: 'reload' });
-				if (!response.ok) throw new Error('Offline asset unavailable: ' + url);
-				await cache.put(url, response);
-			}
+			// A content-hashed chunk an earlier version cached is the same file.
+			const queue = [...precacheUrls];
+			const next = async (): Promise<void> => {
+				for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+					const cached = HASHED_CHUNK.test(url) ? await caches.match(url) : undefined;
+					const response = cached ?? await fetch(url, { cache: 'reload' });
+					if (!response.ok) {
+						queue.length = 0;
+						throw new Error('Offline asset unavailable: ' + url);
+					}
+					await cache.put(url, response);
+				}
+			};
+			await Promise.all(Array.from({ length: PRECACHE_CONCURRENCY }, next));
 		}));
 	});
 
