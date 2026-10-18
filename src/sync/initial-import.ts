@@ -5,7 +5,7 @@ import type { SyncApiClient } from './api';
 import type { PreparedUpload, SyncResult, SyncWork } from './types';
 import type { TransferContext } from './transfer-types';
 import { getAllVaultFiles } from './file-discovery';
-import { prepareUploadChunks } from './transfer-budget';
+import { pipelineUploadChunks } from './transfer-budget';
 import { prepareUploadFromVaultFile } from './transfer-prepare';
 import { createPathRecord } from '@/protocol/path-record';
 import type { FileEntry } from '@/protocol/sync-types';
@@ -43,7 +43,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
   const inventory = createPathRecord<FileEntry>();
   let completed = 0;
   try {
-    const chunks = prepareUploadChunks(local, async file => {
+    // Prepare the next chunk while the current one uploads, within the byte budget.
+    const chunks = pipelineUploadChunks(local, async file => {
       context.throwIfDestroyed();
       const upload = await prepareUploadFromVaultFile(transfer, file, { force: true, expectedHash: remote.files[file.path]?.hash ?? null });
       if (!upload) throw new Error(`Could not prepare ${file.path}`);
