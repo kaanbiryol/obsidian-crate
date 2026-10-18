@@ -12,7 +12,7 @@ const day = 86400000;
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 async function fixture() {
 	const payload = { content: arrayBufferToBase64(bytes('saved note')), hash: await computeHash(bytes('saved note')), size: 10 };
-	const record = { version: 2, authority: 'https://old.example', sequence: 1, file: {
+	const record = { version: 1, authority: 'https://old.example', sequence: 1, file: {
 		...payload, path: 'note.md', contentType: 'text/markdown', expectedHash: null,
 		operationId: id, origin: { clientSession: 'fa270a13-1cb3-4f6a-8529-7e06d75f806f', at: '2026-09-13T00:00:00.000Z' },
 		intent: { kind: 'local' },

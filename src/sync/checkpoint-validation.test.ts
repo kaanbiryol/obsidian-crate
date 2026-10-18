@@ -3,7 +3,7 @@ import { LocalManifest } from './manifest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 
 const mainPath = `${TEST_PLUGIN_DIR}/file-manifest.json`, tmpPath = mainPath + '.tmp';
-const good = { version: 2, generation: 5, authority: 'server', lastSeq: 10,
+const good = { version: 1, generation: 5, authority: 'server', lastSeq: 10,
 	files: { 'note.md': { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09' } } };
 function fixture() {
 	const disk = new PersistentTestVault();
@@ -11,7 +11,7 @@ function fixture() {
 	return { disk, manifest };
 }
 it.each([
-	{ version: 99 }, { version: '2' }, { files: null }, { generation: -1 }, { lastSeq: '10' },
+	{ version: 99 }, { version: '1' }, { files: null }, { generation: -1 }, { lastSeq: '10' },
 	{ authority: 'foreign' }, { truncated: true }, { settledUploads: ['unknown'] },
 	{ files: { ...good.files, 'bad.md': { ...good.files['note.md'], size: 'damaged' } } },
 ])('preserves both generations when the newer JSON checkpoint is semantically invalid: %j', async patch => {

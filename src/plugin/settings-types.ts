@@ -16,10 +16,6 @@ export interface PersistedCrateSettings {
 	lastSync: string | null;
 	lastSeq: number;
 	ignorePatterns: string[];
-	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
-	syncOnStartup: boolean;
-	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
-	syncOnResume: boolean;
 	syncInterval: number;
 	syncHistory: SyncHistoryEntry[];
 	pushEnabled: boolean;
@@ -42,8 +38,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	lastSeq: 0,
 	deviceId: '',
 	ignorePatterns: ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini', '*.swp', '*.swo'],
-	syncOnStartup: true,
-	syncOnResume: true,
 	syncInterval: 300,
 	syncHistory: [],
 	pushEnabled: false,

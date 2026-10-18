@@ -73,7 +73,7 @@ describe('SyncRuntime startup event handling', () => {
 
 	it('keeps automatic sync off after saving settings and restarting', async () => {
 		const saved = buildPersistedCrateSettings(normalizeCrateSettings({
-			automaticSync: false, syncOnStartup: true, syncOnResume: true, syncInterval: 300,
+			automaticSync: false, syncInterval: 300,
 		}, '.vault-config'));
 		const reloaded = normalizeCrateSettings(JSON.parse(JSON.stringify(saved)) as typeof saved, '.vault-config');
 		const { runtime } = createRuntimeHarness(reloaded);

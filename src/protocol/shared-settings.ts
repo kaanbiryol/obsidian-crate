@@ -2,10 +2,6 @@ import { isRecord } from '../platform/validation';
 
 export interface SharedSettings {
 	ignorePatterns: string[];
-	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
-	syncOnStartup: boolean;
-	/** Compatibility field retained in storage and shared settings; automaticSync controls triggers. */
-	syncOnResume: boolean;
 	syncInterval: number;
 	pushEnabled: boolean;
 }
@@ -41,8 +37,6 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 		: null;
 	if (
 		ignorePatterns === null ||
-		typeof value.syncOnStartup !== 'boolean' ||
-		typeof value.syncOnResume !== 'boolean' ||
 		typeof value.pushEnabled !== 'boolean' ||
 		syncInterval === null
 	) {
@@ -51,8 +45,6 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 
 	return {
 		ignorePatterns,
-		syncOnStartup: value.syncOnStartup,
-		syncOnResume: value.syncOnResume,
 		syncInterval,
 		pushEnabled: value.pushEnabled,
 	};

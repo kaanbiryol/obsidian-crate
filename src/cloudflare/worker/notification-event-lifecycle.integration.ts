@@ -55,7 +55,7 @@ it('does not wake notifications for settings or binary uploads', async () => {
   const headers = { Authorization: 'Bearer event-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) };
   expect((await worker.fetch(new Request('https://event.test/settings', {
     method: 'PUT', headers, body: JSON.stringify({ expectedVersion: null, settings: {
-      ignorePatterns: [], syncOnStartup: true, syncOnResume: true, syncInterval: 60, pushEnabled: false,
+      ignorePatterns: [], syncInterval: 60, pushEnabled: false,
     } }),
   }), env)).status).toBe(200);
   expect((await worker.fetch(new Request('https://event.test/sync/upload?path=image.bin', {

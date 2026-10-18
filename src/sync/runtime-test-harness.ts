@@ -67,8 +67,6 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		deviceId: 'device-1',
 		ignorePatterns: ['.trash/', '*.tmp'],
 		automaticSync: true,
-		syncOnStartup: true,
-		syncOnResume: true,
 		syncInterval: 0,
 		syncHistory: [],
 		pushEnabled: false,

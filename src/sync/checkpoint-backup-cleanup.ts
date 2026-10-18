@@ -3,6 +3,7 @@ import { createLogger } from '../plugin/logger';
 import { isRecord } from '../platform/validation';
 import { validateUploadIntent, type JournalUpload } from './upload-intent';
 import { computeHash } from './hasher';
+import { UPLOAD_JOURNAL_VERSION } from './upload-journal';
 import type { SyncState } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -26,9 +27,9 @@ export async function pruneCheckpointBackups(adapter: DataAdapter, directory: st
 		try {
 			const original = await adapter.read(path);
 			const record: unknown = JSON.parse(original);
-			if (!isRecord(record) || record.version !== 2 || typeof record.authority !== 'string'
+			if (!isRecord(record) || record.version !== UPLOAD_JOURNAL_VERSION || typeof record.authority !== 'string'
 				|| !record.authority || !Number.isSafeInteger(record.sequence) || Number(record.sequence) < 1
-				|| !isRecord(record.file) || record.file.operationId !== match[1]) continue;
+				|| !isRecord(record.file) || record.file.encryptedWire !== undefined || record.file.operationId !== match[1]) continue;
 			await validateUploadIntent(record.file);
 			const file = record.file as unknown as JournalUpload;
 			// Never accept another private plugin file as proof of a preserved note.

@@ -88,7 +88,7 @@ async function verify(type) {
 		const oldCreateReceipt = await oldCreate.json();
 		// Valid plaintext settings larger than the former encrypted envelope limit
 		// must convert, resume and remain editable through the production client.
-		const seedSettings = { ignorePatterns: Array.from({ length: 2000 }, (_, index) => `Excluded/project-${String(index).padStart(4, '0')}/archive/`), syncOnStartup: true, syncOnResume: true, syncInterval: 300, pushEnabled: false };
+		const seedSettings = { ignorePatterns: Array.from({ length: 2000 }, (_, index) => `Excluded/project-${String(index).padStart(4, '0')}/archive/`), syncInterval: 300, pushEnabled: false };
 		const initialSettings = type.name() === 'chromium' ? null : seedSettings;
 		if (initialSettings) {
 			const settings = await fetch(`${origin}/settings`, { method: 'PUT', headers, body: JSON.stringify({ settings: initialSettings, expectedVersion: null }) });

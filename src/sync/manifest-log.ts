@@ -1,7 +1,7 @@
 import { isRecord } from '../platform/validation';
 import { isSyncSequence, isSyncPath, parseSyncFiles } from '../protocol/sync-validation';
 import type { FileEntry } from '../protocol/sync-types';
-import { parseCheckpoint, type ManifestCheckpoint } from './manifest-checkpoint';
+import { CHECKPOINT_VERSION, parseCheckpoint, type ManifestCheckpoint } from './manifest-checkpoint';
 
 /**
  * Append-only changes since a full manifest checkpoint. A save writes only the
@@ -82,7 +82,7 @@ function parseRecord(value: unknown, checkpoint: ManifestCheckpoint): ManifestLo
 	}
 	// Reuse the checkpoint validators for the non-file state.
 	const { manifest: _files, generation: _generation, authority: _authority, ...state } = parseCheckpoint({
-		...value.state, version: 3, files: {}, generation: value.generation,
+		...value.state, version: CHECKPOINT_VERSION, files: {}, generation: value.generation,
 		...(checkpoint.authority === undefined ? {} : { authority: checkpoint.authority }),
 	});
 	return { generation: value.generation, set: parseSyncFiles(value.set, true), deleted: value.deleted, state };

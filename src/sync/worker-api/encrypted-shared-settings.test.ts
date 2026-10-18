@@ -4,7 +4,7 @@ import { EncryptedFiles } from '../encrypted-files';
 import type { WorkerApiHttpClient } from './http';
 import { SharedSettingsWorkerApi } from './shared-settings';
 
-const settings = { ignorePatterns: [], syncOnStartup: true, syncOnResume: true, syncInterval: 30, pushEnabled: false };
+const settings = { ignorePatterns: [], syncInterval: 30, pushEnabled: false };
 async function fixture(value: unknown) {
 	const requestJson = vi.fn<(path: string, request?: { method: string; body: string }) => Promise<unknown>>();
 	const http = { requestJson } as unknown as WorkerApiHttpClient;

@@ -3,6 +3,8 @@ import { createReminderOperationId, reminderOperationDay } from '@/protocol/remi
 import { isRecord } from '@/platform/validation';
 import { validateUploadIntent, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 
+export const UPLOAD_JOURNAL_VERSION = 1;
+
 /** One immutable file per dispatched upload, separate from the large manifest.
  * Receipts are removed only after their resulting checkpoint is durable. */
 export class UploadJournal {
@@ -28,9 +30,8 @@ export class UploadJournal {
 			let raw: unknown;
 			try { raw = JSON.parse(await this.adapter.read(path)); } catch { throw new Error('Unreadable upload journal. Preserve the vault and its sync metadata before resetting.'); }
 			if (!isRecord(raw) || raw.authority !== this.authority || !isRecord(raw.file)) throw new Error('Upload journal belongs to another server or is damaged. Preserve it before resetting sync.');
-			if (raw.version !== 2 && raw.version !== 3) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing; older records do not identify merge preimages.');
+			if (raw.version !== UPLOAD_JOURNAL_VERSION) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
 			const file = raw.file;
-			if ((raw.version === 3) !== (file.encryptedWire !== undefined)) throw new Error('Invalid encrypted upload journal version');
 			if (typeof raw.sequence !== 'number' || !Number.isSafeInteger(raw.sequence) || raw.sequence < 1) throw new Error('Invalid upload journal sequence');
 			this.sequence = Math.max(this.sequence, raw.sequence);
 			if (typeof file.operationId !== 'string' || reminderOperationDay(file.operationId) === null
@@ -63,7 +64,7 @@ export class UploadJournal {
 				if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable); }
 				// A failed write must not dispatch the request. A partial journal file
 				// makes restart fail closed instead of guessing that no upload ran.
-				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: encryptedWire ? 3 : 2, authority: this.authority, sequence: ++this.sequence, file: durable }));
+				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
 				this.entries.set(durable.operationId, durable);
 				result.push(durable);
 			}

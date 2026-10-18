@@ -42,13 +42,13 @@ it('round-trips every recovery field, diagnostic and literal filename without ch
 	// Recovery compares parsed generations, including normalized nested field order.
 	const reloaded = parseCheckpoint(JSON.parse(encodeCheckpoint(restored)));
 	expect(sameCheckpointRecoveryState(restored, reloaded)).toBe(true);
-	expect(JSON.parse(encodeCheckpoint(restored))).toMatchObject({ version: 3 });
+	expect(JSON.parse(encodeCheckpoint(restored))).toMatchObject({ version: 1 });
 });
 
-it.each([1, 2, 3])('reads checkpoint version %i and retains empty-field omission rules when encoding', version => {
+it.each([1])('reads checkpoint version %i and retains empty-field omission rules when encoding', version => {
 	const saved = { version, files: {}, generation: 1 };
 	const parsed = parseCheckpoint(saved);
-	expect(JSON.parse(encodeCheckpoint(parsed))).toEqual({ ...saved, version: 3 });
+	expect(JSON.parse(encodeCheckpoint(parsed))).toEqual({ ...saved, version: 1 });
 	expect(parsed.settledUploads).toEqual([]);
 	expect(parsed.renames.size).toBe(0);
 	expect(parsed.restoreIntents).toEqual([]);

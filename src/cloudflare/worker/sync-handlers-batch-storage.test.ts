@@ -172,7 +172,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			'__crate__/settings.json',
 			new TextEncoder().encode(JSON.stringify({
 				ignorePatterns: ['.git/'],
-				syncOnStartup: true,
 				syncInterval: 30,
 			})).buffer,
 		);
@@ -190,10 +189,8 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 					expectedVersion: currentVersion,
 					settings: {
 						ignorePatterns: ['ok'],
-						syncOnStartup: 'yes',
-						syncOnResume: true,
 						syncInterval: 30,
-						pushEnabled: false,
+						pushEnabled: 'false',
 					},
 				}),
 				headers: { 'Content-Type': 'application/json' },
@@ -209,8 +206,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 					expectedVersion: currentVersion,
 					settings: {
 						ignorePatterns: ['.git/'],
-						syncOnStartup: true,
-						syncOnResume: true,
 						syncInterval: 30,
 						pushEnabled: false,
 					},
@@ -226,8 +221,6 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 		const { bucket } = createMockR2Bucket();
 		const firstSettings = {
 			ignorePatterns: ['first'],
-			syncOnStartup: true,
-			syncOnResume: true,
 			syncInterval: 30,
 			pushEnabled: false,
 		};

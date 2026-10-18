@@ -318,7 +318,7 @@ describe('LocalManifest', () => {
 
 		expect(readPersisted(adapter)).toEqual({
 			generation: 2,
-			version: 3,
+			version: 1,
 			files: {},
 		});
 	});

@@ -78,8 +78,6 @@ export function clearSyncConfigurationState(
 export function buildSharedSettings(settings: CrateSettings): SharedSettings {
   return {
     ignorePatterns: settings.ignorePatterns,
-    syncOnStartup: settings.syncOnStartup,
-    syncOnResume: settings.syncOnResume,
     syncInterval: settings.syncInterval,
     pushEnabled: settings.pushEnabled,
   };

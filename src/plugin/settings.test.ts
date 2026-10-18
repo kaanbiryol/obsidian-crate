@@ -4,19 +4,13 @@ import { MAX_SYNC_HISTORY_PATHS } from './settings-types';
 
 describe('normalizeCrateSettings', () => {
 	it.each(['.obsidian', '/custom-config/'])(
-		'upgrades the original default exclusions for %s', configDir => {
+		'uses the default exclusions for new installs in %s', configDir => {
 			const workspacePattern = `${configDir.replace(/^\/+|\/+$/g, '')}/workspace*`;
 			const expected = ['.git/', '.trash/', '*.tmp', '.DS_Store', '._*', 'Thumbs.db', 'desktop.ini',
 				'*.swp', '*.swo', workspacePattern];
-			expect(normalizeCrateSettings(undefined, configDir).ignorePatterns).toEqual(expected);
-			for (const ignorePatterns of [
-				['.git/', '.trash/', '*.tmp', '.DS_Store'],
-				[workspacePattern, '.DS_Store', '*.tmp', '.trash/', ' .git/ ', '.git/'],
-			]) {
-				const settings = normalizeCrateSettings({ ignorePatterns }, configDir);
-				expect(settings.ignorePatterns).toEqual(expected);
-				expect(normalizeCrateSettings(buildPersistedCrateSettings(settings), configDir).ignorePatterns).toEqual(expected);
-			}
+			const settings = normalizeCrateSettings(undefined, configDir);
+			expect(settings.ignorePatterns).toEqual(expected);
+			expect(normalizeCrateSettings(buildPersistedCrateSettings(settings), configDir).ignorePatterns).toEqual(expected);
 		},
 	);
 
@@ -44,12 +38,8 @@ describe('normalizeCrateSettings', () => {
 		expect(normalizeCrateSettings(saved, '.obsidian').automaticSync).toBe(false);
 	});
 
-	it.each([true, false])('does not enable automatic sync from legacy switches (%s)', enabled => {
-		expect(normalizeCrateSettings({ syncOnStartup: enabled, syncOnResume: enabled }, '.obsidian').automaticSync).toBe(false);
-	});
-
 	it.each([true, false])('preserves an explicit automatic sync preference across reloads (%s)', automaticSync => {
-		const settings = normalizeCrateSettings({ automaticSync, syncOnStartup: false, syncOnResume: false }, '.obsidian');
+		const settings = normalizeCrateSettings({ automaticSync }, '.obsidian');
 		const persisted = buildPersistedCrateSettings(settings);
 		expect(settings.automaticSync).toBe(automaticSync);
 		expect(normalizeCrateSettings(JSON.parse(JSON.stringify(persisted)) as typeof persisted, '.obsidian').automaticSync).toBe(automaticSync);
@@ -112,8 +102,6 @@ describe('normalizeCrateSettings', () => {
 			lastSeq: -5,
 			deviceId: ' device-1 ',
 			ignorePatterns: [' .git/ ', '', 'vault-config/workspace*', '.git/', 42 as never],
-			syncOnStartup: 'yes' as never,
-			syncOnResume: 'yes' as never,
 			syncInterval: -30,
 			syncHistory: [
 				{
@@ -137,8 +125,6 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.lastSeq).toBe(DEFAULT_SETTINGS.lastSeq);
 		expect(settings.deviceId).toBe(DEFAULT_SETTINGS.deviceId);
 		expect(settings.ignorePatterns).toEqual(['.git/', 'vault-config/workspace*']);
-		expect(settings.syncOnStartup).toBe(DEFAULT_SETTINGS.syncOnStartup);
-		expect(settings.syncOnResume).toBe(DEFAULT_SETTINGS.syncOnResume);
 		expect(settings.syncInterval).toBe(DEFAULT_SETTINGS.syncInterval);
 		expect(settings.syncHistory).toEqual([
 			{
@@ -159,14 +145,12 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 
-	it('preserves valid syncOnResume, debugLogging, and debounceDelay values', () => {
+	it('preserves valid debugLogging and debounceDelay values', () => {
 		const settings = normalizeCrateSettings({
-			syncOnResume: false,
 			debugLogging: true,
 			debounceDelay: 10,
 		}, 'vault-config');
 
-		expect(settings.syncOnResume).toBe(false);
 		expect(settings.debugLogging).toBe(true);
 		expect(settings.debounceDelay).toBe(10);
 	});

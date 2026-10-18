@@ -269,8 +269,6 @@ describe('SyncApiClient', () => {
 	it('refreshes the shared-settings version after a stale write', async () => {
 		const settings = {
 			ignorePatterns: [],
-			syncOnStartup: true,
-			syncOnResume: true,
 			syncInterval: 30,
 			pushEnabled: false,
 		};

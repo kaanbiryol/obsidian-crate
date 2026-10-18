@@ -7,7 +7,7 @@ import { normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diag
 import { parseRestoreIntents, type RestoreIntent } from './restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
 
-const CHECKPOINT_VERSION = 3;
+export const CHECKPOINT_VERSION = 1;
 
 /** Validated state adopted by the manifest owner after selecting a generation. */
 export interface ManifestCheckpoint {
@@ -24,7 +24,7 @@ export interface ManifestCheckpoint {
 
 /** Only a complete, known checkpoint can carry common-ancestor authority. */
 export function parseCheckpoint(value: unknown): ManifestCheckpoint {
-	if (!isRecord(value) || ![1, 2, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
+	if (!isRecord(value) || value.version !== CHECKPOINT_VERSION) {
 		throw new Error('Unsupported manifest checkpoint. Preserve this vault and its metadata; use a compatible Crate version.');
 	}
 	if (!isSyncSequence(value.generation) || (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
@@ -72,7 +72,7 @@ export function sameCheckpointRecoveryState(left: ManifestCheckpoint, right: Man
 }
 
 export function parseLocalManifest(value: unknown): FileManifest {
-	if (!isRecord(value) || ![1, 2, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number'
+	if (!isRecord(value) || value.version !== CHECKPOINT_VERSION
 		|| (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
 		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint');
 	return { version: 1, files: parseSyncFiles(value.files, true),

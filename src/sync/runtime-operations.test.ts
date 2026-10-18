@@ -362,8 +362,6 @@ describe('SyncRuntime operation wrappers', () => {
 	it('pushes shared settings through the current API client', async () => {
 		const { runtime } = createRuntimeHarness({
 			ignorePatterns: ['*.tmp'],
-			syncOnStartup: false,
-			syncOnResume: false,
 			syncInterval: 15,
 			pushEnabled: true,
 		});
@@ -378,8 +376,6 @@ describe('SyncRuntime operation wrappers', () => {
 
 		expect(putSharedSettings).toHaveBeenCalledWith({
 			ignorePatterns: ['*.tmp'],
-			syncOnStartup: false,
-			syncOnResume: false,
 			syncInterval: 15,
 			pushEnabled: true,
 		});
