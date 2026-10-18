@@ -68,3 +68,23 @@ it('publishes binary uploads without requiring the Markdown coordinator', async 
 	expect(forwarded).toEqual([]);
 	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: 'attachment.bin' });
 });
+
+it('confirms coordinator setup once per Worker instance across sync checks', async () => {
+	const ensures: string[] = [];
+	const namespace: Env['REMINDER_ALARMS'] = {
+		idFromName: name => env.REMINDER_ALARMS.idFromName(name),
+		get: id => ({ fetch: async (input, init) => {
+			const request = new Request(input, init);
+			if (new URL(request.url).pathname === '/ensure') ensures.push(request.url);
+			return env.REMINDER_ALARMS.get(id).fetch(request);
+		} }),
+	};
+	const runtime = { ...env, REMINDER_ALARMS: namespace };
+	for (let poll = 0; poll < 3; poll++) {
+		const response = await fetchWorkerRequest(new Request('https://test/sync/check?since=0', {
+			headers: { Authorization: 'Bearer owner', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) },
+		}), runtime);
+		expect(response.status, await response.clone().text()).toBe(200);
+	}
+	expect(ensures).toHaveLength(1);
+});

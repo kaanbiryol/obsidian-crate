@@ -38,17 +38,23 @@ function withRequestId(response: Response, requestId: string, started: number): 
 	});
 }
 
+/** The coordinator stores its parser version once and only a deploy (fresh
+ * isolates) can change it, so each isolate confirms the setup a single time. */
+const ensuredProjections = new WeakSet<Env['REMINDER_ALARMS']>();
+
 type WorkerExecution =
 	| { kind: 'public' }
 	| { kind: 'coordinator'; state: DurableObjectState }
 	| { kind: 'transfer' };
 
 export async function fetchWorkerRequest(request: Request, env: Env, execution: WorkerExecution = { kind: 'public' }): Promise<Response> {
-	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, execution));
+	// Usage metering wraps the namespace per request; remember setup on the binding.
+	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, execution, env.REMINDER_ALARMS));
 	return shortcutLaunchResponse(request, response, env.CRATE_DEPLOYMENT_FINGERPRINT);
 }
 
-async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, execution: WorkerExecution): Promise<Response> {
+async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Database, execution: WorkerExecution,
+	projectionBinding: Env['REMINDER_ALARMS']): Promise<Response> {
 	const requestId = crypto.randomUUID();
 	const started = performance.now();
 	if (request.method === 'OPTIONS') {
@@ -109,10 +115,11 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 			const forwardedResponse = await stub.fetch(forwarded);
 			return withRequestId(forwardedResponse, forwardedResponse.headers.get('X-Crate-Request-Id') ?? requestId, started);
 		}
-		if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection) {
+		if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
 			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 			const ensured = await stub.fetch('https://do/ensure', { method: 'POST' });
 			if (!ensured.ok) throw new Error('Unable to initialize notification processing');
+			ensuredProjections.add(projectionBinding);
 		}
 		if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);
 		if (mutation && execution.kind !== 'coordinator') {
