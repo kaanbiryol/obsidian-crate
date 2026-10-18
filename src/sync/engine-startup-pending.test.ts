@@ -5,6 +5,8 @@ import { computeHash } from './hasher';
 import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
 import { normalizeCrateSettings } from '../plugin/settings';
+import { VERIFICATION_FILE_BUDGET } from './content-verifier';
+import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './engine-constants';
 
 async function setup() {
 	const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
@@ -149,5 +151,68 @@ describe('pending changes after restart with automatic sync off', () => {
 		h.workspace.runLayoutReady();
 		await h.engine.waitForIdle();
 		expect(h.engine.getPendingPaths()).toEqual([]);
+	});
+});
+
+describe('startup pending scan cost', () => {
+	async function largeVault(count: number) {
+		const h = createHarness({ automaticSync: false, lastSync: '2026-09-19T10:00:00Z' });
+		const original = toArrayBuffer('original');
+		const hash = await computeHash(original);
+		const paths = Array.from({ length: count }, (_, i) => `notes/${i.toString().padStart(4, '0')}.md`);
+		const disk = new Map(paths.map(path => [path, original]));
+		const mtimes = new Map(paths.map(path => [path, 1000]));
+		for (const path of paths) h.localManifest.setEntry(path, { hash, size: original.byteLength, modified: new Date(1000).toISOString() });
+		h.vault.getFiles.mockImplementation(() => [...disk.keys()].map(path => ({
+			path, extension: 'md', stat: { size: disk.get(path)!.byteLength, mtime: mtimes.get(path)! },
+		})));
+		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		// An already seeded Markdown base cache keeps its reads out of these counts.
+		h.vault.adapter.exists.mockImplementation((path: string) => disk.has(path) || path.includes('/markdown-base-cache/'));
+		h.vault.adapter.stat.mockImplementation(async (path: string) => disk.has(path)
+			? { type: 'file', size: disk.get(path)!.byteLength, mtime: mtimes.get(path)! } : null);
+		h.vault.adapter.readBinary.mockImplementation(async (path: string) => {
+			const content = disk.get(path);
+			if (!content) throw new Error(`Missing file: ${path}`);
+			return content;
+		});
+		const recovery = spyOnConflictRecovery(h.engine).mockResolvedValue();
+		const reads = () => h.vault.adapter.readBinary.mock.calls.filter(([path]) => path.startsWith('notes/')).length;
+		return { h, paths, disk, mtimes, recovery, reads };
+	}
+
+	it('reads only changed files plus one rotation instead of hashing every tracked file', async () => {
+		const { h, paths, disk, mtimes, recovery, reads } = await largeVault(200);
+		disk.set(paths[150]!, toArrayBuffer('edited!!'));
+		mtimes.set(paths[150]!, 2000);
+		try {
+			await restore(h);
+			expect(h.engine.getPendingPaths()).toEqual([paths[150]]);
+			// Before: 200 reads. Now: 32 rotated checks plus the one edited file.
+			expect(reads()).toBe(VERIFICATION_FILE_BUDGET + 1);
+		} finally { h.engine.destroy(); recovery.mockRestore(); }
+	});
+
+	it('finds same-size, same-time edits by checking tracked files locally every five minutes', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		const { h, paths, disk, recovery, reads } = await largeVault(40);
+		// Outside the first 32-file rotation, with unchanged size and time.
+		disk.set(paths[39]!, toArrayBuffer('changed!'));
+		try {
+			await restore(h);
+			expect(h.engine.getPendingPaths()).toEqual([]);
+			const listings = h.vault.adapter.list.mock.calls.length;
+			const before = reads();
+
+			await vi.advanceTimersByTimeAsync(LOCAL_CONTENT_CHECK_INTERVAL_MS);
+			await h.engine.waitForIdle();
+
+			expect(h.engine.getPendingPaths()).toEqual([paths[39]]);
+			expect(reads() - before).toBe(VERIFICATION_FILE_BUDGET);
+			expect(h.vault.adapter.list.mock.calls.length).toBe(listings);
+			for (const call of [h.api.checkForChanges, h.api.getChanges, h.api.getManifest, h.api.batchUpload, h.api.uploadFile]) {
+				expect(call).not.toHaveBeenCalled();
+			}
+		} finally { h.engine.destroy(); recovery.mockRestore(); vi.useRealTimers(); }
 	});
 });

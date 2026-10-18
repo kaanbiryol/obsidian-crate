@@ -1,8 +1,11 @@
 import type { SyncResult, SyncState } from './types';
 import { isAbortError } from './abort';
-import { MAX_RETRIES, RETRY_BASE_DELAY_MS } from './engine-constants';
+import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './engine-constants';
 import { runPeriodicCheckWorkflow } from './engine-periodic-workflow';
 import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
+import { createLogger, errorMessage } from '../plugin/logger';
+
+const logger = createLogger('SyncEngine');
 
 interface SyncEngineLifecycleDependencies {
 	automaticSyncEnabled?(): boolean;
@@ -12,6 +15,8 @@ interface SyncEngineLifecycleDependencies {
 	getLastSeq(): number;
 	getPendingPathCount(): number;
 	hasLocalFileChanges(): Promise<boolean>;
+	/** Advance the rotating content check without network access. */
+	verifyLocalContent?(): Promise<void>;
 	checkForChanges(lastSeq: number): Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	sync(): Promise<SyncResult>;
 	onCheckSuccess(): void;
@@ -44,11 +49,24 @@ export class SyncEngineLifecycle {
 		this.stopPeriodicSync();
 		if (this.destroyed) return;
 		const syncIntervalSeconds = this.dependencies.getSyncIntervalSeconds();
-		if (syncIntervalSeconds <= 0) return;
-		this.syncInterval = setInterval(
-			() => { void this.periodicCheck(); },
-			syncIntervalSeconds * 1000,
-		);
+		if (syncIntervalSeconds > 0) {
+			this.syncInterval = setInterval(
+				() => { void this.periodicCheck(); },
+				syncIntervalSeconds * 1000,
+			);
+			return;
+		}
+		if (this.dependencies.automaticSyncEnabled?.() === false && this.dependencies.verifyLocalContent) {
+			this.syncInterval = setInterval(() => { void this.localContentCheck(); }, LOCAL_CONTENT_CHECK_INTERVAL_MS);
+		}
+	}
+
+	private async localContentCheck(): Promise<void> {
+		if (this.destroyed || this.checking) return;
+		this.checking = true;
+		try { await this.dependencies.verifyLocalContent?.(); }
+		catch (error) { if (!isAbortError(error)) logger.warn('Local content check failed:', errorMessage(error)); }
+		finally { this.checking = false; }
 	}
 
 	settingsChanged(): void {

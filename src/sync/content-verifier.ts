@@ -15,6 +15,12 @@ interface VerificationManifest {
 	save(): Promise<void>;
 }
 
+interface TrackedVerificationManifest extends VerificationManifest {
+	getAllPaths(): string[];
+}
+
+type CheckedFile = Pick<VaultFile, 'path' | 'size' | 'mtime'>;
+
 /** Rotating content checks complement filesystem events and metadata hints. */
 export class LocalContentVerifier {
 	private cursor = '';
@@ -39,22 +45,51 @@ export class LocalContentVerifier {
 	}
 
 	verify(vault: Vault, manifest: VerificationManifest, files: VaultFile[], signal: AbortSignal): Promise<boolean> {
-		const task = this.checks.then(() => this.check(vault, manifest, files, signal));
+		return this.enqueue(() => this.check(vault, manifest, files, signal)).then(changed => changed.length > 0);
+	}
+
+	/**
+	 * Check the next tracked files without walking the vault: one stat per
+	 * candidate instead of a listing of every folder. Returns the paths whose
+	 * bytes changed while their size and modification time did not.
+	 */
+	verifyTracked(vault: Vault, manifest: TrackedVerificationManifest, shouldIgnore: (path: string) => boolean, signal: AbortSignal): Promise<string[]> {
+		return this.enqueue(async () => {
+			signal.throwIfAborted();
+			await this.loadProgress();
+			const cursor = this.cursor;
+			const paths = manifest.getAllPaths().filter(path => !shouldIgnore(path)).map(path => ({ path }));
+			const after = smallestByPath(paths, VERIFICATION_FILE_BUDGET, file => file.path > cursor);
+			const candidates = [...after, ...smallestByPath(paths, VERIFICATION_FILE_BUDGET - after.length, file => file.path <= cursor)];
+			const files: CheckedFile[] = [];
+			for (const { path } of candidates) {
+				signal.throwIfAborted();
+				const stat = await withSyncFileContext(path, () => vault.adapter.stat(path));
+				if (stat?.type === 'file') files.push({ path, size: stat.size, mtime: stat.mtime });
+			}
+			// Tracked files deleted while sync is off cannot hold the rotation in place.
+			if (!files.length && candidates.length) this.cursor = candidates.at(-1)!.path;
+			return this.check(vault, manifest, files, signal);
+		});
+	}
+
+	private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+		const task = this.checks.then(operation);
 		this.checks = task.catch(() => {});
 		return task;
 	}
 
-	private async check(vault: Vault, manifest: VerificationManifest, files: VaultFile[], signal: AbortSignal): Promise<boolean> {
+	private async check(vault: Vault, manifest: VerificationManifest, files: CheckedFile[], signal: AbortSignal): Promise<string[]> {
 		signal.throwIfAborted();
 		await this.loadProgress();
 		// The next files in path order after the cursor, wrapping to the start,
 		// selected without sorting the whole vault on every check.
-		const eligible = (file: VaultFile) => file.size <= MAX_FILE_SIZE_BYTES;
+		const eligible = (file: CheckedFile) => file.size <= MAX_FILE_SIZE_BYTES;
 		const cursor = this.cursor;
 		const after = smallestByPath(files, VERIFICATION_FILE_BUDGET, file => eligible(file) && file.path > cursor);
 		const rotation = [...after, ...smallestByPath(files, VERIFICATION_FILE_BUDGET - after.length, file => eligible(file) && file.path <= cursor)];
 		let bytes = 0;
-		let changed = false;
+		const changed: string[] = [];
 		try {
 			for (let count = 0; count < rotation.length; count++) {
 				signal.throwIfAborted();
@@ -73,11 +108,11 @@ export class LocalContentVerifier {
 					// Preserve the common ancestor and revision. Invalidate only the
 					// metadata shortcut so the planner (and a restarted client) re-reads.
 					manifest.setEntry(file.path, { ...entry, modified: UNVERIFIED_MODIFIED });
-					changed = true;
+					changed.push(file.path);
 				}
 			}
 		} finally {
-			if (changed) await manifest.save();
+			if (changed.length) await manifest.save();
 			if (this.progress && !signal.aborted) {
 				const { adapter, path, authority } = this.progress;
 				await adapter.write(path, JSON.stringify({ version: 1, authority, cursor: this.cursor }));
@@ -88,8 +123,8 @@ export class LocalContentVerifier {
 }
 
 /** Up to `limit` matching files in ascending path order, in one pass. */
-function smallestByPath(files: VaultFile[], limit: number, include: (file: VaultFile) => boolean): VaultFile[] {
-	const selected: VaultFile[] = [];
+function smallestByPath<T extends { path: string }>(files: T[], limit: number, include: (file: T) => boolean): T[] {
+	const selected: T[] = [];
 	if (limit <= 0) return selected;
 	for (const file of files) {
 		if (!include(file)) continue;

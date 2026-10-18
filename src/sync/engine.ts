@@ -122,6 +122,7 @@ export class SyncEngine {
 			getLastSeq: () => this.settings.lastSeq,
 			getPendingPathCount: () => this.queueController.getPendingPathCount(),
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
+			verifyLocalContent: () => this.verifyTrackedContent(),
 			checkForChanges: async (lastSeq: number) => {
 				void this.retryReminderScope();
 				return this.api.checkForChanges(lastSeq);
@@ -449,6 +450,7 @@ export class SyncEngine {
 					baseline: this.localManifest.getManifest().files,
 					shouldIgnore: path => this.shouldIgnore(path),
 					throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
+					verifyContent: files => this.verifyContent(files),
 					runConcurrent: this.runConcurrent.bind(this),
 				}, PREPARE_CONCURRENCY);
 				if (revision === this.syncActivityRevision && !this.settings.automaticSync) {
@@ -609,6 +611,18 @@ export class SyncEngine {
 
 	private verifyContent(files: VaultFile[]): Promise<boolean> {
 		return this.trackWork(() => this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal));
+	}
+
+	/** While automatic sync is off, surface same-metadata edits as pending changes. */
+	private async verifyTrackedContent(): Promise<void> {
+		if (this.state.status === 'syncing' || this.state.initializing || !this.api.isConfigured()) return;
+		const revision = this.syncActivityRevision;
+		await this.trackWork(async () => {
+			const changed = await this.contentVerifier.verifyTracked(this.vault, this.localManifest, path => this.shouldIgnore(path), this.lifecycle.abortSignal);
+			if (changed.length && revision === this.syncActivityRevision && !this.settings.automaticSync) {
+				this.queueController.restorePendingPaths(changed.map(path => pendingChangeKey('upload', path)));
+			}
+		});
 	}
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
