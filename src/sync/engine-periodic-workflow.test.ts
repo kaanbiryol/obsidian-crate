@@ -14,9 +14,11 @@ function createContext(overrides: Partial<{
 		overrides.checkForChanges ?? (async () => ({ hasChanges: false })),
 	);
 	const sync = vi.fn(async () => createEmptySyncResult());
+	const hasLocalFileChanges = vi.fn(async () => overrides.localFilesChanged ?? false);
 
 	return {
 		checkForChanges,
+		hasLocalFileChanges,
 		getFailures: () => consecutiveCheckFailures,
 		sync,
 		context: {
@@ -34,7 +36,7 @@ function createContext(overrides: Partial<{
 			setLastCheckAttempt: (value: number) => {
 				lastCheckAttempt = value;
 			},
-			hasLocalFileChanges: async () => overrides.localFilesChanged ?? false,
+			hasLocalFileChanges,
 			checkForChanges,
 			sync,
 			onCheckSuccess: vi.fn(),
@@ -125,6 +127,30 @@ describe('runPeriodicCheckWorkflow', () => {
 		await runPeriodicCheckWorkflow(harness.context);
 
 		expect(harness.sync).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([
+		['the server has changes', { checkForChanges: async () => ({ hasChanges: true }) }],
+		['the server cursor expired', { checkForChanges: async () => ({ hasChanges: false, cursorExpired: true }) }],
+		['local edits are queued', { pendingPathCount: 2 }],
+	])('leaves the vault walk to the sync when %s', async (_label, overrides) => {
+		const harness = createContext(overrides);
+
+		await runPeriodicCheckWorkflow(harness.context);
+
+		expect(harness.hasLocalFileChanges).not.toHaveBeenCalled();
+		expect(harness.sync).toHaveBeenCalledTimes(1);
+	});
+
+	it('walks the vault once on an idle check and not after a failed server check', async () => {
+		const harness = createContext();
+		await runPeriodicCheckWorkflow(harness.context);
+		expect(harness.hasLocalFileChanges).toHaveBeenCalledTimes(1);
+		expect(harness.sync).not.toHaveBeenCalled();
+
+		const failing = createContext({ checkForChanges: async () => { throw new Error('network error'); } });
+		await runPeriodicCheckWorkflow(failing.context);
+		expect(failing.hasLocalFileChanges).not.toHaveBeenCalled();
 	});
 
 	it('skips checks within the backoff window after a failure', async () => {

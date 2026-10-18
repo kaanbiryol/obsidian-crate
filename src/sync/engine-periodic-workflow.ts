@@ -44,12 +44,13 @@ export async function runPeriodicCheckWorkflow(
 	context.setLastCheckAttempt(Date.now());
 
 	try {
-		const [{ hasChanges, cursorExpired }, localFilesChanged] = await Promise.all([
-			context.checkForChanges(context.getLastSeq()),
-			context.hasLocalFileChanges(),
-		]);
+		const { hasChanges, cursorExpired } = await context.checkForChanges(context.getLastSeq());
+		// A sync walks the vault itself, so only look for missed local edits
+		// when nothing else would start one.
+		const syncNeeded = hasChanges || cursorExpired || context.getPendingPathCount() > 0
+			|| await context.hasLocalFileChanges();
 
-		if (!hasChanges && !cursorExpired && !localFilesChanged && context.getPendingPathCount() === 0) {
+		if (!syncNeeded) {
 			logger.debug('Periodic check: no changes');
 			context.setConsecutiveCheckFailures(0);
 			context.onCheckSuccess();
