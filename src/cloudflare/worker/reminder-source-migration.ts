@@ -12,6 +12,7 @@ import type { Env } from './types';
 import { getReminderFolder } from './reminder-scope';
 import { retireOutOfScopeSources } from './reminder-scope-cleanup';
 import { readEncryptionState } from './encryption-state';
+import type { EncryptionServerState } from '../../encryption/server-state';
 
 const SCAN_KEY = `reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}`;
 const SCAN_BATCH_SIZE = 100;
@@ -42,7 +43,7 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
 
 /** At most limit files and 2 MiB plaintext / 4 MiB encrypted transport per pass.
  * The byte budget always admits one valid file, so a large source cannot stall it. */
-export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null }): Promise<boolean> {
+export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null; encryption?: EncryptionServerState | null }): Promise<boolean> {
   if (!scope && await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return false;
   const folder = scope ? scope.folder : await getReminderFolder(env.DB);
   const cleaning = await retireOutOfScopeSources(env.DB, folder);
@@ -62,7 +63,8 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
         AND s.verified = 0 AND s.parser_version = ?
       ORDER BY r.available_at, r.path) s`).bind(`${folder}/`, `${folder}0`, count - sources.length, REMINDER_CACHE_PARSER_VERSION)));
   const stored = await loadStoredFileRows(env.DB, sources.map(file => file.path));
-  const encrypted = sources.length > 0 && (await readEncryptionState(env.DB))?.mode === 'active';
+  const encrypted = sources.length > 0
+    && (scope?.encryption !== undefined ? scope.encryption : await readEncryptionState(env.DB))?.mode === 'active';
   const sourceLimit = reminderSourceByteLimit(encrypted);
   const reparseBudget = Math.max(MAX_REPARSE_BYTES, sourceLimit);
   let bytes = 0;

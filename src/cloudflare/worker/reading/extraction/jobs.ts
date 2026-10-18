@@ -1,7 +1,8 @@
 import { readEncryptionState } from '../../encryption-state';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../file-identity';
 import { publishCapture, runCapture, type CapturePublication } from '../captures';
-import { featureEnabled } from '../../feature-policy';
+import { featureEnabled, type FeaturePolicy } from '../../feature-policy';
+import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';
 import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
@@ -82,9 +83,9 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 }
 
 /** Return the next projection deadline, distinguishing a backlog from an outage. */
-export async function scheduleReading(env: Env): Promise<number | null> {
-  if (await readEncryptionState(env.DB)) return null;
-  if (!await featureEnabled(env.DB, 'reading')) return null;
+export async function scheduleReading(env: Env, loaded?: { encryption: EncryptionServerState | null; features: FeaturePolicy }): Promise<number | null> {
+  if (loaded ? loaded.encryption : await readEncryptionState(env.DB)) return null;
+  if (!(loaded ? loaded.features.reading : await featureEnabled(env.DB, 'reading'))) return null;
   const current = await policy(env.DB);
   if (!current) return null;
   const projection = await projectReading(env, current);

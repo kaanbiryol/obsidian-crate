@@ -1,4 +1,4 @@
-import { featureEnabled } from './feature-policy';
+import { featureEnabled, type FeaturePolicy } from './feature-policy';
 import { planNotificationOperations, type NotificationOperation } from './notification-projection-plan';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
@@ -16,6 +16,7 @@ import type { RemoteReminderRecord } from './reminders-web/types';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import { isReminderPath } from './reminder-scope';
 import { readEncryptionState } from './encryption-state';
+import type { EncryptionServerState } from '../../encryption/server-state';
 
 export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDate' | 'dueDatetime'>, policy: NotificationPolicy): string | undefined {
   if (reminder.dueDatetime) return reminder.dueDatetime;
@@ -42,13 +43,15 @@ function operationChunks(operations: Awaited<ReturnType<typeof planNotificationO
 }
 
 /** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
-export async function drainNotificationProjections(env: Env, limit = 4): Promise<void> {
-  if (!await featureEnabled(env.DB, 'reminders')) return;
-  const policy = await getNotificationPolicy(env.DB);
+export async function drainNotificationProjections(env: Env, limit = 4, loaded?: {
+  features: FeaturePolicy; policy: NotificationPolicy | null; encryption: EncryptionServerState | null;
+}): Promise<void> {
+  if (!(loaded ? loaded.features.reminders : await featureEnabled(env.DB, 'reminders'))) return;
+  const policy = loaded ? loaded.policy : await getNotificationPolicy(env.DB);
   if (!policy) return;
   const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
     READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
-  const encrypted = jobs.length > 0 && (await readEncryptionState(env.DB))?.mode === 'active';
+  const encrypted = jobs.length > 0 && (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
   for (const job of jobs) {
     try {
       const file = await getStoredFileRow(env.DB, job.path);

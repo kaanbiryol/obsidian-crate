@@ -1,4 +1,4 @@
-import { featureEnabled } from './feature-policy';
+import { featurePolicy } from './feature-policy';
 import { scheduleReading } from './reading/extraction/jobs';
 import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './notification-queue';
 import { getNotificationPolicy } from './notification-policy';
@@ -12,9 +12,11 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
   const encryption = await readEncryptionState(env.DB);
   if (['converting', 'resetting'].includes(encryption?.mode ?? '')) return;
   if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return;
-  const readingAt = await scheduleReading(env);
+  // Each sub-step would otherwise reload these rows within the same query budget.
+  const features = await featurePolicy(env.DB);
+  const readingAt = await scheduleReading(env, { encryption, features });
   let sourceWork = false;
-  if (!await featureEnabled(env.DB, 'reminders')) {
+  if (!features.reminders) {
     if (readingAt !== null) await state.storage.setAlarm(readingAt);
     return;
   }
@@ -26,9 +28,9 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     // Reading scheduling checks within the per-invocation query budget.
     const policy = await getNotificationPolicy(env.DB);
     hasPolicy = Boolean(policy);
-    sourceWork = await revalidateReminderSources(env, encryption ? 1 : 2, { folder: policy?.folderPath ?? null });
+    sourceWork = await revalidateReminderSources(env, encryption ? 1 : 2, { folder: policy?.folderPath ?? null, encryption });
     if (hasPolicy) {
-      await drainNotificationProjections(env, 1);
+      await drainNotificationProjections(env, 1, { features, policy, encryption });
       await dispatchNotificationJobs(env);
     }
   } finally {
