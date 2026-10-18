@@ -18,9 +18,14 @@ vi.mock('@/reminders/components/ShadowDOMButton', () => ({ ShadowDOMButton: () =
 import { PluginContext } from '@/reminders/ui/reminders-context';
 import { RemindersList } from './RemindersList';
 
+function localDay(offset: number): string {
+  const day = new Date(); day.setDate(day.getDate() + offset);
+  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+}
+
 const reminders: Reminder[] = Array.from({ length: 450 }, (_, i) => ({
   id: `r${i}`, content: `Task ${i}`, priority: 4, completed: false, project: 'Work', lineNumber: i,
-  dueDate: new Date(Date.now() + (1 + i % 3) * 86_400_000).toISOString().slice(0, 10),
+  dueDate: localDay(1 + i % 3),
 }));
 
 function mount(props: React.ComponentProps<typeof RemindersList>) {

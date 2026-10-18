@@ -335,7 +335,8 @@ it('keeps converted reminders identical until their indexed record changes', () 
 });
 
 it('builds Today from one index read and reuses converted reminders', () => {
-	const today = new Date().toISOString().slice(0, 10);
+	const now = new Date();
+	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 	const reminder = (id: string, dueDate: string, completed = false): IndexedReminder => ({
 		id, content: id, priority: 4, completed, dueDate, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 0, rawLine: `- [ ] ${id}` });
 	const all = [reminder('today', today), reminder('late', '2020-01-01'), reminder('done', today, true), reminder('later', '2999-01-01')];
