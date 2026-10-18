@@ -5,7 +5,7 @@ export const CACHE_STORE_NAME = 'snapshots';
 export const FRESHNESS_STORE_NAME = 'freshness';
 /** One record per note, keyed by [folderPath, path]. */
 export const NOTES_STORE_NAME = 'notes';
-const CACHE_DATABASE_VERSION = 3;
+const CACHE_DATABASE_VERSION = 1;
 const OPEN_TIMEOUT_MS = 3_000;
 
 export type CacheProblem = 'blocked' | 'unsupported' | 'damaged' | 'unavailable' | null;
@@ -28,12 +28,6 @@ function supportedStores(database: IDBDatabase, transaction: IDBTransaction): bo
 		&& names.every(name => !transaction.objectStore(name).autoIncrement)
 		&& keyPath(CACHE_STORE_NAME) === '"folderPath"' && keyPath(FRESHNESS_STORE_NAME) === '"folderPath"'
 		&& keyPath(NOTES_STORE_NAME) === '["folderPath","path"]';
-}
-
-function supportedVersionTwo(database: IDBDatabase, transaction: IDBTransaction): boolean {
-	const names = Array.from(database.objectStoreNames);
-	return names.length === 2 && names.includes(CACHE_STORE_NAME) && names.includes(FRESHNESS_STORE_NAME)
-		&& names.every(name => transaction.objectStore(name).keyPath === 'folderPath' && !transaction.objectStore(name).autoIncrement);
 }
 
 /** A blocked/failed upgrade must not hold bootstrap or a confirmed mutation open. */
@@ -59,12 +53,6 @@ export function openCacheDatabase(): Promise<IDBPDatabase> {
 				if (event.oldVersion === 0) {
 					database.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
 					database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
-					database.createObjectStore(NOTES_STORE_NAME, { keyPath: ['folderPath', 'path'] });
-				} else if (event.oldVersion === 2 && supportedVersionTwo(database, request.transaction!)) {
-					// Version 2 held whole-folder snapshots: disposable copies of server
-					// data, replaced by per-note records on the next refresh.
-					request.transaction!.objectStore(CACHE_STORE_NAME).clear();
-					request.transaction!.objectStore(FRESHNESS_STORE_NAME).clear();
 					database.createObjectStore(NOTES_STORE_NAME, { keyPath: ['folderPath', 'path'] });
 				} else {
 					fail('unsupported');

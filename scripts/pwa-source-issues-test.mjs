@@ -1,6 +1,4 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import http from 'node:http';
-import { createHash } from 'node:crypto';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
@@ -16,7 +14,7 @@ const issues = [
 ];
 const notice = page => page.getByRole('region', { name: 'Incomplete reminder list', exact: true });
 const cachedSnapshot = page => page.evaluate(() => new Promise(resolve => {
-  const request = indexedDB.open('crate-reminders', 3);
+  const request = indexedDB.open('crate-reminders', 1);
   request.onupgradeneeded = () => request.transaction.abort();
   request.onerror = () => resolve(null);
   request.onsuccess = () => {
@@ -29,76 +27,6 @@ const cachedSnapshot = page => page.evaluate(() => new Promise(resolve => {
     tx.onerror = () => { database.close(); resolve(null); };
   };
 }));
-
-async function verifyLegacyCache(browser) {
-  const legacyEtag = '"legacy-cache-with-unknown-completeness"';
-  const requests = [];
-  // Use real HTTP 304 responses, which WebKit cannot synthesize through route.fulfill.
-  const legacyServer = http.createServer((request, response) => {
-    const url = new URL(request.url, origin);
-    if (url.pathname === '/legacy-cache-seed') { response.end('<!doctype html><title>Seed legacy cache</title>'); return; }
-    if (url.pathname === '/reminders/list') {
-      requests.push(request.headers['if-none-match']);
-      if (request.headers['if-none-match'] === legacyEtag) { response.writeHead(304, { ETag: legacyEtag }); response.end(); return; }
-      response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      response.end(JSON.stringify({ reminders: [], projects: [], issues }));
-      return;
-    }
-    const upstream = http.request(url, { method: request.method, headers: { ...request.headers, host: new URL(origin).host } }, incoming => {
-      response.writeHead(incoming.statusCode, incoming.headers);
-      incoming.pipe(response);
-    });
-    upstream.on('error', () => { response.writeHead(502); response.end(); });
-    request.pipe(upstream);
-  });
-  await new Promise(resolve => legacyServer.listen(0, '127.0.0.1', resolve));
-  const legacyOrigin = `http://127.0.0.1:${legacyServer.address().port}`;
-  const context = await browser.newContext({ serviceWorkers: 'block' });
-  try {
-    expect((await fetch(`${legacyOrigin}/reminders/list?folderPath=Reminders`, { headers: { 'If-None-Match': legacyEtag } })).status).toBe(304);
-    requests.length = 0;
-    const page = await context.newPage();
-    await page.goto(`${legacyOrigin}/legacy-cache-seed`);
-    const operationId = '11111111-1111-4111-8111-111111111111';
-    const oldHash = createHash('sha256').update('earlier-browser-session').digest('hex');
-    const pendingKey = `crate-reminder-outbox:v1:${oldHash}:Reminders:${operationId}`;
-    const draftKey = 'crate-reminder-draft:Reminders:new';
-    const preserved = await page.evaluate(async ({ legacyEtag, pendingKey, draftKey, operationId }) => {
-      const pending = JSON.stringify({ version: 1, createdAt: 1, change: { operationId, recordId: operationId, kind: 'save',
-        path: '/reminders/create', method: 'POST', status: 'uncertain', attempts: 1, retryAt: 0,
-        body: JSON.stringify({ operationId, id: operationId, folderPath: 'Reminders', content: 'Keep this unsent creation', project: 'Inbox' }) } });
-      const draft = JSON.stringify({ mode: 'create', operationId: '22222222-2222-4222-8222-222222222222', draft: { content: 'Keep this unsent editor text', description: '', project: 'Inbox', defaultProject: 'Inbox', priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } });
-      localStorage.setItem(pendingKey, pending);
-      sessionStorage.setItem(draftKey, draft);
-      await new Promise((resolve, reject) => {
-        const request = indexedDB.open('crate-reminders', 2);
-        request.onupgradeneeded = () => { request.result.createObjectStore('snapshots', { keyPath: 'folderPath' }); request.result.createObjectStore('freshness', { keyPath: 'folderPath' }); };
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          const database = request.result;
-          const tx = database.transaction(['snapshots', 'freshness'], 'readwrite');
-          tx.objectStore('snapshots').put({ folderPath: 'Reminders', reminders: [], projects: [], savedAt: Date.now(), etag: legacyEtag });
-          tx.objectStore('freshness').put({ folderPath: 'Reminders', savedAt: Date.now() + 60_000, etag: legacyEtag });
-          tx.oncomplete = () => { database.close(); resolve(); };
-          tx.onerror = () => reject(tx.error);
-        };
-      });
-      return { pending, draft };
-    }, { legacyEtag, pendingKey, draftKey, operationId });
-    await page.goto(`${legacyOrigin}/notifications?folder=Reminders&tab=inbox`);
-    await notice(page).waitFor();
-    expect(requests.length).toBeGreaterThan(0);
-    expect(requests.every(etag => etag === undefined)).toBe(true);
-    await expect.poll(async () => (await cachedSnapshot(page))?.issues).toEqual(issues);
-    expect(await page.evaluate(key => localStorage.getItem(key), pendingKey)).toBe(preserved.pending);
-    expect(await page.evaluate(key => sessionStorage.getItem(key), draftKey)).toBe(preserved.draft);
-    await page.locator('[data-action="open-create-modal"]').click();
-    await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toHaveText('Keep this unsent editor text');
-  } finally {
-    await context.close();
-    await new Promise(resolve => legacyServer.close(resolve));
-  }
-}
 
 async function verify(browser) {
   await fetch(`${origin}/preview/reset`, { method: 'POST' });
@@ -168,8 +96,7 @@ try {
     const browser = await browserType.launch();
     try {
       await verify(browser);
-      await verifyLegacyCache(browser);
-      console.log(`${browserType.name()}: partial source warnings persist offline, healthy rows stay editable, repair clears warnings, and legacy cache/ETags force a full response without erasing pending intent`);
+      console.log(`${browserType.name()}: partial source warnings persist offline, healthy rows stay editable, repair clears warnings`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolve => server.close(resolve)); }

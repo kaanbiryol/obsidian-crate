@@ -87,7 +87,7 @@ try {
    // Keep a valid but stale empty snapshot while the live list still has content.
    await page.evaluate(async () => {
     await new Promise((resolve, reject) => {
-     const request = indexedDB.open('crate-reminders', 3);
+     const request = indexedDB.open('crate-reminders', 1);
      request.onerror = () => reject(request.error);
      request.onsuccess = () => {
       const db = request.result;

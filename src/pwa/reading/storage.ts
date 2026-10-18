@@ -96,7 +96,7 @@ export async function exportReadingData(): Promise<void> {
   // records alongside their wrapped local keys. Never silently omit queued work.
   let wrappedKeys: unknown[] = [];
   try { wrappedKeys = await (await import('../encryption-keys')).exportWrappedLocalKeys(); } catch { unreadable.push('encryption-keys'); }
-  downloadJson('crate-reading-recovery.json', { format: 2, origin: location.origin, data, wrappedKeys, unreadable });
+  downloadJson('crate-reading-recovery.json', { format: 1, origin: location.origin, data, wrappedKeys, unreadable });
 }
 
 /** Drop ciphertext attempts only after their durable semantic commands settled.

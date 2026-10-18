@@ -29,10 +29,12 @@ async function verify(browser) {
 		await oldTab.goto(`${origin}/cache-seed`);
 		await oldTab.evaluate(() => new Promise((resolve, reject) => {
 			const request = indexedDB.open('crate-reminders', 1);
-			request.onupgradeneeded = () => request.result.createObjectStore('snapshots', { keyPath: 'folderPath' });
 			request.onsuccess = () => {
-				// Retain a real old connection that ignores versionchange.
-				window.oldCache = request.result; resolve();
+				// Another tab holds a real connection that ignores versionchange while
+				// the database is being replaced, so every later open waits.
+				window.oldCache = request.result;
+				window.replacing = indexedDB.deleteDatabase('crate-reminders');
+				resolve();
 			};
 			request.onerror = () => reject(request.error);
 		}));
@@ -49,24 +51,18 @@ async function verify(browser) {
 		await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 		await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
 		await expect(cacheNotice(page)).toContainText('Close other Crate tabs');
-		// Let every queued open reach its bounded fallback while the legacy
+		// Let every queued open reach its bounded fallback while the other tab's
 		// connection remains held; releasing it must not finish abandoned work.
 		await page.waitForTimeout(3_250);
-		await oldTab.evaluate(() => window.oldCache.close());
+		await oldTab.evaluate(() => new Promise(resolve => { window.replacing.onsuccess = window.replacing.onerror = resolve; window.oldCache.close(); }));
 		const rebuild = cacheNotice(page).getByRole('button', { name: 'Rebuild offline copy', exact: true });
 		await rebuild.focus(); await page.keyboard.press('Enter');
-		await expect(cacheNotice(page)).toContainText('unsupported format');
-		await expect(cacheNotice(page).getByRole('button', { name: 'Rebuild offline copy', exact: true })).toHaveCount(0);
-		// Explicitly clearing the retired development cache permits a fresh baseline.
-		await page.evaluate(() => new Promise((resolve, reject) => {
-			const request = indexedDB.deleteDatabase('crate-reminders');
-			request.onsuccess = resolve; request.onerror = () => reject(request.error);
-		}));
+		await expect(cacheNotice(page)).toHaveCount(0);
 		await page.reload();
 		await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
 		await expect(cacheNotice(page)).toHaveCount(0);
 		const rawCache = () => page.evaluate(() => new Promise((resolve, reject) => {
-			const request = indexedDB.open('crate-reminders', 3);
+			const request = indexedDB.open('crate-reminders', 1);
 			request.onsuccess = () => {
 				const db = request.result; const tx = db.transaction('snapshots', 'readonly');
 				const read = tx.objectStore('snapshots').get('Reminders');
@@ -78,7 +74,7 @@ async function verify(browser) {
 		await expect.poll(async () => (await rawCache())?.sessionScope).toBe(sessionScope);
 		available = false;
 		await page.evaluate(sessionScope => new Promise((resolve, reject) => {
-			const request = indexedDB.open('crate-reminders', 3);
+			const request = indexedDB.open('crate-reminders', 1);
 			request.onsuccess = () => {
 				const db = request.result; const tx = db.transaction('snapshots', 'readwrite');
 				// Metadata promising notes that are not stored: the whole copy is damaged.

@@ -93,7 +93,7 @@ it.each([
   expect(fetch).not.toHaveBeenCalled();
   expect(values.get(`pending:${session.id}`)).toBe(original);
   await exportReadingData();
-  expect(download).toHaveBeenCalledWith('crate-reading-recovery.json', { format: 2, origin: 'https://crate.example', data: { [`pending:${session.id}`]: original }, wrappedKeys: [], unreadable: [] });
+  expect(download).toHaveBeenCalledWith('crate-reading-recovery.json', { format: 1, origin: 'https://crate.example', data: { [`pending:${session.id}`]: original }, wrappedKeys: [], unreadable: [] });
 });
 
 it('rejects duplicate identities and null queues without interpreting them as empty', async () => {
