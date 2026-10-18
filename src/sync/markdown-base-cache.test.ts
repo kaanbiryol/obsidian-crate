@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import { MarkdownBaseCache } from './markdown-base-cache';
+import { MarkdownBaseCache, PRUNE_INTERVAL_MS } from './markdown-base-cache';
 import type { FileEntry } from '../protocol/sync-types';
 
 const PLUGIN_DIR = '.vault-config/plugins/crate';
@@ -204,4 +204,45 @@ it('rewrites a cache entry after pruning it', async () => {
     await cache.pruneReferencedHashes(new Set());
     await cache.putBase('a.md', hash, content);
     expect(adapter.writeBinary).toHaveBeenCalledTimes(2);
+});
+
+it('checks a complete cache with one listing instead of an exists call per note', async () => {
+    const { cache, adapter, files } = createCacheHarness();
+    const entries: Record<string, FileEntry> = {};
+    for (let i = 0; i < 1000; i++) {
+        const hash = i.toString(16).padStart(64, '0');
+        entries[`notes/${i}.md`] = { hash, size: 4, modified: '2026-01-01' };
+        files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('base'));
+    }
+    await cache.seedFromManifest(createManifest(entries), {
+        isDestroyed: () => false,
+        runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+    });
+    // Before: 1,000 exists() calls plus a second listing for the prune.
+    expect(adapter.exists).not.toHaveBeenCalled();
+    expect(adapter.list).toHaveBeenCalledOnce();
+    expect(adapter.readBinary).not.toHaveBeenCalled();
+    expect(adapter.remove).not.toHaveBeenCalled();
+});
+
+it('prunes after syncs at most once per interval', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+        const { cache, adapter, files } = createCacheHarness();
+        const orphan = `${PLUGIN_DIR}/markdown-base-cache/${'b'.repeat(64)}.md`;
+        files.set(orphan, toArrayBuffer('old base'));
+        const manifest = createManifest({});
+
+        await cache.pruneUnreferenced(manifest);
+        expect(files.has(orphan)).toBe(false);
+        files.set(orphan, toArrayBuffer('old base'));
+        await cache.pruneUnreferenced(manifest);
+        expect(adapter.list).toHaveBeenCalledOnce();
+        expect(files.has(orphan)).toBe(true);
+
+        vi.advanceTimersByTime(PRUNE_INTERVAL_MS);
+        await cache.pruneUnreferenced(manifest);
+        expect(adapter.list).toHaveBeenCalledTimes(2);
+        expect(files.has(orphan)).toBe(false);
+    } finally { vi.useRealTimers(); }
 });

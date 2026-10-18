@@ -10,6 +10,9 @@ const HASH_RE = /^[a-f0-9]{64}$/;
 const SEED_CONCURRENCY = 2;
 const SEED_BATCH_FILES = 32;
 const SEED_BATCH_BYTES = 8 * 1024 * 1024;
+// Unreferenced bases are hash-verified, local-only and small, so cleanup after
+// syncs can wait instead of listing the whole cache folder every time.
+export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface MarkdownBaseCacheManifest {
 	getAllPaths(): string[];
@@ -31,6 +34,7 @@ export class MarkdownBaseCache {
 	private readonly writtenHashes = new Set<string>();
 	private readonly pendingWrites = new Map<string, Promise<void>>();
 	private readonly invalidHashes = new Set<string>();
+	private lastPruneAt: number | null = null;
 
 	constructor(app: App, pluginManifest: PluginManifest) {
 		this.app = app;
@@ -97,13 +101,17 @@ export class MarkdownBaseCache {
 		manifest: MarkdownBaseCacheManifest,
 		options: MarkdownBaseCacheSeedOptions,
 	): Promise<void> {
+		// One listing replaces an exists() call per note; it also serves the prune below.
+		const listing = await this.listCacheFiles();
+		const cachedHashes = new Set(listing.map(getHashFromCachePath));
 		const paths = manifest.getAllPaths()
 			.filter(isMarkdownPath)
 			.filter((path) => {
 				const entry = manifest.getEntry(path);
 				return entry !== undefined
 					&& isValidHash(entry.hash)
-					&& entry.size <= MAX_FILE_SIZE_BYTES;
+					&& entry.size <= MAX_FILE_SIZE_BYTES
+					&& (this.invalidHashes.has(entry.hash) || !cachedHashes.has(entry.hash));
 			});
 
 		const seed = (path: string) => async () => {
@@ -117,7 +125,7 @@ export class MarkdownBaseCache {
 			}
 
 			try {
-				if (!this.invalidHashes.has(entry.hash) && await this.app.vault.adapter.exists(this.getCachePath(entry.hash))) {
+				if (!this.invalidHashes.has(entry.hash) && this.writtenHashes.has(entry.hash)) {
 					return;
 				}
 				const content = await this.app.vault.adapter.readBinary(path);
@@ -149,28 +157,39 @@ export class MarkdownBaseCache {
 			bytes += size;
 		}
 		await options.runConcurrent(batch, SEED_CONCURRENCY);
-		if (!options.isDestroyed()) await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
+		if (!options.isDestroyed()) await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
 	}
 
 	async pruneReferencedHashes(referencedHashes: Set<string>): Promise<void> {
+		await this.removeUnreferenced(await this.listCacheFiles(), referencedHashes);
+	}
+
+	/** Prune after syncs at most once per interval; startup seeding always prunes. */
+	async pruneUnreferenced(manifest: MarkdownBaseCacheManifest): Promise<void> {
+		if (this.lastPruneAt !== null && Date.now() - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+		await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
+	}
+
+	private async listCacheFiles(): Promise<string[]> {
 		try {
-			const listing = await this.app.vault.adapter.list(this.cacheDir);
-			await Promise.allSettled(
-				listing.files
-					.filter((path) => path.endsWith('.md'))
-					.filter((path) => !referencedHashes.has(getHashFromCachePath(path)))
-					.map(async (path) => {
-                            this.writtenHashes.delete(getHashFromCachePath(path));
-                            await this.app.vault.adapter.remove(path);
-                        }),
-			);
+			return (await this.app.vault.adapter.list(this.cacheDir)).files.filter((path) => path.endsWith('.md'));
 		} catch {
-			// Cache directory may not exist yet. Pruning is best effort.
+			// Cache directory may not exist yet.
+			return [];
 		}
 	}
 
-	async pruneUnreferenced(manifest: MarkdownBaseCacheManifest): Promise<void> {
-		await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
+	private async removeUnreferenced(listing: string[], referencedHashes: Set<string>): Promise<void> {
+		this.lastPruneAt = Date.now();
+		// Pruning is best effort; a failed removal is retried by a later prune.
+		await Promise.allSettled(
+			listing
+				.filter((path) => !referencedHashes.has(getHashFromCachePath(path)))
+				.map(async (path) => {
+                        this.writtenHashes.delete(getHashFromCachePath(path));
+                        await this.app.vault.adapter.remove(path);
+                    }),
+		);
 	}
 
 	private async ensureCacheDir(): Promise<void> {

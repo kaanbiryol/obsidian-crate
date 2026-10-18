@@ -166,9 +166,10 @@ describe('startup pending scan cost', () => {
 		h.vault.getFiles.mockImplementation(() => [...disk.keys()].map(path => ({
 			path, extension: 'md', stat: { size: disk.get(path)!.byteLength, mtime: mtimes.get(path)! },
 		})));
-		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 		// An already seeded Markdown base cache keeps its reads out of these counts.
-		h.vault.adapter.exists.mockImplementation((path: string) => disk.has(path) || path.includes('/markdown-base-cache/'));
+		h.vault.adapter.list.mockImplementation(async (dir: string) => dir.endsWith('/markdown-base-cache')
+			? { files: [`${dir}/${hash}.md`], folders: [] } : { files: [], folders: [] });
+		h.vault.adapter.exists.mockImplementation((path: string) => disk.has(path));
 		h.vault.adapter.stat.mockImplementation(async (path: string) => disk.has(path)
 			? { type: 'file', size: disk.get(path)!.byteLength, mtime: mtimes.get(path)! } : null);
 		h.vault.adapter.readBinary.mockImplementation(async (path: string) => {
