@@ -8,11 +8,12 @@ import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 import { apiRoutePolicy } from '../routes/policy';
+import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 
 export interface ReadingPolicy { enabled: number; folder_path: string; generation: string; revision: string }
 /** Preparation and capability redemption must recognize the same issuer scopes. */
 export function canPrepareReadingHandoff(scope: string): scope is AuthPrincipal['scope'] {
-  return apiRoutePolicy('/reading/prepare', 'POST')!.scopes.some(allowed => allowed === scope);
+  return apiRoutePolicy(shortcut.preparePath, 'POST')!.scopes.some(allowed => allowed === scope);
 }
 export class ReadingError extends Error {
   constructor(message: string, readonly status = 400, readonly code = 'reading_error') { super(message); }

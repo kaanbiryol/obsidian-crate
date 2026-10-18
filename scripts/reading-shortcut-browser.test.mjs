@@ -41,7 +41,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const dialog = page.getByRole('dialog', { name: 'Set up iPhone shortcut' });
     await expect(dialog).toBeVisible().catch(async error => { console.error('Setup page:', await page.locator('body').innerText(), errors); throw error; });
     const download = dialog.getByRole('link', { name: 'Download Save to Crate' });
-    await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v2/');
+    await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v1/');
     await expect(download).toHaveAttribute('rel', 'noopener noreferrer');
     await mkdir('test-results/reading', { recursive: true });
     await page.screenshot({ path: `test-results/reading/${name}-shortcut-start.png`, fullPage: true, animations: 'disabled' });
@@ -302,11 +302,6 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.deepEqual(attempts[0], attempts[1]);
 
     await page.unroute('**/reading/handoff');
-    const legacyResponse = await post('/reading/prepare', { url: articleUrl }, authorization);
-    const legacy = await legacyResponse.json(); await page.goto(legacy.launchUrl);
-    await expect(page.getByRole('heading', { name: 'Already saved', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'A newer shortcut is available', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Download shortcut', exact: true })).toHaveAttribute('href', contract.downloadUrl);
     assert.deepEqual(errors, []);
   } finally { await browser?.close(); if (server) await new Promise(resolve => server.close(resolve)); await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });

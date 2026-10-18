@@ -37,7 +37,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
       }
       return await handleEncryptedReminders(request, env, path, '/reading', current.folder_path) ?? readingResponse({ error: 'Not found' }, 404);
     }
-    if (encryption && (shortcut?.kind === 'prepare' || ['/reading/prepare', '/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
+    if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
     if (path === '/reading/encryption' && request.method === 'GET' && principal) {
       const current = await authority(env.DB, principal);
       return readingResponse({ encryption: encryption ? { version: encryption.version, vaultId: encryption.vaultId, generation: encryption.generation, mode: encryption.mode, recovery: encryption.recovery, scope: encryption.scopes.find(scope => scope.folderPath === current.folder_path) ?? null } : null });
@@ -73,7 +73,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
     }
     if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
     if (path === '/reading/access' && request.method === 'POST' && principal.scope === 'vault') return await issueReadingAccess(env.DB, current, body, url.origin);
-    if ((path === '/reading/prepare' || shortcut?.kind === 'prepare') && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
+    if (shortcut?.kind === 'prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
     if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
     if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);
     if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });

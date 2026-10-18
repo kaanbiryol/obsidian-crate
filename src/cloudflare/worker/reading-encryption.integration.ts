@@ -120,11 +120,11 @@ it('preserves queued captures during conversion and prevents late plaintext publ
   expect(handoff.status).toBe(428);
 });
 
-it.each(['active', 'converting'] as const)('blocks legacy and versioned Shortcut preparation before parsing private content while %s', async mode => {
+it.each(['active', 'converting'] as const)('blocks Shortcut preparation before parsing private content while %s', async mode => {
   await setup(mode);
-  for (const path of ['/reading/prepare', '/reading/shortcut/v1/prepare']) {
+  for (const path of ['/reading/shortcut/v1/prepare']) {
     const request = new Request('https://test' + path, {
-      method: 'POST', headers: { 'X-Crate-Shortcut-Revision': '2' }, body: 'unparsed private content',
+      method: 'POST', headers: { 'X-Crate-Shortcut-Revision': '1' }, body: 'unparsed private content',
     });
     const response = await handleReadingRoute(request, env);
     expect(response.status).toBe(428);

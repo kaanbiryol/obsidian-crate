@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "revision": 2,
+  "revision": 1,
   "minimumRevision": 1,
   "preparePath": "/reading/shortcut/v1/prepare",
   "exchangePath": "/reading/shortcut/v1/exchange",
   "revisionHeader": "X-Crate-Shortcut-Revision",
-  "downloadUrl": "https://crate.kaanbiryol.com/shortcuts/v2/",
+  "downloadUrl": "https://crate.kaanbiryol.com/shortcuts/v1/",
   "supportUrl": "https://crate.kaanbiryol.com/shortcuts/help/",
   "issuesUrl": "https://github.com/kaanbiryol/obsidian-crate/issues/new"
 }

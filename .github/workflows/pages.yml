@@ -83,7 +83,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: node scripts/download-release-shortcut.mjs published site/shortcuts/v2 --install-page
+        run: node scripts/download-release-shortcut.mjs published site/shortcuts/v1 --install-page
       # Documentation links include the generated shortcut installation page.
       - name: Build static site and documentation
         run: npm run build:site

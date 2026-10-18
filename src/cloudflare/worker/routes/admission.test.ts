@@ -39,7 +39,6 @@ it.each([
 	['GET', '/reading/list', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
 	['GET', '/reading/encrypted-file', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
 	['POST', '/reading/capture', scopes, { kind: 'coordinator', wake: true }],
-	['POST', '/reading/prepare', scopes, { kind: 'coordinator', wake: true }],
 	['POST', '/reading/shortcut-pairing', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: true }],
 	['POST', shortcut.preparePath, ['reading_capture'], { kind: 'coordinator', wake: true }],
 ] as const)('%s %s enforces admission, scopes and execution', (method, path, allowed, execution) => {
@@ -54,7 +53,7 @@ it.each([
 
 it('uses the preparation scope policy when validating a handoff issuer', () => {
 	for (const scope of scopes) {
-		expect(canPrepareReadingHandoff(scope)).toBe(isAuthenticatedRouteAllowed({ tokenId: 'device', scope }, '/reading/prepare', 'POST'));
+		expect(canPrepareReadingHandoff(scope)).toBe(isAuthenticatedRouteAllowed({ tokenId: 'device', scope }, shortcut.preparePath, 'POST'));
 	}
 	expect(canPrepareReadingHandoff('unknown')).toBe(false);
 });

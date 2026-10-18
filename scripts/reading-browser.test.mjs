@@ -832,9 +832,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await fresh.close();
 });
 
-for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enrollment, save, phone confirmation and logout`, { timeout: 90000 }, async t => {
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: enrollment, save and logout`, { timeout: 90000 }, async t => {
   const fixture = await openReadingBrowserFixture(t, name, engine);
-  const { page, context, runtime, origin, api } = fixture;
+  const { page, runtime, origin, api } = fixture;
   await fixture.enroll();
   await page.getByRole('button',{name:'Save a link',exact:true}).click();
   await page.getByLabel('Link',{exact:true}).fill('https://browser.example.invalid/browser');
@@ -842,11 +842,6 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).waitFor();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await mkdir('test-results/reading',{recursive:true}); await page.screenshot({path:`test-results/reading/${name}-library.png`,fullPage:true});
-  const prepared=await api('/reading/prepare',{url:'https://example.invalid/phone',title:'Phone article'});
-  const phone=await context.newPage(); await phone.goto(prepared.launchUrl);
-  await phone.getByRole('heading',{name:'Saved',exact:true}).waitFor(); assert.equal(new URL(phone.url()).hash,'');
-  await phone.screenshot({path:`test-results/reading/${name}-saved.png`,fullPage:true});
-  await phone.reload(); await phone.getByRole('heading',{name:'Saved',exact:true}).waitFor();
   await page.getByRole('button',{name:'Open settings'}).click();
   await page.getByRole('button',{name:'Log out',exact:true}).click();
   const readingToken = await page.evaluate(() => JSON.parse(localStorage.getItem('crate-reading-session-v1')).token);

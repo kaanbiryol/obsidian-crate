@@ -108,7 +108,6 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/handoff': { scopes: VAULT, execution: READING_GRANT },
 	'POST /reading/shortcut-pairing': { scopes: LIBRARY, execution: COORDINATOR },
 	'POST /reading/access': { scopes: VAULT, execution: COORDINATOR },
-	'POST /reading/prepare': { scopes: ALL_SCOPES, execution: COORDINATOR },
 	'POST /reading/capture': { scopes: ALL_SCOPES, execution: COORDINATOR },
 	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR },
 	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR },

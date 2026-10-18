@@ -44,8 +44,6 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
     };
     const saveRequest = shortcutRequest(prepareAction, outputs);
     // Retired protocols cannot bypass the wire gate.
-    const rejected = await api('/reading/prepare', { url: sharedUrl }, { 'X-Crate-Protocol': '11' });
-    assert.equal(rejected.status, 428);
     const unrelated = await dispatch({ ...saveRequest, url: `${origin}/reading/capture`, headers: { ...saveRequest.headers, 'X-Crate-Protocol': '11' } });
     assert.equal(unrelated.status, 428);
     const prepared = await dispatch(saveRequest);
@@ -137,7 +135,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.ok(credential.expires_at <= session.expiresAt);
     assert.equal((await request('/reading/shortcut-pairing', token)).status, 403);
     assert.equal((await request('/reading/access', token, { kind: 'reading' })).status, 403);
-    assert.equal((await request('/reading/prepare', token, { url: 'https://example.invalid/test' })).status, 200);
+    assert.equal((await request(contract.preparePath, token, { url: 'https://example.invalid/test' })).status, 200);
     const replaced = await pair(), current = await pair();
     assert.equal((await request(contract.exchangePath, '', replaced)).status, 410);
     await runtime.db.prepare('UPDATE reading_enrollments SET expires_at=0 WHERE token_hash=?').bind(hash(current.token)).run();

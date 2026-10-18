@@ -4,6 +4,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import contract from '../src/reading/shortcut-contract.json' with { type: 'json' };
 import { openLocalRuntime, issueLocalDevice, localNetworkOptions } from '../packages/server/src/local-server-runtime.mjs';
 
 const operation = () => `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${randomUUID()}`;
@@ -82,9 +83,9 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     result = await request('/reading/update', browser.body.token, { id: item.crate_reading_id, changes: { favorite: true }, before: { favorite: false }, operationId: operation() });
     assert.equal(result.status, 200, JSON.stringify(result));
     listed = await request('/reading/list', browser.body.token); assert.equal(listed.body.items[0].favorite, true);
-    const prepared = await request('/reading/prepare', capture.body.token, { url: 'https://example.invalid/phone', title: 'Phone capture' });
+    const prepared = await request(contract.preparePath, capture.body.token, { url: 'https://example.invalid/phone', title: 'Phone capture' });
     assert.equal(prepared.status, 200, JSON.stringify(prepared));
-    const launch = new URL(prepared.body.launchUrl); assert.equal(launch.pathname, '/notifications/save-reading'); assert.equal(launch.search, '');
+    const launch = new URL(prepared.body.launchUrl); assert.equal(launch.pathname, '/notifications/save-reading'); assert.equal(launch.search, `?shortcut=${contract.revision}&contract=${contract.version}`);
     const handoff = await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) });
     assert.equal(handoff.status, 200, JSON.stringify(handoff)); assert.ok(handoff.body.saved);
     assert.deepEqual(await request('/reading/handoff', '', {}, { 'X-Crate-Capture': launch.hash.slice(1) }), handoff);

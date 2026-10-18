@@ -16,8 +16,8 @@ async function prepare(scope: string) {
 	const token = `handoff-${scope}`;
 	await env.DB.prepare('INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation,expires_at) VALUES (?,?,?,?,?,?)')
 		.bind('issuer', await sha256Hex(token), scope, scope === 'reminders' ? 'Reminders' : 'Reading', 'g', Date.now() + 60_000).run();
-	const response = await fetchWorkerRequest(new Request('https://crate.example/reading/prepare', {
-		method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' },
+	const response = await fetchWorkerRequest(new Request('https://crate.example/reading/shortcut/v1/prepare', {
+		method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '1', 'X-Crate-Shortcut-Revision': '1', 'Content-Type': 'application/json' },
 		body: JSON.stringify({ url: 'https://example.invalid/handoff', title: 'Saved by handoff' }),
 	}), env);
 	expect(response.status, await response.clone().text()).toBe(200);
@@ -27,7 +27,7 @@ const redeem = (token: string) => fetchWorkerRequest(new Request('https://crate.
 	method: 'POST', headers: { 'X-Crate-Capture': token, 'X-Crate-Protocol': '1', 'Content-Type': 'application/json' }, body: '{}',
 }), env);
 
-it.each(['vault', 'reminders', 'reading', 'reading_capture'])('redeems and replays a handoff prepared by %s exactly once', async scope => {
+it.each(['reading_capture'])('redeems and replays a handoff prepared by %s exactly once', async scope => {
 	const token = await prepare(scope);
 	const response = await redeem(token);
 	expect(response.status, await response.clone().text()).toBe(200);
@@ -46,8 +46,8 @@ it.each([
 	['expired capability', 'UPDATE reading_handoffs SET expires_at=1', 410],
 	['changed generation', "UPDATE reading_policy SET generation='new'", 410],
 	['paused Reading', `INSERT INTO maintenance_state(key,value) VALUES ('crate_feature_policy','{"reading":false,"reminders":true,"revision":"r"}')`, 423],
-] as const)('rejects reminder handoffs after %s without writing a note', async (_name, sql, status) => {
-	const token = await prepare('reminders');
+] as const)('rejects Shortcut handoffs after %s without writing a note', async (_name, sql, status) => {
+	const token = await prepare('reading_capture');
 	await env.DB.prepare(sql).run();
 	const response = await redeem(token);
 	expect(response.status, await response.clone().text()).toBe(status);
@@ -56,7 +56,7 @@ it.each([
 });
 
 it('rejects even a previously committed handoff after its issuer is revoked', async () => {
-	const token = await prepare('reminders');
+	const token = await prepare('reading_capture');
 	expect((await redeem(token)).status).toBe(200);
 	await env.DB.prepare("DELETE FROM auth_tokens WHERE id='issuer'").run();
 	expect((await redeem(token)).status).toBe(410);

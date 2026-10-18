@@ -145,7 +145,7 @@ test('private capture variants keep URLs in fragments and resolve their native o
     assert.equal(capture[1].WFWorkflowActionParameters.WFEncodeMode, 'Encode');
     assert.equal(token(capture[1].WFWorkflowActionParameters.WFInput).OutputUUID, capture[0].WFWorkflowActionParameters.UUID);
     const prefix = capture[2].WFWorkflowActionParameters;
-    for (const path of ['/reading/prepare', contract.preparePath]) assert.equal(('https://crate.example' + path).replace(new RegExp(prefix.WFReplaceTextFind), prefix.WFReplaceTextReplace), 'https://crate.example/notifications?section=reading#readingCapture=');
+    for (const path of [contract.preparePath]) assert.equal(('https://crate.example' + path).replace(new RegExp(prefix.WFReplaceTextFind), prefix.WFReplaceTextReplace), 'https://crate.example/notifications?section=reading#readingCapture=');
     const assembled = capture[3].WFWorkflowActionParameters.WFTextActionText;
     assert.equal(assembled.Value.attachmentsByRange['{0, 1}'].OutputUUID, prefix.UUID);
     assert.equal(assembled.Value.attachmentsByRange['{1, 1}'].OutputUUID, capture[1].WFWorkflowActionParameters.UUID);
