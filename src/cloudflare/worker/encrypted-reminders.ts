@@ -1,7 +1,7 @@
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../encryption/receipt-format';
 
 import { ENCRYPTED_INVENTORY_PAGE } from '../../encryption/file-inventory';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
+import { fileFolderArgs } from './file-identity';
 import { corsHeaders, corsResponse } from './cors';
 import { parseJsonObject, sanitizePath, isSha256Hex } from './utils';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from './encryption-state';
@@ -13,6 +13,7 @@ import { commitStagedFile } from './sync-mutations';
 import { FileVersionConflictError } from './storage';
 import { beginReminderOperation, reminderOperationEffects } from './reminders-web/operations';
 import { isSyncRevision } from '../../protocol/sync-validation';
+import { portablePathKey } from '../../protocol/portable-path';
 import type { Env } from './types';
 
 const MAX_WEB_FILE_BYTES = 4 * 1024 * 1024;
@@ -39,12 +40,20 @@ export async function handleEncryptedReminders(request: Request, env: Env, path:
 		const after = params.get('after') ?? '';
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
 		const sequence = await env.DB.prepare("SELECT MAX(COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'changelog'), 0), COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS seq").first<{ seq: number }>();
-		const rows = await env.DB.prepare(`SELECT path, hash, size, storage_key AS revision FROM files
-			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' AND path > ? ORDER BY path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
-			.bind(...fileFolderArgs(folder), after).all<{ path: string; hash: string; size: number; revision: string }>();
-		const files = rows.results.filter(file => scopedPath(file.path, folder, state));
+		// Page in primary-key order from a single lower bound, so each page reads only
+		// its own rows. The cursor is opaque to clients; normalizing it also resumes
+		// an original-case path cursor from an older server.
+		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
+		const afterKey = portablePathKey(after);
+		const [lower, lowerBound] = afterKey >= keyStart ? ['portable_path > ?', afterKey] : ['portable_path >= ?', keyStart];
+		const rows = await env.DB.prepare(`SELECT path, portable_path, hash, size, storage_key AS revision FROM files
+			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
+			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
+			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<{ path: string; portable_path: string; hash: string; size: number; revision: string }>();
+		const files = rows.results.filter(file => scopedPath(file.path, folder, state))
+			.map(({ path, hash, size, revision }) => ({ path, hash, size, revision }));
 		return corsResponse({ files, sequence: sequence?.seq ?? 0, generation: state.generation,
-			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.path : null });
+			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.portable_path : null });
 	}
 	const filePath = scopedPath(params.get('path'), folder, state);
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);
