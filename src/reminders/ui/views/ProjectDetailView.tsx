@@ -73,10 +73,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);
   }, [colorScheme, reminders, project]);
-  const header = useMemo(
-    () => buildProjectDetailHeaderViewModel(reminders, project, colorScheme),
-    [colorScheme, reminders, project],
-  );
+  const header = useMemo(() => buildProjectDetailHeaderViewModel(detail), [detail]);
   const { active, completed } = detail;
 
   const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);

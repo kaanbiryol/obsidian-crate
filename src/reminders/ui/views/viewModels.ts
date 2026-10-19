@@ -165,12 +165,8 @@ export function buildProjectDetailViewModel(
 }
 
 export function buildProjectDetailHeaderViewModel(
-  reminders: Reminder[],
-  project: string,
-  colorScheme: ProjectColorScheme = "dark",
+  detail: ReturnType<typeof buildProjectDetailViewModel>,
 ): ProjectDetailHeaderViewModel {
-  const detail = buildProjectDetailViewModel(reminders, project, colorScheme);
-
   return {
     activeCount: detail.active.length,
     completedCount: detail.completed.length,

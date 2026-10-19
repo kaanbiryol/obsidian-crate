@@ -146,11 +146,11 @@ describe("reminder view models", () => {
   });
 
   it("builds compact project detail header state including all-done status", () => {
-    const header = buildProjectDetailHeaderViewModel([
+    const header = buildProjectDetailHeaderViewModel(buildProjectDetailViewModel([
       makeReminder({ id: "done-1", project: "Work", completed: true }),
       makeReminder({ id: "done-2", project: "Work", completed: true }),
       makeReminder({ id: "other", project: "Home" }),
-    ], "Work");
+    ], "Work"));
 
     expect(typeof header.accentColor).toBe("string");
     expect({

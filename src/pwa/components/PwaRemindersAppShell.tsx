@@ -178,6 +178,16 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		return onReorder(currentProject, orderedIds);
 	}, [currentProject, onReorder]);
 
+	// The project detail view is memoized, so keep its element props stable
+	// across shell renders that do not change them.
+	const projectBackControl = useMemo(() => <BackButton label="Back to projects" onClick={handleBackToProjects} />, [handleBackToProjects]);
+	const projectNavigationRightContent = useMemo(() => headerRightContent?.(true), [headerRightContent]);
+	const projectBelowHeaderContent = useMemo(
+		() => belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>,
+		[belowHeaderContent],
+	);
+	const projectAnimationConfig = useMemo(() => ({ enabled: !reduceMotion }), [reduceMotion]);
+
 	const viewPanels = (
 		<RemindersViewPanels
 			viewMode={viewMode}
@@ -266,13 +276,13 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								<ProjectDetailView
 									project={selectedProject}
 									headerMetaContent={headerMetaContent}
-									backControl={<BackButton label="Back to projects" onClick={handleBackToProjects} />}
-									navigationRightContent={headerRightContent?.(true)}
-									belowHeaderContent={belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>}
+									backControl={projectBackControl}
+									navigationRightContent={projectNavigationRightContent}
+									belowHeaderContent={projectBelowHeaderContent}
 									reminders={reminders}
 									loadingContent={showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : undefined}
 									onBack={handleBackToProjects}
-									animationConfig={{ enabled: !reduceMotion }}
+									animationConfig={projectAnimationConfig}
 									renderCard={panelCardRenderer}
 									hasFab={!suppressFab}
 									onReorder={handleReorder}
