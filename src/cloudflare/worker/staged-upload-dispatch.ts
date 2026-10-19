@@ -1,4 +1,5 @@
-import { getStoredFileRow } from './sync-storage';
+import { toFileStorageRow } from './sync-storage';
+import { filePathArgs } from './file-identity';
 import { commitStagedFile } from './sync-mutations';
 import { armNotificationCoordinator } from './notification-lifecycle';
 import { FileNamespaceConflictError } from './file-namespace';
@@ -91,13 +92,19 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 }
 
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
-  if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== ((await getNotificationPolicy(env.DB))?.revision ?? null)) {
+  // One read under the lock covers the policy fence, the previous file and the
+  // folder used by the projection enqueue.
+  const current = await env.DB.prepare(`SELECT p.revision, p.folder_path, f.hash, f.size, f.storage_key
+    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1
+    LEFT JOIN files f ON f.portable_path = ? AND f.path = ?`).bind(...filePathArgs(params.path))
+    .first<{ revision: string | null; folder_path: string | null; hash: string | null; size: number | null; storage_key: string | null }>();
+  if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== (current?.revision ?? null)) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
-  const previousFile = await getStoredFileRow(env.DB, params.path);
+  const previousFile = toFileStorageRow(current);
   await armNotificationCoordinator(state);
   try {
-    return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, previousFile }));
+    return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, previousFile, reminderFolder: current?.folder_path ?? null }));
   } catch (error) {
     if (error instanceof FileNamespaceConflictError) return error.toResponse();
     throw error;

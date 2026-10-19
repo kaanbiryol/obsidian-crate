@@ -85,6 +85,10 @@ export async function getStoredFileRow(db: D1Database, path: string): Promise<Fi
 	const row = await db.prepare(`SELECT hash, size, storage_key FROM files WHERE ${FILE_PATH_MATCH}`)
 		.bind(...filePathArgs(path))
 		.first<{ hash?: string; size?: number; storage_key?: string }>();
+	return toFileStorageRow(row);
+}
+
+export function toFileStorageRow(row: { hash?: string | null; size?: number | null; storage_key?: string | null } | null): FileStorageRow | null {
 	const storageKey = normalizeStorageKey(row?.storage_key);
 	if (!row || !storageKey) {
 		return null;

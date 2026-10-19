@@ -68,3 +68,30 @@ it.each(['single', 'batch'] as const)('commits a plaintext %s reminder upload wi
   expect(await env.DB.prepare('SELECT verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1 });
   expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path });
 });
+
+it('reads the reminder policy and previous file once while committing a reminder upload', async () => {
+  await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({
+    folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00',
+  }) }), env.DB);
+  const path = 'Reminders/Inbox.md';
+  const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, 'Old', null);
+  const content = `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`;
+  const hash = await sha256Hex(content);
+  const objectKey = createManagedObjectKey(hash);
+  await trackStagedUpload(env.DB, objectKey, path);
+  await env.BUCKET.put(objectKey, content);
+  const prepare = env.DB.prepare.bind(env.DB);
+  const reads: string[] = [];
+  env.DB.prepare = (sql: string) => {
+    if (/FROM notification_policy WHERE id = 1|notification_policy p ON p.id = 1|SELECT hash, size, storage_key FROM files/.test(sql)) reads.push(sql);
+    return prepare(sql);
+  };
+  try {
+    const size = new TextEncoder().encode(content).byteLength;
+    expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: first.hash, previousFile: null })).committed).toBe(true);
+  } finally { env.DB.prepare = prepare; }
+  // One policy read prepares the upload outside the lock; one combined read commits it.
+  expect(reads).toHaveLength(2);
+  expect(await env.DB.prepare('SELECT storage_key FROM file_versions').all()).toMatchObject({ results: [{}] });
+  expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path });
+});

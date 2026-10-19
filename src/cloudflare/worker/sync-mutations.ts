@@ -85,6 +85,8 @@ export interface CommitResult {
 
 export interface StagedFileCommitInput {
 	reminderPolicyRevision?: string | null;
+	/** The current reminder folder when the caller already read it under the coordinator lock. */
+	reminderFolder?: string | null;
 	path: string;
 	hash: string;
 	size: number;
@@ -118,7 +120,7 @@ export async function commitStagedFile(
 		...cleanupKeys.map(storageKey => retainReplacedVersionStatement(db, {
 			storageKey, path: params.path, hash: params.previousFile?.hash ?? '', size: params.previousFile?.size ?? 0,
 		}, [params])),
-		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state)),
+		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),

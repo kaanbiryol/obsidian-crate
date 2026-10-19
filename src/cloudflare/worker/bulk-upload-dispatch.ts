@@ -48,10 +48,10 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
 }
 
 export async function commitCoordinatedNewFiles(files: NewFileUpload[], state: DurableObjectState, env: Env): Promise<Response> {
-  const policyRevision = (await getNotificationPolicy(env.DB))?.revision ?? null;
-  if (files.some(file => file.reminderPolicyRevision !== undefined && file.reminderPolicyRevision !== policyRevision)) {
+  const policy = await getNotificationPolicy(env.DB);
+  if (files.some(file => file.reminderPolicyRevision !== undefined && file.reminderPolicyRevision !== (policy?.revision ?? null))) {
     return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
   }
   await armNotificationCoordinator(state);
-  return Response.json(await commitNewFiles(env.BUCKET, env.DB, files));
+  return Response.json(await commitNewFiles(env.BUCKET, env.DB, files, policy?.folderPath ?? null));
 }

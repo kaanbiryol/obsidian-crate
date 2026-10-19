@@ -5,8 +5,8 @@ import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/ty
 import { getReminderFolder, isReminderPath } from './reminder-scope';
 
 /** The same source/identity publication as a single upload, grouped by live revision. */
-export async function bulkFileProjection(db: D1Database, files: Array<{ path: string; objectKey: string; content: ArrayBuffer }>): Promise<D1PreparedStatement[]> {
-  const folder = await getReminderFolder(db);
+export async function bulkFileProjection(db: D1Database, files: Array<{ path: string; objectKey: string; content: ArrayBuffer }>, knownFolder?: string | null): Promise<D1PreparedStatement[]> {
+  const folder = knownFolder === undefined ? await getReminderFolder(db) : knownFolder;
   const rows = files.filter(file => isReminderPath(file.path, folder)).map(file => {
     const parsed = parseReminderSource(file.path, file.content, folder!);
     return { path: file.path, portable: portablePathKey(file.path), key: file.objectKey, issue: parsed.issue ?? null,

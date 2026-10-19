@@ -7,8 +7,8 @@ import { recordReminderSourceState } from './reminder-source-state';
 import { getReminderFolder, isReminderPath } from './reminder-scope';
 
 /** File bytes, identity ownership and first observation share one commit. */
-export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false, encrypted?: boolean): Promise<D1PreparedStatement[]> {
-  const folder = await getReminderFolder(db);
+export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false, encrypted?: boolean, knownFolder?: string | null): Promise<D1PreparedStatement[]> {
+  const folder = knownFolder === undefined ? await getReminderFolder(db) : knownFolder;
   if (!isReminderPath(path, folder)) return [];
   const guard = storageKey === null ? `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`
     : `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;

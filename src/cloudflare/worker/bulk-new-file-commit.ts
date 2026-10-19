@@ -15,7 +15,7 @@ export interface NewFileUpload {
 
 /** Inserts remain sequential inside one transaction: namespace guards see earlier inserts.
  * Everything derived from a file is conditional on this request's immutable revision. */
-export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: NewFileUpload[]): Promise<UploadResult[]> {
+export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: NewFileUpload[], reminderFolder?: string | null): Promise<UploadResult[]> {
   if (!files.length) return [];
   const json = JSON.stringify(files.map(file => ({ path: file.path, portable: portablePathKey(file.path), hash: file.hash, size: file.size, key: file.objectKey })));
   await db.batch([
@@ -27,7 +27,7 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
     db.prepare(`INSERT INTO changelog(path, action, hash, size, revision)
       SELECT f.path, 'put', f.hash, f.size, f.storage_key FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')`).bind(json),
-    ...await bulkFileProjection(db, files),
+    ...await bulkFileProjection(db, files, reminderFolder),
     db.prepare(`DELETE FROM staged_uploads WHERE storage_key IN (
       SELECT f.storage_key FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key'))`).bind(json),
