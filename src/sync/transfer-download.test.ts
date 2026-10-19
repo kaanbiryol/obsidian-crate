@@ -213,6 +213,19 @@ describe('transfer download/process helpers', () => {
 		expect(localFiles['notes/a.md']?.hash).toBe(changedHash);
 	});
 
+	it('trusts the hash decryption verified instead of rehashing batch plaintext', async () => {
+		const harness = createTransferHarness();
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		const content = new TextEncoder().encode('ok').buffer;
+		// A deliberately different hash proves the transfer did not hash the bytes again.
+		const verifiedHash = 'a'.repeat(64);
+		harness.api.batchDownload.mockResolvedValue({ files: [{ path: 'good.md', verifiedContent: content, hash: verifiedHash, size: 2, contentType: 'text/plain' }] });
+		const result = emptyResult();
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'good.md', expectedLocalHash: null, expectedRemoteHash: verifiedHash, remoteSize: 2 }], result, 5);
+		expect(result.errors).toEqual([]);
+		expect(result.downloaded).toBe(1);
+	});
+
 	it('aggregates per-path download errors during batch downloads', async () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);

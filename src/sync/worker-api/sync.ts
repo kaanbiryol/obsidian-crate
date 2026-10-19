@@ -3,7 +3,7 @@ import { computeHash } from '../hasher';
 import type { EncryptedFiles, UploadPreconditions } from '../encrypted-files';
 import type { JournalUpload } from '../upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
+import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
@@ -42,6 +42,15 @@ import {
 	HttpError,
 	type WorkerApiHttpClient,
 } from './http';
+
+// Bounds decrypted plaintext held at once while overlapping batch decryption.
+const DECRYPT_CONCURRENCY = 4;
+/** With encryption, `content` is plaintext whose `hash` and `size` decryption verified. */
+export interface DownloadedFile { content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string; verified?: true }
+type BatchDownloadEntry = BatchDownloadResponse['files'][number];
+/** Client-side batch entries: decrypted files carry verified bytes instead of base64. */
+export type DownloadedBatchFile = BatchDownloadEntry | (Omit<BatchDownloadEntry, 'content'> & { verifiedContent: ArrayBuffer });
+export interface DownloadedBatch { files: DownloadedBatchFile[] }
 
 export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
@@ -214,7 +223,7 @@ export class SyncWorkerApi {
 		return createReminderOperationId(day);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
+	async downloadFile(path: string): Promise<DownloadedFile> {
 		const encodedPath = encodeURIComponent(path);
 		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
 		const contentLengthHeader = getHeader(headers, 'Content-Length');
@@ -230,7 +239,7 @@ export class SyncWorkerApi {
 		};
 		if (!this.encryption) return result;
 		const opened = await this.encryption.download(path, body, result);
-		return { ...result, content: opened.content, ...opened.metadata };
+		return { ...result, content: opened.content, ...opened.metadata, verified: true };
 	}
 
 	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
@@ -324,7 +333,7 @@ export class SyncWorkerApi {
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
-	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
+	async batchDownload(paths: string[]): Promise<DownloadedBatch> {
 		let response: BatchDownloadResponse;
 		try { response = await this.http.requestJson<BatchDownloadResponse>('/sync/batch-download', {
 			method: 'POST',
@@ -332,20 +341,27 @@ export class SyncWorkerApi {
 		}, TRANSFER_TIMEOUT_MS); }
 		catch (error) {
 			if (!this.encryption || !(error instanceof HttpError) || error.status !== 413) throw error;
-			const files: BatchDownloadResponse['files'] = [];
+			const files: DownloadedBatchFile[] = [];
 			for (const path of paths) {
-				const file = await this.downloadFile(path);
-				files.push({ ...file, path, content: arrayBufferToBase64(file.content) });
+				const { content, verified: _verified, ...file } = await this.downloadFile(path);
+				files.push({ ...file, path, verifiedContent: content });
 			}
 			return { files };
 		}
-		if (!this.encryption) return response;
-		const files: BatchDownloadResponse['files'] = [];
-		for (const file of response.files) {
-			if (file.error) { files.push(file); continue; }
-			const opened = await this.encryption.download(file.path, base64ToArrayBuffer(file.content), file);
-			files.push({ ...file, ...opened.metadata, content: arrayBufferToBase64(opened.content) });
-		}
+		const encryption = this.encryption;
+		if (!encryption) return response;
+		const files = new Array<DownloadedBatchFile>(response.files.length);
+		let next = 0;
+		const worker = async () => {
+			while (next < response.files.length) {
+				const index = next++;
+				const { content, ...file } = response.files[index]!;
+				if (file.error) { files[index] = { ...file, content }; continue; }
+				const opened = await encryption.download(file.path, base64ToArrayBuffer(content), file);
+				files[index] = { ...file, ...opened.metadata, verifiedContent: opened.content };
+			}
+		};
+		await Promise.all(Array.from({ length: Math.min(DECRYPT_CONCURRENCY, response.files.length) }, worker));
 		return { files };
 	}
 

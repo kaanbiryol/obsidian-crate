@@ -31,11 +31,13 @@ export async function validateDownloadedContent(
   declaredSize: number,
   declaredHash: string,
   expectedRemoteHash: string,
+  // Decryption already verified these bytes against `declaredHash`.
+  verified = false,
 ): Promise<string> {
   if (declaredSize !== content.byteLength) {
     throw new Error(`Download size mismatch (expected ${declaredSize}, got ${content.byteLength})`);
   }
-  const computedHash = await computeHash(content);
+  const computedHash = verified ? declaredHash : await computeHash(content);
   if (declaredHash && declaredHash !== computedHash) {
     throw new Error(`Download hash mismatch for ${path}`);
   }
@@ -56,7 +58,7 @@ export async function downloadAndSaveFile(
   if (content.byteLength > MAX_FILE_SIZE_BYTES) {
     return { status: "deferred", reason: "Skipped remote file larger than 25MB" };
   }
-  const hash = await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash);
+  const hash = await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash, response.verified);
   const outcome = await applyRemoteContentIfUnchanged(context, path, content, request.expectedLocalHash);
   if (outcome.status === "deferred") return outcome;
 
@@ -123,13 +125,15 @@ export async function parallelDownloadAndSaveFiles(
               continue;
             }
 
-            const content = base64ToArrayBuffer(file.content);
+            const verified = "verifiedContent" in file;
+            const content = verified ? file.verifiedContent : base64ToArrayBuffer(file.content);
             const hash = await validateDownloadedContent(
               file.path,
               content,
               file.size,
               file.hash,
               downloadRequest.expectedRemoteHash,
+              verified,
             );
             const outcome = await applyRemoteContentIfUnchanged(
               context,

@@ -1,6 +1,7 @@
 import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
-import type { BatchDownloadResponse, BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../protocol/sync-types';
+import type { DownloadedBatch, DownloadedFile } from './worker-api/sync';
+import type { BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../protocol/sync-types';
 import type { RecordConflictInput } from './conflict-store';
 import type { UploadApplyPhase } from './upload-diagnostics';
 
@@ -33,10 +34,10 @@ interface TransferApi {
 	operationId?: string,
 	mergePreimage?: ArrayBuffer,
   ): Promise<UploadResult>;
-  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
+  downloadFile(path: string): Promise<DownloadedFile>;
   deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }>;
   batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
-  batchDownload(paths: string[]): Promise<BatchDownloadResponse>;
+  batchDownload(paths: string[]): Promise<DownloadedBatch>;
 }
 
 export interface TransferContext {

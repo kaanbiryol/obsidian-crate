@@ -13,7 +13,6 @@ import type { NotificationPolicy } from '../protocol/notification-policy';
 
 import type {
 	BatchDeleteResponse,
-	BatchDownloadResponse,
 	BatchUploadFile,
 	BatchUploadResponse,
 	BackendDiagnostics,
@@ -39,7 +38,7 @@ import type {
 } from './worker-api/notifications';
 import { NotificationsWorkerApi } from './worker-api/notifications';
 import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
-import { SyncWorkerApi } from './worker-api/sync';
+import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
 import { EncryptedFiles } from './encrypted-files';
 import type { VaultKeyBundle } from '../encryption/key-bundle';
@@ -155,7 +154,7 @@ export class SyncApiClient {
 		return this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash, operationId);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
+	async downloadFile(path: string): Promise<DownloadedFile> {
 		return this.syncApi.downloadFile(path);
 	}
 
@@ -175,7 +174,7 @@ export class SyncApiClient {
 		return this.syncApi.batchUpload(files);
 	}
 
-	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
+	async batchDownload(paths: string[]): Promise<DownloadedBatch> {
 		return this.syncApi.batchDownload(paths);
 	}
 
