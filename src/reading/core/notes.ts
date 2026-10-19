@@ -21,8 +21,8 @@ export function createReadingNote(input: { id: string; url: string; title?: stri
 	return `---\n${Object.entries(metadata).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n${ARTICLE_START}\n${ARTICLE_END}\n`;
 }
 
-export function updateReadingNote(markdown: string, id: string, changes: ReadingChanges): string {
-	const metadata = parseReadingNote(markdown);
+/** Callers that already parsed `markdown` may pass that result to avoid parsing it again. */
+export function updateReadingNote(markdown: string, id: string, changes: ReadingChanges, metadata: ReadingMetadata | null = parseReadingNote(markdown)): string {
 	if (!metadata || metadata.crate_reading_id !== id) throw new Error('The reading note changed. Refresh before trying again.');
 	// Construct the allowlist explicitly, even for callers outside TypeScript.
 	const allowed: ReadingChanges = {

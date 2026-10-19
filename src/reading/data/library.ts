@@ -34,6 +34,8 @@ export class ReadingLibrary {
 	private captureQueue: Promise<void> = Promise.resolve();
 	// The cached item keeps its identity while the note is unchanged.
 	private cache = new Map<string, { revision: string; metadata: ReadingMetadata | null; item?: ReadingItem }>();
+	// The last parsed note: an update's rescan and reread see the same bytes.
+	private parsed: { content: string; metadata: ReadingMetadata | null } | undefined;
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
 		private canAdopt: () => boolean = () => true, startAfter: Promise<void> = Promise.resolve()) {
 		this.queue = startAfter;
@@ -62,6 +64,12 @@ export class ReadingLibrary {
 		return this.closing ??= Promise.allSettled([this.queue, this.captureQueue]).then(() => {});
 	}
 	refresh(): Promise<void> { return this.enqueue(() => this.scan()); }
+	private parse(content: string): ReadingMetadata | null {
+		if (this.parsed?.content === content) return this.parsed.metadata;
+		const metadata = parseReadingNote(content);
+		this.parsed = { content, metadata };
+		return metadata;
+	}
 	invalidate(path: string): void {
 		for (const cachedPath of this.cache.keys()) if (cachedPath === path || cachedPath.startsWith(`${path}/`)) this.cache.delete(cachedPath);
 	}
@@ -84,7 +92,7 @@ export class ReadingLibrary {
 				try {
 					const original = await this.vault.read(file);
 					// Versioned notes need no adoption, so parse them only once.
-					let metadata = parseReadingNote(original);
+					let metadata = this.parse(original);
 					if (!metadata && this.canAdopt()) {
 						const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
 						this.assertActive();
@@ -93,7 +101,7 @@ export class ReadingLibrary {
 							if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
 							return adopted;
 						});
-						metadata = parseReadingNote(content);
+						metadata = this.parse(content);
 					}
 					if (metadata) {
 						const item = { ...metadata, path: file.path };
@@ -217,7 +225,7 @@ export class ReadingLibrary {
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			const content = await this.vault.read(file);
 			this.assertActive();
-			const metadata = parseReadingNote(content);
+			const metadata = this.parse(content);
 			if (!metadata || metadata.crate_reading_id !== item.crate_reading_id) throw new Error('This reading note changed. Refresh before opening it.');
 			return { item: { ...metadata, path: file.path }, markdown: readReadingFrontmatter(content)!.body };
 		});
@@ -231,10 +239,10 @@ export class ReadingLibrary {
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			await this.vault.process(file, content => {
 				this.assertActive();
-				const current = parseReadingNote(content);
+				const current = this.parse(content);
 				if (!current) throw new Error('This is no longer a reading note.');
 				if (readingUpdateIssue(current, item, changes)) throw new Error('This property changed elsewhere. Refresh before trying again.');
-				return updateReadingNote(content, item.crate_reading_id, changes);
+				return updateReadingNote(content, item.crate_reading_id, changes, current);
 			});
 			await this.scan();
 		});

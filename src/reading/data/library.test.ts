@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ReadingLibrary, type ReadingFile, type ReadingVault } from './library';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { readReadingFrontmatter } from '../core/frontmatter';
+import { readingDocument } from '../core/markdown';
 
 vi.mock('../core/frontmatter', async importOriginal => {
 	const actual = await importOriginal<typeof import('../core/frontmatter')>();
@@ -266,4 +267,23 @@ it('parses each versioned note once during a cold scan', async () => {
 	expect(h.library.getSnapshot().items).toHaveLength(1);
 	expect(readReadingFrontmatter).toHaveBeenCalledOnce();
 	expect(h.process).not.toHaveBeenCalled();
+});
+
+it('reuses parsed notes across a highlight save, its rescan and the reread', async () => {
+	const note = createReadingNote({ id: 'a1b2c3d4-5678-4abc-9def-123456789abc', url: 'https://example.com/article', savedAt: '2026-09-28T00:00:00Z' }) + '\nRead this passage.\n';
+	let content = note, revision = 0;
+	const vault: ReadingVault = { files: () => [{ path: 'Reading/Article.md', size: content.length, modifiedAt: 1, revision: String(revision) }],
+		read: async () => content, process: async (_file, update) => { content = update(content); revision++; return content; }, create: vi.fn() };
+	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal);
+	await library.refresh();
+	const item = library.getSnapshot().items[0]!;
+	const start = readingDocument((await library.read(item)).markdown).text.indexOf('this passage');
+	expect(start).toBeGreaterThan(0);
+	vi.mocked(readReadingFrontmatter).mockClear();
+	const highlights = [{ start, end: start + 12, text: 'this passage' }];
+	await library.update(item, { highlights });
+	const reread = await library.read({ ...item, highlights });
+	expect(reread.item.highlights).toHaveLength(1);
+	// The guard reuses the opened note; the rescan parses the saved bytes once and the reread reuses them.
+	expect(readReadingFrontmatter).toHaveBeenCalledTimes(3);
 });
