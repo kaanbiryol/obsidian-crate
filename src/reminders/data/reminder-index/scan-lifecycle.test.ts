@@ -151,3 +151,34 @@ it('skips a repeated rescan of unchanged note content without notifying listener
   await index.rescanFile(file);
   expect(scanFile).toHaveBeenCalledTimes(2);
 });
+
+it('flushes deferred file scans with one owner map and one notification', async () => {
+  let syncing = false;
+  const paths = ['Reminders/A.md', 'Reminders/B.md', 'Reminders/C.md'];
+  const files = new Map(paths.map(path => [path, Object.assign(new TFile(), { path, basename: path.slice(10, 11), extension: 'md' })]));
+  const index = createReminderIndex({ vault: { getAbstractFileByPath: (path: string) => files.get(path) ?? null } } as unknown as App,
+    'Reminders', undefined, () => syncing);
+  vi.mocked(scanVault).mockResolvedValue(snapshot([reminder()]));
+  await index.load();
+  syncing = true;
+  for (const file of files.values()) await index.rescanFile(file);
+  expect(scanFile).not.toHaveBeenCalled();
+
+  const owners: unknown[] = [];
+  const ownersSeen: string[][] = [];
+  vi.mocked(scanFile).mockImplementation(async (_app, file, _folder, _reserved, _signal, identityOwners) => {
+    owners.push(identityOwners);
+    ownersSeen.push([...identityOwners!].flatMap(([id, owned]) => [...owned].map(path => `${id}@${path}`)).sort());
+    return { filePath: file.path, reminders: [{ ...reminder(file.path), id: file.basename }], lineCount: 1 };
+  });
+  const listener = vi.fn();
+  index.onIndexChange(listener);
+  syncing = false;
+  await index.flushDeferredScans();
+
+  expect(scanFile).toHaveBeenCalledTimes(3);
+  expect(new Set(owners).size).toBe(1);
+  expect(ownersSeen[2]).toEqual(['A@Reminders/A.md', 'B@Reminders/B.md', 'one@Reminders/Old.md']);
+  expect(listener).toHaveBeenCalledOnce();
+  expect(index.getAll().map(item => item.id).sort()).toEqual(['A', 'B', 'C', 'one']);
+});
