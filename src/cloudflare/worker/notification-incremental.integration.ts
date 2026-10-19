@@ -99,3 +99,27 @@ it('continues ready batches immediately and keeps future retry deadlines', async
   expect(await jobs()).toEqual([]);
   expect(setAlarm).not.toHaveBeenCalled();
 });
+
+it('does not requeue delivered occurrences outside the delivery window on unrelated edits', async () => {
+  const id = crypto.randomUUID();
+  const content = note(id);
+  const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  await drainNotificationProjections(env);
+  await drainNotificationJobs(env);
+  // Delivery removes the installed schedule.
+  await env.DB.prepare('DELETE FROM scheduled_reminders').run();
+  const dueAt = Date.parse(due);
+  vi.spyOn(Date, 'now').mockReturnValue(dueAt + 60 * 60 * 1000);
+  const second = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, `${content}\nUnrelated note`, first.hash);
+  await drainNotificationProjections(env);
+  expect(await jobs()).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
+  await env.DB.prepare('DELETE FROM notification_jobs').run();
+  vi.mocked(Date.now).mockReturnValue(dueAt + 25 * 60 * 60 * 1000);
+  const third = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, `${content}\nAnother note`, second.hash);
+  await drainNotificationProjections(env);
+  expect(await jobs()).toEqual([]);
+  const snoozed = '2099-01-03T12:00:00.000Z';
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note(id, 'Task', snoozed), third.hash);
+  await drainNotificationProjections(env);
+  expect(await jobs()).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
+});

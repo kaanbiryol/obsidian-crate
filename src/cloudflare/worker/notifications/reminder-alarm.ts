@@ -8,6 +8,7 @@ import { changedRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
 import { hasNotificationAuthority } from '../reminder-source-state';
+import { NOTIFICATION_DELIVERY_WINDOW_MS } from '../notification-projection-plan';
 
 interface ReminderData {
 	reminderId: string;
@@ -41,7 +42,7 @@ const RETRY_ATTEMPT_KEY = 'retryAttempt';
 const RETRY_BASE_DELAY_MS = 60_000;
 const RETRY_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 const MAX_DELIVERY_RETRY_ATTEMPTS = 10;
-const MAX_DELIVERY_RETRY_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_DELIVERY_RETRY_AGE_MS = NOTIFICATION_DELIVERY_WINDOW_MS;
 const DELIVERY_FAILURE_KEY = 'deliveryFailure';
 const COMPLETED_OCCURRENCE_KEY = 'completedOccurrence';
 

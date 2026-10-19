@@ -1,6 +1,9 @@
 import { queryRows } from './db';
 import { parseEncryptedNotification } from '../../encryption/notification-format';
 
+/** Reminder alarms never deliver an occurrence this long after its due time. */
+export const NOTIFICATION_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 interface SchedulePayload {
   reminderId: string;
   content: string;
@@ -44,6 +47,11 @@ function canReuse(row: ExistingNotification, operation: NotificationOperation): 
     catch { return false; }
   }
   if (operation.operation === 'cancel') return row.scheduleToken === null;
+  // Delivery and cancellation remove schedule state. A previously projected
+  // occurrence outside the delivery window cannot notify, so requeuing it would
+  // only ask its alarm to complete or fail again.
+  if (row.token && row.scheduleToken === null && operation.payload
+    && Date.now() - Date.parse(operation.payload.dueDatetime) >= NOTIFICATION_DELIVERY_WINDOW_MS) return true;
   return Boolean(row.token && row.token === row.scheduleToken && operation.payload
     && samePayload({ reminderId: row.id, content: row.content!, project: row.project, dueDatetime: row.dueDatetime! }, operation.payload));
 }
