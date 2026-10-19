@@ -160,6 +160,7 @@ describe('PWA reminder refresh around local writes', () => {
 	it('restores cached source issues after a network error and clears them on logout', async () => {
 		const { rendered, original, load, settle } = harness();
 		const issues = [{ path: 'Reminders/Copy.md', reason: 'Duplicate reminder ID' }];
+		act(() => rendered.current.resetReminderState());
 		vi.mocked(loadCachedReminderSnapshot).mockResolvedValueOnce({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 123, issues });
 		await settle(0, new Response('Offline', { status: 503 }), load());
 		expect(rendered.current.reminders).toEqual([original]);
@@ -238,6 +239,21 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(rendered.current.refreshing).toBe(false);
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledOnce();
 		if (!oldWriteFirst) finishOldWrite();
+	});
+
+	it('keeps a newer confirmed snapshot instead of an older disk copy after a failed refresh', async () => {
+		const { rendered, original, load, settle, commit } = harness();
+		const confirmed = { ...original, content: 'Acknowledged edit', revision: 'one-confirmed' };
+		await commit([confirmed]);
+		const savedAt = rendered.current.lastUpdatedAt;
+		vi.mocked(loadCachedReminderSnapshot).mockResolvedValue({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 1 });
+		await settle(0, new Response('Offline', { status: 503 }), load());
+		expect(loadCachedReminderSnapshot).not.toHaveBeenCalled();
+		expect(rendered.current.reminders).toEqual([confirmed]);
+		expect(rendered.current.lastUpdatedAt).toBe(savedAt);
+		expect(rendered.current.dataMode).toBe('cached');
+		expect(rendered.current.error).toBe('Offline');
+		vi.mocked(loadCachedReminderSnapshot).mockReset();
 	});
 
 	it('ignores late errors from invalidated reads without restoring an older cache', async () => {

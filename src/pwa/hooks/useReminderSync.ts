@@ -203,6 +203,12 @@ export function useReminderSync({
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
+				// A loaded snapshot is at least as new as the disk copy; keep it and mark it stale.
+				if (lastCheckedAtRef.current !== null) {
+					setDataMode('cached');
+					setError(message);
+					return;
+				}
 				const cached = await loadCachedReminderSnapshot(config.folderPath);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				if (cached) {
