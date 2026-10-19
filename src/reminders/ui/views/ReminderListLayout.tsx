@@ -2,7 +2,7 @@ import React, { forwardRef, useCallback, useId, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProps } from 'motion/react';
 import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { REMINDER_LIST_FADE_TRANSITION } from '../layoutConstants';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
@@ -43,7 +43,7 @@ export function ReminderListLayout({
   renderToggleButton,
   animationConfig,
 }: ReminderListLayoutProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const transition = animationConfig.enabled && !reduceMotion ? REMINDER_LIST_FADE_TRANSITION : { duration: 0 };
   const layoutGroupId = useId();
   const scrollRef = useStableReminderScroll(isDragging);

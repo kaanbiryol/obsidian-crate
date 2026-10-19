@@ -1,11 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import { createTransferHarness, emptyResult } from './transfer-test-harness';
-import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer-download';
+import { createTransferHarness, emptyResult } from './transfer/transfer-test-harness';
+import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer/download';
 import { computeHash } from './hasher';
-import { getLocalChanges } from './planner-local';
+import { getLocalChanges } from './planner/local';
 import { hasLocalFileChanges } from './local-file-changes';
 import { LocalManifest } from './manifest';
-import { processDiff } from './transfer-process';
+import { processDiff } from './transfer/process';
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
 

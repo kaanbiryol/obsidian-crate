@@ -8,15 +8,15 @@ import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
-import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
-import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
+import { useReducedMotion } from "@/ui/shared/useReducedMotion";
+import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
 import { ReminderListPresence } from "@/reminders/components/ReminderListPresence";
 import { useReminderOrder } from "@/reminders/ui/hooks/useReminderOrder";
 import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
-import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
-import { ThemeIconProvider } from "@/reminders/components/theme-icon";
-import { openReminderCreationModal } from "@/reminders/ui/adapters/reminderEditorModals";
+import { ObsidianIcon } from "@/ui/obsidian-icon";
+import { ThemeIconProvider } from "@/ui/shared/ThemeIcon";
+import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import {
   buildRemindersListPresentation,
@@ -53,7 +53,7 @@ const ActiveRemindersList: React.FC<Props> = ({
 }) => {
   const plugin = PluginContext.use();
   const isDarkMode = useObsidianDarkMode();
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const colorScheme = isDarkMode ? "dark" : "light";
   // Use setting default for upcoming days
   const effectiveDays = plugin.remindersSettings.upcomingDaysDefault ?? 7;

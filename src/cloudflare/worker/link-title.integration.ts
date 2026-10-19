@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256HexBytes } from './auth';
+import { sha256HexBytes } from './auth/crypto';
 
 beforeEach(async () => {
 	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

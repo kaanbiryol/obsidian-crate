@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CRATE_PLUGIN_PROTOCOL } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { authenticateWorkerRequest } from './auth/index';
-import { handleCoordinatorRequest } from './coordinator-requests';
+import { handleCoordinatorRequest } from './notifications/coordinator-requests';
 import { fetchWorkerRequest } from './request-handler';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
-import { forwardTransferRequest } from './transfer-dispatch';
+import { forwardTransferRequest } from './sync/transfer-dispatch';
 import type { Env } from './types';
 
 vi.mock('./auth/index', () => ({ authenticateWorkerRequest: vi.fn() }));
@@ -15,8 +15,8 @@ vi.mock('./router', () => ({
 	isAuthenticatedRouteAllowed: vi.fn(() => true),
 }));
 vi.mock('./rate-limit', () => ({ limitNotificationRequest: vi.fn(async () => null) }));
-vi.mock('./admission-state', () => ({ rememberAuthenticatedRequest: vi.fn() }));
-vi.mock('./transfer-dispatch', () => ({ forwardTransferRequest: vi.fn() }));
+vi.mock('./auth/admission-state', () => ({ rememberAuthenticatedRequest: vi.fn() }));
+vi.mock('./sync/transfer-dispatch', () => ({ forwardTransferRequest: vi.fn() }));
 
 const env = { DB: {} } as Env;
 const authorized = { principal: { tokenId: 'device', scope: 'vault' as const }, resetGeneration: null };

@@ -1,4 +1,4 @@
-import { sha256Hex } from '../../auth';
+import { sha256Hex } from '../../auth/crypto';
 import { corsHeaders, corsResponse } from '../../cors';
 import { listStoredMarkdownFileMetadataByPrefix } from '../../storage';
 import type { Env } from '../../types';

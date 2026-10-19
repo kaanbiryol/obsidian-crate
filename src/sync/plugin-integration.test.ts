@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
-import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
+import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
 import { registerSyncCommands } from './plugin-integration';
 import { setSyncReady } from '../plugin/lifecycle-state';
 
-vi.mock('../ui/remote-recovery-modal', () => ({ openRemoteRecoveryModal: vi.fn() }));
-vi.mock('../ui/activity-modal', () => ({ ActivityModal: vi.fn() }));
-vi.mock('./runtime', () => ({ SyncRuntime: vi.fn() }));
+vi.mock('../ui/activity/remote-recovery-modal', () => ({ openRemoteRecoveryModal: vi.fn() }));
+vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
+vi.mock('./runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
 vi.mock('../reminders/runtime', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
 

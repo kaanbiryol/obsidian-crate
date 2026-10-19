@@ -1,4 +1,4 @@
-import { runScheduledMaintenance } from '../maintenance';
+import { runScheduledMaintenance } from './run';
 import type { Env } from '../types';
 
 const MAX_PASSES = 10;

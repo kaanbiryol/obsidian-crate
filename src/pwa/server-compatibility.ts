@@ -1,4 +1,4 @@
-import { isCompatibleCrateServer, parseCrateServerInfo, type CrateServerInfo } from '@/protocol';
+import { isCompatibleCrateServer, parseCrateServerInfo, type CrateServerInfo } from '@/protocol/server-info';
 
 export async function requireCompatibleServer(): Promise<CrateServerInfo> {
   const response = await fetch('/.well-known/crate', { cache: 'no-store', signal: AbortSignal.timeout(30_000) });

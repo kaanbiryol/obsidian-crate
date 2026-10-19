@@ -1,21 +1,21 @@
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
-import { PWA_CONTROL_SPRING, PWA_FADE } from '../motion';
+import { PWA_CONTROL_SPRING, PWA_FADE } from '../../ui/shared/navigation/motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { FeatureNavigationContext } from './FeatureSwitcherButton';
 
 import { PwaDock, PwaDockAddButton } from './PwaDock';
-import { PwaTabTransition } from './PwaTabTransition';
-import { PwaScheduleSwitcher } from './PwaScheduleSwitcher';
+import { TabTransition } from '../../ui/shared/navigation/TabTransition';
+import { ScheduleSwitcher } from '../../ui/shared/navigation/ScheduleSwitcher';
 import { TABS } from '@/reminders/ui/layoutConstants';
-import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
-import { ViewHeader } from '@/reminders/components/ViewHeader';
+import { Button } from '@/ui/shared/Button';
+import { ViewHeader } from '@/ui/shared/ViewHeader';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/layoutConstants';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PwaNavigationScreen } from './PwaNavigationScreen';
+import { NavigationScreen } from '../../ui/shared/navigation/NavigationScreen';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
@@ -152,7 +152,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		showCompleted: boolean;
 		count: number;
 	}) => (
-		<ShadowDOMNativeButton
+		<Button
 			onClick={onPress}
 			className="completed-section-toggle w-full justify-between h-10 px-0"
 		>
@@ -168,7 +168,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					<ChevronDown size={18} />
 				</motion.span>
 			}
-		</ShadowDOMNativeButton>
+		</Button>
 	), [reduceMotion]);
 
 	const currentProject = getReorderProject(viewMode, selectedProject);
@@ -233,7 +233,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			>
 				<div className="pwa-navigation-viewport" inert={backgroundInert || projectOpen}>
 					{/* Keep the Projects list and its scroll position mounted behind detail. */}
-					<PwaTabTransition viewKey={primaryTab}>
+					<TabTransition viewKey={primaryTab}>
 						<div className="overflow-hidden" inert={initializing}>
 							<ViewHeader
 								{...currentHeader}
@@ -248,7 +248,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						</div>
 
 						{(viewMode === 'today' || viewMode === 'upcoming') && (
-							<PwaScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing || showLoadingIndicator} />
+							<ScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing || showLoadingIndicator} />
 						)}
 
 						{belowHeaderContent && (
@@ -259,10 +259,10 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 						<div className="reminders-content">
 							{showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : primaryTab === 'today' ? (
-								<PwaTabTransition viewKey={viewMode}>{viewPanels}</PwaTabTransition>
+								<TabTransition viewKey={viewMode}>{viewPanels}</TabTransition>
 							) : viewPanels}
 						</div>
-					</PwaTabTransition>
+					</TabTransition>
 				</div>
 
 				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
@@ -271,7 +271,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 				<div className="pwa-project-layer" data-project-open={projectOpen} data-pwa-back={canGoBack} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
-						{selectedProject && <PwaNavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
+						{selectedProject && <NavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
 							<div className="reminders-content">
 								<ProjectDetailView
 									project={selectedProject}
@@ -292,7 +292,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								/>
 							</div>
 							{(initializing || !suppressFab) && <div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>}
-						</PwaNavigationScreen>}
+						</NavigationScreen>}
 					</AnimatePresence>
 				</div>
 

@@ -2,6 +2,11 @@ import { dirname, resolve, sep } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const hostDirectories = ['sync', 'plugin'].map(name => resolve(root, 'src', name));
+// Plugin-side Cloudflare modules sit beside the Worker; only build identity is shared.
+const cloudflareHost = resolve(root, 'src', 'cloudflare');
+const sharedCloudflareModules = new Set(['server-build', 'server-release.json', 'schema.sql', 'migrations']);
+const isCloudflareHostModule = target => dirname(target) === cloudflareHost
+  && !sharedCloudflareModules.has(target.slice(cloudflareHost.length + 1).split('?')[0]);
 
 /**
  * Resolve paths so Worker-local modules named sync remain valid at any depth.
@@ -19,7 +24,7 @@ export default {
       const target = specifier.startsWith('@/') ? resolve(root, 'src', specifier.slice(2))
         : specifier.startsWith('src/') ? resolve(root, specifier)
         : specifier.startsWith('.') ? resolve(dirname(context.filename), specifier) : null;
-      if (target && hostDirectories.some(directory => target === directory || target.startsWith(directory + sep))) {
+      if (target && (hostDirectories.some(directory => target === directory || target.startsWith(directory + sep)) || isCloudflareHostModule(target))) {
         context.report({ node: source, messageId: 'hostImport' });
       }
     };

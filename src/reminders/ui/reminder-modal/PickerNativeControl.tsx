@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 
 interface PickerNativeControlProps {
 	icon: string;

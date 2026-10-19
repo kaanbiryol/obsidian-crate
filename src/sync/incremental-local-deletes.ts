@@ -1,7 +1,7 @@
 import { recordSyncError } from './issues';
-import type { IncrementalSyncPlannerContext } from './planner-types';
+import type { IncrementalSyncPlannerContext } from './planner/types';
 import type { SyncResult } from './types';
-import { deleteRemoteFiles } from './transfer-delete';
+import { deleteRemoteFiles } from './transfer/delete';
 
 /** Plan from the acknowledged baseline; all transfer policy lives in the shared executor. */
 export async function applyIncrementalLocalDeletes(

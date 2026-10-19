@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import type { FileEntry } from '../protocol/sync-types';
 import { SyncApiClient } from './api';
 import type { ApiHttpTransport } from './worker-api/http';

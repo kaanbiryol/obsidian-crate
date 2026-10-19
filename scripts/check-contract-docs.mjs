@@ -2,7 +2,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const { outputFiles } = await build({
-	stdin: { contents: `export { CRATE_PLUGIN_PROTOCOL as protocol } from './src/protocol';
+	stdin: { contents: `export { CRATE_PLUGIN_PROTOCOL as protocol } from './src/protocol/server-info';
 		export { default as release } from './src/cloudflare/server-release.json';
 		export { READING_SHORTCUT_CONTRACT as shortcut } from './src/reading/shortcut';
 		export * as limits from './src/protocol/sync-limits';`, resolveDir: process.cwd() },

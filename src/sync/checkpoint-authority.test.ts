@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { LocalManifest } from './manifest';
-import { deleteManifestFile } from './runtime-config';
-import { SyncEngine } from './engine';
-import { createDeferred, createRuntimeHarness } from './runtime-test-harness';
+import { deleteManifestFile } from './runtime/config';
+import { SyncEngine } from './engine/engine';
+import { createDeferred, createRuntimeHarness } from './runtime/runtime-test-harness';
 
 const dir = '.obsidian/plugins/crate';
 const main = `${dir}/file-manifest.json`;

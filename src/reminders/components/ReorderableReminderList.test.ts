@@ -15,7 +15,7 @@ vi.mock('react', async importOriginal => ({
   useState: (current: unknown) => [current, vi.fn()],
   useCallback: (callback: unknown) => callback,
 }));
-vi.mock('../ui/useObsidianReducedMotion', () => ({ useObsidianReducedMotion: () => false }));
+vi.mock('../../ui/shared/useReducedMotion', () => ({ useReducedMotion: () => false }));
 vi.mock('../ui/reminder-pagination', async importOriginal => ({
   ...await importOriginal<typeof import('../ui/reminder-pagination')>(),
   useReminderPagination: (items: Reminder[]) => ({ items: items.slice(0, 2), start: 0 }),

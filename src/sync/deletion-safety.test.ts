@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPersistentEngineHarness } from './engine-persistence-test-harness';
+import { createPersistentEngineHarness } from './engine/engine-persistence-test-harness';
 import { PersistentTestVault } from '../test/factories/sync-vault';
 import type { ApiHttpTransport } from './worker-api/http';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
-import { createIncrementalHarness } from './planner-test-harness';
-import { runIncrementalSync } from './planner-incremental';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
+import { createIncrementalHarness } from './planner/planner-test-harness';
+import { runIncrementalSync } from './planner/incremental';
 import { assertLocalFileAbsent } from './local-absence';
 import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import { apiRoutePolicy } from './policy';
 import { canPrepareReadingHandoff } from '../reading/common';
 import { isAuthenticatedRouteAllowed } from '../router';

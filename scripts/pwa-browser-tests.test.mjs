@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { browserDurations, browserScripts, macosBrowserScripts, runBrowserTests, selectScripts } from './pwa-browser-tests.mjs';
 
@@ -12,6 +12,17 @@ test('shards cover every existing browser script exactly once', () => {
 		assert.deepEqual(shards.flat().sort(), [...browserScripts].sort());
 		assert.ok(shards.every(shard => shard.length > 0));
 	}
+});
+
+test('every browser test script runs from the registry or a package script', () => {
+	// Manual diagnostics documented in docs/ui-styling.md.
+	const manual = new Set(['scripts/pwa-sync-indicator-test.mjs']);
+	const packageScripts = Object.values(JSON.parse(readFileSync('package.json', 'utf8')).scripts).join('\n');
+	const unlisted = readdirSync('scripts')
+		.filter(name => /(?:-test|\.browser\.test)\.mjs$/.test(name))
+		.map(name => `scripts/${name}`)
+		.filter(script => !browserScripts.includes(script) && !packageScripts.includes(script) && !manual.has(script));
+	assert.deepEqual(unlisted, []);
 });
 
 test('balances the four CI groups using measured durations', () => {

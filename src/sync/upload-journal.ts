@@ -1,4 +1,5 @@
 import type { DataAdapter } from 'obsidian';
+import { createAbortError } from './abort';
 import { createReminderOperationId, reminderOperationDay } from '@/protocol/reminder-operation';
 import { isRecord } from '@/platform/validation';
 import { validateUploadIntent, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
@@ -56,7 +57,7 @@ export class UploadJournal {
 	/** Encrypts outside the write chain, so concurrent batches only serialize
 	 * sequence assignment and the journal write. */
 	private async prepareOne(file: IntendedUpload, day: number, clientSession: string, prepareWire?: PrepareUploadWire): Promise<JournalUpload> {
-		if (this.closed) throw new DOMException('Sync engine closed', 'AbortError');
+		if (this.closed) throw createAbortError('Sync engine closed');
 		const seal = async (): Promise<JournalUpload> => {
 			const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
 			this.assertNewOperation(durable.operationId);
@@ -67,7 +68,7 @@ export class UploadJournal {
 		};
 		const sealed = this.pendingFor(file.path) ? undefined : await seal();
 		const task = this.writing.catch(() => {}).then(async () => {
-			if (this.closed) throw new DOMException('Sync engine closed', 'AbortError');
+			if (this.closed) throw createAbortError('Sync engine closed');
 			const prior = this.pendingFor(file.path);
 			if (prior) {
 				if (prior.hash !== file.hash || prior.content !== file.content || prior.expectedHash !== file.expectedHash || prior.contentType !== file.contentType || prior.size !== file.size || JSON.stringify(prior.intent) !== JSON.stringify(file.intent)) throw new Error('An earlier upload is unresolved. Sync again to recover its receipt before sending new changes.');

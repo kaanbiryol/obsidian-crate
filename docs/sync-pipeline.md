@@ -26,7 +26,7 @@ checks; errors and server availability warnings remain visible.
 
 When `automaticSync` is enabled, every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
 
-Entry point: `engine-lifecycle.ts:periodicCheck()`
+Entry point: `engine/lifecycle.ts:periodicCheck()`
 
 ### 2. Foreground Sync
 
@@ -47,7 +47,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
 Returns `null` to signal fallback to full sync (on cursor expiry or a non-transient error). Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault.
 
-Entry point: `planner-incremental.ts:runIncrementalSync()` (exported through `planner.ts`).
+Entry point: `planner/incremental.ts:runIncrementalSync()` (exported through `planner.ts`).
 The coordinator retains phase ordering, progress, manifest saves and cursor
 advancement. `incremental-changelog.ts` handles pagination and path deduplication;
 `incremental-remote-reconciliation.ts` keeps fresh local reads and guarded deletes
@@ -193,7 +193,7 @@ and hidden files for untracked conflict copies and marks conflicts resolved when
 their copies are deleted or renamed. This keeps startup responsive and the
 status-bar and activity counts stable across restarts and unrelated sync runs.
 
-Implementation: `conflict.ts:createConflictCopy()`, `conflict-store.ts:ConflictStore`
+Implementation: `conflict.ts:createConflictCopy()`, `conflict/store.ts:ConflictStore`
 
 ## File Discovery
 
@@ -223,26 +223,26 @@ Release and transfer values are also checked against source in [current contract
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
-| `UPLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
-| `DOWNLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
-| `PREPARE_CONCURRENCY` | 2 | `engine-constants.ts` |
-| Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer-budget.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine-constants.ts` |
-| `BATCH_DELETE_CONCURRENCY` | 2 | `engine-constants.ts` |
+| `UPLOAD_CONCURRENCY` | 2 | `engine/constants.ts` |
+| `DOWNLOAD_CONCURRENCY` | 2 | `engine/constants.ts` |
+| `PREPARE_CONCURRENCY` | 2 | `engine/constants.ts` |
+| Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine/constants.ts` |
+| `BATCH_DELETE_CONCURRENCY` | 2 | `engine/constants.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 
 ## Batching Strategy
 
 Manual, selected-file, incremental, initial, forced and edit-triggered automatic
-sync use `transfer-upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
+sync use `transfer/upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
 are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 
 - **< 1 MB:** batched into JSON payloads with base64-encoded content. Edited Markdown batches contain up to 3 files; assets allow 4, and eligible new-file imports allow 8 when the server supports them. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. The smaller mutation limits keep worst-case conditional-write cleanup below Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload`, with up to 2 requests in flight. Each mode retains its retry policy.
 
 Remote deletes in manual, selected-file, incremental, forced and automatic sync
-use `transfer-delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
+use `transfer/delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and
 reconciliation to succeed, rechecks local absence, and uses `delete-batches.ts`
 to send up to 4 conditional deletes per request with 2 requests in flight.
 Rename preservation, expected hashes and revisions still guard every deletion.
@@ -252,7 +252,7 @@ complete. Queue settlement and conflict retries remain with the calling mode.
 
 Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
 
-Implementation: `transfer-upload.ts`, `transfer-prepare.ts`, `transfer-delete.ts`, `delete-batches.ts`
+Implementation: `transfer/upload.ts`, `transfer/prepare.ts`, `transfer/delete.ts`, `delete-batches.ts`
 
 ## Queue System
 

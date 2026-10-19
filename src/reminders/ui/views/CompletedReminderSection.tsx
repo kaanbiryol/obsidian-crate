@@ -6,12 +6,12 @@ import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import { ReminderListPresence } from '../../components/ReminderListPresence';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import {
   REMINDER_LIST_FADE_TRANSITION,
   REMINDER_SECTION_TRANSITION,
 } from '../layoutConstants';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 
 export interface CompletedSectionToggleProps {
@@ -37,7 +37,7 @@ export const CompletedReminderSection = memo(function CompletedReminderSection({
   renderToggleButton,
   animationConfig = { enabled: true },
 }: CompletedReminderSectionProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const pagination = useReminderPagination(reminders);
   const animationsEnabled = animationConfig.enabled && !reduceMotion;
 

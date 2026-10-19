@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { runMaintenanceEpisode } from './lifecycle';
-import { runScheduledMaintenance } from '../maintenance';
-vi.mock('../maintenance', () => ({ runScheduledMaintenance: vi.fn(async () => ({ removedObjects: 0, backlog: false })) }));
+import { runScheduledMaintenance } from './run';
+vi.mock('./run', () => ({ runScheduledMaintenance: vi.fn(async () => ({ removedObjects: 0, backlog: false })) }));
 beforeEach(() => { vi.clearAllMocks(); });
 
 function fixture(advancing: 'queue' | 'staged' | null) {

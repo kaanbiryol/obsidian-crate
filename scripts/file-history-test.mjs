@@ -6,7 +6,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 const { outputFiles } = await build({
  external: ['electron'],
  stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
- import { openRemoteRecoveryModal } from './src/ui/remote-recovery-modal';
+ import { openRemoteRecoveryModal } from './src/ui/activity/remote-recovery-modal';
  import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
  import { ActivityHistory } from './src/ui/activity/activity-history';
  import { mergeSharedHistory } from './src/ui/activity/shared-history';

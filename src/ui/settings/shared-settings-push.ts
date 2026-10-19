@@ -1,6 +1,6 @@
 import type CratePlugin from '../../main';
 import type { SyncApiClient } from '../../sync/api';
-import { buildSharedSettings } from '../../sync/runtime-config';
+import { buildSharedSettings } from '../../sync/runtime/config';
 
 type SharedSettingsPlugin = Pick<CratePlugin, 'settings'> & {
 	syncRuntime?: Pick<CratePlugin['syncRuntime'], 'getApiClient' | 'pushSharedSettingsBestEffort'>;

@@ -1,4 +1,4 @@
-import type { CrateServerInfo } from '../protocol';
+import type { CrateServerInfo } from '../protocol/server-info';
 import { createReminderOperationId } from '../protocol/reminder-operation';
 import type { FileMetadataResponse, RemoteFileVersion, RestoreFileRequest, UploadResult } from '../protocol/sync-types';
 import { getPathEntry } from '../protocol/path-record';

@@ -28,9 +28,9 @@ async function flushMicrotasks(): Promise<void> {
 async function loadConfigSectionModule(mobile = false) {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: mobile } }));
 	vi.doMock('../../cloudflare/restore/ui', () => ({ openServerRestore }));
-	vi.doMock('../../cloudflare/deployment-recovery-ui', () => ({ checkAndRecoverUpdate }));
+	vi.doMock('../../cloudflare/deployment/recovery-ui', () => ({ checkAndRecoverUpdate }));
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
-	vi.doMock('../../cloudflare/embedded-artifacts', () => ({
+	vi.doMock('../../cloudflare/deployment/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
@@ -60,9 +60,9 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../cloudflare/plugin-integration');
-	vi.doUnmock('../../cloudflare/deployment-recovery-ui');
+	vi.doUnmock('../../cloudflare/deployment/recovery-ui');
 	vi.doUnmock('../../cloudflare/restore/ui');
-	vi.doUnmock('../../cloudflare/embedded-artifacts');
+	vi.doUnmock('../../cloudflare/deployment/embedded-artifacts');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../external-browser-modal');
 	vi.doUnmock('./section-helpers');

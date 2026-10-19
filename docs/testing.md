@@ -2,9 +2,9 @@
 
 ## Cleanup reviews, storage opening and route execution
 
-`sync/engine-ignored-purge.test.ts` binds excluded-file cleanup to reviewed paths,
+`sync/engine/ignored-purge.test.ts` binds excluded-file cleanup to reviewed paths,
 hashes, revisions and exclusions, including acknowledged batches before cancellation
-and exclusive sync admission. `runtime-exclusion-cleanup.test.ts` rejects replaced
+and exclusive sync admission. `runtime/exclusion-cleanup.test.ts` rejects replaced
 engines during review or confirmation; `ui/settings/exclusion-cleanup.test.ts`
 checks confirmation and stale-review guidance.
 
@@ -32,7 +32,7 @@ cursor cycles, and cumulative item, issue and request limits.
 preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
-`encryption/file-inventory.test.ts`, `reading/encrypted-api.test.ts` and
+`encryption/file-inventory.test.ts`, `pwa/reading/encrypted-api.test.ts` and
 `pwa/encrypted-reminder-api.test.ts` cover encrypted page validation, advancing
 empty-page limits, duplicate paths, cursor/sequence changes and retention of the
 previous decrypted cache after rejected loads.
@@ -42,13 +42,13 @@ retain entry-identity checks, checkpoint round trips, conflicting recovery metad
 torn-write recovery and overlapping saves. Content-verifier and pending-verification
 races ensure an older asynchronous read cannot replace or settle a newer baseline.
 
-`reminders-web-moves.integration.ts` runs the production handlers against real D1/R2
+`reminders-web/moves.integration.ts` runs the production handlers against real D1/R2
 bindings, including completed reminders, source conflicts and destination write
 failures. Unit tests retain lightweight reorder coverage without simulating the
 atomic SQL publication. Operation-expiry and upload-retry integration tests exercise
 the shared receipt cleanup owner, including monotonic floors and batch rollback.
 
-`maintenance/object-cleanup.test.ts` and `maintenance.test.ts` distinguish nonfatal
+`maintenance/object-cleanup.test.ts` and `maintenance/run.test.ts` distinguish nonfatal
 post-commit cleanup from scheduled failure reporting. The corresponding
 `maintenance/object-cleanup.integration.ts` regression uses local D1/R2 bindings
 to retain failed cleanup and its diagnostic until a successful retry. It also
@@ -57,7 +57,7 @@ query limit, without sorting the queue, while referenced objects survive.
 
 ## Sync outcomes and reader action lifetimes
 
-`engine-queue.test.ts` delays automatic result recording while a later upload is
+`engine/queue.test.ts` delays automatic result recording while a later upload is
 pending, covering same-path edits, different paths and failed-upload retries.
 `reading/runtime.test.ts` delays accepted host creates/processes and checks that
 shutdown and replacement reads wait for them. Library tests also cover closed
@@ -75,9 +75,9 @@ DST fold. `reminder-index/calendar.test.ts` compares index, embedded queries and
 shared views at midnight, timed deadlines and DST boundaries; it also advances
 the clock between repository query stages to verify one consistent snapshot.
 
-`engine-lifecycle.test.ts` distinguishes cancellation from successful completion
+`engine/lifecycle.test.ts` distinguishes cancellation from successful completion
 across ordinary, initial and forced sync, while retaining cursor and baseline
-checks. `runtime-operations.test.ts` verifies that cancelled manual and automatic
+checks. `runtime/operations.test.ts` verifies that cancelled manual and automatic
 work cannot publish history or checkpoints. Queue race tests use required revision
 snapshots, matching production settlement. Settings and file-history tests keep
 cancellation quiet and retain the controls needed to sync or resume a restore.
@@ -107,11 +107,11 @@ core settings writes, verifying that runtime identity survives and persisted JSO
 omits it. `settings-write-lifecycle.test.ts` retains queue and shutdown coverage.
 Delayed snapshot, preference and debug saves also retain newer sync cursor/history
 updates, including a failed preference write followed by queued persistence.
-`runtime-operations.test.ts` verifies that checkpoint attachment retains newer
+`runtime/operations.test.ts` verifies that checkpoint attachment retains newer
 history entries without mutating a previously captured settings snapshot.
 
-`sync/queue.test.ts`, `engine-selected.test.ts`, `pending-discard.test.ts`,
-`engine-startup-pending.test.ts` and `engine-pending-verification.test.ts` distinguish
+`sync/queue/queue.test.ts`, `engine/selected.test.ts`, `pending-discard.test.ts`,
+`engine/startup-pending.test.ts` and `engine/pending-verification.test.ts` distinguish
 a literal `delete:note.md` filename from deletion of `note.md`, including renames,
 startup recovery, selection, discard and newer edits during settlement.
 `scripts/activity-diff-test.mjs` checks independent labels, previews, selection,
@@ -131,24 +131,24 @@ exercise the extracted storage owners with native IndexedDB and Web Locks.
 
 ## Sync shutdown
 
-`engine-checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads
-through shutdown. `runtime-operations.test.ts` checks that late saves cannot update
+`engine/checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads
+through shutdown. `runtime/operations.test.ts` checks that late saves cannot update
 history, persist settings, or fall back through a replacement engine.
 
-`engine-background-lifecycle.test.ts` holds conflict writes, discovery reads and
+`engine/background-lifecycle.test.ts` holds conflict writes, discovery reads and
 Markdown-cache writes/deletes through shutdown. It checks that replacement engines
 retain conflict metadata and accepted operations can finish their metadata writes
-before the store closes. `conflict-store.test.ts` also checks queued-write draining
+before the store closes. `conflict/store.test.ts` also checks queued-write draining
 and rejection of mutations or late discovery after closure.
 
-`runtime-lifecycle.test.ts` and `runtime-encryption-reset.test.ts` cancel configuration
+`runtime/lifecycle.test.ts` and `runtime/encryption-reset.test.ts` cancel configuration
 changes both before dispatch and behind an active queued operation. They verify that
 shutdown prevents remote resets, credential/settings writes, local cleanup and restart
 without relying on a caller-provided abort signal.
 
-`engine-file-operations.test.ts` checks that raw API calls retain their transport
+`engine/file-operations.test.ts` checks that raw API calls retain their transport
 semantics while engine operations persist interrupted uploads and guard deletion.
-`runtime-file-restore.test.ts` checks restore completion against the originating
+`runtime/file-restore.test.ts` checks restore completion against the originating
 engine; `file-restore-retry.integration.ts` exercises its durable retry against the
 Worker. `activity/shared-history-loader.test.ts` checks coalesced reloads, errors and
 disposal through the loader's public interface. `activity/activity-status.test.ts`
@@ -160,7 +160,7 @@ covers completion progress after engine idle, stopping, conflicts and status lab
 format and guarded edits. `vaultScanner.test.ts` and
 `reminder-source-issue-presentation.test.ts` check structured categories and source
 lines through the index and UI, including compatibility with reason-only diagnostics.
-Worker `reminder-input-contract.integration.ts` verifies the shared format across
+Worker `reminders/input-contract.integration.ts` verifies the shared format across
 plugin-created notes and PWA mutations with local D1/R2/DO bindings.
 
 ## Structured merge and Reading recovery
@@ -169,7 +169,7 @@ Sync orchestration tests observe the engine's constructor-owned manifest through
 `engine-test-harness.ts`. File transfer and recovery tests use
 `engine-persistence-test-harness.ts`, with real file operations, journals and a
 persistent vault; only HTTP responses and deliberate I/O failures are substituted.
-`engine-selected.test.ts` and `deletion-safety.test.ts` reload saved checkpoints to
+`engine/selected.test.ts` and `deletion-safety.test.ts` reload saved checkpoints to
 verify selected uploads/deletions, interrupted journals and incomplete discovery.
 
 `reading/obsidian-vault.test.ts` exercises file replacement, rename, exclusion and
@@ -180,7 +180,7 @@ and preserved plaintext/encrypted conflict responses.
 `markdown-merge-transitions.test.ts` protects newly added, moved and removed code
 fences and indented blocks, alongside ordinary prose and independent-block controls.
 `sync-engine.integration.ts` checks authored conflict copies across both arrival
-orders, restart, retry and a third device. `reading-projection-recovery.integration.ts`
+orders, restart, retry and a third device. `reading/projection-recovery.integration.ts`
 injects R2 failures, missing/invalid bytes, permanent parse
 errors; it checks duplicate-capture prevention, healthy-source progress, retained
 identity and delayed coordinator retry.
@@ -314,7 +314,7 @@ app suspension, and VoiceOver announcements still require physical-device checks
 ```bash
 npm test                                  # run all tests
 npm run test:worker-runtime               # run D1/R2/Durable Object tests in the Workers runtime
-npx vitest run src/sync/planner-full.test.ts   # single test file
+npx vitest run src/sync/planner/full.test.ts   # single test file
 ```
 
 `vitest.cloudflare.config.ts` uses Cloudflare's Vitest plugin with `wrangler.jsonc`. The runtime suite applies the initial schema to an isolated D1 database and exercises real D1, R2, and Durable Object bindings locally.
@@ -354,7 +354,7 @@ after a host restart.
 
 `sync-engine.integration.ts` runs separate real sync engines through the authenticated Worker API. Each simulated device retains its own files, settings and disk checkpoints across restarts. It checks three-device offline merging, edit/delete ordering, rename/edit races, interrupted uploads after the server commits, binary conflict preservation, and filenames such as `__proto__`. Only the Obsidian filesystem/UI surface is simulated; planning, transfer, HTTP serialization, authentication, D1 and R2 use production code.
 
-`sync-initial-config.integration.ts` covers an empty device adopting server settings
+`sync/initial-config.integration.ts` covers an empty device adopting server settings
 without conflicts, subsequent concurrent settings edits, edits during download,
 and interrupted first pulls across restart. `initial-config-pull.test.ts` covers
 the eligibility boundary, custom configuration folders, checkpoint persistence
@@ -455,7 +455,7 @@ Browser focus and persistent storage behavior remain covered by Chromium/WebKit
 checks against the built PWA.
 `useReminderEditorActions.test.ts` covers delayed saves, duplicate submissions,
 failed persistence and logout; `useReminderMutations.test.ts` exercises those actions
-with the command hook. `runtime-encryption-setup.test.ts` verifies shutdown before
+with the command hook. `runtime/encryption-setup.test.ts` verifies shutdown before
 queued setup, during draining and during conversion. Server-status tests exercise
 cache identity, expiry, throttling and cancellation through the public runtime API.
 
@@ -601,7 +601,7 @@ The vitest config aliases `obsidian` imports to this mock file, so all `import {
 
 ### Persistent Engine Harness
 
-`sync/engine-persistence-test-harness.ts` initializes a real `SyncEngine`,
+`sync/engine/engine-persistence-test-harness.ts` initializes a real `SyncEngine`,
 `LocalManifest`, upload/restore journals and file operations against
 `test/factories/sync-vault.ts`. Inject responses through `ApiHttpTransport` for
 network-dependent cases. The shared vault fixture is also used by Worker runtime
@@ -614,7 +614,7 @@ destroys engines and drains active work after each test.
 
 ### Lightweight Engine Harness
 
-`sync/engine-test-harness.ts` bundles mock dependencies for isolated planning and
+`sync/engine/engine-test-harness.ts` bundles mock dependencies for isolated planning and
 orchestration tests. It does not establish persistence behavior:
 
 ```ts
@@ -629,7 +629,7 @@ type Harness = {
 
 A `createHarness()` function wires up the engine with all mocks pre-configured for the happy path. Tests override specific mocks as needed.
 
-### Module-Level Harness (`transfer-download.test.ts`)
+### Module-Level Harness (`transfer/download.test.ts`)
 
 For testing extracted modules (planner, transfer, queue), a lighter harness creates just the context interface:
 
@@ -646,7 +646,7 @@ function createTransferHarness() {
 }
 ```
 
-### Module Mocking with `vi.hoisted()` (`planner-incremental-reconciliation.test.ts`, `transfer-download.test.ts`)
+### Module Mocking with `vi.hoisted()` (`planner/incremental-reconciliation.test.ts`, `transfer/download.test.ts`)
 
 When a module under test imports other modules that need mocking:
 
@@ -718,9 +718,9 @@ const context = {
   pending adapter/API work, rather than replacing private engine contexts.
 - Test pagination directly with `incremental-changelog.test.ts`; incremental
   reconciliation tests cover late local edits, guarded deletes and cursor retention.
-- `engine-transfer-parity.test.ts` runs a mixed upload/delete workload through
+- `engine/transfer-parity.test.ts` runs a mixed upload/delete workload through
   selected, full, incremental, automatic and forced sync using real journals and
-  file operations. `transfer-delete.test.ts` checks bounded concurrency, progress,
+  file operations. `transfer/delete.test.ts` checks bounded concurrency, progress,
   upload failure gates, local absence and accepted sibling cancellation.
 
 ## Portable visual baselines
@@ -799,9 +799,9 @@ review. `npm run preview:ui` remains the live editing server on port 8790.
 `npm run test:ci` checks that concurrent gallery snapshots retain their own styles
 even after the input stylesheet changes or disappears.
 
-Whole-vault history restore is covered by `src/sync/history-restore.test.ts`,
-`src/sync/runtime-history-restore.test.ts`, and
-`src/cloudflare/worker/history-state-restore.integration.ts`. The file-history browser
+Whole-vault history restore is covered by `src/sync/history/restore.test.ts`,
+`src/sync/runtime/history-restore.test.ts`, and
+`src/cloudflare/worker/sync/history-state-restore.integration.ts`. The file-history browser
 harness also checks the checkpoint action, per-file preview, cancellation, busy
 controls, unavailable versions, and retry in both engines and viewport sizes.
 History rows show second-level timestamps; restore-point IDs appear in the confirmation. Browser checks
@@ -814,13 +814,13 @@ stacked dialog dismissal and focus return to the preserved activity list, deskto
 columns, mobile pane navigation, selected restore targets,
 current-vault comparisons even for the oldest checkpoint, matching-state messages,
 explicit comparison refresh, load retry, stale sync requests, and selection
-stability during refresh. `engine-history.test.ts`,
-`history-comparison.test.ts`, and `runtime-history-comparison.test.ts` cover
+stability during refresh. `engine/history.test.ts`,
+`history-comparison.test.ts`, and `runtime/history-comparison.test.ts` cover
 complete-inventory comparisons, unsynced edits, hidden configuration, exclusions,
 incomplete reads, missing saved states, byte verification, preview limits, and
 connection changes.
 `file-history-preview.test.ts`, `pending-diff.test.ts`, `history-comparison.test.ts`
-and `conflict-review.test.ts` protect each flow's BOM behavior and rejection of
+and `conflict/review.test.ts` protect each flow's BOM behavior and rejection of
 binary or invalid UTF-8 text alongside storage, size and integrity checks.
 Restore opens a compact confirmation directly from Vault history. Browser checks
 cover transparent footer actions, current-file counts, cancellation during preflight,
@@ -835,7 +835,7 @@ Shared-checkpoint coverage also exercises a second device discovering and restor
 another device's checkpoint without its local history, retained attachments over
 256 KB, concurrent publication, lost index-write responses, page-generation races,
 20-entry limits, expiry, metadata cleanup, and vault-token authorization. Run
-`npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/history-state-restore.integration.ts`
+`npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/history-state-restore.integration.ts`
 for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
 updating the server and plugin on both devices and restoring from the second one.
 
@@ -852,7 +852,7 @@ failures must not show success. Self-hosted reconnect should accept a new pairin
 code at the saved address and keep the existing local connection on failure.
 
 Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
-`src/cloudflare/deployment-service.test.ts`,
+`src/cloudflare/deployment/service.test.ts`,
 `src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
 `self-hosted-pairing.test.ts` and `ui/settings/self-hosted-errors.test.ts` check
 typed setup failures, including address-update guidance and pairing status handling
@@ -862,7 +862,7 @@ Browser OAuth handoff and real hosted credentials still require manual acceptanc
 ## Saved YouTube videos
 
 For YouTube video capture, run the focused `youtube`, `desktop-capture`, and
-Reading extraction transport unit tests plus `reading-captures.integration.ts`
+Reading extraction transport unit tests plus `reading/captures.integration.ts`
 in the Worker runtime. After building the plugin, run
 `node scripts/visual-test-run.mjs tests/visual/reading-video.spec.ts --workers=2`
 for Chromium/WebKit coverage in both plugin and PWA hosts at phone and desktop
@@ -941,9 +941,9 @@ components’ PWA adapters. Actual Obsidian panes, popout windows and mobile nav
 insets still require host/device acceptance.
 ## Encryption acceptance
 
-`encryption-setup.integration.ts` exercises both empty and populated remotes through the production conversion client and local Worker bindings. It checks that setup leaves local files unsent, first sync uploads ciphertext, existing history survives conversion, pending edits wait for encrypted sync, and file counts advance only after verified acknowledgments. A lost response resumes with the remaining count. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
+`encryption/setup.integration.ts` exercises both empty and populated remotes through the production conversion client and local Worker bindings. It checks that setup leaves local files unsent, first sync uploads ciphertext, existing history survives conversion, pending edits wait for encrypted sync, and file counts advance only after verified acknowledgments. A lost response resumes with the remaining count. The setup browser harness covers the dedicated progress, retry and completion screens without server requests.
 
-Folder-move coverage uses only disposable local storage. `encryption-folder-moves.integration.ts` checks retained credentials, Reading policy generation, push subscriptions and accepted/unaccepted Reading attempts; selecting a different configured folder must revoke the old connection. The native storage harness authenticates multiple offline moves, rejects substituted paths/access identities and preserves drafts through key recovery. The full Reminders and Reading browser scripts exercise the production apps after conversion and normal conditional file moves, retaining their original sessions without new links. Reading also follows a move in the already-open page. Reminder API regression tests preserve queued semantic revisions while encrypting replacements for the current path.
+Folder-move coverage uses only disposable local storage. `encryption/folder-moves.integration.ts` checks retained credentials, Reading policy generation, push subscriptions and accepted/unaccepted Reading attempts; selecting a different configured folder must revoke the old connection. The native storage harness authenticates multiple offline moves, rejects substituted paths/access identities and preserves drafts through key recovery. The full Reminders and Reading browser scripts exercise the production apps after conversion and normal conditional file moves, retaining their original sessions without new links. Reading also follows a move in the already-open page. Reminder API regression tests preserve queued semantic revisions while encrypting replacements for the current path.
 
 `node scripts/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and conversion with absent or populated shared settings, including the first encrypted settings write.
 
@@ -954,17 +954,17 @@ checks decrypted text and navigation, and verifies generic fallback after key
 removal or payload substitution. Push transport and native notification display
 are simulated; background delivery and lock-screen previews still require an iPhone.
 
-The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encrypted-settings.integration.ts` converts and updates settings at the former failure size and the full plaintext request limit, preserves committed settings after oversized writes, and verifies that preflight rejects unsupported stored settings before freezing sync. The full encryption browser test uses a 2,000-entry exclusion list for conversion and encrypted writes.
+The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encryption/settings.integration.ts` converts and updates settings at the former failure size and the full plaintext request limit, preserves committed settings after oversized writes, and verifies that preflight rejects unsupported stored settings before freezing sync. The full encryption browser test uses a 2,000-entry exclusion list for conversion and encrypted writes.
 
 `node scripts/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, folder isolation, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
 
 `CRATE_PWA_PREBUILT=1 node scripts/pwa-encryption-regressions-test.mjs` checks long reminder completion, large pre-encryption receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
 
-Worker `encrypted-source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
+Worker `encryption/source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
 
-Worker `encrypted-sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and cross-key-scope rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
+Worker `encryption/sync-engine.integration.ts` runs the production sync engines against D1/R2/DO bindings with persistent mock vaults: three-device offline merges, deletion and cross-key-scope rename races, upload-response loss across restart, binary conflict preservation, and a 25 MiB attachment round trip. `encryption.integration.ts` also bounds cleanup queries across full conversion pages while preserving live files and retained history.
 
-`encryption-upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
+`encryption/upload-validation.integration.ts` exercises authenticated single and batch uploads against real D1/R2/DO bindings. It rejects plaintext, mixed batches and malformed encrypted framing before any staging lease or R2 write, verifies the content guard with an explicit encryption snapshot, and checks valid ciphertext receipt replay. Reset/upload regressions cover both the public transfer boundary and delayed publication inside the transfer executor.
 
 `upload-publication.integration.ts` rejects Markdown publication at the coordinator
 for single, batch and bulk-new uploads. It checks that bytes remain staged without
@@ -992,8 +992,8 @@ check retains wrong-key, edit and stale-result coverage.
 
 ### Reading encryption acceptance
 
-- `reading-encryption.integration.ts` covers ciphertext-only capture/edit/replay, folder isolation, blocked plaintext paths, queued captures, converted receipts and adding a scope to an already encrypted vault after a lost conversion response.
-- `encryption-reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
+- `reading/encryption.integration.ts` covers ciphertext-only capture/edit/replay, folder isolation, blocked plaintext paths, queued captures, converted receipts and adding a scope to an already encrypted vault after a lost conversion response.
+- `encryption/reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
 - `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
 - `node scripts/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
 - `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic plaintext-to-encrypted migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
@@ -1025,7 +1025,7 @@ points, matching codes, no key persistence until both sides confirm (even after 
 cancellation, expiry/restart, transient retry, both scopes, non-extractable stored
 keys, reload and 320px light/dark layouts. It runs in `test:pwa-browser`.
 
-Worker `encryption-pairing.integration.ts` checks the actual authenticated relay
+Worker `encryption/pairing.integration.ts` checks the actual authenticated relay
 with local D1, including Reading scope checks, concurrent claims, replay,
 cancellation, expiry, revocation, conversion/reset fences and attempt limits.
 `encryption/pairing/protocol.test.ts`, `plugin/web-app-pairing.test.ts`, and

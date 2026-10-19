@@ -2,7 +2,7 @@ import { isRecord } from '../platform/validation';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
 import { isSyncHash, isSyncPath } from '../protocol/sync-validation';
 import type { FileEntry } from '../protocol/sync-types';
-import type { FullSyncPlannerContext } from './planner-types';
+import type { FullSyncPlannerContext } from './planner/types';
 
 /** Local setup bytes that may be replaced during an empty vault's first pull. */
 export interface InitialConfigPull {

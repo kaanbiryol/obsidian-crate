@@ -4,7 +4,7 @@ import type { Reminder } from '../types/reminder';
 import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from '../ui/layoutConstants';
 import { reminderRowMotion } from '../ui/reminderRowMotion';
-import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { useReducedMotion } from '../../ui/shared/useReducedMotion';
 import { createReorderClickGuard } from './reorderClickGuard';
 import { mergeReorderedPage, ReminderPagination, useReminderPagination } from '../ui/reminder-pagination';
 
@@ -232,7 +232,7 @@ export function ReorderableReminderList({
   interaction = 'drag',
   animationsEnabled = true,
 }: ReorderableReminderListProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const pagination = useReminderPagination(reminders);
   const [dragging, setDragging] = useState(false);
   const enableLayoutAnimations = animationsEnabled && !reduceMotion && reminders.length <= LARGE_LIST_ANIMATION_LIMIT;

@@ -3,7 +3,7 @@ import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks 
 import { SECRET_KEYS } from '../../plugin/settings-types';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
-import type { EncryptionProgress } from '../../sync/encryption-conversion';
+import type { EncryptionProgress } from '../../sync/encryption/conversion';
 
 let state: EncryptionServerState | null;
 let body: FakeElement;
@@ -43,15 +43,15 @@ beforeEach(() => {
 		getServerInfo() { return Promise.resolve({ capabilities: ['e2ee-reading-v1'] }); }
 		requestJson = folders;
 	} }));
-	vi.doMock('../../sync/encryption-conversion', async () => ({
-		...await vi.importActual('../../sync/encryption-conversion'),
+	vi.doMock('../../sync/encryption/conversion', async () => ({
+		...await vi.importActual('../../sync/encryption/conversion'),
 		readServerEncryption: read,
 		convertEncryptedVault: convert,
 	}));
 });
 afterEach(() => {
 	vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.resetModules();
-	for (const name of ['obsidian', '../plugin/SharedModal', '../../sync/worker-api/http', '../../sync/encryption-conversion']) vi.doUnmock(name);
+	for (const name of ['obsidian', '../plugin/SharedModal', '../../sync/worker-api/http', '../../sync/encryption/conversion']) vi.doUnmock(name);
 });
 
 async function renderRow() {

@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
-import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
+import { writeCommittedMarkdownFilePair } from './sync/atomic-markdown-write';
 import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './db';
-import { drainNotificationJobs } from './notification-outbox';
+import { drainNotificationJobs } from './notifications/outbox';
 import type { Env } from './types';
 import { handleListReminders } from './reminders-web/routes/list';
 import {

@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { ActivityModal } from '../activity-modal';
-import { notifyConflicts } from '../../sync/conflict';
+import { ActivityModal } from '../activity/activity-modal';
+import { notifyConflicts } from '../../sync/conflict/conflict';
 import { showSyncErrorNotice } from '../sync-error-notice';
 import { errorMessage } from '../../plugin/logger';
 import { syncConnectionFailureMessage } from './self-hosted-errors';

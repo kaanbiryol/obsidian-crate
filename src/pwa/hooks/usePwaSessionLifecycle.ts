@@ -11,7 +11,7 @@ import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import { captureEncryptionCleanupAuthority, clearEncryptionSessionMarkers, clearPersistedEncryption } from '../encryption-cleanup';
 import { resetPwaEncryption } from '../encryption-session';
 import { resetReadingEncryption } from '../reading/encryption-lifecycle';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;

@@ -1,0 +1,108 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../../schema.sql?raw';
+import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { sha256HexBytes } from '../auth/crypto';
+
+const clients: SyncTestDevice[] = [];
+beforeEach(async () => {
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	vi.spyOn(console, 'info').mockImplementation(() => {});
+	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+});
+afterEach(async () => {
+	for (const client of clients.splice(0)) client.close();
+	vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset();
+});
+async function device() {
+	const client = new SyncTestDevice(`full-upload-${clients.length}`, env);
+	clients.push(client); await client.authorize(); await client.open(); return client;
+}
+async function remote(client: SyncTestDevice, path: string) {
+	return new TextDecoder().decode((await client.api.downloadFile(path)).content);
+}
+
+it('batches cold uploads with absent-file guards and preserves confirmed revisions and progress', async () => {
+	const client = await device();
+	for (let index = 0; index < 7; index++) client.disk.write(`note-${index}.md`, `Note ${index}`);
+	const batch = vi.spyOn(client.api.initialImport, 'upload'); const progress = vi.fn();
+	const result = await client.engine.sync(progress);
+	expect(result.errors).toEqual([]); expect(result.uploaded).toBe(7);
+	expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([7]);
+	expect(batch.mock.calls.flatMap(([, files]) => files).every(file => file.expectedHash === null)).toBe(true);
+	expect(client.requests).not.toContain('PUT /sync/upload');
+	expect(progress).toHaveBeenLastCalledWith(7, 7);
+	const manifest = await client.api.getManifest();
+	for (const [path, entry] of Object.entries(manifest.files)) {
+		expect(client.checkpoint().files[path]).toMatchObject({ hash: entry.hash, revision: entry.revision });
+		expect(await remote(client, path)).toBe(client.disk.text(path));
+	}
+});
+
+it('reconciles a stale member while committing healthy batch members across a concurrent remote edit', async () => {
+	const client = await device(); const other = await device();
+	const original = '# Shared\n\nAlpha\n\nBeta\n';
+	client.disk.write('shared.md', original); client.disk.write('healthy.md', 'Original');
+	expect((await client.engine.sync()).errors).toEqual([]);
+	const base = client.checkpoint().files['shared.md']!;
+	client.settings.lastSeq = 0;
+	client.disk.write('shared.md', original.replace('Beta', 'Beta local'));
+	client.disk.write('healthy.md', 'Healthy local');
+	const batch = client.files.batchUpload.bind(client.files);
+	vi.spyOn(client.files, 'batchUpload').mockImplementationOnce(async files => {
+		const content = new TextEncoder().encode(original.replace('Alpha', 'Alpha remote')).buffer;
+		await other.api.uploadFile('shared.md', content, await sha256HexBytes(content), content.byteLength, 'text/markdown', base.hash);
+		expect(files.find(file => file.path === 'shared.md')?.expectedHash).toBe(base.hash);
+		return batch(files);
+	});
+	const result = await client.engine.sync();
+	expect(result).toMatchObject({ success: true, merged: 1, errors: [] });
+	expect(result.uploadedPaths).toEqual(['healthy.md']);
+	const merged = original.replace('Alpha', 'Alpha remote').replace('Beta', 'Beta local');
+	expect(client.disk.text('shared.md')).toBe(merged);
+	expect(await remote(client, 'shared.md')).toBe(merged);
+	expect(await remote(client, 'healthy.md')).toBe('Healthy local');
+	const saved = (await client.api.getFileMetadata(['shared.md'])).files['shared.md']!;
+	expect(client.checkpoint().files['shared.md']).toMatchObject({ hash: saved.hash, revision: saved.revision });
+	expect(await client.engine.sync()).toMatchObject({ success: true, uploaded: 0, merged: 0, errors: [] });
+});
+
+it('resumes a cold batch after committed response loss and retains a later local edit', async () => {
+	const client = await device();
+	for (let index = 0; index < 7; index++) client.disk.write(`note-${index}.md`, `Note ${index}`);
+	const pause = client.pauseNextUploadResponse();
+	const pending = client.engine.sync();
+	await pause.committed;
+	client.close(); await pending;
+	client.disk.write('note-0.md', 'Edited after the lost response');
+	await client.open();
+	const recovered = await client.engine.sync();
+	expect(recovered.errors).toEqual([]);
+	pause.release();
+	// Remote metadata checkpoints the committed files; only the edited file is uploaded again.
+	expect(recovered.conflicts).toEqual([]);
+	for (let index = 0; index < 7; index++) {
+		const path = `note-${index}.md`;
+		const expected = index === 0 ? 'Edited after the lost response' : `Note ${index}`;
+		expect(await remote(client, path)).toBe(expected);
+		expect(client.disk.text(path)).toBe(expected);
+	}
+	expect(Object.keys((await client.api.getManifest()).files)).toHaveLength(7);
+});
+
+it('uses larger commits for the explicit initial-sync workflow', async () => {
+  const client = await device();
+  for (let index = 0; index < 64; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
+  const batch = vi.spyOn(client.api.initialImport, 'upload');
+  const result = await client.engine.initialSync();
+  expect(result.errors).toEqual([]);
+  expect(result.uploaded).toBe(64);
+  expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([32, 32]);
+  expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(2);
+  expect(Object.keys(client.checkpoint().files)).toHaveLength(64);
+  for (let index = 0; index < 64; index++) {
+    expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);
+  }
+});

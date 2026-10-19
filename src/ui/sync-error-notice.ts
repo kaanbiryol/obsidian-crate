@@ -1,6 +1,6 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../main';
-import { ActivityModal } from './activity-modal';
+import { ActivityModal } from './activity/activity-modal';
 
 export function showSyncErrorNotice(plugin: CratePlugin, message: string): void {
 	const content = createFragment();

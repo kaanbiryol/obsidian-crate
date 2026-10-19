@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import type { BrowseProjectCardViewModel } from './viewModels';
 

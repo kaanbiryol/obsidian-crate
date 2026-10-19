@@ -1,5 +1,5 @@
 import type { ChangelogEntry } from '../protocol/sync-types';
-import type { IncrementalSyncPlannerContext } from './planner-types';
+import type { IncrementalSyncPlannerContext } from './planner/types';
 
 /** Read one deduplicated changelog snapshot without advancing the saved cursor. */
 export async function readIncrementalChangelog(

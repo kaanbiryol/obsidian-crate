@@ -1,6 +1,6 @@
 import { rememberEncryptionUnlock } from '../encryption-onboarding';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
 import type { ScopedEncryptionState } from '../encryption-scope';
 import { unlockLocalState, type StoredReminderKeys } from '../encryption-keys';

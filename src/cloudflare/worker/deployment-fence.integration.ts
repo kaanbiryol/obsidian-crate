@@ -1,16 +1,16 @@
-import { recoverDeployment } from '../deployment-recovery';
-import { completePublishedDeployment } from '../complete-published-deployment';
+import { recoverDeployment } from '../deployment/recovery';
+import { completePublishedDeployment } from '../deployment/complete-published';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
-import { provisionCloudflareDeployment } from '../provisioner';
-import { resetCrateServer } from '../server-reset';
+import { provisionCloudflareDeployment } from '../deployment/provisioner';
+import { resetCrateServer } from '../server-reset/reset';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
-import { DEPLOYMENT_FENCE_KEY } from '../deployment-fence';
-import { SERVER_RELEASE } from '../database-upgrades';
-import type { CloudflareDeploymentMetadata } from '../deployment-types';
+import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
+import { SERVER_RELEASE } from '../deployment/database-upgrades';
+import type { CloudflareDeploymentMetadata } from '../deployment/types';
 
 // Recovery tests exercise an older publication, independently of the launch revision.
 vi.mock('../server-release.json', async importOriginal => {
@@ -620,7 +620,7 @@ it('coordinates terminal deletion with only an old key/value administration tabl
 		step: 'unrecognized-step', stepState: 'confirmed', verificationPending: true });
 	await env.DB.prepare('INSERT INTO maintenance_state (key, value) VALUES (?, ?)').bind(DEPLOYMENT_FENCE_KEY, previous).run();
 	const api = { queryD1: async (_account: string, _database: string, sql: string, params?: string[]) => [await env.DB.prepare(sql).bind(...params ?? []).all()] };
-	const { withDeploymentFence } = await import('../deployment-fence');
+	const { withDeploymentFence } = await import('../deployment/fence');
 	await withDeploymentFence({ api, accountId: 'a'.repeat(32), databaseId: 'database', recoverDeletionValue: previous,
 		record: { worker, kind: 'delete', version: '', deletionPending: true } }, async fence => {
 		await fence.mutate(async () => {}, 'delete-worker');

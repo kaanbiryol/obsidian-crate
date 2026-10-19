@@ -5,9 +5,9 @@ import type { RichTextInputHandle } from '../../components/RichTextInput';
 import type { RecurrenceRule } from '../../types';
 import { getProjectColor } from '../../utils/projectColors';
 import { ReminderActionChips } from './ReminderActionChips';
-import { PluginReminderEditorFields as ReminderEditorFields } from './PluginReminderEditorFields';
-import { ThemeIconProvider } from '../../components/theme-icon';
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { PluginReminderEditorFields as ReminderEditorFields } from '../plugin/PluginReminderEditorFields';
+import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
+import { ObsidianIcon } from '../../../ui/obsidian-icon';
 
 interface AddReminderModalBodyProps {
     isDark: boolean;

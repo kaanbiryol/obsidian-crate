@@ -5,7 +5,7 @@ import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { computeHash } from './hasher';
 import { assertLocalSyncPath } from './local-path-safety';
 import { isHiddenPath } from './file-discovery';
-import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { deletePathLocallyIfUnchanged } from './planner/helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
 import { replaceLocalFileWithRecovery } from './local-recovery-write';
 

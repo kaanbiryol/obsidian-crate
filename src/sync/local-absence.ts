@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { isVaultTFileLike } from './planner-helpers';
+import { isVaultTFileLike } from './planner/helpers';
 
 export class LocalFilePresentError extends Error {
 	constructor(path: string) {

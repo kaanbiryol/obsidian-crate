@@ -1,14 +1,17 @@
+export { handleBatchDelete } from './batch/delete';
+export { handleBatchDownload } from './batch/download';
+export { handleBatchUpload } from './batch/upload';
 export {
-	handleBatchDelete,
-	handleBatchUpload,
-	handleCheckChanges,
 	handleDelete,
 	handleDownload,
+	handleUpload,
+} from './file-handlers';
+export {
+	handleCheckChanges,
 	handleGetChanges,
 	handleGetFileMetadata,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,
 	handlePutSettings,
-	handleUpload,
-} from '../sync-handlers';
+} from './metadata-handlers';

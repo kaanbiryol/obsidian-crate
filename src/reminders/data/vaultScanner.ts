@@ -23,7 +23,7 @@ import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
-import { isConflictFile } from '@/sync/conflict';
+import { isConflictFile } from '@/sync/conflict/conflict';
 import { UnresolvedReminderScheduleError } from '@/reminders/utils/reminderParser';
 
 const log = createLogger('VaultScanner');

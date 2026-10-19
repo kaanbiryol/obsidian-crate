@@ -17,11 +17,9 @@ import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type Scan
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 import type { ReminderSourceIssue } from '../reminder-source-issues';
 import { readVaultMarkdown } from '../vault-markdown';
+import { sha256Hex } from '../../../platform/sha256';
 
-async function contentDigest(content: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
+const contentDigest = sha256Hex;
 
 const log = createLogger("ReminderIndex");
 

@@ -6,7 +6,7 @@ import { prepareReadingEncryption } from './encryption-session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY, isStandaloneApp } from '../config';
 import { capturePwaSession } from '../session-generation';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { connectReadingFromReminders, readingRequest } from './api';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './storage';

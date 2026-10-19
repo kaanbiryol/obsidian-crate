@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TFile, Vault } from 'obsidian';
-import { shouldIgnoreSyncPath } from './engine-ignore';
+import { shouldIgnoreSyncPath } from './engine/ignore';
 import {
 	getAllVaultFiles,
 	getExtensionFromPath,

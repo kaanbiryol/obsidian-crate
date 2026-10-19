@@ -1,4 +1,5 @@
 import type { Reminder } from '../types/reminder';
+import { sha256Hex } from '../../platform/sha256';
 
 /** Hash only domain state, excluding line positions, caches and presentation. */
 export async function reminderRevision(reminder: Reminder & { filePath?: string }): Promise<string> {
@@ -13,6 +14,5 @@ export async function reminderRevision(reminder: Reminder & { filePath?: string 
 			// Preserve existing revisions for minute-precision rules.
 			...(rule.second || rule.millisecond ? [rule.second ?? 0, rule.millisecond ?? 0] : [])] : null,
 	]);
-	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-	return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+	return sha256Hex(value);
 }

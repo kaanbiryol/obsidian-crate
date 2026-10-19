@@ -2,13 +2,13 @@ import { SyncWorkerApi } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildDiagnosticExport } from './diagnostic-export';
-import { createRuntimeHarness } from './runtime-test-harness';
+import { createRuntimeHarness } from './runtime/runtime-test-harness';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { SyncApiClient } from './api';
 import { WorkerApiHttpClient, type ApiHttpTransport } from './worker-api/http';
 import { MAX_REQUEST_DIAGNOSTICS } from './request-diagnostics';
-import { SyncEngine } from './engine';
-import { runPeriodicCheck } from './engine-test-harness';
+import { SyncEngine } from './engine/engine';
+import { runPeriodicCheck } from './engine/engine-test-harness';
 
 const requestId = 'e9ffeb0c-7610-4cdb-a129-913c45c2a053';
 const sensitive = 'private-client-name-and-secret';

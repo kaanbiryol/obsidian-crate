@@ -1,9 +1,9 @@
-import { readEncryptionState } from '../encryption-state';
+import { readEncryptionState } from '../encryption/state';
 import { limitNotificationAction } from '../rate-limit';
 import { changedRows } from '../db';
-import { sha256Hex } from '../auth';
+import { sha256Hex } from '../auth/crypto';
 import { validateReadingFolder } from '@/reading/settings';
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import { policy, authority, canPrepareReadingHandoff, ReadingError, readingResponse, type ReadingPolicy } from './common';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 

@@ -3,14 +3,14 @@ import { Button } from '../../ui/shared/Button';
 import { Checkbox } from '@base-ui/react/checkbox';
 import React from 'react';
 import { motion } from 'motion/react';
-import { ThemeIcon } from './theme-icon';
+import { ThemeIcon } from '../../ui/shared/ThemeIcon';
 import { getProjectColor, type ProjectColorScheme } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import { parseMarkdownLinks, isSafeUrl } from '../utils/markdownLinks';
 import { readableWikiLinks } from '../utils/readableWikiLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
-import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { useReducedMotion } from '../../ui/shared/useReducedMotion';
 import { useReminderClock } from '../ui/useReminderClock';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 
@@ -90,7 +90,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     completionPreview = false,
 }) => {
     const { pressed, events: pressEvents } = usePressFeedback<HTMLDivElement>();
-    const reducedMotion = useObsidianReducedMotion();
+    const reducedMotion = useReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reducedMotion;
     const trackedReminders = React.useMemo(() => [reminder], [reminder]);
     const clock = useReminderClock(trackedReminders);

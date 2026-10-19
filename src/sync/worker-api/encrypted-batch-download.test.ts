@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { SyncWorkerApi } from './sync';
 import type { WorkerApiHttpClient } from './http';
-import { EncryptedFiles } from '../encrypted-files';
+import { EncryptedFiles } from '../encryption/encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { sealFile } from '../../encryption/file-codec';
 import { arrayBufferToBase64 } from '../encoding';

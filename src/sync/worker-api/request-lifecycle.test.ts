@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient, type ApiHttpTransport } from './http';
-import { CRATE_PLUGIN_PROTOCOL } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());

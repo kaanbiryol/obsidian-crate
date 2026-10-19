@@ -1,14 +1,14 @@
-import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from './sync/file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
-import { sha256HexBytes } from './auth';
+import { sha256HexBytes } from './auth/crypto';
 import { queryRows } from './db';
-import { stageMarkdownFile } from './markdown-file-staging';
-import { commitStagedFile } from './sync-mutations';
+import { stageMarkdownFile } from './sync/markdown-file-staging';
+import { commitStagedFile } from './sync/mutations';
 import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
-} from './sync-storage';
+} from './sync/storage';
 
 export interface StoredTextFile {
 	path: string;

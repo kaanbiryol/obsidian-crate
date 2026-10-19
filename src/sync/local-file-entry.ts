@@ -1,7 +1,7 @@
 import { assertLocalSyncPath } from './local-path-safety';
 import type { Vault } from 'obsidian';
 import { computeHash } from './hasher';
-import { isVaultTFileLike } from './planner-helpers';
+import { isVaultTFileLike } from './planner/helpers';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 

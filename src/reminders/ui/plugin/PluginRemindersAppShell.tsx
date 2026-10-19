@@ -11,13 +11,13 @@ import type { TabId } from '../layoutConstants';
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 
-import { ThemeIcon } from "@/reminders/components/theme-icon";
+import { ThemeIcon } from "@/ui/shared/ThemeIcon";
 
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
-import { ViewHeader } from "@/reminders/components/ViewHeader";
+import { ViewHeader } from "@/ui/shared/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
 import { RemindersViewPanels } from "@/reminders/ui/RemindersViewPanels";
-import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
+import { useReducedMotion } from "@/ui/shared/useReducedMotion";
 import { useReminderClock } from '../useReminderClock';
 import {
   getCurrentHeaderData,
@@ -104,7 +104,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   const shell = useRef<HTMLDivElement>(null);
   const lastProject = useRef(initialProject);
   const restoreProjectFocus = useRef(false);
-  const prefersReducedMotion = useObsidianReducedMotion();
+  const prefersReducedMotion = useReducedMotion();
   const viewMode = activeTab ?? localViewMode;
   const setViewMode = useCallback((tab: TabId) => {
     setLocalViewMode(tab);

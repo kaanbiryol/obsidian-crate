@@ -1,10 +1,10 @@
 import { featureEnabled } from '../feature-policy';
 import type { Env } from '../types';
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
-import { sha256Hex } from '../auth';
-import { getStoredFileRow } from '../sync-storage';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
+import { sha256Hex } from '../auth/crypto';
+import { getStoredFileRow } from '../sync/storage';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { parseReadingNote } from '@/reading/core/notes';
 import { apiRoutePolicy } from '../routes/policy';

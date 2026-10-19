@@ -1,12 +1,12 @@
-import { readEncryptedReceipt } from '../encrypted-receipt-storage';
+import { readEncryptedReceipt } from '../encryption/receipt-storage';
 import { ENCRYPTION_METADATA_BATCH } from '../../../protocol/sync-limits';
-import { handleEncryptionPairing } from '../encryption-pairing';
-import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption-state';
+import { handleEncryptionPairing } from '../encryption/pairing';
+import { ENCRYPTION_FILE_PREFIX, readEncryptionState } from '../encryption/state';
 import { validateFileDescriptor } from '../../../encryption/file-format';
 import { parseJsonObject } from '../utils';
 import { corsResponse } from '../cors';
 import type { AuthPrincipal } from '../auth/index';
-import { handleEncryptedSettings } from '../encrypted-settings';
+import { handleEncryptedSettings } from '../encryption/settings';
 import { reminderOperationDay } from '../../../protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
 import type { EncryptionServerState } from '../../../encryption/server-state';

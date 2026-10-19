@@ -1,6 +1,6 @@
 import { normalizeSharedSettingsValue, type SharedSettings } from '../../protocol/shared-settings';
 import { HttpError, type WorkerApiHttpClient } from './http';
-import type { EncryptedFiles } from '../encrypted-files';
+import type { EncryptedFiles } from '../encryption/encrypted-files';
 
 export class SharedSettingsWorkerApi {
 	private settingsVersion: string | null | undefined;

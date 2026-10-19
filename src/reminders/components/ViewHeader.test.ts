@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ViewHeader } from './ViewHeader';
+import { ViewHeader } from '../../ui/shared/ViewHeader';
 
 describe('ViewHeader', () => {
   it('keeps the title and actions visible while initial metadata is hidden', () => {

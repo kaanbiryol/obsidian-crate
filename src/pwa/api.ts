@@ -1,7 +1,7 @@
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
 import { capturePwaSession } from './session-generation';
 import { ConnectionError } from './connection/issues';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
+import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa/version';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
 import { preparePwaEncryption, encryptionSnapshot } from './encryption-session';

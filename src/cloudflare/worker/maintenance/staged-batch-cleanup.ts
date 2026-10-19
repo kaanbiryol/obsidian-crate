@@ -1,5 +1,5 @@
 import { findReferencedStorageKeys, type ObjectReference } from '../storage-references';
-import { STAGED_UPLOAD_TTL_MS } from '../staged-uploads';
+import { STAGED_UPLOAD_TTL_MS } from '../sync/staged-uploads';
 
 /** Two batches bound both D1 work and R2 requests during a maintenance pass. */
 export async function cleanStagedBatches(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<number> {

@@ -2,7 +2,7 @@ import type { FileEntry } from '../protocol/sync-types';
 import type { SyncApiClient } from './api';
 import { assertLocalSyncPath } from './local-path-safety';
 import { computeHash } from './hasher';
-import { findHistorySource } from './history-source';
+import { findHistorySource } from './history/source';
 
 /** Recover the exact last-synced bytes for review or discard, never a newer server version. */
 export async function loadRemotePendingBase(

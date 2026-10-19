@@ -1,7 +1,7 @@
 import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_STATUS_BAR_INIT_JS } from './status-bar-bootstrap';
-import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } from '../pwa-version';
-import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } from './version';
+import { PWA_STARTUP_ASSETS } from './client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
 import { PWA_OPENING_DOCK_INIT_JS } from '../../../pwa/opening-dock';

@@ -1,7 +1,7 @@
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
-import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import release from '../../server-release.json';
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from '../pwa/version';
 import { ReadingError } from './common';
 
 export interface ShortcutTransport { kind: 'prepare' | 'exchange'; version: number; revision: number }

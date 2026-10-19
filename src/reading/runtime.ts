@@ -5,7 +5,7 @@ import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { shouldIgnoreSyncPath } from '../sync/engine-ignore';
+import { shouldIgnoreSyncPath } from '../sync/engine/ignore';
 import { ReadingLibrary } from './data/library';
 import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';

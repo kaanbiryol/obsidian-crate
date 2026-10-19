@@ -1,10 +1,10 @@
 import type { Env } from '../types';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import { ReadingError, sourceById, type ReadingPolicy } from './common';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { validateReadingMetadata } from '@/reading/core/model';
-import { sha256Hex } from '../auth';
+import { sha256Hex } from '../auth/crypto';
 import { parseChangeEtags, vaultChangeToken } from '../vault-change-token';
 
 /** Called only after route authorization and a complete Reading projection. */

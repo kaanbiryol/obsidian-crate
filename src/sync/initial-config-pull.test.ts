@@ -3,7 +3,7 @@ import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vaul
 import type { FileEntry } from '../protocol/sync-types';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
-import { createFullSyncPlan } from './planner-full';
+import { createFullSyncPlan } from './planner/full';
 import { parseInitialConfigPull } from './initial-config-pull';
 
 const settingsPath = '.obsidian/appearance.json';

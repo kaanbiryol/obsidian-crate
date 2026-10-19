@@ -1,4 +1,4 @@
-import { createEngineFileOperations } from './engine-file-operations';
+import { createEngineFileOperations } from './engine/file-operations';
 import type { ConnectionTestResult } from './types';
 import { SharedHistoryApi } from './worker-api/history-checkpoints';
 import type { RequestDiagnostics } from './request-diagnostics';
@@ -28,7 +28,7 @@ import type {
 	RemoteFileVersion,
 } from '../protocol/sync-types';
 import type { SharedSettings } from '../protocol/shared-settings';
-import type { CrateServerInfo } from '../protocol';
+import type { CrateServerInfo } from '../protocol/server-info';
 import { AuthWorkerApi } from './worker-api/auth';
 import { WorkerApiHttpClient } from './worker-api/http';
 import type { ApiHttpTransport } from './worker-api/http';
@@ -40,10 +40,10 @@ import { NotificationsWorkerApi } from './worker-api/notifications';
 import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
 import { SyncWorkerApi, type DownloadedBatch, type DownloadedFile } from './worker-api/sync';
 import { InitialImportApi } from './worker-api/initial-import';
-import { EncryptedFiles } from './encrypted-files';
+import { EncryptedFiles } from './encryption/encrypted-files';
 import type { VaultKeyBundle } from '../encryption/key-bundle';
 import { createReminderProjection } from '../encryption/reminder-projection';
-import { readServerEncryption } from './encryption-conversion';
+import { readServerEncryption } from './encryption/conversion';
 
 export { HttpError, SyncTransportError } from './worker-api/http';
 

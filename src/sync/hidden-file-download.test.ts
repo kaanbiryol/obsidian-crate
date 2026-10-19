@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { ConflictStore } from './conflict-store';
-import { getIncomingConflictFileName } from './conflict';
+import { ConflictStore } from './conflict/store';
+import { getIncomingConflictFileName } from './conflict/conflict';
 import { computeHash } from './hasher';
-import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer-download';
-import { createTransferHarness, emptyResult } from './transfer-test-harness';
+import { downloadAndSaveFile, parallelDownloadAndSaveFiles } from './transfer/download';
+import { createTransferHarness, emptyResult } from './transfer/transfer-test-harness';
 
 const encode = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer;
 

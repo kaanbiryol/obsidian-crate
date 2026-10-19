@@ -1,10 +1,10 @@
-import { readEncryptionState } from '../encryption-state';
+import { readEncryptionState } from '../encryption/state';
 import { readingShareFallback } from '../reading/share-target';
 import { readingSavePage, readingSaveScript } from '../reading/save-page';
 import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
-} from '../notification-enrollment-handlers';
+} from '../notifications/enrollment-handlers';
 import {
 	handleAppleTouchIcon,
 	handleCrateIcon192,

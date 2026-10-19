@@ -1,6 +1,6 @@
 import { renderDiffText } from './diff-renderer';
 import { diffWordsWithSpace } from 'diff';
-import { diffSequence } from '../../sync/text-diff';
+import { diffSequence } from '../../sync/merge/text-diff';
 
 export interface ConflictDiffLine {
     number: number;

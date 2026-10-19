@@ -14,8 +14,8 @@ import {
 	createManifestJson,
 	createPwaHtml,
 	createPwaVersionJson,
-} from '../pwa';
-import { PWA_ASSET_VERSION } from '../pwa-version';
+} from './index';
+import { PWA_ASSET_VERSION } from './version';
 
 function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 	return {

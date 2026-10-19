@@ -2,7 +2,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ModalHeader } from '../shared/ModalHeader';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
-import { BaseModal } from '../../reminders/components/BaseModal';
+import { BaseModal } from '../plugin/BaseModal';
 
 interface ActivitySheetProps {
     isMobile: boolean;

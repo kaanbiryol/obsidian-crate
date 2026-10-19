@@ -1,6 +1,6 @@
 import { DEVELOPMENT_BUILD } from '../server-build';
 import { SHARED_CHECKPOINT_CAPABILITY } from '../../protocol/history-checkpoints';
-import { PWA_ASSET_VERSION } from './pwa-version';
+import { PWA_ASSET_VERSION } from './pwa/version';
 import release from '../server-release.json';
 import type { Env } from './types';
 import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
@@ -8,11 +8,11 @@ import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
 	type CrateServerInfo,
-} from '../../protocol';
+} from '../../protocol/server-info';
 import { corsResponse } from './cors';
 import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
-import { readEncryptionState } from './encryption-state';
+import { readEncryptionState } from './encryption/state';
 import { ENCRYPTION_CAPABILITY, READING_ENCRYPTION_CAPABILITY, ENCRYPTION_FOLDER_MOVES_CAPABILITY } from '../../encryption/server-state';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;

@@ -1,4 +1,4 @@
-import { SERVER_RELEASE, validateMigrationHistory } from '../database-upgrades';
+import { SERVER_RELEASE, validateMigrationHistory } from '../deployment/database-upgrades';
 import type { BackupRow, Cell, UpgradeBackup } from './archive';
 import policy from './restore-policy.json';
 

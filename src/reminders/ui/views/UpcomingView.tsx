@@ -13,7 +13,7 @@ import { buildUpcomingViewModel } from './viewModels';
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { reminderRowMotion } from '../reminderRowMotion';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 import { groupRemindersByDate } from '../../utils/reminderSort';
 import { useReminderClock } from '../useReminderClock';
@@ -45,7 +45,7 @@ export const UpcomingView = memo(function UpcomingView({
   className = '',
   colorScheme = 'dark',
 }: UpcomingViewProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const clock = useReminderClock(reminders);
   const { upcomingReminders } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days, clock.now);

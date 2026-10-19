@@ -1,5 +1,5 @@
 import type { ReadingItem } from '@/reading/core/model';
-import type { EncryptedReadingIndexEntry } from '@/reading/encrypted-api';
+import type { EncryptedReadingIndexEntry } from '@/pwa/reading/encrypted-api';
 import { isRecord } from '@/platform/validation';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';

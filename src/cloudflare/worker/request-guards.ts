@@ -1,7 +1,7 @@
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './cors';
-import { EncryptionStateError } from './encryption-state';
+import { EncryptionStateError } from './encryption/state';
 import { shortcutCompatibility, type ShortcutTransport } from './reading/shortcut-transport';
 
 /** Runs after admission, before public grants or authenticated route handling. */

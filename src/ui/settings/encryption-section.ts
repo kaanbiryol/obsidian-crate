@@ -7,7 +7,7 @@ import { SECRET_KEYS } from '../../plugin/settings-types';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../../plugin/encryption-storage';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
-import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../sync/encryption-conversion';
+import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../sync/encryption/conversion';
 import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { errorMessage } from '../../plugin/logger';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';

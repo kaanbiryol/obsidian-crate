@@ -1,7 +1,7 @@
 import type { CloudflareApiClient } from '../cloudflare-api';
-import type { CloudflareDeploymentArtifacts } from '../deployment-artifacts';
-import type { CloudflareDeploymentMetadata } from '../deployment-types';
-import { randomHex } from '../pkce';
+import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
+import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { randomHex } from '../oauth/pkce';
 import type { BackupChoice } from './archive';
 import type { ServerRestoreState } from './state';
 

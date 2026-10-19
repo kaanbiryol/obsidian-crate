@@ -1,5 +1,5 @@
-import { prepareEncryptedReceipt, readEncryptedReceipt } from '../encrypted-receipt-storage';
-import { FILE_PATH_MATCH, filePathArgs } from '../file-identity';
+import { prepareEncryptedReceipt, readEncryptedReceipt } from '../encryption/receipt-storage';
+import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { reminderRequestHash } from '../../../encryption/reminder-receipt';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';

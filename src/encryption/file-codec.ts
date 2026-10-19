@@ -1,5 +1,6 @@
 import { decryptBytes, decryptJson, encryptBytes, encryptJson, type EncryptionContext, type EncryptionKey } from './envelope';
 import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
+import { sha256Hex } from '../platform/sha256';
 
 export interface PrivateFileMetadata {
 	version: 1;
@@ -17,7 +18,7 @@ export interface FileEncryptionAuthority {
 }
 
 async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-	return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('');
+	return sha256Hex(bytes);
 }
 
 function context(descriptor: EncryptedFileDescriptor, purpose: EncryptionContext['purpose']): EncryptionContext {

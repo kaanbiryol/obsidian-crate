@@ -9,7 +9,7 @@ import { UNVERIFIED_MODIFIED } from './applied-content';
 import { computeHash } from './hasher';
 import type { UploadApplyPhase, UploadPhase } from './upload-diagnostics';
 import { HttpError } from './worker-api/http';
-import type { UploadPreconditions } from './encrypted-files';
+import type { UploadPreconditions } from './encryption/encrypted-files';
 
 interface UploadTransport {
 	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;

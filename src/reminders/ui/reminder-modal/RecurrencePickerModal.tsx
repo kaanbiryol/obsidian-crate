@@ -1,11 +1,11 @@
 import { RecurrencePickerContent } from './RecurrencePickerContent';
-import { ThemeIconProvider } from '../../components/theme-icon';
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
+import { ObsidianIcon } from '../../../ui/obsidian-icon';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { BaseModal } from '../../components/BaseModal';
+import { BaseModal } from '../../../ui/plugin/BaseModal';
 import type { AnimationConfig } from '../animations';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
 import {
@@ -36,7 +36,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     recurrence,
     onApply,
 }) => {
-    const reduceMotion = useObsidianReducedMotion();
+    const reduceMotion = useReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const modalProps = getPickerModalProps(pickerMode);
 

@@ -1,1 +1,0 @@
-export { FileVersionConflictError } from '../storage';

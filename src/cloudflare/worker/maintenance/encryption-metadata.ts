@@ -1,4 +1,4 @@
-import { ENCRYPTION_FILE_PREFIX, ENCRYPTION_STATE_KEY } from '../encryption-state';
+import { ENCRYPTION_FILE_PREFIX, ENCRYPTION_STATE_KEY } from '../encryption/state';
 
 const CURSOR_KEY = 'e2ee:descriptor-cleanup-cursor';
 // Reference checks materialize each referencing table once per statement, so a

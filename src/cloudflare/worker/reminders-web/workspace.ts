@@ -3,7 +3,7 @@ import type { StoredTextFile } from '../storage';
 import type { Env } from '../types';
 import { scanReminderMarkdownFile } from './scan';
 import type { RemoteReminderRecord } from './types';
-import { assertUniqueReminderSources } from '../reminder-source-identity';
+import { assertUniqueReminderSources } from '../reminders/source-identity';
 
 export async function loadReminderSource(
 	env: Env,

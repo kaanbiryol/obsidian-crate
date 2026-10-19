@@ -1,6 +1,6 @@
 import { setIcon } from 'obsidian';
 import type { SyncHistoryEntry } from '../../sync/types';
-import type { HistoryComparison } from '../../sync/history-comparison';
+import type { HistoryComparison } from '../../sync/history/comparison';
 import { groupHistory } from './history-groups';
 import { historyEntryKey } from './history-point';
 import { describeHistory, historyTime, recordedHistoryFiles } from './history';

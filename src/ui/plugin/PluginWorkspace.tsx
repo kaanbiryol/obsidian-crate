@@ -3,7 +3,7 @@ import { Notice } from 'obsidian';
 import type CratePlugin from '@/plugin/CratePlugin';
 import { getReadingLibrary, subscribeReadingRuntime } from '@/reading/runtime';
 import { LocalReadingLibrary } from '@/reading/ui/LocalReadingLibrary';
-import { RemindersViewContent } from '@/reminders/ui/adapters/RemindersViewContent';
+import { RemindersViewContent } from '@/reminders/ui/plugin/RemindersViewContent';
 import { PluginContext } from '@/reminders/ui/reminders-context';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';

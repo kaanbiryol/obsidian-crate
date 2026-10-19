@@ -1,10 +1,10 @@
 import type { ComponentProps } from 'react';
-import { BaseModal } from '../../components/BaseModal';
-import { ThemeIconProvider } from '../../components/theme-icon';
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { BaseModal } from '../../../ui/plugin/BaseModal';
+import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
+import { ObsidianIcon } from '../../../ui/obsidian-icon';
 import type { AnimationConfig } from '../animations';
 import { getPickerModalProps } from '../glassStyles';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { ProjectPickerContent } from './ProjectPickerContent';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 
@@ -15,7 +15,7 @@ type ProjectPickerModalProps = ComponentProps<typeof ProjectPickerContent> & {
 };
 
 export function ProjectPickerModal({ animationConfig, pickerMode, finalFocus, ...props }: ProjectPickerModalProps) {
-    const reduceMotion = useObsidianReducedMotion();
+    const reduceMotion = useReducedMotion();
     return (
         <BaseModal
             finalFocus={finalFocus}

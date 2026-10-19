@@ -17,7 +17,7 @@ const harness = (await build({ stdin: { contents: `
 export * from './src/encryption/key-bundle';
 export * from './src/encryption/file-authority';
 export * from './src/encryption/file-codec';
-export * from './src/sync/encryption-conversion';
+export * from './src/sync/encryption/conversion';
 export * from './src/sync/worker-api/http';
 export * from './src/pwa/encryption-keys';
 export * from './src/pwa/encrypted-reminder-api';

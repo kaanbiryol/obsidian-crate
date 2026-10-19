@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { requestUrl } from 'obsidian';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { ConnectionSetupError } from './connection-errors';
 
 vi.mock('obsidian', () => ({ requestUrl: vi.fn() }));

@@ -1,12 +1,12 @@
 import type { TFile, Vault } from 'obsidian';
 import { LocalPathObstructionError, prepareLocalFilePath } from './local-path-topology';
-import { createConflictCopy } from './conflict';
+import { createConflictCopy } from './conflict/conflict';
 import { isHiddenPath } from './file-discovery';
 import { computeHash } from './hasher';
 import { IncomingFileReviewError, preserveIncomingForReview } from './incoming-file-review';
-import type { RecordConflictInput } from './conflict-store';
-import { isVaultTFileLike } from './planner-helpers';
-import type { DiffApplyOutcome } from './transfer-types';
+import type { RecordConflictInput } from './conflict/store';
+import { isVaultTFileLike } from './planner/helpers';
+import type { DiffApplyOutcome } from './transfer/types';
 import { isCurrentVaultFile } from '../platform/vault-file-identity';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;

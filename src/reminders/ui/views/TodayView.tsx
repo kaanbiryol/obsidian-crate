@@ -10,7 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { buildTodayViewModel } from './viewModels';
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 import { useReminderClock } from '../useReminderClock';
 
@@ -38,7 +38,7 @@ export const TodayView = memo(function TodayView({
   className = '',
   colorScheme = 'dark',
 }: TodayViewProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const clock = useReminderClock(reminders);
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders, clock.now), [reminders, clock]);
   const pagination = useReminderPagination(active);

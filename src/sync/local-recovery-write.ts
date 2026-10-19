@@ -1,6 +1,6 @@
 import type { Vault } from 'obsidian';
 import { assertLocalSyncPath } from './local-path-safety';
-import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { deletePathLocallyIfUnchanged } from './planner/helpers';
 
 /** Explicit recovery only: preserve the bytes actually displaced, then create.
  * Never use an overwriting adapter write, even for hidden files. The host's

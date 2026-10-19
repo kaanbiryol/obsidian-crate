@@ -80,7 +80,7 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 
 ## Worker Bindings
 
-`cloudflare/worker-upload-payload.ts` builds multipart metadata and module bytes for
+`cloudflare/deployment/worker-upload-payload.ts` builds multipart metadata and module bytes for
 normal, reset and deletion Workers. `cloudflare/cloudflare-api.ts` owns authenticated
 transport, response handling and pagination. Binding and export policy belongs with
 the payload builders, including preserved Durable Object namespaces during reset.
@@ -100,8 +100,8 @@ CratePlugin (src/plugin/CratePlugin.ts)
   ├── CrateSettingTab          - settings UI (delegates to section modules)
   ├── Sync status (plugin/sync-status.ts) - subscribes to runtime state and progress
   │     └── StatusBarManager (ui/status.ts) - status bar rendering
-  ├── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
-        ├── SyncEngine (sync/engine.ts) - orchestrates sync operations
+  ├── SyncRuntime (sync/runtime/runtime.ts) - lifecycle coordinator
+        ├── SyncEngine (sync/engine/engine.ts) - orchestrates sync operations
         │     uses: planner, transfer, queue, file-discovery, manifest
         │     owns: engine-file-operations - journaled uploads/restores and guarded deletes
         └── SyncApiClient (sync/api.ts) - HTTP calls to worker
@@ -111,14 +111,14 @@ CratePlugin (src/plugin/CratePlugin.ts)
   └── MarkdownWriter (reminders/data/markdown-writer/) - markdown CRUD for reminder lines
 ```
 
-Sync history checkpoint and restore policy lives in `sync/engine-history.ts`.
+Sync history checkpoint and restore policy lives in `sync/engine/history.ts`.
 `sync/manifest-checkpoint.ts` owns checkpoint parsing, encoding and recovery
 equivalence. `LocalManifest` retains generation selection, file I/O and ordered
 saves. Its baseline readers expose readonly views with stable entry identities;
 mutations replace entries through the manifest so revision tracking and checks
 across asynchronous reads agree. Diagnostics remain outside recovery equivalence.
 Pending previews, discard preparation and post-sync baseline verification live in
-`sync/engine-pending-changes.ts`; `SyncQueueController` owns pending revisions and
+`sync/engine/pending-changes.ts`; `SyncQueueController` owns pending revisions and
 accepted flush batches. Each batch captures its revision snapshot and releases its
 in-flight paths once before publishing idle/error. Result recording can overlap a
 later transfer without an older finalizer clearing that transfer's pending work.
@@ -137,7 +137,7 @@ history checkpoint or error notice. Result aggregation and finalization preserve
 cancellation rather than inferring completion from an empty error list.
 Queue revision tracking and settlement snapshots are required dependencies, so
 settling an earlier upload cannot silently bypass the guard for a newer local edit.
-`sync/runtime-history-workflow.ts` keeps pause, persistence, application, sync,
+`sync/runtime/history-workflow.ts` keeps pause, persistence, application, sync,
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
@@ -146,21 +146,21 @@ the 256 KB preview limit. Each preview loader retains its storage access and int
 checks. File history hides the UTF-8 BOM for display; pending diffs, restore comparisons
 and conflict review preserve it. Conflict review retains its separate 1 MB edit limit.
 
-`sync/engine-file-operations.ts` binds durable uploads, restores and rename deletion
+`sync/engine/file-operations.ts` binds durable uploads, restores and rename deletion
 guards to one engine's manifest and Markdown cache. Planners, transfers and the queue
 receive this required handle. Creating it does not change the raw endpoint methods
 on `SyncApiClient`; the client retains HTTP, protocol and encryption concerns.
 Restore writes participate in engine shutdown draining, and the runtime only finishes
 a restore after successful reconciliation by the same engine.
 
-`sync/transfer-upload.ts` and `sync/transfer-delete.ts` own ordinary transfer
+`sync/transfer/upload.ts` and `sync/transfer/delete.ts` own ordinary transfer
 execution across sync modes. Automatic queue adapters retain revision settlement
 and retry scheduling while delegating batching, concurrency, acknowledgements and
 manifest updates to these executors. `sync/delete-batches.ts` bounds deletion
 requests and drains accepted siblings on cancellation. Sync modes supply their
 planning and conflict-reconciliation policy.
 
-`sync/engine-exclusion-cleanup.ts` binds a cleanup review to its original paths,
+`sync/engine/exclusion-cleanup.ts` binds a cleanup review to its original paths,
 hashes, revisions and exclusions. The engine retains exclusive mutation admission
 and lifetime checks; the runtime rejects reviews from a replaced engine. Execution
 cannot add newly discovered remote files to an already reviewed deletion set.
@@ -171,7 +171,7 @@ Markdown-cache work before a replacement engine can load their files. The confli
 store closes after its producers settle, finishes queued writes, and rejects new
 mutations; serialization within one store alone cannot protect replacement stores.
 
-`sync/planner-incremental.ts` owns incremental phase ordering, progress, manifest
+`sync/planner/incremental.ts` owns incremental phase ordering, progress, manifest
 saves and cursor advancement. `incremental-changelog.ts` reads a deduplicated
 snapshot without changing the saved cursor. `incremental-remote-reconciliation.ts`
 checks current local bytes and applies guarded local deletes together; it returns
@@ -221,24 +221,24 @@ and its retry queue. Scheduled drains report failures to maintenance diagnostics
 cleanup after a committed mutation remains best effort. Reference checks, object
 deletion and queue settlement stay in one operation.
 
-`sync/runtime-server-status.ts` owns version caching and delayed reachability
+`sync/runtime/server-status.ts` owns version caching and delayed reachability
 probes for manual sync. `SyncRuntime` supplies the current client and an idle-engine
 guard, resets probes during lifecycle changes, and retains foreground sync policy.
 Server observations cannot publish after a newer sync, shutdown or engine replacement.
 
-`cloudflare/deployment-types.ts` defines authorization-independent deployment requests
+`cloudflare/deployment/types.ts` defines authorization-independent deployment requests
 and distinguishes a deleted server from a deployed server with a URL. OAuth sessions
 contain a request; saved authorization runs that request directly.
-`cloudflare/deployment-target.ts` owns account selection, discovery and server reuse
+`cloudflare/deployment/target.ts` owns account selection, discovery and server reuse
 policy. The service owns authorization, cancellation, target verification and the
 ordered provisioning workflow. `cloudflare/plugin-integration.ts` coordinates
-the operation and device connection; `ui/cloudflare-operation-presentation.ts`
+the operation and device connection; `ui/cloudflare/operation-presentation.ts`
 owns modal copy and recovery actions supplied by that coordinator.
 
-`sync/runtime-connection-workflow.ts` owns connecting and disconnecting, including
+`sync/runtime/connection-workflow.ts` owns connecting and disconnecting, including
 validation, credential revocation, local state cleanup and settings persistence.
-`sync/runtime-encryption-reset-workflow.ts` owns the durable remote reset, local
-invalidation and upload sequence. `sync/runtime-address-workflow.ts` owns verified
+`sync/runtime/encryption-reset-workflow.ts` owns the durable remote reset, local
+invalidation and upload sequence. `sync/runtime/address-workflow.ts` owns verified
 encrypted connection and reset-address moves. `SyncRuntime` serializes these
 configuration changes and supplies stop, drain, initialize and cancellation checks;
 workflows do not calculate lifecycle generations or register events.
@@ -248,16 +248,16 @@ queued resets, address changes, connection changes and encryption setup even whe
 caller supplies no cancellation signal. `sync/connection-errors.ts` defines stable
 codes for owned setup failures; settings presentation uses those codes to preserve
 recovery guidance while redacting unknown transport failures.
-`sync/engine-contexts.ts` binds planners and transfers directly to their dependencies.
+`sync/engine/contexts.ts` binds planners and transfers directly to their dependencies.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
 The ordered completion of the initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
 Planner cancellation checks, transfer baseline reads and workflow setup completion
 are required context dependencies, including in test fixtures.
-`sync/planner-types.ts` owns `FullSyncPlan`, shared by the planner and the workflow
+`sync/planner/types.ts` owns `FullSyncPlan`, shared by the planner and the workflow
 that applies its result.
 
-`ui/activity-modal.ts` owns the Activity view's subscriptions and rendering.
+`ui/activity/activity-modal.ts` owns the Activity view's subscriptions and rendering.
 `ui/activity/shared-history-loader.ts` owns request coalescing and disposal for each
 open view, keeping available history on failure and ignoring late responses after
 close. `ui/activity/activity-status.ts` derives labels, indicators and button state
@@ -389,7 +389,7 @@ operation reconciliation still handles uncertain remote writes.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
 6. After a successful operation, `CloudflareUsageConnection` retains the access and refresh tokens in Obsidian secret storage, scoped to the Cloudflare account. Explicit usage, reconnect, update, reset, deletion and recovery operations reuse this login and renew it when needed. Failed operations with newly exchanged tokens revoke them; a failed operation using the saved login keeps that shared login. Plugin settings contain only non-secret deployment metadata and the cached usage snapshot. Revocation is available in Cloudflare.
 
-Terminal Cloudflare deletion is implemented separately in `server-delete.ts`, with resource identity checks in `server-delete-ownership.ts` and settled-operation takeover in `server-delete-fence.ts`. It removes the selected Worker and its owned Durable Objects, then its entire R2 bucket and D1 database. A separate temporary cleanup Worker uses a hashed capability and only the selected R2 binding; it does not depend on application protocols, releases, schemas, or reset/rebuild rules. Non-secret deletion progress survives plugin reload.
+Terminal Cloudflare deletion is implemented separately in `server-reset/delete.ts`, with resource identity checks in `server-reset/delete-ownership.ts` and settled-operation takeover in `server-reset/delete-fence.ts`. It removes the selected Worker and its owned Durable Objects, then its entire R2 bucket and D1 database. A separate temporary cleanup Worker uses a hashed capability and only the selected R2 binding; it does not depend on application protocols, releases, schemas, or reset/rebuild rules. Non-secret deletion progress survives plugin reload.
 
 ### Device authorization
 
@@ -468,7 +468,7 @@ immutable history. Sync retains cursor/checkpoint ordering and persists at opera
 completion. This preserves newer progress during unrelated settings saves, the
 hydrated device identity and the existing shared settings object.
 
-`cloudflare/deployment-state.ts` validates persisted deployment, reset and deletion
+`cloudflare/deployment/state.ts` validates persisted deployment, reset and deletion
 state; plugin settings compose that domain normalizer. `cloudflare/restore/workflow.ts`
 keeps restore checkpoint selection, destination creation and persist-before-remote
 ordering together. `CloudflareDeploymentService` retains authorization, operation
@@ -542,15 +542,15 @@ lock. `coordinator-requests.ts` dispatches coordinator endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
 maintenance, and projection roles; reminder delivery stays in `ReminderAlarm`.
 
-`sync-batch/upload-validation.ts` decodes and validates upload candidates and
-request budgets before storage work. `sync-batch/upload.ts` retains receipt
+`worker/sync/batch/upload-validation.ts` decodes and validates upload candidates and
+request budgets before storage work. `worker/sync/batch/upload.ts` retains receipt
 checks, encryption validation, staging and the bulk/conditional commit paths.
 Per-file validation errors retain the batch response's partial-success behavior.
 Single and bulk notification-source publication share ID, due-key and occurrence
-aggregation in `worker/reminder-source-summary.ts`. Their specialized SQL and
+aggregation in `worker/reminders/source-summary.ts`. Their specialized SQL and
 atomic file-publication transactions remain separate.
 
-`worker/file-publication-statements.ts` constructs per-file changelog and retained
+`worker/sync/file-publication-statements.ts` constructs per-file changelog and retained
 version statements. Single-file publication requires its committed revision;
 atomic moves retain both revision conditions. Each writer still owns transaction
 assembly, receipts, projection work and recovery; bulk publication keeps its
@@ -617,25 +617,25 @@ Sync deletes require both the acknowledged content hash and opaque file revision
 
 See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 
-Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public scope/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
+Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/encryption-session.ts` and `private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public scope/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
 
 `encryption/file-inventory.ts` validates shared encrypted inventory pages and bounds
 traversal independently of file counts. Reading and Reminders retain their own file
 limits, projections and sequence checks; each publishes its derived source cache
 only after a complete, confirmed load.
 
-`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
+`encryption/` owns key bundles, authenticated formats and identity comparison. Both browser enrollment flows use `pwa/encryption-scope.ts` to validate complete folder authority before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata. `plugin/encryption-folder-move-journal.ts` owns the durable move contract, exact setting destinations and guarded journal-head updates. `encryption-folder-move-workflow.ts` applies one persisted job, keeping target persistence, conversion, both settings saves, capture recovery and journal advancement ordered together. `encryption-folder-moves.ts` retains task deduplication, queue draining and feature restarts through `SyncRuntime`'s existing configuration serialization.
 
-`sync/encryption-conversion.ts` owns conversion sequencing, progress, server
-acknowledgments and activation. `encryption-conversion-content.ts` authenticates
+`sync/encryption/conversion.ts` owns conversion sequencing, progress, server
+acknowledgments and activation. `encryption/conversion-content.ts` authenticates
 original or interrupted file bytes and prepares encrypted receipts with their
 existing folder audience. These transformations run without network or storage
 access, so integrity failures and receipt isolation can be tested directly.
 
-Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
+Self-hosted encrypted address changes authenticate the server recovery bundle in `sync/encryption/encrypted-connection.ts`. A local `checkpointScope` associates the new transport URL with the existing disk authority so pending uploads, rename dependencies and local history survive tunnel changes. It is only retained for that URL, never shared as a preference, and cleared when resetting sync. The runtime owns connection switching and waits for journal I/O; neither the enrollment validator nor the connection verifier starts sync independently.
 
 App key approval separates the cryptographic state machine (`encryption/pairing/`)
-from the relay (`worker/encryption-pairing.ts`). `plugin/web-app-pairing.ts` captures
+from the relay (`worker/encryption/pairing.ts`). `plugin/web-app-pairing.ts` captures
 one unlocked vault connection and limits approved grants to the browser features;
 `ui/settings/web-app-pairing-modal.ts` owns the human approval. The shared PWA
 connection gate presents `AppPairing`; `pairing-client.ts` binds requests to the

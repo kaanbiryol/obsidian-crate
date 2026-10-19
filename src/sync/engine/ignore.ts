@@ -1,0 +1,78 @@
+import { isConflictFile } from '../conflict/conflict';
+import { createLogger, errorMessage } from '../../plugin/logger';
+
+const logger = createLogger('SyncEngine');
+
+export interface IgnoreMatcherContext {
+	ignoredDirPrefixes: string[];
+	ignorePatterns: string[];
+	patternCache: Map<string, RegExp>;
+}
+
+export function matchIgnorePattern(
+	path: string,
+	pattern: string,
+	patternCache: Map<string, RegExp>
+): boolean {
+	if (pattern.endsWith('/')) {
+		// Git internals also occur in nested repositories and worktree pointer files.
+		return path.startsWith(pattern) || path === pattern.slice(0, -1)
+			|| (pattern === '.git/' && (path.includes('/.git/') || path.endsWith('/.git')));
+	}
+
+	let regex = patternCache.get(pattern);
+	if (!regex) {
+		const regexPattern = Array.from(pattern).map(char => {
+			if (char === '*') return '.*';
+			if (char === '?') return '.';
+			return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
+		}).join('');
+		try {
+			regex = new RegExp(`^${regexPattern}$`);
+		} catch (error) {
+			logger.warn(`Invalid ignore pattern "${pattern}":`, errorMessage(error));
+			regex = /^$/;
+		}
+		patternCache.set(pattern, regex);
+	}
+
+	if (pattern.includes('/')) {
+		return regex.test(path);
+	}
+
+	const basename = path.split('/').pop() ?? path;
+	return regex.test(path) || regex.test(basename);
+}
+
+export function shouldIgnoreSyncPath(
+	path: string,
+	context: IgnoreMatcherContext
+): boolean {
+	if (isConflictFile(path)) {
+		return true;
+	}
+
+	return shouldIgnoreConfiguredPath(path, context);
+}
+
+export function shouldIgnoreConfiguredPath(
+	path: string,
+	context: IgnoreMatcherContext,
+): boolean {
+	// Recovery copies created by local trash must never re-enter sync.
+	if (path === '.trash' || path.startsWith('.trash/')) return true;
+	for (const prefix of context.ignoredDirPrefixes) {
+		if (matchIgnorePattern(path, prefix, context.patternCache)) {
+			return true;
+		}
+	}
+
+	for (const pattern of context.ignorePatterns) {
+		if (pattern.endsWith('/')) continue;
+		if (matchIgnorePattern(path, pattern, context.patternCache)) {
+			return true;
+		}
+	}
+
+	return false;
+}

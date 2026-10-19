@@ -262,7 +262,7 @@ Dock morphs use the shared collapsed height.
   `scripts/pwa-sheet-field-test.mjs` checks capture focus and simulated keyboard
   geometry in Chromium/WebKit; installed iPhone keyboard behavior needs a device check.
 
-  PWA surface motion lives in `src/pwa/motion.ts` and
+  PWA surface motion lives in `src/ui/shared/navigation/motion.ts` and
   `src/pwa/styles/motion.scss`. Project details and picker entrances use a
   critically damped Motion spring; CSS-owned drawers and Reading navigation
   use a sampled spring curve with a cubic fallback. Direct drawer dragging
@@ -339,7 +339,7 @@ Dock morphs use the shared collapsed height.
   keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
   desktop browser automation cannot establish that OS behavior.
 
-- `src/reminders/components/BaseModal.tsx` uses Base UI Dialog on desktop and
+- `src/ui/plugin/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and
   owner document, including Obsidian Shadow DOM and popout windows. Nested
   pickers share the parent's dialog tree and restore editor focus. Pending

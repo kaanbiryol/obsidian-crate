@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 
 import type { RichTextInputHandle } from '../../components/RichTextInput';
-import { BaseModal } from '../../components/BaseModal';
+import { BaseModal } from '../../../ui/plugin/BaseModal';
 import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { AddReminderModalOverlays } from './AddReminderModalOverlays';
@@ -10,7 +10,7 @@ import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../animations';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { Reminder, RecurrenceRule } from '../../types';
 import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 
@@ -133,7 +133,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
 
     // Keep project accents and picker chrome in sync when the active theme changes.
     const isDark = useObsidianDarkMode();
-    const reduceMotion = useObsidianReducedMotion();
+    const reduceMotion = useReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
 
     const handlePriorityToggle = useCallback(() => {

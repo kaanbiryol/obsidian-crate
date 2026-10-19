@@ -1,6 +1,6 @@
 import { BULK_NEW_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
-import type { AuthPrincipal } from './authenticate';
+import type { AuthPrincipal } from './auth/authenticate';
 
 function opaque(value: string | null): string | undefined {
   return value && /^[a-zA-Z0-9_-]{16,128}$/.test(value) ? value : undefined;

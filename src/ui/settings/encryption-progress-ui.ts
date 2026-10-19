@@ -1,5 +1,5 @@
 import { createModalActions, createModalFooter } from '../plugin/modal-elements';
-import type { EncryptionProgress } from '../../sync/encryption-conversion';
+import type { EncryptionProgress } from '../../sync/encryption/conversion';
 
 /** A dedicated conversion view keeps recovery controls out of the running operation. */
 export function renderEncryptionProgress(container: HTMLElement) {

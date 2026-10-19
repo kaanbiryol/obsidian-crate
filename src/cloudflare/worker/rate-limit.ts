@@ -1,7 +1,7 @@
-import { sha256Hex } from './auth';
+import { sha256Hex } from './auth/crypto';
 import { corsResponse } from './cors';
 import { requestAdmissionKind } from './routes/admission';
-import { admitLocally, authenticatedAdmissionKey } from './admission-state';
+import { admitLocally, authenticatedAdmissionKey } from './auth/admission-state';
 
 export interface NotificationRateLimiter { limit(input: { key: string }): Promise<{ success: boolean }> }
 const actions = new Map([

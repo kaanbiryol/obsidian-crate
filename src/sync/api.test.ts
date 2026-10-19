@@ -1,4 +1,4 @@
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, SyncApiClient } from './api';
 import type { ApiHttpResponse, ApiHttpTransport } from './worker-api/http';

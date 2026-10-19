@@ -48,7 +48,7 @@ async function loadUpdateNotice() {
 			}
 		},
 	}));
-	vi.doMock('./embedded-artifacts', () => ({
+	vi.doMock('./deployment/embedded-artifacts', () => ({
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
 
@@ -94,7 +94,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('./embedded-artifacts');
+	vi.doUnmock('./deployment/embedded-artifacts');
 });
 
 describe('showCloudflareServerUpdateNotice', () => {

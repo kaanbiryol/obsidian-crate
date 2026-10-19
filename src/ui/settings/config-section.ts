@@ -1,9 +1,9 @@
 import { SECRET_KEYS } from '../../plugin/settings-types';
 import { renderVersionSettings, renderUpdateVersions } from './version-settings';
-import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
+import { checkAndRecoverUpdate } from '../../cloudflare/deployment/recovery-ui';
 import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
-import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
-import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
+import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/deployment/embedded-artifacts';
+import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment/update';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';

@@ -3,7 +3,7 @@ import React, { useMemo, memo } from 'react';
 import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { Button } from '../../../ui/shared/Button';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
@@ -12,7 +12,7 @@ import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useReminderOrder } from '../hooks/useReminderOrder';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 
 
 export interface ProjectDetailViewProps {
@@ -105,10 +105,10 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       header={
         <>
           <div className="project-detail-navigation crate-detail-navigation">
-            {backControl ?? <ShadowDOMNativeButton onClick={onBack} className="premium-back-button">
+            {backControl ?? <Button onClick={onBack} className="premium-back-button">
               <ThemeIcon size="xs" id="chevron-left" />
               <span>{backLabel}</span>
-            </ShadowDOMNativeButton>}
+            </Button>}
             {navigationRightContent}
           </div>
           <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} titleContent={headerTitleContent} rightContent={headerRightContent} metaContent={headerMetaContent} />

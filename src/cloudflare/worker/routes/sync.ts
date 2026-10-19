@@ -1,6 +1,6 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { listSharedCheckpoints, createSharedCheckpoint } from '../history-checkpoints';
-import { handleFileVersionPreview } from '../file-version-preview';
+import { listSharedCheckpoints, createSharedCheckpoint } from '../sync/history-checkpoints';
+import { handleFileVersionPreview } from '../sync/file-versions/preview';
 import {
 	handleBatchDelete,
 	handleBatchUpload,
@@ -14,19 +14,19 @@ import {
 	handleHealth,
 	handlePutSettings,
 	handleUpload,
-} from '../sync';
-import { handleListFileVersions, handleRestoreFileVersion } from '../file-version-handlers';
-import { retryPausedNotifications } from '../notification-retry-handler';
+} from '../sync/index';
+import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-versions/handlers';
+import { retryPausedNotifications } from '../notifications/retry-handler';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 import type { MutationAuditContext } from '../request-diagnostics';
-import { beginInitialImport, finishInitialImport } from '../initial-import';
-import { pruneInitialImport } from '../initial-import-prune';
-import { forwardTransferRequest } from '../transfer-dispatch';
-import { finishInitialReminderSetup } from '../initial-import-readiness';
-import type { UploadCommitters } from '../upload-committers';
+import { beginInitialImport, finishInitialImport } from '../sync/initial-import';
+import { pruneInitialImport } from '../sync/initial-import-prune';
+import { forwardTransferRequest } from '../sync/transfer-dispatch';
+import { finishInitialReminderSetup } from '../sync/initial-import-readiness';
+import type { UploadCommitters } from '../sync/upload-committers';
 
 export async function handleSyncRoute(
 	request: Request,

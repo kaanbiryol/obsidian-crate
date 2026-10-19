@@ -1,8 +1,8 @@
 import { D1_USAGE_HEADER, parseD1Usage } from '@/protocol/d1-usage';
 import { emptyRequestTimings } from '../timings';
-import type { CrateServerInfo } from '../../protocol';
+import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../request-diagnostics';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
 import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
 import { createAbortError } from '../abort';

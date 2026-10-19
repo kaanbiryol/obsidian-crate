@@ -3,7 +3,7 @@ import React, { useLayoutEffect, useRef } from 'react';
 import { ModalHeader } from '../../../ui/shared/ModalHeader';
 import { Toolbar } from '@base-ui/react/toolbar';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { ProjectDot } from './ProjectDot';
 
 interface ProjectPickerContentProps {

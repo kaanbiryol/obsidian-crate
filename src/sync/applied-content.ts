@@ -1,7 +1,7 @@
 import { computeHash } from './hasher';
 import { isMarkdownPath } from './markdown-base-cache';
 import type { FileEntry } from '../protocol/sync-types';
-import type { TransferContext } from './transfer-types';
+import type { TransferContext } from './transfer/types';
 
 // A remote baseline can be valid even when its local metadata is not. The
 // planners deliberately hash entries whose modification time is not a date.

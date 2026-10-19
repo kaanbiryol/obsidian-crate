@@ -1,0 +1,379 @@
+import { PushPayloadError } from './payload-budget';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
+import { ReminderAlarm } from './reminder-alarm';
+import { listPushSubscriptions, sendToAllSubscriptions } from './push';
+
+vi.mock('./push', () => ({
+	listPushSubscriptions: vi.fn(),
+	sendToAllSubscriptions: vi.fn(),
+}));
+
+const subscriptionRows = (...ids: string[]) => ids.map(id => ({ id, endpoint: `https://push.example/${id}`, p256dh: 'key', auth: 'auth' }));
+
+const unexpectedQueries: string[] = [];
+beforeEach(() => {
+	vi.clearAllMocks();
+	unexpectedQueries.length = 0;
+});
+afterEach(() => {
+	vi.restoreAllMocks();
+	expect(unexpectedQueries).toEqual([]);
+});
+
+function createHarness(authority = true) {
+	const reminder = {
+		reminderId: 'reminder-1',
+		scheduleToken: 'schedule-token-1',
+		content: 'Ship it',
+		project: 'Work',
+		dueDatetime: '2099-01-01T00:00:00.000Z',
+	};
+	const storedValues = new Map<string, unknown>([['reminder', reminder]]);
+	const deleteAll = vi.fn(async () => {
+		storedValues.clear();
+	});
+	const deleteValue = vi.fn(async (key: string) => storedValues.delete(key));
+	const setAlarm = vi.fn(async (_scheduledTime: number | Date) => {});
+	const deleteAlarm = vi.fn(async () => {});
+	const getAlarm = vi.fn(async () => Date.parse(reminder.dueDatetime));
+	const put = vi.fn(async (key: string, value: unknown) => {
+		storedValues.set(key, value);
+	});
+	const run = vi.fn(async () => ({ meta: { changes: 1 } }));
+	const state = {
+		storage: {
+			get: vi.fn(async (key: string) => storedValues.get(key)),
+			getAlarm,
+			put,
+			delete: deleteValue,
+			deleteAll,
+			setAlarm,
+			deleteAlarm,
+		},
+	} as unknown as DurableObjectState;
+	const scheduledReminder = {
+		schedule_token: reminder.scheduleToken,
+		content: reminder.content,
+		project: reminder.project,
+		due_datetime: reminder.dueDatetime,
+	};
+	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
+	const queries: string[] = [];
+	const db = {
+		prepare: vi.fn((sql: string) => {
+			const query = sql.replace(/\s+/g, ' ').trim();
+			queries.push(query);
+			let read: () => Promise<unknown>;
+			if (query.startsWith('SELECT 1 FROM reminder_projections p JOIN files')) read = async () => authority ? { ok: 1 } : null;
+			else if (query === 'SELECT file_path FROM reminder_projections WHERE reminder_id = ?') read = async () => ({ file_path: 'Notes/task.md' });
+			else if (query.startsWith('SELECT job_token FROM notification_jobs WHERE reminder_id = ?')) read = async () => ({ job_token: 'current-job' });
+			else if (query === 'SELECT schedule_token, content, project, due_datetime FROM scheduled_reminders WHERE reminder_id = ?') read = first;
+			else if (query.startsWith('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
+				|| query.startsWith('INSERT OR REPLACE INTO scheduled_reminders ')
+				|| query.startsWith('UPDATE scheduled_reminders SET delivery_failed_at = ?')) read = async () => null;
+			else {
+				unexpectedQueries.push(query);
+				throw new Error(`Unexpected reminder alarm query: ${query}`);
+			}
+			return { bind: vi.fn(() => ({ run, first: read, async all() {
+				const row = await read();
+				return { results: row ? [row] : [] };
+			} })) };
+		}),
+	} as unknown as D1Database;
+	return {
+		alarm: new ReminderAlarm(state, { DB: db, CRATE_PUBLIC_ORIGIN: 'https://worker.test' }),
+		queries,
+		deleteAll,
+		deleteAlarm,
+		first,
+		put,
+		run,
+		setAlarm,
+		storedValues,
+	};
+}
+
+describe('reminder alarm delivery', () => {
+	it('deletes authoritative schedule metadata before clearing an alarm', async () => {
+		const harness = createHarness();
+
+		const response = await harness.alarm.fetch(new Request(
+			'https://do/cancel?reminderId=reminder-1&jobToken=current-job',
+			{ method: 'DELETE' },
+		));
+
+		expect(response.status).toBe(200);
+		expect(harness.run).toHaveBeenCalledOnce();
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('retries only subscriptions whose push delivery failed', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1', 'subscription-2'));
+		vi.mocked(sendToAllSubscriptions)
+			.mockResolvedValueOnce({
+				sent: 1,
+				failed: 1,
+				pruned: 0,
+				quarantined: 0,
+				errors: ['temporary failure'],
+				failedSubscriptionIds: ['subscription-2'],
+			})
+			.mockResolvedValueOnce({
+				sent: 1,
+				failed: 0,
+				pruned: 0,
+				quarantined: 0,
+				errors: [],
+				failedSubscriptionIds: [],
+			});
+		const harness = createHarness();
+
+		await harness.alarm.alarm();
+		expect(harness.storedValues.get('pendingSubscriptionIds')).toEqual(['subscription-2']);
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.run).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
+
+		await harness.alarm.alarm();
+
+		expect(listPushSubscriptions).toHaveBeenCalledOnce();
+		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(1, expect.anything(), expect.anything(), {
+			origin: 'https://worker.test',
+			subscriptionIds: ['subscription-1', 'subscription-2'],
+			subscriptions: subscriptionRows('subscription-1', 'subscription-2'),
+		});
+		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything(), {
+			origin: 'https://worker.test',
+			subscriptionIds: ['subscription-2'],
+			subscriptions: undefined,
+		});
+		expect(harness.run).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('keeps alarm state when every push delivery fails', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 0,
+			failed: 1,
+			pruned: 0,
+			quarantined: 0,
+			errors: ['temporary failure'],
+			failedSubscriptionIds: ['subscription-1'],
+		});
+		const harness = createHarness();
+
+		await harness.alarm.alarm();
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.run).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
+	});
+
+	it('records deterministic payload errors immediately without retrying or disabling recipients', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockRejectedValueOnce(new PushPayloadError('Invalid notification identifiers'));
+		const harness = createHarness();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		await harness.alarm.alarm();
+		expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 0, error: 'Invalid notification identifiers' });
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.setAlarm).not.toHaveBeenCalled();
+	});
+
+	it('records a terminal delivery failure after the retry budget is exhausted', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 0,
+			failed: 1,
+			pruned: 0,
+			quarantined: 0,
+			errors: ['temporary failure'],
+			failedSubscriptionIds: ['subscription-1'],
+		});
+		const harness = createHarness();
+		harness.storedValues.set('retryAttempt', 10);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('deliveryFailure')).toEqual(expect.objectContaining({
+			attempts: 10,
+			error: 'Push delivery failed for 1 subscription(s)',
+		}));
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.setAlarm).not.toHaveBeenCalled();
+	});
+
+	it('cleans up only after delivery finishes without retryable failures', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 1,
+			failed: 0,
+			pruned: 0,
+			quarantined: 0,
+			errors: [],
+			failedSubscriptionIds: [],
+		});
+		const harness = createHarness();
+
+		await harness.alarm.alarm();
+		expect(harness.run).toHaveBeenCalledTimes(1);
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('retries D1 cleanup without sending a duplicate push', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 1,
+			failed: 0,
+			pruned: 0,
+			quarantined: 0,
+			errors: [],
+			failedSubscriptionIds: [],
+		});
+		const harness = createHarness();
+		harness.run.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+		expect(harness.storedValues.get('deliveryComplete')).toBe(true);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(true);
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+		expect(harness.run).toHaveBeenCalledTimes(2);
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('keeps explicitly rescheduling transient D1 failures with bounded backoff', async () => {
+		const harness = createHarness();
+		harness.first.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(true);
+
+		harness.first.mockRejectedValueOnce(new Error('D1 still unavailable'));
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('retryAttempt')).toBe(2);
+		expect(harness.setAlarm).toHaveBeenCalledTimes(2);
+		const firstRetry = Number(harness.setAlarm.mock.calls[0]?.[0]);
+		const secondRetry = Number(harness.setAlarm.mock.calls[1]?.[0]);
+		expect(secondRetry - Date.now()).toBeGreaterThan(firstRetry - Date.now());
+	});
+
+	it('does not clear a newer schedule after an older alarm finishes', async () => {
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows());
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 0,
+			failed: 0,
+			pruned: 0,
+			quarantined: 0,
+			errors: [],
+			failedSubscriptionIds: [],
+		});
+		const harness = createHarness();
+		const newerReminder = {
+			reminderId: 'reminder-1',
+			scheduleToken: 'newer-schedule-token',
+			content: 'Rescheduled',
+			dueDatetime: '2099-02-01T00:00:00.000Z',
+		};
+		harness.run.mockImplementationOnce(async () => {
+			harness.storedValues.set('reminder', newerReminder);
+			return { meta: { changes: 1 } };
+		});
+
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.has('reminder')).toBe(true);
+		expect(harness.storedValues.get('reminder')).toEqual(newerReminder);
+	});
+
+	it('discards an orphan alarm without sending when its D1 schedule is missing', async () => {
+		const harness = createHarness();
+		harness.first.mockResolvedValueOnce(null);
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('discards stale alarm state when its schedule token no longer matches D1', async () => {
+		const harness = createHarness();
+		harness.first.mockResolvedValueOnce({
+			schedule_token: 'newer-schedule-token',
+			content: 'Updated',
+			project: 'Work',
+			due_datetime: '2099-02-01T00:00:00.000Z',
+		});
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(false);
+	});
+
+	it('rolls back alarm state when D1 cannot persist a schedule', async () => {
+		const harness = createHarness();
+		harness.run.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		const response = await harness.alarm.fetch(new Request('https://do/schedule', {
+			method: 'PUT',
+			body: JSON.stringify({
+				reminderId: 'reminder-1',
+				content: 'Updated reminder',
+				jobToken: 'current-job',
+				dueDatetime: '2099-02-01T00:00:00.000Z',
+			}),
+		}));
+
+		expect(response.status).toBe(500);
+		expect(harness.storedValues.get('reminder')).toMatchObject({
+			scheduleToken: 'schedule-token-1',
+			content: 'Ship it',
+		});
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+	});
+
+	it('acknowledges a completed occurrence without checking source authority', async () => {
+		const harness = createHarness();
+		harness.storedValues.set('completedOccurrence', '2099-01-01T00:00:00.000Z');
+
+		const response = await harness.alarm.fetch(new Request('https://do/schedule', {
+			method: 'PUT',
+			body: JSON.stringify({
+				reminderId: 'reminder-1',
+				content: 'Ship it',
+				jobToken: 'current-job',
+				dueDatetime: '2099-01-01T00:00:00.000Z',
+			}),
+		}));
+
+		expect(response.status).toBe(200);
+		expect(harness.queries.some(sql => sql.includes('reminder_projections'))).toBe(false);
+		expect(harness.storedValues.has('reminder')).toBe(false);
+		expect(harness.setAlarm).not.toHaveBeenCalled();
+	});
+});
+
+ it('stops retrying when source authority never becomes available', async () => {
+   const harness = createHarness(false);
+   for (let attempt = 0; attempt < 11; attempt++) await harness.alarm.alarm();
+   expect(harness.setAlarm).toHaveBeenCalledTimes(10);
+   expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+   expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 10 });
+   expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+ });

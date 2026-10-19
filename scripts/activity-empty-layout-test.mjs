@@ -7,7 +7,7 @@ import { obsidianDomHelpers, obsidianDialogModule, hostStyles } from './obsidian
 // Mount the production modal, header and tab renderers against native host CSS.
 const { outputFiles } = await build({
   stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
-    import { ActivityModal } from './src/ui/activity-modal';
+    import { ActivityModal } from './src/ui/activity/activity-modal';
     import { ConflictReviewModal } from './src/ui/activity/conflict-review-modal';
     ${obsidianDomHelpers}
     HTMLElement.prototype.addClasses = function(names) { this.classList.add(...names); };

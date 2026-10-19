@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { SyncEngine } from '../sync/engine';
-import { createDeferred, createRuntimeHarness, initializeRuntime } from '../sync/runtime-test-harness';
+import { SyncEngine } from '../sync/engine/engine';
+import { createDeferred, createRuntimeHarness, initializeRuntime } from '../sync/runtime/runtime-test-harness';
 import { createEmptySyncResult } from '../sync/sync-result';
 import type { SyncState } from '../sync/types';
 import { registerSyncStatus } from './sync-status';

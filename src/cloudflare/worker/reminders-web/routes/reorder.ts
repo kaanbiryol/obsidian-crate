@@ -7,7 +7,7 @@ import { getProjectFilePath, reorderReminderBlocksInFileContent } from '../file-
 import { parseFolderPath, parseProjectPath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile } from '../scan';
-import { assertUniqueReminderSources } from '../../reminder-source-identity';
+import { assertUniqueReminderSources } from '../../reminders/source-identity';
 import { ReminderReorderConflictError } from '@/reminders/core/markdownReminderFile';
 
 // Paging changes only mounted rows; reorder still submits the complete project

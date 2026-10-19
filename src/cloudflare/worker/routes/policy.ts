@@ -1,4 +1,4 @@
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 
 type Scope = AuthPrincipal['scope'];

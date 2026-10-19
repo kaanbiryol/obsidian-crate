@@ -9,11 +9,11 @@ vi.mock('@/reminders/ui/views', async () => {
 	return { ProjectDetailView: memo(function ProjectDetailView() { projectDetailRenders.count++; return null; }) };
 });
 vi.mock('@/reminders/ui/RemindersViewPanels', () => ({ RemindersViewPanels: () => null }));
-vi.mock('@/reminders/components/ViewHeader', () => ({ ViewHeader: () => null }));
+vi.mock('@/ui/shared/ViewHeader', () => ({ ViewHeader: () => null }));
 vi.mock('./PwaDock', () => ({ PwaDock: () => null, PwaDockAddButton: () => null }));
-vi.mock('./PwaTabTransition', () => ({ PwaTabTransition: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('./PwaNavigationScreen', () => ({ PwaNavigationScreen: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('./PwaScheduleSwitcher', () => ({ PwaScheduleSwitcher: () => null }));
+vi.mock('../../ui/shared/navigation/TabTransition', () => ({ TabTransition: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock('../../ui/shared/navigation/NavigationScreen', () => ({ NavigationScreen: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock('../../ui/shared/navigation/ScheduleSwitcher', () => ({ ScheduleSwitcher: () => null }));
 vi.mock('@/ui/shared/useReducedMotion', () => ({ useReducedMotion: () => true }));
 vi.mock('../hooks/useReminderProjectNavigation', () => {
 	const navigation = {

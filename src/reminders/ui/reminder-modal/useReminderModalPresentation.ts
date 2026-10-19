@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { isObsidianOverlayActive } from '../../components/useObsidianOverlayActive';
+import { isObsidianOverlayActive } from '../../../ui/plugin/useObsidianOverlayActive';
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 
 interface UseReminderModalPresentationOptions {

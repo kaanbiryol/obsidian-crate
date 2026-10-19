@@ -1,4 +1,4 @@
-import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { afterEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
 import { AUTH_TOKEN_KEY } from './config';

@@ -4,7 +4,7 @@ import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks 
 const fetchUsage = vi.fn();
 vi.mock('obsidian', () => createObsidianUiModule());
 
-import type { UsageSnapshot } from '../../cloudflare/usage-snapshot';
+import type { UsageSnapshot } from '../../cloudflare/usage/snapshot';
 import { renderUsageSection } from './usage-section';
 
 beforeEach(() => { resetObsidianUiMocks(); fetchUsage.mockReset(); });

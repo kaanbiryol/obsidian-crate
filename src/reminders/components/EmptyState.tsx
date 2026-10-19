@@ -2,8 +2,8 @@ import React, { createContext, useContext, useRef } from 'react';
 import { motion, useIsPresent } from 'motion/react';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { REMINDER_LIST_FADE_TRANSITION } from '../ui/layoutConstants';
-import { ThemeIcon } from './theme-icon';
-import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { ThemeIcon } from '../../ui/shared/ThemeIcon';
+import { useReducedMotion } from '../../ui/shared/useReducedMotion';
 
 interface EmptyStateProps {
     icon: string;
@@ -39,7 +39,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 	// Preserve loading copy while this state exits to reveal newly loaded cards.
 	if (isPresent) lastMessage.current = currentMessage;
 	const message = isPresent ? currentMessage : lastMessage.current;
-    const reduceMotion = useObsidianReducedMotion();
+    const reduceMotion = useReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const duration = animationConfig.duration ?? REMINDER_LIST_FADE_TRANSITION.duration;
     const variants = {

@@ -4,7 +4,7 @@ import { computeHash } from '../hasher';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
-import type { EncryptedFiles } from '../encrypted-files';
+import type { EncryptedFiles } from '../encryption/encrypted-files';
 
 export class SharedHistoryApi {
     constructor(private http: WorkerApiHttpClient) {}

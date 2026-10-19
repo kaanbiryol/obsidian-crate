@@ -1,6 +1,6 @@
 import { changedRows } from '../db';
 import { OPERATION_FLOOR } from '../operation-expiry';
-import { pruneEncryptionPairings } from '../encryption-pairing';
+import { pruneEncryptionPairings } from '../encryption/pairing';
 
 /** Publish the retry floor and prune receipts in the same transaction. */
 // Primary-key range deletes; uploads create one receipt each, so a pass must

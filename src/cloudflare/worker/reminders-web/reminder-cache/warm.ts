@@ -1,6 +1,6 @@
 import { readStoredMarkdownFiles, type StoredMarkdownFileMetadata } from '../../storage';
 import type { Env } from '../../types';
-import { parseReminderSource } from '../../reminder-source-parse';
+import { parseReminderSource } from '../../reminders/source-parse';
 import {
 	REMINDER_INDEX_WARM_MAX_BYTES,
 	REMINDER_INDEX_MAX_FILE_BYTES,

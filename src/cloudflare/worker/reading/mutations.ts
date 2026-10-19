@@ -4,11 +4,11 @@ import { createReadingNote, parseReadingNote, updateReadingNote } from '@/readin
 import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { isEmptyReadingCapture, readingUpdateIssue } from '@/reading/core/mutation-policy';
 import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
-import { stageMarkdownFile } from '../markdown-file-staging';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../file-identity';
-import { commitStagedFile } from '../sync-mutations';
+import { stageMarkdownFile } from '../sync/markdown-file-staging';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
+import { commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
 import { ReadingError, readingResponse, sourceById, type ReadingPolicy } from './common';
 import { projectReading } from './projection';

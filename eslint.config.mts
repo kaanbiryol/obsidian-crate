@@ -84,7 +84,7 @@ export default tseslint.config(
 	{
 		files: [
 			'src/cloudflare/callback-page.test.ts',
-			'src/cloudflare/worker/pwa.test.ts',
+			'src/cloudflare/worker/pwa/index.test.ts',
 		],
 		rules: {
 			'obsidianmd/no-nodejs-modules': 'off',
@@ -175,12 +175,17 @@ export default tseslint.config(
 		rules: { 'obsidianmd/prefer-window-timers': 'off' },
 	},
 	{
-		files: ['src/reminders/core/**/*.{ts,tsx}'],
+		// Shared by the plugin, PWA and Worker.
+		files: [
+			'src/reminders/{core,utils,types}/**/*.{ts,tsx}',
+			'src/reading/{core,extraction}/**/*.{ts,tsx}',
+			'src/{protocol,encryption}/**/*.{ts,tsx}',
+		],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {
 				paths: [{
 					name: 'obsidian',
-					message: 'reminders/core must stay platform-neutral so it can be shared by the plugin and Worker.',
+					message: 'Shared domain modules must stay platform-neutral so the plugin, PWA and Worker can use them.',
 				}],
 			}],
 		},
@@ -207,7 +212,7 @@ export default tseslint.config(
 	{
 		// Remote deletions must remain recoverable even when the user's host
 		// preference is permanent deletion. Vault.trash(file, false) forces .trash.
-		files: ['src/sync/planner-helpers.ts'],
+		files: ['src/sync/planner/helpers.ts'],
 		rules: { 'obsidianmd/prefer-file-manager-trash-file': 'off' },
 	},
 	{

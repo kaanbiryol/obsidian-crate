@@ -1,30 +1,30 @@
-import { CloudflareOperationPresentation } from '../ui/cloudflare-operation-presentation';
-import { ResetBlockedError } from './reset-errors';
-import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment-types';
+import { CloudflareOperationPresentation } from '../ui/cloudflare/operation-presentation';
+import { ResetBlockedError } from './server-reset/reset-errors';
+import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment/types';
 import type { ConnectionTestResult } from '../sync/types';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { SyncApiClient, HttpError } from '../sync/api';
-import { checkAndRecoverUpdate } from './deployment-recovery-ui';
-import { DeploymentRecoveryRequiredError } from './deployment-fence';
+import { checkAndRecoverUpdate } from './deployment/recovery-ui';
+import { DeploymentRecoveryRequiredError } from './deployment/fence';
 import { Notice, Platform } from 'obsidian';
-import { CloudflareReauthorizationRequired } from './oauth-client';
-import { CloudflareUsageConnection } from './usage-connection';
+import { CloudflareReauthorizationRequired } from './oauth/client';
+import { CloudflareUsageConnection } from './usage/connection';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { CloudflareDeploymentService } from './deployment-service';
-import { loadEmbeddedCloudflareArtifacts } from './embedded-artifacts';
+import { CloudflareDeploymentService } from './deployment/service';
+import { loadEmbeddedCloudflareArtifacts } from './deployment/embedded-artifacts';
 import { obsidianHttpTransport } from './http';
 import { configureCloudflareAuthorizedDevice } from '../sync/plugin-integration';
 import { isSelfHostedConnectionPending } from '../sync/self-hosted-connection';
 import { generateSecureToken, hashToken } from '../sync/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
-import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare-deployment-modal';
-import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare-authorization-modal';
-import { selectCloudflareServer } from '../ui/cloudflare-server-picker-modal';
+import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare/deployment-modal';
+import { dismissCloudflareAuthorizationModal, openCloudflareAuthorizationModal } from '../ui/cloudflare/authorization-modal';
+import { selectCloudflareServer } from '../ui/cloudflare/server-picker-modal';
 import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
 	isCloudflareOAuthConfigured,
-} from './oauth-config';
+} from './oauth/config';
 
 export function createCloudflareUsageConnection(plugin: CratePlugin): CloudflareUsageConnection {
 	return new CloudflareUsageConnection({

@@ -1,8 +1,8 @@
 import statusStyles from '../../../../site/assets/status.css?raw-css';
-import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import release from '../../server-release.json';
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from '../pwa/version';
 import { runReadingSavePage, type ReadingSaveConfig } from './save-client';
 
 const pageHeaders = (type: string) => ({ 'Content-Type': type, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',

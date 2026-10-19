@@ -1,12 +1,12 @@
 import { registerSyncStatus } from '../plugin/sync-status';
 import type { ConnectionTestResult } from './types';
-import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
+import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
-import { type ForegroundSyncReason, SyncRuntime } from './runtime';
-import { notifyConflicts } from './conflict';
-import { ActivityModal } from '../ui/activity-modal';
+import { type ForegroundSyncReason, SyncRuntime } from './runtime/runtime';
+import { notifyConflicts } from './conflict/conflict';
+import { ActivityModal } from '../ui/activity/activity-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';

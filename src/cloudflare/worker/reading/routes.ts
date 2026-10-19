@@ -1,12 +1,12 @@
-import { readEncryptedReceipt } from '../encrypted-receipt-storage';
-import { readEncryptionState } from '../encryption-state';
-import { handleEncryptedReminders } from '../encrypted-reminders';
+import { readEncryptedReceipt } from '../encryption/receipt-storage';
+import { readEncryptionState } from '../encryption/state';
+import { handleEncryptedReminders } from '../reminders/encrypted-reminders';
 import { issueShortcutPairing, exchangeShortcutPairing } from './shortcut-pairing';
 import { shortcutTransport, validateShortcutBody } from './shortcut-transport';
-import { armNotificationCoordinator } from '../notification-lifecycle';
+import { armNotificationCoordinator } from '../notifications/lifecycle';
 import { limitNotificationAction } from '../rate-limit';
 import type { Env } from '../types';
-import type { AuthPrincipal } from '../authenticate';
+import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject } from '../utils';
 import { policy, authority, readingResponse, ReadingError } from './common';

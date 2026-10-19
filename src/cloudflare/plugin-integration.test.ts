@@ -1,4 +1,4 @@
-import type { CloudflareDeploymentResult } from './deployment-types';
+import type { CloudflareDeploymentResult } from './deployment/types';
 import { HttpError } from '../sync/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,7 +24,7 @@ const progress = {
 
 async function loadPluginIntegration() {
 	vi.doMock('../sync/api', () => ({ HttpError, SyncApiClient: class { constructor() { return reconnectApi; } } }));
-	vi.doMock('./oauth-config', async () => ({ ...await vi.importActual<object>('./oauth-config'), isCloudflareOAuthConfigured: () => true }));
+	vi.doMock('./oauth/config', async () => ({ ...await vi.importActual<object>('./oauth/config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn(), Platform: platform }));
 	vi.doMock('../sync/plugin-integration', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('../sync/device-token', () => ({ generateSecureToken, hashToken }));
@@ -32,10 +32,10 @@ async function loadPluginIntegration() {
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),
 	}));
-	vi.doMock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
-	vi.doMock('../ui/cloudflare-authorization-modal', () => ({ openCloudflareAuthorizationModal, dismissCloudflareAuthorizationModal }));
-	vi.doMock('../ui/cloudflare-server-picker-modal', () => ({ selectCloudflareServer: vi.fn() }));
-	vi.doMock('./embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
+	vi.doMock('../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
+	vi.doMock('../ui/cloudflare/authorization-modal', () => ({ openCloudflareAuthorizationModal, dismissCloudflareAuthorizationModal }));
+	vi.doMock('../ui/cloudflare/server-picker-modal', () => ({ selectCloudflareServer: vi.fn() }));
+	vi.doMock('./deployment/embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
 	vi.doMock('./http', () => ({ obsidianHttpTransport: vi.fn() }));
 
 	return import('./plugin-integration');
@@ -89,14 +89,14 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../sync/api');
-	vi.doUnmock('./oauth-config');
+	vi.doUnmock('./oauth/config');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('../sync/device-token');
 	vi.doUnmock('../plugin/deviceInfo');
-	vi.doUnmock('../ui/cloudflare-deployment-modal');
-	vi.doUnmock('../ui/cloudflare-authorization-modal');
-	vi.doUnmock('../ui/cloudflare-server-picker-modal');
-	vi.doUnmock('./embedded-artifacts');
+	vi.doUnmock('../ui/cloudflare/deployment-modal');
+	vi.doUnmock('../ui/cloudflare/authorization-modal');
+	vi.doUnmock('../ui/cloudflare/server-picker-modal');
+	vi.doUnmock('./deployment/embedded-artifacts');
 	vi.doUnmock('./http');
 });
 
@@ -321,7 +321,7 @@ it('repairs an unconfigured device with saved authorization and then connects it
 
 it.each(['reset', 'delete'] as const)('falls back to the same %s intent only for invalid authorization', async intent => {
 	const { startCloudflareDeployment } = await loadPluginIntegration();
-	const { CloudflareReauthorizationRequired } = await import('./oauth-client');
+	const { CloudflareReauthorizationRequired } = await import('./oauth/client');
 	const plugin = createPlugin(true);
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareReauthorizationRequired());
 	await startCloudflareDeployment(plugin as never, intent);
@@ -351,7 +351,7 @@ it('shows a rejected D1 quota error directly without sending the user to lock re
 
 it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
     const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-    const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
+    const { DeploymentRecoveryRequiredError } = await import('./deployment/fence');
     const plugin = createPlugin(true);
     plugin.cloudflareDeploymentService.pendingIntent = intent === 'update' ? null : intent;
     plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(
@@ -371,7 +371,7 @@ it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an 
 
 it('offers resume only when an interrupted deletion checkpoint is saved', async () => {
 	const { startCloudflareDeployment } = await loadPluginIntegration();
-	const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
+	const { DeploymentRecoveryRequiredError } = await import('./deployment/fence');
 	const plugin = createPlugin(true);
 	Object.assign(plugin.settings.cloudflareDeployment, { reset: { deleteOnly: true } });
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new DeploymentRecoveryRequiredError('Needs review'));
@@ -478,7 +478,7 @@ describe('unified reconnect', () => {
 
 
 it('requests Cloudflare sign-in only when saved authorization cannot be renewed', async () => {
-	const { CloudflareReauthorizationRequired } = await import('./oauth-client');
+	const { CloudflareReauthorizationRequired } = await import('./oauth/client');
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const plugin = createPlugin(true);
 	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareReauthorizationRequired());

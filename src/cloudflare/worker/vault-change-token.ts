@@ -1,6 +1,6 @@
-import { sha256Hex } from './auth';
-import { getChangelogBounds, LAST_SEQ_SQL } from './sync-storage';
-import { SYNC_RESET_GENERATION_KEY } from './sync-reset-generation';
+import { sha256Hex } from './auth/crypto';
+import { getChangelogBounds, LAST_SEQ_SQL } from './sync/storage';
+import { SYNC_RESET_GENERATION_KEY } from './sync/reset-generation';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
 

@@ -1,5 +1,5 @@
-import { readEncryptionState } from '../../encryption-state';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../file-identity';
+import { readEncryptionState } from '../../encryption/state';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../sync/file-identity';
 import { publishCapture, runCapture, type CapturePublication } from '../captures';
 import { featureEnabled, type FeaturePolicy } from '../../feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
@@ -8,9 +8,9 @@ import { policy, readSource } from '../common';
 import { parseReadingNote } from '@/reading/core/notes';
 import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { invalidateReadingProjection, projectReading } from '../projection';
-import { sha256Hex } from '../../auth';
-import { commitStagedFile } from '../../sync-mutations';
-import { stageMarkdownFile } from '../../markdown-file-staging';
+import { sha256Hex } from '../../auth/crypto';
+import { commitStagedFile } from '../../sync/mutations';
+import { stageMarkdownFile } from '../../sync/markdown-file-staging';
 import type { extractDocument } from './document';
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }

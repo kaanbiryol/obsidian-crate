@@ -4,7 +4,7 @@ import type CratePlugin from '../main';
 import { registerReminderCommands } from './commands';
 import { ReminderQueryInjector } from './query/injector';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
-import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/adapters/reminders-view';
+import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { createLogger } from './utils/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';

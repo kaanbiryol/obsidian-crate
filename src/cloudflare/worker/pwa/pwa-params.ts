@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from './version';
 
 export const PWA_CHROME_COLOR = '#0d0d0f';
 export const PWA_LIGHT_CHROME_COLOR = '#f7f7f8';

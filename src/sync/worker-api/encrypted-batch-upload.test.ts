@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { SyncWorkerApi } from './sync';
 import { HttpError, type WorkerApiHttpClient } from './http';
-import { EncryptedFiles } from '../encrypted-files';
+import { EncryptedFiles } from '../encryption/encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';

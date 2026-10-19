@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from './version';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from './pwa-params';
 
 export function createManifestJson(requestUrl?: string, encrypted = false): string {

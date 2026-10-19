@@ -1,4 +1,4 @@
-import { PWA_CONTROL_SPRING } from '../motion';
+import { PWA_CONTROL_SPRING } from '../../ui/shared/navigation/motion';
 import { useId } from 'react';
 import { ChevronDown, GripVertical } from 'lucide-react';
 import { Reorder, useDragControls, useReducedMotion } from 'motion/react';

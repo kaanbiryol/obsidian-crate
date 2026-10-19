@@ -1,4 +1,4 @@
-import type { CloudflareDeploymentMetadata } from '../deployment-types';
+import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import type { BackupSource } from './archive';
 export interface ServerRestoreState {
   id: string; source: BackupSource; prefix: string; archiveHash: string; fingerprint: string;

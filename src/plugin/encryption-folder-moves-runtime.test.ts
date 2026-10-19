@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { TFolder } from 'obsidian';
 import type CratePlugin from './CratePlugin';
-import { createRuntimeHarness } from '../sync/runtime-test-harness';
+import { createRuntimeHarness } from '../sync/runtime/runtime-test-harness';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { LocalManifest } from '../sync/manifest';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
@@ -11,7 +11,7 @@ import { saveEncryptionKeys } from './encryption-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
 import { computeHash } from '../sync/hasher';
 
-vi.mock('../sync/encryption-conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
+vi.mock('../sync/encryption/conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 

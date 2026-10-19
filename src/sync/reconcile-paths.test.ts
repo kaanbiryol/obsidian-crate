@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HttpError } from './api';
-import { RemoteVersionChangedError } from './transfer-download';
+import { RemoteVersionChangedError } from './transfer/download';
 import { computeHash } from './hasher';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/reminders/ui/remindersViewModel';
-import type { PwaNavigationMotion } from '../components/PwaNavigationScreen';
+import type { NavigationMotion } from '../../ui/shared/navigation/NavigationScreen';
 import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../project-history';
 
 /** Own project history, exit completion and focus restoration as one lifetime. */
@@ -10,7 +10,7 @@ export function useReminderProjectNavigation({ initialTab, initialProject, reduc
 	// Seed the real screen from the same destination as its lazy loading shell.
 	// Applying it later via the dock retains the default tab as an outgoing fade.
 	const [viewMode, setViewMode] = useState<ViewMode>(() => initialProject ? 'browse' : initialTab);
-	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
+	const [direction, setDirection] = useState<NavigationMotion['direction']>(0);
 	const [skipProjectMotion, setSkipProjectMotion] = useState(Boolean(initialProject));
 	const navigationMotion = { direction, reduceMotion: reduceMotion || skipProjectMotion };
 	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);

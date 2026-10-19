@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/ui/shared/Button';
 import { IconButton } from '@/ui/shared/IconButton';
-import { ThemeIcon } from '@/reminders/components/theme-icon';
+import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { PwaButton } from '@/pwa/components/PwaButton';
 import { usePwaInputModality } from '@/pwa/hooks/usePwaInputModality';
 import { TextField } from '@/ui/shared/TextField';

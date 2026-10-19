@@ -1,4 +1,4 @@
-import { deleteRemoteFiles } from './transfer-delete';
+import { deleteRemoteFiles } from './transfer/delete';
 import { pendingChangeKey } from './pending-change';
 import { describe, expect, it, vi } from 'vitest';
 import type { App, PluginManifest, Vault } from 'obsidian';

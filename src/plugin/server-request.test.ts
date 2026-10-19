@@ -6,7 +6,7 @@ import { serverRequest } from './server-request';
 import { readingServerRequest } from '../reading/server';
 import { SECRET_KEYS } from './settings-types';
 import { createVaultKeyBundle } from '../encryption/key-bundle';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 
 const transport = vi.hoisted(() => vi.fn<(request: string | RequestUrlParam) => Promise<RequestUrlResponse>>());
 vi.mock('obsidian', () => ({ requestUrl: transport }));

@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { buildProjectTree, ProjectTree } from './ProjectTree';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 
 export interface BrowseViewProps {
   projects: string[];
@@ -36,7 +36,7 @@ export const BrowseView = memo(function BrowseView({
   className = '',
   colorScheme = 'dark',
 }: BrowseViewProps) {
-  const reduceMotion = useObsidianReducedMotion();
+  const reduceMotion = useReducedMotion();
   const animationsEnabled = animationConfig.enabled && !reduceMotion;
   const effectiveAnimationConfig = { ...animationConfig, enabled: animationsEnabled };
   const cards = useMemo(

@@ -1,10 +1,10 @@
 import { prepareRows } from './prepare-rows';
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
-import type { CloudflareDeploymentArtifacts } from '../deployment-artifacts';
-import { sha256Hex } from '../deployment-artifacts';
-import { provisionCloudflareDeployment } from '../provisioner';
-import { recoverDeployment } from '../deployment-recovery';
-import { completePublishedDeployment } from '../complete-published-deployment';
+import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
+import { sha256Hex } from '../deployment/artifacts';
+import { provisionCloudflareDeployment } from '../deployment/provisioner';
+import { recoverDeployment } from '../deployment/recovery';
+import { completePublishedDeployment } from '../deployment/complete-published';
 import { hashBytes, literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 

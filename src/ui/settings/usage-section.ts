@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import type { UsageMetric } from '../../cloudflare/usage-service';
-import type { UsageSnapshot } from '../../cloudflare/usage-snapshot';
+import type { UsageMetric } from '../../cloudflare/usage/service';
+import type { UsageSnapshot } from '../../cloudflare/usage/snapshot';
 import { createSettingsDisclosure } from './section-helpers';
 
 export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin): () => void {

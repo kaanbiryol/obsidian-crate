@@ -112,7 +112,7 @@ async function loadPluginIntegrationModule() {
 			constructor(public readonly plugin: unknown, public readonly reminderIndex: unknown) {}
 		},
 	}));
-	vi.doMock('./ui/adapters/reminders-view', () => ({
+	vi.doMock('./ui/plugin/reminders-view', () => ({
 		RemindersView: class RemindersView {
 			constructor(public readonly leaf: unknown, public readonly plugin: unknown) {}
 		},
@@ -219,7 +219,7 @@ afterEach(() => {
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
 	vi.doUnmock('./services/vaultWatcher');
-	vi.doUnmock('./ui/adapters/reminders-view');
+	vi.doUnmock('./ui/plugin/reminders-view');
 	vi.doUnmock('./utils/logger');
 });
 

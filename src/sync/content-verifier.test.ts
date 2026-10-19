@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { LocalContentVerifier, VERIFICATION_FILE_BUDGET, VERIFICATION_BYTE_BUDGET } from './content-verifier';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
-import { getLocalChanges } from './planner-local';
-import { createFullSyncPlan } from './planner-full';
-import { createHarness, toArrayBuffer } from './engine-test-harness';
-import { createDeferred } from './runtime-test-harness';
+import { getLocalChanges } from './planner/local';
+import { createFullSyncPlan } from './planner/full';
+import { createHarness, toArrayBuffer } from './engine/engine-test-harness';
+import { createDeferred } from './runtime/runtime-test-harness';
 import type { VaultFile } from './file-discovery';
 
 async function fixture(count = 1, size = 4) {

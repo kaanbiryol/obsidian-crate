@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { deletePathLocallyIfUnchanged } from './planner/helpers';
 import { computeHash } from './hasher';
 import { TFile, TFolder } from 'obsidian';
-import { createTransferHarness, emptyResult } from './transfer-test-harness';
-import { processDiff } from './transfer-process';
+import { createTransferHarness, emptyResult } from './transfer/transfer-test-harness';
+import { processDiff } from './transfer/process';
 
 	describe('recoverable local deletion', () => {
 	it.each(['note.md', 'drawing.canvas', 'image.png', '.hidden/settings.json'])('preserves an edit arriving after the hash check in local trash: %s', async path => {

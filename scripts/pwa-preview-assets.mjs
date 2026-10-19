@@ -47,7 +47,7 @@ export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 	const serviceWorkerRuntime = await bundleServiceWorkerRuntime(process.cwd());
 	const pwaBundle = await build({
 		stdin: {
-			contents: "export * from './src/cloudflare/worker/pwa'; export { CRATE_PLUGIN_PROTOCOL } from './src/protocol';",
+			contents: "export * from './src/cloudflare/worker/pwa/index'; export { CRATE_PLUGIN_PROTOCOL } from './src/protocol/server-info';",
 			resolveDir: process.cwd(),
 			sourcefile: 'crate-pwa-preview-entry.ts',
 			loader: 'ts',

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { checkServerReachability } from './server-reachability';
 
 const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v1'] };

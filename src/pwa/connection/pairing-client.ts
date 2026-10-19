@@ -1,4 +1,4 @@
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
 import { PAIRING_PATH, PairingEndedError, type PairingTransport } from '../../encryption/pairing/protocol';
 import { parseScopedEncryptionState, type ScopedEncryptionState } from '../encryption-scope';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';

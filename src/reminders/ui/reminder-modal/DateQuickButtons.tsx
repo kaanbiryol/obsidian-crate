@@ -1,6 +1,6 @@
 import { isSameDay } from 'date-fns';
 import { ToggleButton } from '../../../ui/shared/ToggleButton';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import {
 	getReminderDateForPreset,
 	REMINDER_DATE_PRESETS,

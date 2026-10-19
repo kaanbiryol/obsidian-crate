@@ -1,9 +1,9 @@
-import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './worker-upload-payload';
+import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
 import { CloudflareApiError } from './cloudflare-api-error';
 export { CloudflareApiError } from './cloudflare-api-error';
-import { verifyWorkerDeployment } from './verify-worker-deployment';
-import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
-import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
+import { verifyWorkerDeployment } from './deployment/verify-worker';
+import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
+import type { CloudflareDeploymentArtifacts } from './deployment/artifacts';
 import type { HttpRequest, HttpTransport } from './http';
 
 const API_BASE_URL = 'https://api.cloudflare.com/client/v4';

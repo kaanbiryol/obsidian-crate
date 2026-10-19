@@ -1,7 +1,7 @@
 import { ToggleButton } from '../../../ui/shared/ToggleButton';
 import React from 'react';
 import { Button } from '../../../ui/shared/Button';
-import { ThemeIcon } from '../../components/theme-icon';
+import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import type { RecurrenceRule } from '../../types';
 import { formatRecurrence } from '../../utils/rruleConverter';
 import { formatDueDate } from '../../utils/dateFormatting';

@@ -1,11 +1,11 @@
-import { readEncryptionState } from '../encryption-state';
+import { readEncryptionState } from '../encryption/state';
 import { readingCapturePath } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
 import { portablePathKey } from '@/protocol/portable-path';
-import { namespacePredicate } from '../file-namespace';
-import { FILE_PATH_MATCH, filePathArgs } from '../file-identity';
-import { stageMarkdownFile } from '../markdown-file-staging';
-import { commitStagedFile } from '../sync-mutations';
+import { namespacePredicate } from '../sync/file-namespace';
+import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { stageMarkdownFile } from '../sync/markdown-file-staging';
+import { commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
 import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';

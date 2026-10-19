@@ -5,8 +5,8 @@ import { updateReminderVisibility } from '../reminders/visibility';
  */
 
 import { Notice, Plugin } from 'obsidian';
-import type { CloudflareUsageConnection } from '../cloudflare/usage-connection';
-import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
+import type { CloudflareUsageConnection } from '../cloudflare/usage/connection';
+import { type CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
 import { type ReminderRepository } from '../reminders/data/reminder-repository';
@@ -19,7 +19,7 @@ import {
 import { type VaultWatcher } from '../reminders/services/vaultWatcher';
 import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
 import { configureLogger as configureRemindersLogger } from '../reminders/utils/logger';
-import { SyncRuntime } from '../sync/runtime';
+import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';

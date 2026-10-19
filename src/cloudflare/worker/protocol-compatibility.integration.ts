@@ -4,10 +4,10 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256HexBytes } from './auth';
+import { sha256HexBytes } from './auth/crypto';
 import { writeCommittedMarkdownFile } from './storage';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol/server-info';
 
 const token = 'protocol-compatibility-test-credential';
 beforeEach(async () => {

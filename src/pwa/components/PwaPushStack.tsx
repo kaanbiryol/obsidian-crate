@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { PWA_NAVIGATION_SPRING } from '../motion';
+import { PWA_NAVIGATION_SPRING } from '../../ui/shared/navigation/motion';
 
 /** Full pages (fixed header + scrolling body) share push/pop motion and retain root state. */
 export function PwaPushStack<Page extends string>({ page, entryId, immediate, onBackComplete, rootRef, children, rootHeader, renderHeader, renderPage, rootClassName = '', detailClassName = '' }: {

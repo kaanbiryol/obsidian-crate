@@ -17,7 +17,7 @@ import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
-import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../motion';
+import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../../ui/shared/navigation/motion';
 import { PwaSheetSurface } from './PwaSheetSurface';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));

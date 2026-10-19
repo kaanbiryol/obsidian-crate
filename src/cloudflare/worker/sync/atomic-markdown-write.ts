@@ -1,0 +1,195 @@
+import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
+import { publishedChangelogStatement, retainReplacedVersionStatement } from './file-publication-statements';
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
+import { enqueueFileProjection } from '../notifications/projection-queue';
+import type { CommitEffects } from '../commit-effects';
+import { changedRows } from '../db';
+import { portablePathKey } from '../../../protocol/portable-path';
+import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
+import { FileVersionConflictError } from '../storage';
+import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
+import {
+	collectCleanupKeys,
+	getStoredFileRow,
+} from './storage';
+
+function destinationMutation(
+	db: D1Database,
+	destination: StagedMarkdownFile,
+	source: StagedMarkdownFile,
+	encryptionState: EncryptionServerState | null,
+): D1PreparedStatement {
+	const destinationNamespace = fileNamespaceGuard(destination.path);
+	const sourceNamespace = fileNamespaceGuard(source.path);
+	const destinationLease = stagedUploadGuard(destination.objectKey);
+  const sourceLease = stagedUploadGuard(source.objectKey);
+  const encryption = encryptionWriteGuard(encryptionState);
+  let namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql} AND ${encryption.sql}`;
+	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args, ...encryption.args];
+	for (const file of [source, destination]) {
+		if (file.expectedRevision) {
+			namespaceGuard += ` AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;
+			namespaceArgs.push(...filePathArgs(file.path), file.expectedRevision);
+		}
+	}
+	if (destination.expectedHash === null) {
+		return db.prepare(`/* atomic-destination-insert */
+			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
+			SELECT ?, ?, ?, ?, datetime('now'), ?
+			WHERE NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})
+			AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
+			AND ${namespaceGuard}
+			ON CONFLICT(portable_path) DO NOTHING`)
+			.bind(
+				destination.path,
+				portablePathKey(destination.path),
+				destination.hash,
+				destination.size,
+				destination.objectKey,
+				...filePathArgs(destination.path),
+				...filePathArgs(source.path),
+				source.expectedHash,
+				...namespaceArgs,
+			);
+	}
+
+	return db.prepare(`/* atomic-destination-update */
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		WHERE ${FILE_PATH_MATCH} AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
+		AND ${namespaceGuard}`)
+		.bind(
+			portablePathKey(destination.path),
+			destination.hash,
+			destination.size,
+			destination.objectKey,
+			...filePathArgs(destination.path),
+			destination.expectedHash,
+			...filePathArgs(source.path),
+			source.expectedHash,
+			...namespaceArgs,
+		);
+}
+
+function sourceMutation(
+	db: D1Database,
+	source: StagedMarkdownFile,
+	destination: StagedMarkdownFile,
+): D1PreparedStatement {
+	return db.prepare(`/* atomic-source-update */
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		WHERE ${FILE_PATH_MATCH} AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
+		.bind(
+			portablePathKey(source.path),
+			source.hash,
+			source.size,
+			source.objectKey,
+			...filePathArgs(source.path),
+			source.expectedHash,
+			...filePathArgs(destination.path),
+			destination.objectKey,
+		);
+}
+
+export async function writeCommittedMarkdownFilePair(
+	bucket: R2Bucket,
+	db: D1Database,
+	params: {
+		source: { path: string; content: string; expectedHash: string; expectedRevision?: string };
+		effects?: CommitEffects;
+		destination: { path: string; content: string; expectedHash: string | null; expectedRevision?: string };
+	},
+): Promise<{
+	source: { hash: string; size: number };
+	destination: { hash: string; size: number };
+}> {
+	if (params.source.path === params.destination.path) {
+		throw new Error('Atomic reminder move requires two distinct files');
+	}
+	const sourceEncryption = await prepareEncryptedFileCommit(db, params.source.path, params.source.content);
+	const destinationEncryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content);
+
+	const [previousSource, previousDestination] = await Promise.all([
+		getStoredFileRow(db, params.source.path),
+		getStoredFileRow(db, params.destination.path),
+	]);
+	const stagedFiles: StagedMarkdownFile[] = [];
+	try {
+		stagedFiles.push(await stageMarkdownFile(
+			bucket,
+      db,
+			params.destination.path,
+			params.destination.content,
+			params.destination.expectedHash,
+			Boolean(destinationEncryption.state),
+		));
+		stagedFiles.push(await stageMarkdownFile(
+			bucket,
+      db,
+			params.source.path,
+			params.source.content,
+			params.source.expectedHash,
+			Boolean(sourceEncryption.state),
+		));
+	} catch (error) {
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
+		throw error;
+	}
+
+	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
+	source.expectedRevision = params.source.expectedRevision;
+	destination.expectedRevision = params.destination.expectedRevision;
+	const previousVersions = [
+		...(previousSource && collectCleanupKeys(previousSource, source.objectKey).length > 0
+			? [{ path: source.path, ...previousSource }]
+			: []),
+		...(previousDestination && collectCleanupKeys(previousDestination, destination.objectKey).length > 0
+			? [{ path: destination.path, ...previousDestination }]
+			: []),
+	];
+
+	// An exception may follow a committed transaction. Never reclaim those keys
+	// here; the orphan sweep checks references after the uncertainty window.
+	const results: unknown[] = await db.batch([
+			destinationMutation(db, destination, source, sourceEncryption.state),
+			sourceMutation(db, source, destination),
+			...recordEncryptedFile(db, source.path, source.objectKey, sourceEncryption.descriptor),
+			...recordEncryptedFile(db, destination.path, destination.objectKey, destinationEncryption.descriptor),
+			publishedChangelogStatement(db, destination),
+			publishedChangelogStatement(db, source),
+			...previousVersions.map(previous => retainReplacedVersionStatement(db, previous, [source, destination])),
+			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
+			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
+			finishStagedUpload(db, source.objectKey, source.path),
+			finishStagedUpload(db, destination.objectKey, destination.path),
+			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
+	]);
+
+	const destinationCommitted = changedRows(results[0]) === 1;
+	const sourceCommitted = changedRows(results[1]) === 1;
+	if (!destinationCommitted || !sourceCommitted) {
+		if (destinationCommitted !== sourceCommitted) {
+			throw new Error('Atomic reminder move committed only one file');
+		}
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
+		await assertFileNamespaceAvailable(db, source.path);
+		await assertFileNamespaceAvailable(db, destination.path);
+		const [currentSource, currentDestination] = await Promise.all([
+			getStoredFileRow(db, source.path),
+			getStoredFileRow(db, destination.path),
+		]);
+		if (currentSource?.hash !== source.expectedHash) {
+			throw new FileVersionConflictError(source.path, currentSource?.hash ?? null);
+		}
+		throw new FileVersionConflictError(destination.path, currentDestination?.hash ?? null);
+	}
+
+	return {
+		source: { hash: source.hash, size: source.size },
+		destination: { hash: destination.hash, size: destination.size },
+	};
+}

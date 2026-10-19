@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createHarness, runPeriodicCheck } from './engine-test-harness';
-import { recordSyncHistory } from './runtime-history';
+import { createHarness, runPeriodicCheck } from './engine/engine-test-harness';
+import { recordSyncHistory } from './runtime/history';
 import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
-import { AUTH_ERROR_MESSAGE } from './engine-constants';
+import { AUTH_ERROR_MESSAGE } from './engine/constants';
 
 const lastSync = '2026-09-23T11:54:44.763Z';
 

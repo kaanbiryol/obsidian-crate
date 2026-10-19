@@ -5,12 +5,12 @@ import type { BackupChoice } from './archive';
 const { progress, confirm, connect } = vi.hoisted(() => ({ progress: { dismiss: vi.fn(), setWorking: vi.fn(), fail: vi.fn() }, confirm: vi.fn(), connect: vi.fn() }));
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('../../ui/plugin/SharedModal', () => ({ SharedModal: class extends MockModal { bodyEl = new FakeElement('div'); openLayout() {} } }));
-vi.mock('../../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
+vi.mock('../../ui/cloudflare/deployment-modal', () => ({ openCloudflareDeploymentModal: () => progress, revealCloudflareOperation: () => false }));
 vi.mock('../../ui/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 vi.mock('../plugin-integration', () => ({ startCloudflareDeployment: connect }));
 vi.mock('../../plugin/lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
 import { openServerRestore } from './ui';
-import { CloudflareReauthorizationRequired } from '../oauth-client';
+import { CloudflareReauthorizationRequired } from '../oauth/client';
 const backup = { prefix: 'backup', hash: 'hash', manifest: { createdAt: '2026-09-01T00:00:00Z', objects: [] } } as unknown as BackupChoice;
 function harness(saved?: unknown) {
   const plugin = { app: {}, settings: { cloudflareRestore: saved }, getSettingsDocument: vi.fn(), refreshSettingsTab: vi.fn(), cloudflareUsageConnection: { withAuthorization: vi.fn() }, cloudflareDeploymentService: { isBusy: false, listRestoreBackups: vi.fn(async () => [backup]), restoreBackup: vi.fn(async () => 'https://restored.test.workers.dev') } };

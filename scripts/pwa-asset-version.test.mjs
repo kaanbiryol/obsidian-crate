@@ -22,8 +22,8 @@ test('filesystem metadata, tests and declarations change neither asset versions 
 		].join('\n'));
 		write('src/pwa/styles/reminders-view.scss', '.test { color: red; }');
 		write('src/pwa/styles/feature-switcher.scss', '.switcher { opacity: 1; }');
-		for (const path of ['src/cloudflare/provisioner.ts', 'src/cloudflare/deployment-recovery.ts',
-			'src/cloudflare/server-delete.ts', 'scripts/build-worker.mjs', 'scripts/cloudflare-artifacts-vite-plugin.mjs']) write(path, 'export {};');
+		for (const path of ['src/cloudflare/deployment/provisioner.ts', 'src/cloudflare/deployment/recovery.ts',
+			'src/cloudflare/server-reset/delete.ts', 'scripts/build-worker.mjs', 'scripts/cloudflare-artifacts-vite-plugin.mjs']) write(path, 'export {};');
 		const assets = { 'app.js': 'app' };
 		const baselineInputs = new Set();
 		const baseline = createPwaAssetVersion(assets, root, path => baselineInputs.add(path));
@@ -62,8 +62,8 @@ test('transitive service-worker runtime edits change the shell version and remai
 		write('src/pwa/service-worker/tsconfig.json', '{}');
 		write('src/pwa/service-worker/runtime.ts', "import { behavior } from './behavior'; export function initialize(scope) { scope.behavior = behavior; }");
 		write('src/pwa/service-worker/behavior.ts', 'export const behavior = "before";');
-		for (const path of ['src/cloudflare/provisioner.ts', 'src/cloudflare/deployment-recovery.ts',
-			'src/cloudflare/server-delete.ts', 'scripts/build-worker.mjs', 'scripts/cloudflare-artifacts-vite-plugin.mjs']) write(path, 'export {};');
+		for (const path of ['src/cloudflare/deployment/provisioner.ts', 'src/cloudflare/deployment/recovery.ts',
+			'src/cloudflare/server-reset/delete.ts', 'scripts/build-worker.mjs', 'scripts/cloudflare-artifacts-vite-plugin.mjs']) write(path, 'export {};');
 		const before = await bundleServiceWorkerRuntime(root);
 		const version = script => createPwaAssetVersion({ 'app.js': 'unchanged client', 'service-worker-runtime.js': script }, root);
 		const baseline = version(before.script);

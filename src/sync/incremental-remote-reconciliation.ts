@@ -1,15 +1,15 @@
 import { pendingChangeKey } from './pending-change';
 import { isAbortError } from './abort';
 import { readLocalFileEntry } from './local-file-entry';
-import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { deletePathLocallyIfUnchanged } from './planner/helpers';
 import { classifyPath } from './reconciliation';
-import type { IncrementalSyncPlannerContext } from './planner-types';
-import type { DownloadRequest } from './transfer-download';
+import type { IncrementalSyncPlannerContext } from './planner/types';
+import type { DownloadRequest } from './transfer/download';
 import { recordSyncError } from './issues';
 import type { ChangelogEntry, FileEntry } from '../protocol/sync-types';
 import type { FileDiff, SyncResult } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { isVaultTFileLike } from './planner-helpers';
+import { isVaultTFileLike } from './planner/helpers';
 import { assertLocalSyncPath } from './local-path-safety';
 
 export interface IncrementalRemoteReconciliation {

@@ -4,7 +4,7 @@ import { buildReminderUpdate } from '@/reminders/core/reminderMutationPlan';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
 import { parseStoredReminderDate, reminderHasTime } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
-import { writeCommittedMarkdownFilePair } from '../../atomic-markdown-write';
+import { writeCommittedMarkdownFilePair } from '../../sync/atomic-markdown-write';
 import { corsResponse } from '../../cors';
 import {
 	readCommittedMarkdownFileVersion,

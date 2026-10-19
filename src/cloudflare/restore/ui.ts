@@ -2,11 +2,11 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { SharedModal } from '../../ui/plugin/SharedModal';
 import { openConfirmationModal } from '../../ui/confirmation-modal';
-import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../../ui/cloudflare-deployment-modal';
+import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../../ui/cloudflare/deployment-modal';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { startCloudflareDeployment } from '../plugin-integration';
 import type { BackupChoice } from './archive';
-import { CloudflareReauthorizationRequired } from '../oauth-client';
+import { CloudflareReauthorizationRequired } from '../oauth/client';
 
 const renewLoginMessage = 'Your Cloudflare login needs renewing. Select Reconnect under Account and devices, then resume the restore.';
 

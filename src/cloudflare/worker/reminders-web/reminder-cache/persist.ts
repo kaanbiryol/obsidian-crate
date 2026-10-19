@@ -1,4 +1,4 @@
-import { FILE_PATH_MATCH, filePathArgs } from '../../file-identity';
+import { FILE_PATH_MATCH, filePathArgs } from '../../sync/file-identity';
 import { portablePathKey } from '../../../../protocol/portable-path';
 import type { RemoteReminderRecord } from '../types';
 import { changedRows } from '../../db';

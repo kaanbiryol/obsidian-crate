@@ -1,5 +1,5 @@
 import type { Plugin } from 'obsidian';
-import type { SyncRuntime } from '../sync/runtime';
+import type { SyncRuntime } from '../sync/runtime/runtime';
 import { StatusBarManager } from '../ui/status';
 
 type StatusRuntime = Pick<SyncRuntime, 'isInitialized' | 'getState' | 'getActivityProgress'

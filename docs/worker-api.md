@@ -416,7 +416,7 @@ When a client's `since` cursor points to pruned entries, the `cursorExpired` fla
 
 ## Bindings Table
 
-See `docs/architecture.md` for the full bindings table. When adding new bindings, update the Worker upload metadata in `src/cloudflare/cloudflare-api.ts` and the deployment flow in `src/cloudflare/provisioner.ts`.
+See `docs/architecture.md` for the full bindings table. When adding new bindings, update the Worker upload metadata in `src/cloudflare/cloudflare-api.ts` and the deployment flow in `src/cloudflare/deployment/provisioner.ts`.
 
 ### Retained file history pagination
 

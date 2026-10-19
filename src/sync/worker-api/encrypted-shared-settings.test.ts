@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
-import { EncryptedFiles } from '../encrypted-files';
+import { EncryptedFiles } from '../encryption/encrypted-files';
 import type { WorkerApiHttpClient } from './http';
 import { SharedSettingsWorkerApi } from './shared-settings';
 

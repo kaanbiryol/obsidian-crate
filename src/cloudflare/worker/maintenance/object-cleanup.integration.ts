@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
-import { runScheduledMaintenance } from '../maintenance';
+import { runScheduledMaintenance } from './run';
 import { runMaintenanceEpisode } from './lifecycle';
 
 beforeEach(async () => {

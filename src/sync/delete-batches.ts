@@ -4,7 +4,7 @@ import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
 import type { MutationFailure } from '../protocol/sync-types';
 import { LocalFilePresentError } from './local-absence';
-import { BATCH_DELETE_CONCURRENCY } from './engine-constants';
+import { BATCH_DELETE_CONCURRENCY } from './engine/constants';
 
 export interface ConditionalDeleteCandidate {
 	path: string;

@@ -1,3 +1,4 @@
+import { sha256Hex } from '../platform/sha256';
 /** Shared with the legacy server contract, for recovering accepted edits whose
  * response was lost before encryption was enabled. */
 function canonical(value: unknown): unknown {
@@ -7,5 +8,5 @@ function canonical(value: unknown): unknown {
 }
 export async function reminderRequestHash(action: string, body: Record<string, unknown>): Promise<string> {
 	const bytes = new TextEncoder().encode(JSON.stringify(canonical({ action, body })));
-	return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('');
+	return sha256Hex(bytes);
 }

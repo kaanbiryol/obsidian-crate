@@ -10,7 +10,7 @@ const { outputFiles } = await build({
 		import { createRoot } from 'react-dom/client';
 		import { PwaSyncStatusIndicator } from './src/pwa/components/PwaSyncStatusIndicator';
 		import { reminderSyncStatus } from './src/pwa/sync/reminder-status';
-		import { ViewHeader } from './src/reminders/components/ViewHeader';
+		import { ViewHeader } from './src/ui/shared/ViewHeader';
 		import { ProjectDetailHeader } from './src/reminders/ui/views/ProjectDetailHeader';
 		function Harness() {
 			const [props, setProps] = React.useState({});

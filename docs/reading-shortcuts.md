@@ -12,7 +12,7 @@ support, and issue links. The native builders, Worker metadata, save page, PWA
 setup, and contract documentation use this source.
 
 The capture contract is version 1; the template is revision 1. The app wire
-protocol in `src/protocol.ts`, server revision in `server-release.json`, and D1
+protocol in `src/protocol/server-info.ts`, server revision in `server-release.json`, and D1
 schema are separate numbers. Do not change the capture contract or native
 headers merely because one of those numbers changes.
 

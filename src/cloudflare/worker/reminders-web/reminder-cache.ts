@@ -14,7 +14,7 @@ import {
 import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './reminder-cache/warm';
 import { getProjectFromPath } from './scan';
 import type { RemoteReminderRecord } from './types';
-import { ReminderIdentityConflictError } from '../reminder-source-identity';
+import { ReminderIdentityConflictError } from '../reminders/source-identity';
 
 export { REMINDER_CACHE_PARSER_VERSION, saveReminderFileCache };
 

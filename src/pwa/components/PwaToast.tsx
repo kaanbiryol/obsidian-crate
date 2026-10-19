@@ -1,4 +1,4 @@
-import { PWA_FADE } from '../motion';
+import { PWA_FADE } from '../../ui/shared/navigation/motion';
 import { SyncIndicator } from '@/ui/shared/SyncIndicator';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ToastState } from '../types';

@@ -1,6 +1,6 @@
 import type { ConnectionTestResult } from '../types';
 import { computeHash } from '../hasher';
-import type { EncryptedFiles, UploadPreconditions } from '../encrypted-files';
+import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
 import type { JournalUpload } from '../upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
@@ -32,7 +32,7 @@ import type {
 import {
 	isCompatibleCrateServer,
 	type CrateServerInfo,
-} from '../../protocol';
+} from '../../protocol/server-info';
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';

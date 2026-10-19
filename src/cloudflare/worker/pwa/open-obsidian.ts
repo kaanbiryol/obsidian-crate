@@ -1,5 +1,5 @@
 import statusStyles from '../../../../site/assets/status.css?raw-css';
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from './version';
 
 export const OPEN_OBSIDIAN_JS = `(()=>{
 var params = new URLSearchParams(location.search);

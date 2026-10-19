@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Platform } from 'obsidian';
 import { readLocalFileEntry } from './local-file-entry';
-import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { deletePathLocallyIfUnchanged } from './planner/helpers';
 import { PersistentTestVault } from '@/test/factories/sync-vault';
 
 const previous = Platform.isWin;

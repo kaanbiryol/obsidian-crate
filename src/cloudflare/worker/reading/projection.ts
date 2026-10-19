@@ -1,10 +1,10 @@
-import { readEncryptionState } from '../encryption-state';
-import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from '../file-identity';
+import { readEncryptionState } from '../encryption/state';
+import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from '../sync/file-identity';
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
 import { ReadingError, readSource, type ReadingPolicy } from './common';
-import { sha256Hex } from '../auth';
+import { sha256Hex } from '../auth/crypto';
 import type { Env } from '../types';
 import { vaultChangeToken } from '../vault-change-token';
 

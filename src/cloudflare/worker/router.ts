@@ -16,11 +16,11 @@ import { mutationAuditContext } from './request-diagnostics';
 import { handleLinkTitle } from './link-title';
 import { apiRoutePolicy } from './routes/policy';
 import { handleEncryptionRoute } from './routes/encryption';
-import { handleEncryptedReminders } from './encrypted-reminders';
-import { handleEncryptionReset } from './encryption-reset';
-import { handleEncryptionConversion } from './encryption-conversion';
+import { handleEncryptedReminders } from './reminders/encrypted-reminders';
+import { handleEncryptionReset } from './encryption/reset';
+import { handleEncryptionConversion } from './encryption/conversion';
 import type { EncryptionServerState } from '../../encryption/server-state';
-import type { UploadCommitters } from './upload-committers';
+import type { UploadCommitters } from './sync/upload-committers';
 
 
 export { handlePublicRoute };

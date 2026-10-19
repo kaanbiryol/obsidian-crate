@@ -1,0 +1,97 @@
+import { corsResponse } from '../cors';
+import { sha256Hex } from './crypto';
+import { parseOptionalString } from '../utils';
+import { CRATE_WEB_SESSION_NAME_HEADER } from '../../../protocol/web-session';
+import { validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
+import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
+import { FEATURE_POLICY_KEY } from '../feature-policy';
+
+type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
+
+export interface AuthPrincipal {
+	tokenId: string;
+	scope: AuthScope;
+	folderPath?: string;
+ readingGeneration?: string;
+	expiresAt?: number;
+}
+
+export type AuthenticationResult =
+	| { principal: AuthPrincipal; resetGeneration: string | null; encryption?: EncryptionServerState | null; featurePolicyValue?: string | null; response?: never }
+	| { principal?: never; response: Response };
+
+function readWebSessionName(request: Request): string | null {
+	const encoded = parseOptionalString(request.headers.get(CRATE_WEB_SESSION_NAME_HEADER), 384);
+	if (!encoded) return null;
+	try {
+		return parseOptionalString(decodeURIComponent(encoded), 128);
+	} catch {
+		return null;
+	}
+}
+
+export async function authenticateWorkerRequest(
+	request: Request,
+	db: D1Database,
+): Promise<AuthenticationResult> {
+	const authHeader = request.headers.get('Authorization');
+	if (!authHeader || !authHeader.startsWith('Bearer ')) {
+		return { response: corsResponse({ error: 'Unauthorized' }, 401) };
+	}
+
+	const token = authHeader.substring(7).trim();
+	if (!token) {
+		return { response: corsResponse({ error: 'Unauthorized' }, 401) };
+	}
+
+	try {
+		const tokenHash = await sha256Hex(token);
+		const row = await db.prepare(`SELECT id, scope, folder_path, reading_generation, expires_at, device_name,
+			(last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours')) AS last_seen_stale,
+			(SELECT value FROM maintenance_state WHERE key = 'e2ee:state') AS encryption_state,
+			(SELECT value FROM maintenance_state WHERE key = '${FEATURE_POLICY_KEY}') AS feature_policy,
+			(SELECT value FROM maintenance_state WHERE key = '${SYNC_RESET_GENERATION_KEY}') AS reset_generation FROM auth_tokens
+			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
+			.bind(tokenHash, Date.now())
+			.first<{ id: string; scope?: string | null; folder_path?: string | null; reading_generation?: string | null; expires_at?: number | null; device_name?: string | null; last_seen_stale?: number | null; encryption_state?: string | null; feature_policy?: string | null; reset_generation?: string | null }>();
+		if (!row?.id) {
+			return { response: corsResponse({ error: 'Invalid token' }, 401) };
+		}
+		if (row.scope !== 'vault' && row.scope !== 'reminders' && row.scope !== 'reading' && row.scope !== 'reading_capture') {
+			return { response: corsResponse({ error: 'Invalid token' }, 401) };
+		}
+
+		if (row.scope === 'reminders' && !row.folder_path) return { response: corsResponse({ error: 'Open a fresh Crate web app link to renew this session' }, 401) };
+		// Refresh only this authenticated web session's display name. Older
+		// clients omit the header, and vault-device names stay user-controlled.
+		const sessionName = row.scope === 'reminders'
+			? readWebSessionName(request)
+			: null;
+		// The SELECT already says whether this write would change anything.
+		if (row.last_seen_stale || (sessionName !== null && row.device_name !== sessionName)) {
+			await db.prepare(`UPDATE auth_tokens
+				SET device_name = COALESCE(?, device_name), last_seen_at = datetime('now')
+				WHERE id = ? AND ((? IS NOT NULL AND (device_name IS NULL OR device_name != ?))
+					OR last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
+				.bind(sessionName, row.id, sessionName, sessionName)
+				.run();
+		}
+		const encryption: unknown = row.encryption_state ? JSON.parse(row.encryption_state) as unknown : null;
+		if (encryption) validateEncryptionState(encryption);
+		return {
+			resetGeneration: row.reset_generation ?? null,
+			featurePolicyValue: row.feature_policy ?? null,
+			...(encryption ? { encryption: encryption as EncryptionServerState } : {}),
+			principal: {
+				tokenId: row.id,
+ ...(row.reading_generation ? { readingGeneration: row.reading_generation } : {}),
+				...(row.expires_at ? { expiresAt: row.expires_at } : {}),
+				scope: row.scope,
+				...(row.folder_path ? { folderPath: row.folder_path } : {}),
+			},
+		};
+	} catch (error) {
+		console.error('Worker authentication database unavailable', error);
+		return { response: corsResponse({ error: 'Authentication service unavailable' }, 503) };
+	}
+}

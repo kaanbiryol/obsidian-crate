@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 
 /** Resize around live metadata without scaling text or delaying parsed values. */
 export function AnimatedActionLabel({ children }: { children: string }) {
@@ -9,7 +9,7 @@ export function AnimatedActionLabel({ children }: { children: string }) {
     const widthAnimationRef = useRef<Animation | null>(null);
     const textAnimationRef = useRef<Animation | null>(null);
     const previousWidthRef = useRef<number | null>(null);
-    const reducedMotion = useObsidianReducedMotion();
+    const reducedMotion = useReducedMotion();
 
     useLayoutEffect(() => {
         const container = containerRef.current;

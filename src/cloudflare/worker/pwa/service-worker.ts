@@ -1,6 +1,6 @@
 import type { ServiceWorkerConfig } from '../../../pwa/service-worker/config';
-import { PWA_ASSET_VERSION } from '../pwa-version';
-import { PWA_CLIENT_ASSETS, PWA_ON_DEMAND_ASSETS } from '../pwa-client-bundle';
+import { PWA_ASSET_VERSION } from './version';
+import { PWA_CLIENT_ASSETS, PWA_ON_DEMAND_ASSETS } from './client-bundle';
 
 declare const __CRATE_SERVICE_WORKER_JS__: string | undefined;
 const runtime = typeof __CRATE_SERVICE_WORKER_JS__ === 'string' ? __CRATE_SERVICE_WORKER_JS__

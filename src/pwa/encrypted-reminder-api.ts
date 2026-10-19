@@ -17,26 +17,12 @@ import type { StoredReminderKeys } from './encryption-keys';
 import type { ApiFetch, ReminderSourceIssue } from './types';
 import { routeFolderPath } from './encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
+import { mapBounded } from '@/platform/map-bounded';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
 interface ScannedNote { file: RemoteFile; reminders: ReminderPayload[]; issue?: string }
-
-/** Results keep input order; at most `limit` notes download and decrypt at once.
- * After a failure, no further notes start. */
-async function mapBounded<T, R>(values: readonly T[], limit: number, map: (value: T) => Promise<R>): Promise<R[]> {
-	const results = new Array<R>(values.length);
-	let next = 0, failed = false;
-	const worker = async () => {
-		while (!failed && next < values.length) {
-			const index = next++;
-			try { results[index] = await map(values[index]!); } catch (error) { failed = true; throw error; }
-		}
-	};
-	await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
-	return results;
-}
 
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {

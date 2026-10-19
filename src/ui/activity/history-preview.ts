@@ -1,4 +1,4 @@
-import type { HistoryRestorePreview } from '../../sync/history-restore-preview';
+import type { HistoryRestorePreview } from '../../sync/history/restore-preview';
 import { buildDiff } from './diff-model';
 import { renderDiffLines } from './diff-renderer';
 import { renderFileText } from './history-text';

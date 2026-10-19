@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
-import { isCloudflareServerUpdateAvailable } from './deployment-update';
-import { EMBEDDED_CLOUDFLARE_ARTIFACT } from './embedded-artifacts';
+import { isCloudflareServerUpdateAvailable } from './deployment/update';
+import { EMBEDDED_CLOUDFLARE_ARTIFACT } from './deployment/embedded-artifacts';
 import release from './server-release.json';
 
 export function showCloudflareServerUpdateNotice(plugin: CratePlugin): void {

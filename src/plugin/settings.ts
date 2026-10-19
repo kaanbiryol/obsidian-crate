@@ -1,6 +1,6 @@
 import { isRecord } from '../platform/validation';
 import { validRestoreState } from '../cloudflare/restore/state';
-import { normalizeCloudflareDeployment } from '../cloudflare/deployment-state';
+import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { normalizeReadingSettings } from '../reading/settings';
 import { normalizeSyncTimings } from '../sync/timings';
 import { normalizeSyncIssues } from '../sync/issues';
@@ -8,7 +8,7 @@ import { normalizeSyncIssues } from '../sync/issues';
  * Settings helpers for Crate.
  */
 
-import { normalizeUsageSnapshot } from '../cloudflare/usage-snapshot';
+import { normalizeUsageSnapshot } from '../cloudflare/usage/snapshot';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import { normalizeRequestDiagnostics } from '../sync/request-diagnostics';
 import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHarness, toArrayBuffer } from './engine-test-harness';
+import { createHarness, toArrayBuffer } from './engine/engine-test-harness';
 
 const configDir = '.vault-config';
 const pluginsDir = `${configDir}/plugins`;

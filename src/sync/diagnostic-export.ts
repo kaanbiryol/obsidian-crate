@@ -1,6 +1,6 @@
 import serverRelease from '../cloudflare/server-release.json';
-import type { CrateServerInfo } from '../protocol';
-import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import type { CrateServerInfo } from '../protocol/server-info';
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { normalizeSyncTimings } from './timings';
 import { MAX_SYNC_HISTORY, type CrateSettings } from '../plugin/settings-types';
 import type { SyncState } from './types';

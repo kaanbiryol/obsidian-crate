@@ -1,7 +1,7 @@
 import type { Vault } from 'obsidian';
-import { getIncomingConflictFileName } from './conflict';
+import { getIncomingConflictFileName } from './conflict/conflict';
 import { computeHash } from './hasher';
-import type { RecordConflictInput } from './conflict-store';
+import type { RecordConflictInput } from './conflict/store';
 
 export class IncomingFileReviewError extends Error {}
 

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { ShadowDOMNativeMotionButton } from './ShadowDOMNativeMotionButton';
-import { ThemeIcon } from './theme-icon';
-import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { ThemeIcon } from '../../ui/shared/ThemeIcon';
+import { useReducedMotion } from '../../ui/shared/useReducedMotion';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
@@ -28,7 +28,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
   'aria-label': ariaLabel = 'Add reminder',
   'data-action': dataAction,
 }: FloatingActionButtonProps) {
-  const prefersReducedMotion = useObsidianReducedMotion();
+  const prefersReducedMotion = useReducedMotion();
 
   return (
     <ShadowDOMNativeMotionButton

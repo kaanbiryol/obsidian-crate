@@ -1,5 +1,5 @@
-import type { AuthPrincipal } from '../authenticate';
-import { sha256Hex } from '../auth';
+import type { AuthPrincipal } from '../auth/authenticate';
+import { sha256Hex } from '../auth/crypto';
 import { changedRows } from '../db';
 import { limitNotificationAction } from '../rate-limit';
 import { ReadingError, readingResponse, type ReadingPolicy } from './common';

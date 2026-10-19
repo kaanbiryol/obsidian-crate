@@ -1,4 +1,4 @@
-import { parseCrateServerInfo } from '../protocol';
+import { parseCrateServerInfo } from '../protocol/server-info';
 
 export const SERVER_CHECK_TIMEOUT_MS = 6_000;
 

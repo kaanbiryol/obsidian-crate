@@ -10,7 +10,7 @@ A full Markdown source scan runs once per parser version, with a durable cursor 
 
 ## Regression measurement
 
-`notification-quota.integration.ts` measures `meta.rows_read` in the local Cloudflare D1 runtime with 2,000 and 10,000 queued files. At 2,000 files, the old job-selection and queue-count queries read 8,001 rows per pass; their replacements read 6. Both queue sizes must remain at or below 10 reads per pass, including queues containing only failures that are not due yet.
+`notifications/quota.integration.ts` measures `meta.rows_read` in the local Cloudflare D1 runtime with 2,000 and 10,000 queued files. At 2,000 files, the old job-selection and queue-count queries read 8,001 rows per pass; their replacements read 6. Both queue sizes must remain at or below 10 reads per pass, including queues containing only failures that are not due yet.
 
 For 1,200 equivalent passes, 6 reads per pass projects to 7,200 reads for these two operations. This is not a total notification-processing estimate: file parsing, source verification, alarm updates, sync, and maintenance have their own reads. Production analytics should be checked after deployment.
 

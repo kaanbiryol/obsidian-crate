@@ -9,7 +9,7 @@ const worker = 'crate-0123456789abcdef';
 
 async function setup(options: { revision?: number; development?: DevelopmentBuild; live?: Version | Promise<Version>; cached?: Version } = {}) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../cloudflare/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: 'a'.repeat(64), development: options.development } }));
+	vi.doMock('../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: 'a'.repeat(64), development: options.development } }));
 	const deployment = { workerName: worker, workersSubdomain: 'example', lastKnownRevision: options.revision };
 	const plugin = {
 		settings: { cloudflareDeployment: deployment, workerUrl: `https://${worker}.example.workers.dev` },
@@ -31,7 +31,7 @@ afterEach(() => {
 	resetObsidianUiMocks();
 	vi.resetModules();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../../cloudflare/embedded-artifacts');
+	vi.doUnmock('../../cloudflare/deployment/embedded-artifacts');
 });
 
 it('shows a known newer revision without requesting remote metadata', async () => {

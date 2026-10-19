@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeVaultName, readVaultName, vaultChoiceLabel } from './vault-name';
-import type { CloudflareDeploymentMetadata } from './deployment-types';
+import type { CloudflareDeploymentMetadata } from './deployment/types';
 
 const choice = (id: string, vaultName?: string) => ({ deploymentId: id, vaultName }) as CloudflareDeploymentMetadata;
 

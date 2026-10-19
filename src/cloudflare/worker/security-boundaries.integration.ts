@@ -1,12 +1,12 @@
-import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
 import worker from './index';
-import { sha256Hex } from './auth';
-import { handleSubscribe, handleUnsubscribe } from './notification-subscription-handlers';
+import { sha256Hex } from './auth/crypto';
+import { handleSubscribe, handleUnsubscribe } from './notifications/subscription-handlers';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
 import { makeApiFetch } from '@/pwa/api';

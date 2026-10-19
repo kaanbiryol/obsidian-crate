@@ -8,17 +8,17 @@ import { saveEncryptionKeys } from './encryption-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../reminders/settings';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
-import { SyncRuntime } from '../sync/runtime';
+import { SyncRuntime } from '../sync/runtime/runtime';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
-import { convertEncryptedVault } from '../sync/encryption-conversion';
+import { convertEncryptedVault } from '../sync/encryption/conversion';
 import { startReading } from '../reading/runtime';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
 vi.mock('../reminders/ui/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
-vi.mock('../sync/encryption-rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
-vi.mock('../sync/encryption-conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
+vi.mock('../sync/encryption/rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
+vi.mock('../sync/encryption/conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));
 
 beforeEach(() => {
   vi.clearAllMocks();

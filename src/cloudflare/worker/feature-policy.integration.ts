@@ -12,13 +12,13 @@ import { policy } from './reading/common';
 import { publishExtraction, type Publication } from './reading/extraction/jobs';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
-import { handleNotificationPolicy } from './notification-policy';
-import { drainNotificationProjections } from './notification-projection';
+import { handleNotificationPolicy } from './notifications/policy';
+import { drainNotificationProjections } from './notifications/projection';
 import { ReminderAlarm } from './notifications/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
-import { authenticateWorkerRequest } from './authenticate';
-import { sha256Hex } from './auth';
+import { authenticateWorkerRequest } from './auth/authenticate';
+import { sha256Hex } from './auth/crypto';
 vi.mock('./notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
   await env.DB.batch(schema.split(';').map(s => s.trim()).filter(Boolean).map(s => env.DB.prepare(s)));

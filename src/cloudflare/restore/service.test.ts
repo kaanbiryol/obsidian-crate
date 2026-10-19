@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CloudflareDeploymentService } from '../deployment-service';
+import { CloudflareDeploymentService } from '../deployment/service';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings';
-import type { CloudflareOAuthTokens } from '../oauth-client';
+import type { CloudflareOAuthTokens } from '../oauth/client';
 import { listUpgradeBackups, restoreUpgradeBackup } from './server-restore';
 import type { BackupChoice } from './archive';
 import type { HttpTransport } from '../http';
