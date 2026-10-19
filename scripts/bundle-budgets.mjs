@@ -20,8 +20,9 @@ export const bundleBudgets = {
 		// Shared inventory/submission guards measure 5.607 MB raw / 2.821 MB gzip,
 		// adding 0.42 KB gzip to the preceding build. Retain about 4.5 KB gzip margin.
 		// The 2026-10 performance pass measures 5.632 MB raw / 2.831 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5650000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2840000', 10),
+		// Quantized PWA icons bring it to 5.292 MB raw / 2.587 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '5310000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '2600000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -47,8 +48,9 @@ export const bundleBudgets = {
 		// Inventory validation and cleanup reporting measure 5.402 MB raw,
 		// adding 1.22 KB to the preceding build. Retain about 8.5 KB raw margin.
 		// The 2026-10 performance pass measures 5.417 MB raw / 1.849 MB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5430000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1860000', 10),
+		// Quantized PWA icons bring it to 5.105 MB raw / 1.614 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '5120000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '1625000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
