@@ -26,8 +26,8 @@ async function readGeneratedPwaClient() {
 export async function buildPwaPreviewAssets({ assetVersion } = {}) {
 	let pwaClient;
 	if (assetVersion) {
-		// Build distinct, content-hashed app versions for real update tests.
-		pwaClient = { ...await bundlePwaClient(assetVersion, process.cwd()), version: assetVersion };
+		// Serve the app under a distinct asset version for real update tests.
+		pwaClient = { ...await bundlePwaClient(process.cwd()), version: assetVersion };
 	} else {
 		if (process.env.CRATE_PWA_PREBUILT !== '1') {
 			const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {

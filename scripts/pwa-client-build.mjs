@@ -3,7 +3,9 @@ import { basename, resolve } from 'node:path';
 import { getPwaClientAssets, getPwaOnDemandAssets, getPwaStartupAssets } from './pwa-startup-assets.mjs';
 import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
-export async function bundlePwaClient(assetVersion, root) {
+// The asset version is read from the shell at runtime, so client output is
+// independent of it and unchanged chunks keep their hashes across deploys.
+export async function bundlePwaClient(root) {
 	const result = await build({
 		absWorkingDir: root,
 		// A second build entry gives the editor a stable chunk boundary. App still
@@ -26,7 +28,6 @@ export async function bundlePwaClient(assetVersion, root) {
 		minify: true,
 		define: {
 			'process.env.NODE_ENV': JSON.stringify('production'),
-			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(assetVersion),
 		},
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import', 'production'],

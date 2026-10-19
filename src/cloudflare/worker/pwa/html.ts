@@ -1,6 +1,6 @@
 import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_STATUS_BAR_INIT_JS } from './status-bar-bootstrap';
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_META } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
@@ -25,6 +25,7 @@ export function createPwaHtml(requestUrl?: string, nonce: string = crypto.random
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="${PWA_ASSET_VERSION_META}" content="${PWA_ASSET_VERSION}">
 <!-- The root already paints the system palette before head metadata is parsed.
      Resolve the saved override before native launcher metadata and app startup. -->
 <style>

@@ -20,7 +20,6 @@ const development = process.argv.includes('--development') ? createDevelopmentBu
 // Keeping it stable prevents an otherwise unrelated plugin version bump from
 // changing the Worker bundle and prompting users to redeploy their server.
 const serverVersion = 'crate';
-const PWA_VERSION_PLACEHOLDER = 'crate-pwa-version-placeholder';
 const rawInputs = new Set();
 
 function writeGeneratedJson(fileName, payload) {
@@ -70,9 +69,8 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 }
 
 async function buildPwaClientBundle(serviceWorkerRuntime) {
-	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER, root);
-	const version = createPwaAssetVersion({ ...versionTemplate.assets, 'service-worker-runtime.js': serviceWorkerRuntime }, root, path => rawInputs.add(path));
-	const { assets, startupAssets, onDemandAssets, metafile } = await bundlePwaClient(version, root);
+	const { assets, startupAssets, onDemandAssets, metafile } = await bundlePwaClient(root);
+	const version = createPwaAssetVersion({ ...assets, 'service-worker-runtime.js': serviceWorkerRuntime }, root, path => rawInputs.add(path));
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
 	writeGeneratedJson('pwa-client.json', {

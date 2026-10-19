@@ -9,6 +9,8 @@ function listFiles(directory) {
 		// Finder/Explorer metadata is not an app asset or a server build input.
 		if (entry.name === '.DS_Store' || entry.name.startsWith('._')
 			|| entry.name === 'Thumbs.db' || entry.name === 'desktop.ini') return [];
+		// Tests and type declarations never reach a served asset.
+		if (/\.test\.[cm]?[jt]sx?$|\.d\.ts$/.test(entry.name)) return [];
 		const path = resolve(directory, entry.name);
 		return entry.isDirectory() ? listFiles(path) : [path];
 	});

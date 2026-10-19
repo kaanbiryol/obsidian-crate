@@ -7,7 +7,7 @@ import { createPwaAssetVersion } from './pwa-asset-version.mjs';
 import { collectServerInputs } from './server-build-inputs.mjs';
 import { bundleServiceWorkerRuntime } from './service-worker-build.mjs';
 
-test('filesystem metadata changes neither asset versions nor collected server inputs', async () => {
+test('filesystem metadata, tests and declarations change neither asset versions nor collected server inputs', async () => {
 	const root = mkdtempSync(join(tmpdir(), 'crate-asset-version-'));
 	const write = (path, text) => {
 		mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -27,7 +27,8 @@ test('filesystem metadata changes neither asset versions nor collected server in
 		const assets = { 'app.js': 'app' };
 		const baselineInputs = new Set();
 		const baseline = createPwaAssetVersion(assets, root, path => baselineInputs.add(path));
-		for (const file of ['.DS_Store', 'nested/.DS_Store', '._page.ts', 'nested/Thumbs.db', 'nested/desktop.ini']) {
+		for (const file of ['.DS_Store', 'nested/.DS_Store', '._page.ts', 'nested/Thumbs.db', 'nested/desktop.ini',
+			'page.test.ts', 'nested/assets.d.ts']) {
 			write(`src/cloudflare/worker/pwa/${file}`, 'machine-specific metadata');
 		}
 		const actualInputs = new Set();
