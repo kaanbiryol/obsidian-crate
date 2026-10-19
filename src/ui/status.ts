@@ -50,9 +50,10 @@ export class StatusBarManager {
 		if (this.onClick) {
 			this.statusBarEl.setAttribute('role', 'button');
 			this.statusBarEl.tabIndex = 0;
-			this.plugin.registerDomEvent(this.statusBarEl, 'click', this.activate);
-			this.plugin.registerDomEvent(this.statusBarEl, 'mousedown', this.onMouseDown);
-			this.plugin.registerDomEvent(this.statusBarEl, 'keydown', this.onKeyDown);
+			// destroy() removes these; registerDomEvent would keep each detached item until unload.
+			this.statusBarEl.addEventListener('click', this.activate);
+			this.statusBarEl.addEventListener('mousedown', this.onMouseDown);
+			this.statusBarEl.addEventListener('keydown', this.onKeyDown);
 		}
 		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
