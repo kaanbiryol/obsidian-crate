@@ -315,8 +315,10 @@ temporary checkpoint. A mutation revision ensures edits made during a save are
 included in a follow-up checkpoint before that save finishes.
 
 **Change log:** after a full checkpoint, saves append one JSON line to
-`file-manifest.log` with only the changed or removed entries and the small recovery
-state, so a queue flush in a large vault no longer rewrites the whole baseline. The
+`file-manifest.log` with only the changed or removed entries and the recovery state
+fields (renames, upload receipts, diagnostics, restore intents) that changed since the
+previous record, with `null` clearing a field. A queue flush in a large vault rewrites
+neither the whole baseline nor unchanged recovery state. The
 log's header names the base checkpoint generation; loading applies its consecutive
 records only when that base is the selected main checkpoint, so a log left behind by
 an interrupted compaction is ignored. An interrupted append can only tear the final

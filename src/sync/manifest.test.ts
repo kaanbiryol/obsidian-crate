@@ -364,6 +364,48 @@ describe('LocalManifest', () => {
 			expect(restored.getEntry('notes/new.md')?.hash).toBe('c'.repeat(64));
 		});
 
+		it('writes recovery state only when it changes', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			for (let index = 0; index < 2000; index++) manifest.setEntry(`notes/${index}.md`, entry('a'));
+			await manifest.save();
+			manifest.recordRename('notes', 'archive', 'folder');
+			await manifest.save();
+			for (const hash of ['b', 'c', 'd']) {
+				manifest.setEntry('other.md', entry(hash));
+				await manifest.save();
+			}
+			const records = disk.get(log)!.trim().split('\n').slice(1);
+			// The rename record carries 2,000 dependencies; later file changes do not repeat them.
+			expect(records[0]!.length).toBeGreaterThan(50_000);
+			expect(records.slice(1).map(record => record.length).every(length => length < 300)).toBe(true);
+			expect(Object.keys((await reload()).getRenameDependencies())).toHaveLength(2000);
+		});
+
+		it('replays a cleared recovery field', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			await manifest.save();
+			manifest.recordRename('a.md', 'b.md', 'file');
+			await manifest.save();
+			manifest.removeEntry('a.md');
+			await manifest.save();
+			expect(disk.get(log)!.trim().split('\n').at(-1)).toContain('"changes":{"renameDependencies":null}');
+			expect((await reload()).getRenameDependencies()).toEqual({});
+		});
+
+		it('replays records that carry the full recovery state', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			manifest.setEntry('a.md', entry('a'));
+			manifest.recordRename('a.md', 'b.md', 'file');
+			await manifest.save();
+			// An omitted field in a full `state` record means empty, clearing the rename.
+			disk.set(log, `{"version":1,"base":1}\n{"generation":2,"set":{},"deleted":[],"state":{}}\n`);
+			expect((await reload()).getRenameDependencies()).toEqual({});
+		});
+
 		it('drops a torn final record and compacts before appending again', async () => {
 			const disk = new Map<string, string>();
 			diskAdapter(disk);

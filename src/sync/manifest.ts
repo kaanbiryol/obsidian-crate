@@ -1,5 +1,5 @@
 import { encodeCheckpoint, parseCheckpoint, parseLocalManifest, sameCheckpointRecoveryState } from './manifest-checkpoint';
-import { encodeLogHeader, encodeLogRecord, replayManifestLog } from './manifest-log';
+import { encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
 import { UploadJournal } from './upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from './restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
@@ -45,6 +45,8 @@ export class LocalManifest {
 	/** The log on disk extends the current base checkpoint; otherwise the next save compacts. */
 	private logActive = false;
 	private logBytes = 0;
+	/** Recovery state as of the checkpoint plus log on disk; records write only differences. */
+	private persistedState?: EncodedLogState;
 	private manifest: FileManifest;
 	private dirty: boolean;
 	private revision = 0;
@@ -126,6 +128,7 @@ export class LocalManifest {
 			this.renameDependencies = selected.renames;
 			this.indexRenameTargets();
 			this.appliedRename = selected.appliedRename;
+			this.persistedState = encodeLogState(selected);
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
 			this.generation = selected.generation;
@@ -206,7 +209,8 @@ export class LocalManifest {
 			if (entry) set[path] = entry;
 			else deleted.push(path);
 		}
-		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state: this.recoveryState() });
+		const state = encodeLogState(this.recoveryState());
+		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state, previous: this.persistedState });
 		if (this.logBytes + record.length > MAX_LOG_BYTES) return false;
 		// The first record after a compaction replaces any older log with its header.
 		if (this.logBytes === 0) {
@@ -216,6 +220,7 @@ export class LocalManifest {
 		} else await this.app.vault.adapter.append(this.logPath, record);
 		this.generation++;
 		this.logBytes += record.length;
+		this.persistedState = state;
 		return true;
 	}
 
@@ -224,6 +229,7 @@ export class LocalManifest {
 		const adapter = this.app.vault.adapter;
 		this.logActive = false;
 		this.generation++;
+		const state = encodeLogState(this.recoveryState());
 		const data = this.serialize();
 		await adapter.write(this.tmpPath, data);
 		if (this.closed) return;
@@ -233,6 +239,7 @@ export class LocalManifest {
 		// A stale log stays until the next record replaces it; its header names an
 		// older base, so loading ignores it.
 		this.logBytes = 0;
+		this.persistedState = state;
 		this.logActive = true;
 	}
 
