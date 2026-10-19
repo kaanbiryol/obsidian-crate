@@ -35,7 +35,18 @@ export function createShadowRootMount(
   mountPoint.classList.add("crate-reminders-ui");
   mountPoint.dataset.uiHost = "plugin";
   mountPoint.classList.toggle("is-mobile", host.doc.body.classList.contains("is-mobile"));
-  mountPoint.classList.add(host.doc.body.classList.contains("theme-dark") ? "dark" : "light");
+  const syncTheme = () => {
+    const dark = host.doc.body.classList.contains("theme-dark");
+    mountPoint.classList.toggle("dark", dark);
+    mountPoint.classList.toggle("light", !dark);
+  };
+  syncTheme();
+  // Obsidian switches theme on the body, e.g. when a phone follows the system appearance.
+  const themeObserver = new MutationObserver(() => {
+    if (!host.isConnected) themeObserver.disconnect();
+    else syncTheme();
+  });
+  themeObserver.observe(host.doc.body, { attributes: true, attributeFilter: ["class"] });
   options.configureMountPoint?.(mountPoint);
   return { shadowRoot, mountPoint };
 }

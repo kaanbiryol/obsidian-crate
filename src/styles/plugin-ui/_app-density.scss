@@ -25,4 +25,26 @@
       .pwa-dock__menu { left: 16px; right: 80px; }
     }
   }
+
+  // Obsidian mobile uses touch on any pane width, including landscape phones
+  // wider than the shared 640px picker breakpoint, so keep 44px touch targets.
+  &[data-ui-host="plugin"].is-mobile {
+    .reminder-picker { --crate-picker-row-height: 44px; }
+    :is(.reminder-date-picker .date-quick-button, .picker-control-row, .project-picker-row,
+      .reminder-recurrence-picker .recurrence-frequency-button, .reminder-recurrence-picker .recurrence-day-button) { min-height: 44px; }
+    .reminder-date-picker .date-quick-button { height: 44px; }
+    .reminder-recurrence-picker .recurrence-stepper { --stepper-button-size: 44px; }
+    .reminder-recurrence-picker .recurrence-stepper-button { width: 44px; height: 44px; }
+    .picker-native-control :is(.picker-date-input, .picker-time-input) { height: 44px; }
+    .reminder-action-chip { height: 44px; min-width: 44px; }
+
+    // Follow the phone's text size setting while keeping the shared list scale at 1x.
+    :is(.reminders-view.is-primary, .crate-reading, .reminders-list-container) {
+      --reminder-font-base: calc(16px * var(--preferred-text-scale, 1));
+      --reminder-font-sm: calc(15px * var(--preferred-text-scale, 1));
+      --reminder-font-xs: calc(14px * var(--preferred-text-scale, 1));
+      --reminder-font-xxs: calc(13px * var(--preferred-text-scale, 1));
+      --checkbox-size: calc(16px * var(--preferred-text-scale, 1));
+    }
+  }
 }

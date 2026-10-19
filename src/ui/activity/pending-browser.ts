@@ -151,6 +151,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         const status = meta.createSpan({ cls: 'crate-browser-file-status', text: canPreview(index) ? 'Checking…' : 'No preview' });
         status.id = `${detail.id}-status-${index}`;
         button.setAttribute('aria-describedby', status.id);
+        selection?.addMenuButton(row, key);
         rows.push({ button, status });
         rowSelection.addButton(key, button);
         button.addEventListener('click', event => {

@@ -3,9 +3,12 @@ import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks 
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../plugin/settings-types';
 
-async function setup(encrypted = true) {
-  vi.doMock('obsidian', () => createObsidianUiModule());
+const openExternalBrowserModal = vi.fn<(app: unknown, url: string, options: { linkText: string }) => void>();
+
+async function setup(encrypted = true, isMobile = false) {
+  vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile } }));
   vi.doMock('../qr-modal', () => ({ QRModal: class {} }));
+  vi.doMock('../external-browser-modal', () => ({ openExternalBrowserModal }));
   const recovery = await generateRecoveryCode();
   const bundle = addReminderScope(addReminderScope(createVaultKeyBundle(), 'Reminders'), 'Reading', 'reading');
   const secrets = new Map<string, string>([[SECRET_KEYS.AUTH_TOKEN, 'device-token']]);
@@ -28,7 +31,18 @@ async function setup(encrypted = true) {
 
 afterEach(() => {
   resetObsidianUiMocks(); vi.unstubAllGlobals(); vi.resetModules();
-  vi.doUnmock('obsidian'); vi.doUnmock('../qr-modal');
+  vi.doUnmock('obsidian'); vi.doUnmock('../qr-modal'); vi.doUnmock('../external-browser-modal');
+  openExternalBrowserModal.mockClear();
+});
+
+it('opens the web app from a fresh link tap on mobile', async () => {
+  const { button, open, plugin } = await setup(false, true);
+  button.click(); await vi.waitFor(() => expect(openExternalBrowserModal).toHaveBeenCalledOnce());
+  expect(open).not.toHaveBeenCalled();
+  const [app, url, options] = openExternalBrowserModal.mock.calls[0]!;
+  expect(app).toBe((plugin as { app?: unknown }).app);
+  expect(new URL(url).origin).toBe('https://crate.example');
+  expect(options).toMatchObject({ linkText: 'Open app' });
 });
 
 it('shares the same recovery code through fragments without sending it to enrollment APIs', async () => {

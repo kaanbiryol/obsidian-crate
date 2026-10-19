@@ -176,8 +176,13 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                     : 'none',
             }}
             contentStyle={{
-                // Keep the editor above the on-screen keyboard.
-                ...(keyboardOffset > 0 ? { marginBottom: keyboardOffset } : {}),
+                // Keep the whole editor above the on-screen keyboard and below the status bar.
+                ...(keyboardOffset > 0 ? {
+                    marginBottom: keyboardOffset,
+                    maxHeight: `calc(100dvh - ${keyboardOffset}px - var(--safe-area-inset-top, env(safe-area-inset-top)) - 20px)`,
+                    minHeight: 0,
+                    paddingBottom: 18,
+                } : {}),
             }}
             overlays={
                 <AddReminderModalOverlays

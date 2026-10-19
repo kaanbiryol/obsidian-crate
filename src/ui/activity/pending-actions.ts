@@ -1,4 +1,4 @@
-import { Menu, Notice } from 'obsidian';
+import { Menu, Notice, Platform, setIcon } from 'obsidian';
 import { decodePendingChange } from '../../sync/pending-change';
 import type { PendingFileAction } from './file-actions';
 import type { PendingRowSelection } from './pending-row-selection';
@@ -72,6 +72,18 @@ export function createPendingActions(
             const input = label.createEl('input', { attr: { type: 'checkbox', 'aria-label': `Sync ${path}` } });
             checkboxes.set(key, input); input.checked = !excluded.has(key);
             input.addEventListener('change', () => { if (input.checked) excluded.delete(key); else excluded.add(key); update(); });
+        },
+        // Touch hosts have no reliable context menu, so each row gets a visible menu button.
+        addMenuButton: (row: HTMLElement, key: string) => {
+            if (!Platform.isMobile) return;
+            const { path } = decodePendingChange(key);
+            const button = row.createEl('button', { cls: 'crate-browser-file-menu', attr: { type: 'button', 'aria-label': `More actions for ${path}`, 'aria-haspopup': 'menu' } });
+            setIcon(button, 'more-horizontal');
+            button.addEventListener('click', event => {
+                event.stopPropagation();
+                const bounds = button.getBoundingClientRect();
+                contextMenu(key).showAtPosition({ x: bounds.right, y: bounds.bottom });
+            });
         },
         bindContextMenu: (row: HTMLElement, key: string) => {
             row.addEventListener('contextmenu', event => {

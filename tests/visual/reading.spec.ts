@@ -119,6 +119,8 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	await page.getByRole('button', { name: 'Save a link', exact: true }).click();
 	await expect(page.getByLabel('Link', { exact: true })).toHaveValue('https://example.com/later');
 	await page.getByLabel('Link', { exact: true }).focus();
+	// Obsidian mobile reports the keyboard through --keyboard-height; the PWA measures the visual viewport.
+	if (host === 'plugin') await page.addStyleTag({ content: ':root { --keyboard-height: 360px; }' });
 	await page.evaluate(() => { Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 484 }); window.visualViewport!.dispatchEvent(new Event('resize')); });
 	await expect.poll(async () => page.getByRole('dialog', { name: 'Save a link' }).evaluate((element, host) => {
 		const surface = host === 'pwa' ? element.querySelector<HTMLElement>('.pwa-reading-sheet')! : element;

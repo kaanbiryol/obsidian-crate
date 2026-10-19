@@ -78,7 +78,7 @@
     color: var(--text-muted);
     font: inherit;
     cursor: pointer;
-    &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+    @media (hover: hover) and (pointer: fine) { &:hover { background: var(--background-modifier-hover); color: var(--text-normal); } }
     &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: -2px; }
 }
 .crate-reminders-ui .crate-file-diff .crate-diff-gap > button {

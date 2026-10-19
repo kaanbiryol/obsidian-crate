@@ -1,7 +1,8 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import { QRModal } from '../qr-modal';
+import { openExternalBrowserModal } from '../external-browser-modal';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';
 import { SECRET_KEYS } from '../../plugin/settings-types';
 
@@ -17,7 +18,15 @@ export function renderCrateWebApp(containerEl: HTMLElement, plugin: CratePlugin)
 				button.setDisabled(true);
 				button.setButtonText('Creating...');
 				try {
-					window.open(await buildEnrollmentUrl(plugin), '_blank', 'noopener,noreferrer');
+					const url = await buildEnrollmentUrl(plugin);
+					// Mobile webviews can block window.open once the tap's gesture has passed.
+					if (Platform.isMobile) {
+						openExternalBrowserModal(plugin.app, url, {
+							title: 'Open Crate web app',
+							message: 'Select the link below to open the web app in your browser.',
+							linkText: 'Open app',
+						});
+					} else window.open(url, '_blank', 'noopener,noreferrer');
 				} catch (error) {
 					new Notice(`Could not create app link: ${errorMessage(error)}`, 10000);
 				} finally {

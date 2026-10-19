@@ -191,7 +191,10 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
       onPointerMove={handleItemPointerMove}
       onPointerUp={cancelLongPress}
       onPointerCancel={cancelLongPress}
-      onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
+      onContextMenu={(event) => {
+        // Android raises its long-press menu while a touch press is arming or dragging the row.
+        if (interaction === 'long-press' || longPressTimerRef.current !== null || touchDragActiveRef.current) event.preventDefault();
+      }}
       layout="position"
       layoutDependency={index}
       data-reminder-scroll-anchor={isPresent ? 'true' : undefined}

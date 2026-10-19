@@ -412,6 +412,7 @@ export function resetObsidianUiMocks(): void {
 export function createObsidianUiModule(): Record<string, unknown> {
 	return {
 		Modal: MockModal,
+		Platform: { isMobile: false },
 		Scope: class Scope {},
 		Setting: MockSetting,
 		setIcon: () => {},

@@ -31,9 +31,11 @@
         padding-bottom: 0;
     }
 
+    // Obsidian mobile keeps the page full height and reports the keyboard separately.
     &.is-bottom-sheet {
-        height: 85dvh;
-        max-height: 90dvh;
+        height: calc(85dvh - var(--keyboard-height, 0px));
+        max-height: calc(90dvh - var(--keyboard-height, 0px));
+        margin-bottom: var(--keyboard-height, 0px);
         min-height: 0;
     }
 }
@@ -313,8 +315,10 @@
 		content: none !important;
 	}
 
-	&:hover {
-		color: var(--text-muted);
+	@media (hover: hover) and (pointer: fine) {
+		&:hover {
+			color: var(--text-muted);
+		}
 	}
 
 	&:focus-visible {
@@ -633,9 +637,11 @@
         content: '';
     }
 
-    &:hover {
-        background: var(--crate-activity-control-hover-bg);
-        .crate-history-chevron { color: var(--text-normal); }
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            background: var(--crate-activity-control-hover-bg);
+            .crate-history-chevron { color: var(--text-normal); }
+        }
     }
 
     &:focus-visible {
@@ -794,7 +800,7 @@ body.reduce-motion .crate-activity-modal {
     height: min(560px, calc(100dvh - 48px));
     max-height: calc(100dvh - 48px);
     box-sizing: border-box;
-    &.is-mobile { width: 100%; max-width: none; height: 85dvh; max-height: 90dvh; }
+    &.is-mobile { width: 100%; max-width: none; height: calc(85dvh - var(--keyboard-height, 0px)); max-height: calc(90dvh - var(--keyboard-height, 0px)); margin-bottom: var(--keyboard-height, 0px); }
     .modal-content {
         display: flex;
         flex-direction: column;
@@ -850,7 +856,7 @@ body.reduce-motion .crate-activity-modal {
         background: transparent; box-shadow: none; font-weight: var(--font-semibold); color: var(--text-normal);
         cursor: pointer;
         &:disabled { cursor: default; }
-        &:hover { color: var(--text-normal); }
+        @media (hover: hover) and (pointer: fine) { &:hover { color: var(--text-normal); } }
         svg { width: 14px; height: 14px; color: var(--text-faint); }
     }
 }
@@ -909,7 +915,7 @@ body.reduce-motion .crate-activity-modal {
         line-height: 1.4;
         background: transparent;
         transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
-        &:not(:has(input:disabled)):hover { background: var(--crate-control-hover-bg); }
+        @media (hover: hover) and (pointer: fine) { &:not(:has(input:disabled)):hover { background: var(--crate-control-hover-bg); } }
         &:not(:has(input:disabled)):active { background: var(--crate-control-active-bg); }
         gap: 5px;
         &:has(input:checked) {
@@ -947,7 +953,7 @@ body.reduce-motion .crate-activity-modal {
 .modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action-danger {
     background: var(--crate-danger);
     color: var(--crate-on-accent);
-    &:not(:disabled):hover { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
+    @media (hover: hover) and (pointer: fine) { &:not(:disabled):hover { background: color-mix(in srgb, var(--crate-danger) 88%, black); } }
     &:not(:disabled):active { background: color-mix(in srgb, var(--crate-danger) 88%, black); }
 }
 

@@ -87,7 +87,8 @@
 .premium-checkbox {
     --premium-checkbox-size: var(--checkbox-size, var(--icon-size-s, 18px));
     --premium-checkbox-offset: -12px;
-    --premium-checkbox-border-width: var(--checkbox-border-width, var(--input-border-width, 1px));
+    // Obsidian mobile sets --input-border-width to 0, which would hide the ring.
+    --premium-checkbox-border-width: max(1px, var(--checkbox-border-width, var(--input-border-width, 1px)));
 
     flex: 0 0 44px;
     width: 44px;

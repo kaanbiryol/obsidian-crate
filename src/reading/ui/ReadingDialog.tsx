@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
 import { BaseModal } from '../../reminders/components/BaseModal';
 import { ModalHeader } from '../../ui/shared/ModalHeader';
-import { useKeyboardHeight } from '../../reminders/ui/hooks/useKeyboardHeight';
+import { useObsidianKeyboardHeight } from '../../reminders/ui/hooks/useObsidianKeyboardHeight';
 
 export interface ReadingDialogProps {
 	className?: string;
@@ -29,7 +29,7 @@ export function ReadingDialog(props: ReadingDialogProps) {
 /** Base UI keeps plugin portals inside the same document and Obsidian shadow root. */
 export function PluginReadingDialog({ title, action, variant = 'bottom-sheet', showBackdrop = true, fullHeight = false, onClose, busy = false, children, className = '', contentClassName = 'crate-reading', contained = false }: ReadingDialogProps & { contained?: boolean }) {
 	const marker = useRef<HTMLDivElement>(null);
-	const keyboardInset = useKeyboardHeight(true);
+	const keyboardInset = useObsidianKeyboardHeight(true);
 	const [closing, setClosing] = useState(false);
 	const close = () => { if (!busy) setClosing(true); };
 	return <div ref={marker}><BaseModal isOpen={!closing} onClose={close} onExitComplete={onClose} dismissible={!busy && !closing} ariaLabel={title} variant={variant} showBackdrop={showBackdrop} className={`crate-reading-dialog${fullHeight ? ' crate-reading-dialog--full' : ''} ${className}`}

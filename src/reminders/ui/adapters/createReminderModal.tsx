@@ -12,7 +12,7 @@ import { parseReminderDateValue } from "@/reminders/utils/reminderDate";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
 import { ModalContext, PluginContext } from "@/reminders/ui/reminders-context";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { useKeyboardHeight } from "@/reminders/ui/hooks/useKeyboardHeight";
+import { useObsidianKeyboardHeight } from "@/reminders/ui/hooks/useObsidianKeyboardHeight";
 
 type ReminderModalProps = {
   initialProject?: string;
@@ -45,7 +45,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   const { isMobile } = modal;
 
   // Track keyboard height on mobile to position modal above keyboard
-  const keyboardHeight = useKeyboardHeight(isMobile);
+  const keyboardHeight = useObsidianKeyboardHeight(isMobile);
 
   // Get projects and active reminders from index (sync, fast)
   const projects = plugin.reminderRepository.getProjects();

@@ -34,6 +34,7 @@
 }
 
 .reminders-list-container {
+  container: reminders-list / inline-size;
   margin: 1em 0;
   padding: 0 20px;
 
@@ -41,11 +42,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
     margin-bottom: 12px;
     padding: 4px 0; // Add vertical padding to prevent button borders from being cut
     gap: 12px;
 
     .reminders-count {
+      // The basis decides when the actions no longer fit and move to their own line.
+      flex: 1 1 12em;
+      min-width: 0;
+      flex-wrap: wrap;
       font-size: var(--reminder-font-sm);
       font-weight: var(--reminder-font-weight-medium);
       color: var(--text-muted);
@@ -69,7 +75,7 @@
       display: flex;
       align-items: center;
       gap: 0.5em;
-      flex-wrap: wrap;
+      margin-left: auto;
       margin-right: 4px; // Prevent buttons from being cut off on the right
 
     }
@@ -91,8 +97,10 @@
       background: var(--interactive-accent);
       color: var(--text-on-accent);
 
-      &:hover {
-        background: var(--interactive-accent-hover);
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: var(--interactive-accent-hover);
+        }
       }
     }
 
@@ -100,8 +108,23 @@
     .reminders-toggle-completed {
       border: 1px solid var(--background-modifier-border);
 
-      &:hover {
-        border-color: var(--interactive-accent);
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          border-color: var(--interactive-accent);
+        }
+      }
+    }
+  }
+
+  // Narrow panes and phones shrink the actions before they wrap.
+  @container reminders-list (max-width: 360px) {
+    .reminders-list-header {
+      .reminders-add-button,
+      .reminders-toggle-completed {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
       }
     }
   }
@@ -158,22 +181,6 @@
         }
       }
     }
-  }
-}
-
-&.is-mobile .reminders-list-container .reminders-list-header {
-  flex-wrap: wrap;
-
-  .reminders-count {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .reminders-header-actions {
-    flex: 0 0 auto;
-    justify-content: flex-end;
-    width: auto;
   }
 }
 }

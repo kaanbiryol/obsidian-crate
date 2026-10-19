@@ -202,8 +202,9 @@
 	&.is-mobile {
 		width: 100%;
 		max-width: none;
-		height: 85dvh;
-		max-height: 90dvh;
+		height: calc(85dvh - var(--keyboard-height, 0px));
+		max-height: calc(90dvh - var(--keyboard-height, 0px));
+		margin-bottom: var(--keyboard-height, 0px);
 	}
 }
 

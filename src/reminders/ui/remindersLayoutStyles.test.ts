@@ -70,6 +70,7 @@ describe('plugin reminder layout styles', () => {
     expect(cardStyles).toContain('--checkbox-color');
     expect(cardStyles).toContain('--checkbox-marker-color');
     expect(cardStyles).toContain('--checkbox-border-color');
+    expect(cardStyles).toContain('--premium-checkbox-border-width: max(1px,');
     expect(primaryStyles).not.toContain('--premium-checkbox-size: 18px');
     expect(primaryStyles).not.toContain('height: 3px');
   });
@@ -225,5 +226,15 @@ describe('plugin reminder layout styles', () => {
     expect(transitionBlock).toBeDefined();
     expect(transitionBlock).not.toContain('overflow-y: hidden');
     expect(scrollBlock).toContain('scrollbar-gutter: stable');
+  });
+
+  it('clears Obsidian mobile navbars with the host view bottom spacing', async () => {
+    const navigation = await readFile(new URL('../../ui/plugin/plugin-navigation.scss', import.meta.url), 'utf8');
+    const layoutModes = await readFile(new URL('./reminders-view/_layout-modes.scss', import.meta.url), 'utf8');
+
+    // --navbar-height counts a navbar that sits below the view and misses the floating navbar's safe area.
+    expect(navigation).not.toContain('var(--navbar-height');
+    expect(navigation).toContain('--pwa-dock-bottom-inset: max(10px, var(--view-bottom-spacing,');
+    expect(layoutModes).not.toContain('--navbar-height');
   });
 });

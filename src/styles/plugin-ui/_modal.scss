@@ -149,8 +149,9 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
   align-self: center;
   width: min(640px, 100%);
   max-width: 640px;
-  height: min(680px, 85dvh);
+  height: min(680px, calc(85dvh - var(--keyboard-height, 0px)));
   min-height: 0;
+  margin-bottom: var(--keyboard-height, 0px);
   outline: none;
 }
 
@@ -203,7 +204,7 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
     box-sizing: border-box;
     height: 58px;
     justify-content: center;
-    &:hover { background: var(--background-modifier-hover); }
+    @media (hover: hover) and (pointer: fine) { &:hover { background: var(--background-modifier-hover); } }
   }
 }
 .crate-exclusion-preview-list .crate-exclusion-spacer {

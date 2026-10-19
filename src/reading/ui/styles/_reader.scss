@@ -95,7 +95,7 @@
 @container reading (max-width: 719px) {
 	.crate-reminders-ui .crate-reading-reader {
 		&__nav { min-height: 64px; padding: 6px 12px; gap: 2px; }
-		&__page { padding: 36px 26px max(40px, env(safe-area-inset-bottom)); }
+		&__page { padding: 36px 26px max(40px, var(--view-bottom-spacing, env(safe-area-inset-bottom))); }
 		&__header h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.035em; }
 		&__source { margin-bottom: 22px; }
 		&__body { line-height: 1.8; }

@@ -117,9 +117,9 @@
     background: var(--background-primary);
     --reminders-tabbar-overlay: 0px;
     --reminders-safe-area: 0px;
-    // Obsidian owns the mobile navbar and includes its safe-area padding in this height.
+    // Obsidian reserves this only when its navbar floats over the view.
     --reminders-tabbar-bottom-offset: var(
-        --navbar-height,
+        --view-bottom-spacing,
         calc(40px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)))
     );
 
