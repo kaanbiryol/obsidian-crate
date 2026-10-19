@@ -47,6 +47,70 @@ const CHECKBOX_REGEX = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
  * @returns ParsedCheckbox if line contains a checkbox, null otherwise
  */
 export function parseCheckboxLine(line: string, options: { persisted?: boolean } = {}): ParsedCheckbox | null {
+  return options.persisted ? parsePersistedCheckboxLine(line) : readCheckboxLine(line, options);
+}
+
+const PERSISTED_PARSE_GENERATION = 2048;
+const UNRESOLVED = Symbol('unresolved');
+type PersistedParse = ParsedCheckbox | null | typeof UNRESOLVED;
+// Two generations bound memory without per-hit reordering: a full current
+// generation becomes the previous one, and hits there move back to current.
+let currentParses = new Map<string, PersistedParse>();
+let previousParses = new Map<string, PersistedParse>();
+let persistedParseZone: string | undefined;
+
+/** Local offsets that persisted dates depend on, without Intl's per-call cost. */
+function localZoneKey(): string {
+  const year = new Date().getFullYear();
+  return [2000, year].map(value => `${new Date(value, 0, 1, 12).getTimezoneOffset()},${new Date(value, 6, 1, 12).getTimezoneOffset()}`).join(';');
+}
+
+function cloneParsedCheckbox(checkbox: ParsedCheckbox): ParsedCheckbox {
+  const { dueDate, recurrence } = checkbox.parsed;
+  return {
+    ...checkbox,
+    parsed: {
+      ...checkbox.parsed,
+      ...(dueDate ? { dueDate: new Date(dueDate.getTime()) } : {}),
+      ...(recurrence ? { recurrence: { ...recurrence, ...(recurrence.daysOfWeek ? { daysOfWeek: [...recurrence.daysOfWeek] } : {}) } } : {}),
+    },
+  };
+}
+
+/**
+ * Persisted parsing uses a fixed reference date, so a line's result depends
+ * only on its text and the local timezone. Rescans reuse unchanged lines from
+ * a bounded cache; callers receive clones because results are mutable.
+ */
+function parsePersistedCheckboxLine(line: string): ParsedCheckbox | null {
+  const zone = localZoneKey();
+  if (zone !== persistedParseZone) {
+    currentParses = new Map();
+    previousParses = new Map();
+    persistedParseZone = zone;
+  }
+  let cached = currentParses.get(line);
+  if (cached === undefined && !currentParses.has(line)) {
+    cached = previousParses.get(line);
+    if (cached === undefined && !previousParses.has(line)) {
+      try {
+        cached = readCheckboxLine(line, { persisted: true });
+      } catch (error) {
+        if (!(error instanceof UnresolvedReminderScheduleError)) throw error;
+        cached = UNRESOLVED;
+      }
+    }
+    if (currentParses.size >= PERSISTED_PARSE_GENERATION) {
+      previousParses = currentParses;
+      currentParses = new Map();
+    }
+    currentParses.set(line, cached as PersistedParse);
+  }
+  if (cached === UNRESOLVED) throw new UnresolvedReminderScheduleError();
+  return cached ? cloneParsedCheckbox(cached) : null;
+}
+
+function readCheckboxLine(line: string, options: { persisted?: boolean }): ParsedCheckbox | null {
   const match = (line.endsWith('\r') ? line.slice(0, -1) : line).match(CHECKBOX_REGEX);
   if (!match) {
     return null;

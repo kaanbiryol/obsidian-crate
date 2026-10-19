@@ -13,7 +13,7 @@ function file(path: string): TFile {
 	return Object.assign(new TFile(), { path, name: 'Inbox.md', basename: 'Inbox', extension: 'md', parent: null, vault: {}, stat: { ctime: 0, mtime: 0, size: 0 } });
 }
 
-it('parses each reminder line once when a toggle rescans its note', async () => {
+it('parses only the changed reminder line when a toggle rescans its note', async () => {
 	const lines = Array.from({ length: 50 }, (_, i) => `- [ ] Task ${i} Nov 20, 2026 <!-- crate-id:rem-${i} -->`);
 	let content = lines.join('\n');
 	const inbox = file('Reminders/Inbox.md');
@@ -35,6 +35,6 @@ it('parses each reminder line once when a toggle rescans its note', async () => 
 
 	expect(index.getAll().find(reminder => reminder.id === 'rem-7')?.completed).toBe(true);
 	// Saved lines need one persisted parse, shared by ID normalization and the
-	// scan; only unresolved drafts fall back to a draft parse.
-	expect(vi.mocked(parseReminderContent).mock.calls.length).toBe(lines.length);
+	// scan, and unchanged lines reuse the persisted parse from the first load.
+	expect(vi.mocked(parseReminderContent).mock.calls.length).toBe(1);
 });
