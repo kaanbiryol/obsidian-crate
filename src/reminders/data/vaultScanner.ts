@@ -24,6 +24,7 @@ import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict';
+import { UnresolvedReminderScheduleError } from '@/reminders/utils/reminderParser';
 
 const log = createLogger('VaultScanner');
 
@@ -71,7 +72,7 @@ function createUniqueReminderId(usedIds: Set<string>): string {
 export function normalizeReminderIds(
   content: string,
   reservedIds: ReadonlySet<string> = new Set(),
-  parsePersisted?: (line: string) => ParsedCheckbox | null,
+  parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
 ): ReminderIdNormalizationResult {
   const lines = content.split("\n");
   const usedIds = new Set(reservedIds);
@@ -80,7 +81,17 @@ export function normalizeReminderIds(
   for (const index of markdownTaskContexts(lines).keys()) {
     const line = lines[index];
     if (line === undefined) continue;
-    const parsed = parseCheckboxLine(line);
+    // Saved lines resolve in persisted mode; only unresolved drafts need the
+    // slower draft parse and schedule normalization.
+    let parsed: ParsedCheckbox | null;
+    let unresolved = false;
+    try {
+      parsed = parsePersisted(line);
+    } catch (error) {
+      if (!(error instanceof UnresolvedReminderScheduleError)) throw error;
+      unresolved = true;
+      parsed = parseCheckboxLine(line);
+    }
     if (!parsed || !parsed.parsed.cleanContent.trim()) {
       continue;
     }
@@ -88,7 +99,8 @@ export function normalizeReminderIds(
     const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
       ? parsed.reminderId : createUniqueReminderId(usedIds);
     usedIds.add(reminderId);
-    const normalized = setReminderIdMarker(normalizeReminderScheduleLine(line, parsePersisted), reminderId);
+    const scheduled = unresolved ? normalizeReminderScheduleLine(line, () => { throw new UnresolvedReminderScheduleError(); }) : line;
+    const normalized = setReminderIdMarker(scheduled, reminderId);
     if (normalized !== line) {
       lines[index] = normalized;
       remindersUpdated++;
