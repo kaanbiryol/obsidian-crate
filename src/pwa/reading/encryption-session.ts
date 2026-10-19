@@ -42,7 +42,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     if (!current()) throw new Error('Reading sign-in changed.');
     const tx = db.transaction('values', 'readwrite');
     try {
-      for (const key of await tx.store.getAllKeys()) if (['list', 'draft', 'pending'].some(kind => key === `${kind}:${session.id}`)
+      for (const key of await tx.store.getAllKeys()) if (['list', 'draft', 'pending', 'article-index'].some(kind => key === `${kind}:${session.id}`)
         || key.startsWith(`article:${session.id}:`) || key.startsWith(`attempt:${session.id}:`) || key.startsWith('share:')) {
         const value = await tx.store.get(key);
         if (!(value && typeof value === 'object' && 'encryptedReading' in value)) await tx.store.put(encodeReadingValue(key, value), key);

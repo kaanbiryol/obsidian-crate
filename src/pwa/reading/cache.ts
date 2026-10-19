@@ -91,30 +91,52 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
   }
   return cache;
 }
+interface ArticleUse { id: string; usedAt: number; bytes: number }
+const MAX_CACHED_ARTICLES = 50, MAX_CACHED_ARTICLE_BYTES = 20 * 1024 * 1024;
+
+function articleUses(value: unknown): Map<string, ArticleUse> {
+  const uses = new Map<string, ArticleUse>();
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.entries)) return uses;
+  for (const entry of value.entries as unknown[]) {
+    if (!isRecord(entry) || typeof entry.id !== 'string' || typeof entry.usedAt !== 'number' || !Number.isFinite(entry.usedAt)
+      || typeof entry.bytes !== 'number' || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0) return new Map();
+    uses.set(entry.id, { id: entry.id, usedAt: entry.usedAt, bytes: entry.bytes });
+  }
+  return uses;
+}
+
 export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string) {
   const db = await readingDatabase(); assertReadingSession(session);
   const tx = db.transaction('values', 'readwrite');
-  const key = `article:${session.id}:${item.crate_reading_id}`;
+  const prefix = `article:${session.id}:`, key = `${prefix}${item.crate_reading_id}`, indexKey = `article-index:${session.id}`;
   try {
     // Keep a damaged/newer copy exportable even when this article is opened online.
     const previous = await tx.store.get(key);
     if (previous !== undefined && !isReadingArticleCache(decodeReadingValue(key, previous), session.folderPath)) {
       throw new Error('The saved article needs recovery before replacing its offline copy.');
     }
-    await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt: Date.now() }), key);
-    const keys = (await tx.store.getAllKeys()).filter(k => String(k).startsWith(`article:${session.id}:`));
-    const records = await Promise.all(keys.map(async key => {
-      const raw = await tx.store.get(key);
-      try { return { key, value: decodeReadingValue(key, raw) }; }
-      catch { return { key, value: undefined }; }
-    }));
-    // Preserve unreadable copies for recovery; they must not break a healthy write.
-    const entries = records.flatMap(entry => isReadingArticleCache(entry.value, session.folderPath) ? [{ key: entry.key, value: entry.value }] : []);
-    entries.sort((a, b) => b.value.usedAt - a.value.usedAt);
-    let bytes = 0;
-    for (let i = 0; i < entries.length; i++) { const entry = entries[i]!; bytes += new TextEncoder().encode(entry.value.markdown).byteLength;
-      if (i >= 50 || bytes > 20 * 1024 * 1024) await tx.store.delete(entry.key);
+    const usedAt = Date.now();
+    await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt }), key);
+    // A small use index avoids decrypting every cached article to evict a few.
+    let indexed: Map<string, ArticleUse>;
+    try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey))); } catch { indexed = new Map(); }
+    const uses: ArticleUse[] = [];
+    for (const stored of await tx.store.getAllKeys()) {
+      if (!stored.startsWith(prefix)) continue;
+      const id = stored.slice(prefix.length);
+      if (id === item.crate_reading_id) { uses.push({ id, usedAt, bytes: new TextEncoder().encode(markdown).byteLength }); continue; }
+      const use = indexed.get(id);
+      if (use) { uses.push(use); continue; }
+      let value: unknown;
+      try { value = decodeReadingValue(stored, await tx.store.get(stored)); } catch { continue; }
+      // Preserve unreadable copies for recovery; they must not break a healthy write.
+      if (isReadingArticleCache(value, session.folderPath)) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength });
     }
+    uses.sort((a, b) => b.usedAt - a.usedAt);
+    let bytes = 0;
+    const kept = uses.filter((use, i) => { bytes += use.bytes; return i < MAX_CACHED_ARTICLES && bytes <= MAX_CACHED_ARTICLE_BYTES; });
+    for (const use of uses.slice(kept.length)) await tx.store.delete(`${prefix}${use.id}`);
+    await tx.store.put(encodeReadingValue(indexKey, { version: 1, entries: kept }), indexKey);
     assertReadingSession(session);
     await tx.done;
   } catch (error) { try { tx.abort(); } catch { /* already aborted */ } await tx.done.catch(() => {}); throw error; }
