@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse, parseReminderListResponse, type ReminderIndexingProgress } from '../reminder-api';
-import { isReminderList } from '../reminder-storage-validation';
+import { isScopedReminderList } from '../reminder-storage-validation';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -187,8 +187,9 @@ export function useReminderSync({
 				const isDelta = Boolean(body && typeof body === 'object' && (body as { delta?: unknown }).delta === true);
 				const delta = isDelta && since ? parseReminderDeltaResponse(body, config.folderPath) : null;
 				const merged = delta ? applyReminderDelta(snapshotRef.current.reminders, delta) : null;
+				// Delta records were validated above and base records on entry; recheck only their combination.
 				const result = !isDelta ? parseReminderListResponse(body, config.folderPath)
-					: delta && merged && isReminderList(merged, config.folderPath) ? { reminders: merged, projects: delta.projects, issues: [] } : null;
+					: delta && merged && isScopedReminderList(merged, config.folderPath) ? { reminders: merged, projects: delta.projects, issues: [] } : null;
 				// An unusable delta drops the base, so the next read is a full one.
 				if (isDelta && !result) deltaBaseRef.current = undefined;
 				if (!result) {

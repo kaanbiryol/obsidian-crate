@@ -26,4 +26,11 @@ describe('durable reminder snapshot validation', () => {
 			recurrence: { frequency: 'daily', timezone: 'Europe/Berlin', completedCount: 3 } }], issues: [{ path: 'Reminders/Large.md', reason: 'Too large' }] };
 		expect(normalizeSnapshot(complete, 'Reminders')).toEqual(complete);
 	});
+	it('rechecks only folder scope, unique identities and metadata for pre-validated records', () => {
+		expect(normalizeSnapshot(snapshot, 'Reminders', true)).toEqual(snapshot);
+		expect(normalizeSnapshot({ ...snapshot, reminders: [reminder, { ...reminder, id: 'r2', filePath: 'Private/Inbox.md' }] }, 'Reminders', true)).toBeNull();
+		expect(normalizeSnapshot({ ...snapshot, reminders: [reminder, { ...reminder, filePath: 'Reminders/Other.md' }] }, 'Reminders', true)).toBeNull();
+		expect(normalizeSnapshot({ ...snapshot, reminders: undefined }, 'Reminders', true)).toBeNull();
+		expect(normalizeSnapshot({ ...snapshot, savedAt: -1 }, 'Reminders', true)).toBeNull();
+	});
 });

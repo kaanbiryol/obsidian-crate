@@ -72,6 +72,13 @@ export function isReminderList(value: unknown, folderPath: string): value is Rem
 		&& new Set(value.map(record => record.id)).size === value.length;
 }
 
+/** For records that each passed reminder validation on entry: recheck only the
+ * folder scope and identity uniqueness of their combination. */
+export function isScopedReminderList(records: ReminderRecord[], folderPath: string): boolean {
+	return records.every(record => record.filePath.startsWith(`${folderPath}/`))
+		&& new Set(records.map(record => record.id)).size === records.length;
+}
+
 export function isStoredReminderDraft(value: unknown): value is ModalDraft {
 	return !Array.isArray(value) && v.is(reminderDraftSchema, value);
 }

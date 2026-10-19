@@ -355,6 +355,14 @@ describe('delta refresh', () => {
 		expect(rendered.current.reminders).toEqual([original]);
 	});
 
+	it('rejects a delta whose records duplicate an unchanged note identity', async () => {
+		const { rendered, original, load, settle } = harness();
+		await settle(0, full([original, work('two')]), load());
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [work('one')], projects: ['Inbox', 'Work'], issues: [] })), load());
+		expect(rendered.current.reminders).toEqual([original, work('two')]);
+		expect(rendered.current.error).toMatch(/invalid reminder data/);
+	});
+
 	it('advances the delta base from a 304 without rewriting the snapshot', async () => {
 		const { options, original, load, settle } = harness();
 		await settle(0, full([original]), load());

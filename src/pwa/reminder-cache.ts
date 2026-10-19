@@ -39,8 +39,10 @@ type StoredMetadata = Partial<SnapshotMetadata> & { sessionScope?: string; encry
 
 interface StoredNote { folderPath: string; path: string; sessionScope: string; version: string; encrypted?: string; reminders?: ReminderRecord[] }
 
-/** What this tab last read or wrote for a folder: note versions and their JSON. */
-const persisted = new Map<string, { scope: string; generation: number; notes: Map<string, { version: string; json: string }> }>();
+/** What this tab last read or wrote for a folder: note versions, their JSON and
+ * the record objects it was serialized from. */
+interface PersistedNote { version: string; json: string; reminders: ReminderRecord[] }
+const persisted = new Map<string, { scope: string; generation: number; notes: Map<string, PersistedNote> }>();
 
 const noteRange = (folderPath: string) => IDBKeyRange.bound([folderPath], [folderPath, []]);
 const noteKey = (sessionScope: string, folderPath: string, path: string) => `cache-note:${sessionScope}:${folderPath}:${path}`;
@@ -110,14 +112,14 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 			if (!opened || notes.length !== opened.versions.size || notes.some(note => opened.versions.get(note.path) !== note.version)) return null;
 			const { metadata } = opened;
 			const reminders: ReminderRecord[] = [];
-			const read = new Map<string, { version: string; json: string }>();
+			const read = new Map<string, PersistedNote>();
 			for (const note of notes) {
 				if (note.sessionScope !== sessionScope || typeof note.version !== 'string' || typeof note.path !== 'string') return null;
 				if (privateStorageEnabled() !== Boolean(note.encrypted)) return null;
 				const value: unknown = note.encrypted ? JSON.parse(openPrivateValue(note.encrypted, noteKey(sessionScope, folderPath, note.path))) : note.reminders;
 				if (!Array.isArray(value) || !value.length || value.some(reminder => !reminder || typeof reminder !== 'object' || (reminder as ReminderRecord).filePath !== note.path)) return null;
 				reminders.push(...value as ReminderRecord[]);
-				read.set(note.path, { version: note.version, json: JSON.stringify(value) });
+				read.set(note.path, { version: note.version, json: JSON.stringify(value), reminders: value as ReminderRecord[] });
 			}
 			const snapshot = normalizeSnapshot({ folderPath, reminders, projects: metadata.projects, savedAt: metadata.savedAt, etag: metadata.etag,
 				deltaBase: metadata.deltaBase, issues: metadata.issues }, folderPath);
@@ -137,14 +139,19 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 	const generation = cacheGeneration;
 	const sessionScope = await cacheSessionScope();
 	const { folderPath } = snapshot;
-	const next = new Map([...groupByNote(snapshot.reminders)].map(([path, reminders]) => [path, { reminders, json: JSON.stringify(reminders) }]));
 	const known = persisted.get(folderPath);
-	const previous = known?.scope === sessionScope && known.generation === generation ? known.notes : new Map<string, { version: string; json: string }>();
+	const previous = known?.scope === sessionScope && known.generation === generation ? known.notes : new Map<string, PersistedNote>();
+	// Confirmed records are immutable: a note holding the same record objects reuses its JSON.
+	const next = new Map([...groupByNote(snapshot.reminders)].map(([path, reminders]) => {
+		const prior = previous.get(path);
+		const same = prior?.reminders.length === reminders.length && reminders.every((reminder, index) => reminder === prior.reminders[index]);
+		return [path, { reminders, json: same ? prior.json : JSON.stringify(reminders) }];
+	}));
 	const database = await openCacheDatabase();
 	try {
 		if (!sessionCurrent() || generation !== cacheGeneration) return;
 		const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
-		const written = new Map<string, { version: string; json: string }>();
+		const written = new Map<string, PersistedNote>();
 		async function writeNotes(): Promise<void> {
 			const notesStore = transaction.objectStore(NOTES_STORE_NAME);
 			const stored = await transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as StoredMetadata | undefined;
@@ -154,12 +161,12 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 			for (const path of onDisk.keys()) if (!next.has(path)) await notesStore.delete([folderPath, path]);
 			for (const [path, note] of next) {
 				const prior = previous.get(path);
-				if (prior && prior.json === note.json && onDisk.get(path) === prior.version) { written.set(path, prior); continue; }
+				if (prior && prior.json === note.json && onDisk.get(path) === prior.version) { written.set(path, { ...prior, reminders: note.reminders }); continue; }
 				const version = crypto.randomUUID();
 				const sealed = sealPrivateValue(note.json, noteKey(sessionScope, folderPath, path));
 				await notesStore.put(sealed === note.json ? { folderPath, path, sessionScope, version, reminders: note.reminders }
 					: { folderPath, path, sessionScope, version, encrypted: sealed } satisfies StoredNote);
-				written.set(path, { version, json: note.json });
+				written.set(path, { version, json: note.json, reminders: note.reminders });
 			}
 			const metadata: SnapshotMetadata = { layout: 'notes', projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag,
 				...(snapshot.deltaBase ? { deltaBase: snapshot.deltaBase } : {}), issues: snapshot.issues ?? [],
@@ -215,7 +222,8 @@ export async function saveCachedReminderSnapshot(
 ): Promise<void> {
 	const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt, etag, issues, ...(deltaBase ? { deltaBase } : {}) };
 	try {
-		if (!normalizeSnapshot(snapshot, folderPath)) { reportCacheProblem('damaged'); return; }
+		// Callers pass confirmed in-memory records, each validated when it entered the app.
+		if (!normalizeSnapshot(snapshot, folderPath, true)) { reportCacheProblem('damaged'); return; }
 		await writeIndexedDbSnapshot(snapshot);
 	} catch {
 		if (!reminderCacheHealth.getSnapshot()) reportCacheProblem('unavailable');
