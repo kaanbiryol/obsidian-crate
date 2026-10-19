@@ -44,21 +44,53 @@ for (const browserType of [chromium, webkit]) {
 			const before = await versions();
 			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 120, 'one-changed');
 			const afterPartial = await versions();
-			await new Promise((resolve, reject) => {
+			// Replace note A; another tab also updates the metadata in the same transaction.
+			const replaceNoteA = (withMetadata, nextVersion = 'other-tab') => new Promise((resolve, reject) => {
 				const request = indexedDB.open('crate-reminders');
 				request.onsuccess = () => {
-					const db = request.result, tx = db.transaction('notes', 'readwrite'), store = tx.objectStore('notes');
+					const db = request.result, tx = db.transaction(['notes', 'snapshots'], 'readwrite'), store = tx.objectStore('notes');
 					const read = store.get(['Reminders', 'Reminders/A.md']);
-					read.onsuccess = () => store.put({ ...read.result, version: 'other-tab' });
+					read.onsuccess = () => store.put({ ...read.result, version: nextVersion });
+					if (withMetadata) {
+						const snapshots = tx.objectStore('snapshots'), metadata = snapshots.get('Reminders');
+						metadata.onsuccess = () => snapshots.put({ ...metadata.result,
+							noteVersions: metadata.result.noteVersions.map(([path, version]) => [path, path === 'Reminders/A.md' ? nextVersion : version]) });
+					}
 					tx.oncomplete = () => { db.close(); resolve(); };
 					tx.onerror = () => reject(tx.error);
 				};
 				request.onerror = () => reject(request.error);
 			});
+			await replaceNoteA(true);
 			const peerWritten = await cache.loadCachedReminderSnapshot('Reminders');
+			await replaceNoteA(true, 'other-tab-2');
 			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 130, 'after-peer');
 			const afterPeer = await versions();
+			await replaceNoteA(false);
+			const tampered = await cache.loadCachedReminderSnapshot('Reminders');
+			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 140, 'after-tamper');
 			const merged = await cache.loadCachedReminderSnapshot('Reminders');
+			// A save reads no note records: the metadata lists the stored versions.
+			const many = Array.from({ length: 50 }, (_, index) => note(`n${index}`, `Reminders/N${index}.md`));
+			await cache.saveCachedReminderSnapshot('Reminders', many, ['Inbox'], 150, 'many');
+			let noteRecordsRead = 0;
+			const originals = {};
+			for (const method of ['get', 'getAll', 'openCursor']) {
+				originals[method] = IDBObjectStore.prototype[method];
+				IDBObjectStore.prototype[method] = function (...args) {
+					const request = originals[method].apply(this, args);
+					if (this.name === 'notes') request.addEventListener('success', () => {
+						noteRecordsRead += Array.isArray(request.result) ? request.result.length : request.result ? 1 : 0;
+					});
+					return request;
+				};
+			}
+			try {
+				await cache.saveCachedReminderSnapshot('Reminders', [...many.slice(1), note('changed', 'Reminders/N0.md')], ['Inbox'], 160, 'one-of-many');
+			} finally {
+				Object.assign(IDBObjectStore.prototype, originals);
+			}
+			const afterMany = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.saveCachedReminderSnapshot('Reminders', [reminder('new')], ['Inbox'], 300, 'new');
 			await cache.refreshCachedReminderSnapshot('Reminders', 400, 'old');
 			const afterStaleRefresh = await cache.loadCachedReminderSnapshot('Reminders');
@@ -86,7 +118,7 @@ for (const browserType of [chromium, webkit]) {
             await cache.clearCachedReminderSnapshots();
             await cache.saveCachedReminderSnapshot('Reminders', [reminder('fresh')], ['Inbox'], 600, 'fresh');
             const fresh = await cache.loadCachedReminderSnapshot('Reminders');
-            return { initial, refreshed, stored, before, afterPartial, peerWritten, afterPeer, merged, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing, unsupported, preservedVersion, fresh };
+            return { initial, refreshed, stored, before, afterPartial, peerWritten, afterPeer, tampered, merged, noteRecordsRead, afterMany, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing, unsupported, preservedVersion, fresh };
 		});
 		assert.equal(result.initial.reminders[0].id, 'original');
 		assert.equal(result.refreshed.savedAt, 200);
@@ -96,9 +128,14 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(result.stored.layout, 'notes');
 		assert.equal(result.afterPartial['Reminders/A.md'], result.before['Reminders/A.md'], 'An unchanged note keeps its record');
 		assert.notEqual(result.afterPartial['Reminders/B.md'], result.before['Reminders/B.md']);
-		assert.equal(result.peerWritten, null, 'A note replaced outside the metadata rejects the whole snapshot');
-		assert.notEqual(result.afterPeer['Reminders/A.md'], 'other-tab');
-		assert.deepEqual(result.merged.reminders.map(item => item.id), ['a', 'b2']);
+		assert.deepEqual(result.peerWritten.reminders.map(item => item.id), ['a', 'b2'], 'Another tab\'s complete write is a valid snapshot');
+		assert.notEqual(result.afterPeer['Reminders/A.md'], 'other-tab-2', 'A note another tab rewrote is rewritten');
+		assert.equal(result.tampered, null, 'A note replaced outside the metadata rejects the whole snapshot');
+		assert.deepEqual(result.merged.reminders.map(item => item.id), ['a', 'b2'], 'The next save repairs a rejected snapshot');
+		assert.equal(result.noteRecordsRead, 0, 'A save must not read stored notes');
+		assert.equal(result.afterMany.reminders.length, 50);
+		assert.ok(result.afterMany.reminders.some(item => item.id === 'changed'));
+		console.log(`${browserType.name()}: note records read by a 50-note save: ${result.noteRecordsRead}`);
 		assert.equal(result.afterStaleRefresh.savedAt, 300);
 		assert.equal(result.afterStaleRefresh.reminders[0].id, 'new');
 		assert.equal(result.afterOldTimestamp.savedAt, 300);

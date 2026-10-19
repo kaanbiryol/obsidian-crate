@@ -21,9 +21,10 @@ async function cacheSessionScope(): Promise<string> {
 	return stringDigest(token);
 }
 
-/** Metadata for one folder's snapshot. The note set is verified by count and a
- * digest of each note's random write version, so a missing, extra or replaced
- * note rejects the whole snapshot without storing plaintext digests. */
+/** Metadata for one folder's snapshot. It lists each note's random write
+ * version and commits with the notes, so a missing, extra or replaced note
+ * rejects the whole snapshot, and a save learns what is stored without reading
+ * the notes. Versions carry no content. */
 interface SnapshotMetadata {
 	layout: 'notes';
 	projects: string[];
@@ -31,9 +32,10 @@ interface SnapshotMetadata {
 	etag?: string;
 	deltaBase?: string;
 	issues: ReminderSourceIssue[];
-	noteCount: number;
-	inventory: string;
+	noteVersions: [path: string, version: string][];
 }
+
+type StoredMetadata = Partial<SnapshotMetadata> & { sessionScope?: string; encrypted?: string };
 
 interface StoredNote { folderPath: string; path: string; sessionScope: string; version: string; encrypted?: string; reminders?: ReminderRecord[] }
 
@@ -43,17 +45,22 @@ const persisted = new Map<string, { scope: string; generation: number; notes: Ma
 const noteRange = (folderPath: string) => IDBKeyRange.bound([folderPath], [folderPath, []]);
 const noteKey = (sessionScope: string, folderPath: string, path: string) => `cache-note:${sessionScope}:${folderPath}:${path}`;
 /** Synchronous, so a write transaction never waits on non-IndexedDB work and
- * auto-commits early. It detects inconsistent note sets; it is not a security
- * boundary (versions are random and carry no content). */
-function inventoryDigest(notes: Iterable<[string, string]>): string {
-	const text = [...notes].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([path, version]) => `${path}\0${version}`).join('\n');
-	let first = 0x811c9dc5, second = 0x9747b28c;
-	for (let index = 0; index < text.length; index++) {
-		const code = text.charCodeAt(index);
-		first = Math.imul(first ^ code, 0x01000193);
-		second = Math.imul(second ^ code, 0x5bd1e995);
+ * auto-commits early. Null when the record belongs to another session, does not
+ * match the private storage setting or is damaged. */
+function openMetadata(raw: StoredMetadata, sessionScope: string, folderPath: string): { metadata: Partial<SnapshotMetadata>; versions: Map<string, string> } | null {
+	try {
+		if (raw.sessionScope !== sessionScope || Boolean(raw.encrypted) !== privateStorageEnabled()) return null;
+		const metadata = (raw.encrypted ? JSON.parse(openPrivateValue(raw.encrypted, `cache:${sessionScope}:${folderPath}`)) : raw) as Partial<SnapshotMetadata>;
+		if (metadata.layout !== 'notes' || !Array.isArray(metadata.noteVersions)) return null;
+		const versions = new Map<string, string>();
+		for (const entry of metadata.noteVersions as unknown[]) {
+			if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || typeof entry[1] !== 'string' || versions.has(entry[0])) return null;
+			versions.set(entry[0], entry[1]);
+		}
+		return { metadata, versions };
+	} catch {
+		return null;
 	}
-	return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}:${text.length}`;
 }
 
 function groupByNote(reminders: ReminderRecord[]): Map<string, ReminderRecord[]> {
@@ -74,7 +81,7 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 		const [, [raw, freshness, notes]] = await Promise.all([
 			transaction.done,
 			(async () => Promise.all([
-				transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as Promise<{ sessionScope?: string; layout?: string; encrypted?: string } | undefined>,
+				transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as Promise<StoredMetadata | undefined>,
 				transaction.objectStore(FRESHNESS_STORE_NAME).get(folderPath) as Promise<CacheFreshness | undefined>,
 				transaction.objectStore(NOTES_STORE_NAME).getAll(noteRange(folderPath)) as Promise<StoredNote[]>,
 			]))(),
@@ -86,7 +93,8 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 		if (!raw || raw.sessionScope !== sessionScope) return null;
 		const snapshot = await assembleSnapshot(folderPath, sessionScope, raw, notes);
 		reportCacheProblem(snapshot ? null : 'damaged');
-		if (!snapshot) return null;
+		// The next save then rewrites every note instead of trusting this tab's record.
+		if (!snapshot) { persisted.delete(folderPath); return null; }
 		// A late revalidation must never update the timestamp of a different revision.
 		if (snapshot.etag && freshness?.etag === snapshot.etag && Number.isFinite(freshness.savedAt)) {
 			snapshot.savedAt = Math.max(snapshot.savedAt, freshness.savedAt);
@@ -96,11 +104,11 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 		database.close();
 	}
 
-	async function assembleSnapshot(folderPath: string, sessionScope: string, raw: { encrypted?: string }, notes: StoredNote[]): Promise<CachedReminderSnapshot | null> {
+	async function assembleSnapshot(folderPath: string, sessionScope: string, raw: StoredMetadata, notes: StoredNote[]): Promise<CachedReminderSnapshot | null> {
 		try {
-			const metadata = (raw.encrypted ? JSON.parse(openPrivateValue(raw.encrypted, `cache:${sessionScope}:${folderPath}`)) : raw) as Partial<SnapshotMetadata>;
-			if (metadata.layout !== 'notes' || !Number.isSafeInteger(metadata.noteCount) || typeof metadata.inventory !== 'string' || notes.length !== metadata.noteCount) return null;
-			if (inventoryDigest(notes.map(note => [note.path, note.version])) !== metadata.inventory) return null;
+			const opened = openMetadata(raw, sessionScope, folderPath);
+			if (!opened || notes.length !== opened.versions.size || notes.some(note => opened.versions.get(note.path) !== note.version)) return null;
+			const { metadata } = opened;
 			const reminders: ReminderRecord[] = [];
 			const read = new Map<string, { version: string; json: string }>();
 			for (const note of notes) {
@@ -122,7 +130,8 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 }
 
 /** Writes only notes whose contents changed, plus notes another tab rewrote. The
- * metadata and every note change commit in one transaction. */
+ * metadata and every note change commit in one transaction, so the stored note
+ * versions come from the metadata alone; unreadable metadata replaces every note. */
 async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise<void> {
 	const sessionCurrent = capturePwaSession();
 	const generation = cacheGeneration;
@@ -138,8 +147,10 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 		const written = new Map<string, { version: string; json: string }>();
 		async function writeNotes(): Promise<void> {
 			const notesStore = transaction.objectStore(NOTES_STORE_NAME);
-			const onDisk = new Map((await notesStore.getAll(noteRange(folderPath)) as StoredNote[])
-				.map(note => [note.path, note.sessionScope === sessionScope ? note.version : '']));
+			const stored = await transaction.objectStore(CACHE_STORE_NAME).get(folderPath) as StoredMetadata | undefined;
+			const storedVersions = stored ? openMetadata(stored, sessionScope, folderPath)?.versions : undefined;
+			if (!storedVersions) await notesStore.delete(noteRange(folderPath));
+			const onDisk = storedVersions ?? new Map<string, string>();
 			for (const path of onDisk.keys()) if (!next.has(path)) await notesStore.delete([folderPath, path]);
 			for (const [path, note] of next) {
 				const prior = previous.get(path);
@@ -152,7 +163,7 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 			}
 			const metadata: SnapshotMetadata = { layout: 'notes', projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag,
 				...(snapshot.deltaBase ? { deltaBase: snapshot.deltaBase } : {}), issues: snapshot.issues ?? [],
-				noteCount: written.size, inventory: inventoryDigest([...written].map(([path, note]) => [path, note.version])) };
+				noteVersions: [...written].map(([path, note]) => [path, note.version]) };
 			const plain = JSON.stringify({ ...metadata, sessionScope });
 			const protectedValue = sealPrivateValue(plain, `cache:${sessionScope}:${folderPath}`);
 			await transaction.objectStore(CACHE_STORE_NAME).put(protectedValue === plain ? { folderPath, ...metadata, sessionScope }

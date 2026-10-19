@@ -94,9 +94,9 @@ try {
       const tx = db.transaction(['snapshots', 'notes'], 'readwrite');
       const store = tx.objectStore('snapshots');
       const read = store.get('Reminders');
-      // A complete empty revision: no notes, and the digest of an empty inventory.
+      // A complete empty revision: no notes, and an empty note version list.
       tx.objectStore('notes').delete(IDBKeyRange.bound(['Reminders'], ['Reminders', []]));
-      read.onsuccess = () => store.put({ ...read.result, projects: [], noteCount: 0, inventory: '811c9dc59747b28c:0' });
+      read.onsuccess = () => store.put({ ...read.result, projects: [], noteVersions: [] });
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => reject(tx.error);
      };
