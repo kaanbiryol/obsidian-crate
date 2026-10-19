@@ -20,7 +20,7 @@ import {
   handleCloudflareOAuthProtocol,
 } from "../cloudflare/plugin-integration";
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
-import { beginPluginLifecycle, endPluginLifecycle } from './lifecycle-state';
+import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/checkpoint-backup-cleanup';
 
@@ -45,13 +45,20 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
     await initializePluginReminders(plugin, signal);
   }
   if (signal.aborted) return;
-  await initializePluginSync(plugin, signal);
-  if (signal.aborted) return;
+  // Manifest loading and startup sync wait for the workspace so they never
+  // delay Obsidian's startup. The runtime reports `initializing` until then.
+  const syncReady = new Promise<void>(resolve => {
+    plugin.app.workspace.onLayoutReady(() => {
+      if (signal.aborted) { resolve(); return; }
+      void initializePluginSync(plugin, signal).finally(resolve);
+    });
+  });
+  setSyncReady(plugin, syncReady);
   registerSharedFeatures(plugin);
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
-  void reconcileNotificationsAfterStartupSync(plugin, signal);
+  void reconcileNotificationsAfterStartupSync(plugin, signal, syncReady);
 }
 
 export function shutdownPlugin(plugin: CratePlugin): void {
@@ -117,8 +124,10 @@ async function initializePluginSync(plugin: CratePlugin, signal: AbortSignal): P
   }
 }
 
-async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signal: AbortSignal): Promise<void> {
+async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signal: AbortSignal, syncReady: Promise<void>): Promise<void> {
   try {
+    await syncReady;
+    if (signal.aborted) return;
     const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
     if (signal.aborted) return;
     if (!plugin.remindersSettings.enabled || !plugin.reminderIndex) return;

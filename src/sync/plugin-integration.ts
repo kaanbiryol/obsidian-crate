@@ -10,7 +10,7 @@ import { ActivityModal } from '../ui/activity-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
-import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
 import { SECRET_KEYS } from '../plugin/settings-types';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
@@ -47,7 +47,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
 		if (!(file instanceof TFile) || !plugin.syncRuntime.isConfigured()) return;
 		menu.addItem(item => item.setTitle('File history').setIcon('history').onClick(() => {
-			openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, file.path);
+			openFileHistoryWhenReady(plugin, file.path);
 		}));
 	}));
 	plugin.addCommand({
@@ -55,7 +55,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 		checkCallback: checking => {
 			const file = plugin.app.workspace.getActiveFile();
 			const available = plugin.syncRuntime.isConfigured() && file !== null;
-			if (!checking && available) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, file.path);
+			if (!checking && available) openFileHistoryWhenReady(plugin, file.path);
 			return available;
 		},
 	});
@@ -94,8 +94,19 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	});
 }
 
+function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
+	const signal = getPluginLifecycleSignal(plugin);
+	void waitForSyncReady(plugin).then(() => {
+		if (!signal.aborted) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, path);
+	});
+}
+
 async function runSyncNow(plugin: CratePlugin): Promise<void> {
+	const signal = getPluginLifecycleSignal(plugin);
 	try {
+		// Startup initialization runs after the workspace is ready.
+		await waitForSyncReady(plugin);
+		if (signal.aborted) return;
 		const result = await plugin.syncRuntime.sync();
 		if (result.outcome === 'cancelled') return;
 		if (!result.success) {

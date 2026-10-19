@@ -106,6 +106,9 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 				open: vi.fn(),
 				openTabById: vi.fn(),
 			},
+			workspace: {
+				onLayoutReady: vi.fn((callback: () => void) => callback()),
+			},
 		},
 		manifest: {
 			id: 'crate',
@@ -426,8 +429,9 @@ it.each(['connection restore', 'reminders', 'sync'])('stops startup after shutdo
   shutdownPlugin(plugin as never);
   finish();
   await starting;
-  expect(registerSyncCommands).not.toHaveBeenCalled();
-  expect(plugin.registerObsidianProtocolHandler).not.toHaveBeenCalled();
+  // Sync initialization runs after onload, once the workspace layout is ready.
+  expect(registerSyncCommands).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
+  expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(stage === 'sync' ? 2 : 0);
   expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
   expect(initialize).toHaveBeenCalledTimes(stage === 'sync' ? 1 : 0);
   expect(destroy).toHaveBeenCalledTimes(stage === 'connection restore' ? 0 : 1);
@@ -468,4 +472,54 @@ it('does not reactivate after shutdown during settings load', async () => {
   await starting;
   await Promise.resolve();
   expect(initialize).not.toHaveBeenCalled();
+});
+
+it('finishes loading before sync initializes and starts sync once the layout is ready', async () => {
+  const { bootstrapPlugin } = await loadLifecycleModule();
+  let layoutReady!: () => void;
+  const plugin = createPlugin({ reminderIndex: { flushDeferredScans: vi.fn(async () => undefined) } });
+  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+  let finishInitialize!: () => void;
+  const initialize = vi.fn(() => new Promise<void>(resolve => { finishInitialize = resolve; }));
+  const waitForStartupSync = vi.fn(async () => true);
+  initializeSyncManagers.mockImplementation(target => {
+    target.syncRuntime = { isConfigured: () => true, initialize, waitForStartupSync };
+  });
+
+  await bootstrapPlugin(plugin as never);
+
+  expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
+  expect(initialize).not.toHaveBeenCalled();
+  expect(waitForStartupSync).not.toHaveBeenCalled();
+
+  layoutReady();
+  expect(initialize).toHaveBeenCalledOnce();
+  await Promise.resolve();
+  expect(waitForStartupSync).not.toHaveBeenCalled();
+
+  finishInitialize();
+  await vi.waitFor(() => expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin));
+  expect(waitForStartupSync).toHaveBeenCalledOnce();
+});
+
+it('does not initialize sync when the plugin unloads before the layout is ready', async () => {
+  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+  let layoutReady!: () => void;
+  const plugin = createPlugin();
+  plugin.app.workspace.onLayoutReady.mockImplementation((callback: () => void) => { layoutReady = callback; });
+  const initialize = vi.fn(async () => {});
+  const waitForStartupSync = vi.fn(async () => false);
+  initializeSyncManagers.mockImplementation(target => {
+    target.syncRuntime = { isConfigured: () => true, initialize, destroy: vi.fn(), waitForStartupSync };
+  });
+
+  await bootstrapPlugin(plugin as never);
+  shutdownPlugin(plugin as never);
+  layoutReady();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(initialize).not.toHaveBeenCalled();
+  expect(waitForStartupSync).not.toHaveBeenCalled();
+  expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 });

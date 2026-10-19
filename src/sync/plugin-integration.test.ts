@@ -3,6 +3,7 @@ import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractF
 import type CratePlugin from '../main';
 import { openRemoteRecoveryModal } from '../ui/remote-recovery-modal';
 import { registerSyncCommands } from './plugin-integration';
+import { setSyncReady } from '../plugin/lifecycle-state';
 
 vi.mock('../ui/remote-recovery-modal', () => ({ openRemoteRecoveryModal: vi.fn() }));
 vi.mock('../ui/activity-modal', () => ({ ActivityModal: vi.fn() }));
@@ -25,13 +26,13 @@ function setup() {
  return { plugin, workspace, file, commands, fileMenu };
 }
 
-it('opens the active file only when the history command is executed', () => {
+it('opens the active file only when the history command is executed', async () => {
  const { plugin, workspace, file, commands } = setup();
  const command = commands.find(command => command.id === 'show-file-history')!;
  expect(command.checkCallback!(true)).toBe(true);
  expect(openRemoteRecoveryModal).not.toHaveBeenCalled();
  command.checkCallback!(false);
- expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, file.path);
+ await vi.waitFor(() => expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, file.path));
  workspace.getActiveFile.mockReturnValue(null);
  expect(command.checkCallback!(false)).toBe(false);
  workspace.getActiveFile.mockReturnValue(file);
@@ -40,7 +41,7 @@ it('opens the active file only when the history command is executed', () => {
  expect(openRemoteRecoveryModal).toHaveBeenCalledTimes(1);
 });
 
-it('registers a file-only context action that opens the clicked file', () => {
+it('registers a file-only context action that opens the clicked file', async () => {
  const { plugin, file, fileMenu } = setup();
  let click!: () => void;
  const item = { setTitle: vi.fn().mockReturnThis(), setIcon: vi.fn().mockReturnThis(), onClick: vi.fn((callback: () => void) => { click = callback; }) };
@@ -50,9 +51,22 @@ it('registers a file-only context action that opens the clicked file', () => {
  fileMenu(menu as unknown as Menu, clicked);
  expect(item.setTitle).toHaveBeenCalledWith('File history');
  click();
- expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, clicked.path);
+ await vi.waitFor(() => expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, clicked.path));
  fileMenu(menu as unknown as Menu, new TFolder());
  plugin.syncRuntime.isConfigured.mockReturnValue(false);
  fileMenu(menu as unknown as Menu, file);
  expect(menu.addItem).toHaveBeenCalledTimes(1);
+});
+
+it('waits for startup sync initialization before running sync now', async () => {
+ const { plugin, commands } = setup();
+ let ready!: () => void;
+ setSyncReady(plugin as unknown as CratePlugin, new Promise<void>(resolve => { ready = resolve; }));
+ const sync = vi.fn(async () => ({ outcome: 'cancelled' }));
+ Object.assign(plugin.syncRuntime, { sync });
+ commands.find(command => command.id === 'sync-now')!.checkCallback!(false);
+ await Promise.resolve();
+ expect(sync).not.toHaveBeenCalled();
+ ready();
+ await vi.waitFor(() => expect(sync).toHaveBeenCalledOnce());
 });
