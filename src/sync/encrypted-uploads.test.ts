@@ -139,9 +139,9 @@ it('uses a batch-resolved precondition once instead of asking the server per fil
 	const encryption = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, createVaultKeyBundle(), async () => null);
 	const journal = { ...file, expectedHash: 'plain-baseline', operationId: crypto.randomUUID() } as unknown as JournalUpload;
 	const cipher = 'c'.repeat(64);
-	(encryption as unknown as { preloaded: Map<string, unknown> }).preloaded.set(file.path, { expected: 'plain-baseline', result: cipher });
-	await expect(encryption.prepare(journal)).resolves.toMatchObject({ expectedHash: cipher });
+	const batch = new Map([[file.path, { expected: 'plain-baseline', result: cipher }]]);
+	await expect(encryption.prepare(journal, batch)).resolves.toMatchObject({ expectedHash: cipher });
 	expect(requestJson).not.toHaveBeenCalled();
 	// Consumed: a second preparation must check the server again.
-	await expect(encryption.prepare(journal)).rejects.toThrow('Unexpected precondition request');
+	await expect(encryption.prepare(journal, batch)).rejects.toThrow('Unexpected precondition request');
 });

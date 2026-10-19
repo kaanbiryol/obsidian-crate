@@ -9,13 +9,14 @@ import { UNVERIFIED_MODIFIED } from './applied-content';
 import { computeHash } from './hasher';
 import type { UploadApplyPhase, UploadPhase } from './upload-diagnostics';
 import { HttpError } from './worker-api/http';
+import type { UploadPreconditions } from './encrypted-files';
 
 interface UploadTransport {
 	requiresLegacyUploadRecovery?(file: JournalUpload): boolean;
 	resolveLegacyUpload?(file: JournalUpload): Promise<UploadResult | null>;
-	prepareUploadWire?: PrepareUploadWire;
+	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
 	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
-	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<void>;
+	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined>;
 	assertPreparedUpload?(file: JournalUpload): Promise<void>;
 	getServerInfo(): Promise<{ reminderOperationDay?: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
@@ -34,21 +35,17 @@ export class DurableUploads {
 	async batch(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
 		const durable: JournalUpload[] = [];
 		const rejected: UploadResult[] = [];
-		try {
-			await this.transport.preloadUploadPreconditions?.(files);
-			for (const file of files) {
-				try {
-					durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }]));
-				} catch (error) {
-					// Encryption resolves the plaintext precondition before journaling.
-					// A stale file has not been dispatched and can reconcile independently.
-					if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
-					rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
-				}
+		// Batch-scoped, so unconsumed results cannot satisfy a later upload.
+		const preconditions = await this.transport.preloadUploadPreconditions?.(files);
+		for (const file of files) {
+			try {
+				durable.push(...await this.prepare([{ ...file, intent: { kind: 'local' } }], preconditions));
+			} catch (error) {
+				// Encryption resolves the plaintext precondition before journaling.
+				// A stale file has not been dispatched and can reconcile independently.
+				if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
+				rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
 			}
-		} finally {
-			// Unconsumed results must not satisfy a later upload.
-			await this.transport.preloadUploadPreconditions?.([]);
 		}
 		const response = durable.length ? await this.sendBatch(durable) : { success: true, results: [] };
 		const results = new Map([...response.results, ...rejected].map(result => [result.path, result]));
@@ -124,14 +121,15 @@ export class DurableUploads {
 		return this.recovering;
 	}
 
-	private async prepare(files: IntendedUpload[]): Promise<JournalUpload[]> {
+	private async prepare(files: IntendedUpload[], preconditions?: UploadPreconditions): Promise<JournalUpload[]> {
 		if (!this.serverDay || this.serverDay.expires <= performance.now()) {
 			const info = await this.transport.getServerInfo();
 			if (!Number.isInteger(info.reminderOperationDay)) throw new Error('Server did not provide an upload retry window. Update the server before syncing.');
 			this.serverDay = { day: info.reminderOperationDay!, expires: performance.now() + 60_000 };
 		}
+		const transport = this.transport;
 		const prepared = await this.manifest.uploadJournal.prepare(files, this.serverDay.day, this.clientSession,
-			this.transport.prepareUploadWire?.bind(this.transport));
+			transport.prepareUploadWire && (file => transport.prepareUploadWire!(file, preconditions)));
 		for (const file of prepared) await this.trace(file, 'prepared');
 		return prepared;
 	}

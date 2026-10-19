@@ -22,6 +22,8 @@ type PublicDataBuilder = (path: string, content: ArrayBuffer) => Promise<unknown
 interface VerifiedRevision { metadata: PrivateFileMetadata; wireHash: string }
 /** A plaintext precondition to translate into the server's ciphertext hash. */
 export interface ExpectedHashRequest { path: string; expected: string | null; revision?: string | null }
+/** One upload batch's resolved preconditions, each consumed once by `prepare`. */
+export type UploadPreconditions = Map<string, { expected: string; result: string | HttpError }>;
 
 function conflictError(): HttpError {
 	return new HttpError('Remote file changed; sync again before writing', 409, null, 'version_conflict');
@@ -31,8 +33,6 @@ function conflictError(): HttpError {
  * Never substitute a decrypted hash into an R2 or conditional-write request. */
 export class EncryptedFiles {
 	private readonly verifiedMetadata = new Map<string, VerifiedRevision>();
-	// Batch-resolved upload preconditions, each consumed once by `prepare`.
-	private readonly preloaded = new Map<string, { expected: string; result: string | HttpError }>();
 	private constructor(private readonly http: WorkerApiHttpClient, readonly keys: FileKeyAuthority,
 		readonly generation: number, private readonly publicData: PublicDataBuilder) {}
 
@@ -94,12 +94,14 @@ export class EncryptedFiles {
 		return results as Array<string | null>;
 	}
 
-	/** Resolve one upload batch's preconditions together; `prepare` consumes each result once. */
-	async preloadExpected(requests: ExpectedHashRequest[]): Promise<void> {
-		this.preloaded.clear();
+	/** Resolve one upload batch's preconditions together. The result is scoped to
+	 * that batch, so concurrent batches cannot consume or discard each other's. */
+	async preloadExpected(requests: ExpectedHashRequest[]): Promise<UploadPreconditions> {
+		const preloaded: UploadPreconditions = new Map();
 		const pending = requests.filter(request => request.expected !== null);
 		const results = await this.resolveExpected(pending);
-		pending.forEach((request, index) => this.preloaded.set(request.path, { expected: request.expected!, result: results[index]! }));
+		pending.forEach((request, index) => preloaded.set(request.path, { expected: request.expected!, result: results[index]! }));
+		return preloaded;
 	}
 
 	private async resolveExpected(requests: ExpectedHashRequest[]): Promise<Array<string | null | HttpError>> {
@@ -143,9 +145,9 @@ export class EncryptedFiles {
 		return conflictError();
 	}
 
-	async prepare(file: JournalUpload): Promise<EncryptedUploadWire> {
-		const preloaded = this.preloaded.get(file.path);
-		if (preloaded) this.preloaded.delete(file.path);
+	async prepare(file: JournalUpload, batch?: UploadPreconditions): Promise<EncryptedUploadWire> {
+		const preloaded = batch?.get(file.path);
+		if (preloaded) batch!.delete(file.path);
 		const resolved = preloaded && preloaded.expected === file.expectedHash ? preloaded.result : undefined;
 		if (resolved instanceof HttpError) throw resolved;
 		const expectedHash = resolved ?? await this.expectedHash(file.path, file.expectedHash);

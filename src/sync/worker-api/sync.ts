@@ -1,6 +1,6 @@
 import type { ConnectionTestResult } from '../types';
 import { computeHash } from '../hasher';
-import type { EncryptedFiles } from '../encrypted-files';
+import type { EncryptedFiles, UploadPreconditions } from '../encrypted-files';
 import type { JournalUpload } from '../upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
@@ -47,9 +47,9 @@ export class SyncWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 	private encryption?: EncryptedFiles;
 	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
-	prepareUploadWire(file: JournalUpload) { return this.encryption?.prepare(file) ?? Promise.resolve(undefined); }
-	async preloadUploadPreconditions(files: Array<{ path: string; expectedHash: string | null }>): Promise<void> {
-		await this.encryption?.preloadExpected(files.map(file => ({ path: file.path, expected: file.expectedHash })));
+	prepareUploadWire(file: JournalUpload, preconditions?: UploadPreconditions) { return this.encryption?.prepare(file, preconditions) ?? Promise.resolve(undefined); }
+	async preloadUploadPreconditions(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined> {
+		return this.encryption?.preloadExpected(files.map(file => ({ path: file.path, expected: file.expectedHash })));
 	}
 	prepareRestoreWire(intent: RestoreIntent) { return this.encryption?.prepareRestore(intent) ?? Promise.resolve(undefined); }
 	assertPreparedRestore(intent: RestoreIntent): void {

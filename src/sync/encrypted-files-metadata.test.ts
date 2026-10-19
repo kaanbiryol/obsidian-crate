@@ -5,7 +5,9 @@ import type { WorkerApiHttpClient } from './worker-api/http';
 
 vi.mock('../encryption/file-format', async original => ({ ...await original<object>(), validateFileDescriptor: () => {} }));
 vi.mock('../encryption/file-codec', async original => ({ ...await original<object>(),
-	openFileMetadata: async (descriptor: { path: string; revision: string }) => ({ path: descriptor.path, hash: `plain-${descriptor.revision}`, size: 1 }) }));
+	openFileMetadata: async (descriptor: { path: string; revision: string }) => ({ path: descriptor.path, hash: `plain-${descriptor.revision}`, size: 1 }),
+	sealFile: async (input: { path: string; content: Uint8Array }) => ({ bytes: input.content, hash: 'sealed',
+		metadata: { path: input.path, hash: 'plain', size: input.content.byteLength } }) }));
 vi.mock('../encryption/file-authority', () => ({ FileKeyAuthority: { fromVault: async () => ({ forPath: () => ({}) }) } }));
 
 it('decrypts large inventories in bounded, overlapping batches and keeps their order', async () => {
@@ -73,10 +75,21 @@ it('still rejects a file whose plaintext no longer matches the synced baseline',
 it('resolves an upload batch once and lets each file use its result only once', async () => {
 	const { cipher, requests, files } = precondition();
 	const encryption = await files();
-	await encryption.preloadExpected([0, 1, 2].map(i => ({ path: `n/${i}.md`, expected: `plain-rev-${i}` })));
+	const preloaded = await encryption.preloadExpected([0, 1, 2].map(i => ({ path: `n/${i}.md`, expected: `plain-rev-${i}` })));
 	expect(requests('/sync/metadata')).toBe(1);
-	const preloaded = (encryption as unknown as { preloaded: Map<string, { result: string }> }).preloaded;
 	expect([...preloaded.values()].map(entry => entry.result)).toEqual([0, 1, 2].map(cipher));
-	await encryption.preloadExpected([]);
-	expect(preloaded.size).toBe(0);
+});
+
+it('keeps concurrent upload batches from discarding each other\'s preconditions', async () => {
+	const { cipher, requests, files } = precondition();
+	const encryption = await files();
+	const upload = (i: number) => ({ path: `n/${i}.md`, content: btoa('x'), hash: 'plain', size: 1, contentType: 'text/markdown',
+		expectedHash: `plain-rev-${i}`, intent: { kind: 'local' as const }, operationId: 'op', origin: { clientSession: 's', at: '' } });
+	const batches = [[0, 1, 2], [3, 4, 5]];
+	const preloaded = await Promise.all(batches.map(batch => encryption.preloadExpected(batch.map(i => ({ path: `n/${i}.md`, expected: `plain-rev-${i}` })))));
+	const wires = await Promise.all(batches.map((batch, index) => Promise.all(batch.map(i => encryption.prepare(upload(i), preloaded[index])))));
+	expect(wires.flat().map(wire => wire.expectedHash)).toEqual([0, 1, 2, 3, 4, 5].map(cipher));
+	// Before: the second preload cleared the first batch, costing one request per file.
+	expect(requests('/sync/metadata')).toBe(2);
+	expect(preloaded.every(batch => batch.size === 0)).toBe(true);
 });
