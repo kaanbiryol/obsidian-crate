@@ -14,7 +14,7 @@ const chunks = Array.from({ length: 74 }, (_, index) => `/notifications/assets/c
 async function install(chunkUrls: string[], previous: string[], failing?: string) {
   const stores = new Map<string, Map<string, Response>>([['crate-reminders-shell-v1', new Map(previous.map(url => [url, new Response(url)]))]]);
   let inFlight = 0, peak = 0;
-  const fetch = vi.fn(async (url: string) => {
+  const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
     inFlight += 1; peak = Math.max(peak, inFlight);
     await new Promise(resolve => setTimeout(resolve, 1));
     inFlight -= 1;
@@ -36,7 +36,7 @@ async function install(chunkUrls: string[], previous: string[], failing?: string
   let work!: Promise<unknown>;
   handlers.get('install')!({ waitUntil: (promise: Promise<unknown>) => { work = promise; } });
   const result = await work.then(() => 'installed', (error: Error) => error.message);
-  return { result, fetched: fetch.mock.calls.map(([url]) => url), peak, cached: stores.get('crate-reminders-shell-v2')! };
+  return { result, fetched: fetch.mock.calls.map(([url]) => url), init: new Map(fetch.mock.calls.map(([url, options]) => [url, options] as const)), peak, cached: stores.get('crate-reminders-shell-v2')! };
 }
 
 it('reuses unchanged hashed chunks from an earlier version and downloads the rest in parallel', async () => {
@@ -53,4 +53,12 @@ it('reuses unchanged hashed chunks from an earlier version and downloads the res
 it('still fails the install when any asset is unavailable', async () => {
   const { result } = await install(chunks, [], chunks[10]);
   expect(result).toBe(`Offline asset unavailable: ${chunks[10]}`);
+});
+
+it('bypasses the HTTP cache only for the unversioned shell', async () => {
+  // The page already loaded immutable hashed and versioned assets before registering.
+  const { init } = await install(chunks.slice(0, 2), []);
+  expect(init.get('/notifications')).toEqual({ cache: 'reload' });
+  expect([...init].filter(([url, options]) => url !== '/notifications' && options !== undefined)).toEqual([]);
+  expect(init.size).toBe(9);
 });

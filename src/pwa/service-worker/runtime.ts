@@ -50,11 +50,13 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 		event.waitUntil(caches.open(shellCache).then(async cache => {
 			// Keep installation conditional on a complete shell and bound traffic.
 			// A content-hashed chunk an earlier version cached is the same file.
+			// Hashed and versioned URLs are immutable, so the page's HTTP cache may
+			// satisfy them; only the unversioned shell must bypass it.
 			const queue = [...precacheUrls];
 			const next = async (): Promise<void> => {
 				for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
 					const cached = HASHED_CHUNK.test(url) ? await caches.match(url) : undefined;
-					const response = cached ?? await fetch(url, { cache: 'reload' });
+					const response = cached ?? await (url === shellUrl ? fetch(url, { cache: 'reload' }) : fetch(url));
 					if (!response.ok) {
 						queue.length = 0;
 						throw new Error('Offline asset unavailable: ' + url);
