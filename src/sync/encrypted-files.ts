@@ -33,6 +33,9 @@ function conflictError(): HttpError {
  * Never substitute a decrypted hash into an R2 or conditional-write request. */
 export class EncryptedFiles {
 	private readonly verifiedMetadata = new Map<string, VerifiedRevision>();
+	// Wires sealed by this instance from content whose hash and size it checked.
+	// Journal entries loaded from disk are new objects and get full verification.
+	private readonly sealed = new WeakSet<EncryptedUploadWire>();
 	private constructor(private readonly http: WorkerApiHttpClient, readonly keys: FileKeyAuthority,
 		readonly generation: number, private readonly publicData: PublicDataBuilder) {}
 
@@ -155,12 +158,15 @@ export class EncryptedFiles {
 		const sealed = await sealFile({ path: file.path, content: new Uint8Array(content), contentType: file.contentType,
 			publicData: await this.publicData(file.path, content) }, this.keys.forPath(file.path));
 		if (sealed.metadata.hash !== file.hash || sealed.metadata.size !== file.size) throw new Error('File changed before encryption');
-		return { format: 'crate-e2ee-v1', generation: this.generation, content: arrayBufferToBase64(sealed.bytes.buffer), hash: sealed.hash,
+		const wire: EncryptedUploadWire = { format: 'crate-e2ee-v1', generation: this.generation, content: arrayBufferToBase64(sealed.bytes.buffer), hash: sealed.hash,
 			size: sealed.bytes.byteLength, contentType: ENCRYPTED_FILE_CONTENT_TYPE, expectedHash };
+		this.sealed.add(wire);
+		return wire;
 	}
 
 	async verifyPrepared(file: JournalUpload): Promise<void> {
 		if (!file.encryptedWire) throw new Error('A plaintext upload is unresolved. Recover it before enabling encryption.');
+		if (this.sealed.has(file.encryptedWire)) return;
 		const plain = await this.download(file.path, base64ToArrayBuffer(file.encryptedWire.content), file.encryptedWire);
 		if (plain.metadata.hash !== file.hash || plain.metadata.size !== file.size) throw new Error('Encrypted upload does not match its saved local content');
 	}

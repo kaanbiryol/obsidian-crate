@@ -61,7 +61,8 @@ export class UploadJournal {
 				const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
 				if (reminderOperationDay(durable.operationId) === null || (this.entries.has(durable.operationId) || this.completed.has(durable.operationId))) throw new Error('Invalid or reused upload operation identity');
 				const encryptedWire = await prepareWire?.(durable);
-				if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable); }
+				// Sealing already hashed this plaintext and ciphertext; check only the shape.
+				if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable, true); }
 				// A failed write must not dispatch the request. A partial journal file
 				// makes restart fail closed instead of guessing that no upload ran.
 				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));

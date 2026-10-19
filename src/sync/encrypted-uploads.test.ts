@@ -51,6 +51,31 @@ it('replays identical ciphertext and operation identity after a lost response an
 	await restarted.close();
 });
 
+it('trusts ciphertext sealed in this session but fully verifies a journal loaded from disk', async () => {
+	const { create, file, encryption } = await fixture();
+	const download = vi.spyOn(encryption, 'download');
+	let loseResponse = true;
+	const transport = {
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }), prepareUploadWire: (file: JournalUpload) => encryption.prepare(file),
+		assertPreparedUpload: (file: JournalUpload) => encryption.verifyPrepared(file), batchUpload: vi.fn(),
+		uploadFile: async (path: string, _body: ArrayBuffer, hash: string) => {
+			if (loseResponse) throw new Error('Lost response after commit');
+			return { success: true, path, hash, revision: 'immutable-revision' };
+		},
+	};
+	const cache = { putBase: vi.fn(async () => {}) };
+	const first = create();
+	await expect(new DurableUploads(first, transport, cache as never, crypto.randomUUID()).single(file)).rejects.toThrow('Lost response');
+	// Before: the freshly sealed upload was decrypted again before dispatch.
+	expect(download).not.toHaveBeenCalled();
+	await first.close();
+	const restarted = create(); await restarted.load();
+	loseResponse = false;
+	await new DurableUploads(restarted, transport, cache as never, crypto.randomUUID()).recover();
+	expect(download).toHaveBeenCalledOnce();
+	await restarted.close();
+});
+
 it('does not dispatch when persisting the encrypted wire fails', async () => {
 	const { disk, create, file, encryption } = await fixture();
 	const manifest = create();
