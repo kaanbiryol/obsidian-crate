@@ -18,13 +18,33 @@ it('publishes scheduling facts without reminder text and decrypts only with the 
 	expect(JSON.stringify(first)).not.toContain('Personal');
 	expect(first.reminders[0]?.dueDatetime).toBe('2099-01-02T10:00:00.000Z');
 	const notice = first.reminders[0]!.notification;
-	expect(notice.envelope).not.toBe(second!.reminders[0]!.notification.envelope);
+	// An unchanged fingerprint reuses its envelope instead of encrypting again.
+	expect(notice.envelope).toBe(second!.reminders[0]!.notification.envelope);
 	expect(notice.fingerprint).toBe(second!.reminders[0]!.notification.fingerprint);
+	const edited = await createReminderProjection(bundle, 'Reminders/Personal.md',
+		new TextEncoder().encode('- [ ] Secret meeting 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->').buffer);
+	expect(edited!.reminders[0]!.notification.fingerprint).not.toBe(notice.fingerprint);
+	expect(edited!.reminders[0]!.notification.envelope).not.toBe(notice.envelope);
 	expect(await openNotification(notice, await importEncryptionSecret(scope.notifications), bundle.vaultId, scope.id))
 		.toEqual({ title: 'Secret appointment', body: 'Personal' });
 	await expect(openNotification(notice, await importEncryptionSecret(scope.data), bundle.vaultId, scope.id)).rejects.toThrow();
 	await expect(openNotification(notice, await importEncryptionSecret(scope.notifications), 'different', scope.id)).rejects.toThrow();
 	expect(notice.envelope.length).toBeLessThanOrEqual(2800);
+});
+
+it('re-encrypts only reminders whose notification fingerprint changed', async () => {
+	const bundle = addReminderScope(createVaultKeyBundle(), 'Reminders');
+	const note = (changed: string) => new TextEncoder().encode(Array.from({ length: 20 }, (_, index) =>
+		`- [ ] ${index === 0 ? changed : `Task ${index}`} @2099-01-02 <!-- crate-id:r${index} -->`).join('\n')).buffer;
+	const before = await createReminderProjection(bundle, 'Reminders/Inbox.md', note('First'));
+	const importKey = vi.spyOn(crypto.subtle, 'importKey');
+	try {
+		const after = await createReminderProjection(bundle, 'Reminders/Inbox.md', note('Edited'));
+		// One envelope (two key imports). Before: 40, all 20 were encrypted again.
+		expect(importKey).toHaveBeenCalledTimes(2);
+		expect(after!.reminders.map(reminder => reminder.id)).toEqual(before!.reminders.map(reminder => reminder.id));
+		expect(after!.reminders.slice(1)).toEqual(before!.reminders.slice(1));
+	} finally { importKey.mockRestore(); }
 });
 
 it('quarantines invalid and oversize notes instead of cancelling their existing schedules', async () => {

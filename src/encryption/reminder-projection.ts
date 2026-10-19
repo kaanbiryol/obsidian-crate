@@ -53,6 +53,38 @@ export async function importNotificationFingerprintKey(vaultId: string, scope: S
 		material, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']);
 }
 
+const NOTIFICATION_CONCURRENCY = 8;
+const MAX_CACHED_ENVELOPES = 4096;
+/** Recent envelopes per notification key, by context and fingerprint. The server
+ * already sees when a fingerprint is unchanged, so reusing that ciphertext for
+ * identical display text reveals nothing new and skips re-encrypting it. */
+const notificationEnvelopes = new WeakMap<EncryptionKey, Map<string, string>>();
+
+async function sealNotification(vaultId: string, scopeId: string, key: EncryptionKey, fingerprintKey: CryptoKey,
+	reminder: { id: string; content: string; project: string }): Promise<EncryptedNotification> {
+	const notice: EncryptedNotification = { version: 1, vaultId, scopeId,
+		keyId: key.id, reminderId: reminder.id, fingerprint: '', envelope: '' };
+	const display = { title: trimDisplay(readableLinkText(reminder.content), 800),
+		body: trimDisplay(readableLinkText(reminder.project), 160) };
+	while (new TextEncoder().encode(JSON.stringify(display)).length > 1024) display.title = Array.from(display.title).slice(0, -1).join('');
+	notice.fingerprint = encodeBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', fingerprintKey,
+		new TextEncoder().encode(JSON.stringify([reminder.id, display])))));
+	let envelopes = notificationEnvelopes.get(key);
+	if (!envelopes) notificationEnvelopes.set(key, envelopes = new Map<string, string>());
+	const cacheKey = JSON.stringify([vaultId, scopeId, reminder.id, notice.fingerprint]);
+	const cached = envelopes.get(cacheKey);
+	if (cached !== undefined) {
+		envelopes.delete(cacheKey);
+		notice.envelope = cached;
+	} else {
+		notice.envelope = await encryptJson(display, key, context(notice));
+	}
+	envelopes.set(cacheKey, notice.envelope);
+	while (envelopes.size > MAX_CACHED_ENVELOPES) envelopes.delete(envelopes.keys().next().value!);
+	validateEncryptedNotification(notice);
+	return notice;
+}
+
 export async function createReminderProjectionWithKeys(vaultId: string, scope: Pick<ScopeKeys, 'id' | 'folderPath'>,
 	key: EncryptionKey, fingerprintKey: CryptoKey, path: string, bytes: ArrayBuffer): Promise<EncryptedSchedules | null> {
 	if (!path.startsWith(`${scope.folderPath}/`) || !path.toLowerCase().endsWith('.md')) return null;
@@ -63,24 +95,19 @@ export async function createReminderProjectionWithKeys(vaultId: string, scope: P
 	if (scanned.length > 10_000) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
 	const reminders: EncryptedSchedules['reminders'] = [];
 	let projectionBytes = new TextEncoder().encode(JSON.stringify({ version: 1, reminders: [] })).byteLength;
-	for (const reminder of scanned) {
-		const notice: EncryptedNotification = { version: 1, vaultId, scopeId: scope.id,
-			keyId: key.id, reminderId: reminder.id, fingerprint: '', envelope: '' };
-		const display = { title: trimDisplay(readableLinkText(reminder.content), 800),
-			body: trimDisplay(readableLinkText(reminder.project), 160) };
-		while (new TextEncoder().encode(JSON.stringify(display)).length > 1024) display.title = Array.from(display.title).slice(0, -1).join('');
-		notice.fingerprint = encodeBase64Url(new Uint8Array(await crypto.subtle.sign('HMAC', fingerprintKey,
-			new TextEncoder().encode(JSON.stringify([reminder.id, display])))));
-		notice.envelope = await encryptJson(display, key, context(notice));
-		validateEncryptedNotification(notice);
-		const schedule = { id: reminder.id, completed: reminder.completed,
-			...(reminder.dueDate ? { dueDate: reminder.dueDate } : {}),
-			...(reminder.dueDatetime ? { dueDatetime: reminder.dueDatetime } : {}), notification: notice };
-		projectionBytes += new TextEncoder().encode(JSON.stringify(schedule)).byteLength + (reminders.length ? 1 : 0);
-		// Optional scheduling must not prevent encrypting and syncing the vault
-		// file, including while converting an existing large reminders note.
-		if (projectionBytes > MAX_ENCRYPTED_PUBLIC_DATA_BYTES) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
-		reminders.push(schedule);
+	for (let offset = 0; offset < scanned.length; offset += NOTIFICATION_CONCURRENCY) {
+		const chunk = scanned.slice(offset, offset + NOTIFICATION_CONCURRENCY);
+		const notices = await Promise.all(chunk.map(reminder => sealNotification(vaultId, scope.id, key, fingerprintKey, reminder)));
+		for (const [index, reminder] of chunk.entries()) {
+			const schedule = { id: reminder.id, completed: reminder.completed,
+				...(reminder.dueDate ? { dueDate: reminder.dueDate } : {}),
+				...(reminder.dueDatetime ? { dueDatetime: reminder.dueDatetime } : {}), notification: notices[index]! };
+			projectionBytes += new TextEncoder().encode(JSON.stringify(schedule)).byteLength + (reminders.length ? 1 : 0);
+			// Optional scheduling must not prevent encrypting and syncing the vault
+			// file, including while converting an existing large reminders note.
+			if (projectionBytes > MAX_ENCRYPTED_PUBLIC_DATA_BYTES) return { version: 1, reminders: [], issue: 'scheduling-capacity' };
+			reminders.push(schedule);
+		}
 	}
 	return { version: 1, reminders };
 }
