@@ -266,8 +266,8 @@ it('finishes 400 newly imported overdue reminders without creating cancellation 
   expect(await readiness()).toEqual({ ready: true });
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 400 });
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_jobs').first()).toEqual({ n: 0 });
-  // The dispatcher is called once; no per-reminder cancellation objects are opened.
-  expect(dispatch).toHaveBeenCalledTimes(1);
+  // With no alarm update due, neither the dispatcher nor per-reminder objects are opened.
+  expect(dispatch).not.toHaveBeenCalled();
 });
 
 it.each([false, true])('cancels a completed reminder with an existing alarm or pending schedule (dispatched=%s)', async dispatched => {

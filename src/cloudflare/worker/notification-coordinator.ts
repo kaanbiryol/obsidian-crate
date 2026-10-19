@@ -8,6 +8,12 @@ import { dispatchNotificationJobs } from './notification-outbox';
 import { revalidateReminderSources } from './reminder-source-migration';
 import { readEncryptionState } from './encryption-state';
 
+type NotificationWork = { ready: number; projectionRetry: number | null; dispatchAt: number | null };
+
+function nextNotificationWork(db: D1Database): Promise<NotificationWork | null> {
+  return db.prepare(NEXT_NOTIFICATION_WORK_SQL).first<NotificationWork>();
+}
+
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   const encryption = await readEncryptionState(env.DB);
   if (['converting', 'resetting'].includes(encryption?.mode ?? '')) return;
@@ -21,6 +27,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     return;
   }
   let hasPolicy = false;
+  let pending: NotificationWork | null | undefined;
   try {
     // Source verification and projection share this budget. Dispatch has its own
     // invocation so a reminder backlog does not compete with source scans.
@@ -31,7 +38,12 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     sourceWork = await revalidateReminderSources(env, encryption ? 1 : 2, { folder: policy?.folderPath ?? null, encryption });
     if (hasPolicy) {
       await drainNotificationProjections(env, 1, { features, policy, encryption });
-      await dispatchNotificationJobs(env);
+      // Skip the dispatcher hop when no alarm update is due yet.
+      pending = await nextNotificationWork(env.DB);
+      if (pending?.dispatchAt != null && pending.dispatchAt <= Date.now()) {
+        pending = undefined;
+        await dispatchNotificationJobs(env, true);
+      }
     }
   } finally {
     if (sourceWork) {
@@ -39,8 +51,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     } else {
       const source = hasPolicy ? null : await env.DB.prepare(NEXT_SOURCE_RETRY_SQL)
         .first<{ retryAt: number | null }>();
-      const pending = hasPolicy ? await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL)
-        .first<{ ready: number; projectionRetry: number | null; dispatchAt: number | null }>() : null;
+      if (pending === undefined) pending = hasPolicy ? await nextNotificationWork(env.DB) : null;
       const deadlines = [readingAt, source?.retryAt, pending?.projectionRetry, pending?.dispatchAt,
         ...(pending?.ready ? [0] : [])].filter((value): value is number => typeof value === 'number');
       // Continue ready work immediately in a fresh invocation with its own budget.

@@ -19,12 +19,16 @@ interface NotificationJobRow {
 }
 
 const OUTBOX_BATCH_SIZE = 10;
+/** Set by a coordinator pass that has just loaded the feature policy. */
+export const REMINDERS_ENABLED_HEADER = 'X-Crate-Reminders-Enabled';
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
-export async function dispatchNotificationJobs(env: Env): Promise<void> {
+export async function dispatchNotificationJobs(env: Env, remindersEnabled?: boolean): Promise<void> {
 	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
-	const response = await dispatcher.fetch('https://do/dispatch-jobs', { method: 'POST' });
+	const response = await dispatcher.fetch('https://do/dispatch-jobs', {
+		method: 'POST', headers: remindersEnabled ? { [REMINDERS_ENABLED_HEADER]: '1' } : undefined,
+	});
 	if (!response.ok) throw new Error('Unable to process reminder schedules');
 }
 
@@ -48,17 +52,9 @@ async function runJob(env: Env, job: NotificationJobRow): Promise<void> {
 	if (!response.ok) throw new Error('Failed to schedule alarm');
 }
 
-async function processNotificationJob(
-	env: Env,
-	reminderId: string,
-	jobToken: string,
-): Promise<string | undefined> {
-	const job = await env.DB.prepare(`SELECT reminder_id, job_token, operation, payload_json, attempts
-		FROM notification_jobs WHERE reminder_id = ?`)
-		.bind(reminderId)
-		.first<NotificationJobRow>();
-	if (!job || job.job_token !== jobToken) return undefined;
-
+async function processNotificationJob(env: Env, job: NotificationJobRow): Promise<string | undefined> {
+	// Each reminder object rejects a superseded job token, and every write below
+	// is token-guarded, so the batch row needs no second read.
 	try {
 		await runJob(env, job);
 		await env.DB.prepare('DELETE FROM notification_jobs WHERE reminder_id = ? AND job_token = ?')
@@ -79,10 +75,10 @@ async function processNotificationJob(
 	}
 }
 
-export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE): Promise<void> {
-  if (!await featureEnabled(env.DB, 'reminders')) return;
-	const jobs = await queryRows<Pick<NotificationJobRow, 'reminder_id' | 'job_token'>>(
-		env.DB.prepare(`SELECT reminder_id, job_token FROM notification_jobs
+export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE, remindersEnabled?: boolean): Promise<void> {
+  if (!(remindersEnabled ?? await featureEnabled(env.DB, 'reminders'))) return;
+	const jobs = await queryRows<NotificationJobRow>(
+		env.DB.prepare(`SELECT reminder_id, job_token, operation, payload_json, attempts FROM notification_jobs
 			WHERE available_at >= 0 AND available_at <= ? ORDER BY available_at ASC LIMIT ?`)
 			.bind(Date.now(), limit),
 	);
@@ -90,7 +86,7 @@ export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE)
 	// bounds outgoing requests while avoiding serial network round trips.
 	for (let offset = 0; offset < jobs.length; offset += 5) {
 		const results = await Promise.allSettled(jobs.slice(offset, offset + 5).map(job =>
-			processNotificationJob(env, job.reminder_id, job.job_token)));
+			processNotificationJob(env, job)));
 		const failed = results.find(result => result.status === 'rejected');
 		if (failed?.status === 'rejected') throw failed.reason;
 	}

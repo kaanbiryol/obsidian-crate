@@ -5,7 +5,7 @@ import type { Env } from './types';
 
 import { publishExtraction, type Publication } from './reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from './history-checkpoints';
-import { drainNotificationJobs } from './notification-outbox';
+import { drainNotificationJobs, REMINDERS_ENABLED_HEADER } from './notification-outbox';
 import { uploadInitialFiles } from './initial-import-upload';
 import { handleBatchDownload } from './sync-batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from './bulk-upload-dispatch';
@@ -56,7 +56,7 @@ export async function handleCoordinatorRequest(
       return new Response(null, { status: 204 });
     }
     if (path === '/dispatch-jobs' && request.method === 'POST') {
-      await drainNotificationJobs(env);
+      await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);
       return new Response(null, { status: 204 });
     }
     if (path === '/history-checkpoint-create' && request.method === 'POST') return createSharedCheckpoint(env.BUCKET, env.DB);
