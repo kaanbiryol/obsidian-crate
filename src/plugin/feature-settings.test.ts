@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
-import { refreshSharedFeatures, registerSharedFeatures, setSharedFeature } from './feature-settings';
+import { refreshSharedFeatures, registerSharedFeatures, setSharedFeature, SHARED_FEATURES_REFRESH_INTERVAL_MS } from './feature-settings';
 import type { SyncState } from '../sync/types';
 import { startReading, stopReading } from '../reading/runtime';
 import { serverRequest } from './server-request';
@@ -53,7 +53,9 @@ it('resumes local backends when another device resumes the server features', asy
   expect(plugin.setRemindersEnabled).toHaveBeenCalledWith(true, expect.any(Function));
   expect(plugin.refreshSettingsTab).toHaveBeenCalledOnce();
 });
-it('checks the shared policy at startup and after each completed sync, not on a timer', async () => {
+it('checks the shared policy at startup and after completed syncs at most every ten minutes, not on a timer', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
   const listeners = new Set<(state: SyncState) => void>();
   const emit = (status: SyncState['status']) => { for (const listener of listeners) listener({ status } as SyncState); };
   const plugin = Object.assign(fixture(), {
@@ -73,6 +75,29 @@ it('checks the shared policy at startup and after each completed sync, not on a 
   await Promise.resolve();
   expect(serverRequest).toHaveBeenCalledOnce();
 
+  // Frequent automatic syncs do not refetch the policy each time.
+  emit('syncing');
+  emit('idle');
+  await Promise.resolve();
+  expect(serverRequest).toHaveBeenCalledOnce();
+
+  vi.setSystemTime(Date.now() + SHARED_FEATURES_REFRESH_INTERVAL_MS);
+  emit('syncing');
+  emit('idle');
+  await vi.waitFor(() => expect(serverRequest).toHaveBeenCalledTimes(2));
+  } finally { vi.useRealTimers(); }
+});
+it('retries the shared policy after the next sync when the last check failed', async () => {
+  const listeners = new Set<(state: SyncState) => void>();
+  const emit = (status: SyncState['status']) => { for (const listener of listeners) listener({ status } as SyncState); };
+  const plugin = Object.assign(fixture(), {
+    syncRuntime: { addStateChangeListener: (listener: (state: SyncState) => void) => listeners.add(listener), removeStateChangeListener: (listener: (state: SyncState) => void) => listeners.delete(listener) },
+    register: vi.fn(),
+  });
+  vi.mocked(serverRequest).mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ reading: true, reminders: true, revision: 'one' });
+  registerSharedFeatures(plugin as unknown as CratePlugin);
+  await vi.waitFor(() => expect(serverRequest).toHaveBeenCalledOnce());
+  await new Promise(resolve => setTimeout(resolve, 0));
   emit('syncing');
   emit('idle');
   await vi.waitFor(() => expect(serverRequest).toHaveBeenCalledTimes(2));

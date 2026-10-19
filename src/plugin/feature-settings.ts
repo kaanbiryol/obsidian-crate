@@ -56,17 +56,22 @@ export function setSharedFeature(plugin: CratePlugin, feature: 'reading' | 'remi
     await apply(plugin, policy, true, assertCurrent);
   });
 }
+/** Automatic syncs can run every few seconds; the policy rarely changes. */
+export const SHARED_FEATURES_REFRESH_INTERVAL_MS = 10 * 60_000;
 export function registerSharedFeatures(plugin: CratePlugin): void {
   let refreshing = false;
+  let lastRefreshAt: number | null = null;
   const refresh = () => {
     if (refreshing) return;
     refreshing = true;
-    void refreshSharedFeatures(plugin).catch(() => { /* Keep the last confirmed state offline. */ }).finally(() => { refreshing = false; });
+    void refreshSharedFeatures(plugin).then(() => { lastRefreshAt = Date.now(); })
+      .catch(() => { /* Keep the last confirmed state offline. */ }).finally(() => { refreshing = false; });
   };
   // Changes from other devices arrive with sync; the server enforces them meanwhile.
   let wasSyncing = false;
   const listener = (state: SyncState) => {
-    if (wasSyncing && state.status === 'idle') refresh();
+    if (wasSyncing && state.status === 'idle'
+      && (lastRefreshAt === null || Date.now() - lastRefreshAt >= SHARED_FEATURES_REFRESH_INTERVAL_MS)) refresh();
     wasSyncing = state.status === 'syncing';
   };
   plugin.syncRuntime.addStateChangeListener(listener);
