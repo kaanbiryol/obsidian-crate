@@ -28,6 +28,7 @@ test('Reading recovers an unavailable source across server restart without dupli
     const bytes = await (await bucket.get(file.storage_key)).arrayBuffer();
     // The next projection must read this source; simulate temporary loss of its object.
     await runtime.db.prepare('DELETE FROM reading_sources').run();
+    await runtime.db.prepare("DELETE FROM maintenance_state WHERE key = 'reading_projection'").run();
     await bucket.delete(file.storage_key);
     assert.equal((await request('/reading/list')).status, 503);
     const retry = { ...capture, operationId: operation() };

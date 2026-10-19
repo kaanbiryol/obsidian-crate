@@ -400,7 +400,8 @@ check the live index and exact current/retained D1 path and revision ownership; 
 client verifies size and SHA-256 against the checkpoint before staging. Unlike text
 previews, these reads support the full 25 MiB sync-file limit.
 
-Unreferenced local inventories are pruned at startup. Shared checkpoints
+Local checkpoint inventories that no sync history entry references are pruned
+when the sync engine starts. Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current
 excluded files and rejects exclusion changes during review.
 
