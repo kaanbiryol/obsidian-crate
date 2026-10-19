@@ -116,16 +116,44 @@ it('tracks thousands of card deadlines in linear time and reschedules after earl
 	// Before: about 1.3 seconds to mount and 1.5 seconds to unmount 20,000 cards on an M-series Mac.
 	expect(performance.now() - started).toBeLessThan(300);
 	expect(vi.getTimerCount()).toBe(1);
-	// The removed 12:00:31 deadline causes one early refresh, then the
+	// The removed 12:00:31 deadline causes one early wake-up, then the
 	// remaining far deadline leaves the next wake-up at the minute boundary.
+	// Neither publishes a snapshot because nothing observable changed.
 	const before = current.getSnapshot();
-	vi.advanceTimersByTime(31_000);
+	const setTimer = vi.spyOn(window, 'setTimeout');
+	vi.advanceTimersByTime(31_001);
+	expect(setTimer).toHaveBeenLastCalledWith(expect.any(Function), 28_999);
+	vi.advanceTimersByTime(28_999);
+	expect(setTimer).toHaveBeenLastCalledWith(expect.any(Function), 60_000);
 	expect(current.getSnapshot()).toBe(before);
-	vi.advanceTimersByTime(1);
-	const early = current.getSnapshot();
-	expect(early).not.toBe(before);
-	vi.advanceTimersByTime(28_998);
-	expect(current.getSnapshot()).toBe(early);
-	vi.advanceTimersByTime(1);
-	expect(current.getSnapshot()).not.toBe(early);
+	expect(vi.getTimerCount()).toBe(1);
+});
+
+it('keeps the snapshot on minute ticks and resume events until something observable changes', () => {
+	vi.setSystemTime(new Date('2026-09-08T12:00:10Z'));
+	const current = createReminderClock();
+	const listener = vi.fn();
+	cleanups.push(current.subscribe(listener));
+	const before = current.getSnapshot();
+	listener.mockClear();
+	vi.advanceTimersByTime(10 * 60_000);
+	window.dispatchEvent(new Event('focus'));
+	window.dispatchEvent(new Event('pageshow'));
+	document.dispatchEvent(new Event('visibilitychange'));
+	expect(current.getSnapshot()).toBe(before);
+	expect(listener).not.toHaveBeenCalled();
+
+	// A deadline already passed since the published time refreshes on track.
+	const reminder = task({ dueDatetime: '2026-09-08T12:05:00Z' });
+	expect(isReminderOverdue(reminder, before.now)).toBe(false);
+	cleanups.push(current.track([reminder.dueDatetime]));
+	expect(listener).toHaveBeenCalledTimes(1);
+	expect(isReminderOverdue(reminder, current.getSnapshot().now)).toBe(true);
+
+	// Moving the clock back across a tracked deadline on the same day refreshes too.
+	const afterTrack = current.getSnapshot();
+	vi.setSystemTime(new Date('2026-09-08T12:04:00Z'));
+	window.dispatchEvent(new Event('focus'));
+	expect(current.getSnapshot()).not.toBe(afterTrack);
+	expect(isReminderOverdue(reminder, current.getSnapshot().now)).toBe(false);
 });

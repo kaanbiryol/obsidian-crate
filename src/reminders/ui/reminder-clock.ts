@@ -1,5 +1,6 @@
 import { resetLocalTimeZone } from '@internationalized/date';
 import { resetDateFormatterCache } from '../utils/dateFormatting';
+import { formatLocalDateKey } from '../utils/reminderDate';
 
 interface ReminderClockSnapshot { now: Date; timezone: string }
 
@@ -9,10 +10,24 @@ export function createReminderClock() {
 	const listeners = new Set<() => void>();
 	const deadlines = new Map<symbol, number[]>();
 	let timer: number | undefined;
+	// Views only depend on the local day, the timezone and which tracked
+	// deadlines have passed. Keeping the previous snapshot otherwise lets
+	// subscribers skip re-rendering on minute ticks and resume events.
+	const crossesDeadline = (from: number, to: number) => {
+		const low = Math.min(from, to);
+		const high = Math.max(from, to);
+		for (const values of deadlines.values()) for (const deadline of values) {
+			if (deadline >= low && deadline <= high) return true;
+		}
+		return false;
+	};
 	const update = () => {
+		const now = new Date();
 		const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		if (timezone !== snapshot.timezone) { resetLocalTimeZone(); resetDateFormatterCache(); }
-		snapshot = { now: new Date(), timezone };
+		else if (formatLocalDateKey(now) === formatLocalDateKey(snapshot.now)
+			&& !crossesDeadline(snapshot.now.getTime(), now.getTime())) return;
+		snapshot = { now, timezone };
 		for (const listener of listeners) listener();
 	};
 	let scheduledAt = Infinity;
@@ -63,9 +78,15 @@ export function createReminderClock() {
 			deadlines.set(key, values);
 			if (listeners.size) {
 				const now = Date.now();
+				const published = snapshot.now.getTime();
+				let passedSincePublished = false;
 				for (const deadline of values) {
 					if (deadline >= now && deadline + 1 < scheduledAt) setTimer(deadline + 1, now);
+					if (deadline >= published && deadline <= now) passedSincePublished = true;
 				}
+				// The published time can be older than a minute. A new deadline
+				// between it and now must not render as still pending.
+				if (passedSincePublished) update();
 			}
 			return () => { deadlines.delete(key); };
 		},

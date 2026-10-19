@@ -67,6 +67,15 @@ it.each([
   const repository = mount(props);
   await act(async () => {});
   const before = repository[query].mock.calls.length;
+  // Resuming on the same day publishes no clock change, so nothing reloads.
   await act(async () => { window.dispatchEvent(new window.Event('focus')); });
+  expect(repository[query].mock.calls.length - before).toBe(0);
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    vi.setSystemTime(Date.now() + 24 * 60 * 60_000);
+    await act(async () => { window.dispatchEvent(new window.Event('focus')); });
+  } finally {
+    vi.useRealTimers();
+  }
   expect(repository[query].mock.calls.length - before).toBe(reloads);
 });
