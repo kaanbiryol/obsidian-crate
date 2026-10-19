@@ -247,6 +247,8 @@ describe('reminderIndex', () => {
 
     const index = createReminderIndex(app, 'Reminders');
     await index.load();
+    // Without pending optimistic state, queries reuse the indexed array.
+    expect(index.getAll()).toBe(index.getAll());
 
     index.applyOptimisticUpdate('r1', { content: 'Updated task', completed: true });
     index.applyOptimisticCreate(

@@ -17,6 +17,8 @@ export function createReminderOptimisticState(): ReminderOptimisticState {
 
   return {
     mergeReminders(reminders: IndexedReminder[]) {
+      // Queries run on every render; skip the copy when nothing is pending.
+      if (!createdReminders.size && !updatedReminders.size && !deletedReminderIds.size) return reminders;
       const visibleReminders = reminders.filter((reminder) => !deletedReminderIds.has(reminder.id));
       const withUpdates = visibleReminders.map((reminder) => {
         const updates = updatedReminders.get(reminder.id);
