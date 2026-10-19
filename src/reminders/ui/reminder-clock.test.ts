@@ -76,9 +76,11 @@ it('rechecks timezone on focus and clears the calendar library timezone cache', 
 	expect(getLocalTimeZone()).toBe('UTC');
 	const reminders = [task({ dueDatetime: '2026-09-09T12:00:00Z' })];
 	expect(buildTodayViewModel(reminders, current.getSnapshot().now).active).toHaveLength(1);
+	expect(formatDueDate(reminders[0]!.dueDatetime, 'en-US', current.getSnapshot().now)).toBe('Today, 12:00');
 	process.env.TZ = 'America/Los_Angeles';
 	window.dispatchEvent(new Event('focus'));
 	expect(current.getSnapshot().timezone).toBe('America/Los_Angeles');
+	expect(formatDueDate(reminders[0]!.dueDatetime, 'en-US', current.getSnapshot().now)).toBe('Tomorrow, 05:00');
 	expect(getLocalTimeZone()).toBe('America/Los_Angeles');
 	expect(buildTodayViewModel(reminders, current.getSnapshot().now).active).toEqual([]);
 });

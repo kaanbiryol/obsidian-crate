@@ -4,8 +4,39 @@ import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
 
 export { isReminderOverdue } from './reminderDate';
 
+// Formatters are reused per locale and options. Formatters without an explicit
+// timeZone capture the local timezone when created, so the cache is cleared
+// when the reminder clock detects a timezone change.
+const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+export function resetDateFormatterCache(): void {
+  relativeFormatters.clear();
+  dateFormatters.clear();
+}
+
+function getRelativeFormatter(locale: string | undefined): Intl.RelativeTimeFormat {
+  const key = locale ?? '';
+  let formatter = relativeFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    relativeFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+function getDateFormatter(locale: string | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale ?? ''}|${JSON.stringify(options)}`;
+  let formatter = dateFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options);
+    dateFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 function formatRelativeDay(offset: number, locale = getUiLocale()): string {
-  const value = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(offset, 'day');
+  const value = getRelativeFormatter(locale).format(offset, 'day');
   return sentenceCaseLocalized(value, locale);
 }
 
@@ -34,7 +65,7 @@ export function formatDueDate(
   } else if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) {
     dateText = formatRelativeDay(1, locale);
   } else {
-    dateText = new Intl.DateTimeFormat(locale, {
+    dateText = getDateFormatter(locale, {
       month: 'short',
       day: 'numeric',
     }).format(date);
@@ -46,7 +77,7 @@ export function formatDueDate(
     // Date-only occurrences keep their wall-clock time in the repeat rule.
     // Format that time in UTC to avoid shifting it through a local DST gap.
     const time = hasTime ? date : new Date(Date.UTC(2000, 0, 1, recurrenceHour, recurrence?.minute ?? 0));
-    const timeText = new Intl.DateTimeFormat(locale, {
+    const timeText = getDateFormatter(locale, {
       hour: '2-digit',
       minute: '2-digit', hourCycle: 'h23',
       ...(!hasTime ? { timeZone: 'UTC' } : {}),
@@ -67,7 +98,7 @@ export function formatDateHeader(date: Date, locale = getUiLocale(), now = new D
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (formatLocalDateKey(date) === formatLocalDateKey(now)) return formatRelativeDay(0, locale);
   if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) return formatRelativeDay(1, locale);
-  return new Intl.DateTimeFormat(locale, {
+  return getDateFormatter(locale, {
     weekday: 'long',
     month: 'short',
     day: 'numeric',

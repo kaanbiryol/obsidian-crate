@@ -1,4 +1,5 @@
 import { resetLocalTimeZone } from '@internationalized/date';
+import { resetDateFormatterCache } from '../utils/dateFormatting';
 
 interface ReminderClockSnapshot { now: Date; timezone: string }
 
@@ -10,7 +11,7 @@ export function createReminderClock() {
 	let timer: number | undefined;
 	const update = () => {
 		const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-		if (timezone !== snapshot.timezone) resetLocalTimeZone();
+		if (timezone !== snapshot.timezone) { resetLocalTimeZone(); resetDateFormatterCache(); }
 		snapshot = { now: new Date(), timezone };
 		for (const listener of listeners) listener();
 	};
