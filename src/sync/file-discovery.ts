@@ -105,22 +105,8 @@ export async function getAllVaultFiles(
 		shouldIgnore, seen, result, assertActive);
 
 	// Include hidden files at the root level (e.g. `.gitignore`)
-	for (const filePath of root.files) {
-		const name = filePath.split('/').pop() ?? '';
-		if (!name.startsWith('.')) continue;
-		if (seen.has(filePath) || shouldIgnore(filePath)) continue;
-
-		const stat = await safeStat(vault, filePath, assertActive);
-		if (!stat || stat.type !== 'file') continue;
-
-		seen.add(filePath);
-		result.push({
-			path: filePath,
-			size: stat.size,
-			mtime: stat.mtime,
-			extension: getExtensionFromPath(filePath),
-		});
-	}
+	await addStatFiles(vault, root.files.filter(filePath => (filePath.split('/').pop() ?? '').startsWith('.')),
+		shouldIgnore, seen, result, assertActive);
 
 	assertActive?.();
 	assertPortablePaths(result.map(file => file.path));
@@ -145,21 +131,7 @@ async function walkHiddenFolder(
 		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
 		visitedFolders.add(currentFolder);
 		const listing = await safeList(vault, currentFolder, assertActive);
-
-		for (const filePath of listing.files) {
-			if (seen.has(filePath) || shouldIgnore(filePath)) continue;
-
-			const stat = await safeStat(vault, filePath, assertActive);
-			if (!stat || stat.type !== 'file') continue;
-
-			seen.add(filePath);
-			result.push({
-				path: filePath,
-				size: stat.size,
-				mtime: stat.mtime,
-				extension: getExtensionFromPath(filePath),
-			});
-		}
+		await addStatFiles(vault, listing.files, shouldIgnore, seen, result, assertActive);
 
 		for (const subfolder of listing.folders) {
 			if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
@@ -168,8 +140,43 @@ async function walkHiddenFolder(
 	}
 }
 
-// Folder listings are slow bridge calls on mobile; a bounded pool overlaps them.
+// Folder listings and stats are slow bridge calls on mobile; a bounded pool overlaps them.
 const LISTING_CONCURRENCY = 8;
+const STAT_CONCURRENCY = 8;
+
+/**
+ * Stat candidate files with bounded concurrency and add them in listing order.
+ */
+async function addStatFiles(
+	vault: Vault,
+	filePaths: string[],
+	shouldIgnore: (path: string) => boolean,
+	seen: Set<string>,
+	result: VaultFile[],
+	assertActive?: () => void,
+): Promise<void> {
+	const candidates = [...new Set(filePaths)].filter(filePath => !seen.has(filePath) && !shouldIgnore(filePath));
+	const stats = new Array<Awaited<ReturnType<typeof safeStat>>>(candidates.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < candidates.length) {
+			const index = next++;
+			stats[index] = await safeStat(vault, candidates[index]!, assertActive);
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(STAT_CONCURRENCY, candidates.length) }, worker));
+	candidates.forEach((filePath, index) => {
+		const stat = stats[index];
+		if (!stat || stat.type !== 'file') return;
+		seen.add(filePath);
+		result.push({
+			path: filePath,
+			size: stat.size,
+			mtime: stat.mtime,
+			extension: getExtensionFromPath(filePath),
+		});
+	});
+}
 
 /**
  * Walk non-hidden folders and recurse into hidden descendants only. Listings run

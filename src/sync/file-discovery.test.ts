@@ -42,6 +42,26 @@ describe('getAllVaultFiles', () => {
 		expect(files.map(file => file.path)).toEqual(folders.map(folder => `${folder}/.cfg/a.json`));
 	});
 
+	it('stats hidden files with bounded overlap and keeps listing order', async () => {
+		const hidden = Array.from({ length: 30 }, (_, index) => `.cfg/${String(index).padStart(2, '0')}.json`);
+		let active = 0, peak = 0;
+		const stat = vi.fn(async () => {
+			active++; peak = Math.max(peak, active);
+			await new Promise(resolve => setTimeout(resolve, 1));
+			active--;
+			return { type: 'file', size: 1, mtime: 1 };
+		});
+		const vault = {
+			getFiles: vi.fn(() => []),
+			adapter: { list: vi.fn(async (path: string) => path === '' ? { files: [], folders: ['.cfg'] } : { files: hidden, folders: [] }), stat },
+		} as unknown as Vault;
+		const files = await getAllVaultFiles(vault, () => false);
+		// Before: one stat at a time.
+		expect(peak).toBeGreaterThan(1);
+		expect(peak).toBeLessThanOrEqual(8);
+		expect(files.map(file => file.path)).toEqual(hidden);
+	});
+
 	it('skips root and nested Git repositories before listing their contents', async () => {
 		const listings: Record<string, { files: string[]; folders: string[] }> = {
 			'': { files: ['.gitignore'], folders: ['.git', 'Projects'] },
