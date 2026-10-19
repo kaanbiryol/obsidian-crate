@@ -15,27 +15,40 @@ type UploadMetadata = Pick<UploadParams,
   'path' | 'hash' | 'size' | 'objectKey' | 'expectedHash' | 'expectedRevision'
   | 'previousFile' | 'encryptionState' | 'resetGeneration' | 'operation'>;
 
-// Encrypted Markdown commits carry their bytes, framed after the metadata, so
-// the coordinator validates them without reading the staged object back from R2.
-const FRAMED_CONTENT_HEADER = 'X-Crate-Framed-Content';
+// Markdown commits carry their bytes, framed after the metadata, so the
+// coordinator validates and projects them without reading the staged object
+// back from R2. Large plaintext files keep the metadata-only request.
+export const FRAMED_CONTENT_HEADER = 'X-Crate-Framed-Content';
+const FRAMED_MARKDOWN_MAX_BYTES = 1024 * 1024;
 
-function frameUpload(metadata: UploadMetadata, content: string | ArrayBuffer): Uint8Array<ArrayBuffer> {
+export function hasFramedMarkdown(file: { path: string; size: number }): boolean {
+  return file.path.toLowerCase().endsWith('.md') && file.size <= FRAMED_MARKDOWN_MAX_BYTES;
+}
+
+export function frameUpload(metadata: unknown, contents: Array<string | ArrayBuffer>): Uint8Array<ArrayBuffer> {
   const head = new TextEncoder().encode(JSON.stringify(metadata));
-  const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
-  const frame = new Uint8Array(4 + head.length + bytes.length);
+  const parts = contents.map(content => typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content));
+  const frame = new Uint8Array(4 + head.length + parts.reduce((total, part) => total + part.length, 0));
   new DataView(frame.buffer).setUint32(0, head.length);
   frame.set(head, 4);
-  frame.set(bytes, 4 + head.length);
+  let offset = 4 + head.length;
+  for (const part of parts) {
+    frame.set(part, offset);
+    offset += part.length;
+  }
   return frame;
+}
+
+export function readFrame<T>(frame: ArrayBuffer): { metadata: T; content: ArrayBuffer } {
+  const length = new DataView(frame).getUint32(0);
+  return { metadata: JSON.parse(new TextDecoder().decode(new Uint8Array(frame, 4, length))) as T, content: frame.slice(4 + length) };
 }
 
 type CoordinatedUploadMetadata = UploadMetadata & { reminderPolicyRevision?: string | null };
 
 async function readUpload(request: Request): Promise<{ metadata: CoordinatedUploadMetadata; content?: ArrayBuffer }> {
   if (request.headers.get(FRAMED_CONTENT_HEADER) !== '1') return { metadata: await request.json() as CoordinatedUploadMetadata };
-  const frame = await request.arrayBuffer();
-  const length = new DataView(frame).getUint32(0);
-  return { metadata: JSON.parse(new TextDecoder().decode(new Uint8Array(frame, 4, length))) as CoordinatedUploadMetadata, content: frame.slice(4 + length) };
+  return readFrame<CoordinatedUploadMetadata>(await request.arrayBuffer());
 }
 
 /** File transfer and hashing finish before acquiring the coordinator lock. */
@@ -49,8 +62,8 @@ export function coordinatedUpload(env: Env): CommitUpload {
       resetGeneration: params.resetGeneration, operation: params.operation,
     };
     const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
-    const response = await stub.fetch('https://do/commit-upload', params.encryptionState
-      ? { method: 'POST', body: frameUpload(metadata, params.content), headers: { [FRAMED_CONTENT_HEADER]: '1' } }
+    const response = await stub.fetch('https://do/commit-upload', params.encryptionState || hasFramedMarkdown(params)
+      ? { method: 'POST', body: frameUpload(metadata, [params.content]), headers: { [FRAMED_CONTENT_HEADER]: '1' } }
       : { method: 'POST', body: JSON.stringify(metadata) });
     if (!response.ok) {
       const failure = await response.json() as { code?: string; path?: string; conflictingPath?: string };

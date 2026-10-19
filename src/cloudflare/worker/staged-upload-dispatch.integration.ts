@@ -7,6 +7,11 @@ import { writeCommittedMarkdownFile } from './storage';
 import { getStoredFileRow, createManagedObjectKey } from './sync-storage';
 import { trackStagedUpload } from './staged-uploads';
 import { coordinatedUpload } from './staged-upload-dispatch';
+import { coordinatedNewFiles } from './bulk-upload-dispatch';
+import { handleNotificationPolicy } from './notification-policy';
+import { handleBatchUpload } from './sync-batch/upload';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
+import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { sha256Hex } from './auth';
 
 beforeEach(async () => {
@@ -31,4 +36,35 @@ it('retains the current revision when another same-content save finished during 
   expect(result.committed).toBe(true);
   expect(await env.DB.prepare('SELECT storage_key FROM file_versions WHERE storage_key = ?').bind(current!.storageKey).first())
     .toEqual({ storage_key: current!.storageKey });
+});
+
+it.each(['single', 'batch'] as const)('commits a plaintext %s reminder upload without reading it back from R2', async kind => {
+  await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({
+    folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00',
+  }) }), env.DB);
+  const path = 'Reminders/Inbox.md';
+  const content = `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`;
+  const get = env.BUCKET.get.bind(env.BUCKET);
+  let reads = 0;
+  env.BUCKET.get = ((...args: Parameters<R2Bucket['get']>) => { reads += 1; return get(...args); });
+  try {
+    if (kind === 'single') {
+      const hash = await sha256Hex(content);
+      const objectKey = createManagedObjectKey(hash);
+      await trackStagedUpload(env.DB, objectKey, path);
+      await env.BUCKET.put(objectKey, content);
+      const size = new TextEncoder().encode(content).byteLength;
+      expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: null, previousFile: null })).committed).toBe(true);
+    } else {
+      const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', { method: 'POST', body: JSON.stringify({ bulkNewFiles: true, files: [
+        { path, content: btoa(content), expectedHash: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) },
+        { path: 'Notes/other.md', content: btoa('Other'), expectedHash: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) },
+      ] }) }), env.BUCKET, env.DB, { commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) });
+      const body = await response.json() as BatchUploadResponse;
+      expect(body.success, JSON.stringify(body)).toBe(true);
+    }
+  } finally { env.BUCKET.get = get; }
+  expect(reads).toBe(0);
+  expect(await env.DB.prepare('SELECT verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1 });
+  expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path });
 });
