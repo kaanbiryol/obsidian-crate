@@ -86,6 +86,20 @@ describe('SyncRuntime startup event handling', () => {
 		} finally { runtime.destroy(); }
 	});
 
+	it('checks pending membership for previews without copying the pending list', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		await runtime.initialize();
+		runtime.onFileChange({ path: 'edited.md' } as never);
+		expect(runtime.hasPendingPath('edited.md')).toBe(true);
+		expect(runtime.hasPendingPath('other.md')).toBe(false);
+		const copy = vi.spyOn(SyncEngine.prototype, 'getPendingPaths');
+		const preview = { kind: 'modified', before: 'a', after: 'b' } as never;
+		vi.spyOn(SyncEngine.prototype, 'loadPendingDiff').mockResolvedValue(preview);
+		await expect(runtime.loadPendingDiff('edited.md', false)).resolves.toBe(preview);
+		await expect(runtime.loadPendingDiff('other.md', false)).rejects.toThrow('Pending changes were updated');
+		expect(copy).not.toHaveBeenCalled();
+	});
+
 	it('ignores vault discovery before layout readiness and keeps manual sync available', async () => {
 		const { runtime, plugin } = createRuntimeHarness({ automaticSync: false });
 		const sync = vi.spyOn(SyncEngine.prototype, 'sync');

@@ -146,12 +146,16 @@ export class SyncRuntime {
 		return this.syncEngine?.getPendingChangeCount() ?? 0;
 	}
 
+	hasPendingPath(key: string): boolean {
+		return this.syncEngine?.hasPendingPath(key) ?? false;
+	}
+
 	async loadPendingDiff(path: string, deleted: boolean) {
 		const engine = this.syncEngine;
 		if (!engine) throw new Error('Sync is not initialized');
 		const pendingPath = pendingChangeKey(deleted ? 'delete' : 'upload', path);
 		const verify = () => {
-			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !this.getPendingPaths().includes(pendingPath)) {
+			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !engine.hasPendingPath(pendingPath)) {
 				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
 			}
 		};

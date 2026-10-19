@@ -282,6 +282,10 @@ export class SyncEngine {
 		return this.queueController.getPendingChangeCount();
 	}
 
+	hasPendingPath(key: string): boolean {
+		return this.queueController.hasPendingPath(key);
+	}
+
     private history() {
         return createEngineHistory({
             vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
@@ -533,7 +537,7 @@ export class SyncEngine {
 			const stat = await this.vault.adapter.stat(path);
 			if (!isCurrent()) return;
 			if (stat?.type === 'file' && this.localManifest.hasFile(path)
-				&& this.state.status !== 'syncing' && !this.getPendingPaths().includes(path)) {
+				&& this.state.status !== 'syncing' && !this.hasPendingPath(path)) {
 				// Obsidian and iCloud can touch settings without changing their bytes.
 				// Check before publishing a pending entry; serialize reads to bound memory.
 				const activityRevision = this.syncActivityRevision;

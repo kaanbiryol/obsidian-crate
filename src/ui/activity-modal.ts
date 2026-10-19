@@ -40,6 +40,7 @@ export interface ActivityModalDeps extends Partial<FileHistoryRuntime> {
 	getPendingPaths(): string[];
 	/** Pending count without copying the pending list on every progress tick. */
 	getPendingChangeCount?(): number;
+	hasPendingPath?(key: string): boolean;
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
 	getActivityProgress?(): SyncActivityProgress | null;
@@ -118,7 +119,7 @@ export class ActivityModal extends BaseUiModal {
                     catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
                 },
                 fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
-                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(key => this.deps.getPendingPaths().includes(key))), () => this.refresh()).open(),
+                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(this.pendingPathFilter())), () => this.refresh()).open(),
             } : undefined);
         this.updateSyncBtn();
 	}
@@ -222,6 +223,12 @@ export class ActivityModal extends BaseUiModal {
         this.updateSyncBtn();
         this.updateSyncStatusText();
 	}
+
+    private pendingPathFilter(): (key: string) => boolean {
+        if (this.deps.hasPendingPath) return key => this.deps.hasPendingPath!(key);
+        const pending = new Set(this.deps.getPendingPaths());
+        return key => pending.has(key);
+    }
 
     private pendingChangeCount(): number {
         return this.deps.getPendingChangeCount?.() ?? this.deps.getPendingPaths().length;
