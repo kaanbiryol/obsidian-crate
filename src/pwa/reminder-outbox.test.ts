@@ -41,6 +41,7 @@ function memoryStorage() {
 	const entries = new Map<string, PendingReminderChange>();
 	const storage: ReminderOutboxStorage = {
 		load: () => structuredClone([...entries.values()]),
+		get: id => structuredClone(entries.get(id) ?? null),
 		put: change => { entries.set(change.operationId, structuredClone(change)); },
 		remove: id => { entries.delete(id); },
 		acceptsKey: () => true,
@@ -93,6 +94,30 @@ describe('optimistic reminder outbox', () => {
 			expect(tab.commit).toHaveBeenCalledOnce();
 			expect(tab.storage.load()).toEqual([]);
 		}
+	});
+
+	it('drains a queue with a bounded number of full storage reads', async () => {
+		const state = harness();
+		state.apiFetch.mockImplementation(async (_path, init) => confirmed((JSON.parse(init?.body as string) as { id: string }).id));
+		for (let index = 0; index < 8; index++) state.storage.put(completion(`id-${index}`));
+		const load = vi.spyOn(state.storage, 'load');
+		await state.drain();
+		expect(state.commit).toHaveBeenCalledTimes(8);
+		// One read when the lock is acquired and one final reread before stopping.
+		expect(load).toHaveBeenCalledTimes(2);
+		expect(state.storage.load()).toEqual([]);
+		expect(state.onChange).toHaveBeenLastCalledWith([]);
+	});
+
+	it('sends a command another tab wrote while the lock was held', async () => {
+		const state = harness();
+		const late = completion('two');
+		state.storage.put(completion('one'));
+		state.apiFetch.mockImplementationOnce(async () => { state.storage.put(late); return confirmed('one'); });
+		state.apiFetch.mockImplementationOnce(async () => confirmed('two'));
+		await state.drain();
+		expect(state.apiFetch).toHaveBeenCalledTimes(2);
+		expect(state.storage.load()).toEqual([]);
 	});
 
 	it('does not discard a changed payload merely because its operation ID previously settled', async () => {

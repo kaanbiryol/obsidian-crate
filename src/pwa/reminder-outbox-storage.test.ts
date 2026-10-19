@@ -54,6 +54,22 @@ describe('durable reminder outbox storage', () => {
 		expect(JSON.stringify([...values])).not.toContain('secret-token');
 	});
 
+	it('reads one command by key and leaves a damaged entry quarantined', async () => {
+		const outbox = await createReminderOutboxStorage('token', 'Reminders');
+		const pending = change();
+		outbox.put(pending);
+		const damaged = crypto.randomUUID();
+		const damagedKey = [...values.keys()][0]!.replace(pending.operationId, damaged);
+		values.set(damagedKey, '{');
+		const read = vi.spyOn(storage, 'getItem');
+		expect(outbox.get(pending.operationId)).toEqual(pending);
+		expect(read).toHaveBeenCalledOnce();
+		expect(outbox.get(damaged)).toBeNull();
+		expect(outbox.get(crypto.randomUUID())).toBeNull();
+		expect(values.get(damagedKey)).toBe('{');
+		expect(outbox.quarantined()).toEqual([{ key: damagedKey, raw: '{' }]);
+	});
+
 	it('isolates both enrolled sessions and reminder folders', async () => {
 		const first = await createReminderOutboxStorage('one', 'Reminders');
 		const second = await createReminderOutboxStorage('two', 'Reminders');

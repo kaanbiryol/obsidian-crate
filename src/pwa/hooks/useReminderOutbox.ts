@@ -63,7 +63,8 @@ export function useReminderOutbox(options: {
 				withLock: work => navigator.locks.request('crate-reminder-outbox', work),
 				canSend: () => optionsRef.current.enabled !== false && optionsRef.current.hasSnapshot !== false,
 				beginMutation: () => optionsRef.current.beginLocalMutation(),
-				onChange: next => { setChanges(next); refreshQuarantine(); },
+				onChange: setChanges,
+				onScan: refreshQuarantine,
 			onError: message => { setStorageError(message); optionsRef.current.showToast('error', message); },
 				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
 				commit: async (change, result) => {

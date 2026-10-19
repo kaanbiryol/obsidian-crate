@@ -10,6 +10,8 @@ const CORRUPT_ERROR = 'Pending changes on this device could not be read. Keep th
 
 export interface ReminderOutboxStorage {
 	load(): PendingReminderChange[];
+	/** Reads one command's key; a damaged entry stays quarantined and reads as null. */
+	get(operationId: string): PendingReminderChange | null;
 	put(change: PendingReminderChange): void;
 	remove(operationId: string): void;
 	acceptsKey(key: string | null): boolean;
@@ -104,6 +106,12 @@ export async function createReminderOutboxStorage(authToken: string, folderPath:
 			return recoverableEntries(storage, keys(), folderPath).valid.map(entry => entry.stored)
 				.sort((a, b) => a.createdAt - b.createdAt)
 				.map(entry => entry.change);
+		},
+		get(operationId) {
+			let raw: string | null;
+			try { raw = storage.getItem(scope + operationId); } catch { throw new Error(STORAGE_ERROR); }
+			if (raw === null) return null;
+			try { return readStored(raw, operationId, folderPath).change; } catch { return null; }
 		},
 		put(change) {
 			if (!isStoredReminderChange(change, change.operationId, folderPath)) throw new Error(CORRUPT_ERROR);

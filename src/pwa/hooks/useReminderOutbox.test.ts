@@ -10,6 +10,7 @@ const stored = vi.hoisted(() => ({ changes: [] as PendingReminderChange[], initi
 vi.mock('../reminder-outbox-storage', () => ({
 	createReminderOutboxStorage: async () => { await stored.initializing; return {
 		load: () => structuredClone(stored.changes),
+		get: (id: string) => structuredClone(stored.changes.find(item => item.operationId === id) ?? null),
 		put: (change: PendingReminderChange) => {
 			stored.changes = [...stored.changes.filter(item => item.operationId !== change.operationId), structuredClone(change)];
 		},

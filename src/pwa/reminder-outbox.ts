@@ -13,13 +13,15 @@ export function reminderRetryAt(change: PendingReminderChange): number | undefin
 	return change.status === 'uncertain' && !change.reviewRequired && change.attempts < 3 ? change.retryAt : undefined;
 }
 
-export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onError, onSettled, withLock = work => work(), canSend = () => true }: {
+export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onScan = () => {}, onError, onSettled, withLock = work => work(), canSend = () => true }: {
 	storage: ReminderOutboxStorage;
 	apiFetch: ApiFetch;
 	isCurrent: () => boolean;
 	beginMutation: () => () => void;
 	commit: (change: PendingReminderChange, result: ReminderChangeResult) => Promise<void>;
 	onChange: (changes: PendingReminderChange[]) => void;
+	/** After a full storage read, which can also reveal entries written elsewhere. */
+	onScan?: () => void;
 	onError: (message: string) => void;
 	onSettled: () => void;
 	withLock?: (work: () => Promise<void>) => Promise<void>;
@@ -30,20 +32,43 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 	// fully persisted settlements to stop stale entries bouncing between tabs.
 	// Eviction/restart may replay a receipt safely; no private bodies are retained.
 	const settledRequests = new Map<string, string>();
-	const refresh = () => {
-		const changes = storage.load();
+	// The last full read plus this tab's own writes. Writes from other tabs
+	// arrive as storage events, which call refresh().
+	let snapshot: PendingReminderChange[] | undefined;
+	const publish = (changes: PendingReminderChange[]) => {
+		snapshot = changes;
 		if (isCurrent()) onChange(changes);
 		return changes;
 	};
-	const update = (change: PendingReminderChange) => { storage.put(change); refresh(); };
-	const hasCurrentAttempt = (change: PendingReminderChange) => isCurrent() && storage.load().some(item => item.operationId === change.operationId && item.body === change.body && item.path === change.path && item.method === change.method);
+	const refresh = () => {
+		const changes = publish(storage.load());
+		if (isCurrent()) onScan();
+		return changes;
+	};
+	// A write touches only its own key, so patch that entry instead of rereading every command.
+	const patch = (operationId: string, change: PendingReminderChange | null) => {
+		if (!snapshot) return refresh();
+		const index = snapshot.findIndex(item => item.operationId === operationId);
+		if (!change) return publish(snapshot.filter(item => item.operationId !== operationId));
+		return publish(index < 0 ? [...snapshot, change] : snapshot.map((item, position) => position === index ? change : item));
+	};
+	const update = (change: PendingReminderChange) => { storage.put(change); patch(change.operationId, change); };
+	const remove = (operationId: string) => { storage.remove(operationId); patch(operationId, null); };
+	const hasCurrentAttempt = (change: PendingReminderChange) => {
+		if (!isCurrent()) return false;
+		const item = storage.get(change.operationId);
+		return item !== null && item.body === change.body && item.path === change.path && item.method === change.method;
+	};
+	const isQueued = (item: PendingReminderChange) => !item.reviewRequired && (item.status === 'pending'
+		|| (reminderRetryAt(item) ?? Infinity) <= Date.now());
 
 	const enqueue = (change: PendingReminderChange) => {
 		if (!isCurrent()) throw new Error('Session changed. Reopen Crate before saving.');
-		const conflict = storage.load().find(item => item.operationId !== change.operationId
+		const current = storage.load();
+		const conflict = current.find(item => item.operationId !== change.operationId
 			&& (item.kind === 'reorder' || change.kind === 'reorder' || item.recordId === change.recordId));
 		if (conflict) throw new Error('Resolve the pending change before changing this reminder again.');
-		const previous = storage.load().find(item => item.operationId === change.operationId);
+		const previous = current.find(item => item.operationId === change.operationId);
 		if (previous && (previous.status !== 'failed' || previous.ambiguous)) throw new Error('This change is still syncing. Use Retry to check its status.');
 		// Persist first: quota failures leave the editor and its draft intact.
 		update(change);
@@ -51,7 +76,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 
 	// Explicit retry/recovery only. Foreground and reconnect events call drain().
 	const retry = (operationId: string) => {
-		const change = storage.load().find(item => item.operationId === operationId);
+		const change = storage.get(operationId);
 		if (!change || change.reviewRequired || !isCurrent()) return;
 		if (running && change.status === 'pending') return;
 		update({ ...change, status: 'pending', attempts: 0, retryAt: 0, error: undefined,
@@ -60,7 +85,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 
 	const discard = (operationId: string, reviewedChange?: string): void | Promise<void> => {
 		const remove = () => {
-			const change = storage.load().find(item => item.operationId === operationId);
+			const change = storage.get(operationId);
 			if (!change || change.status !== 'failed' || !isCurrent()) return;
 			if (change.reviewRequired ? reviewedChange !== JSON.stringify(change) : change.ambiguous) return;
 			storage.remove(operationId);
@@ -76,13 +101,24 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 		let settled = false;
 		try {
 			await withLock(async () => {
+				// One full read per lock hold; each command is then reread by its own key.
+				snapshot = storage.load();
+				let fresh = true;
 				while (isCurrent() && canSend() && (typeof navigator === 'undefined' || navigator.onLine)) {
-					const queued = storage.load().find(item => !item.reviewRequired && (item.status === 'pending'
-						|| (reminderRetryAt(item) ?? Infinity) <= Date.now()));
-					if (!queued) break;
+					const candidate = snapshot?.find(isQueued);
+					if (!candidate) {
+						// Reread once before stopping in case a storage event is still in flight.
+						if (fresh) break;
+						snapshot = storage.load();
+						fresh = true;
+						continue;
+					}
+					const queued = storage.get(candidate.operationId);
+					if (!queued || !isQueued(queued)) { patch(candidate.operationId, queued); continue; }
+					fresh = false;
 					if (settledRequests.has(queued.operationId)
 						&& settledRequests.get(queued.operationId) === await requestFingerprint(queued)) {
-						if (hasCurrentAttempt(queued)) { storage.remove(queued.operationId); refresh(); }
+						if (hasCurrentAttempt(queued)) remove(queued.operationId);
 						continue;
 					}
 					const change = { ...queued, status: 'pending' as const, attempts: queued.attempts + 1,
@@ -98,8 +134,7 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 						settledRequests.set(change.operationId, fingerprint);
 						if (settledRequests.size > 64) settledRequests.delete(settledRequests.keys().next().value!);
 						if (!hasCurrentAttempt(change)) continue;
-						storage.remove(change.operationId);
-						refresh();
+						remove(change.operationId);
 					} catch (error) {
 						if (!hasCurrentAttempt(change)) continue;
 						// A prior request may still have committed even if a retry conflicts.
