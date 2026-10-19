@@ -16,6 +16,25 @@ export const findPriorityMatches = (text: string): TextMatch[] => {
     }));
 };
 
+// Editors match the same project list on every keystroke. Compile it once per
+// array; callers pass a new array when the project list changes.
+const knownProjectRegexes = new WeakMap<string[], RegExp[]>();
+
+function getKnownProjectRegexes(knownProjects: string[]): RegExp[] {
+    let regexes = knownProjectRegexes.get(knownProjects);
+    if (!regexes) {
+        // Sorted by length descending to match longest first
+        regexes = [...knownProjects].sort((a, b) => b.length - a.length).map(knownProject => {
+            // Escape special regex characters in project name
+            const escapedProject = knownProject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Match #projectName followed by space, end of string, or another special char
+            return new RegExp(`(?<!\\S)#${escapedProject}(?=\\s|$|@|!|#)`, 'gi');
+        });
+        knownProjectRegexes.set(knownProjects, regexes);
+    }
+    return regexes;
+}
+
 /**
  * Find all project matches in text (#something)
  * - Skips purely numeric tags (like #338 in GitHub issue links)
@@ -43,12 +62,8 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
 
     // Try known projects first (sorted by length descending to match longest first)
     if (knownProjects && knownProjects.length > 0) {
-        const sortedProjects = [...knownProjects].sort((a, b) => b.length - a.length);
-        for (const knownProject of sortedProjects) {
-            // Escape special regex characters in project name
-            const escapedProject = knownProject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // Match #projectName followed by space, end of string, or another special char
-            const projectRegex = new RegExp(`(?<!\\S)#${escapedProject}(?=\\s|$|@|!|#)`, 'gi');
+        for (const projectRegex of getKnownProjectRegexes(knownProjects)) {
+            projectRegex.lastIndex = 0;
             let match: RegExpExecArray | null;
             while ((match = projectRegex.exec(text)) !== null) {
                 const matchIndex = match.index;

@@ -26,6 +26,16 @@ describe('findProjectMatches', () => {
 		expect(matches[0]?.text).toBe('#my project');
     });
 
+    it('reuses known project patterns across calls with the same list', () => {
+        const projects = ['my', 'my project'];
+        const expected = ['#my project', '#my'];
+        expect(findProjectMatches('task #my project and #my', projects).map(match => match.text)).toEqual(expected);
+        expect(findProjectMatches('task #my project and #my', projects).map(match => match.text)).toEqual(expected);
+        expect(findProjectMatches('#my', projects).map(match => match.text)).toEqual(['#my']);
+        expect(projects).toEqual(['my', 'my project']);
+        expect(findProjectMatches('task #other', [...projects, 'other']).map(match => match.text)).toEqual(['#other']);
+    });
+
     it('skips purely numeric tags', () => {
         const matches = findProjectMatches('see #338 for details');
         expect(matches).toHaveLength(0);
