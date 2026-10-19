@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { parseReminderContent } from '@/reminders/utils/reminderParser';
 import {
 	appendReminderBlockToContent,
 	deleteReminderBlockFromContent,
@@ -8,6 +9,11 @@ import {
 	type ReminderLineRecord,
 } from './markdownReminderFile';
 import { buildDescriptionBlock } from './reminderDescription';
+
+vi.mock('@/reminders/utils/reminderParser', async importOriginal => {
+	const actual = await importOriginal<typeof import('@/reminders/utils/reminderParser')>();
+	return { ...actual, parseReminderContent: vi.fn(actual.parseReminderContent) };
+});
 
 function makeRecord(overrides: Partial<ReminderLineRecord>): ReminderLineRecord {
 	return {
@@ -66,6 +72,17 @@ describe('markdownReminderFile', () => {
 		const second = '- [ ] Second <!-- crate-id:r2 -->';
 		expect(reorderReminderBlocksInContent(`${first}\n${second}\n`, ['r2', 'r1']))
 			.toBe(`${second}\n${first}\n`);
+	});
+
+	it('reorders by checkbox state without parsing reminder content', () => {
+		const first = '- [ ] First tomorrow <!-- crate-id:r1 -->\r';
+		const done = '- [X] Done <!-- crate-id:r3 -->\r';
+		const second = '- [ ] Second Nov 20, 2026 <!-- crate-id:r2 -->\r';
+		vi.mocked(parseReminderContent).mockClear();
+		expect(reorderReminderBlocksInContent(`${first}\n${done}\n${second}\n`, ['r2', 'r1']))
+			.toBe(`${second}\n${done}\n${first}\n`);
+		expect(() => reorderReminderBlocksInContent(`${first}\n${done}\n`, ['r3', 'r1'])).toThrow();
+		expect(parseReminderContent).not.toHaveBeenCalled();
 	});
 
 	it.each([

@@ -40,6 +40,12 @@ export interface ParsedCheckbox {
  */
 const CHECKBOX_REGEX = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
 
+/** Checkbox completion without parsing reminder content; null for non-checkbox lines. */
+export function readCheckboxCompletion(line: string): boolean | null {
+  const state = (line.endsWith('\r') ? line.slice(0, -1) : line).match(CHECKBOX_REGEX)?.[2];
+  return state === undefined ? null : state.toLowerCase() === 'x';
+}
+
 /**
  * Parse a markdown checkbox line
  *

@@ -1,6 +1,6 @@
 import { buildDescriptionBlock, readDescriptionBlock } from './reminderDescription';
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
-import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
+import { parseCheckboxLine, readCheckboxCompletion } from "@/reminders/utils/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import { extractReminderId } from "./reminderIdentity";
@@ -183,8 +183,9 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 		const line = lines[index];
 		if (line === undefined) break;
 		const context = taskContexts.get(index);
-		const parsed = context ? parseCheckboxLine(line) : null;
-		if (parsed) {
+		// Reordering needs only the checkbox state, not the reminder content.
+		const isCompleted = context ? readCheckboxCompletion(line) : null;
+		if (isCompleted !== null) {
 			if (nonBlockAccum.length > 0) {
 				if (nonBlockAccum.some(line => line.trim())) group++;
 				segments.push({ isBlock: false, lines: [...nonBlockAccum] });
@@ -202,7 +203,7 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 				isBlock: true,
 				lines: blockLines,
 				id: extractReminderId(line),
-				isCompleted: parsed.isCompleted,
+				isCompleted,
 				group,
 				movable: context?.indentation === 0 && !hasAttachedMarkdownContent(lines, index, index + 1 + descCount),
 			});
