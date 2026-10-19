@@ -945,15 +945,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: /Extraction fixture/ }).click();
     await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toBeVisible();
     status = 'ready';
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.locator('.crate-reading-reader__body')).toContainText('The extracted article is now available.');
     await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toHaveCount(0);
     // A retry may go back to pending without changing the highlights array.
     status = 'pending';
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.getByText('Your link is saved. Article text is on its way.', { exact: true })).toBeVisible();
     status = 'unavailable';
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });

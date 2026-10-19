@@ -44,13 +44,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       assert.equal((await api('/reading/list')).items.length, 2);
       const features = await api('/features');
       await api('/features', { feature: 'reading', enabled: false, revision: features.revision });
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
       await expect(page.getByRole('heading', { name: 'Reading paused', exact: true })).toBeVisible();
       await page.screenshot({ path: `test-results/reading-consent/${name}-shared-paused.png` });
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toHaveCount(0);
       const paused = await api('/features');
       await api('/features', { feature: 'reading', enabled: true, revision: paused.revision });
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible();
       assert.equal((await api('/reading/list')).items.length, 2);
 

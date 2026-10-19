@@ -142,7 +142,7 @@ try {
 				await settings.getByRole('button', { name: 'Close settings', exact: true }).click();
 				await page.reload(); await expect(indicator(page)).toHaveAttribute('title', /Paused:/);
 				features[paused] = true;
-				await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+				await page.evaluate(() => window.dispatchEvent(new Event('online')));
 				if (paused === 'reading') await expect.poll(async () => (await pendingReading(page)).length).toBe(0);
 				else await expect.poll(() => reminderCount(page)).toBe(0);
 				await expect(indicator(page)).toHaveAttribute('data-sync-state', 'synced');

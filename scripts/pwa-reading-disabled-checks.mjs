@@ -10,7 +10,7 @@ export async function checkDisabledReading(browser, origin, name) {
 	let readingEnabled = false;
 	await disabledPage.route('**/reading/session', async route => {
 		if (holdReadingCheck) await new Promise(resolve => { releaseReadingCheck = resolve; });
-		await route.fulfill(readingEnabled ? { json: { id: 'enabled-reading', folderPath: 'Reading', generation: 'enabled-generation', expiresAt: Date.now() + 86400000 } } : { status: 403, json: { error: 'Choose a Reading folder in Obsidian’s Crate settings first.' } });
+		await route.fulfill(readingEnabled ? { json: { id: 'enabled-reading', folderPath: 'Reading', generation: 'enabled-generation', expiresAt: Date.now() + 86400000 } } : { status: 403, json: { error: 'Choose a Reading folder in Obsidian’s Crate settings first.', code: 'reading_not_configured' } });
 	});
 	await disabledPage.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 	await disabledPage.goto(origin + '/notifications?tab=inbox');

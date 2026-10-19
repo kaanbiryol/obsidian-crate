@@ -13,11 +13,11 @@ export function SourceNoticeFixture({ isDark }: { isDark: boolean }) {
   const many = new URLSearchParams(location.search).has('many');
   const duplicateNames = new URLSearchParams(location.search).has('duplicates');
   const initialIssues = useRef(duplicateNames ? ['Reminders/Work/Inbox.md', 'Reminders/Personal/Inbox.md'].map(path => ({
-    path, reason: 'Invalid reminder description block on line 8',
+    path, reason: 'Invalid reminder description block on line 8', diagnostic: { code: 'invalid-description-block', line: 8 } as const,
   })) : many ? Array.from({ length: 21 }, (_, i) => ({
     path: i === 0 ? 'Reminders/<img src=x onerror=alert(1)>.md' : `Reminders/A long project name/Unreadable note ${i}.md`,
     reason: 'Save this note as UTF-8 without null characters before editing its reminders. The original vault file remains synced.',
-  })) : [{ path: 'Reminders/Inbox.md', reason: 'Invalid reminder description block on line 8.' }]);
+  })) : [{ path: 'Reminders/Inbox.md', reason: 'Invalid reminder description block on line 8.', diagnostic: { code: 'invalid-description-block', line: 8 } as const }]);
   const [issues, setIssues] = useState(initialIssues.current);
   const [openedNote, setOpenedNote] = useState('');
   const attempts = useRef(0);

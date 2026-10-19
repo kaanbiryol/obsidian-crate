@@ -102,6 +102,7 @@ const { outputFiles } = await build({
                 open() { document.body.append(this.modalEl); this.onOpen(); }
                 close() { this.onClose(); this.modalEl.remove(); }
             }
+            export const Platform = { isMobile: false };
             export class Setting {}
             export class Notice { constructor(message) { window.notice = message; } }
             export function setIcon(el, name) {
