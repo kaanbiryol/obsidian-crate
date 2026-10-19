@@ -7,6 +7,8 @@ const CACHE_KEY = 'crate-shared-features';
 const defaults: SharedFeatures = { reading: true, reminders: true };
 // Data refreshes can repeat often; paused responses always check immediately.
 const REFRESH_INTERVAL_MS = 5 * 60_000;
+// Foregrounding repeats quickly; reconnecting always checks.
+const FOREGROUND_MAX_AGE_MS = 30_000;
 const refreshListeners = new Set<(immediate: boolean) => void>();
 /** Re-read the shared policy after a data refresh, or at once after a paused response. */
 export function requestSharedFeaturesRefresh(immediate = false): void {
@@ -48,12 +50,13 @@ export function useServerFeatures(): SharedFeatures {
     const requested = (immediate: boolean) => {
       if (immediate || Date.now() - checkedAt >= REFRESH_INTERVAL_MS) void refresh();
     };
-    // Returning to the app or reconnecting checks at once; there is no timer.
-    const check = () => { void refresh(); };
+    // Returning to the app or reconnecting checks; there is no timer.
+    const focused = () => { if (Date.now() - checkedAt >= FOREGROUND_MAX_AGE_MS) void refresh(); };
+    const online = () => { void refresh(); };
     void refresh();
     refreshListeners.add(requested);
-    window.addEventListener('focus', check); window.addEventListener('online', check);
-    return () => { alive = false; refreshListeners.delete(requested); window.removeEventListener('focus', check); window.removeEventListener('online', check); };
+    window.addEventListener('focus', focused); window.addEventListener('online', online);
+    return () => { alive = false; refreshListeners.delete(requested); window.removeEventListener('focus', focused); window.removeEventListener('online', online); };
   }, []);
   return features;
 }

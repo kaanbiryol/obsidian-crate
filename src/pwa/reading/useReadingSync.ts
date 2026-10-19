@@ -6,6 +6,9 @@ import { assertReadingSession, pendingReading, readingLock, readingSession, read
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
+// Foregrounding shortly after a completed refresh reuses it, like Reminders.
+const FOREGROUND_MAX_AGE_MS = 30_000;
+
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
 export function useReadingSync({ session, ready, pending, publishSyncResult, isCurrentSession, run, resetSession }: Pick<ReturnType<typeof useReadingSession>,
   'session' | 'ready' | 'pending' | 'publishSyncResult' | 'isCurrentSession' | 'run' | 'resetSession'>, enabled = true) {
@@ -16,6 +19,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   const refreshing = useRef(false), refreshQueued = useRef<{ session: ReadingSession; mode: ReadingRetryMode } | null>(null);
   // The last confirmed library, so a conditional reload can keep it without decoding storage.
   const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
+  const completedAt = useRef<{ session: ReadingSession; at: number } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -65,7 +69,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
           const work = await pendingReading(current);
           assertReadingSession(current);
           if (!publishSyncResult(current, { pending: work, cache: data, completed })) return;
-          if (completed && enabledRef.current && navigator.onLine && data) setSyncedSession(current);
+          if (completed && enabledRef.current && navigator.onLine && data) { setSyncedSession(current); completedAt.current = { session: current, at: Date.now() }; }
         });
       }
     } finally {
@@ -89,6 +93,11 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
   useEffect(() => {
     if (!session || !ready) return;
     const reload = () => { if (enabledRef.current && document.visibilityState === 'visible') void run(() => refresh(session)); };
+    const foreground = () => {
+      const completed = completedAt.current;
+      if (completed?.session === session && Date.now() - completed.at < FOREGROUND_MAX_AGE_MS) return;
+      reload();
+    };
     const changed = () => {
       let current: ReadingSession | null;
       try { current = readingSession(); } catch (cause) {
@@ -103,8 +112,8 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
     };
     reload();
     // Refresh on open, foreground, reconnect and explicit refresh; never on a timer.
-    window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', reload);
-    return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', reload); };
+    window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener('crate-reading-change', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', foreground);
+    return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener('crate-reading-change', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', foreground); };
   }, [enabled, session, ready, refresh, run, resetSession]);
   const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
   return { refresh, refreshManually, syncing, syncedSession, isOffline };

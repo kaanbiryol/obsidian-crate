@@ -250,3 +250,19 @@ it('refreshes the library on open and when shown again, never on a timer', async
   await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
   expect(loadReading).toHaveBeenCalledTimes(2);
 });
+
+it('reuses a refresh completed within 30 seconds when shown again, but not when reconnecting', async () => {
+  stored.queue = [];
+  renderSync();
+  await act(async () => {});
+  expect(loadReading).toHaveBeenCalledOnce();
+  // Before: every foreground reloaded the list in every tab.
+  await act(async () => vi.advanceTimersByTimeAsync(29_999));
+  await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
+  expect(loadReading).toHaveBeenCalledOnce();
+  await act(async () => window.dispatchEvent(new window.Event('online')));
+  expect(loadReading).toHaveBeenCalledTimes(2);
+  await act(async () => vi.advanceTimersByTimeAsync(30_000));
+  await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
+  expect(loadReading).toHaveBeenCalledTimes(3);
+});

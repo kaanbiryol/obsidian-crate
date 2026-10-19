@@ -77,10 +77,15 @@ it('does not re-render or rewrite storage when the policy is unchanged', async (
   expect(hook.current).toEqual({ reading: false, reminders: true });
 });
 
-it('checks again when the app regains focus or reconnects', async () => {
+it('checks again when the app regains focus after 30 seconds or reconnects', async () => {
   const { hook } = mount();
   await settle();
   policy = { reading: false, reminders: true, revision: 'two' };
+  // Before: every focus requested the policy again.
+  act(() => { window.dispatchEvent(new window.Event('focus')); });
+  await settle();
+  expect(network).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(30_000);
   act(() => { window.dispatchEvent(new window.Event('focus')); });
   await settle();
   expect(network).toHaveBeenCalledTimes(2);
