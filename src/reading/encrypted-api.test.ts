@@ -189,3 +189,24 @@ it('changes the library label when an article changes or stops failing', async (
 	const changed = await api.request('/reading/list') as { revision: string };
 	expect(changed.revision).not.toBe(recovered.revision);
 });
+
+it('keeps other decrypted notes after committing an edit', async () => {
+	const saved = await notes(2), edited = [saved[0]!, (await notes(2, 'r2'))[1]!];
+	let current = saved, sequence = 1;
+	const request = vi.fn<(path: string, body?: string) => Promise<Response>>(async (path, body) => {
+		if (path.startsWith('/reading/encrypted-receipt?')) return Response.json({ envelope: null });
+		if (path === '/reading/encrypted-commit') return Response.json({ encrypted: (JSON.parse(body!) as { acknowledgment: string }).acknowledgment });
+		if (path.startsWith('/reading/encrypted-files?')) return Response.json(page(current.map(note => note.file), null, sequence));
+		const target = new URL(path, 'https://crate.invalid').searchParams.get('path');
+		return new Response(current.find(note => note.file.path === target)!.bytes);
+	});
+	const api = new EncryptedReadingApi({ folderPath: 'Reading', generation: 1, authority, request,
+		readAttempt: async () => undefined, writeAttempt: async () => {}, error: message => new Error(message) });
+	const list = await api.request('/reading/list') as { items: Array<{ crate_reading_id: string; title: string }> };
+	const first = list.items.find(item => item.title === 'Note 0'), second = list.items.find(item => item.title === 'Note 1');
+	await api.request('/reading/update', JSON.stringify({ id: second!.crate_reading_id, operationId: 'operation-1', changes: { favorite: true }, before: { favorite: false } }));
+	current = edited; sequence = 2; request.mockClear();
+	await expect(api.request(`/reading/item?id=${first!.crate_reading_id}`)).resolves.toMatchObject({ item: { title: 'Note 0' } });
+	// Only the committed note is downloaded again; the open note stays decrypted.
+	expect(request.mock.calls.filter(([path]) => path.startsWith('/reading/encrypted-file?')).map(([path]) => new URL(path, 'https://crate.invalid').searchParams.get('path'))).toEqual([saved[1]!.file.path]);
+});

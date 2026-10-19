@@ -48,6 +48,14 @@ async function hash(value: string | Uint8Array<ArrayBuffer>): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Unchanged notes keep their item object across inventories, so measure each once.
+const metadataSizes = new WeakMap<ReadingItem, number>();
+function metadataSize(item: ReadingItem): number {
+  let size = metadataSizes.get(item);
+  if (size === undefined) { size = new TextEncoder().encode(JSON.stringify(item)).length; metadataSizes.set(item, size); }
+  return size;
+}
+
 /** Plaintext only exists in the trusted client. Every dispatched mutation is
  * persisted as exact ciphertext first, including its authenticated receipt. */
 export class EncryptedReadingApi {
@@ -126,7 +134,7 @@ export class EncryptedReadingApi {
           const result = loaded[index]!;
           if ('error' in result) throw result.error;
           const item = result.item;
-          metadataBytes += new TextEncoder().encode(JSON.stringify(item)).length;
+          metadataBytes += metadataSize(item);
           if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
           candidates.push(item);
           nextIndex.set(file.path, { file, item });
@@ -235,7 +243,8 @@ export class EncryptedReadingApi {
     const result = await this.json<{ encrypted: string }>('/reading/encrypted-commit', attempt.body);
     const receipt = await decryptJson(result.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
     if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
-    this.sources.clear();
+    // Other decrypted notes stay valid; `sameFile` rejects any that changed elsewhere.
+    for (const file of (JSON.parse(attempt.body) as { files: Array<{ path: string }> }).files) this.sources.delete(file.path);
     return receipt.response;
   }
 }
