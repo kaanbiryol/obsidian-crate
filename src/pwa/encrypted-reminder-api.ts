@@ -19,8 +19,24 @@ import { routeFolderPath } from './encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
+const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
 interface ScannedNote { file: RemoteFile; reminders: ReminderPayload[]; issue?: string }
+
+/** Results keep input order; at most `limit` notes download and decrypt at once.
+ * After a failure, no further notes start. */
+async function mapBounded<T, R>(values: readonly T[], limit: number, map: (value: T) => Promise<R>): Promise<R[]> {
+	const results = new Array<R>(values.length);
+	let next = 0, failed = false;
+	const worker = async () => {
+		while (!failed && next < values.length) {
+			const index = next++;
+			try { results[index] = await map(values[index]!); } catch (error) { failed = true; throw error; }
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+	return results;
+}
 
 async function json<T>(response: Response): Promise<T> {
 	if (!response.ok) {
@@ -88,8 +104,12 @@ export class EncryptedReminderApi {
 	}
 
 	private async read(file: RemoteFile, cache = this.cached): Promise<string> {
+		return (await this.readNote(file, cache)).content;
+	}
+
+	private async readNote(file: RemoteFile, cache: typeof this.cached): Promise<{ content: string; issue?: string }> {
 		const cached = cache.get(file.revision);
-		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached.content;
+		if (cached && cached.file.path === file.path && cached.file.hash === file.hash && cached.file.size === file.size) return cached;
 		if (file.size > 4 * 1024 * 1024) throw new ReminderCommandError('Split this note into files of 1 MiB or smaller to use its reminders.', 413, 'file_too_large');
 		const query = new URLSearchParams({ folderPath: this.keys.folderPath, path: file.path, revision: file.revision });
 		const response = await this.fetch(`/reminders/encrypted-file?${query}`);
@@ -108,7 +128,7 @@ export class EncryptedReminderApi {
 			const first = cache.keys().next().value!;
 			bytesCached -= cache.get(first)!.content.length * 2; cache.delete(first);
 		}
-		return content;
+		return { content, issue };
 	}
 
 	private async list(previousEtag: string | null): Promise<Response> {
@@ -124,21 +144,28 @@ export class EncryptedReminderApi {
 				const reminders: Awaited<ReturnType<typeof reminderCommandPayload>>[] = [], issues: ReminderSourceIssue[] = [];
 				const projects = new Set<string>();
 				const nextScanned = new Map<string, ScannedNote>();
-				for (const file of inventory.files) {
-					projects.add(getProjectFromPath(file.path, this.keys.folderPath));
+				const loaded = await mapBounded(inventory.files, NOTE_CONCURRENCY, async (file): Promise<ScannedNote | { file: RemoteFile; error: unknown }> => {
 					try {
 						const known = this.scanned.get(file.revision);
-						const entry: ScannedNote = known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size ? known : await (async () => {
-							const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), await this.read(file, nextCache), this.localFolder).reminders;
-							return { file, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: nextCache.get(file.revision)?.issue };
-						})();
-						nextScanned.set(file.revision, entry);
-						if (entry.issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.issue });
-						reminders.push(...entry.reminders);
+						if (known && known.file.path === file.path && known.file.hash === file.hash && known.file.size === file.size) return known;
+						const note = await this.readNote(file, nextCache);
+						const scanned = scanReminderMarkdownContent(routeFolderPath(file.path, this.keys.folderPath, this.localFolder), note.content, this.localFolder).reminders;
+						return { file, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
 					} catch (error) {
 						if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
-						issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: error instanceof Error ? error.message : 'This note could not be decrypted' });
+						return { file, error };
 					}
+				});
+				for (const entry of loaded) {
+					const { file } = entry;
+					projects.add(getProjectFromPath(file.path, this.keys.folderPath));
+					if ('error' in entry) {
+						issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.error instanceof Error ? entry.error.message : 'This note could not be decrypted' });
+						continue;
+					}
+					nextScanned.set(file.revision, entry);
+					if (entry.issue) issues.push({ path: routeFolderPath(file.path, this.keys.folderPath, this.localFolder), reason: entry.issue });
+					reminders.push(...entry.reminders);
 				}
 				if ((await this.page()).sequence !== inventory.sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
 				const counts = new Map<string, number>();

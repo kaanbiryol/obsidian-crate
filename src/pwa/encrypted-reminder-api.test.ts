@@ -185,3 +185,28 @@ it('downloads only changed notes even when the folder exceeds the content cache'
   expect(refreshed.reminders.find(reminder => reminder.id === 't0')?.completed).toBe(true);
   expect(fetch.mock.calls.filter(([route]) => route.startsWith('/reminders/encrypted-file?'))).toHaveLength(1);
 }, 60_000);
+
+it('downloads cold notes with bounded concurrency while keeping note order and issues', async () => {
+  const authority = { vaultId: keys.vaultId, scopeId: keys.scopeId, key: keys.data };
+  const notes = await Promise.all(Array.from({ length: 20 }, async (_, index) => {
+    const path = `Reminders/N${String(index).padStart(2, '0')}.md`;
+    const content = index === 3 ? new Uint8Array([0xff, 0xfe, 0xfd]) : new TextEncoder().encode(`- [ ] Task ${index} <!-- crate-id:t${index} -->\n`);
+    return { path, sealed: await sealFile({ path, content, contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+  }));
+  const byRevision = new Map(notes.map(note => [note.sealed.hash, note.sealed.bytes]));
+  let inFlight = 0, maxInFlight = 0;
+  const fetch = vi.fn(async (route: string) => {
+    if (route.startsWith('/reminders/encrypted-file?')) {
+      inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight--;
+      return new Response(byRevision.get(new URL(route, 'https://x').searchParams.get('revision')!));
+    }
+    return Response.json({ ...page(4), files: notes.map(note => ({ path: note.path, hash: note.sealed.hash, size: note.sealed.bytes.length, revision: note.sealed.hash })) });
+  });
+  const listed = await (await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders'))!.json() as { reminders: Array<{ id: string }>; issues: Array<{ path: string }> };
+  expect(maxInFlight).toBeGreaterThan(1);
+  expect(maxInFlight).toBeLessThanOrEqual(6);
+  expect(listed.reminders.map(reminder => reminder.id)).toEqual(Array.from({ length: 20 }, (_, index) => `t${index}`).filter(id => id !== 't3'));
+  expect(listed.issues.map(issue => issue.path)).toEqual(['Reminders/N03.md']);
+});
