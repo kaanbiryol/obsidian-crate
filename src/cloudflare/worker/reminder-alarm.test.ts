@@ -57,9 +57,11 @@ function createHarness(authority = true) {
 		due_datetime: reminder.dueDatetime,
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
+	const queries: string[] = [];
 	const db = {
 		prepare: vi.fn((sql: string) => {
 			const query = sql.replace(/\s+/g, ' ').trim();
+			queries.push(query);
 			let read: () => Promise<unknown>;
 			if (query.startsWith('SELECT 1 FROM reminder_projections p JOIN files')) read = async () => authority ? { ok: 1 } : null;
 			else if (query === 'SELECT file_path FROM reminder_projections WHERE reminder_id = ?') read = async () => ({ file_path: 'Notes/task.md' });
@@ -80,6 +82,7 @@ function createHarness(authority = true) {
 	} as unknown as D1Database;
 	return {
 		alarm: new ReminderAlarm(state, { DB: db, CRATE_PUBLIC_ORIGIN: 'https://worker.test' }),
+		queries,
 		deleteAll,
 		deleteAlarm,
 		first,
@@ -339,6 +342,26 @@ describe('reminder alarm delivery', () => {
 			content: 'Ship it',
 		});
 		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+	});
+
+	it('acknowledges a completed occurrence without checking source authority', async () => {
+		const harness = createHarness();
+		harness.storedValues.set('completedOccurrence', '2099-01-01T00:00:00.000Z');
+
+		const response = await harness.alarm.fetch(new Request('https://do/schedule', {
+			method: 'PUT',
+			body: JSON.stringify({
+				reminderId: 'reminder-1',
+				content: 'Ship it',
+				jobToken: 'current-job',
+				dueDatetime: '2099-01-01T00:00:00.000Z',
+			}),
+		}));
+
+		expect(response.status).toBe(200);
+		expect(harness.queries.some(sql => sql.includes('reminder_projections'))).toBe(false);
+		expect(harness.storedValues.has('reminder')).toBe(false);
+		expect(harness.setAlarm).not.toHaveBeenCalled();
 	});
 });
 

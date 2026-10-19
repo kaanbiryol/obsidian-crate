@@ -115,15 +115,16 @@ export class ReminderAlarm implements DurableObject {
 			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
 			const current = await env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
 			if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
-			if (!await hasNotificationAuthority(env.DB, reminderId, jobToken)) return new Response(JSON.stringify({ error: 'Reminder source verification is pending' }), { status: 409 });
 			// A completed occurrence survives transient schedule cleanup. Replaying
 			// an accepted job (or reprojecting the same due time) cannot notify twice.
+			// This only removes schedule state, so it does not need source authority.
 			if (await this.state.storage.get<string>(COMPLETED_OCCURRENCE_KEY) === dueDatetime) {
 				await env.DB.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?').bind(reminderId).run();
 				await this.state.storage.deleteAlarm();
 				await this.clearScheduleState();
 				return new Response(JSON.stringify({ success: true }));
 			}
+			if (!await hasNotificationAuthority(env.DB, reminderId, jobToken)) return new Response(JSON.stringify({ error: 'Reminder source verification is pending' }), { status: 409 });
 			const snapshot = await this.readSnapshot();
 			const sameOccurrence = snapshot.reminder?.dueDatetime === dueDatetime;
 			const body: ReminderData = {
