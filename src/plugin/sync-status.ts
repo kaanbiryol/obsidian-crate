@@ -14,8 +14,8 @@ export function registerSyncStatus(plugin: Plugin, runtime: StatusRuntime, onCli
     status.setEnabled(runtime.isInitialized() || state.initializing === true || state.status === 'error');
     const progress = runtime.getActivityProgress();
     if (progress) {
-      status.update({ ...state, status: 'syncing', work: state.work ?? progress.work });
       status.setSyncProgress(progress.current, progress.total);
+      status.update({ ...state, status: 'syncing', work: state.work ?? progress.work });
     } else {
       status.clearSyncProgress();
       status.update(state);

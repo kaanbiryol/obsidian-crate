@@ -73,11 +73,10 @@ export class StatusBarManager {
 	}
 
 	/**
-	 * Set progress for the active sync
+	 * Set progress for the active sync; the next syncing update renders it
 	 */
 	setSyncProgress(current: number, total: number): void {
 		this.syncProgress = { current, total };
-		this.update({ work: this.work, status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
 
 	/**
