@@ -41,106 +41,113 @@ export function calculateStableScrollAdjustment(
   return null;
 }
 
-function captureAnchors(container: HTMLElement, visibleOnly = false): ReminderScrollAnchor[] {
-  const containerTop = layoutOffsetTop(container);
-  const viewportHeight = container.clientHeight;
-
-  return Array.from(container.querySelectorAll<HTMLElement>('[data-reminder-scroll-anchor]'))
-    .map((element) => {
-      const top = layoutOffsetTop(element) - containerTop - container.scrollTop;
-      return {
-        id: element.dataset.reminderId ?? '',
-        section: element.dataset.reminderSection ?? '',
-        top,
-        height: element.offsetHeight,
-      };
-    })
-    .filter((anchor) => (
-      Boolean(anchor.id)
-      && (!visibleOnly || (anchor.top + anchor.height > 0 && anchor.top < viewportHeight))
-    ));
+interface MeasuredAnchor extends ReminderScrollAnchor {
+  height: number;
 }
 
-/** Keep the viewport anchored through both React commits and animated reflow. */
-export function useStableReminderScroll(suspended = false): RefObject<HTMLDivElement | null> {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const previousContainerRef = useRef<HTMLElement | null>(null);
-  const previousAnchorsRef = useRef<ReminderScrollAnchor[]>([]);
+interface ViewportSnapshot {
+  anchors: MeasuredAnchor[];
+  scrollTop: number;
+  viewportHeight: number;
+}
 
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    if (previousContainerRef.current !== container) {
-      previousContainerRef.current = container;
-      previousAnchorsRef.current = [];
+function captureAnchors(container: HTMLElement): MeasuredAnchor[] {
+  const containerTop = layoutOffsetTop(container);
+  const scrollTop = container.scrollTop;
+
+  return Array.from(container.querySelectorAll<HTMLElement>('[data-reminder-scroll-anchor]'))
+    .map((element) => ({
+      id: element.dataset.reminderId ?? '',
+      section: element.dataset.reminderSection ?? '',
+      top: layoutOffsetTop(element) - containerTop - scrollTop,
+      height: element.offsetHeight,
+    }))
+    .filter((anchor) => Boolean(anchor.id));
+}
+
+// Scrolling moves every row by the same distance, so the visible rows are
+// derived from the last measurement instead of measuring on each scroll event.
+function visibleAnchorsAt(snapshot: ViewportSnapshot, scrollTop: number): ReminderScrollAnchor[] {
+  const offset = scrollTop - snapshot.scrollTop;
+  return snapshot.anchors
+    .map((anchor) => ({ ...anchor, top: anchor.top - offset }))
+    .filter((anchor) => anchor.top + anchor.height > 0 && anchor.top < snapshot.viewportHeight);
+}
+
+function attachStableScroll(container: HTMLElement, isSuspended: () => boolean) {
+  let snapshot: ViewportSnapshot = { anchors: [], scrollTop: container.scrollTop, viewportHeight: container.clientHeight };
+  let lastScrollTop = container.scrollTop;
+  const captureCurrentViewport = () => {
+    snapshot = { anchors: captureAnchors(container), scrollTop: container.scrollTop, viewportHeight: container.clientHeight };
+    lastScrollTop = container.scrollTop;
+  };
+  const stabilize = () => {
+    const scrollTop = container.scrollTop;
+    // The old anchor may have moved completely outside the viewport.
+    const current = captureAnchors(container);
+    const adjustment = calculateStableScrollAdjustment(
+      visibleAnchorsAt(snapshot, lastScrollTop),
+      current,
+      isSuspended(),
+    );
+    if (adjustment !== null && Math.abs(adjustment) > 0.5) {
+      container.scrollTop += adjustment;
     }
-    let lastScrollTop = container.scrollTop;
-    const captureCurrentViewport = () => {
-      previousAnchorsRef.current = captureAnchors(container, true);
-      lastScrollTop = container.scrollTop;
-    };
-    const stabilize = () => {
-      const adjustment = calculateStableScrollAdjustment(
-        previousAnchorsRef.current,
-        // The old anchor may have moved completely outside the viewport.
-        captureAnchors(container),
-        suspended,
-      );
-      if (adjustment !== null && Math.abs(adjustment) > 0.5) {
-        container.scrollTop += adjustment;
-      }
-      captureCurrentViewport();
-    };
-    stabilize();
+    snapshot = { anchors: current, scrollTop, viewportHeight: container.clientHeight };
+    lastScrollTop = container.scrollTop;
+  };
+  stabilize();
 
-    // Height animations continue after the commit. Observe flow containers too:
-    // their size includes changing margins and rows that are still exiting.
-    // Register observations and adjust scrolling outside resize delivery. React
-    // can otherwise replace these observations during WebKit's layout pass.
-    let resizeFrame: number | undefined;
-    const resizeObserver = new ResizeObserver(() => scheduleStabilization());
-    const observed = new Set<Element>();
-    const observeContent = () => {
-      const elements = new Set<Element>([container, ...Array.from(container.querySelectorAll(
-        '[data-reminder-scroll-anchor], .reminder-list-presence',
-      ))]);
-      for (const element of observed) {
-        if (!elements.has(element)) {
-          resizeObserver.unobserve(element);
-          observed.delete(element);
-        }
+  // Height animations continue after the commit. Observe flow containers too:
+  // their size includes changing margins and rows that are still exiting.
+  // Register observations and adjust scrolling outside resize delivery. React
+  // can otherwise replace these observations during WebKit's layout pass.
+  let resizeFrame: number | undefined;
+  const resizeObserver = new ResizeObserver(() => scheduleStabilization());
+  const observed = new Set<Element>();
+  const observeContent = () => {
+    const elements = new Set<Element>([container, ...Array.from(container.querySelectorAll(
+      '[data-reminder-scroll-anchor], .reminder-list-presence',
+    ))]);
+    for (const element of observed) {
+      if (!elements.has(element)) {
+        resizeObserver.unobserve(element);
+        observed.delete(element);
       }
-      for (const element of elements) {
-        if (!observed.has(element)) {
-          resizeObserver.observe(element);
-          observed.add(element);
-        }
+    }
+    for (const element of elements) {
+      if (!observed.has(element)) {
+        resizeObserver.observe(element);
+        observed.add(element);
       }
-    };
-    const scheduleStabilization = () => {
-      if (resizeFrame !== undefined) return;
-      resizeFrame = window.requestAnimationFrame(() => {
-        resizeFrame = undefined;
-        observeContent();
-        stabilize();
-      });
-    };
-    scheduleStabilization();
-    const mutationObserver = new MutationObserver(scheduleStabilization);
-    mutationObserver.observe(container, {
-      childList: true, subtree: true, attributes: true,
-      attributeFilter: ['data-reminder-scroll-anchor'],
+    }
+  };
+  const scheduleStabilization = () => {
+    if (resizeFrame !== undefined) return;
+    resizeFrame = window.requestAnimationFrame(() => {
+      resizeFrame = undefined;
+      observeContent();
+      stabilize();
     });
-    const handleScroll = () => {
-      // Our own scroll event must not overwrite the anchor during a later frame.
-      if (container.scrollTop !== lastScrollTop) captureCurrentViewport();
-    };
-    const visualViewport = window.visualViewport;
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    container.addEventListener('pointerdown', captureCurrentViewport, true);
-    window.addEventListener('resize', captureCurrentViewport);
-    visualViewport?.addEventListener('resize', captureCurrentViewport);
-    return () => {
+  };
+  scheduleStabilization();
+  const mutationObserver = new MutationObserver(scheduleStabilization);
+  mutationObserver.observe(container, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ['data-reminder-scroll-anchor'],
+  });
+  const handleScroll = () => {
+    lastScrollTop = container.scrollTop;
+  };
+  const visualViewport = window.visualViewport;
+  container.addEventListener('scroll', handleScroll, { passive: true });
+  container.addEventListener('pointerdown', captureCurrentViewport, true);
+  window.addEventListener('resize', captureCurrentViewport);
+  visualViewport?.addEventListener('resize', captureCurrentViewport);
+  return {
+    container,
+    stabilize,
+    dispose: () => {
       resizeObserver.disconnect();
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       mutationObserver.disconnect();
@@ -148,8 +155,33 @@ export function useStableReminderScroll(suspended = false): RefObject<HTMLDivEle
       container.removeEventListener('pointerdown', captureCurrentViewport, true);
       window.removeEventListener('resize', captureCurrentViewport);
       visualViewport?.removeEventListener('resize', captureCurrentViewport);
-    };
+    },
+  };
+}
+
+/** Keep the viewport anchored through both React commits and animated reflow. */
+export function useStableReminderScroll(suspended = false): RefObject<HTMLDivElement | null> {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const suspendedRef = useRef(suspended);
+  const sessionRef = useRef<ReturnType<typeof attachStableScroll> | null>(null);
+
+  // Observers and listeners live as long as the container. Each later commit
+  // only re-anchors the viewport synchronously, before the browser paints.
+  useLayoutEffect(() => {
+    suspendedRef.current = suspended;
+    const container = containerRef.current;
+    const session = sessionRef.current;
+    if (session && session.container === container) {
+      session.stabilize();
+      return;
+    }
+    session?.dispose();
+    sessionRef.current = container ? attachStableScroll(container, () => suspendedRef.current) : null;
   });
+  useLayoutEffect(() => () => {
+    sessionRef.current?.dispose();
+    sessionRef.current = null;
+  }, []);
 
   return containerRef;
 }
