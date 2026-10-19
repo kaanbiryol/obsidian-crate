@@ -49,7 +49,7 @@ const DECRYPT_CONCURRENCY = 4;
 export interface DownloadedFile { content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string; verified?: true }
 type BatchDownloadEntry = BatchDownloadResponse['files'][number];
 /** Client-side batch entries: decrypted files carry verified bytes instead of base64. */
-export type DownloadedBatchFile = BatchDownloadEntry | (Omit<BatchDownloadEntry, 'content'> & { verifiedContent: ArrayBuffer });
+type DownloadedBatchFile = BatchDownloadEntry | (Omit<BatchDownloadEntry, 'content'> & { verifiedContent: ArrayBuffer });
 export interface DownloadedBatch { files: DownloadedBatchFile[] }
 
 export class SyncWorkerApi {
