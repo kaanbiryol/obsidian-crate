@@ -98,3 +98,22 @@ it('encrypts a notification that an independent receiver can authenticate and de
 		keys: { p256dh: toBase64Url(publicKey), auth: toBase64Url(auth) },
 	}, payload);
 });
+
+it('reuses one VAPID authorization per push service within a send', async () => {
+	const vapid = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+	const receiver = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+	const keys = { p256dh: toBase64Url(await crypto.subtle.exportKey('raw', receiver.publicKey)), auth: toBase64Url(new Uint8Array(16)) };
+	const authorizations = new Map<string, string>();
+	vi.stubGlobal('fetch', vi.fn(async (request: Request) => {
+		authorizations.set(request.url, request.headers.get('Authorization')!);
+		return new Response(null, { status: 201 });
+	}));
+	const cache = new Map<string, Promise<string>>();
+	for (const endpoint of ['https://fcm.googleapis.com/a', 'https://fcm.googleapis.com/b', 'https://web.push.apple.com/c']) {
+		await sendPushNotificationWithoutContact(vapid, { endpoint, keys }, '{}', cache);
+	}
+	// ECDSA signatures are randomized, so equal headers mean one shared token.
+	expect(authorizations.get('https://fcm.googleapis.com/b')).toBe(authorizations.get('https://fcm.googleapis.com/a'));
+	expect(authorizations.get('https://web.push.apple.com/c')).not.toBe(authorizations.get('https://fcm.googleapis.com/a'));
+	expect([...cache.keys()]).toEqual(['https://fcm.googleapis.com', 'https://web.push.apple.com']);
+});

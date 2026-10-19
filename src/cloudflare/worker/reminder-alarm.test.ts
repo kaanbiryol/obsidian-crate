@@ -2,12 +2,14 @@ import { PushPayloadError } from './notifications/payload-budget';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./feature-policy', () => ({ featureEnabled: vi.fn(async () => true) }));
 import { ReminderAlarm } from './notifications/reminder-alarm';
-import { listPushSubscriptionIds, sendToAllSubscriptions } from './notifications/push';
+import { listPushSubscriptions, sendToAllSubscriptions } from './notifications/push';
 
 vi.mock('./notifications/push', () => ({
-	listPushSubscriptionIds: vi.fn(),
+	listPushSubscriptions: vi.fn(),
 	sendToAllSubscriptions: vi.fn(),
 }));
+
+const subscriptionRows = (...ids: string[]) => ids.map(id => ({ id, endpoint: `https://push.example/${id}`, p256dh: 'key', auth: 'auth' }));
 
 const unexpectedQueries: string[] = [];
 beforeEach(() => {
@@ -109,7 +111,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('retries only subscriptions whose push delivery failed', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1', 'subscription-2']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1', 'subscription-2'));
 		vi.mocked(sendToAllSubscriptions)
 			.mockResolvedValueOnce({
 				sent: 1,
@@ -138,21 +140,23 @@ describe('reminder alarm delivery', () => {
 
 		await harness.alarm.alarm();
 
-		expect(listPushSubscriptionIds).toHaveBeenCalledOnce();
+		expect(listPushSubscriptions).toHaveBeenCalledOnce();
 		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(1, expect.anything(), expect.anything(), {
 			origin: 'https://worker.test',
 			subscriptionIds: ['subscription-1', 'subscription-2'],
+			subscriptions: subscriptionRows('subscription-1', 'subscription-2'),
 		});
 		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything(), {
 			origin: 'https://worker.test',
 			subscriptionIds: ['subscription-2'],
+			subscriptions: undefined,
 		});
 		expect(harness.run).toHaveBeenCalledOnce();
 		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('keeps alarm state when every push delivery fails', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 0,
 			failed: 1,
@@ -171,7 +175,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('records deterministic payload errors immediately without retrying or disabling recipients', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockRejectedValueOnce(new PushPayloadError('Invalid notification identifiers'));
 		const harness = createHarness();
 		vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -182,7 +186,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('records a terminal delivery failure after the retry budget is exhausted', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 0,
 			failed: 1,
@@ -206,7 +210,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('cleans up only after delivery finishes without retryable failures', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 1,
 			failed: 0,
@@ -223,7 +227,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('retries D1 cleanup without sending a duplicate push', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows('subscription-1'));
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 1,
 			failed: 0,
@@ -270,7 +274,7 @@ describe('reminder alarm delivery', () => {
 	});
 
 	it('does not clear a newer schedule after an older alarm finishes', async () => {
-		vi.mocked(listPushSubscriptionIds).mockResolvedValue([]);
+		vi.mocked(listPushSubscriptions).mockResolvedValue(subscriptionRows());
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 0,
 			failed: 0,

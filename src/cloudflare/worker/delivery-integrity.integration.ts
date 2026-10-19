@@ -9,7 +9,7 @@ import { handleNotificationPolicy } from './notification-policy';
 import { ReminderAlarm } from './notifications/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { handleDiagnostics } from './maintenance/diagnostics';
-vi.mock('./notifications/push', () => ({ listPushSubscriptionIds: vi.fn(async () => ['sub']), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
+vi.mock('./notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.clearAllMocks(); await reset(); });
 const id = '11111111-1111-4111-8111-111111111111';

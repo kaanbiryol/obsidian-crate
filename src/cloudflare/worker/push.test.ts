@@ -195,6 +195,31 @@ describe('sendToAllSubscriptions', () => {
 		expect(run).toHaveBeenCalledOnce();
 	});
 
+	it('imports VAPID keys once per stored key pair and passes provided recipients through', async () => {
+		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response(null, { status: 201 }));
+		let stored = { public_key: 'cached-public', private_key: 'cached-private' };
+		const prepare = vi.fn((sql: string) => {
+			const statement = {
+				bind: vi.fn(() => statement),
+				run: vi.fn(async () => ({})),
+				all: vi.fn(async () => ({ results: [stored] })),
+			};
+			if (sql.includes('FROM push_subscriptions')) throw new Error('Recipients were already provided');
+			return statement;
+		});
+		const subscriptions = [{ id: 'subscription', endpoint: 'https://push.example/1', p256dh: 'key', auth: 'auth' }];
+		const send = () => sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' }, { origin: 'https://worker.test', subscriptions });
+
+		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
+		await send();
+		await send();
+		expect(deserializeVapidKeys).toHaveBeenCalledOnce();
+		stored = { public_key: 'rotated-public', private_key: 'rotated-private' };
+		await send();
+		expect(deserializeVapidKeys).toHaveBeenCalledTimes(2);
+		expect(sendPushNotificationWithoutContact).toHaveBeenCalledTimes(3);
+	});
+
 	it('returns transient push failures for bounded alarm retries', async () => {
 		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
 		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response('busy', { status: 503 }));

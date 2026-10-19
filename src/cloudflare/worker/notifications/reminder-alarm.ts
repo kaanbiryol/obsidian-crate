@@ -6,7 +6,7 @@ import { PushPayloadError } from './payload-budget';
 import type { Env } from '../types';
 import { changedRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
-import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
+import { listPushSubscriptions, sendToAllSubscriptions, type PushSubscriptionRow } from './push';
 import { hasNotificationAuthority } from '../reminder-source-state';
 import { NOTIFICATION_DELIVERY_WINDOW_MS } from '../notification-projection-plan';
 
@@ -243,19 +243,20 @@ export class ReminderAlarm implements DurableObject {
 				throw new Error('Notification missed its 24-hour delivery window');
 			}
 			let pendingSubscriptionIds = await this.state.storage.get<string[]>(PENDING_SUBSCRIPTION_IDS_KEY);
+			let subscriptions: PushSubscriptionRow[] | undefined;
 			if (!pendingSubscriptionIds) {
-				pendingSubscriptionIds = await listPushSubscriptionIds(db);
-				if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, pendingSubscriptionIds))) return;
-			}
-			if (!await this.writeIfCurrent(reminder.scheduleToken, async () => {})) return;
-			if (!await featureEnabled(db, 'reminders')) return;
+				subscriptions = await listPushSubscriptions(db);
+				const recipients = subscriptions.map(subscription => subscription.id);
+				pendingSubscriptionIds = recipients;
+				if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, recipients))) return;
+			} else if (!await this.writeIfCurrent(reminder.scheduleToken, async () => {})) return;
 			const delivery = await sendToAllSubscriptions(db, {
 				title: scheduled.content,
 				body: scheduled.project || '',
 				tag: reminder.reminderId,
 				project: scheduled.project ?? undefined,
 				reminderId: reminder.reminderId,
-			}, { origin: this.env.CRATE_PUBLIC_ORIGIN ?? '', subscriptionIds: pendingSubscriptionIds });
+			}, { origin: this.env.CRATE_PUBLIC_ORIGIN ?? '', subscriptionIds: pendingSubscriptionIds, subscriptions });
 			if (delivery.failed > 0) {
 				if (!await this.writeIfOccurrenceCurrent(reminder.dueDatetime, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, delivery.failedSubscriptionIds))) return;
 				throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);

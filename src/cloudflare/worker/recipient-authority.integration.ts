@@ -3,7 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
-import { listPushSubscriptionIds } from './notifications/push';
+import { listPushSubscriptions } from './notifications/push';
 import { pruneExpiredTokens } from './maintenance/database';
 
 afterEach(async () => { await reset(); });
@@ -23,7 +23,7 @@ it('authorizes live scoped recipients at send selection without waiting for cron
 	}
 	await expect(subscribe('unowned', null, null)).rejects.toThrow('NOT NULL');
 	await subscribe('forged-folder', 'other', 'Private');
-	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['live']);
+	expect((await listPushSubscriptions(env.DB)).map(row => row.id).sort()).toEqual(['live']);
 	await pruneExpiredTokens(env.DB);
-	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['live']);
+	expect((await listPushSubscriptions(env.DB)).map(row => row.id).sort()).toEqual(['live']);
 });

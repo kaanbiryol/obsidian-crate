@@ -15,7 +15,7 @@ interface SerializedVapidKeys {
 	privateKey: string;
 }
 
-interface PushSubscriptionRow {
+export interface PushSubscriptionRow {
 	id: string;
 	endpoint: string;
 	p256dh: string;
@@ -110,9 +110,24 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 	return persistedKeys;
 }
 
-export async function listPushSubscriptionIds(db: D1Database): Promise<string[]> {
-	const rows = await queryRows<{ id: string }>(db.prepare(`SELECT id FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()));
-	return rows.map((row) => row.id);
+export function listPushSubscriptions(db: D1Database): Promise<PushSubscriptionRow[]> {
+	return queryRows<PushSubscriptionRow>(
+		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
+	);
+}
+
+// Imported keys are reused by this isolate until the stored key pair changes.
+let importedVapidKeys: { id: string; keys: Promise<CryptoKeyPair> } | undefined;
+
+function importVapidKeys(serialized: SerializedVapidKeys): Promise<CryptoKeyPair> {
+	const id = `${serialized.publicKey}.${serialized.privateKey}`;
+	if (importedVapidKeys?.id === id) return importedVapidKeys.keys;
+	const keys = deserializeVapidKeys(serialized);
+	importedVapidKeys = { id, keys };
+	keys.catch(() => {
+		if (importedVapidKeys?.keys === keys) importedVapidKeys = undefined;
+	});
+	return keys;
 }
 
 async function runBounded<T>(items: readonly T[], worker: (item: T) => Promise<void>): Promise<void> {
@@ -142,11 +157,10 @@ function isRetryablePushStatus(status: number): boolean {
 export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
-	options: { origin: string; subscriptionIds?: readonly string[] },
+	options: { origin: string; subscriptionIds?: readonly string[]; subscriptions?: readonly PushSubscriptionRow[] },
 ): Promise<PushDeliveryResult> {
-	const allSubscriptions = await queryRows<PushSubscriptionRow>(
-		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
-	);
+	// Callers that just read the recipients pass them in to avoid a second query.
+	const allSubscriptions = options.subscriptions ?? await listPushSubscriptions(db);
 	const requestedIds = options.subscriptionIds ? new Set(options.subscriptionIds) : null;
 	const subscriptions = requestedIds
 		? allSubscriptions.filter((subscription) => requestedIds.has(subscription.id))
@@ -164,7 +178,8 @@ export async function sendToAllSubscriptions(
 	}
 
 	const serializedKeys = await getOrCreateVapidKeys(db);
-	const keys = await deserializeVapidKeys(serializedKeys);
+	const keys = await importVapidKeys(serializedKeys);
+	const authorizations = new Map<string, Promise<string>>();
 	const payloadString = JSON.stringify(createDeclarativePushPayload(payload, options.origin));
 	let sent = 0;
 	let failed = 0;
@@ -182,6 +197,7 @@ export async function sendToAllSubscriptions(
 					keys: { p256dh: subscription.p256dh, auth: subscription.auth },
 				},
 				payloadString,
+				authorizations,
 			);
 
 			if (isExpiredSubscriptionStatus(response.status)) {

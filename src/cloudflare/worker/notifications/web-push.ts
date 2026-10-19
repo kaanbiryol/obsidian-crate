@@ -38,23 +38,35 @@ export async function createVapidAuthorizationToken(
 	return `${signingInput}.${toBase64Url(signature)}`;
 }
 
+async function createVapidAuthorization(vapidKeys: CryptoKeyPair, endpoint: URL): Promise<string> {
+	const [jwt, exportedPublicKey] = await Promise.all([
+		createVapidAuthorizationToken(vapidKeys.privateKey, endpoint),
+		crypto.subtle.exportKey('raw', vapidKeys.publicKey),
+	]);
+	return `vapid t=${jwt}, k=${toBase64Url(exportedPublicKey)}`;
+}
+
 export async function sendPushNotificationWithoutContact(
 	vapidKeys: CryptoKeyPair,
 	subscription: WebPushSubscription,
 	payload: string,
+	authorizations?: Map<string, Promise<string>>,
 ): Promise<Response> {
 	if (new TextEncoder().encode(payload).byteLength > MAX_PUSH_PAYLOAD_BYTES) throw new PushPayloadError('Push payload exceeds the Web Push byte limit');
 	if (!isValidPushEndpoint(subscription.endpoint)) throw new Error('Push service is not supported');
 	const encryptedPayload = encrypt(subscription.keys.p256dh, subscription.keys.auth, payload, 'aes128gcm').cipherText;
-	const [jwt, exportedPublicKey] = await Promise.all([
-		createVapidAuthorizationToken(vapidKeys.privateKey, new URL(subscription.endpoint)),
-		crypto.subtle.exportKey('raw', vapidKeys.publicKey),
-	]);
+	const endpoint = new URL(subscription.endpoint);
+	// One send reuses its VAPID token for every endpoint on the same push service.
+	let authorization = authorizations?.get(endpoint.origin);
+	if (!authorization) {
+		authorization = createVapidAuthorization(vapidKeys, endpoint);
+		authorizations?.set(endpoint.origin, authorization);
+	}
 	const headers = new Headers({
 		'Content-Type': 'application/octet-stream',
 		'Content-Length': String(encryptedPayload.byteLength),
 		TTL: '86400',
-		Authorization: `vapid t=${jwt}, k=${toBase64Url(exportedPublicKey)}`,
+		Authorization: await authorization,
 		'Content-Encoding': 'aes128gcm',
 	});
 

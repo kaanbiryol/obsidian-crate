@@ -16,7 +16,7 @@ import { sendToAllSubscriptions } from './notifications/push';
 import { handleDiagnostics } from './maintenance/diagnostics';
 
 vi.mock('./notifications/push', () => ({
-  listPushSubscriptionIds: vi.fn(async () => ['sub']),
+  listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]),
   sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })),
 }));
 beforeEach(async () => {
