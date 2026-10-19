@@ -37,7 +37,9 @@ export function reorderProjectReminders(reminders: ReminderRecord[], project: st
 		if (reminder.project !== project || reminder.completed) return reminder;
 		const nextReminder = activeProjectReminders[activeIndex];
 		activeIndex += 1;
-		return nextReminder ? { ...nextReminder, lineNumber: reminder.lineNumber } : reminder;
+		if (!nextReminder) return reminder;
+		// Keep unmoved records so their shared card data stays identical.
+		return nextReminder.lineNumber === reminder.lineNumber ? nextReminder : { ...nextReminder, lineNumber: reminder.lineNumber };
 	});
 }
 
