@@ -77,7 +77,27 @@ export class ActivityModal extends BaseUiModal {
 	private conflictsPanel!: HTMLDivElement;
 	private renderedCheckingConflicts: boolean | undefined;
 	private historyPanel!: HTMLDivElement;
-	private readonly onProgress = () => {
+	private closed = false;
+	private updateScheduled = false;
+	private stateChanged = false;
+	private renderedBrowserSignature: string | undefined;
+	// A file's state change and progress tick arrive together; apply them once.
+	private scheduleUpdate(stateChanged: boolean): void {
+		this.stateChanged ||= stateChanged;
+		if (this.updateScheduled) return;
+		this.updateScheduled = true;
+		queueMicrotask(() => {
+			this.updateScheduled = false;
+			const changed = this.stateChanged;
+			this.stateChanged = false;
+			if (this.closed || !this.pendingPanel) return;
+			if (changed) this.applyStateChange();
+			else this.applyProgress();
+		});
+	}
+	private readonly onProgress = () => this.scheduleUpdate(false);
+	private readonly onStateChange = () => this.scheduleUpdate(true);
+	private applyProgress(): void {
 		if (!this.pendingPanel) return;
 		const state = this.deps.getState();
 		// Manual sync records history after the engine's final state event.
@@ -93,7 +113,7 @@ export class ActivityModal extends BaseUiModal {
         // The empty conflicts panel only changes with its checking state.
         if (this.deps.getActiveConflicts().length === 0 && status.checkingConflicts !== this.renderedCheckingConflicts) this.renderConflicts(status);
 		this.renderPending();
-	};
+	}
 	private renderPending(): void {
 		const state = this.deps.getState();
         const progress = this.deps.getActivityProgress?.();
@@ -106,6 +126,16 @@ export class ActivityModal extends BaseUiModal {
             return;
         }
         const paths = this.deps.getPendingPaths();
+        // Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
+        const showsBrowser = !!this.deps.loadPendingDiff && paths.length > 0 && state.status !== 'syncing' && !progress
+            && !(state.initializing && state.status !== 'error' && state.status !== 'offline');
+        const browserSignature = showsBrowser ? paths.join('\0') : undefined;
+        if (browserSignature !== undefined && browserSignature === this.renderedBrowserSignature
+            && this.pendingPanel.querySelector('.crate-pending-browser')) {
+            this.updateSyncBtn();
+            return;
+        }
+        this.renderedBrowserSignature = browserSignature;
         this.pendingBrowserState.dispose?.();
         this.pendingBrowserState.startChecks = undefined;
         this.pendingBrowserState.pauseChecks = undefined;
@@ -123,15 +153,15 @@ export class ActivityModal extends BaseUiModal {
             } : undefined);
         this.updateSyncBtn();
 	}
-	private readonly onStateChange = () => {
+	private applyStateChange(): void {
 		const state = this.deps.getState();
 		if ((state.status === 'syncing' || state.initializing && state.status === 'idle')
-			&& this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
+			&& this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.applyProgress();
 		else {
             this.refresh();
             if (this.currentTabIndex === 2 && this.deps.getState().status !== 'syncing') void this.sharedHistory?.refresh();
         }
-	};
+	}
 
 	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'conflicts' | 'history' = 'pending') {
 		super(app);
@@ -140,6 +170,7 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	onOpen(): void {
+        this.closed = false;
         if (this.deps.listSharedCheckpoints) {
             this.sharedHistory = new SharedHistoryLoader(() => this.deps.listSharedCheckpoints!(), () => this.refresh());
         }
@@ -340,6 +371,7 @@ export class ActivityModal extends BaseUiModal {
     }
 
 	onClose(): void {
+        this.closed = true;
         this.sharedHistory?.dispose();
         this.sharedHistory = undefined;
         this.activityHistory?.dispose();
