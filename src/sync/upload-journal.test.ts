@@ -166,3 +166,20 @@ it('prunes journal copies periodically during a long run of uploads', async () =
 	expect(manifest.uploadJournal.pending()).toEqual([]);
 	await manifest.close();
 });
+
+it('seals concurrent uploads outside the journal write chain and checks its folder once', async () => {
+	const { disk, create, file } = fixture();
+	const manifest = create();
+	const exists = vi.spyOn(disk.vault.adapter, 'exists');
+	let release!: () => void;
+	const gate = new Promise<void>(resolve => { release = resolve; });
+	const sealing: string[] = [];
+	const prepareWire = async (upload: { path: string }) => { sealing.push(upload.path); await gate; return undefined; };
+	const pending = [0, 1, 2].map(index => manifest.uploadJournal.prepare([{ ...file, path: `note-${index}.md` }], 20000, undefined, prepareWire));
+	await vi.waitFor(() => expect(sealing).toHaveLength(3));
+	// Before: each upload waited for the previous one's encryption and write.
+	release();
+	expect((await Promise.all(pending)).flat().map(upload => upload.path)).toEqual(['note-0.md', 'note-1.md', 'note-2.md']);
+	expect(exists.mock.calls.filter(([path]) => path.endsWith('/pending-uploads'))).toHaveLength(1);
+	await manifest.close();
+});

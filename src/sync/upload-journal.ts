@@ -13,6 +13,7 @@ export class UploadJournal {
 	private writing: Promise<void> = Promise.resolve();
 	private closed = false;
 	private sequence = 0;
+	private directoryReady = false;
 	constructor(private adapter: DataAdapter, private directory: string, private authority?: string) {}
 
 	async load(settled: unknown = []): Promise<void> {
@@ -46,33 +47,58 @@ export class UploadJournal {
 	completedSnapshot(): string[] { return [...this.completed]; }
 	complete(id: string): void { this.entries.delete(id); this.completed.add(id); }
 
-	prepare(files: IntendedUpload[], day: number, clientSession: string = crypto.randomUUID(), prepareWire?: PrepareUploadWire): Promise<JournalUpload[]> {
+	async prepare(files: IntendedUpload[], day: number, clientSession: string = crypto.randomUUID(), prepareWire?: PrepareUploadWire): Promise<JournalUpload[]> {
+		const result: JournalUpload[] = [];
+		for (const file of files) result.push(await this.prepareOne(file, day, clientSession, prepareWire));
+		return result;
+	}
+
+	/** Encrypts outside the write chain, so concurrent batches only serialize
+	 * sequence assignment and the journal write. */
+	private async prepareOne(file: IntendedUpload, day: number, clientSession: string, prepareWire?: PrepareUploadWire): Promise<JournalUpload> {
+		if (this.closed) throw new DOMException('Sync engine closed', 'AbortError');
+		const seal = async (): Promise<JournalUpload> => {
+			const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
+			this.assertNewOperation(durable.operationId);
+			const encryptedWire = await prepareWire?.(durable);
+			// Sealing already hashed this plaintext and ciphertext; check only the shape.
+			if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable, true); }
+			return durable;
+		};
+		const sealed = this.pendingFor(file.path) ? undefined : await seal();
 		const task = this.writing.catch(() => {}).then(async () => {
 			if (this.closed) throw new DOMException('Sync engine closed', 'AbortError');
-			if (!await this.adapter.exists(this.directory)) await this.adapter.mkdir(this.directory);
-			const result: JournalUpload[] = [];
-			for (const file of files) {
-				const prior = this.pending().find(item => item.path === file.path);
-				if (prior) {
-					if (prior.hash !== file.hash || prior.content !== file.content || prior.expectedHash !== file.expectedHash || prior.contentType !== file.contentType || prior.size !== file.size || JSON.stringify(prior.intent) !== JSON.stringify(file.intent)) throw new Error('An earlier upload is unresolved. Sync again to recover its receipt before sending new changes.');
-					result.push(prior);
-					continue;
-				}
-				const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
-				if (reminderOperationDay(durable.operationId) === null || (this.entries.has(durable.operationId) || this.completed.has(durable.operationId))) throw new Error('Invalid or reused upload operation identity');
-				const encryptedWire = await prepareWire?.(durable);
-				// Sealing already hashed this plaintext and ciphertext; check only the shape.
-				if (encryptedWire) { durable.encryptedWire = encryptedWire; await validateUploadIntent(durable, true); }
-				// A failed write must not dispatch the request. A partial journal file
-				// makes restart fail closed instead of guessing that no upload ran.
-				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
-				this.entries.set(durable.operationId, durable);
-				result.push(durable);
+			const prior = this.pendingFor(file.path);
+			if (prior) {
+				if (prior.hash !== file.hash || prior.content !== file.content || prior.expectedHash !== file.expectedHash || prior.contentType !== file.contentType || prior.size !== file.size || JSON.stringify(prior.intent) !== JSON.stringify(file.intent)) throw new Error('An earlier upload is unresolved. Sync again to recover its receipt before sending new changes.');
+				return prior;
 			}
-			return result;
+			// The earlier pending upload settled while this one waited.
+			const durable = sealed ?? await seal();
+			this.assertNewOperation(durable.operationId);
+			if (!this.directoryReady) {
+				if (!await this.adapter.exists(this.directory)) await this.adapter.mkdir(this.directory);
+				this.directoryReady = true;
+			}
+			// A failed write must not dispatch the request. A partial journal file
+			// makes restart fail closed instead of guessing that no upload ran.
+			try {
+				await this.adapter.write(this.path(durable.operationId), JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
+			} catch (error) { this.directoryReady = false; throw error; }
+			this.entries.set(durable.operationId, durable);
+			return durable;
 		});
 		this.writing = task.then(() => {}, () => {});
 		return task;
+	}
+
+	private pendingFor(path: string): JournalUpload | undefined {
+		for (const file of this.entries.values()) if (file.path === path && !this.completed.has(file.operationId)) return file;
+		return undefined;
+	}
+
+	private assertNewOperation(id: string): void {
+		if (reminderOperationDay(id) === null || this.entries.has(id) || this.completed.has(id)) throw new Error('Invalid or reused upload operation identity');
 	}
 
 	async pruneCompleted(ids: string[]): Promise<void> {
