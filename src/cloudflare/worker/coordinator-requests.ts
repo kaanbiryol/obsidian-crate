@@ -10,6 +10,7 @@ import { uploadInitialFiles } from './initial-import-upload';
 import { handleBatchDownload } from './sync-batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from './bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from './staged-upload-dispatch';
+import { scheduleMaintenance } from './maintenance-schedule';
 
 export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;
 
@@ -44,7 +45,7 @@ export async function handleCoordinatorRequest(
     && await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
   // Schedule cleanup before queuing, so a running maintenance pass delays only
   // this request rather than every coordinated mutation behind it.
-  if (request.headers.get('X-Crate-Internal-Mutation') === '1') await scheduleMaintenance(env);
+  if (request.headers.get('X-Crate-Internal-Mutation') === '1') await scheduleMaintenance(env, state);
   return withStateLock(async () => {
     if (path === '/reading-wake' && request.method === 'POST') {
       await state.storage.put('readingCoordinator', true);
@@ -69,12 +70,6 @@ export async function handleCoordinatorRequest(
     }
     return await handleLockedCoordinatorRequest(request, state, env) ?? handleReminder();
   });
-}
-
-async function scheduleMaintenance(env: Env): Promise<void> {
-	const maintenance = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/maintenance'));
-	const response = await maintenance.fetch('https://do/maintain', { method: 'POST' });
-	if (!response.ok) throw new Error('Unable to schedule server cleanup');
 }
 
 /** Internal endpoints; the caller holds the Durable Object's mutation lock. */

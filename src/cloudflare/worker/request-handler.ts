@@ -24,6 +24,7 @@ import { EncryptionStateError } from './encryption-state';
 import { ENCRYPTION_STATE_HEADER } from '../../encryption/server-state';
 import { assertRequestEncryption, checkRequestProtocol } from './request-guards';
 import { forwardTransferRequest } from './transfer-dispatch';
+import { scheduleMaintenance } from './maintenance-schedule';
 import { commitStagedFile } from './sync-mutations';
 import { commitNewFiles } from './bulk-new-file-commit';
 import type { UploadCommitters } from './upload-committers';
@@ -128,9 +129,7 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		}
 		if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);
 		if (mutation && execution.kind !== 'coordinator') {
-			const maintenance = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/maintenance'));
-			const scheduled = await maintenance.fetch('https://do/maintain', { method: 'POST' });
-			if (!scheduled.ok) throw new Error('Unable to schedule cleanup');
+			await scheduleMaintenance(env, projectionBinding);
 		}
 		const uploadCommitters: UploadCommitters = execution.kind === 'coordinator'
 			? { commitUpload: commitStagedFile, commitNewFiles }
