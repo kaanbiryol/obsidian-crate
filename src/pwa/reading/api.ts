@@ -9,7 +9,6 @@ import { capturePwaSession } from '../session-generation';
 import { READING_SESSION_KEY, assertReadingSession, commitReadingCache, readingSession, type ReadingSession, type ReadingCache } from './storage';
 import { ReadingApiError } from './api-error';
 export { ReadingApiError } from './api-error';
-import { isReadingCache } from './storage-validation';
 import { isReadingArticle, parseReadingListPage, type ReadingArticle } from './record-validation';
 import { EncryptionScopeChangedError, routeFolderPath } from '../encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -145,7 +144,8 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
     cache.items.push(...page.items); cache.issues.push(...page.issues);
     cursor = page.cursor;
   } while (cursor);
-  if (!isReadingCache(cache, session.folderPath)) throw new Error('Reading library response is unreadable.');
+  // Pages are already validated; only identities can conflict across pages.
+  if (new Set(cache.items.map(item => item.crate_reading_id)).size !== cache.items.length) throw new Error('Reading library response is unreadable.');
   return commitReadingCache(session, cache);
 }
 

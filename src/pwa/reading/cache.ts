@@ -69,7 +69,8 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
       cache.issues.push({ path: session.folderPath, message: 'The saved library needs recovery. Export Reading data before clearing this device’s storage.' });
       return cache;
     }
-    if (isReadingCache(previous, session.folderPath)) for (const item of previous.items) {
+    // Only notes with source issues keep their previous entries.
+    if (uncertain.size && isReadingCache(previous, session.folderPath)) for (const item of previous.items) {
       if (uncertain.has(item.path) && !ids.has(item.crate_reading_id)) {
         cache.items.push(item); ids.add(item.crate_reading_id);
       }

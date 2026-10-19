@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { cacheReadingArticle } from './cache';
+import { cacheReadingArticle, commitReadingCache } from './cache';
+import { isReadingCache } from './storage-validation';
 import { decodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session';
 
@@ -8,6 +9,10 @@ const values = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./private-storage', async importOriginal => {
   const actual = await importOriginal<typeof import('./private-storage')>();
   return { ...actual, decodeReadingValue: vi.fn(actual.decodeReadingValue) };
+});
+vi.mock('./storage-validation', async importOriginal => {
+  const actual = await importOriginal<typeof import('./storage-validation')>();
+  return { ...actual, isReadingCache: vi.fn(actual.isReadingCache) };
 });
 vi.mock('../single-store-database', () => ({ openSingleStoreDatabase: async () => ({
   transaction: () => ({
@@ -27,7 +32,7 @@ const articleKey = (n: number) => `article:${session.id}:${item(n).crate_reading
 const articleDecodes = () => vi.mocked(decodeReadingValue).mock.calls.filter(([key]) => key.startsWith('article:')).length;
 
 beforeEach(() => {
-  values.clear(); vi.mocked(decodeReadingValue).mockClear();
+  values.clear(); vi.mocked(decodeReadingValue).mockClear(); vi.mocked(isReadingCache).mockClear();
   vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : null });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
@@ -69,4 +74,15 @@ it('preserves unreadable article copies and rebuilds a malformed index', async (
   await cacheReadingArticle(session, item(2), 'Two');
   expect(values.has(articleKey(1))).toBe(true);
   expect(values.get(`article-index:${session.id}`)).toMatchObject({ entries: [{ id: item(2).crate_reading_id }] });
+});
+
+it('validates the previous library only to keep entries for notes with source issues', async () => {
+  values.set(`list:${session.id}`, { items: [item(1)], issues: [], savedAt: 1 });
+  await commitReadingCache(session, { items: [item(2)], issues: [], savedAt: 2 });
+  expect(isReadingCache).not.toHaveBeenCalled();
+  expect(values.get(`list:${session.id}`)).toMatchObject({ items: [{ crate_reading_id: item(2).crate_reading_id }] });
+
+  const kept = await commitReadingCache(session, { items: [], issues: [{ path: item(2).path, message: 'Unreadable' }], savedAt: 3 });
+  expect(isReadingCache).toHaveBeenCalledOnce();
+  expect(kept.items).toEqual([item(2)]);
 });
