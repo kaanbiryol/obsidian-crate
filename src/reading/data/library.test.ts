@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ReadingLibrary, type ReadingFile, type ReadingVault } from './library';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
+import { readReadingFrontmatter } from '../core/frontmatter';
+
+vi.mock('../core/frontmatter', async importOriginal => {
+	const actual = await importOriginal<typeof import('../core/frontmatter')>();
+	return { ...actual, readReadingFrontmatter: vi.fn(actual.readReadingFrontmatter) };
+});
 
 function harness() {
 	const files = new Map<string, string>();
@@ -250,4 +256,14 @@ it('does not republish an unchanged library after a rescan', async () => {
 	revision = 'two';
 	await library.refresh();
 	expect(published).toHaveBeenCalledTimes(2);
+});
+
+it('parses each versioned note once during a cold scan', async () => {
+	const h = harness();
+	h.files.set('Reading/Article.md', createReadingNote({ id: 'a1b2c3d4-5678-4abc-9def-123456789abc', url: 'https://example.com/article', savedAt: '2026-09-28T00:00:00Z' }));
+	vi.mocked(readReadingFrontmatter).mockClear();
+	await h.library.refresh();
+	expect(h.library.getSnapshot().items).toHaveLength(1);
+	expect(readReadingFrontmatter).toHaveBeenCalledOnce();
+	expect(h.process).not.toHaveBeenCalled();
 });

@@ -82,18 +82,19 @@ export class ReadingLibrary {
 					continue;
 				}
 				try {
-					let content = await this.vault.read(file);
-					if (this.canAdopt()) {
-						const original = content;
+					const original = await this.vault.read(file);
+					// Versioned notes need no adoption, so parse them only once.
+					let metadata = parseReadingNote(original);
+					if (!metadata && this.canAdopt()) {
 						const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
 						this.assertActive();
-						if (adopted !== original) content = await this.vault.process(file, current => {
+						const content = adopted === original ? original : await this.vault.process(file, current => {
 							this.assertActive();
 							if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
 							return adopted;
 						});
+						metadata = parseReadingNote(content);
 					}
-					const metadata = parseReadingNote(content);
 					if (metadata) {
 						const item = { ...metadata, path: file.path };
 						items.push(item);
