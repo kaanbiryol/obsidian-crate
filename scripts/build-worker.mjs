@@ -32,7 +32,7 @@ function writeGeneratedJson(fileName, payload) {
 	);
 }
 
-async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, serviceWorkerRuntime) {
+async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets, onDemandAssets, serviceWorkerRuntime) {
 	const result = await build({
 		absWorkingDir: root,
 		entryPoints: [resolve(root, 'src/cloudflare/worker/index.ts')],
@@ -56,6 +56,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaAssetVersion),
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
+			__CRATE_PWA_ON_DEMAND_ASSETS__: JSON.stringify(onDemandAssets),
 			__CRATE_SERVICE_WORKER_JS__: JSON.stringify(serviceWorkerRuntime),
 		},
 		plugins: [rawTextPlugin(path => rawInputs.add(path)), readingExtractionPlugin()],
@@ -71,7 +72,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 async function buildPwaClientBundle(serviceWorkerRuntime) {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER, root);
 	const version = createPwaAssetVersion({ ...versionTemplate.assets, 'service-worker-runtime.js': serviceWorkerRuntime }, root, path => rawInputs.add(path));
-	const { assets, startupAssets, metafile } = await bundlePwaClient(version, root);
+	const { assets, startupAssets, onDemandAssets, metafile } = await bundlePwaClient(version, root);
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
 	writeGeneratedJson('pwa-client.json', {
@@ -79,13 +80,14 @@ async function buildPwaClientBundle(serviceWorkerRuntime) {
 		script,
 		assets,
 		startupAssets,
+		onDemandAssets,
 	});
 	console.log('PWA client bundle written to .generated/cloudflare/pwa-client.json');
-	return { assets, version, startupAssets, metafile };
+	return { assets, version, startupAssets, onDemandAssets, metafile };
 }
 
 const serviceWorkerRuntime = await bundleServiceWorkerRuntime(root);
 const pwaClient = await buildPwaClientBundle(serviceWorkerRuntime.script);
-const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets, serviceWorkerRuntime.script);
+const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets, pwaClient.onDemandAssets, serviceWorkerRuntime.script);
 writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile, serviceWorkerRuntime.metafile], rawInputs));
 writeGeneratedJson('build-identity.json', { development: development ?? null, workerSha256: createHash('sha256').update(readFileSync(resolve(generatedDir, 'worker.mjs'))).digest('hex'), release: JSON.parse(readFileSync(resolve(root, 'src/cloudflare/server-release.json'), 'utf8')) });
