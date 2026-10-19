@@ -256,6 +256,15 @@ describe('PWA reminder refresh around local writes', () => {
 		vi.mocked(loadCachedReminderSnapshot).mockReset();
 	});
 
+	it('applies a peer confirmation in memory without rewriting the offline copy', async () => {
+		const { rendered, original } = harness();
+		const confirmed = { ...original, content: 'Peer edit', revision: 'one-peer' };
+		await act(() => rendered.current.commitReminderState([confirmed], ['Inbox'], { persist: false }));
+		expect(rendered.current.reminders).toEqual([confirmed]);
+		expect(rendered.current.dataMode).toBe('live');
+		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
+	});
+
 	it('ignores late errors from invalidated reads without restoring an older cache', async () => {
 		const { rendered, original, load, settle, commit } = harness();
 		const staleRead = load();

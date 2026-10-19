@@ -19,7 +19,7 @@ export function subscribeReminderOutboxEvents(options: {
 		hasSnapshot?: boolean;
 		beginLocalMutation: () => () => void;
 		getSnapshot: () => Pick<CachedReminderSnapshot, 'reminders' | 'projects'>;
-		commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => void | Promise<void>;
+		commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => void | Promise<void>;
 		loadReminders: LoadReminders;
 		showToast: ShowToast;
 	};
@@ -42,9 +42,27 @@ export function subscribeReminderOutboxEvents(options: {
 			if (isCurrent()) void options.current().loadReminders({ silent: true });
 		}, PEER_REFRESH_DELAY_MS);
 	};
+	// A burst of peer key writes rereads the queue once. Earlier-session keys are
+	// read only when one of them changed. Hidden tabs wait until they are shown.
+	let outboxTimer: ReturnType<typeof setTimeout> | undefined;
+	let recoveryChanged = false;
+	const loadRecovery = () => {
+		if (!recoveryChanged) return;
+		recoveryChanged = false;
+		options.setRecoveryChanges(recovery.load());
+	};
+	const syncOutbox = () => {
+		outboxTimer = undefined;
+		if (!isCurrent() || page.visibilityState === 'hidden') return;
+		try { loadRecovery(); outbox.refresh(); void outbox.drain(); }
+		catch (error) { options.current().showToast('error', error instanceof Error ? error.message : String(error)); }
+	};
 	const visible = () => {
 		if (page.visibilityState !== 'visible') return;
 		if (refreshWhenVisible && isCurrent()) { refreshWhenVisible = false; void options.current().loadReminders({ silent: true }); }
+		if (isCurrent()) {
+			try { loadRecovery(); } catch (error) { options.current().showToast('error', error instanceof Error ? error.message : String(error)); }
+		}
 		resume();
 	};
 	const storageChanged = (event: StorageEvent) => {
@@ -57,22 +75,22 @@ export function subscribeReminderOutboxEvents(options: {
 				try {
 					const snapshot = current.getSnapshot();
 					const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(snapshot.reminders, snapshot.projects, confirmed) : null;
-					if (next) await current.commitReminderState(next.reminders, next.projects);
+					// The sender persisted this result before publishing it.
+					if (next) await current.commitReminderState(next.reminders, next.projects, { persist: false });
 				} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
 				finally { finish(); if (isCurrent()) refreshList(); }
 			})();
 			return;
 		}
 		if (!recovery.acceptsKey(event.key)) return;
-		try {
-			// A missed confirmation still invalidates stale reads when its command disappears.
-			if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
-				const finish = options.current().beginLocalMutation();
-				finish();
-				refreshList();
-			}
-			options.setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain();
-		} catch (error) { options.current().showToast('error', error instanceof Error ? error.message : String(error)); }
+		// A missed confirmation still invalidates stale reads when its command disappears.
+		if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
+			const finish = options.current().beginLocalMutation();
+			finish();
+			refreshList();
+		}
+		if (event.key === null || !storage.acceptsKey(event.key)) recoveryChanged = true;
+		outboxTimer ??= setTimeout(syncOutbox, PEER_REFRESH_DELAY_MS);
 	};
 	browser.addEventListener('online', resume);
 	page.addEventListener('visibilitychange', visible);
@@ -80,6 +98,7 @@ export function subscribeReminderOutboxEvents(options: {
 	return () => {
 		subscribed = false;
 		clearTimeout(refreshTimer);
+		clearTimeout(outboxTimer);
 		browser.removeEventListener('online', resume);
 		page.removeEventListener('visibilitychange', visible);
 		browser.removeEventListener('storage', storageChanged);

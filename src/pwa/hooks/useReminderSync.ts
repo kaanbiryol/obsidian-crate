@@ -30,7 +30,8 @@ export interface ReminderSyncState {
 	loadReminders: LoadReminders;
 	rebuildOfflineCache: () => Promise<void>;
 	beginLocalMutation: () => () => void;
-	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => Promise<void>;
+	/** Peers applying another tab's persisted confirmation pass persist: false. */
+	commitReminderState: (reminders: ReminderRecord[], projects?: string[], options?: { persist?: boolean }) => Promise<void>;
 	resetReminderState: () => void;
 	refreshPresentation: () => void;
 	reportError: (message: string | null) => void;
@@ -94,7 +95,7 @@ export function useReminderSync({
 	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
 	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
 
-	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string, deltaBase?: string) => {
+	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string, deltaBase?: string, persist = true) => {
 		const savedAt = Date.now();
 		publishSnapshot(nextReminders, nextProjects);
 		etagRef.current = etag;
@@ -104,8 +105,10 @@ export function useReminderSync({
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
-		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current, deltaBaseRef.current);
+		if (persist) await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current, deltaBaseRef.current);
 	}, [config.folderPath, publishSnapshot]);
+	const commitReminderState = useCallback((nextReminders: ReminderRecord[], nextProjects?: string[], options?: { persist?: boolean }) =>
+		commitConfirmedSnapshot(nextReminders, nextProjects, undefined, undefined, options?.persist), [commitConfirmedSnapshot]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		hydratedCacheRef.current = true;
@@ -304,7 +307,7 @@ export function useReminderSync({
 		rebuildOfflineCache,
 		loadReminders,
 		beginLocalMutation,
-		commitReminderState: commitConfirmedSnapshot,
+		commitReminderState,
 		resetReminderState,
 		refreshPresentation,
 		reportError: setError,

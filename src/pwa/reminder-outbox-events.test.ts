@@ -39,7 +39,7 @@ it.each(['logout', 'dispose'] as const)('settles an already dispatched commit wi
 	const committed = new Promise<void>((_resolve, fail) => { reject = fail; });
 	h.commitReminderState.mockReturnValue(committed);
 	h.storage('settled', 'receipt');
-	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox']);
+	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox'], { persist: false });
 	expect(h.finish).not.toHaveBeenCalled();
 	h[stop]();
 	reject(new Error('Late storage failure'));
@@ -58,9 +58,36 @@ it('invalidates reads when a peer removes a command without a confirmation', asy
 	h.storage('pending', null, 'command');
 	expect(h.beginLocalMutation).toHaveBeenCalledOnce();
 	expect(h.finish).toHaveBeenCalledOnce();
-	expect(h.setRecoveryChanges).toHaveBeenCalledWith([]);
-	expect(h.outbox.drain).toHaveBeenCalledOnce();
+	await vi.waitFor(() => expect(h.outbox.drain).toHaveBeenCalledOnce());
+	expect(h.setRecoveryChanges).not.toHaveBeenCalled();
 	await vi.waitFor(() => expect(h.loadReminders).toHaveBeenCalledWith({ silent: true }));
+});
+
+it('coalesces peer queue writes and reads earlier-session keys only when they change', async () => {
+	const h = harness();
+	for (let index = 0; index < 5; index++) h.storage('pending', `command-${index}`);
+	expect(h.outbox.refresh).not.toHaveBeenCalled();
+	await vi.waitFor(() => expect(h.outbox.drain).toHaveBeenCalledOnce());
+	expect(h.outbox.refresh).toHaveBeenCalledOnce();
+	expect(h.setRecoveryChanges).not.toHaveBeenCalled();
+	h.storage('recovery', 'earlier');
+	h.storage('pending', 'command');
+	await vi.waitFor(() => expect(h.outbox.drain).toHaveBeenCalledTimes(2));
+	expect(h.setRecoveryChanges).toHaveBeenCalledExactlyOnceWith([]);
+});
+
+it('defers peer queue work in a hidden tab until it is shown', async () => {
+	const h = harness();
+	h.page.visibilityState = 'hidden';
+	h.storage('recovery', 'earlier');
+	h.storage('pending', 'command');
+	await new Promise(resolve => setTimeout(resolve, 150));
+	expect(h.outbox.refresh).not.toHaveBeenCalled();
+	expect(h.setRecoveryChanges).not.toHaveBeenCalled();
+	h.page.visibilityState = 'visible';
+	h.page.dispatchEvent(new Event('visibilitychange'));
+	expect(h.setRecoveryChanges).toHaveBeenCalledExactlyOnceWith([]);
+	expect(h.resume).toHaveBeenCalledOnce();
 });
 
 it('detaches wakeups and storage listeners as a single subscription', () => {
@@ -82,7 +109,7 @@ it('applies a peer confirmation while hidden and reads the list once it is shown
 	h.storage('settled', 'receipt');
 	h.storage('pending', null, 'command');
 	await vi.waitFor(() => expect(h.finish).toHaveBeenCalledTimes(2));
-	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox']);
+	expect(h.commitReminderState).toHaveBeenCalledWith([after], ['Inbox'], { persist: false });
 	expect(h.loadReminders).not.toHaveBeenCalled();
 	h.page.visibilityState = 'visible';
 	h.page.dispatchEvent(new Event('visibilitychange'));
