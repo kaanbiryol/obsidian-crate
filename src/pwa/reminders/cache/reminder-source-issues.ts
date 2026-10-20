@@ -1,4 +1,4 @@
-import type { ReminderSourceIssue } from '../../types';
+import type { ReminderSourceIssue } from '../types';
 
 /** An omitted optional API field is empty; cache readers separately reject legacy snapshots without it. */
 export function parseReminderSourceIssues(value: unknown): ReminderSourceIssue[] | null {

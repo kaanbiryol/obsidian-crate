@@ -1,5 +1,5 @@
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 // Unchanged records keep the same card data, so memoized cards skip re-rendering.

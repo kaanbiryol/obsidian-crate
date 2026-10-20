@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { isStoredReminderDraft, storedObject, storedStringChoice } from '../cache/reminder-storage-validation';
-import type { ModalState } from '../../types';
+import type { ModalState } from '../types';
 import { isSyncPath } from '../../../protocol/sync-validation';
 
 const optionalString = v.optional(v.string());

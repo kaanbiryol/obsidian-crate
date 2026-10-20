@@ -10,7 +10,7 @@ import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutat
 import { scanReminderMarkdownFile, toReminderPayload } from '../reminders-web/scan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
-import type { ReminderRecord } from '@/pwa/types';
+import type { ReminderRecord } from '@/pwa/reminders/types';
 import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {

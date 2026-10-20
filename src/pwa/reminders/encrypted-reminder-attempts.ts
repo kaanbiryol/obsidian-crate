@@ -1,6 +1,6 @@
 import type { DBSchema } from 'idb';
 import { reminderOperationDay, REMINDER_RETRY_DAYS } from '../../protocol/reminder-operation';
-import { sealPrivateValue, openPrivateValue } from '../storage/private-storage';
+import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { clearSessionStore } from '../storage/clear-session-store';
 import { openEncryptedDatabase } from '../storage/encrypted-storage-database';
 import { isSha256Hex } from '../../platform/validation';

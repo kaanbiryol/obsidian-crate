@@ -12,7 +12,7 @@ export async function bundlePwaClient(root) {
 		// imports it statically, so first-tap keyboard activation stays synchronous.
 		entryPoints: {
 			app: resolve(root, 'src/pwa/main.tsx'),
-			'reminder-editor': resolve(root, 'src/pwa/components/ReminderSheet.tsx'),
+			'reminder-editor': resolve(root, 'src/pwa/reminders/editor/ReminderSheet.tsx'),
 		},
 		bundle: true,
 		splitting: true,

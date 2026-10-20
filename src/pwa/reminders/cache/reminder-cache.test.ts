@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearCachedReminderSnapshots, loadCachedReminderSnapshot, saveCachedReminderSnapshot } from './reminder-cache';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 
 const reminder: ReminderRecord = {
 	id: 'r1',

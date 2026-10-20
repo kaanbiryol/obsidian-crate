@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyReminderChanges, predictReminderCompletion, predictSavedReminder } from './reminder-optimistic-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 
 function reminder(id: string, overrides: Partial<ReminderRecord> = {}): ReminderRecord {
 	return { id, content: id, priority: 4, completed: false, project: 'Inbox',

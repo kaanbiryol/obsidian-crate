@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { isStoredReminderChange, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import { privateStorage } from '../../storage/private-storage';
+import { privateStorage } from '../private-storage';
 import { isSha256Hex } from '../../../platform/validation';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
 import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';

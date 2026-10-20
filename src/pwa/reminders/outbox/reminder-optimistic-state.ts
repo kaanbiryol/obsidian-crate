@@ -3,7 +3,7 @@ import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath
 import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { applyReminderListEffect, type ReminderList } from './reminder-list-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import type { ReminderMutationBody, ReminderRecord } from '../../types';
+import type { ReminderMutationBody, ReminderRecord } from '../types';
 
 export function predictSavedReminder(id: string, input: ReminderMutationBody, previous?: ReminderRecord): ReminderRecord {
 	const dates = buildCreatedReminderBlock({

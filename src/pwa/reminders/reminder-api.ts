@@ -1,4 +1,5 @@
-import type { ApiFetch, ReminderRecord, ReminderSourceIssue } from '../types';
+import type { ApiFetch } from '../types';
+import type { ReminderRecord, ReminderSourceIssue } from './types';
 import { isReminderList, isScopedReminderList } from './cache/reminder-storage-validation';
 import { parseReminderSourceIssues } from './cache/reminder-source-issues';
 

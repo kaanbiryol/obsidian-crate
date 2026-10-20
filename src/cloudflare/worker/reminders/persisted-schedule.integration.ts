@@ -10,7 +10,7 @@ import { handleUpdateReminder } from '../reminders-web/routes/update';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
 import { normalizeReminderScheduleLine } from '@/reminders/core/normalizeReminderSchedule';
-import type { ReminderRecord } from '@/pwa/types';
+import type { ReminderRecord } from '@/pwa/reminders/types';
 import { handleCreateReminder } from '../reminders-web/routes/create';
 import { revalidateReminderSources } from './source-migration';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';

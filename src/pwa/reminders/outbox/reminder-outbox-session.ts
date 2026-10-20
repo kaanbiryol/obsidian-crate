@@ -5,7 +5,8 @@ import type { createReminderSettlementChannel } from './reminder-settlement';
 import { subscribeReminderOutboxEvents } from './reminder-outbox-events';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { REMINDER_OUTBOX_LOCK } from './reminder-storage-keys';
-import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../../types';
+import type { ApiFetch, ShowToast } from '../../types';
+import type { LoadReminders, ReminderRecord } from '../types';
 
 /** The latest values from the hosting view, read when the session needs them. */
 export interface ReminderOutboxSessionHost {

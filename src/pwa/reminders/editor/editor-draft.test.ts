@@ -8,7 +8,7 @@ import {
 	hasReminderDraftTitle,
 } from './editor-draft';
 import { reorderProjectReminders, toSharedReminder } from '../outbox/reminder-list-state';
-import type { ModalDraft, ReminderRecord } from '../../types';
+import type { ModalDraft, ReminderRecord } from '../types';
 
 function createModalDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {
 	return {

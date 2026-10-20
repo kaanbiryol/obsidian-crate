@@ -1,9 +1,9 @@
 import { capturePwaSession } from '../../session-generation';
-import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from '../../types';
+import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from '../types';
 import { AUTH_TOKEN_KEY } from '../../config';
 import { CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME, deleteCacheDatabase, openCacheDatabase, reminderCacheHealth, reportCacheProblem } from './reminder-cache-database';
 import { normalizeSnapshot } from './reminder-cache-validation';
-import { sealPrivateValue, openPrivateValue, privateStorageEnabled } from '../../storage/private-storage';
+import { sealPrivateValue, openPrivateValue, privateStorageEnabled } from '../private-storage';
 import { sha256Hex } from '../../../platform/sha256';
 
 let cacheGeneration = 0;

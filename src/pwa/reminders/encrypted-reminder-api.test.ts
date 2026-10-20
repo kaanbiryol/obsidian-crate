@@ -7,7 +7,7 @@ import { EncryptedReminderApi } from './encrypted-reminder-api';
 import { invalidatePwaSession } from '../session-generation';
 import type { StoredReminderKeys } from '../encryption/encryption-keys';
 import { openFile, sealFile } from '@/encryption/file-codec';
-import type { ReminderRecord } from '../types';
+import type { ReminderRecord } from './types';
 
 const attempts = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./encrypted-reminder-attempts', () => ({

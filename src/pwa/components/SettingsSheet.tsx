@@ -17,7 +17,7 @@ import { SettingsSection } from './SettingsSection';
 import { VersionSettings } from './VersionSettings';
 import { DeviceStorageSettings } from './DeviceStorageSettings';
 import { GeneralSettings } from './GeneralSettings';
-import { ReminderSettings } from './ReminderSettings';
+import { ReminderSettings } from '../reminders/ReminderSettings';
 import { ReadingSettings } from '../reading/ReadingSettings';
 import { HomeScreenInstallSteps } from './HomeScreenInstall';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';

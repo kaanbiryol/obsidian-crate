@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { createSaveReminderChange } from './save-reminder-command';
-import type { ModalState } from '../../types';
+import type { ModalState } from '../types';
 
 vi.mock('../../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 

@@ -1,6 +1,6 @@
-import type { ModalState } from '../../types';
+import type { ModalState } from '../types';
 import { isStoredReminderModal } from './reminder-draft-validation';
-import { privateStorage } from '../../storage/private-storage';
+import { privateStorage } from '../private-storage';
 import { REMINDER_DRAFT_PREFIX } from '../outbox/reminder-storage-keys';
 
 const draftStorage = () => privateStorage(sessionStorage);

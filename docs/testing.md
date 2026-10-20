@@ -8,7 +8,7 @@ and exclusive sync admission. `runtime/exclusion-cleanup.test.ts` rejects replac
 engines during review or confirmation; `ui/settings/exclusion-cleanup.test.ts`
 checks confirmation and stale-review guidance.
 
-`pwa/hooks/useReminderSync.test.ts` composes indexing progress with sync status,
+`pwa/reminders/useReminderSync.test.ts` composes indexing progress with sync status,
 including HTTP 202 followed by 200/304, terminal failure and request/session
 invalidation. Normal preparation must not publish recovery attention.
 `tests/browser/reading/reading-cache-recovery.browser.test.mjs` exercises Reading's shared

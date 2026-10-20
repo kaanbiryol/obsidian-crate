@@ -21,7 +21,7 @@ export * from './src/sync/encryption/conversion';
 export * from './src/sync/worker-api/http';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-api';
-export { unlockPrivateStorage } from './src/pwa/storage/private-storage';
+export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 export { scanReminderMarkdownContent } from './src/reminders/core/markdownScan';
 export { reminderCommandPayload } from './src/reminders/core/reminderFileCommand';
 `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife', globalName: 'regression', platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mocks/obsidian.ts') } })).outputFiles[0].text;

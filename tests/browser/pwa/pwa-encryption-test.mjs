@@ -34,7 +34,7 @@ export { AUTH_TOKEN_KEY } from './src/pwa/config';
 export * from './src/pwa/encryption/encrypted-push';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-attempts';
-export { unlockPrivateStorage } from './src/pwa/storage/private-storage';
+export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife', globalName: 'crateEncryptionTest', platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mocks/obsidian.ts') } })).outputFiles[0].text;
 
 async function verify(type) {

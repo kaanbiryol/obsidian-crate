@@ -1,4 +1,5 @@
-import type { ApiFetch, ReminderRecord } from '../../types';
+import type { ApiFetch } from '../../types';
+import type { ReminderRecord } from '../types';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import { isReminderRecord } from '../cache/reminder-storage-validation';
 

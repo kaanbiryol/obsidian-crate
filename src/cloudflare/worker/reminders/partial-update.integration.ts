@@ -8,7 +8,7 @@ import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '..
 import { handleListReminders } from '../reminders-web/routes/list';
 import { handleUpdateReminder } from '../reminders-web/routes/update';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock } from '@/reminders/core/markdownReminderMutation';
-import type { ReminderRecord } from '@/pwa/types';
+import type { ReminderRecord } from '@/pwa/reminders/types';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { await reset(); });

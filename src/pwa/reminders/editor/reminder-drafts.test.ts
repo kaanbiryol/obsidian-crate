@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { discardReviewedReminderDraft, inspectReminderDraft, restoreReminderDraft, saveReminderDraft } from './reminder-drafts';
-import type { ModalState } from '../../types';
+import type { ModalState } from '../types';
 
 function modal(patch: Partial<ModalState> = {}): ModalState {
 	return {

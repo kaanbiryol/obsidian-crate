@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
-import type { ModalDraft, ModalPickerId, ReminderRecord } from '../../types';
+import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
 
 function isStoredCalendarDate(value: string): boolean {

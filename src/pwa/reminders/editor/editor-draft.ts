@@ -12,7 +12,7 @@ import {
 	getReminderDateForPreset,
 	type ReminderDatePreset,
 } from '@/reminders/ui/reminder-modal/datePresets';
-import type { ModalDraft } from '../../types';
+import type { ModalDraft } from '../types';
 
 export function formatModalDueSummary(draft: ModalDraft): string {
 	if (!draft.dueDate) return 'No date';

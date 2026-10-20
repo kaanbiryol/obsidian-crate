@@ -10,7 +10,7 @@ const { outputFiles } = await build({
 			import { createRoot } from 'react-dom/client';
 			import { flushSync } from 'react-dom';
 			import { RichTextInput } from './src/reminders/ui/shared/RichTextInput';
-			import { useKeyboardHeight } from './src/reminders/ui/hooks/useKeyboardHeight';
+			import { useKeyboardHeight } from './src/pwa/hooks/useKeyboardHeight';
 			import { PwaPullRefreshIndicator } from './src/pwa/components/PwaChrome';
 			export { getPlainText } from './src/reminders/ui/editor/richTextPlainText';
 			function Editor() {

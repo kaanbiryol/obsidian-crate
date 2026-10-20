@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { subscribeReminderOutboxEvents } from './reminder-outbox-events';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 
 const before: ReminderRecord = { id: 'one', content: 'Before', completed: false, priority: 4,
 	project: 'Inbox', filePath: 'Reminders/Inbox.md', revision: 'before' };

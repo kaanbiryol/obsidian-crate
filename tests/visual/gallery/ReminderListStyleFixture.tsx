@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { WebReminderCard } from '@/pwa/components/WebReminderCard';
+import { WebReminderCard } from '@/pwa/reminders/WebReminderCard';
 import { usePwaPreferences } from '@/pwa/hooks/usePwaPreferences';
 import { usePwaInputModality } from '@/pwa/hooks/usePwaInputModality';
 import { ListStyleSetting } from '@/pwa/components/ListStyleSetting';

@@ -2,7 +2,7 @@ import { EncryptionKeyRequiredError, rememberEncryptionUnlock } from './encrypti
 import { loadEncryptionState, loadScopeKeys, assertEncryptionActive } from '../connection/encryption';
 import type { ScopedEncryptionState } from './encryption-scope';
 import type { StoredReminderKeys } from './encryption-keys';
-import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from '../storage/private-storage';
+import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, useUnencryptedStorage } from '../reminders/private-storage';
 import { capturePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import type { ApiFetch } from '../types';

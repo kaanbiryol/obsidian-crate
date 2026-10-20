@@ -10,7 +10,7 @@ import { handleSetReminderCompleted } from '../reminders-web/routes/complete';
 import { handleDeleteReminder } from '../reminders-web/routes/delete';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { scanReminderMarkdownFile } from '../reminders-web/scan';
-import type { ReminderRecord } from '@/pwa/types';
+import type { ReminderRecord } from '@/pwa/reminders/types';
 
 const path = 'Reminders/Inbox.md';
 const request = (body: Record<string, unknown>) => new Request('https://test/reminders', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', ...body }) });

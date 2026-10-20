@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReminderOutbox } from './reminder-outbox';
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;

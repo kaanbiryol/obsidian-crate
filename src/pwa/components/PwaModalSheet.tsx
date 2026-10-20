@@ -4,7 +4,7 @@ import { Drawer } from '@base-ui/react/drawer';
 import { lockSheetDocumentScroll } from '../navigation/sheet-scroll-lock';
 import { measureSheetTravel } from '../navigation/sheet-geometry';
 import { trackSheetPresentation } from '../navigation/sheet-presentation';
-import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
+import { useKeyboardHeight } from '@/pwa/hooks/useKeyboardHeight';
 import { PwaSheetSurface } from './PwaSheetSurface';
 
 export function PwaModalSheet({

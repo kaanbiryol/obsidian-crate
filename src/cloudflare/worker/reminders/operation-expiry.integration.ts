@@ -10,7 +10,7 @@ import { handleSetReminderCompleted } from '../reminders-web/routes/complete';
 import { handleUpdateReminder } from '../reminders-web/routes/update';
 import { pruneOperationReceipts, RECEIPT_BATCH } from '../maintenance/operation-receipts';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
-import type { ReminderRecord } from '@/pwa/types';
+import type { ReminderRecord } from '@/pwa/reminders/types';
 
 const { DB: db, BUCKET: bucket } = env;
 const path = 'Reminders/Inbox.md';

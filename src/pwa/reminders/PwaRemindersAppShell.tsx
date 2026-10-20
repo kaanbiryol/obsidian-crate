@@ -1,0 +1,272 @@
+import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
+import { PWA_CONTROL_SPRING, PWA_FADE } from '../../ui/shared/navigation/motion';
+import { AnimatePresence, motion } from 'motion/react';
+import { ChevronDown } from 'lucide-react';
+import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+
+import { PwaDock, PwaDockAddButton } from '../components/PwaDock';
+import { TabTransition } from '../../ui/shared/navigation/TabTransition';
+import { ScheduleSwitcher } from '../../ui/shared/navigation/ScheduleSwitcher';
+import { TABS } from '@/reminders/ui/shared/layoutConstants';
+import { Button } from '@/ui/shared/Button';
+import { ViewHeader } from '@/ui/shared/ViewHeader';
+import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
+import type { Reminder } from '@/reminders/types/reminder';
+import type { TabId } from '@/reminders/ui/shared/layoutConstants';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
+import { NavigationScreen } from '../../ui/shared/navigation/NavigationScreen';
+import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
+import { RemindersViewPanels } from '@/reminders/ui/shared/RemindersViewPanels';
+import { ProjectDetailView } from '@/reminders/ui/views';
+import { BackButton } from '@/ui/shared/BackButton';
+import { shouldShowReminderFab } from '@/reminders/ui/shared/remindersViewModel';
+import { useRemindersShellModel } from '@/reminders/ui/shared/useRemindersShellModel';
+import { PwaThemeIcon } from '../components/PwaThemeIcon';
+import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
+import { EmptyStateMessageContext } from '@/reminders/ui/shared/EmptyState';
+import { useReminderProjectNavigation } from './useReminderProjectNavigation';
+
+const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };
+const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
+
+export type PwaReminderCardRenderer = (props: {
+	reminder: Reminder;
+	index: number;
+	hideProject: boolean;
+}) => React.ReactNode;
+
+interface PwaRemindersAppShellProps {
+	listStyle?: ListStyle;
+	reminders: Reminder[];
+	projects: string[];
+	isDarkMode: boolean;
+	initialTab: TabId;
+	initialProject?: string;
+	upcomingDays: number;
+	headerRightContent?: (isProjectDetail: boolean) => React.ReactNode;
+	headerMetaContent?: React.ReactNode;
+	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
+	children?: React.ReactNode;
+	className?: string;
+	suppressFab?: boolean;
+	backgroundInert?: boolean;
+	incomplete?: boolean;
+	checkingReminders?: boolean;
+	showLoadingIndicator?: boolean;
+	initializing?: boolean;
+	renderCard: PwaReminderCardRenderer;
+	onAdd: (defaultProject: string) => void;
+	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
+	onReorderDragActiveChange?: (active: boolean) => void;
+}
+
+/**
+ * PWA-owned reminders chrome.
+ *
+ * The plugin has a separate shell because viewport, navigation, safe-area, and
+ * modal behavior are host concerns. Panels, cards, and view-model logic remain
+ * shared with the plugin.
+ */
+export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
+	listStyle = DEFAULT_LIST_STYLE,
+	reminders,
+	projects,
+	isDarkMode,
+	initialTab,
+	initialProject,
+	upcomingDays,
+	headerRightContent,
+	headerMetaContent,
+	belowHeaderContent,
+	children,
+	className = '',
+	suppressFab = false,
+	backgroundInert = false,
+	incomplete = false,
+	checkingReminders = false,
+	showLoadingIndicator = false,
+	initializing = false,
+	renderCard,
+	onAdd,
+	onReorder,
+	onReorderDragActiveChange,
+}) => {
+	const requested = useContext(FeatureNavigationContext)?.destination;
+	const reduceMotion = useReducedMotion();
+	const { viewMode, selectedProject, navigationMotion, projectOpen, canGoBack,
+		handleViewModeChange, handleProjectSelect, handleBackToProjects, finishProjectClose } = useReminderProjectNavigation({
+		initialTab: requested?.section === 'reminders' ? requested.tab : initialTab, initialProject, reduceMotion,
+	});
+	const shell = useRef<HTMLDivElement>(null);
+	const contentRevealed = useRef(false);
+
+	useLayoutEffect(() => {
+		if (showLoadingIndicator || contentRevealed.current) return;
+		contentRevealed.current = true;
+		if (reduceMotion) return;
+		// Reveal the snapshot as one stationary change. Keep the title, actions,
+		// and dock painted, and never replay this entrance for background refreshes.
+		const regions = shell.current?.querySelectorAll<HTMLElement>(
+			'.pwa-navigation-viewport .view-header-meta, .pwa-navigation-viewport .pwa-schedule-switcher, .pwa-navigation-viewport .reminders-content',
+		);
+		const animations = Array.from(regions ?? [], region => region.animate(
+			[{ opacity: 0 }, { opacity: 1 }],
+			{ duration: PWA_FADE.duration * 1000, easing: 'ease-out' },
+		));
+		return () => animations.forEach(animation => animation.cancel());
+	}, [showLoadingIndicator, reduceMotion]);
+
+	const { currentHeader, primaryTab, handleAdd, panelCardRenderer, listCardRenderer, handleReorder } = useRemindersShellModel({
+		reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder, addDisabled: backgroundInert,
+	});
+
+	const renderToggleButton = useCallback(({ onPress, showCompleted, count }: {
+		onPress: () => void;
+		showCompleted: boolean;
+		count: number;
+	}) => (
+		<Button
+			onClick={onPress}
+			className="completed-section-toggle w-full justify-between h-10 px-0"
+		>
+			<span className="text-sm font-semibold reminders-muted-label">
+				Completed ({count})
+			</span>
+			{
+				<motion.span
+					animate={{ rotate: showCompleted ? 180 : 0 }}
+					transition={reduceMotion ? { duration: 0 } : PWA_CONTROL_SPRING}
+					className="inline-flex"
+				>
+					<ChevronDown size={18} />
+				</motion.span>
+			}
+		</Button>
+	), [reduceMotion]);
+
+	// The project detail view is memoized, so keep its element props stable
+	// across shell renders that do not change them.
+	const projectBackControl = useMemo(() => <BackButton label="Back to projects" onClick={handleBackToProjects} />, [handleBackToProjects]);
+	const projectNavigationRightContent = useMemo(() => headerRightContent?.(true), [headerRightContent]);
+	const projectBelowHeaderContent = useMemo(
+		() => belowHeaderContent && <div className="pwa-below-header-content">{belowHeaderContent(true)}</div>,
+		[belowHeaderContent],
+	);
+	const projectAnimationConfig = useMemo(() => ({ enabled: !reduceMotion }), [reduceMotion]);
+
+	const viewPanels = (
+		<RemindersViewPanels
+			viewMode={viewMode}
+			selectedProject={null}
+			isInitialLoadComplete
+			reminders={reminders}
+			projects={projects}
+			showFab={shouldShowReminderFab(viewMode, null)}
+			upcomingDays={upcomingDays}
+			renderCard={listCardRenderer}
+			renderToggleButton={renderToggleButton}
+			onProjectSelect={handleProjectSelect}
+			onBackToProjects={handleBackToProjects}
+			onReorder={handleReorder}
+			onReorderDragActiveChange={onReorderDragActiveChange}
+			colorScheme={isDarkMode ? 'dark' : 'light'}
+			reorderInteraction="long-press"
+			pageTransitionsEnabled={false}
+			animationsEnabled={!reduceMotion}
+		/>
+	);
+
+	return (
+		<ReminderPageSizeContext.Provider value={200}>
+		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
+		<ThemeIconProvider renderer={PwaThemeIcon}>
+		  <div
+				ref={shell}
+				data-pwa-opening={initializing || undefined}
+				data-pwa-loading={showLoadingIndicator || undefined}
+				aria-busy={initializing}
+				data-list-style={listStyle}
+				className={[
+					'pwa-screen',
+					'reminders-view',
+					'is-primary',
+					isDarkMode ? 'dark' : 'light',
+					'is-fullscreen',
+					'is-modal',
+					viewMode === 'browse' && selectedProject ? 'is-project-detail' : `is-${viewMode}`,
+					className,
+				].filter(Boolean).join(' ')}
+			>
+				<div className="pwa-navigation-viewport" inert={backgroundInert || projectOpen}>
+					{/* Keep the Projects list and its scroll position mounted behind detail. */}
+					<TabTransition viewKey={primaryTab}>
+						<div className="overflow-hidden" inert={initializing}>
+							<ViewHeader
+								{...currentHeader}
+								title={primaryTab === 'today' ? 'Reminders' : currentHeader.title}
+								countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
+								large
+								showMeta={!showLoadingIndicator}
+								reserveMetaSpace={showLoadingIndicator}
+								metaContent={headerMetaContent}
+								rightContent={headerRightContent?.(false)}
+							/>
+						</div>
+
+						{(viewMode === 'today' || viewMode === 'upcoming') && (
+							<ScheduleSwitcher value={viewMode} onChange={handleViewModeChange} inert={initializing || showLoadingIndicator} />
+						)}
+
+						{belowHeaderContent && (
+							<div className="pwa-below-header-content">
+								{belowHeaderContent(false)}
+							</div>
+						)}
+
+						<div className="reminders-content">
+							{showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : primaryTab === 'today' ? (
+								<TabTransition viewKey={viewMode}>{viewPanels}</TabTransition>
+							) : viewPanels}
+						</div>
+					</TabTransition>
+				</div>
+
+				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
+					inert={initializing || backgroundInert || projectOpen}
+					onAdd={initializing || !suppressFab ? handleAdd : undefined} />
+
+				<div className="pwa-project-layer" data-project-open={projectOpen} data-pwa-back={canGoBack} inert={initializing}>
+					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
+						{selectedProject && <NavigationScreen key={selectedProject} motion={navigationMotion} isProjectDetail>
+							<div className="reminders-content">
+								<ProjectDetailView
+									project={selectedProject}
+									headerMetaContent={headerMetaContent}
+									backControl={projectBackControl}
+									navigationRightContent={projectNavigationRightContent}
+									belowHeaderContent={projectBelowHeaderContent}
+									reminders={reminders}
+									loadingContent={showLoadingIndicator ? <LoadingIndicator label="Loading reminders" /> : undefined}
+									onBack={handleBackToProjects}
+									animationConfig={projectAnimationConfig}
+									renderCard={panelCardRenderer}
+									hasFab={!suppressFab}
+									onReorder={handleReorder}
+									onReorderDragActiveChange={onReorderDragActiveChange}
+									colorScheme={isDarkMode ? 'dark' : 'light'}
+									reorderInteraction="long-press"
+								/>
+							</div>
+							{(initializing || !suppressFab) && <div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>}
+						</NavigationScreen>}
+					</AnimatePresence>
+				</div>
+
+				{children}
+		  </div>
+		</ThemeIconProvider>
+		</EmptyStateMessageContext.Provider>
+		</ReminderPageSizeContext.Provider>
+	);
+};

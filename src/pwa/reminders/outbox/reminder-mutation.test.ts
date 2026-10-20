@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildReminderMutationBody } from './reminder-mutation';
 import { buildModalDraft } from '../editor/reminder-modal-draft';
 import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '../editor/editor-draft';
-import type { ModalDraft, StoredConfig } from '../../types';
+import type { StoredConfig } from '../../types';
+import type { ModalDraft } from '../types';
 
 const config: StoredConfig = {
 	folderPath: 'Reminders',

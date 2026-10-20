@@ -6,7 +6,7 @@ import { FeatureShell } from './FeatureShell';
 import { PwaLaunchSplash } from './components/PwaChrome';
 import { LazyPwaFeature } from './components/LazyPwaFeature';
 
-const loadReminders = () => import('./components/RemindersApp').then(module => ({ default: module.RemindersApp }));
+const loadReminders = () => import('./reminders/RemindersApp').then(module => ({ default: module.RemindersApp }));
 
 consumeReadingKeyFragment();
 consumeEncryptionFragment();

@@ -1,7 +1,8 @@
 import { buildReminderMutationBody } from './reminder-mutation';
 import { predictSavedReminder } from './reminder-optimistic-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import type { ModalState, ReminderMutationBody, ReminderRecord, StoredConfig } from '../../types';
+import type { StoredConfig } from '../../types';
+import type { ModalState, ReminderMutationBody, ReminderRecord } from '../types';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { newReminderOperationId } from './reminder-operation-id';
 

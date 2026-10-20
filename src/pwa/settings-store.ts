@@ -1,6 +1,7 @@
 import type { ReactNode, SetStateAction } from 'react';
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
-import type { PushState, StoredConfig } from './types';
+import type { StoredConfig } from './types';
+import type { PushState } from './reminders/types';
 
 interface FeatureSettings {
 	enabled?: boolean;

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyReminderSettlement, createReminderSettlementChannel } from './reminder-settlement';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
-import type { ReminderRecord } from '../../types';
+import type { ReminderRecord } from '../types';
 
 const before: ReminderRecord = { id: 'one', content: 'Before', revision: 'before', project: 'Inbox',
 	filePath: 'Reminders/Inbox.md', priority: 4, completed: false };

@@ -1,6 +1,6 @@
 import { isReminderList, isScopedReminderList } from './reminder-storage-validation';
 import { parseReminderSourceIssues } from './reminder-source-issues';
-import type { CachedReminderSnapshot } from '../../types';
+import type { CachedReminderSnapshot } from '../types';
 
 /** Reject the entire damaged revision so its ETag cannot hide missing records.
  * `recordsValidated` is only for in-memory records that each passed reminder validation. */

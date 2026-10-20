@@ -501,7 +501,7 @@ Shared icons and reduced-motion preferences live in `src/ui/shared/`; the Obsidi
 icon renderer lives in `src/ui/obsidian-icon/`. Reminder import paths re-export
 these implementations for existing feature consumers.
 
-`src/pwa/main.tsx` mounts the feature shell. `components/RemindersRuntime.tsx` composes
+`src/pwa/main.tsx` mounts the feature shell. `reminders/RemindersRuntime.tsx` composes
 reminder data, session, outbox, and editor hooks independently of the lazy screen.
 Its screen-facing contract groups connection, sync, mutations, editor, status and
 presentation models. The always-mounted provider retains hydration, recovery and

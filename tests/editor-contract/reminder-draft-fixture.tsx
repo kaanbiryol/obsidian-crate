@@ -1,5 +1,5 @@
-import { ReminderEditorScreen } from '@/pwa/components/ReminderEditorScreen';
-import type { ModalState } from '@/pwa/types';
+import { ReminderEditorScreen } from '@/pwa/reminders/editor/ReminderEditorScreen';
+import type { ModalState } from '@/pwa/reminders/types';
 import React, { useRef, useState } from 'react';
 import type { Reminder } from '@/reminders/types';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';

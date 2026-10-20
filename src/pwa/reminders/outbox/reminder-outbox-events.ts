@@ -2,7 +2,8 @@ import { applyReminderSettlement, type createReminderSettlementChannel } from '.
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { createReminderOutbox } from './reminder-outbox';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import type { CachedReminderSnapshot, LoadReminders, ReminderRecord, ShowToast } from '../../types';
+import type { ShowToast } from '../../types';
+import type { CachedReminderSnapshot, LoadReminders, ReminderRecord } from '../types';
 
 const PEER_REFRESH_DELAY_MS = 100;
 

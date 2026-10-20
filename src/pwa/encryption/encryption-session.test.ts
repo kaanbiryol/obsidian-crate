@@ -3,7 +3,7 @@ import { consumeEncryptionFragment, encryptionSnapshot, preparePwaEncryption, re
 import { invalidatePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
-import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from '../storage/private-storage';
+import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from '../reminders/private-storage';
 import { createReminderOutboxStorage } from '../reminders/outbox/reminder-outbox-storage';
 import { getPwaPushManager } from '../service-worker-registration';
 

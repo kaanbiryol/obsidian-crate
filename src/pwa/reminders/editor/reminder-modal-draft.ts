@@ -1,6 +1,6 @@
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { buildInitialReminderContent } from '@/reminders/core/reminderDraft';
-import type { ModalDraft, ReminderRecord } from '../../types';
+import type { ModalDraft, ReminderRecord } from '../types';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 export function buildModalDraft(reminder: ReminderRecord | null, selectedProject: string | null): ModalDraft {

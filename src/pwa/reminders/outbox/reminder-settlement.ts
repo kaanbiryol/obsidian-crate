@@ -1,8 +1,8 @@
 import { isConfirmedReminder } from './reminder-change-request';
 import { applyReminderListEffect } from './reminder-list-state';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
-import type { ReminderRecord } from '../../types';
-import { sealPrivateValue, openPrivateValue } from '../../storage/private-storage';
+import type { ReminderRecord } from '../types';
+import { sealPrivateValue, openPrivateValue } from '../private-storage';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
 import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
 import { sha256Hex } from '../../../platform/sha256';

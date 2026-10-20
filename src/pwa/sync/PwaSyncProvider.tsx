@@ -1,6 +1,6 @@
 import { AppConnectionProvider } from '../connection/AppConnection';
 import type { ReactNode } from 'react';
-import { RemindersRuntimeProvider } from '../components/RemindersRuntime';
+import { RemindersRuntimeProvider } from '../reminders/RemindersRuntime';
 import { ReadingRuntimeProvider } from '../reading/ReadingRuntime';
 import { SyncFeedbackProvider } from './SyncFeedback';
 

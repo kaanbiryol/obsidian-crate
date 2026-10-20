@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 
 const { outputFiles } = await build({
-	stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { requirePrivateStorageUnlock, useUnencryptedStorage } from './src/pwa/storage/private-storage';`, resolveDir: process.cwd(), loader: 'ts' },
+	stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { requirePrivateStorageUnlock, useUnencryptedStorage } from './src/pwa/reminders/private-storage';`, resolveDir: process.cwd(), loader: 'ts' },
 	bundle: true,
 	format: 'iife',
 	globalName: 'reminderCache',

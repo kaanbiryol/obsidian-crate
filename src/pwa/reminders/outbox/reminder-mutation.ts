@@ -1,6 +1,7 @@
 import { assertReminderMutationInput, ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { resolveReminderSubmission } from '@/reminders/core/reminderSubmission';
-import type { ModalDraft, ModalMode, ReminderMutationBody, StoredConfig } from '../../types';
+import type { StoredConfig } from '../../types';
+import type { ModalDraft, ModalMode, ReminderMutationBody } from '../types';
 import { DEFAULT_PROJECT, projectOptionsWithDefault } from '@/reminders/core/constants';
 
 export function buildReminderMutationBody({

@@ -1,4 +1,4 @@
-import type { ModalState, ReminderRecord } from '../../types';
+import type { ModalState, ReminderRecord } from '../types';
 
 interface ReminderChangeState {
 	operationId: string;
