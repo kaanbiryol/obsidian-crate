@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { addReminderScope, createVaultKeyBundle } from '@/encryption/key-bundle';
-import { importEncryptionSecret } from '@/encryption/envelope';
+import { encryptJson, importEncryptionSecret } from '@/encryption/envelope';
+import { sha256Hex } from '@/platform/sha256';
 import { importNotificationFingerprintKey } from '@/encryption/reminder-projection';
 import { EncryptedReminderApi } from './encrypted-reminder-api';
 import { invalidatePwaSession } from '../session-generation';
@@ -215,5 +216,39 @@ it('never sends an encrypted reminder link to the server for a page title', asyn
   const fetch = vi.fn();
   const response = await new EncryptedReminderApi(keys, fetch).handle('/links/title', { method: 'POST', body: JSON.stringify({ url: 'https://private.example' }) });
   await expect(response?.json()).resolves.toEqual({ title: null });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+const operationId = 'e1_20261020_00000000-0000-4000-8000-000000000001';
+const updateBody = () => JSON.stringify({ folderPath: 'Reminders', operationId, id: 'one', content: 'Task', project: 'Inbox' });
+const semanticHash = async (action: string, body: string) => sha256Hex(new TextEncoder().encode(JSON.stringify([action, body])).buffer);
+
+it('rejects encrypted changes for another folder or with an invalid operation id before any request', async () => {
+  const fetch = vi.fn();
+  const api = new EncryptedReminderApi(keys, fetch);
+  for (const body of [{ folderPath: 'Other', operationId }, { folderPath: 'Reminders', operationId: 'short' }]) {
+    const response = await api.handle('/reminders/update', { method: 'POST', body: JSON.stringify(body) });
+    expect(response?.status).toBe(400);
+    expect(await response?.json()).toMatchObject({ code: 'invalid_reminder_input' });
+  }
+  expect(await api.handle('/reminders/unknown', { method: 'POST', body: '{}' })).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('keeps an unresolved encrypted save from being replaced by different content', async () => {
+  attempts.set(`${keys.vaultId}:${keys.scopeId}:${operationId}`, { semanticHash: 'different', generation: keys.generation, body: '{}' });
+  const fetch = vi.fn();
+  await expect(new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body: updateBody() }))
+    .rejects.toThrow('original encrypted save is still unresolved');
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('answers a retried save from its encrypted acknowledgment without contacting the server', async () => {
+  const body = updateBody();
+  const acknowledgment = await encryptJson({ reminder: { id: 'one' } }, keys.data, { vaultId: keys.vaultId, scopeId: keys.scopeId, objectId: operationId, purpose: 'reminder' });
+  attempts.set(`${keys.vaultId}:${keys.scopeId}:${operationId}`, { semanticHash: await semanticHash('update', body), generation: keys.generation, body: '{}', acknowledgment });
+  const fetch = vi.fn();
+  const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/update', { method: 'POST', body });
+  expect(await response?.json()).toEqual({ reminder: { id: 'one' } });
   expect(fetch).not.toHaveBeenCalled();
 });
