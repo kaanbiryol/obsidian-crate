@@ -11,10 +11,10 @@ checks confirmation and stale-review guidance.
 `pwa/hooks/useReminderSync.test.ts` composes indexing progress with sync status,
 including HTTP 202 followed by 200/304, terminal failure and request/session
 invalidation. Normal preparation must not publish recovery attention.
-`scripts/reading-cache-recovery.browser.test.mjs` exercises Reading's shared
+`tests/browser/reading/reading-cache-recovery.browser.test.mjs` exercises Reading's shared
 single-store opener in Chromium/WebKit: unknown layouts and key configurations,
 blocked/late opens, retry and version-change closure, preserving original bytes.
-`scripts/pwa-encryption-storage-test.mjs` retains native key, attempt, logout and
+`tests/browser/pwa/pwa-encryption-storage-test.mjs` retains native key, attempt, logout and
 push coverage for the same opener. These do not establish physical-device acceptance.
 
 `worker/routes/admission.test.ts` checks scopes, execution destination, coordinator
@@ -28,7 +28,7 @@ boundaries.
 
 `pwa/reading/list-response.test.ts` exercises malformed page envelopes and cursors,
 cursor cycles, and cumulative item, issue and request limits.
-`scripts/reading-cache-recovery.browser.test.mjs` verifies that rejected pagination
+`tests/browser/reading/reading-cache-recovery.browser.test.mjs` verifies that rejected pagination
 preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
@@ -93,7 +93,7 @@ preparation scenarios as independent named Node tests for Chromium and WebKit.
 `pwa-dock-test.mjs` and `pwa-schedule-test.mjs` likewise isolate navigation,
 gestures, motion, launch, empty-state and responsive checks into named scenarios.
 Each owns its browser and storage; one failed scenario does not skip later cases.
-Run a focused case with `node --test --test-name-pattern='<name>' scripts/pwa-update-test.mjs`.
+Run a focused case with `node --test --test-name-pattern='<name>' tests/browser/pwa/pwa-update-test.mjs`.
 
 The service-worker cache and push tests execute the compiled runtime, using the
 same bundler as production and browser previews. `npm run typecheck:service-worker`
@@ -114,7 +114,7 @@ history entries without mutating a previously captured settings snapshot.
 `engine/startup-pending.test.ts` and `engine/pending-verification.test.ts` distinguish
 a literal `delete:note.md` filename from deletion of `note.md`, including renames,
 startup recovery, selection, discard and newer edits during settlement.
-`scripts/activity-diff-test.mjs` checks independent labels, previews, selection,
+`tests/browser/plugin/activity-diff-test.mjs` checks independent labels, previews, selection,
 file actions and discard targets in Chromium and WebKit.
 
 `worker/delivery-integrity.integration.ts` runs old-delivery/new-occurrence races
@@ -185,14 +185,14 @@ injects R2 failures, missing/invalid bytes, permanent parse
 errors; it checks duplicate-capture prevention, healthy-source progress, retained
 identity and delayed coordinator retry.
 
-`node --test scripts/reading-cache-recovery.browser.test.mjs` exercises the production
+`node --test tests/browser/reading/reading-cache-recovery.browser.test.mjs` exercises the production
 Reading loader and native IndexedDB in Chromium/WebKit. It covers old-server source
 issues, retained offline articles/list entries, definitive deletion, quota rollback
 and malformed-record preservation. It is included in `npm run test:reading-browser`.
 
 ## Optimistic Reading actions
 
-After building the Worker, run `node --test scripts/reading-optimistic.browser.test.mjs`
+After building the Worker, run `node --test tests/browser/reading/reading-optimistic.browser.test.mjs`
 for Chromium and WebKit coverage of immediate link saves, continued editing during
 delayed requests, tags and highlight notes, offline changes, and conflict rollback.
 The tests use the built PWA, native IndexedDB/Web Locks, and the real local Worker.
@@ -201,7 +201,7 @@ document. Physical installed-app acceptance remains a device check.
 
 The Reading library, consent, optimistic-action and highlight suites, plus the
 PWA header and dock suites, share
-`scripts/worker-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
+`tests/browser/support/worker-browser-fixture.mjs` for the disposable Worker, HTTP bridge,
 authenticated setup requests and cleanup. Request gates and lost replies stay in
 their individual scenarios through `handleRequest`; normal requests still reach
 the real Worker and its storage bindings.
@@ -231,7 +231,7 @@ publishes their Markdown note. Article extraction still requires a connection.
 
 ## PWA sync coordinator
 
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-sync-coordinator-test.mjs`.
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-sync-coordinator-test.mjs`.
 It exercises the built app in Chromium and WebKit with native IndexedDB and localStorage:
 Reading dispatch while only Reminders is rendered, reminder dispatch while only Reading
 is rendered, a Reading refresh failure that does not block reminders, shared header
@@ -245,7 +245,7 @@ a device check.
 
 ## Unified PWA settings
 
-After building the Worker, run `CRATE_PWA_PREBUILT=1 node scripts/pwa-settings-test.mjs`
+After building the Worker, run `CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-settings-test.mjs`
 for Chromium and WebKit coverage of both settings entry points, retained view/search
 and focus, shared theme and preferences, Reading launch destinations, explicit-link
 precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared
@@ -267,12 +267,12 @@ and unlocked states without hiding problems behind the details disclosure.
 Theme checks cover one document update with both features mounted, system-theme
 changes, explicit overrides, settings close/reopen, feature switching, and native
 cross-tab updates including invalid or removed preferences. Early HTML theme
-application before React loads is covered by `scripts/pwa-startup-empty-test.mjs`.
+application before React loads is covered by `tests/browser/pwa/pwa-startup-empty-test.mjs`.
 Run the storage-safety, sheet-interaction, and Reading shortcut browser checks for
 cleanup failures, touch/keyboard behavior, and real local pairing. Physical iPhone
 keyboard, VoiceOver, installed-sheet gestures, and safe areas remain device checks.
 
-Run `node scripts/pwa-sheet-field-test.mjs` for Chromium/WebKit coverage of
+Run `node tests/browser/pwa/pwa-sheet-field-test.mjs` for Chromium/WebKit coverage of
 **Save a link** focus, keyboard geometry, and caret visibility during opening,
 closing, interrupted dragging, and retargeted keyboard movement. It also checks
 caret restoration with reduced motion and draft preservation across reopening.
@@ -291,11 +291,11 @@ the shared real React harness for rerenders and effect cleanup. `apply-update.te
 also starts transient work during asynchronous storage checks before activation
 and reload.
 
-Run `node scripts/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
+Run `node tests/browser/pwa/pwa-update-notice-test.mjs` for Chromium/WebKit checks of global
 version detection from a Reading-only launch, foreground checks, navigation,
 direct header updates, offline blocking, Settings access, and light/dark mobile layouts.
 Screenshots are written to `test-results/update-notice/`.
-`node scripts/pwa-update-test.mjs` exercises real service-worker preparation,
+`node tests/browser/pwa/pwa-update-test.mjs` exercises real service-worker preparation,
 activation, failed/slow checks, launch updates, pending writes, and other tabs.
 It delays the server clock while preparing a completion command and checks that
 updates stay blocked before that command reaches the durable outbox. It also holds
@@ -401,7 +401,7 @@ The PWA now pages active, completed and date-grouped lists in batches of 200. A 
 
 Cards within each page remain rendered offscreen. Avoid `content-visibility: auto`
 on reminder rows: fast scrolling can expose unpainted cards and replace estimated
-row heights mid-scroll. Run `node scripts/pwa-reminder-scroll-test.mjs` for
+row heights mid-scroll. Run `node tests/browser/pwa/pwa-reminder-scroll-test.mjs` for
 Chromium/WebKit checks of Today and Upcoming rendering before scrolling, rapid
 scroll reversals with variable-height cards, and completion scroll anchoring.
 Installed iPhone momentum scrolling still requires a physical-device check.
@@ -755,7 +755,7 @@ The drag surface lifts while row geometry stays unchanged, releasing commits the
 order without opening a reminder, and the next click still opens it. This replaces
 source checks for Motion props and drag wrappers.
 
-`node scripts/activity-empty-layout-test.mjs` mounts the production activity and
+`node tests/browser/plugin/activity-empty-layout-test.mjs` mounts the production activity and
 conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check
 header alignment, viewport fit, centered empty states, disabled sync actions and
 matching primary controls in light/dark themes at desktop, mobile and short sizes.
@@ -873,20 +873,20 @@ handoff and hosted YouTube availability need separate verification.
 
 ## Reading touch feedback
 
-Run `node scripts/pwa-project-transition-test.mjs` for project navigation and
+Run `node tests/browser/pwa/pwa-project-transition-test.mjs` for project navigation and
 card feedback in Chromium/WebKit. It checks resting card styles at the history
 push after held presses and native taps, including grouped and nested projects
 in both themes. Verify the browser-owned swipe-back preview on an installed
 iPhone separately.
 
-Run `node scripts/reading-touch-test.mjs` for Chromium/WebKit checks of article
+Run `node tests/browser/reading/reading-touch-test.mjs` for Chromium/WebKit checks of article
 open/Back cycles in both themes, retained hover, and keyboard focus restoration.
 Chromium also exercises native touch cancellation and scrolling, plus a forced
 stale `:active` state. The test uses the built PWA with synthetic Reading APIs
 and is included in `npm run test:pwa-browser`. Installed iPhone behavior still
 requires device verification.
 
-Run `node scripts/shared-press-feedback-test.mjs` for the shared controls’ press
+Run `node tests/browser/plugin/shared-press-feedback-test.mjs` for the shared controls’ press
 contract in Chromium and WebKit, in both document and Shadow DOM hosts. It covers
 release outside an inert control, cancellation, movement into scrolling, window
 blur, keyboard activation, disabled controls, persistent toggle selection, and
@@ -900,7 +900,7 @@ the configuration itself performs no network work, so static analysis and
 `npx playwright test --list` can read it directly. Preview build/serve lifecycle
 remains in `scripts/visual-preview.mjs`.
 
-`node scripts/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
+`node tests/browser/pwa/pwa-feature-switcher-test.mjs` checks opaque feature dissolves,
 mid-fade reversals, delayed animation cleanup, lazy-loading surfaces, immediate
 reduced-motion switching and focus in Chromium/WebKit. Build the Worker first,
 or let its preview harness build it.
@@ -915,7 +915,7 @@ and Obsidian rendering still requires device verification.
 ## Reading fetching consent
 
 After `npm run build:worker`, run
-`node --test scripts/reading-consent.browser.test.mjs` for Chromium and WebKit
+`node --test tests/browser/reading/reading-consent.browser.test.mjs` for Chromium and WebKit
 coverage of the full article save disclosure, automatic extraction,
 and library access after fetching is disabled. Light/dark phone screenshots are
 written to `test-results/reading-consent/`. This uses a real local Worker; physical
@@ -935,8 +935,8 @@ After building the plugin, run
 The Shadow DOM fixture covers the production plugin navigation shell at narrow and
 wide widths, Today/Upcoming selection, project Back and retained scroll/focus,
 Reading search and article return, keyboard/held dock expansion, disabled features,
-rapid switching, reduced motion, and compact project sheets. Run `node scripts/pwa-dock-test.mjs` and
-`node scripts/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
+rapid switching, reduced motion, and compact project sheets. Run `node tests/browser/pwa/pwa-dock-test.mjs` and
+`node tests/browser/pwa/pwa-schedule-test.mjs` after rebuilding the Worker for the shared
 components’ PWA adapters. Actual Obsidian panes, popout windows and mobile navbar
 insets still require host/device acceptance.
 ## Encryption acceptance
@@ -945,7 +945,7 @@ insets still require host/device acceptance.
 
 Folder-move coverage uses only disposable local storage. `encryption/folder-moves.integration.ts` checks retained credentials, Reading policy generation, push subscriptions and accepted/unaccepted Reading attempts; selecting a different configured folder must revoke the old connection. The native storage harness authenticates multiple offline moves, rejects substituted paths/access identities and preserves drafts through key recovery. The full Reminders and Reading browser scripts exercise the production apps after conversion and normal conditional file moves, retaining their original sessions without new links. Reading also follows a move in the already-open page. Reminder API regression tests preserve queued semantic revisions while encrypting replacements for the current path.
 
-`node scripts/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and conversion with absent or populated shared settings, including the first encrypted settings write.
+`node tests/browser/pwa/pwa-encryption-storage-test.mjs` exercises native Chromium/WebKit CryptoKey storage with the production session hook and a delayed cache-cleanup boundary. It covers cross-tab re-enrollment during logout, preservation of new drafts and immutable attempts after reload, rollback when authority changes during deletion, normal logout erasure, repair of partially damaged keys, and preservation of unsupported or unrecoverable records. The full encryption browser test also exercises damaged-key recovery through the unlock UI and conversion with absent or populated shared settings, including the first encrypted settings write.
 
 The storage test also runs the production push listener and decryption bundle in a
 real service worker, reading keys persisted by the page. It simulates both Safari's
@@ -956,9 +956,9 @@ are simulated; background delivery and lock-screen previews still require an iPh
 
 The storage harness also queues real database opens behind blocked native deletions: bootstrap, key enrollment, attempt access and logout cleanup must reject promptly, push decryption must fall back, failed operations must preserve bytes, and abandoned opens must not create stores or write after unblocking. It checks successful retry and future-format preservation in both engines. Unit tests run the production service-worker push handler through the generic-notification deadline and fence late open/upgrade events. Worker `encryption/settings.integration.ts` converts and updates settings at the former failure size and the full plaintext request limit, preserves committed settings after oversized writes, and verifies that preflight rejects unsupported stored settings before freezing sync. The full encryption browser test uses a 2,000-entry exclusion list for conversion and encrypted writes.
 
-`node scripts/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, folder isolation, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
+`node tests/browser/pwa/pwa-encryption-test.mjs` exercises both Chromium and WebKit against a disposable production self-hosted runtime. It covers active/locked/converting encryption status and native IndexedDB cleanup, including expired acknowledgments, pending references from older sessions, drafts, damaged/unknown entries, folder isolation, and stale-session fences. It belongs to `test:pwa-browser`. Recovery-verification and settings tests check that conversion is gated on decrypting the saved key and that editing the input or changing the connection invalidates verification. Worker `maintenance/encryption-metadata.integration.ts` checks bounded descriptor cleanup and references from files, history, receipts, changelog and upload leases. Run the encryption unit tests, Worker `encryption.integration.ts`, the full sync/notification regressions, and paired backup tests before enabling encryption in a release. Physical iOS/Android background push, browser storage eviction, hosted Worker limits and an independent security review remain separate acceptance checks; see [encryption](e2ee-implementation.md).
 
-`CRATE_PWA_PREBUILT=1 node scripts/pwa-encryption-regressions-test.mjs` checks long reminder completion, large pre-encryption receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
+`CRATE_PWA_PREBUILT=1 node tests/browser/pwa/pwa-encryption-regressions-test.mjs` checks long reminder completion, large pre-encryption receipt conversion, plaintext that resembles ciphertext, and interrupted conversion/save retries against the production local server in Chromium and WebKit. Run `npm run build:worker` first, or omit `CRATE_PWA_PREBUILT` to build automatically.
 
 Worker `encryption/source-rebuild.integration.ts` covers atomic chunked scheduling for 2,000 reminders with rollback and stable command tokens, and coordinator query budgets while rebuilding dense encrypted sources.
 
@@ -971,7 +971,7 @@ for single, batch and bulk-new uploads. It checks that bytes remain staged witho
 file metadata, changelog or receipts being committed, while binary uploads retain
 their direct publication path.
 
-After `npm run build:plugin`, run `node scripts/encryption-setup-test.mjs` for the
+After `npm run build:plugin`, run `node tests/browser/plugin/encryption-setup-test.mjs` for the
 Obsidian encryption setup UI. It uses production key verification with a synthetic
 Obsidian host in Chromium and WebKit, at desktop, phone and small-screen sizes in
 both themes. It checks that loading and setup keep the same bounds and
@@ -994,15 +994,15 @@ check retains wrong-key, edit and stale-result coverage.
 
 - `reading/encryption.integration.ts` covers ciphertext-only capture/edit/replay, folder isolation, blocked plaintext paths, queued captures, converted receipts and adding a scope to an already encrypted vault after a lost conversion response.
 - `encryption/reset.integration.ts` seeds all seven Reading tables and checks immediate/final deletion and old-grant rejection.
-- `scripts/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
-- `node scripts/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
-- `scripts/pwa-reading-encryption-storage-test.mjs` covers atomic plaintext-to-encrypted migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
-- `node scripts/pwa-web-app-unlock-test.mjs`: shared recovery-key unlock for Reading/Reminders in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
+- `tests/browser/pwa/pwa-reading-encryption-test.mjs` runs the production PWA against disposable local bindings. Chromium covers offline edits/reload and exact ciphertext retry after response loss. Both browser engines cover enrollment, article access, logout key removal and a Shortcut arriving before folder unlock. It also checks that the production nonce-based CSP blocks injected inline and same-origin scripts while the app and deferred Reading code load, and that hostile encrypted article content remains inert after opening (and offline reopening in Chromium). Use `CRATE_TEST_BROWSER=webkit` for WebKit.
+- `node tests/browser/reading/reading-content-security-test.mjs` mounts the production reader and reminder card in Chromium/WebKit document and Shadow DOM hosts with CSP disabled. It covers hostile HTML, malformed mixed namespaces, event handlers, active URLs, DOM clobbering, code-highlighter output and resource requests, while preserving benign Markdown and code. It runs in `test:pwa-browser`. This is regression coverage, not a substitute for an independent security review.
+- `tests/browser/pwa/pwa-reading-encryption-storage-test.mjs` covers atomic plaintext-to-encrypted migration/rollback, scope-key recovery, preserving unrelated sessions, locked reads and cleanup racing a new sign-in in both engines.
+- `node tests/browser/pwa/pwa-web-app-unlock-test.mjs`: shared recovery-key unlock for Reading/Reminders in Chromium and WebKit, wrong-vault rejection, session changes during import, native key persistence and offline draft recovery after reimport/reload.
 - Native iOS Shortcut signing/import and physical iOS/Android offline/push delivery remain manual acceptance. Test encrypted Android after reinstalling its changed manifest. Hosted quota validation must use an explicitly budgeted disposable deployment; do not run local test fixtures against hosted D1.
 
 ## Encrypted iPhone onboarding
 
-`node scripts/pwa-encryption-onboarding-test.mjs` checks the production PWA against fixture HTTP responses in Chromium and WebKit: Safari installation guidance, isolated installed-app storage, Reading and Reminders first unlock, wrong-key feedback, pending controls, remembered keys after reload, recovery after key loss, desktop copy and a 320px viewport. These contexts model iOS storage separation; physical Add to Home Screen and background push still require device acceptance.
+`node tests/browser/pwa/pwa-encryption-onboarding-test.mjs` checks the production PWA against fixture HTTP responses in Chromium and WebKit: Safari installation guidance, isolated installed-app storage, Reading and Reminders first unlock, wrong-key feedback, pending controls, remembered keys after reload, recovery after key loss, desktop copy and a 320px viewport. These contexts model iOS storage separation; physical Add to Home Screen and background push still require device acceptance.
 
 Mobile setup links first offer **Continue to web** and **Install Crate**. The
 script verifies that installation instructions leave vault screens unmounted,
@@ -1018,7 +1018,7 @@ feature failures and shared logout before delayed/failed remote revocation.
 
 ### Copy-free encrypted app approval
 
-`node scripts/pwa-pairing-test.mjs` runs the production PWA and approval modal in
+`node tests/browser/pwa/pwa-pairing-test.mjs` runs the production PWA and approval modal in
 separate Chromium/WebKit contexts with real WebCrypto and native IndexedDB. The Obsidian DOM host and HTTP relay are fixtures; service workers are blocked
 so requests stay in that fixture. The full encryption suites cover the real worker. It checks both feature entry
 points, matching codes, no key persistence until both sides confirm (even after receiving a packet), no plaintext secrets in requests,

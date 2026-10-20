@@ -1,0 +1,334 @@
+import { chromium, webkit, expect } from '@playwright/test';
+import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+import { previewAuthToken } from '../../../scripts/pwa-preview-fixtures.mjs';
+
+const assets = await buildPwaPreviewAssets();
+const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const origin = `http://127.0.0.1:${server.address().port}`;
+
+try {
+	for (const browserType of [chromium, webkit]) {
+		const browser = await browserType.launch();
+		try {
+			await scenario(browser, verifyImmediateUpdates);
+			await scenario(browser, verifyProjectSyncIndicator);
+			await scenario(browser, verifyRejectedSaveRecovery);
+			await scenario(browser, verifyRejectedDeleteRecovery);
+			await scenario(browser, verifyLostAcknowledgement);
+			await scenario(browser, verifyExhaustedRetries);
+			console.log(`${browserType.name()}: optimistic mutations, retained drafts, rollback, reload recovery and idempotent retry passed`);
+		} finally {
+			await browser.close();
+		}
+	}
+} finally {
+	await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+}
+
+async function scenario(browser, verify) {
+	const context = await browser.newContext({
+		viewport: { width: 390, height: 844 }, hasTouch: true, serviceWorkers: 'block',
+	});
+	const externalRequests = [];
+	const pageErrors = [];
+	try {
+		await context.route('**/*', route => {
+			if (new URL(route.request().url()).origin === origin) return route.continue();
+			externalRequests.push(route.request().url());
+			return route.abort('blockedbyclient');
+		});
+		const page = await context.newPage();
+		page.setDefaultTimeout(15_000);
+		page.on('pageerror', error => pageErrors.push(error.message));
+		await page.request.post(`${origin}/preview/reset`);
+		await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+		await expect(card(page, 'Check this article')).toBeVisible();
+		await expect(page.locator('[data-action="open-create-modal"]')).toBeVisible();
+		await verify(page);
+		expect(externalRequests).toEqual([]);
+		expect(pageErrors).toEqual([]);
+	} finally {
+		await context.close();
+	}
+}
+
+function card(page, content) {
+	return page.getByRole('group', { name: `${content}. Press Enter to edit reminder.`, exact: true });
+}
+
+function title(page) {
+	return page.getByRole('textbox', { name: 'Reminder title', exact: true });
+}
+
+function save(page) {
+	return page.locator('[data-action="save-reminder"]');
+}
+
+async function expectEditorClosed(page) {
+	await expect(page.locator('.pwa-modal-sheet__container--reminder')).toHaveCount(0);
+}
+
+async function expectSynced(page, indicator = page.locator('.pwa-navigation-viewport .pwa-sync-indicator')) {
+	await expect(indicator).toHaveCount(1);
+	await expect(indicator).toHaveAttribute('data-sync-state', 'synced');
+	await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
+}
+
+async function openReminder(page, content) {
+	await card(page, content).click();
+	await expect(title(page)).toHaveText(content);
+	await expect(save(page)).toBeEnabled();
+}
+
+async function confirmDelete(page) {
+	await page.getByRole('button', { name: 'Delete reminder', exact: true }).click();
+	const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder', exact: true });
+	await expect(confirmation).toBeVisible();
+	await expect(page.locator('.reminder-action-chips')).not.toHaveAttribute('inert');
+	await confirmation.getByRole('button', { name: 'Delete reminder', exact: true }).click();
+}
+
+async function holdNextMutation(page, path) {
+	let captured;
+	let release;
+	let released = false;
+	const outcome = new Promise(resolve => { release = resolve; });
+	await page.route(`${origin}${path}`, async route => {
+		captured = route.request().postData();
+		const response = await outcome;
+		if (response) await route.fulfill({ status: response.status, contentType: 'application/json', body: JSON.stringify({ error: response.error }) });
+		else await route.continue();
+	}, { times: 1 });
+	return {
+		wait: () => expect.poll(() => captured !== undefined).toBe(true),
+		assertHeld: () => expect(released).toBe(false),
+		finish: response => { released = true; release(response); },
+	};
+}
+
+async function verifyImmediateUpdates(page) {
+	const create = await holdNextMutation(page, '/reminders/create');
+	try {
+		await page.locator('[data-action="open-create-modal"]').click();
+		await expect(title(page)).toBeEditable();
+		await title(page).fill('Optimistic creation');
+		await save(page).click();
+		await create.wait();
+		await expectEditorClosed(page);
+		await expect(card(page, 'Optimistic creation')).toBeVisible();
+		await expect(page.locator('.view-header .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'syncing');
+		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
+		create.assertHeld();
+		// A completed background request must not close an editor opened later.
+		await openReminder(page, 'Check this article');
+		create.finish();
+		await expectSynced(page);
+		await expect(page.locator('.toast.is-success')).toHaveText('Reminder created');
+		await expect(title(page)).toHaveText('Check this article');
+		await expect(save(page)).toBeEnabled();
+	} finally { create.finish(); }
+
+	const edit = await holdNextMutation(page, '/reminders/update');
+	try {
+		await title(page).fill('Optimistic edit');
+		await save(page).click();
+		await edit.wait();
+		await expectEditorClosed(page);
+		await expect(card(page, 'Optimistic edit')).toBeVisible();
+		await expect(card(page, 'Check this article')).toHaveCount(0);
+		edit.assertHeld();
+	} finally { edit.finish(); }
+	await expectSynced(page);
+
+	const complete = await holdNextMutation(page, '/reminders/set-completed');
+	try {
+		await card(page, 'Optimistic edit').getByRole('checkbox').click();
+		await complete.wait();
+		await expect(card(page, 'Optimistic edit')).toHaveCount(0);
+		complete.assertHeld();
+	} finally { complete.finish(); }
+	await expectSynced(page);
+
+	const remove = await holdNextMutation(page, '/reminders/delete');
+	try {
+		await openReminder(page, 'Optimistic creation');
+		await confirmDelete(page);
+		await remove.wait();
+		await expectEditorClosed(page);
+		await expect(card(page, 'Optimistic creation')).toHaveCount(0);
+		remove.assertHeld();
+	} finally { remove.finish(); }
+	await expectSynced(page);
+}
+
+async function verifyProjectSyncIndicator(page) {
+	await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
+	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
+	await page.locator('[data-action="open-project"][data-project="Work"]').click();
+	const indicator = page.locator('.project-detail-navigation .pwa-sync-indicator');
+	const scroll = page.locator('.pwa-project-layer .reminders-view-scroll');
+	await expect(scroll).toHaveCount(1);
+	await expect(indicator).toBeVisible();
+	await expect(page.locator('.project-detail-header').getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
+	await expectSynced(page, indicator);
+	await indicator.getByRole('button').click();
+	const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+	await expect(page.locator('.toast.has-sync-indicator')).toHaveText('All changes synced');
+	await expect(settings).toHaveCount(0);
+	const originalTop = (await scroll.boundingBox()).y;
+	const mutation = await holdNextMutation(page, '/reminders/update');
+	try {
+		await card(page, 'Do I have this documented already?').click();
+		await expect(title(page)).toContainText('Do I have this documented already?');
+		await expect(save(page)).toBeEnabled();
+		await title(page).fill('Project sync indicator #Work');
+		await save(page).click();
+		await mutation.wait();
+		await expectEditorClosed(page);
+		await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
+		await expect(indicator).toHaveText('Syncing 1 change');
+		await expect(indicator.locator('.crate-sync-indicator')).toHaveAttribute('data-visual-state', 'syncing');
+		await expect.poll(() => indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el).animationName)).toBe('pwa-sync-breathe');
+		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
+		expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await expect.poll(() => indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+	} finally { mutation.finish(); }
+	await expectSynced(page, indicator);
+	expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
+	await page.context().setOffline(true);
+	await expect(indicator).toHaveAttribute('data-sync-state', 'offline');
+	await page.context().setOffline(false);
+	await expectSynced(page, indicator);
+}
+
+async function verifyRejectedSaveRecovery(page) {
+	const rejected = await holdNextMutation(page, '/reminders/update');
+	try {
+		await openReminder(page, 'Check this article');
+		await title(page).fill('Rejected draft title');
+		await page.getByRole('textbox', { name: 'Reminder description', exact: true }).fill('Keep these details after a failed save and reload.');
+		await save(page).click();
+		await rejected.wait();
+		await expectEditorClosed(page);
+		await expect(card(page, 'Rejected draft title')).toBeVisible();
+		rejected.assertHeld();
+	} finally { rejected.finish({ status: 400, error: 'This draft needs a correction' }); }
+	const notice = page.getByRole('region', { name: 'Not saved: Rejected draft title', exact: true });
+	await expect(notice).toBeVisible();
+	await expect(page.locator('.toast.is-error')).toHaveText('Reminder changes need attention. Review them in settings.');
+	await expect(page.locator('.pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'error');
+	await expect(notice.getByRole('button', { name: 'Retry: Rejected draft title', exact: true })).toBeEnabled();
+	await expect(notice.getByRole('button', { name: 'Edit: Rejected draft title', exact: true })).toBeEnabled();
+	await page.reload();
+	await expect(notice).toBeVisible();
+	await expect(card(page, 'Rejected draft title')).toBeVisible();
+	await notice.getByRole('button', { name: 'Edit: Rejected draft title', exact: true }).click();
+	await expect(title(page)).toHaveText('Rejected draft title');
+	await expect(page.getByRole('textbox', { name: 'Reminder description', exact: true })).toHaveText('Keep these details after a failed save and reload.');
+	await title(page).fill('Corrected draft title');
+	await save(page).click();
+	await expectEditorClosed(page);
+	await expect(card(page, 'Corrected draft title')).toBeVisible();
+	await expectSynced(page);
+}
+
+async function verifyRejectedDeleteRecovery(page) {
+	const rejected = await holdNextMutation(page, '/reminders/delete');
+	try {
+		await openReminder(page, 'Check this article');
+		await confirmDelete(page);
+		await rejected.wait();
+		await expectEditorClosed(page);
+		await expect(card(page, 'Check this article')).toHaveCount(0);
+		rejected.assertHeld();
+	} finally { rejected.finish({ status: 409, error: 'Delete could not be applied' }); }
+	await expect(card(page, 'Check this article')).toBeVisible();
+	const notice = page.getByRole('region', { name: 'Couldn’t delete reminder: Check this article', exact: true });
+	await expect(notice).toBeVisible();
+	await expectEditorClosed(page);
+	await notice.getByRole('button', { name: 'Retry: Check this article', exact: true }).click();
+	await expect(card(page, 'Check this article')).toHaveCount(0);
+	await expectSynced(page);
+}
+
+async function verifyLostAcknowledgement(page) {
+	const bodies = [];
+	let releaseRetry;
+	const retryGate = new Promise(resolve => { releaseRetry = resolve; });
+	await page.route(`${origin}/reminders/create`, async route => {
+		bodies.push(route.request().postData());
+		if (bodies.length === 1) {
+			const committed = await route.fetch();
+			expect(committed.ok()).toBe(true);
+			await route.abort('failed');
+			return;
+		}
+		await retryGate;
+		await route.continue();
+	});
+	try {
+		await page.locator('[data-action="open-create-modal"]').click();
+		await title(page).fill('Saved despite lost acknowledgement');
+		await save(page).click();
+		await expectEditorClosed(page);
+		const notice = page.getByRole('region', { name: 'Couldn’t sync: Saved despite lost acknowledgement', exact: true });
+		await expect(notice).toBeVisible();
+		await expect(page.locator('.toast.is-error')).toHaveCount(0);
+		await expect(card(page, 'Saved despite lost acknowledgement')).toHaveCount(1);
+		await notice.getByRole('button', { name: 'Retry: Saved despite lost acknowledgement', exact: true }).click();
+		await expect.poll(() => bodies.length).toBe(2);
+		expect(bodies[1]).toBe(bodies[0]);
+		expect(await serverRecordCount(page, 'Saved despite lost acknowledgement')).toBe(1);
+	} finally { releaseRetry(); }
+	await expectSynced(page);
+	expect(await serverRecordCount(page, 'Saved despite lost acknowledgement')).toBe(1);
+	await page.reload();
+	await expect(card(page, 'Saved despite lost acknowledgement')).toHaveCount(1);
+	await expectSynced(page);
+}
+
+async function verifyExhaustedRetries(page) {
+	let attempts = 0;
+	let recover = false;
+	const bodies = [];
+	await page.route(`${origin}/reminders/create`, route => {
+		attempts++;
+		bodies.push(route.request().postData());
+		if (recover) return route.continue();
+		return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Service temporarily unavailable' }) });
+	});
+	await page.locator('[data-action="open-create-modal"]').click();
+	await title(page).fill('Saved locally while service is unavailable');
+	await save(page).click();
+	await expectEditorClosed(page);
+	await expect.poll(() => attempts).toBe(1);
+	await expect(page.locator('.toast.is-error')).toHaveCount(0);
+	await expect.poll(() => attempts, { timeout: 12000 }).toBe(3);
+	await expect(page.locator('.toast.is-error')).toHaveText('Reminder changes need attention. Review them in settings.');
+	await expect(card(page, 'Saved locally while service is unavailable')).toBeVisible();
+	await page.reload();
+	const notice = page.getByRole('region', { name: 'Couldn’t sync: Saved locally while service is unavailable', exact: true });
+	await expect(notice).toBeVisible();
+	await page.evaluate(() => {
+		window.dispatchEvent(new Event('online'));
+		document.dispatchEvent(new Event('visibilitychange'));
+	});
+	await page.waitForTimeout(1_000);
+	expect(attempts).toBe(3);
+	recover = true;
+	await notice.getByRole('button', { name: 'Retry: Saved locally while service is unavailable', exact: true }).click();
+	await expectSynced(page);
+	expect(attempts).toBe(4);
+	expect(new Set(bodies).size).toBe(1);
+}
+
+async function serverRecordCount(page, content) {
+	const response = await page.request.get(`${origin}/reminders/list?folderPath=Reminders`, {
+		headers: { Authorization: `Bearer ${previewAuthToken}` },
+	});
+	expect(response.ok()).toBe(true);
+	const result = await response.json();
+	return result.reminders.filter(reminder => reminder.content === content).length;
+}

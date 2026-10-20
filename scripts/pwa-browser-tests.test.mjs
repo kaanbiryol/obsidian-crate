@@ -16,7 +16,7 @@ test('shards cover every existing browser script exactly once', () => {
 
 test('every browser test script runs from the registry or a package script', () => {
 	// Manual diagnostics documented in docs/ui-styling.md.
-	const manual = new Set(['scripts/pwa-sync-indicator-test.mjs']);
+	const manual = new Set(['tests/browser/pwa/pwa-sync-indicator-test.mjs']);
 	const packageScripts = Object.values(JSON.parse(readFileSync('package.json', 'utf8')).scripts).join('\n');
 	const unlisted = readdirSync('scripts')
 		.filter(name => /(?:-test|\.browser\.test)\.mjs$/.test(name))

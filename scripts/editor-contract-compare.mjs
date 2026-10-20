@@ -21,7 +21,7 @@ function run(name, directory) {
   });
   if (result.error) throw result.error;
   if (result.signal) throw new Error(`${name} interrupted: ${result.signal}`);
-  const pwa = spawnSync(process.execPath, ['scripts/pwa-editor-contract-test.mjs'], {
+  const pwa = spawnSync(process.execPath, ['tests/browser/pwa/pwa-editor-contract-test.mjs'], {
     cwd: directory, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, env: process.env,
   });
   if (pwa.error) throw pwa.error;

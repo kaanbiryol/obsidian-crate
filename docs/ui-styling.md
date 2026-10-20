@@ -259,7 +259,7 @@ Dock morphs use the shared collapsed height.
   to touch activation of editable fields. Open capture synchronously within its
   initiating tap so iOS can show the keyboard. Outer sheet wrappers use clipped
   overflow; the form's content panel retains native scrolling and selection.
-  `scripts/pwa-sheet-field-test.mjs` checks capture focus and simulated keyboard
+  `tests/browser/pwa/pwa-sheet-field-test.mjs` checks capture focus and simulated keyboard
   geometry in Chromium/WebKit; installed iPhone keyboard behavior needs a device check.
 
   PWA surface motion lives in `src/ui/shared/navigation/motion.ts` and
@@ -403,7 +403,7 @@ Both views select Reminders in the default dock; a pinned Upcoming tab has its o
 before JavaScript loads. Once the initial reminder snapshot is ready, the counts,
 chips, and list reveal together with the shared 160ms fade. The title, actions,
 and dock stay painted; reduced motion reveals content immediately, and background
-refreshes do not replay the entrance. `scripts/pwa-schedule-test.mjs` checks cold
+refreshes do not replay the entrance. `tests/browser/pwa/pwa-schedule-test.mjs` checks cold
 and cached launches with overdue reminders, coordinated reveal, selection,
 keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
 empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin uses the same dock, date switcher and project transition components. `PluginWorkspaceNavigation` retains both features inside one pane, while `PluginRemindersAppShell` manages local project navigation without browser history. Compact project sheets keep their own header and omit the main dock. Plugin pane geometry and Obsidian bottom obstructions live in `src/ui/plugin/plugin-navigation.scss`; dock, schedule and navigation presentation lives in the shared Sass modules. Dock destinations persist through Obsidian device-local storage.
@@ -425,8 +425,8 @@ in their feature styles. PWA-wide behavior belongs in the host layer:
   input-modality focus, and motion respectively. New features reuse them rather
   than adding a second interaction policy.
 
-Built-app checks in `scripts/reading-browser.test.mjs` and
-`scripts/pwa-focus-test.mjs` cover the shared screen policy, native Chromium
+Built-app checks in `tests/browser/reading/reading-browser.test.mjs` and
+`tests/browser/pwa/pwa-focus-test.mjs` cover the shared screen policy, native Chromium
 pinching, text selection, font sizing, and sheet editing boundaries. Desktop
 WebKit checks the CSS policy and editing behavior; installed iPhone gestures
 still need physical-device verification.
@@ -505,7 +505,7 @@ The PWA resolves its saved theme in a nonce-authorized inline script before the
 stylesheets are parsed, then applies the light palette before the body appears.
 The document, launch screen, update curtain, and app use matching surface colors;
 the page backdrop has no gradient that can show through during mounting.
-`scripts/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
+`tests/browser/pwa/pwa-startup-empty-test.mjs` samples launch frames with delayed JavaScript
 and data in both engines, including saved themes opposite to the system theme.
 The initial HTML includes the selected title, settings icon, bottom dock, and
 a small, muted content loading indicator. `src/pwa/shell/opening-screen.ts` and `opening-dock.ts` supply the
@@ -559,10 +559,10 @@ The stylesheet is approximately 170 KB raw / 24 KB gzip after the shared Base UI
 migration. `scripts/bundle-budgets.mjs` records measured baselines and explicit
 limits for the plugin, embedded Worker, and PWA startup/deferred assets.
 
-`scripts/base-ui-plugin-test.mjs` checks Dialog/Drawer nesting, keyboard navigation,
+`tests/browser/plugin/base-ui-plugin-test.mjs` checks Dialog/Drawer nesting, keyboard navigation,
 focus return, pending mutations, native Obsidian overlay handoff, touch gestures,
 and portal content initialization in Chromium and WebKit. The smaller
-`scripts/react-shadow-dom-test.mjs` covers editing and single button activation
+`tests/browser/plugin/react-shadow-dom-test.mjs` covers editing and single button activation
 across mount/unmount cycles.
 
 Knip ignores the `tailwindcss` dependency because its direct import is the Sass
@@ -773,8 +773,8 @@ Reading retains its wrapper inset; Reminders retains its header inset. Header
 surfaces use the same theme color as startup chrome. Check launch/resume, rotation,
 light/dark themes, scrolling, and sheets on an installed iOS 27 device: desktop
 WebKit can verify layout and platform gating but cannot reproduce native blur.
-`scripts/pwa-safe-area-test.mjs` covers the inset and viewport geometry;
-`scripts/pwa-ios27-header-test.mjs` covers Reading headers, dock menus, sheets,
+`tests/browser/pwa/pwa-safe-area-test.mjs` covers the inset and viewport geometry;
+`tests/browser/pwa/pwa-ios27-header-test.mjs` covers Reading headers, dock menus, sheets,
 theme changes, rotation, and reload against the built local Worker.
 The dock reserves the current device-reported bottom safe area once, with a 10px
 minimum visual gap (not an additional 10px). Use `safe-area-inset-bottom`, not
@@ -789,12 +789,12 @@ multitouch gestures are left to the browser.
 
 Run the Reading visual specs in Chromium and WebKit for both hosts, light/dark
 surfaces, mobile and desktop widths, safe rendering, article actions, capture,
-and appearance controls. `scripts/reading-browser.test.mjs` exercises the built
+and appearance controls. `tests/browser/reading/reading-browser.test.mjs` exercises the built
 PWA against real local storage and Worker bindings, including offline reading and
 replay of a save whose response was lost. iPhone keyboard, native sharing, and
 installed-app safe areas still require physical-device acceptance.
 
-`scripts/pwa-dock-test.mjs` exercises the built Worker in Chromium and WebKit:
+`tests/browser/pwa/pwa-dock-test.mjs` exercises the built Worker in Chromium and WebKit:
 section switching, retained tabs/search, directional slides, reduced motion,
 minimum touch targets, stationary dock geometry, focus return, capture/settings
 sheets, and light/dark phone and landscape layouts. Drag-to-select coverage checks
@@ -992,5 +992,5 @@ the full status.
 Forced-colors mode uses `CanvasText` for the dot and hides decorative halos
 and ripples. The dot, glow, halo, and ripple share one SVG center; animation changes their
 radii without independently scaling rasterized layers.
-`scripts/pwa-sync-indicator-test.mjs` checks both PWA palettes, centered state
+`tests/browser/pwa/pwa-sync-indicator-test.mjs` checks both PWA palettes, centered state
 geometry, motion interruption, reduced motion, and Chromium forced colors.

@@ -1,0 +1,236 @@
+import assert from 'node:assert/strict';
+import { checkNativeEditorGestures } from './pwa-editor-gesture-checks.mjs';
+import { checkCheckboxHoverAfterDismissal } from './pwa-checkbox-hover-checks.mjs';
+import { chromium, webkit, expect } from '@playwright/test';
+import { buildPwaPreviewAssets } from '../../../scripts/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '../../../scripts/pwa-preview-server.mjs';
+
+async function tapBackdropAbove(page, dialog) {
+	// The library container is taller than the visible reminder sheet. Tap the
+	// apparent backdrop immediately above the content to catch invisible blockers.
+	const sheet = page.locator('.pwa-reminder-sheet-stage');
+	await expect(dialog).toBeVisible();
+	await expect(page.locator('.pwa-modal-sheet__backdrop')).toBeVisible();
+	await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
+	if (await sheet.count()) await expect(sheet).toHaveCSS('transform', 'none');
+	const surface = await sheet.count() ? sheet : dialog;
+	// Picker tabs animate sheet height as well as transform. Wait for stable
+	// geometry before choosing a coordinate just outside the visible content.
+	await surface.tap({ trial: true });
+	const bounds = await surface.boundingBox();
+	assert.ok(bounds && bounds.y > 0, 'The sheet must leave a visible backdrop');
+	const point = { x: bounds.x + bounds.width / 2, y: bounds.y - Math.min(24, bounds.y / 2) };
+	assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('pwa-modal-sheet__backdrop'), point),
+		`Visible backdrop must receive the tap: ${JSON.stringify(bounds)}`);
+	// Chromium expands touch targets into the header across the settings page's
+	// 10px top gap. Use precise pointer hit-testing there; settings touch swipe
+	// dismissal is covered by pwa-settings-motion-checks.
+	if (bounds.y < 24) await page.mouse.click(point.x, point.y);
+	else await page.touchscreen.tap(point.x, point.y);
+}
+
+async function expectNoTouchRing(locator) {
+	await expect(locator).toHaveCSS('outline-style', 'none');
+	await expect(locator).toHaveCSS('box-shadow', 'none');
+}
+
+async function trackEditorBlur(title) {
+	await expect(title).toBeFocused();
+	await title.evaluate(element => {
+		delete document.documentElement.dataset.editorBlurWhileMounted;
+		element.addEventListener('blur', () => {
+			document.documentElement.dataset.editorBlurWhileMounted = String(element.isConnected);
+		}, { once: true });
+	});
+}
+
+async function expectEditorBlurBeforeUnmount(page) {
+	await expect(page.locator('html')).toHaveAttribute('data-editor-blur-while-mounted', 'true');
+}
+
+async function tabTo(page, locator) {
+	// Safari's default Tab order includes text inputs; Option-Tab includes buttons.
+	const tab = page.context().browser().browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
+	for (let attempts = 0; attempts < 30; attempts++) {
+		await page.keyboard.press(tab);
+		// Base UI's focus guards wrap focus on the next animation frame.
+		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+		if (await locator.evaluate(element => element === document.activeElement)) return;
+	}
+	assert.fail('Keyboard navigation did not reach the requested control');
+}
+
+async function expectNeutralKeyboardRing(locator) {
+	await expect(locator).toHaveCSS('outline-style', 'solid');
+	const style = await locator.evaluate(element => {
+		const computed = getComputedStyle(element);
+		return { color: computed.outlineColor, width: parseFloat(computed.outlineWidth) };
+	});
+	assert.ok(style.width >= 1, 'Keyboard focus must remain visible');
+	const channels = style.color.match(/[\d.]+/g).slice(0, 3).map(Number);
+	assert.ok(Math.max(...channels) - Math.min(...channels) < 35,
+		`Keyboard focus should use a neutral color, received ${style.color}`);
+}
+
+const assets = await buildPwaPreviewAssets();
+const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const origin = `http://127.0.0.1:${server.address().port}`;
+try {
+	for (const browserType of [chromium, webkit]) {
+		const browser = await browserType.launch();
+		try {
+			await checkCheckboxHoverAfterDismissal(browser, origin);
+			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
+			// Exercise the library's iOS platform branch even in desktop WebKit.
+			await page.addInitScript(() => {
+				Object.defineProperty(navigator, 'platform', { get: () => 'iPhone' });
+			});
+			await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+			const fab = page.locator('[data-action="open-create-modal"]');
+			await expect(fab).toBeVisible();
+			// Settings must open on its first tap even when the network disappears.
+			const settingsButton = page.getByRole('button', { name: 'Open settings', exact: true });
+			await expect(settingsButton).toBeVisible();
+			await page.context().setOffline(true);
+			await settingsButton.tap();
+			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+			await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Close settings', exact: true }).tap();
+			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
+			await page.context().setOffline(false);
+			await expect(fab).toBeVisible();
+			await fab.evaluate(element => { window.originalFab = element; });
+			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
+			const editor = page.getByRole('dialog', { name: 'Edit reminder', exact: true });
+			const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+			await card.tap();
+			await expect(title).toBeFocused();
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
+			await expect(fab).toHaveCSS('opacity', '1');
+			await fab.evaluate(element => { element.focus(); element.click(); });
+			await expect(title).toBeFocused();
+			await expect(editor).toBeVisible();
+			await expect(page.getByRole('dialog', { name: 'New reminder', exact: true })).toHaveCount(0);
+			await editor.getByRole('heading', { name: 'Edit reminder', exact: true }).tap();
+			await expect(title).toBeFocused();
+			await editor.locator('.reminder-modal-header').tap({ position: { x: 85, y: 28 } });
+			await expect(title).toBeFocused();
+			await editor.locator('.modal-form').tap({ position: { x: 2, y: 80 } });
+			await expect(title).toBeFocused();
+			await expectNoTouchRing(title);
+			await title.fill('Keep this draft while choosing');
+			await checkNativeEditorGestures(page, title);
+			const priority = editor.getByRole('button', { name: /^(Set|Remove) priority$/ });
+			await priority.tap();
+			await expect(editor).toBeVisible();
+			await expectNoTouchRing(priority);
+
+			const project = page.getByRole('dialog', { name: 'Select project', exact: true });
+			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
+			await project.getByRole('heading', { name: 'Project', exact: true }).tap();
+			await expect(project).toBeVisible();
+			await tapBackdropAbove(page, project);
+			await expect(project).toBeHidden();
+			await expect(title).toContainText('Keep this draft while choosing');
+			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
+			await expect(project).toBeVisible();
+			await expect(page.locator('.pwa-modal-sheet__backdrop')).toBeVisible();
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
+			await project.getByRole('option', { name: 'Work', exact: true }).tap();
+			await expect(editor.getByRole('button', { name: 'Work', exact: true })).toBeVisible();
+
+			await editor.getByRole('button', { name: 'Date', exact: true }).tap();
+			const schedule = page.getByRole('dialog', { name: 'Schedule reminder', exact: true });
+			const date = schedule.locator('input[type="date"]');
+			await date.tap();
+			await expectNoTouchRing(date);
+			await date.fill('2027-06-10');
+			await expect(schedule).toBeVisible();
+			await tapBackdropAbove(page, schedule);
+			await expect(schedule).toBeHidden();
+			await expect(title).toContainText('Keep this draft while choosing');
+
+			await editor.getByRole('button', { name: 'Recurrence', exact: true }).tap();
+			const repeat = page.getByRole('dialog', { name: 'Repeat reminder', exact: true });
+			const weekly = repeat.getByRole('tab', { name: 'Weekly', exact: true });
+			await weekly.tap();
+			await expect(weekly).toHaveAttribute('aria-selected', 'true');
+			await expectNoTouchRing(weekly);
+			await expect(repeat).toBeVisible();
+			await tapBackdropAbove(page, repeat);
+			await expect(repeat).toBeHidden();
+			await expect(title).toContainText('Keep this draft while choosing');
+			await tapBackdropAbove(page, editor);
+			await expect(editor).toBeHidden();
+			await expectNoTouchRing(card);
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
+			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
+			await card.tap();
+			await expect(title).toHaveText('Check this article');
+			await trackEditorBlur(title);
+			await tapBackdropAbove(page, editor);
+			await expectEditorBlurBeforeUnmount(page);
+			await expect(editor).toBeHidden();
+
+			await page.getByRole('button', { name: 'Open settings', exact: true }).tap();
+			const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
+			await expect(fab).toHaveCSS('opacity', '1');
+			// The dialog role now belongs to the popup, which has a deliberate sheet shadow.
+			await expect(settings).toHaveCSS('outline-style', 'none');
+			await expectNoTouchRing(settings.locator('.settings-sheet'));
+			const darkTheme = settings.getByRole('button', { name: 'Dark', exact: true });
+			await darkTheme.tap();
+			await expect(darkTheme).toHaveAttribute('aria-pressed', 'true');
+			await expectNoTouchRing(darkTheme);
+			await expect(settings).toBeVisible();
+			const days = settings.getByRole('spinbutton', { name: 'Upcoming range (days)', exact: true });
+			const wrapperBorder = await days.locator('..').evaluate(element => getComputedStyle(element).borderColor);
+			await days.tap();
+			await days.fill('12');
+			await expectNoTouchRing(days);
+			await expect(days).toHaveCSS('border-width', '0px');
+			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
+			const select = settings.getByRole('combobox', { name: 'Open app to', exact: true });
+			await select.tap();
+			await expectNoTouchRing(select);
+			await select.selectOption('inbox');
+			await expect(settings).toBeVisible();
+
+			await tabTo(page, days);
+			await expect(days.locator('..')).toHaveCSS('outline-style', 'none');
+			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
+			await tabTo(page, settings.getByRole('button', { name: 'Close settings', exact: true }));
+			await expectNeutralKeyboardRing(settings.getByRole('button', { name: 'Close settings', exact: true }));
+			await darkTheme.tap();
+			await expectNoTouchRing(darkTheme);
+			await tapBackdropAbove(page, settings);
+			await expect(settings).toBeHidden();
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
+			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
+			await expectNoTouchRing(page.getByRole('button', { name: 'Open settings', exact: true }));
+			await tabTo(page, card);
+			await expectNeutralKeyboardRing(card);
+			await page.keyboard.press('Enter');
+			await expect(editor).toBeVisible();
+			await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
+			await trackEditorBlur(title);
+			await page.keyboard.press('Escape');
+			await expectEditorBlurBeforeUnmount(page);
+			await expect(editor).toBeHidden();
+			console.log(`${browserType.name()}: sheet backdrops, interior controls, touch focus and keyboard focus passed`);
+			await fab.tap();
+			const create = page.getByRole('dialog', { name: 'New reminder', exact: true });
+			await expect(create).toBeVisible();
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(true);
+			await tapBackdropAbove(page, create);
+			await expect(create).toBeHidden();
+			await expect.poll(() => fab.evaluate(element => !!element.closest('[inert]'))).toBe(false);
+			await expect(fab).toHaveCSS('transform', 'none');
+			expect(await fab.evaluate(element => element === window.originalFab)).toBe(true);
+		} finally {
+			await browser.close();
+		}
+	}
+} finally {
+	await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+}

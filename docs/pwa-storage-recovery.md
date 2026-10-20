@@ -89,7 +89,7 @@ untouched: the empty capture form cannot overwrite it during startup. Export and
 the retained data before changing browser storage; reload after repairing storage.
 
 `src/pwa/reading/storage.test.ts` covers malformed durable records and exact-byte
-preservation. `scripts/reading-optimistic.browser.test.mjs` also verifies native
+preservation. `tests/browser/reading/reading-optimistic.browser.test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
 Reading refresh commits the list and article removals in one IndexedDB transaction.
@@ -98,14 +98,14 @@ does not authorize removing that source's cached article or its last verified li
 entry; the issue remains visible while the saved copy is retained. Unknown article
 records remain available for export. A complete response without that source or
 an issue still removes its derived offline copy. HTTP failures preserve the prior
-snapshot. `scripts/reading-cache-recovery.browser.test.mjs` tests these boundaries
+snapshot. `tests/browser/reading/reading-cache-recovery.browser.test.mjs` tests these boundaries
 in native Chromium and WebKit storage, including a quota failure after pruning.
 
 Reading enrollment captures the current credentials and logout marker before
 exchanging a setup grant. A delayed response cannot replace a newer session or
 restore access after logout. Unused returned credentials are revoked on a best-effort
 basis without storing their install grant or hydrating private data.
-`scripts/pwa-auth-recovery-test.mjs` checks these cross-tab races in Chromium and WebKit.
+`tests/browser/pwa/pwa-auth-recovery-test.mjs` checks these cross-tab races in Chromium and WebKit.
 ## Encrypted enrollments
 
 Encrypted enrollments unlock before reading private local state or draining the queue. Non-extractable folder and notification CryptoKeys live in `crate-encryption-keys`; a wrapped local key protects outbox/draft values, snapshots, cross-tab settlements and `crate-encrypted-reminder-attempts`. Conversion preserves and encrypts current-folder pending text in place. Quota failures keep the original bytes; damaged ciphertext remains quarantined. Exporting a healthy pending change explicitly decrypts its contents, so protect the downloaded file. Existing offline snapshots remain read-only. Expiry preserves keys and drafts for same-folder recovery; explicit logout clears them. See [encryption](e2ee-implementation.md).
