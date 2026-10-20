@@ -8,7 +8,7 @@ export interface ReminderIndexingProgress {
 }
 
 /** Validate the complete revision before either the UI or its cache accepts it. */
-export function parseReminderListResponse(value: unknown, folderPath: string): {
+function parseReminderListResponse(value: unknown, folderPath: string): {
 	reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[];
 } | null {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -21,7 +21,7 @@ export function parseReminderListResponse(value: unknown, folderPath: string): {
 
 /** A delta replaces every reminder from `changedPaths` with `reminders`; other
  * notes keep the base snapshot's records. Validated as strictly as a full list. */
-export function parseReminderDeltaResponse(value: unknown, folderPath: string): {
+function parseReminderDeltaResponse(value: unknown, folderPath: string): {
 	changedPaths: string[]; reminders: ReminderRecord[]; projects: string[];
 } | null {
 	if (!value || typeof value !== 'object' || Array.isArray(value) || (value as { delta?: unknown }).delta !== true) return null;
@@ -51,7 +51,7 @@ export function readReminderListBody(body: unknown, folderPath: string, base: Re
 }
 
 /** Rebuild the full list in the server's order: notes by path, reminders by line. */
-export function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: string[]; reminders: ReminderRecord[] }): ReminderRecord[] {
+function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: string[]; reminders: ReminderRecord[] }): ReminderRecord[] {
 	const changed = new Set(delta.changedPaths);
 	const notes = new Map<string, ReminderRecord[]>();
 	for (const reminder of [...base.filter(reminder => !changed.has(reminder.filePath)), ...delta.reminders]) {
