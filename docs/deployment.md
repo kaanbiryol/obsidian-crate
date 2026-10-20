@@ -8,7 +8,7 @@ Crate deploys its Cloudflare server from inside Obsidian with OAuth Authorizatio
 
 ## One-time GitHub Pages setup
 
-The site in `site/` is independent of the `kaanbiryol.com` blog repository. The Pages workflow in `.github/workflows/pages.yml` publishes only this repository's `site/` directory.
+The site in `site/` is independent of the `kaanbiryol.com` blog repository. The Pages workflow in `.github/workflows/pages.yml` publishes only this repository's `site/` directory. Pull requests and pushes that touch the site, documentation or shortcut inputs build and check it without deploying.
 
 1. In the `obsidian-crate` repository, open **Settings → Pages**.
 2. Under **Build and deployment → Source**, select **GitHub Actions**.

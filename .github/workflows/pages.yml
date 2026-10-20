@@ -9,6 +9,7 @@ on:
       - "docs/**"
       - "package.json"
       - "package-lock.json"
+      - ".nvmrc"
       - ".github/workflows/pages.yml"
       - "scripts/download-release-shortcut.mjs"
       - "scripts/shortcut-release.mjs"
@@ -20,13 +21,55 @@ on:
       - "scripts/reading-shortcut-template.mjs"
       - "scripts/reading-shortcut-fixture.mjs"
       - "scripts/build-shortcut-support.mjs"
+      - "scripts/raw-text-plugin.mjs"
       - "scripts/build-site-images.mjs"
       - "scripts/site-deployment.mjs"
       - "scripts/site-deployment.test.mjs"
       - "src/reading/shortcut-contract.json"
+      - "src/reading/shortcut.ts"
+      - "src/cloudflare/server-release.json"
       - "src/cloudflare/worker/reading/save-page.ts"
       - "src/cloudflare/worker/reading/save-client.ts"
+      - "src/platform/validation.ts"
+      - "src/protocol/server-build.ts"
+      - "src/protocol/server-info.ts"
+      - "src/pwa/shell/version.ts"
       - "docs/shortcuts/save-to-crate.plist"
+      - "tests/fixtures/reading-shortcut-v1.plist"
+  pull_request:
+    paths:
+      - "site/**"
+      - "docs-site/**"
+      - "docs/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - ".github/workflows/pages.yml"
+      - "scripts/download-release-shortcut.mjs"
+      - "scripts/shortcut-release.mjs"
+      - "scripts/shortcut-release.test.mjs"
+      - "scripts/shortcut-install-page.mjs"
+      - "scripts/sign-reading-shortcut.mjs"
+      - "scripts/reading-shortcut-first-run.mjs"
+      - "scripts/reading-shortcut.test.mjs"
+      - "scripts/reading-shortcut-template.mjs"
+      - "scripts/reading-shortcut-fixture.mjs"
+      - "scripts/build-shortcut-support.mjs"
+      - "scripts/raw-text-plugin.mjs"
+      - "scripts/build-site-images.mjs"
+      - "scripts/site-deployment.mjs"
+      - "scripts/site-deployment.test.mjs"
+      - "src/reading/shortcut-contract.json"
+      - "src/reading/shortcut.ts"
+      - "src/cloudflare/server-release.json"
+      - "src/cloudflare/worker/reading/save-page.ts"
+      - "src/cloudflare/worker/reading/save-client.ts"
+      - "src/platform/validation.ts"
+      - "src/protocol/server-build.ts"
+      - "src/protocol/server-info.ts"
+      - "src/pwa/shell/version.ts"
+      - "docs/shortcuts/save-to-crate.plist"
+      - "tests/fixtures/reading-shortcut-v1.plist"
   release:
     types: [published]
   workflow_dispatch:
@@ -40,8 +83,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  # A queued pull request build must never replace a pending deployment.
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.pull_request.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -88,7 +132,7 @@ jobs:
       - name: Build static site and documentation
         run: npm run build:site
       - name: Compare with the deployed website
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && github.event_name != 'pull_request'
         id: website
         env:
           SITE_DEPLOY_FORCE: ${{ github.event_name == 'workflow_dispatch' && !inputs.release_tag }}
@@ -100,7 +144,7 @@ jobs:
           path: site
   deploy:
     needs: build
-    if: github.event_name != 'push' && needs.build.outputs.deploy == 'true'
+    if: github.event_name != 'push' && github.event_name != 'pull_request' && needs.build.outputs.deploy == 'true'
     permissions:
       pages: write
       id-token: write
