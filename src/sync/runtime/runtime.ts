@@ -34,6 +34,8 @@ import { buildSharedSettings } from '../connection/shared-settings';
 
 const logger = createLogger('SyncRuntime');
 const NOT_CONFIGURED = 'Sync is not configured.';
+const FILE_HISTORY_CHANGED = 'Sync configuration changed. Reopen file history.';
+const HISTORY_CHANGED = 'Sync connection changed. Reopen history.';
 
 /** Transition authority stays with the runtime across stopping and initialization. */
 export interface RuntimeConfigurationTransition {
@@ -74,33 +76,41 @@ export class SyncRuntime {
 		return this.apiClient;
 	}
 
-	async loadCurrentSyncedPreview(path: string) {
-		const api = this.requireApi();
-		const preview = await loadCurrentSyncedPreview(api, path);
-		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
-		return preview;
+	/** Each engine belongs to one initialize() call. initialize() and destroy() clear it
+	 * synchronously whenever they advance the revision, so a current engine also means
+	 * the revision and the API client it was built on are unchanged. */
+	private assertCurrentEngine(engine: SyncEngine, stale: () => Error): void {
+		if (engine !== this.syncEngine) throw stale();
 	}
 
-	async loadFileHistoryPreview(version: RemoteFileVersion) {
+	/** The API client is created before its engine and kept while initialize() waits for
+	 * the old engine to stop, so server reads check only the client they used. */
+	private async readCurrentApi<T>(read: (api: SyncApiClient) => Promise<T>, staleMessage: string): Promise<T> {
 		const api = this.requireApi();
-		const preview = await loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version);
-		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
-		return preview;
+		const result = await read(api);
+		if (api !== this.apiClient) throw new Error(staleMessage);
+		return result;
 	}
 
-	async listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
-		const api = this.requireApi();
-		const page = await api.listFileVersions(query);
-		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
-		return page;
+	loadCurrentSyncedPreview(path: string) {
+		return this.readCurrentApi(api => loadCurrentSyncedPreview(api, path), FILE_HISTORY_CHANGED);
+	}
+
+	loadFileHistoryPreview(version: RemoteFileVersion) {
+		return this.readCurrentApi(api => loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version), FILE_HISTORY_CHANGED);
+	}
+
+	listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
+		return this.readCurrentApi(api => api.listFileVersions(query), FILE_HISTORY_CHANGED);
 	}
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
 		const engine = this.requireEngine();
+		const stale = () => createAbortError('Sync configuration changed during restore');
 		await engine.restoreFileVersion(version);
-		if (engine !== this.syncEngine) throw createAbortError('Sync configuration changed during restore');
+		this.assertCurrentEngine(engine, stale);
 		const result = await this.sync();
-		if (engine !== this.syncEngine) throw createAbortError('Sync configuration changed during restore');
+		this.assertCurrentEngine(engine, stale);
 		if (result.success) await engine.finishRestore(version.storage_key);
 		return result;
 	}
@@ -121,9 +131,8 @@ export class SyncRuntime {
 			captureIdleState: () => {
 				const engine = this.syncEngine;
 				if (!engine || engine.getState().status !== 'idle') return null;
-				const revision = this.initializationRevision;
 				const lastSync = engine.getState().lastSync;
-				return () => this.initializationRevision === revision && this.syncEngine === engine
+				return () => this.syncEngine === engine
 					&& engine.getState().status === 'idle' && engine.getState().lastSync === lastSync;
 			},
 			onIssueChange: () => this.emitCurrentState(),
@@ -186,9 +195,7 @@ export class SyncRuntime {
 
 	async createExclusionCleanupReview() {
 		const engine = this.requireEngine();
-		const verify = () => {
-			if (engine !== this.syncEngine) throw createAbortError('Sync connection changed. Review the excluded server files again.');
-		};
+		const verify = () => this.assertCurrentEngine(engine, () => createAbortError('Sync connection changed. Review the excluded server files again.'));
 		const review = await engine.createExclusionCleanupReview();
 		verify();
 		return { ...review, execute: async () => {
@@ -674,11 +681,8 @@ export class SyncRuntime {
 		return this.requireEngine().createPendingDiscard(keys);
 	}
 
-	async listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
-		const api = this.requireApi();
-		const checkpoints = await api.sharedHistory.list();
-		if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
-		return checkpoints;
+	listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
+		return this.readCurrentApi(api => api.sharedHistory.list(), HISTORY_CHANGED);
 	}
 
 	async loadHistoryComparison(entry: SyncHistoryEntry) {
@@ -698,7 +702,7 @@ export class SyncRuntime {
 	}
 
 	private verifyHistoryEngine(engine: SyncEngine): void {
-		if (engine !== this.syncEngine) throw new Error('Sync connection changed. Reopen history.');
+		this.assertCurrentEngine(engine, () => new Error(HISTORY_CHANGED));
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
