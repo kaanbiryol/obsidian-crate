@@ -32,7 +32,7 @@ export function ProjectInteractionFixture({ host, isDark }: { host: 'plugin' | '
           style={{ position: 'relative', height: 540, width: '100%', maxWidth: 560, margin: '0 auto', padding: 18 }}>
           <div style={{ height: params.get('placement') === 'top' ? 400 : 0 }} />
           <ReminderEditorFields content={title} onContentChange={setTitle} description={description} onDescriptionChange={setDescription}
-            allowAutoFocus={false} projects={projects} textareaRef={titleRef} richTextInputRef={inputRef} />
+            allowAutoFocus={false} projects={projects} isDark={isDark} textareaRef={titleRef} richTextInputRef={inputRef} />
         </section>
         : open && <section data-testid="picker-surface"
           className={host === 'plugin' ? 'base-modal-surface crate-reminder-picker-surface is-project-picker' : 'pwa-picker-sheet pwa-project-picker-sheet'}

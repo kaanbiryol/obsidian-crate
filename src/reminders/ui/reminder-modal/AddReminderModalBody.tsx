@@ -80,6 +80,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                         onKeyDown={onKeyDown}
                         allowAutoFocus={allowAutoFocus}
                         projects={projects}
+                        isDark={isDark}
                         textareaRef={textareaRef}
                         richTextInputRef={richTextInputRef}
                         descriptionInputRef={descriptionInputRef}

@@ -47,7 +47,7 @@ describe('reminder editor chrome', () => {
     ])('shows an invalid schedule as an editor error: %s', (schedule, error) => {
         const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
             content: `Task ${schedule}`, onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
-            allowAutoFocus: false, projects: [], textareaRef: { current: null }, richTextInputRef: { current: null },
+            allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
         }));
         expect(markup).toContain('role="alert"');
         expect(markup).toContain(error);
@@ -56,7 +56,7 @@ describe('reminder editor chrome', () => {
     it('shows no calendar error when Chrono leaves a phrase as text', () => {
         const markup = renderToStaticMarkup(React.createElement(ReminderEditorFields, {
             content: 'Task February 30 at 9 in the morning', onContentChange: vi.fn(), description: '', onDescriptionChange: vi.fn(),
-            allowAutoFocus: false, projects: [], textareaRef: { current: null }, richTextInputRef: { current: null },
+            allowAutoFocus: false, projects: [], isDark: false, textareaRef: { current: null }, richTextInputRef: { current: null },
         }));
         expect(markup).not.toContain('role="alert"');
     });

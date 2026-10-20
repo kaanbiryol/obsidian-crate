@@ -43,7 +43,7 @@ export function ReminderDraftFixture() {
   return <main className="crate-reminders-ui reminders-shadow-root">
     <ReminderEditorFields content={draft.content} onContentChange={draft.setContent}
       description={draft.description} onDescriptionChange={draft.setDescription} allowAutoFocus={false}
-      projects={projects} textareaRef={textareaRef} richTextInputRef={richTextInputRef} />
+      projects={projects} isDark={false} textareaRef={textareaRef} richTextInputRef={richTextInputRef} />
     <button onClick={() => setShowProjects(true)}>Choose project</button>
     <button onClick={draft.togglePriority}>Toggle priority</button>
     <button onClick={() => setShowRepeat(true)}>Choose repeat</button>

@@ -14,6 +14,8 @@ interface ReminderEditorFieldsProps {
     onKeyDown?: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
     projects: string[];
+    /** Hosts own their theme source: Obsidian body classes or the PWA color scheme. */
+    isDark: boolean;
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
     containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -35,6 +37,7 @@ export function ReminderEditorFields({
     onKeyDown,
     allowAutoFocus,
     projects,
+    isDark,
     textareaRef,
     richTextInputRef,
     containerRef: externalContainerRef,
@@ -101,6 +104,7 @@ export function ReminderEditorFields({
                     highlightedIndex={autocomplete.highlightedIndex}
                     anchorRect={autocomplete.rect}
                     containerRef={containerRef}
+                    isDark={isDark}
                     onSelect={autocomplete.selectProject}
                 />
             )}

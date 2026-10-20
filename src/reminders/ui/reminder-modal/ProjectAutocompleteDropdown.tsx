@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 
-import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { ProjectDot } from './ProjectDot';
 
 const DROPDOWN_MAX_HEIGHT = 224;
@@ -14,6 +13,7 @@ interface ProjectAutocompleteDropdownProps {
     highlightedIndex: number;
     anchorRect: DOMRect | null;
     containerRef: React.RefObject<HTMLElement | null>;
+    isDark: boolean;
     onSelect: (project: string) => void;
 }
 
@@ -22,10 +22,10 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
     highlightedIndex,
     anchorRect,
     containerRef,
+    isDark,
     onSelect,
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const isDark = useObsidianDarkMode();
 
     useEffect(() => {
         const scrollContainer = scrollRef.current;

@@ -205,6 +205,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						description={draft.description}
 						onDescriptionChange={(description) => onPatchDraft({ description })}
 						projects={projectOptions}
+						isDark={colorScheme === 'dark'}
 						richTextInputRef={richTextInputRef}
 						textareaRef={contentRef}
 						descriptionRef={descriptionRef}
