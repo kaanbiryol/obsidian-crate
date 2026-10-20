@@ -15,6 +15,20 @@ npm run dev
 
 Open the ignored `test-vault/` in Obsidian and enable Crate under **Settings → Community plugins**. The watcher installs each successful development build there. Use a disposable vault and, only for hosted testing, a disposable Cloudflare account. Local unit, Worker-runtime and PWA preview tests require no Cloudflare credentials. See [deployment setup](docs/deployment.md) for explicit hosted enrollment.
 
+### Development configuration
+
+Put local settings in the ignored `.env.development.local`:
+
+```dotenv
+# Restrict development builds to your own development Worker
+CRATE_DEV_WORKER=crate-0123456789abcdef
+# Install each build into another vault, or several
+OBSIDIAN_TEST_VAULT=/path/to/vault
+OBSIDIAN_DEV_VAULTS='["./test-vault", "/path/to/another/vault"]'
+```
+
+`OBSIDIAN_DEV_VAULTS` takes precedence over `OBSIDIAN_TEST_VAULT`; shell values override the file. See [development deployments](docs/server-upgrades.md#testing-development-deployments) for server revision requirements and [test vault setup](docs/testing.md#test-vault-setup) for restoring sample notes. The installer replaces only `main.js`, `manifest.json` and `styles.css`, so plugin settings are preserved.
+
 ## Where changes belong
 
 | Area | Starting point |

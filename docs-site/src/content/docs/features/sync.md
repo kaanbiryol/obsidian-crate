@@ -38,7 +38,9 @@ Touched files can remain in the list until sync even if you undo their edits; ma
 
 Selecting a subset applies to that sync only. It does not permanently ignore files or disable automatic sync. Turn automatic sync off first if you want to control exactly when the remaining files transfer.
 
-The file menu also offers actions to discard local changes. Check the filenames in the confirmation: discarding restores server versions or moves local additions to trash. Use this only when you want to give up those edits; it is not needed to leave a file pending.
+Highlight rows for file actions: click one, Shift-click a range, or Cmd/Ctrl-click individual rows. Use **Cmd+A** (macOS) or **Ctrl+A** to highlight all rows without changing sync checkboxes, **Space** to toggle the focused file's checkbox, and **Shift+F10** to open its menu. Right-click a highlighted row to act on the whole group, or another row to target only that file. The menu can also open a file in Obsidian or reveal it in your file manager.
+
+The file menu also offers actions to discard local changes. Check the filenames in the confirmation: discarding restores server versions or moves local additions to trash. Use this only when you want to give up those edits; it is not needed to leave a file pending. Replaced content is kept as recovery copies in `<vault config>/plugins/crate/discard-recovery/`, and discarding never changes the server copy.
 
 ## What syncs
 
