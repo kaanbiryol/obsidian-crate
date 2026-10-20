@@ -2,6 +2,26 @@ import type { SyncHistoryEntry, SyncResult } from '../types';
 import { getSyncIssues } from '../issues';
 import { MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
 
+const CHECKPOINT_INTERVAL_PER_FILE_MS = 360;
+
+/** A checkpoint reads the whole server inventory. Ordinary syncs space them by
+ * vault size, about 2.4 inventory reads a day at any size (100,000 files: every
+ * 10 hours; 1,000 files: every 6 minutes). Initial and full syncs always save one. */
+export function checkpointDue(input: {
+  type: SyncHistoryEntry['type'];
+  history: readonly SyncHistoryEntry[];
+  latest: SyncHistoryEntry;
+  /** Survives entries that fall out of the 20-entry history window. */
+  lastCheckpointAt: number;
+  trackedFiles: number;
+  now: number;
+}): boolean {
+  if (input.type !== 'sync') return true;
+  const previous = input.history.find(entry => entry !== input.latest && (entry.sharedCheckpoint || entry.historyCheckpoint) && entry.checkpointFileCount === undefined);
+  const last = Math.max(previous ? Date.parse(previous.timestamp) : 0, input.lastCheckpointAt);
+  return !last || input.now - last >= input.trackedFiles * CHECKPOINT_INTERVAL_PER_FILE_MS;
+}
+
 export function recordSyncHistory(
   settings: SyncSettings,
   type: SyncHistoryEntry["type"],

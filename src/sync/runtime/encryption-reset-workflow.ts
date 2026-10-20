@@ -15,6 +15,7 @@ interface EncryptionResetContext {
 	transition: RuntimeConfigurationTransition;
 	persistSettings: (update?: Partial<SyncSettings>) => Promise<void>;
 	clearLocalState: () => Promise<void>;
+	/** Also pauses vault event capture until resumeEvents runs. */
 	getResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
 	pushSharedSettings: () => Promise<boolean>;
 	resumeEvents: () => void;

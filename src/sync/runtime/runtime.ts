@@ -26,20 +26,17 @@ import {
 	deleteManifestFile,
 	type ApplyInfrastructureConfigInput,
 } from './config';
-import { recordSyncHistory } from './history';
+import { checkpointDue, recordSyncHistory } from './history';
 import { emitStateChange, emitSyncProgress } from './listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
+import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground-sync';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import { updateSyncProgress } from '../settings';
 import type { CrateSettings } from '../../plugin/settings-types';
 
-const CHECKPOINT_INTERVAL_PER_FILE_MS = 360;
 const logger = createLogger('SyncRuntime');
-export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
-export const FOREGROUND_SYNC_COOLDOWN_MS = 30_000;
-
-export type ForegroundSyncReason = 'focus' | 'visible' | 'online';
+const NOT_CONFIGURED = 'Sync is not configured.';
 
 /** Transition authority stays with the runtime across stopping and initialization. */
 export interface RuntimeConfigurationTransition {
@@ -63,33 +60,46 @@ export class SyncRuntime {
 	private stopSyncTask: Promise<void> | null = null;
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
-	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+	private readonly foregroundSync = new ForegroundSyncScheduler({
+		canSync: () => this.settings.automaticSync && this.acceptingEvents && this.isConfigured()
+			&& this.syncEngine !== null && this.syncEngine.getState().status !== 'syncing',
+		sync: () => this.sync(),
+	});
 	private readonly serverStatus: RuntimeServerStatus;
 
+	private requireEngine(): SyncEngine {
+		if (!this.syncEngine) throw new Error(NOT_CONFIGURED);
+		return this.syncEngine;
+	}
+
+	private requireApi(): SyncApiClient {
+		if (!this.apiClient) throw new Error(NOT_CONFIGURED);
+		return this.apiClient;
+	}
+
 	async loadCurrentSyncedPreview(path: string) {
-		const api = this.apiClient;
-		if (!api) throw new Error('Sync is not configured');
+		const api = this.requireApi();
 		const preview = await loadCurrentSyncedPreview(api, path);
 		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
 		return preview;
 	}
 
 	async loadFileHistoryPreview(version: RemoteFileVersion) {
-		const api = this.apiClient;
-		if (!api) throw new Error('Sync is not configured');
+		const api = this.requireApi();
 		const preview = await loadFileHistoryPreview(this.plugin.app.vault.adapter, api, version);
 		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
 		return preview;
 	}
 
 	async listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
-		if (!this.apiClient) throw new Error('Sync is not configured');
-		return this.apiClient.listFileVersions(query);
+		const api = this.requireApi();
+		const page = await api.listFileVersions(query);
+		if (api !== this.apiClient) throw new Error('Sync configuration changed. Reopen file history.');
+		return page;
 	}
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
-		const engine = this.syncEngine;
-		if (!engine) throw new Error('Sync is not configured');
+		const engine = this.requireEngine();
 		await engine.restoreFileVersion(version);
 		if (engine !== this.syncEngine) throw createAbortError('Sync configuration changed during restore');
 		const result = await this.sync();
@@ -98,7 +108,6 @@ export class SyncRuntime {
 		return result;
 	}
 	getPendingRestores(): RemoteFileVersion[] { return this.syncEngine?.getPendingRestores() ?? []; }
-	private lastForegroundSyncAt: number | null = null;
 	private lastCheckpointAt = 0;
 
 	constructor(
@@ -153,8 +162,7 @@ export class SyncRuntime {
 	}
 
 	async loadPendingDiff(path: string, deleted: boolean) {
-		const engine = this.syncEngine;
-		if (!engine) throw new Error('Sync is not initialized');
+		const engine = this.requireEngine();
 		const pendingPath = pendingChangeKey(deleted ? 'delete' : 'upload', path);
 		const verify = () => {
 			if (engine !== this.syncEngine || this.getState().status === 'syncing' || !engine.hasPendingPath(pendingPath)) {
@@ -180,8 +188,7 @@ export class SyncRuntime {
 	}
 
 	async createExclusionCleanupReview() {
-		const engine = this.syncEngine;
-		if (!engine) throw new Error('Sync is not configured');
+		const engine = this.requireEngine();
 		const verify = () => {
 			if (engine !== this.syncEngine) throw createAbortError('Sync connection changed. Review the excluded server files again.');
 		};
@@ -238,6 +245,7 @@ export class SyncRuntime {
 		return this.apiClient;
 	}
 
+	/** Resolves true once the startup sync ran to an outcome (success or failure), false if it was skipped or cancelled. */
 	waitForStartupSync(): Promise<boolean> {
 		return this.startupSyncTask;
 	}
@@ -250,7 +258,7 @@ export class SyncRuntime {
 		this.initializationError = null;
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
-		this.clearForegroundSyncTimer();
+		this.foregroundSync.cancel();
 		this.serverStatus.reset();
 
 		this.stopEngine();
@@ -362,7 +370,7 @@ export class SyncRuntime {
 		this.initializing = false;
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
-		this.clearForegroundSyncTimer();
+		this.foregroundSync.cancel();
 		this.serverStatus.reset();
 		this.stopEngine();
 		this.apiClient = null;
@@ -492,22 +500,8 @@ export class SyncRuntime {
 	}
 
 	triggerForegroundSync(reason: ForegroundSyncReason): void {
-		if (!this.settings.automaticSync) {
-			this.scheduleServerCheck();
-			return;
-		}
-		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
-		if (this.syncEngine.getState().status === 'syncing') return;
-		if (this.foregroundSyncTimer) return;
-
-		if (this.isForegroundSyncOnCooldown()) {
-			return;
-		}
-
-		this.foregroundSyncTimer = setTimeout(() => {
-			this.foregroundSyncTimer = null;
-			void this.runForegroundSync(reason);
-		}, FOREGROUND_SYNC_DEBOUNCE_MS);
+		if (!this.settings.automaticSync) this.scheduleServerCheck();
+		else this.foregroundSync.trigger(reason);
 	}
 
 	/** Authenticate a changed transport address without losing pending disk work. */
@@ -570,38 +564,9 @@ export class SyncRuntime {
 		return this.apiClient.testConnection();
 	}
 
-	private clearForegroundSyncTimer(): void {
-		if (this.foregroundSyncTimer) {
-			clearTimeout(this.foregroundSyncTimer);
-			this.foregroundSyncTimer = null;
-		}
-	}
-
 	private scheduleServerCheck(): void {
 		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
 		this.serverStatus.scheduleCheck();
-	}
-
-	private isForegroundSyncOnCooldown(): boolean {
-		return this.lastForegroundSyncAt !== null
-			&& Date.now() - this.lastForegroundSyncAt < FOREGROUND_SYNC_COOLDOWN_MS;
-	}
-
-	private async runForegroundSync(reason: ForegroundSyncReason): Promise<void> {
-		if (!this.settings.automaticSync) return;
-		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
-		if (this.syncEngine.getState().status === 'syncing') return;
-		if (this.isForegroundSyncOnCooldown()) return;
-
-		this.lastForegroundSyncAt = Date.now();
-		logger.info(`Foreground sync triggered: ${reason}`);
-
-		try {
-			const result = await this.sync();
-			if (result.outcome !== 'cancelled') notifyConflicts(result.conflicts);
-		} catch (error) {
-			logger.warn('Foreground sync failed:', error);
-		}
 	}
 
 	private async recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
@@ -616,7 +581,10 @@ export class SyncRuntime {
 			this.lastCheckpointAt = Date.now();
 			updateSyncProgress(this.settings, { syncHistory: this.settings.syncHistory.map(entry => entry === latest ? { ...entry, ...checkpoint } : entry) });
 		};
-		if (result.success && !result.conflicts.length && this.checkpointDue(type, engine, latest)) {
+		if (result.success && !result.conflicts.length && checkpointDue({
+			type, history: this.settings.syncHistory, latest, lastCheckpointAt: this.lastCheckpointAt,
+			trackedFiles: engine.trackedFileCount(), now: Date.now(),
+		})) {
 			try {
                 const shared = await engine.saveSharedHistoryCheckpoint();
                 if (this.syncEngine !== engine) return;
@@ -628,17 +596,6 @@ export class SyncRuntime {
             }
 			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
 		}
-	}
-
-	/** A checkpoint reads the whole server inventory. Ordinary syncs space them by
-	 * vault size, about 2.4 inventory reads a day at any size (100,000 files: every
-	 * 10 hours; 1,000 files: every 6 minutes). Initial and full syncs always save one. */
-	private checkpointDue(type: SyncHistoryEntry['type'], engine: SyncEngine, latest: SyncHistoryEntry): boolean {
-		if (type !== 'sync') return true;
-		// History keeps 20 entries; remember the last checkpoint beyond that window.
-		const previous = this.settings.syncHistory.find(entry => entry !== latest && (entry.sharedCheckpoint || entry.historyCheckpoint) && entry.checkpointFileCount === undefined);
-		const last = Math.max(previous ? Date.parse(previous.timestamp) : 0, this.lastCheckpointAt);
-		return !last || Date.now() - last >= engine.trackedFileCount() * CHECKPOINT_INTERVAL_PER_FILE_MS;
 	}
 
 	private emitCurrentState(): void {
@@ -693,9 +650,7 @@ export class SyncRuntime {
 			// still take time. Keep that work visible after the engine clears its phase.
 			active.work = { phase: 'saving' };
 			emitSyncProgress(this.progressListeners, active.current, active.total);
-			if (type === 'sync') {
-				this.lastForegroundSyncAt = Date.now();
-			}
+			if (type === 'sync') this.foregroundSync.recordSync();
 			await this.recordSyncResult(engine, type, result);
 			if (this.syncEngine !== engine) return result;
 			await this.persistSettings();
@@ -722,31 +677,27 @@ export class SyncRuntime {
     }
 
     async createPendingDiscard(keys: string[]) {
-        if (!this.syncEngine) throw new Error('Sync is not configured.');
-        return this.syncEngine.createPendingDiscard(keys);
+        return this.requireEngine().createPendingDiscard(keys);
     }
 
     async listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
-        const api = this.apiClient;
-        if (!api) throw new Error('Sync is not configured.');
+        const api = this.requireApi();
         const checkpoints = await api.sharedHistory.list();
         if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
         return checkpoints;
     }
 
     async loadHistoryComparison(entry: SyncHistoryEntry) {
-        const engine = this.syncEngine;
-        if (!engine) throw new Error('Sync is not configured.');
+        const engine = this.requireEngine();
         return loadRuntimeHistoryComparison(engine, () => this.verifyHistoryEngine(engine), entry);
     }
 
     async createHistoryRestore(entry: SyncHistoryEntry) {
-        const engine = this.syncEngine;
-        if (!engine) throw new Error('Sync is not configured.');
+        const engine = this.requireEngine();
         return createRuntimeHistoryRestore({
             engine, settings: this.settings,
             verify: () => this.verifyHistoryEngine(engine),
-            clearForegroundSyncTimer: () => this.clearForegroundSyncTimer(),
+            clearForegroundSyncTimer: () => this.foregroundSync.cancel(),
             persistSettings: update => this.persistSettings(update),
             runSyncOperation: operation => this.runSyncOperation('sync', operation),
         }, entry);

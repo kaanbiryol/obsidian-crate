@@ -4,7 +4,7 @@ import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
-import { type ForegroundSyncReason, SyncRuntime } from './runtime/runtime';
+import { SyncRuntime } from './runtime/runtime';
 import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import { applySharedSettings } from './connection/shared-settings';
@@ -14,6 +14,7 @@ import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import type { ForegroundSyncReason } from './runtime/foreground-sync';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 

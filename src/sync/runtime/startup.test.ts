@@ -5,7 +5,7 @@ import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugi
 import { SyncQueueController } from '../queue/controller';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
 import * as conflict from '../conflict/conflict';
-import { FOREGROUND_SYNC_DEBOUNCE_MS, SyncRuntime } from './runtime';
+import { SyncRuntime } from './runtime';
 import type { SyncResult } from '../types';
 import {
 	createDeferred,
@@ -14,6 +14,7 @@ import {
 	expectFileEventsAccepted,
 	type Deferred,
 } from './runtime-test-harness';
+import { FOREGROUND_SYNC_DEBOUNCE_MS } from './foreground-sync';
 
 const runtimes: SyncRuntime[] = [];
 function createRuntimeHarness(...args: Parameters<typeof createUntrackedRuntimeHarness>) {

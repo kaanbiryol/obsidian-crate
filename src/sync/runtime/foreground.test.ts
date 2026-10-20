@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FOREGROUND_SYNC_COOLDOWN_MS, FOREGROUND_SYNC_DEBOUNCE_MS } from './runtime';
 import { createEmptySyncResult } from '../sync-result';
 import { createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
+import { FOREGROUND_SYNC_COOLDOWN_MS, FOREGROUND_SYNC_DEBOUNCE_MS } from './foreground-sync';
 
 describe('SyncRuntime foreground sync', () => {
 	beforeEach(() => {
