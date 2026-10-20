@@ -6,7 +6,7 @@ import {
 import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/reminder";
-import { DEFAULT_PROJECT } from "../../core/constants";
+import { DEFAULT_PROJECT } from "../../../core/constants";
 
 export interface RemindersListLoadOptions {
   repository: ReminderRepository;

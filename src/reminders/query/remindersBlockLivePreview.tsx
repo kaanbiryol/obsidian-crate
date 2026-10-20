@@ -17,7 +17,7 @@ import {
   type ShadowRootMount,
 } from "@/ui/plugin/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
-import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
+import { RemindersList } from "@/reminders/ui/plugin/reminder-list/RemindersList";
 import { getEditorFile } from "./editorFile";
 import type { ReminderQueryOptions } from "./queryOptions";
 import {

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type { EditorView } from '@codemirror/view';
 import type CratePlugin from '@/main';
 
-vi.mock('@/reminders/ui/reminder-list/RemindersList', () => ({ RemindersList: () => null }));
+vi.mock('@/reminders/ui/plugin/reminder-list/RemindersList', () => ({ RemindersList: () => null }));
 import { RemindersBlockWidget } from './remindersBlockLivePreview';
 
 const block = (completed: boolean) => ['```reminders', 'project: Work', `show-completed: ${completed}`, '```'].join('\n');

@@ -1,5 +1,5 @@
 import type React from "react";
-import { useRemindersSettingsStore } from "../../settings";
+import { useRemindersSettingsStore } from "../../../settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LayoutGroup } from "motion/react";
 import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
@@ -23,12 +23,12 @@ import {
   loadRemindersListData,
 } from "./reminderListModel";
 import { formatDateHeader } from "@/reminders/ui/format/dateFormatting";
-import { RemindersLoading } from "../plugin/RemindersLoading";
+import { RemindersLoading } from "../RemindersLoading";
 import "./styles.scss";
-import { useReminderClock } from '../shared/useReminderClock';
-import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
+import { useReminderClock } from '../../shared/useReminderClock';
+import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../../shared/reminder-pagination';
 import { groupRemindersByDate } from "@/reminders/core/reminderSort";
-import { DEFAULT_PROJECT } from "../../core/constants";
+import { DEFAULT_PROJECT } from "../../../core/constants";
 
 type Props = {
   projectFilter?: string; // If provided, only show reminders for this project

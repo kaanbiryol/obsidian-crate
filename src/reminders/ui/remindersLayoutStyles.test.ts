@@ -164,7 +164,7 @@ describe('plugin reminder layout styles', () => {
       './shared/styles/_project-detail.scss',
       './shared/styles/_reminder-cards.scss',
       './shared/styles/_primary-screen.scss',
-      './reminder-list/styles.scss',
+      './plugin/reminder-list/styles.scss',
     ];
     const styles = (await Promise.all(styleUrls.map((path) => (
       readFile(new URL(path, import.meta.url), 'utf8')
