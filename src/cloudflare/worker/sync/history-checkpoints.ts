@@ -7,10 +7,9 @@ import { fileTransportLimit } from '../../../encryption/file-format';
 import { storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../utils';
 import { isSyncRevision } from '../../../protocol/sync-validation';
+import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 
-const INDEX_KEY = '__crate__/history/index.json';
-export const CHECKPOINT_PREFIX = '__crate__/history/checkpoints/';
-const PREFIX = CHECKPOINT_PREFIX;
+const PREFIX = HISTORY_CHECKPOINT_PREFIX;
 // Ten pages cover the largest checkpoint within the Free plan's query budget.
 export const CHECKPOINT_PAGE_SIZE = 10_000;
 const MAX_STORED_CHECKPOINT_BYTES = MAX_ENCRYPTED_CHECKPOINT_BYTES + 4096;
@@ -19,7 +18,7 @@ const headers = { 'Cache-Control': 'private, no-store' };
 const response = (value: unknown, status = 200) => corsResponse(value, status, headers);
 
 async function readIndex(bucket: R2Bucket) {
-    const object = await bucket.get(INDEX_KEY);
+    const object = await bucket.get(HISTORY_INDEX_KEY);
     if (!object) return { checkpoints: [] as SharedCheckpoint[], etag: undefined };
     if (object.size > 32_768) throw new Error('Invalid checkpoint index');
     return { checkpoints: parseSharedCheckpointList(JSON.parse(await object.text())), etag: object.etag };
@@ -73,7 +72,7 @@ export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): 
         if (duplicate) return response({ checkpoint: duplicate });
         const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_SHARED_CHECKPOINTS);
         if (!checkpoints.some(entry => entry.id === checkpoint.id)) return response({ error: 'Newer checkpoints replaced this state. Sync again.' }, 409);
-        const written = await bucket.put(INDEX_KEY, JSON.stringify({ version: 1, checkpoints }), {
+        const written = await bucket.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints }), {
             onlyIf: index.etag ? { etagMatches: index.etag } : { etagDoesNotMatch: '*' },
             httpMetadata: { contentType: 'application/json' },
         });

@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import { writeCommittedMarkdownFile } from '../storage';
-import { getStoredFileRow, createManagedObjectKey } from './storage';
+import { getStoredFileRow } from './storage';
 import { trackStagedUpload } from './staged-uploads';
 import { coordinatedUpload } from './staged-upload-dispatch';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
@@ -13,6 +13,7 @@ import { handleBatchUpload } from './batch/upload';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { sha256Hex } from '../auth/crypto';
+import { createManagedObjectKey } from '@/protocol/storage-keys';
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();

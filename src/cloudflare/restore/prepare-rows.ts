@@ -2,6 +2,7 @@ import { SERVER_RELEASE, validateMigrationHistory } from '../deployment/database
 import type { BackupRow, Cell, UpgradeBackup } from './archive';
 import policy from './restore-policy.json';
 import { isSha256Hex } from '../../platform/validation';
+import { SHARED_SETTINGS_KEY } from '../../protocol/storage-keys';
 
 function discardMaintenanceKey(key: string): boolean {
   return policy.resetMaintenanceKeys.includes(key) || policy.resetMaintenancePrefixes.some(prefix => key.startsWith(prefix));
@@ -28,7 +29,7 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
   }
   for (const item of manifest.objects) {
     const ref = refs.get(item.key);
-    if (ref ? ref.hash !== item.sha256 || ref.size !== item.size : item.key !== '__crate__/settings.json') throw new Error('Backup inventory does not match its database');
+    if (ref ? ref.hash !== item.sha256 || ref.size !== item.size : item.key !== SHARED_SETTINGS_KEY) throw new Error('Backup inventory does not match its database');
     refs.delete(item.key);
   }
   if (refs.size) throw new Error('Backup is missing file contents');

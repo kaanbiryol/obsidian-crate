@@ -12,9 +12,10 @@ import { isEncryptionId } from '../../../encryption/encoding';
 import { prepareEncryptedReceipt } from './receipt-storage';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { Env } from '../types';
-import { CHECKPOINT_PREFIX, storeEncryptedCheckpoint, streamCheckpointObject } from '../sync/history-checkpoints';
+import { storeEncryptedCheckpoint, streamCheckpointObject } from '../sync/history-checkpoints';
 import { MAX_ENCRYPTED_CHECKPOINT_BYTES } from '../../../protocol/history-checkpoints';
 import { readLimitedRequestBody } from '../body-reader';
+import { HISTORY_CHECKPOINT_PREFIX, SHARED_SETTINGS_KEY, MANAGED_FILES_PREFIX } from '../../../protocol/storage-keys';
 
 const CONVERSION_PAGE_SIZE = 25;
 const CONVERSION_INDEX = 'files_conversion_storage_key_idx';
@@ -88,7 +89,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	if (path === '/encryption/conversion/settings') {
 		if (request.method === 'GET') {
 			if (await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(ENCRYPTED_SETTINGS_KEY).first()) return corsResponse({ converted: true });
-			const object = await env.BUCKET.get('__crate__/settings.json');
+			const object = await env.BUCKET.get(SHARED_SETTINGS_KEY);
 			return corsResponse({ settings: object ? JSON.parse(await object.text()) as unknown : null });
 		}
 		if (request.method === 'PUT') {
@@ -102,7 +103,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 			if (body.value.vaultId !== state.vaultId || body.value.keyId !== state.keyId) return corsResponse({ error: 'Settings use a different key' }, 409);
 			await env.DB.batch([putValue(env, ENCRYPTED_SETTINGS_KEY, { settings: body.value, settingsVersion: crypto.randomUUID() }), putValue(env, 'e2ee:settings-converted', true)]);
 			// Final cleanup also retries deletion after an interrupted response.
-			await env.BUCKET.delete('__crate__/settings.json');
+			await env.BUCKET.delete(SHARED_SETTINGS_KEY);
 			return corsResponse({ success: true });
 		}
 	}
@@ -123,7 +124,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	}
 	if (path === '/encryption/conversion/checkpoints') {
 		const cursor = new URL(request.url).searchParams.get('cursor') ?? undefined;
-		const listing = await env.BUCKET.list({ prefix: CHECKPOINT_PREFIX, limit: 100, include: ['customMetadata'], ...(cursor ? { cursor } : {}) });
+		const listing = await env.BUCKET.list({ prefix: HISTORY_CHECKPOINT_PREFIX, limit: 100, include: ['customMetadata'], ...(cursor ? { cursor } : {}) });
 		const keys = listing.objects.filter(item => item.customMetadata?.encrypted !== '1').map(item => item.key);
 		return corsResponse({ keys, cursor: listing.truncated ? listing.cursor : null });
 	}
@@ -160,7 +161,7 @@ async function beginConversion(request: Request, env: Env, state: EncryptionServ
 	}
 	// Reject unsupported legacy data before freezing sync. All settings accepted
 	// by the plaintext API fit the encrypted envelope and request limits.
-	const settings = await env.BUCKET.head('__crate__/settings.json');
+	const settings = await env.BUCKET.head(SHARED_SETTINGS_KEY);
 	if (settings && settings.size > MAX_SHARED_SETTINGS_BYTES) {
 		return corsResponse({ error: 'Shared settings are too large to encrypt. Reduce exclusion patterns before enabling encryption.' }, 413);
 	}
@@ -231,7 +232,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 	// must already be encrypted. Unreferenced staged/retired content is disposable.
 	const listing = await env.BUCKET.list({ limit: CONVERSION_SWEEP_PAGE_SIZE, include: ['customMetadata'], ...(cursor ? { cursor: JSON.parse(cursor) as string } : {}) });
 	const managedKeys = listing.objects.map(object => object.key)
-		.filter(key => key.startsWith('__crate__/files/') || key === '__crate__/settings.json');
+		.filter(key => key.startsWith(MANAGED_FILES_PREFIX) || key === SHARED_SETTINGS_KEY);
 	// Bound queries independently of page size; per-object lookups can exhaust
 	// the request budget before a full page advances its cleanup cursor.
 	const references = managedKeys.length ? await env.DB.prepare(`
@@ -239,7 +240,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 		UNION SELECT storage_key FROM file_versions WHERE storage_key IN (SELECT value FROM json_each(?))`)
 		.bind(JSON.stringify(managedKeys), JSON.stringify(managedKeys)).all<{ storage_key: string }>() : null;
 	const referenced = new Set(references?.results.map(row => row.storage_key));
-	if (listing.objects.some(object => object.key.startsWith(CHECKPOINT_PREFIX) && object.customMetadata?.encrypted !== '1')) {
+	if (listing.objects.some(object => object.key.startsWith(HISTORY_CHECKPOINT_PREFIX) && object.customMetadata?.encrypted !== '1')) {
 		return corsResponse({ error: 'Convert every retained checkpoint before finishing' }, 409);
 	}
 	const orphaned = managedKeys.filter(key => !referenced.has(key));

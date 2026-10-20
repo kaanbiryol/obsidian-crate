@@ -13,7 +13,7 @@ import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX } from './state';
 import { handleUpload } from '../sync/file-handlers';
-import { getStoredFileRow, createManagedObjectKey } from '../sync/storage';
+import { getStoredFileRow } from '../sync/storage';
 import { trackStagedUpload } from '../sync/staged-uploads';
 import { uploadMutation } from '../sync/mutations';
 import { handleNotificationPolicy } from '../notifications/policy';
@@ -30,6 +30,7 @@ import { openFile } from '../../../encryption/file-codec';
 import { readEncryptionState } from './state';
 import { handleCheckChanges } from '../sync/metadata-handlers';
 import worker from '../index';
+import { createManagedObjectKey } from '../../../protocol/storage-keys';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

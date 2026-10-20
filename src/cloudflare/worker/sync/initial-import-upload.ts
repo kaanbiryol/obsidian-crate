@@ -6,11 +6,12 @@ import { corsResponse } from '../cors';
 import { parseJsonObject, sanitizePath } from '../utils';
 import { sha256HexBytes } from '../auth/crypto';
 import { readInitialImport } from './initial-import';
-import { createManagedObjectKey, loadStoredFileRows, parseExpectedFileHash } from './storage';
+import { loadStoredFileRows, parseExpectedFileHash } from './storage';
 import { trackStagedBatch, finishStagedBatches } from './staged-upload-batches';
 import { uploadMutation } from './mutations';
 import { readLimitedRequestBody } from '../body-reader';
 import { isSha256Hex } from '@/platform/validation';
+import { createManagedObjectKey } from '@/protocol/storage-keys';
 
 interface ImportFile {
   path: string; hash: string; size: number; content: ArrayBuffer;

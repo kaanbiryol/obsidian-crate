@@ -5,11 +5,12 @@ import { sha256HexBytes } from '../../auth/crypto';
 import { corsResponse } from '../../cors';
 import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../utils';
 import {
-	createManagedObjectKey, formatMutationError, MAX_BATCH_UPLOAD_FILES, MAX_BATCH_TOTAL_BYTES,
+	formatMutationError, MAX_BATCH_UPLOAD_FILES, MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash, type ExpectedFileHash,
 } from '../storage';
 import type { BatchFile } from './types';
 import { isSha256Hex } from '../../../../platform/validation';
+import { createManagedObjectKey } from '../../../../protocol/storage-keys';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
 export async function prepareBatchUpload(request: Request, expectedEncryption?: EncryptionServerState | null) {

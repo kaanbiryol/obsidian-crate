@@ -1,5 +1,6 @@
 import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, buildServerDeletionWorkerMultipartBody } from './deployment/worker-upload-payload';
 import { CloudflareApiError } from './cloudflare-api-error';
+import { BACKUPS_PREFIX } from '../protocol/storage-keys';
 export { CloudflareApiError } from './cloudflare-api-error';
 import { verifyWorkerDeployment } from './deployment/verify-worker';
 import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
@@ -226,7 +227,7 @@ export class CloudflareApiClient {
     return new Uint8Array(response.arrayBuffer);
   }
   async putRecoveryObject(accountId: string, bucketName: string, key: string, bytes: Uint8Array): Promise<void> {
-    if (!key.startsWith('__crate__/backups/')) throw new Error('Invalid checkpoint destination');
+    if (!key.startsWith(BACKUPS_PREFIX)) throw new Error('Invalid checkpoint destination');
     await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${key.split('/').map(encodeURIComponent).join('/')}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes.slice().buffer,
     });

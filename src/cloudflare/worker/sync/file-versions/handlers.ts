@@ -7,12 +7,12 @@ import { commitStagedFile } from '../mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../encryption/file-format';
 import {
-	createManagedObjectKey,
 	getStoredFileRow,
 	storedObjectMatchesMetadata,
 } from '../storage';
 import { parseExpectedFileHash } from '../storage';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../../utils';
+import { createManagedObjectKey } from '@/protocol/storage-keys';
 export { handleListFileVersions } from './list';
 
 interface FileVersionRow {

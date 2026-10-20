@@ -10,7 +10,6 @@ export {
 	BATCH_UPLOAD_MAX_FILES as MAX_BATCH_UPLOAD_FILES,
 	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
 } from '../../../protocol/sync-limits';
-const MANAGED_FILES_PREFIX = '__crate__/files/';
 const MAX_D1_BOUND_PARAMETERS = 100;
 export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -43,10 +42,6 @@ export function parseDeclaredSize(headerValue: string | null): number | null {
 
 export function formatMutationError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
-}
-
-export function createManagedObjectKey(hash: string): string {
-	return `${MANAGED_FILES_PREFIX}${hash}/${crypto.randomUUID()}`;
 }
 
 function normalizeStorageKey(value: unknown): string | null {

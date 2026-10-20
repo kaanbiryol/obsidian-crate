@@ -1,7 +1,7 @@
 import { trackStagedUpload } from './staged-uploads';
 import { sha256HexBytes } from '../auth/crypto';
-import { createManagedObjectKey } from './storage';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../encryption/file-format';
+import { createManagedObjectKey } from '../../../protocol/storage-keys';
 
 export interface StagedMarkdownFile {
 	path: string;

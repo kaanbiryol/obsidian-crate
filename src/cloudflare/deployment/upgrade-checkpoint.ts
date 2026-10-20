@@ -1,6 +1,7 @@
 import { CloudflareApiError, type CloudflareApiClient } from '../cloudflare-api';
 import { sha256Hex } from './artifacts';
 import type { DeploymentFence } from './fence';
+import { UPGRADE_BACKUP_PREFIX, SHARED_SETTINGS_KEY } from '../../protocol/storage-keys';
 
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
 const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
@@ -22,7 +23,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   if (!tables.includes('files') || !tables.includes('crate_schema')) throw new Error('Cannot back up an unrecognized server database');
   fence.requireVerification();
   await fence.mutate(() => api.queryD1(accountId, databaseId, tables.map(upgradeGuards).join('\n')), 'freeze-upgrade-data');
-  const prefix = `__crate__/backups/schema-upgrade-${crypto.randomUUID()}`;
+  const prefix = `${UPGRADE_BACKUP_PREFIX}${crypto.randomUUID()}`;
   input.onProgress?.('Backing up the server database. Large servers can take several minutes…');
   let sql = 'PRAGMA foreign_keys=OFF;\n';
   for (const row of definitions.filter(row => row.type === 'table')) {
@@ -76,7 +77,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
   }
   input.onProgress?.('Finishing and verifying the backup archive…');
   try {
-    const key = '__crate__/settings.json', bytes = await api.getRecoveryObject(accountId, bucketName, key);
+    const key = SHARED_SETTINGS_KEY, bytes = await api.getRecoveryObject(accountId, bucketName, key);
     const sha = await hash(bytes), backupKey = `${prefix}/objects/${await sha256Hex(key)}`;
     await api.putRecoveryObject(accountId, bucketName, backupKey, bytes);
     if (await hash(await api.getRecoveryObject(accountId, bucketName, backupKey)) !== sha) throw new Error('Settings checkpoint verification failed');

@@ -7,6 +7,7 @@ import { CHANGELOG_BOUNDS_SQL, getChangelogBounds } from './storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
+import { SHARED_SETTINGS_KEY } from '../../../protocol/storage-keys';
 
 function batchRows<T>(result: unknown): T[] {
 	if (!result || typeof result !== 'object') return [];
@@ -133,7 +134,7 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 }
 
 export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
-	const obj = await bucket.get('__crate__/settings.json');
+	const obj = await bucket.get(SHARED_SETTINGS_KEY);
 	if (!obj) return corsResponse({ settings: null, settingsVersion: null });
 	try {
 		const body = await obj.text();
@@ -161,11 +162,11 @@ export async function handlePutSettings(request: Request, bucket: R2Bucket): Pro
 		return corsResponse({ error: 'expectedVersion must be a string or null' }, 400);
 	}
 
-	const current = await bucket.head('__crate__/settings.json');
+	const current = await bucket.head(SHARED_SETTINGS_KEY);
 	if ((current?.etag ?? null) !== expectedVersion) {
 		return corsResponse({ error: 'Shared settings changed on another device' }, 409);
 	}
-	const written = await bucket.put('__crate__/settings.json', JSON.stringify(settings), {
+	const written = await bucket.put(SHARED_SETTINGS_KEY, JSON.stringify(settings), {
 		onlyIf: current
 			? { etagMatches: current.etag }
 			: { etagDoesNotMatch: '*' },

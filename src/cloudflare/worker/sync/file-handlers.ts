@@ -13,7 +13,6 @@ import { FileNamespaceConflictError } from './file-namespace';
 import { mutationAuditContext } from '../request-diagnostics';
 import type { FileDeletionReceipt } from './file-delete-audit';
 import {
-	createManagedObjectKey,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	getStoredFileRow,
@@ -23,6 +22,7 @@ import {
 	type FileStorageRow,
 } from './storage';
 import { isSha256Hex } from '../../../platform/validation';
+import { createManagedObjectKey } from '../../../protocol/storage-keys';
 
 export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
 	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined);

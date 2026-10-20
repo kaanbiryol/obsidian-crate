@@ -3,10 +3,10 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { ENCRYPTION_FILE_PREFIX, validateEncryptedContent } from './state';
 import { sha256Hex } from '../auth/crypto';
-import { createManagedObjectKey } from '../sync/storage';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../utils';
 import type { Env } from '../types';
+import { createManagedObjectKey } from '../../../protocol/storage-keys';
 
 export const convertedCapturePath = (folder: string, id: string) => `${folder}/Article ${id}.md`;
 

@@ -1,6 +1,7 @@
 import { BULK_NEW_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
 import type { AuthPrincipal } from './auth/authenticate';
+import { MANAGED_FILE_OBJECT } from '../../protocol/storage-keys';
 
 function opaque(value: string | null): string | undefined {
   return value && /^[a-zA-Z0-9_-]{16,128}$/.test(value) ? value : undefined;
@@ -22,7 +23,7 @@ export function mutationAuditContext(request: Request, principal?: AuthPrincipal
 }
 
 function fileRevision(value: unknown): value is string {
-  return typeof value === 'string' && /^__crate__\/files\/[a-f0-9]{64}\/[a-f0-9-]{36}$/.test(value);
+  return typeof value === 'string' && MANAGED_FILE_OBJECT.test(value);
 }
 
 /** Correlate client attempts, receipts and file incarnations without logging paths or content. */
