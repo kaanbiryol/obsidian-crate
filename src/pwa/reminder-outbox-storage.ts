@@ -5,8 +5,8 @@ import type { PendingReminderChange } from './reminder-outbox-types';
 import { privateStorage } from './private-storage';
 import { isSha256Hex } from '../platform/validation';
 import { isReminderOperationId } from '../protocol/reminder-operation';
+import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
 
-const PREFIX = 'crate-reminder-outbox:';
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
 const CORRUPT_ERROR = 'Pending changes on this device could not be read. Keep this app open and try again.';
 
@@ -89,7 +89,7 @@ function quarantineStorage(storage: Storage, keys: () => string[], folderPath: s
 
 async function outboxScope(authToken: string, folderPath: string): Promise<string> {
 	const tokenHash = await stringDigest(authToken);
-	return `${PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
+	return `${REMINDER_OUTBOX_PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
 }
 
 /** One key per command prevents another tab from replacing an unrelated command. */
@@ -142,7 +142,7 @@ export async function createReminderRecoveryStorage(authToken: string, folderPat
 	const acceptsKey = (key: string | null) => {
 		if (key === null) return true;
 		const parts = key.split(':');
-		return parts.length === 5 && `${parts[0]}:` === PREFIX && parts[1] === 'v1'
+		return parts.length === 5 && `${parts[0]}:` === REMINDER_OUTBOX_PREFIX && parts[1] === 'v1'
 			&& isSha256Hex(parts[2]) && parts[3] === encodeURIComponent(folderPath);
 	};
 	const keys = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope));
@@ -178,12 +178,12 @@ export async function createReminderRecoveryStorage(authToken: string, folderPat
 /** Only explicit logout clears data belonging to every old session. */
 export function clearReminderOutbox(): void {
 	const storage = browserStorage();
-	for (const key of storageKeys(storage).filter(key => key.startsWith(PREFIX))) {
+	for (const key of storageKeys(storage).filter(key => key.startsWith(REMINDER_OUTBOX_PREFIX))) {
 		try { storage.removeItem(key); } catch { throw new Error(STORAGE_ERROR); }
 	}
 }
 
 /** Check all retained sessions without reading private command bodies. */
 export function hasUnsettledReminders(): boolean {
-	return storageKeys(browserStorage()).some(key => key.startsWith(PREFIX));
+	return storageKeys(browserStorage()).some(key => key.startsWith(REMINDER_OUTBOX_PREFIX));
 }

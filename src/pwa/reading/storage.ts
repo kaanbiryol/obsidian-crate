@@ -4,6 +4,7 @@ import { isPendingReading, isReadingDraft } from './storage-validation';
 import { downloadJson } from '../download';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_SESSION_KEY, type ReadingSession } from './session';
+import { readingKeys, isPendingReadingKey } from './storage-keys';
 
 export { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from './session';
 export { readReadingCache, readReadingArticle, commitReadingCache, cacheReadingArticle, readEncryptedReadingIndex, writeEncryptedReadingIndex, type ReadingCache } from './cache';
@@ -20,31 +21,31 @@ async function readDraft(key: string): Promise<ReadingDraft | undefined> {
 }
 
 export function readReadingDraft(session: ReadingSession): Promise<ReadingDraft | undefined> {
-  return readDraft(`draft:${session.id}`);
+  return readDraft(readingKeys.draft(session.id));
 }
 export function saveReadingDraft(session: ReadingSession, draft: ReadingDraft): Promise<void> {
-  return writeReadingValue(`draft:${session.id}`, draft, session);
+  return writeReadingValue(readingKeys.draft(session.id), draft, session);
 }
 export function readReadingShare(id: string): Promise<ReadingDraft | undefined> {
-  return readDraft(`share:${id}`);
+  return readDraft(readingKeys.share(id));
 }
 export function removeReadingShare(session: ReadingSession, id: string): Promise<void> {
-  return writeReadingValue(`share:${id}`, null, session);
+  return writeReadingValue(readingKeys.share(id), null, session);
 }
 export function savePendingReading(session: ReadingSession, pending: PendingReading[]): Promise<void> {
-  return writeReadingValue(`pending:${session.id}`, pending, session);
+  return writeReadingValue(readingKeys.pending(session.id), pending, session);
 }
 export function readReadingAttempt(session: ReadingSession, id: string): Promise<unknown> {
-  return readReadingValue(`attempt:${session.id}:${id}`);
+  return readReadingValue(`${readingKeys.attemptPrefix(session.id)}${id}`);
 }
 export function writeReadingAttempt(session: ReadingSession, id: string, attempt: ReadingAttempt): Promise<void> {
-  return writeReadingValue(`attempt:${session.id}:${id}`, attempt, session);
+  return writeReadingValue(`${readingKeys.attemptPrefix(session.id)}${id}`, attempt, session);
 }
 
 export async function hasEarlierReadingChanges(sessionId?: string): Promise<boolean> {
   const db = await readingDatabase();
   for (const key of await db.getAllKeys('values')) {
-    if (!key.startsWith('pending:') || key === `pending:${sessionId}`) continue;
+    if (!isPendingReadingKey(key) || (sessionId !== undefined && key === readingKeys.pending(sessionId))) continue;
     let value: unknown;
     try { value = decodeReadingValue(key, await db.get('values', key)); } catch { return true; }
     if (!Array.isArray(value) || value.length) return true;
@@ -52,7 +53,7 @@ export async function hasEarlierReadingChanges(sessionId?: string): Promise<bool
   return false;
 }
 export async function pendingReading(session: ReadingSession): Promise<PendingReading[]> {
-  const stored = await readReadingValue(`pending:${session.id}`);
+  const stored = await readReadingValue(readingKeys.pending(session.id));
   const data = stored === undefined ? [] : stored;
   const ids = new Set<string>();
   if (!Array.isArray(data) || !data.every((op: unknown): op is PendingReading => {
@@ -108,7 +109,7 @@ export async function pruneReadingAttempts(session: ReadingSession): Promise<voi
     try { const body = JSON.parse(op.body) as { operationId?: unknown }; return typeof body.operationId === 'string' ? [body.operationId] : []; } catch { throw new Error('Pending Reading change needs recovery.'); }
   }));
   const db = await readingDatabase(); assertReadingSession(session);
-  const prefix = `attempt:${session.id}:`, tx = db.transaction('values', 'readwrite');
+  const prefix = readingKeys.attemptPrefix(session.id), tx = db.transaction('values', 'readwrite');
   try {
     for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !retained.has(key.slice(prefix.length))) await tx.store.delete(key);
     assertReadingSession(session); await tx.done;

@@ -6,6 +6,7 @@ import type { PendingReminderChange, ReminderChangeResult } from './reminder-out
 import type { ReminderRecord } from './types';
 import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { isReminderOperationId } from '../protocol/reminder-operation';
+import { REMINDER_OUTBOX_PREFIX } from './reminder-storage-keys';
 
 interface ReminderSettlement {
 	version: 1;
@@ -25,7 +26,7 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 export async function createReminderSettlementChannel(authToken: string, folderPath: string) {
 	const hash = await stringDigest(authToken);
 	// Old clients ignore this reserved namespace, while their logout still erases it.
-	const key = `crate-reminder-outbox:confirmed:${hash}:${encodeURIComponent(folderPath)}`;
+	const key = `${REMINDER_OUTBOX_PREFIX}confirmed:${hash}:${encodeURIComponent(folderPath)}`;
 	return {
 		key,
 		publish(change: PendingReminderChange, result: ReminderChangeResult) {

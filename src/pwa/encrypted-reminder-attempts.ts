@@ -4,6 +4,7 @@ import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { clearSessionStore } from './clear-session-store';
 import { openEncryptedDatabase } from './encrypted-storage-database';
 import { isSha256Hex } from '../platform/validation';
+import { REMINDER_OUTBOX_PREFIX, REMINDER_DRAFT_PREFIX } from './reminder-storage-keys';
 
 export interface EncryptedReminderAttempt { semanticHash: string; body: string; generation: number; rejected?: boolean; acknowledgment?: string }
 interface AttemptDatabase extends DBSchema { attempts: { key: string; value: string } }
@@ -47,10 +48,10 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; s
 	try {
 		if (!isCurrent()) return after;
 		// Include old sessions and malformed queue entries without decrypting them.
-		const pending = new Set(Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).map(key => key.slice(key.lastIndexOf(':') + 1)));
+		const pending = new Set(Object.keys(localStorage).filter(key => key.startsWith(REMINDER_OUTBOX_PREFIX)).map(key => key.slice(key.lastIndexOf(':') + 1)));
 		// Drafts are independent durable data. Skip deletion while any draft in
 		// this tab might still reference an attempt, including unrecognized formats.
-		const hasDraft = Object.keys(sessionStorage).some(key => key.startsWith('crate-reminder-draft:'));
+		const hasDraft = Object.keys(sessionStorage).some(key => key.startsWith(REMINDER_DRAFT_PREFIX));
 		const tx = db.transaction('attempts', 'readwrite');
 		let cursor = await tx.store.openCursor(IDBKeyRange.bound(after?.startsWith(prefix) ? after : prefix, prefix + '\uffff', true, true));
 		let last: string | undefined, visited = 0;

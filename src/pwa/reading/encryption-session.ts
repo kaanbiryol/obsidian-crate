@@ -8,6 +8,7 @@ import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../en
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
 import { readingDatabase } from './database';
+import { isSessionReadingKey } from '@/pwa/reading/storage-keys';
 
 type ReadingEncryptionState = ScopedEncryptionState;
 let pending: { identity: string; promise: Promise<StoredReminderKeys | null> } | undefined;
@@ -42,8 +43,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
     if (!current()) throw new Error('Reading sign-in changed.');
     const tx = db.transaction('values', 'readwrite');
     try {
-      for (const key of await tx.store.getAllKeys()) if (['list', 'draft', 'pending', 'article-index'].some(kind => key === `${kind}:${session.id}`)
-        || key.startsWith(`article:${session.id}:`) || key.startsWith(`attempt:${session.id}:`) || key.startsWith('share:')) {
+      for (const key of await tx.store.getAllKeys()) if (isSessionReadingKey(key, session.id)) {
         const value = await tx.store.get(key);
         if (!(value && typeof value === 'object' && 'encryptedReading' in value)) await tx.store.put(encodeReadingValue(key, value), key);
       }

@@ -1,4 +1,5 @@
 import type { LocalStateCipher } from '../encryption/local-state';
+import { REMINDER_OUTBOX_PREFIX, REMINDER_DRAFT_PREFIX } from './reminder-storage-keys';
 
 let cipher: LocalStateCipher | undefined;
 let locked = false;
@@ -24,8 +25,8 @@ export function useUnencryptedStorage(): void {
 export function unlockPrivateStorage(next: LocalStateCipher, folderPath: string, persistent: Storage, session: Storage): void {
 	const folder = encodeURIComponent(folderPath);
 	for (const [storage, accepts] of [
-		[persistent, (key: string) => key.startsWith('crate-reminder-outbox:') && key.split(':')[3] === folder],
-		[session, (key: string) => key.startsWith(`crate-reminder-draft:${folder}:`)],
+		[persistent, (key: string) => key.startsWith(REMINDER_OUTBOX_PREFIX) && key.split(':')[3] === folder],
+		[session, (key: string) => key.startsWith(`${REMINDER_DRAFT_PREFIX}${folder}:`)],
 	] as const) {
 		const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key): key is string => key !== null && accepts(key));
 		for (const key of keys) {

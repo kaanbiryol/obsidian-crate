@@ -10,6 +10,7 @@ import { subscribeReminderOutboxEvents } from '../reminder-outbox-events';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
+import { REMINDER_OUTBOX_LOCK } from '../reminder-storage-keys';
 
 export function useReminderOutbox(options: {
 	enabled?: boolean;
@@ -60,7 +61,7 @@ export function useReminderOutbox(options: {
 			};
 			const outbox = createReminderOutbox({
 				storage, apiFetch: optionsRef.current.apiFetch, isCurrent,
-				withLock: work => navigator.locks.request('crate-reminder-outbox', work),
+				withLock: work => navigator.locks.request(REMINDER_OUTBOX_LOCK, work),
 				canSend: () => optionsRef.current.enabled !== false && optionsRef.current.hasSnapshot !== false,
 				beginMutation: () => optionsRef.current.beginLocalMutation(),
 				onChange: setChanges,
@@ -90,7 +91,7 @@ export function useReminderOutbox(options: {
 			setReady(true);
 			removeQuarantinedRef.current = async entries => {
 				try {
-					await navigator.locks.request('crate-reminder-outbox', () => {
+					await navigator.locks.request(REMINDER_OUTBOX_LOCK, () => {
 						if (!isCurrent()) return;
 						storage.removeQuarantined(entries);
 						recovery.removeQuarantined(entries);
@@ -112,7 +113,7 @@ export function useReminderOutbox(options: {
 			recoverRef.current = async () => {
 				if (!isCurrent() || optionsRef.current.canRecover === false || optionsRef.current.hasSnapshot === false) return;
 				try {
-					await navigator.locks.request('crate-reminder-outbox', () => {
+					await navigator.locks.request(REMINDER_OUTBOX_LOCK, () => {
 						if (!isCurrent()) return;
 						const recovered = new Set(recovery.load().map(change => change.operationId));
 						recovery.adopt();

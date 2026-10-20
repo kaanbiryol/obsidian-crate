@@ -1,12 +1,12 @@
 import type { ModalState } from './types';
 import { isStoredReminderModal } from './reminder-draft-validation';
 import { privateStorage } from './private-storage';
+import { REMINDER_DRAFT_PREFIX } from './reminder-storage-keys';
 
 const draftStorage = () => privateStorage(sessionStorage);
 
-const PREFIX = 'crate-reminder-draft:';
 function key(modal: ModalState, folderPath: string): string {
-	return `${PREFIX}${encodeURIComponent(folderPath)}:${modal.reminderId ?? 'new'}`;
+	return `${REMINDER_DRAFT_PREFIX}${encodeURIComponent(folderPath)}:${modal.reminderId ?? 'new'}`;
 }
 
 export function saveReminderDraft(modal: ModalState, folderPath: string): void {
@@ -45,7 +45,7 @@ export function discardReminderDraft(modal: ModalState, folderPath: string): voi
 }
 export function clearReminderDrafts(): boolean {
 	try {
-		for (const entry of Object.keys(sessionStorage)) if (entry.startsWith(PREFIX)) sessionStorage.removeItem(entry);
+		for (const entry of Object.keys(sessionStorage)) if (entry.startsWith(REMINDER_DRAFT_PREFIX)) sessionStorage.removeItem(entry);
 		return true;
 	} catch { return false; }
 }

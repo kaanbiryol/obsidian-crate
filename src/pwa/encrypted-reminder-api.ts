@@ -20,6 +20,7 @@ import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type Enc
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
+import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminder-storage-keys';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
@@ -180,7 +181,7 @@ export class EncryptedReminderApi {
 		if (this.lastCleanup !== undefined && now >= this.lastCleanup && now - this.lastCleanup < 5 * 60_000) return;
 		this.lastCleanup = now;
 		this.cleanupRunning = true;
-		void requireCompatibleServer().then(info => navigator.locks.request('crate-reminder-outbox', { ifAvailable: true }, async lock => {
+		void requireCompatibleServer().then(info => navigator.locks.request(REMINDER_OUTBOX_LOCK, { ifAvailable: true }, async lock => {
 			if (lock && info.reminderOperationDay !== undefined) this.cleanupCursor = await pruneEncryptedReminderAttempts(this.keys, info.reminderOperationDay, this.current, this.cleanupCursor);
 		})).catch(() => { /* Cleanup failure never blocks reminders or changes pending work. */ })
 			.finally(() => { this.cleanupRunning = false; });
