@@ -1,5 +1,5 @@
 import { prepareEncryptedReceipt, readEncryptedReceipt } from '../encryption/receipt-storage';
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { fileRevisionsGuard } from '../sync/file-identity';
 import { reminderRequestHash } from '../../../encryption/reminder-receipt';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
@@ -27,8 +27,7 @@ async function readReminderReceipt(db: D1Database, operation: Pick<ReminderOpera
 }
 export function reminderOperationEffects(db: D1Database, operation: ReminderOperation, response: Record<string, unknown>, createdId?: string): CommitEffects {
 	return files => {
-		const predicate = files.map(() => `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`).join(' AND ');
-		const bindings = files.flatMap(file => [...filePathArgs(file.path), file.storageKey]);
+		const { sql: predicate, args: bindings } = fileRevisionsGuard(files);
 		const receipt = typeof response.encrypted === 'string'
 			? prepareEncryptedReceipt(db, 'reminder', operation.id, response, { sql: predicate, args: bindings })
 			: { json: JSON.stringify(response), statements: [] };

@@ -1,4 +1,4 @@
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 
@@ -6,11 +6,12 @@ import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 export function recordReminderSourceState(db: D1Database, path: string, storageKey: string | null, verified: boolean): D1PreparedStatement {
   if (storageKey === null) return db.prepare(`DELETE FROM reminder_source_state WHERE file_path = ?
     AND NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`).bind(path, ...filePathArgs(path));
+  const revision = fileRevisionGuard(path, storageKey);
   return db.prepare(`INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified)
-    SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
+    SELECT ?, ?, ?, ? WHERE ${revision.sql}
     ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision,
       parser_version = excluded.parser_version, verified = excluded.verified, updated_at = datetime('now')`)
-    .bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION, verified ? 1 : 0, ...filePathArgs(path), storageKey);
+    .bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION, verified ? 1 : 0, ...revision.args);
 }
 
 export async function hasVerifiedReminderSource(db: D1Database, path: string, storageKey: string): Promise<boolean> {

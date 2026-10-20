@@ -1,5 +1,5 @@
 import { portablePathKey } from '../../../protocol/portable-path';
-import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from '../sync/file-identity';
+import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { loadStoredFileRows } from '../sync/storage';
 import { recordFileFailure } from '../notifications/file-retries';
 import { queryRows } from '../db';
@@ -95,13 +95,14 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
       ]);
     } catch (error) {
       const issue = error instanceof Error ? error.message.slice(0, 512) : 'Committed reminder content could not be verified';
+      const revision = fileRevisionGuard(file.path, file.storageKey);
       await env.DB.batch([
         recordReminderSourceState(env.DB, file.path, file.storageKey, false),
-        recordFileFailure(env.DB, file.path, issue, `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`, [...filePathArgs(file.path), file.storageKey], isPermanentSourceError(error)),
+        recordFileFailure(env.DB, file.path, issue, revision.sql, revision.args, isPermanentSourceError(error)),
         env.DB.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
-          SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
+          SELECT ?, ?, ? WHERE ${revision.sql}
           ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = excluded.last_error, updated_at = datetime('now')`)
-          .bind(file.path, crypto.randomUUID(), issue, ...filePathArgs(file.path), file.storageKey),
+          .bind(file.path, crypto.randomUUID(), issue, ...revision.args),
       ]);
     }
   }
