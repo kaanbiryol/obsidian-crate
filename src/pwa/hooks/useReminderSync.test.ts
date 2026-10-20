@@ -12,7 +12,7 @@ vi.mock('../reminders/cache/reminder-cache', () => ({
 	refreshCachedReminderSnapshot: vi.fn(async () => {}),
 	saveCachedReminderSnapshot: vi.fn(async () => {}),
 }));
-afterEach(() => { vi.clearAllMocks(); });
+afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
 
 function reminder(id: string, overrides: Partial<ReminderRecord> = {}): ReminderRecord {
 	return { id, content: id, completed: false, priority: 4, revision: `${id}-original`,
@@ -40,17 +40,23 @@ function harness() {
 		await act(async () => { requests[index]!.resolve(result); await pending; });
 	};
 	const commit = (records: ReminderRecord[]) => act(() => rendered.current.commitReminderState(records));
-	return { rendered, options, requests, original, load, settle, commit };
+	/** Answers a request with index progress, then waits out the one-second poll delay. */
+	const warming = async (index: number, remainingFiles: number) => {
+		await act(async () => {
+			requests[index]!.resolve(new Response(JSON.stringify({ remainingFiles, totalFiles: 10 }), { status: 202 }));
+			await vi.advanceTimersByTimeAsync(1_000);
+		});
+	};
+	return { rendered, options, requests, original, load, settle, commit, warming };
 }
 
 describe('PWA reminder refresh around local writes', () => {
 	it.each([200, 304])('keeps indexing progress out of recovery state until HTTP %s confirms the list', async status => {
-		const { rendered, original, requests, load, settle } = harness();
+		vi.useFakeTimers();
+		const { rendered, original, requests, load, settle, warming } = harness();
 		act(() => { window.dispatchEvent(new window.Event('online')); });
 		const pending = load();
-		await act(async () => {
-			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
-		});
+		await warming(0, 3);
 		expect(requests).toHaveLength(2);
 		expect(rendered.current.indexingProgress).toEqual({ indexedFiles: 7, totalFiles: 10 });
 		expect(rendered.current.error).toBeNull();
@@ -64,11 +70,10 @@ describe('PWA reminder refresh around local writes', () => {
 	});
 
 	it('replaces indexing progress with attention only when the refresh fails', async () => {
-		const { rendered, requests, load, settle } = harness();
+		vi.useFakeTimers();
+		const { rendered, load, settle, warming } = harness();
 		const pending = load();
-		await act(async () => {
-			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
-		});
+		await warming(0, 3);
 		await settle(1, new Response('Index unavailable', { status: 503 }), pending);
 		expect(rendered.current.indexingProgress).toBeNull();
 		expect(rendered.current.error).toBe('Index unavailable');
@@ -76,11 +81,10 @@ describe('PWA reminder refresh around local writes', () => {
 	});
 
 	it.each(['reset', 'replacement', 'mutation'] as const)('clears indexing progress on %s and ignores the old response', async change => {
-		const { rendered, options, requests, load, settle } = harness();
+		vi.useFakeTimers();
+		const { rendered, options, load, settle, warming } = harness();
 		const pending = load();
-		await act(async () => {
-			requests[0]!.resolve(new Response(JSON.stringify({ remainingFiles: 3, totalFiles: 10 }), { status: 202 }));
-		});
+		await warming(0, 3);
 		let finish: (() => void) | undefined;
 		if (change === 'reset') {
 			invalidatePwaSession();
@@ -90,9 +94,7 @@ describe('PWA reminder refresh around local writes', () => {
 			rendered.rerender();
 		} else act(() => { finish = rendered.current.beginLocalMutation(); });
 		expect(rendered.current.indexingProgress).toBeNull();
-		await act(async () => {
-			requests[1]!.resolve(new Response(JSON.stringify({ remainingFiles: 1, totalFiles: 10 }), { status: 202 }));
-		});
+		await warming(1, 1);
 		expect(rendered.current.indexingProgress).toBeNull();
 		await settle(2, response([]), pending);
 		finish?.();
