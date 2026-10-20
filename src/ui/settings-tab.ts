@@ -8,7 +8,7 @@ import { createSettingsSectionHeading } from './settings/section-helpers';
 import { renderUsageSection } from './settings/infrastructure/usage-section';
 import { renderConnectionStatus } from './settings/infrastructure/connection-status';
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { renderForgetServerSetting } from './settings/infrastructure/server-selection-setting';
 import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/infrastructure/config-section';
 import { renderDevicesSection } from './settings/devices-section';

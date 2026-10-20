@@ -1,4 +1,4 @@
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import type { SyncApiClient } from '../sync/api';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';

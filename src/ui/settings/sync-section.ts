@@ -1,5 +1,5 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../sync/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';

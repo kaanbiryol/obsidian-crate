@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ensureReminderNotificationPolicy } from './runtime';
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 
 function harness(pushEnabled = true) {
 	const ensureNotificationPolicy = vi.fn().mockResolvedValue({ policy: {} });

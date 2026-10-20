@@ -1,5 +1,5 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../sync/logger';
 
 export function renderTroubleshootingSettings(containerEl: HTMLElement, plugin: CratePlugin): void {

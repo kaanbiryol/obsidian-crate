@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { createSharedSettingsPush } from './shared-settings-push';
 
 function fixture() {

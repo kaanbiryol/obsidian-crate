@@ -1,5 +1,5 @@
 import { Setting } from 'obsidian';
-import type CratePlugin from '../../../main';
+import type CratePlugin from '../../../plugin/CratePlugin';
 import type { UsageMetric } from '../../../cloudflare/usage/service';
 import type { UsageSnapshot } from '../../../cloudflare/usage/snapshot';
 import { createSettingsDisclosure } from '../../plugin/settings-disclosure';

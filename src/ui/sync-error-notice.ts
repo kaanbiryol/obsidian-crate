@@ -1,5 +1,5 @@
 import { Notice } from 'obsidian';
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { ActivityModal } from './activity/activity-modal';
 
 export function showSyncErrorNotice(plugin: CratePlugin, message: string): void {

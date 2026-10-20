@@ -1,4 +1,4 @@
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderIntegrations } from './register-integrations';
 import {
 	ensureReminderNotificationPolicy,

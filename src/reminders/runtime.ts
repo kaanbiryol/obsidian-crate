@@ -1,4 +1,4 @@
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { createReminderIndex } from './data/reminder-index';
 import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository } from './data/reminder-repository';

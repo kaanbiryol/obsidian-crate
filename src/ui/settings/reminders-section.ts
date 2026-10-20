@@ -1,7 +1,7 @@
 import { setSharedFeature } from '../../plugin/feature-settings';
 import { Notice, Setting } from 'obsidian';
 import { changeReminderFolder } from '../../reminders/notification-policy-sync';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import {
 	normalizeRemindersFolderPath,
 	type DueDateDefaultSetting,

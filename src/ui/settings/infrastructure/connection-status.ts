@@ -1,5 +1,5 @@
 import { Notice, Setting } from 'obsidian';
-import type CratePlugin from '../../../main';
+import type CratePlugin from '../../../plugin/CratePlugin';
 import { ActivityModal } from '../../activity/activity-modal';
 import { notifyConflicts } from '../../../sync/conflict/conflict';
 import { showSyncErrorNotice } from '../../sync-error-notice';

@@ -1,7 +1,7 @@
 import { Notice, Setting, type TextAreaComponent } from 'obsidian';
 import { matchIgnorePattern } from '../../sync/local/ignore';
 import { getAllVaultFiles } from '../../sync/local/file-discovery';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { ExclusionPreviewModal } from '../exclusion-preview-modal';
 import { renderExclusionCleanup } from './exclusion-cleanup';
 import { bindCommittedText } from './input-helpers';

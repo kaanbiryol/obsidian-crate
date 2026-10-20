@@ -1,6 +1,6 @@
 import { setReminderRibbon } from './visibility';
 import { addIcon, type MarkdownPostProcessorContext } from 'obsidian';
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderCommands } from './commands';
 import { ReminderQueryInjector } from './query/injector';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';

@@ -1,6 +1,6 @@
 import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonComponent } from 'obsidian';
 import { createSettingsDisclosure } from '../plugin/settings-disclosure';
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../sync/logger';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';

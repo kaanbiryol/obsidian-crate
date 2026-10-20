@@ -1,4 +1,4 @@
-import type CratePlugin from '../../main';
+import type CratePlugin from '../../plugin/CratePlugin';
 import type { SyncApiClient } from '../../sync/api';
 import { buildSharedSettings } from '../../sync/connection/shared-settings';
 

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
 import { registerSyncCommands } from './plugin-integration';
 import { setSyncReady } from '../plugin/lifecycle-state';
