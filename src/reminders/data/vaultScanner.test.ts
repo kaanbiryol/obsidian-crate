@@ -39,7 +39,7 @@ it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens
     if (boundary === 'read') controller.abort();
     return original;
   }, process } } as unknown as App;
-  const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Inbox.md'), 'Reminders', new Set(), controller.signal);
+  const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Inbox.md'), 'Reminders', { signal: controller.signal });
   expect(persisted).toBe(original);
   expect(result.reminders).toEqual([]);
   expect(process).toHaveBeenCalledTimes(boundary === 'read' ? 0 : 1);

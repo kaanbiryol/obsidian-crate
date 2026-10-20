@@ -166,7 +166,7 @@ it('flushes deferred file scans with one owner map and one notification', async 
 
   const owners: unknown[] = [];
   const ownersSeen: string[][] = [];
-  vi.mocked(scanFile).mockImplementation(async (_app, file, _folder, _reserved, _signal, identityOwners) => {
+  vi.mocked(scanFile).mockImplementation(async (_app, file, _folder, { identityOwners } = {}) => {
     owners.push(identityOwners);
     ownersSeen.push([...identityOwners!].flatMap(([id, owned]) => [...owned].map(path => `${id}@${path}`)).sort());
     return { filePath: file.path, reminders: [{ ...reminder(file.path), id: file.basename }], lineCount: 1 };

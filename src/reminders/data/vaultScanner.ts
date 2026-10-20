@@ -14,17 +14,14 @@ import {
   getProjectFromPath as deriveProjectFromPath,
   scanReminderMarkdownContent,
 } from "@/reminders/core/markdownScan";
-import { createReminderId, setReminderIdMarker } from "@/reminders/core/reminderIdentity";
-import { createPersistedCheckboxParses, parseCheckboxLine, type ParsedCheckbox } from "@/reminders/core/grammar/checkboxParser";
+import { createPersistedCheckboxParses } from "@/reminders/core/grammar/checkboxParser";
+import { normalizeReminderIds } from "@/reminders/core/normalizeReminderIds";
 import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
-import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
-import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
-import { UnresolvedReminderScheduleError } from '@/reminders/core/grammar/reminderParser';
 
 const log = createLogger('VaultScanner');
 
@@ -49,68 +46,6 @@ export interface FileScanResult {
   diagnostic?: ReminderSourceIssue['diagnostic'];
   releasedOwners?: ReminderIdentityOwner[];
   deferred?: boolean;
-}
-
-export interface ReminderIdNormalizationResult {
-  content: string;
-  remindersUpdated: number;
-}
-
-/**
- * Add stable IDs while the file is already being read for indexing. This keeps
- * manually-authored checkboxes discoverable without a separate vault-wide
- * rewrite.
- */
-function createUniqueReminderId(usedIds: Set<string>): string {
-  let reminderId = createReminderId();
-  while (usedIds.has(reminderId)) {
-    reminderId = createReminderId();
-  }
-  return reminderId;
-}
-
-export function normalizeReminderIds(
-  content: string,
-  reservedIds: ReadonlySet<string> = new Set(),
-  parsePersisted: (line: string) => ParsedCheckbox | null = value => parseCheckboxLine(value, { persisted: true }),
-): ReminderIdNormalizationResult {
-  const lines = content.split("\n");
-  const usedIds = new Set(reservedIds);
-  let remindersUpdated = 0;
-
-  for (const index of markdownTaskContexts(lines).keys()) {
-    const line = lines[index];
-    if (line === undefined) continue;
-    // Saved lines resolve in persisted mode; only unresolved drafts need the
-    // slower draft parse and schedule normalization.
-    let parsed: ParsedCheckbox | null;
-    let unresolved = false;
-    try {
-      parsed = parsePersisted(line);
-    } catch (error) {
-      if (!(error instanceof UnresolvedReminderScheduleError)) throw error;
-      unresolved = true;
-      parsed = parseCheckboxLine(line);
-    }
-    if (!parsed || !parsed.parsed.cleanContent.trim()) {
-      continue;
-    }
-
-    const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
-      ? parsed.reminderId : createUniqueReminderId(usedIds);
-    usedIds.add(reminderId);
-    const scheduled = unresolved ? normalizeReminderScheduleLine(line, () => { throw new UnresolvedReminderScheduleError(); }) : line;
-    const normalized = setReminderIdMarker(scheduled, reminderId);
-    if (normalized !== line) {
-      lines[index] = normalized;
-      remindersUpdated++;
-    }
-  }
-
-  return {
-    content: remindersUpdated > 0 ? lines.join("\n") : content,
-    remindersUpdated,
-  };
 }
 
 /**
@@ -158,6 +93,16 @@ function collectMarkdownFilesInFolder(app: App, remindersFolderPath: string): TF
   return files;
 }
 
+interface ScanFileOptions {
+  reservedIds?: ReadonlySet<string>;
+  signal?: AbortSignal;
+  identityOwners?: ReminderIdentityOwners;
+  shouldDeferNormalization?: () => boolean;
+  shouldDeferCollisionRepair?: () => boolean;
+  /** Content the caller just read; writes still verify it as their preimage. */
+  preread?: string;
+}
+
 /**
  * Scan a single file for reminders
  * @param app - Obsidian app instance
@@ -168,13 +113,14 @@ export async function scanFile(
   app: App,
   file: TFile,
   remindersFolderPath: string,
-  reservedIds: ReadonlySet<string> = new Set(),
-  signal?: AbortSignal,
-  identityOwners?: ReminderIdentityOwners,
-  shouldDeferNormalization: (filePath?: string) => boolean = () => false,
-  shouldDeferCollisionRepair = () => false,
-  /** Content the caller just read; writes still verify it as their preimage. */
-  preread?: string,
+  {
+    reservedIds = new Set(),
+    signal,
+    identityOwners,
+    shouldDeferNormalization = () => false,
+    shouldDeferCollisionRepair = () => false,
+    preread,
+  }: ScanFileOptions = {},
 ): Promise<FileScanResult> {
   const filePath = file.path;
   const cancelled = { filePath, reminders: [], lineCount: 0 };
@@ -194,10 +140,11 @@ export async function scanFile(
     });
     const ownership = identityOwners ? await resolveReminderIdentityOwners(app, filePath, originalContent, identityOwners) : undefined;
     if (signal?.aborted) return cancelled;
-    if (shouldDeferNormalization()) return deferred();
     const currentReservedIds = new Set([...reservedIds, ...(ownership?.reservedIds ?? [])]);
-    if (currentReservedIds.size && shouldDeferCollisionRepair()) return deferred();
-    if (ownership && !ownership.isCurrent()) return deferred();
+    const mustDefer = () => shouldDeferNormalization()
+      || (currentReservedIds.size > 0 && shouldDeferCollisionRepair())
+      || (ownership !== undefined && !ownership.isCurrent());
+    if (mustDefer()) return deferred();
     let normalized = normalizeReminderIds(originalContent, currentReservedIds, parses.remember);
     if (normalized.remindersUpdated > 0) {
       let remindersUpdated = 0;
@@ -209,8 +156,7 @@ export async function scanFile(
           targetChanged = true;
           return currentContent;
         }
-        if (signal?.aborted || shouldDeferNormalization() || currentReservedIds.size && shouldDeferCollisionRepair()
-          || ownership && !ownership.isCurrent()) return currentContent;
+        if (signal?.aborted || mustDefer()) return currentContent;
         const currentNormalization = normalizeReminderIds(currentContent, currentReservedIds, parses.remember);
         remindersUpdated = currentNormalization.remindersUpdated;
         return currentNormalization.content;
@@ -222,8 +168,7 @@ export async function scanFile(
       }
     }
     if (signal?.aborted) return cancelled;
-    if (shouldDeferNormalization() || currentReservedIds.size && shouldDeferCollisionRepair()
-      || ownership && !ownership.isCurrent()) return deferred();
+    if (mustDefer()) return deferred();
     const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath, { parsePersisted: parses.take });
 
     return {
@@ -289,7 +234,9 @@ export async function scanVault(
   for (const file of reminderFiles) {
     if (signal?.aborted) break;
     if (shouldDeferNormalization()) { deferred = true; break; }
-    const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair);
+    const result = await scanFile(app, file, remindersFolderPath, {
+      signal, identityOwners, shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
+    });
     if (result.deferred) deferred = true;
     if (result.error) {
       issues.push({ path: result.filePath, reason: result.error, ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}) });

@@ -146,8 +146,13 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     log.info(` Rescanning file: ${filePath}`);
 
     const identityOwners = batch ? (batch.owners ??= buildIdentityOwners()) : buildIdentityOwners();
-    const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners,
-      () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath), shouldDeferCollisionRepair, content);
+    const result = await scanFile(app, file, remindersFolderPath, {
+      signal,
+      identityOwners,
+      shouldDeferNormalization: () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath),
+      shouldDeferCollisionRepair,
+      preread: content,
+    });
     if (signal?.aborted || !scan.current || file.path !== scan.path) return false;
     if (result.deferred) { deferredPaths.add(filePath); return false; }
     if (result.error) {
