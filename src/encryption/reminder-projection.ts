@@ -1,6 +1,6 @@
 import { scanReminderMarkdownContent } from '../reminders/core/markdownScan';
 import { decodeMarkdownBytes } from '../reminders/core/markdownEncoding';
-import { readableLinkText } from '../reminders/utils/markdownLinks';
+import { readableLinkText } from '../reminders/core/grammar/markdownLinks';
 import { decryptJson, encryptJson, importEncryptionSecret, type EncryptionKey } from './envelope';
 import type { ReminderKeyGrant, VaultKeyBundle, ScopeKeys } from './key-bundle';
 import { validateEncryptedNotification, type EncryptedNotification, type EncryptedSchedules } from './notification-format';

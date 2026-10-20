@@ -7,15 +7,15 @@
  */
 import { Notice } from 'obsidian';
 import React, { useCallback, useRef, useState } from 'react';
-import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
-import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
-import { createLogger } from '@/reminders/utils/logger';
+import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
+import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
+import { createLogger } from '@/reminders/logger';
 
 const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/plugin-reminder';
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { openReminderEditModal } from '@/reminders/ui/plugin/reminderEditorModals';
-import type { ProjectColorScheme } from '@/reminders/utils/projectColors';
+import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 
 interface ReminderCardWrapperProps {

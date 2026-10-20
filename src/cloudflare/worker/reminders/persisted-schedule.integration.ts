@@ -14,8 +14,8 @@ import type { ReminderRecord } from '@/pwa/types';
 import { handleCreateReminder } from '../reminders-web/routes/create';
 import { revalidateReminderSources } from './source-migration';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
-import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
-import { calculateNextOccurrence } from '@/reminders/utils/recurrenceCalculator';
+import { parseReminderEditorContent } from '@/reminders/core/grammar/reminderEditorParsing';
+import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await reset(); });

@@ -13,9 +13,9 @@ vi.mock('@/reminders/ui/hooks/useIndexRefresh', () => ({ useIndexRefresh: () => 
 vi.mock('@/reminders/settings', () => ({ useRemindersSettingsStore: (select: (state: { enabled: boolean }) => unknown) => select({ enabled: true }) }));
 vi.mock('@/ui/obsidian-icon', () => ({ ObsidianIcon: () => null }));
 vi.mock('./styles.scss', () => ({}));
-vi.mock('@/reminders/components/ShadowDOMButton', () => ({ ShadowDOMButton: () => null }));
+vi.mock('@/reminders/ui/plugin/ShadowDOMButton', () => ({ ShadowDOMButton: () => null }));
 
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { RemindersList } from './RemindersList';
 
 function localDay(offset: number): string {

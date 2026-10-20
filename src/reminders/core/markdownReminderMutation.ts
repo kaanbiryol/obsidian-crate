@@ -1,14 +1,14 @@
-import { recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrenceCalendar';
+import { recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
-import { rebuildCheckboxLine } from '@/reminders/utils/checkboxParser';
-import { calculateFirstOccurrence, calculateNextOccurrence } from '@/reminders/utils/recurrenceCalculator';
+import { rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
+import { calculateFirstOccurrence, calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
 import {
 	buildStoredReminderDates,
 	inferHasTimeFromDate,
 	parseStoredReminderDate,
 	reminderHasTime,
-} from '@/reminders/utils/reminderDate';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+} from '@/reminders/core/dates/reminderDate';
+import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceRule';
 import { setReminderIdMarker } from './reminderIdentity';
 import {
 	appendReminderBlockToContent,

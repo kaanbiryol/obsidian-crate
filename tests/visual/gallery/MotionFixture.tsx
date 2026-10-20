@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/ui/shared/Button';
 import { BaseModal } from '@/ui/plugin/BaseModal';
-import { EmptyState } from '@/reminders/components/EmptyState';
-import { ProgressMeter } from '@/reminders/components/ProgressMeter';
-import { ReminderCard } from '@/reminders/components/ReminderCard';
+import { EmptyState } from '@/reminders/ui/shared/EmptyState';
+import { ProgressMeter } from '@/reminders/ui/shared/ProgressMeter';
+import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { ReminderListLayout } from '@/reminders/ui/views/ReminderListLayout';
 
 export function MotionFixture({ host }: { host: 'plugin' | 'pwa' }) {

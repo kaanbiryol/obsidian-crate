@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 
-import { ProgressMeter } from '../../components/ProgressMeter';
+import { ProgressMeter } from '../shared/ProgressMeter';
 import type { ProjectDetailHeaderViewModel } from './viewModels';
 
 export const ProjectDetailHeader = memo(function ProjectDetailHeader({

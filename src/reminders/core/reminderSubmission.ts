@@ -1,8 +1,8 @@
 import type { Priority, RecurrenceRule } from '../types/reminder';
-import { preserveReminderInstant } from '../utils/preserveReminderInstant';
-import { buildStoredReminderDates, parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
-import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
-import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '../utils/recurrenceRule';
+import { preserveReminderInstant } from './preserveReminderInstant';
+import { buildStoredReminderDates, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
+import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';
 
 interface ReminderSubmissionDraft {
 	content: string;

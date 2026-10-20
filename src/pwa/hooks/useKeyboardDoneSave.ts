@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type FocusEvent, type RefObject } from 'react';
-import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
+import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { shouldSaveFromKeyboardDone } from '../reminders/editor/keyboard-done-save';
 
 export function useKeyboardDoneSave({

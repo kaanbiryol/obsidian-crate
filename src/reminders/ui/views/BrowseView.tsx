@@ -2,10 +2,10 @@ import React, { memo, useMemo } from 'react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { EmptyState } from '../../components/EmptyState';
+import { EmptyState } from '../shared/EmptyState';
 import { buildProjectTree, ProjectTree } from './ProjectTree';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
-import type { ProjectColorScheme } from '../../utils/projectColors';
+import type { ProjectColorScheme } from '../format/projectColors';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 
 export interface BrowseViewProps {

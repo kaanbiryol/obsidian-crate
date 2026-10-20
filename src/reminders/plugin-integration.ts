@@ -5,7 +5,7 @@ import {
 	setupReminderBackend,
 } from './runtime';
 import { normalizeRemindersFolderPath } from './settings';
-import { createLogger } from './utils/logger';
+import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 
 const remindersLogger = createLogger('Reminders');

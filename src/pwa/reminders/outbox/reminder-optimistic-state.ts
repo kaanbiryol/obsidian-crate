@@ -1,6 +1,6 @@
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '@/reminders/core/markdownReminderMutation';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
-import { parseReminderDateValue } from '@/reminders/utils/reminderDate';
+import { parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { mergeProject, reorderProjectReminders } from './reminder-list-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ReminderMutationBody, ReminderRecord } from '../../types';

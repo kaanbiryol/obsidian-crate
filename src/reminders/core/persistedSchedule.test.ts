@@ -3,10 +3,10 @@ import { resetLocalTimeZone } from '@internationalized/date';
 import { scanReminderMarkdownContent } from './markdownScan';
 import { normalizeReminderScheduleLine } from './normalizeReminderSchedule';
 import { reminderRevision } from './reminderRevision';
-import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
-import { rebuildCheckboxLine } from '../utils/checkboxParser';
-import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
-import { calculateFirstOccurrence } from '../utils/recurrenceCalculator';
+import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
+import { rebuildCheckboxLine } from './grammar/checkboxParser';
+import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
+import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from './markdownReminderMutation';
 
 const originalZone = process.env.TZ;

@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProp
 import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { REMINDER_LIST_FADE_TRANSITION } from '../layoutConstants';
+import { REMINDER_LIST_FADE_TRANSITION } from '../shared/layoutConstants';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
 

@@ -2,12 +2,12 @@ import { scanReminderMarkdownContent } from './markdownScan';
 import { reminderRevision } from './reminderRevision';
 import { assertReminderMutationInput } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
-import { validateRecurrence } from './validateRecurrence';
+import { validateRecurrence } from './recurrence/validateRecurrence';
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderReminderBlocksInContent } from './markdownReminderFile';
-import { parseStoredReminderDate, reminderHasTime } from '../utils/reminderDate';
-import { normalizeRecurrenceRule } from '../utils/recurrenceRule';
+import { parseStoredReminderDate, reminderHasTime } from './dates/reminderDate';
+import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
 import type { UpdateReminderParams, RecurrenceRule } from '../types/reminder';
 
 export class ReminderCommandError extends Error {

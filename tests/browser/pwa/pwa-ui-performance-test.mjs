@@ -9,10 +9,10 @@ const { outputFiles } = await build({
 			import React, { useEffect, useState } from 'react';
 			import { createRoot } from 'react-dom/client';
 			import { flushSync } from 'react-dom';
-			import { RichTextInput } from './src/reminders/components/RichTextInput';
+			import { RichTextInput } from './src/reminders/ui/shared/RichTextInput';
 			import { useKeyboardHeight } from './src/reminders/ui/hooks/useKeyboardHeight';
 			import { PwaPullRefreshIndicator } from './src/pwa/components/PwaChrome';
-			export { getPlainText } from './src/reminders/utils/richTextPlainText';
+			export { getPlainText } from './src/reminders/ui/editor/richTextPlainText';
 			function Editor() {
 				const [value, setValue] = useState('Task #Work !');
 				return <><RichTextInput value={value} onChange={setValue} knownProjects={['Work']} ariaLabel="Test editor" autoFocus syncContentBeforePaint /><output id="value">{value}</output></>;

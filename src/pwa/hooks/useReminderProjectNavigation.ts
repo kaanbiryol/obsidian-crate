@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ViewMode } from '@/reminders/ui/remindersViewModel';
+import type { ViewMode } from '@/reminders/ui/shared/remindersViewModel';
 import type { NavigationMotion } from '../../ui/shared/navigation/NavigationScreen';
 import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../navigation/project-history';
 

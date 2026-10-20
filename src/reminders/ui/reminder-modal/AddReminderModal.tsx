@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 
-import type { RichTextInputHandle } from '../../components/RichTextInput';
+import type { RichTextInputHandle } from '../shared/RichTextInput';
 import { BaseModal } from '../../../ui/plugin/BaseModal';
 import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
@@ -9,10 +9,10 @@ import { useReminderModalActions } from './useReminderModalActions';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
-import { AnimationConfig } from '../animations';
+import { AnimationConfig } from '../plugin/animations';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { Reminder, RecurrenceRule } from '../../types';
-import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
+import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 
 interface AddReminderModalProps {
     onClose: () => void;

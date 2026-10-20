@@ -1,5 +1,5 @@
 import { TFile, type App } from 'obsidian';
-import { parseCheckboxLine } from '../utils/checkboxParser';
+import { parseCheckboxLine } from '../core/grammar/checkboxParser';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { extractReminderId } from '../core/reminderIdentity';
 import { readVaultMarkdown } from './vault-markdown';

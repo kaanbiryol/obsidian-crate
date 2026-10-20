@@ -4,10 +4,10 @@ import { ObsidianIcon } from '../../../ui/obsidian-icon';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { BaseModal } from '../../../ui/plugin/BaseModal';
-import type { AnimationConfig } from '../animations';
+import type { AnimationConfig } from '../plugin/animations';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { RecurrenceRule } from '../../types';
-import { getPickerModalProps } from '../glassStyles';
+import { getPickerModalProps } from '../plugin/glassStyles';
 import {
 	buildRecurrencePickerState,
 	isRecurrencePickerStateUnchanged,

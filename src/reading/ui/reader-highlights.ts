@@ -1,4 +1,4 @@
-import { getEditorSelectionRange } from '../../reminders/utils/editorSelection';
+import { getEditorSelectionRange } from '../../ui/shared/editorSelection';
 import { matchingHighlights, type ReadingHighlight } from '../core/highlights';
 
 export function selectedHighlight(body: HTMLElement): ReadingHighlight | null {

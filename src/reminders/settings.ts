@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { normalizePath } from 'obsidian';
 import { isRecord } from '../platform/validation';
-import type { TabId } from './ui/layoutConstants';
+import type { TabId } from './ui/shared/layoutConstants';
 import { DEFAULT_LIST_STYLE, normalizeListStyle, type ListStyle } from '@/ui/shared/list-style';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';

@@ -1,4 +1,4 @@
-import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
+import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { buildInitialReminderContent } from '@/reminders/core/reminderDraft';
 import type { ModalDraft, ReminderRecord } from '../../types';
 

@@ -21,7 +21,7 @@ const { outputFiles } = await build({
     import { createRoot } from 'react-dom/client';
     import { Button } from './src/ui/shared/Button';
     import { AddReminderModal } from './src/reminders/ui/reminder-modal/AddReminderModal';
-    import { PluginContext } from './src/reminders/ui/reminders-context';
+    import { PluginContext } from './src/reminders/ui/plugin/reminders-context';
     import { BaseUiModal } from './src/ui/plugin/BaseUiModal';
     import { useReminderModalPresentation } from './src/reminders/ui/reminder-modal/useReminderModalPresentation';
     import { BaseModal } from './src/ui/plugin/BaseModal';

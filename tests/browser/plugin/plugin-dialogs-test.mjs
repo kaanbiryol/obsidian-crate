@@ -10,7 +10,7 @@ const { outputFiles } = await build({
     import { Setting } from 'obsidian';
     import { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
-    import { DeleteConfirmationModal } from './src/reminders/components/DeleteConfirmationModal';
+    import { DeleteConfirmationModal } from './src/reminders/ui/plugin/DeleteConfirmationModal';
     import { SharedModal } from './src/ui/plugin/SharedModal';
     import { createSettingsDisclosure } from './src/ui/plugin/settings-disclosure';
     import { openConfirmationModal } from './src/ui/confirmation-modal';

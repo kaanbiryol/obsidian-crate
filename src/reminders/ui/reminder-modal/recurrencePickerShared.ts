@@ -1,6 +1,6 @@
 import type { RecurrenceRule } from '../../types';
-import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
-import { getUiLocale } from '../../utils/uiLocale';
+import { normalizeRecurrenceRule } from '../../core/recurrence/recurrenceRule';
+import { getUiLocale } from '../format/uiLocale';
 
 export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
 

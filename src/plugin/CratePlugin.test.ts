@@ -14,7 +14,7 @@ vi.mock('../reminders/plugin-integration', () => ({
 	initializeReminders: vi.fn(),
 	reinitializeReminders: vi.fn(),
 }));
-vi.mock('../reminders/ui/workspaceLayout', () => ({
+vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({
 	activateOrRevealRemindersLeaf: vi.fn(),
 }));
 vi.mock('./lifecycle', () => ({

@@ -1,9 +1,9 @@
 import React, { useCallback } from 'react';
-import { PluginContext } from '../reminders-context';
-import { PageTitleContext } from '../../components/lexical/pageTitles';
-import type { RichTextInputHandle } from '../../components/RichTextInput';
+import { PluginContext } from '../plugin/reminders-context';
+import { PageTitleContext } from '../shared/lexical/pageTitles';
+import type { RichTextInputHandle } from '../shared/RichTextInput';
 import type { RecurrenceRule } from '../../types';
-import { getProjectColor } from '../../utils/projectColors';
+import { getProjectColor } from '../format/projectColors';
 import { ReminderActionChips } from './ReminderActionChips';
 import { PluginReminderEditorFields as ReminderEditorFields } from '../plugin/PluginReminderEditorFields';
 import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';

@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { PluginWorkspaceNavigation } from '@/ui/plugin/PluginWorkspaceNavigation';
 import { PluginRemindersAppShell } from '@/reminders/ui/plugin/PluginRemindersAppShell';
 import { DEFAULT_DOCK_TABS, type DockTab } from '@/ui/shared/navigation/dock-destinations';
-import { ReminderCard } from '@/reminders/components/ReminderCard';
+import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import type { Reminder } from '@/reminders/types/reminder';
 import { ReadingFixture } from './ReadingFixture';
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';
-import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
+import { RemindersLoading } from '@/reminders/ui/plugin/RemindersLoading';
 
 const reminders: Reminder[] = Array.from({ length: 36 }, (_, index) => ({
   id: String(index), content: `Reminder ${index + 1}`, completed: false, priority: 4,

@@ -5,18 +5,18 @@ import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { formatDateHeader } from '../../utils/dateFormatting';
-import { ReminderListPresence } from '../../components/ReminderListPresence';
-import { ReminderCard } from '../../components/ReminderCard';
-import { EmptyState } from '../../components/EmptyState';
+import { formatDateHeader } from '../format/dateFormatting';
+import { ReminderListPresence } from '../shared/ReminderListPresence';
+import { ReminderCard } from '../shared/ReminderCard';
+import { EmptyState } from '../shared/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
-import { ReminderMotionRow } from '../../components/ReminderMotionRow';
-import type { ProjectColorScheme } from '../../utils/projectColors';
-import { reminderRowMotion } from '../reminderRowMotion';
+import { ReminderMotionRow } from '../shared/ReminderMotionRow';
+import type { ProjectColorScheme } from '../format/projectColors';
+import { reminderRowMotion } from '../shared/reminderRowMotion';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
-import { groupRemindersByDate } from '../../utils/reminderSort';
-import { useReminderClock } from '../useReminderClock';
+import { ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
+import { groupRemindersByDate } from '../../core/reminderSort';
+import { useReminderClock } from '../shared/useReminderClock';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];

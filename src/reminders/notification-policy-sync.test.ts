@@ -7,7 +7,7 @@ import { beginPluginLifecycle } from '../plugin/lifecycle-state';
 
 vi.mock('../plugin/lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('./plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('./ui/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
+vi.mock('./ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 beforeEach(() => useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true }, true));
 afterEach(() => vi.restoreAllMocks());
 

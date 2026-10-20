@@ -1,11 +1,11 @@
 import { expect, it, vi } from 'vitest';
 import { TFile, TFolder, type App } from 'obsidian';
 import { createReminderIndex } from './reminder-index';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 // Count the date-parsing step that dominates scan cost, without changing it.
-vi.mock('@/reminders/utils/reminderParser', async importOriginal => {
-	const actual = await importOriginal<typeof import('@/reminders/utils/reminderParser')>();
+vi.mock('@/reminders/core/grammar/reminderParser', async importOriginal => {
+	const actual = await importOriginal<typeof import('@/reminders/core/grammar/reminderParser')>();
 	return { ...actual, parseReminderContent: vi.fn(actual.parseReminderContent) };
 });
 

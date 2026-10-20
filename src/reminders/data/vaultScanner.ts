@@ -15,8 +15,8 @@ import {
   scanReminderMarkdownContent,
 } from "@/reminders/core/markdownScan";
 import { createReminderId, setReminderIdMarker } from "@/reminders/core/reminderIdentity";
-import { createPersistedCheckboxParses, parseCheckboxLine, type ParsedCheckbox } from "@/reminders/utils/checkboxParser";
-import { createLogger } from "@/reminders/utils/logger";
+import { createPersistedCheckboxParses, parseCheckboxLine, type ParsedCheckbox } from "@/reminders/core/grammar/checkboxParser";
+import { createLogger } from "@/reminders/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
@@ -24,7 +24,7 @@ import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
-import { UnresolvedReminderScheduleError } from '@/reminders/utils/reminderParser';
+import { UnresolvedReminderScheduleError } from '@/reminders/core/grammar/reminderParser';
 
 const log = createLogger('VaultScanner');
 

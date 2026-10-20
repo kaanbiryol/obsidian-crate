@@ -2,17 +2,17 @@ import { memo, type ReactElement } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { ReminderMotionRow } from '../../components/ReminderMotionRow';
-import { ReminderListPresence } from '../../components/ReminderListPresence';
+import { ReminderMotionRow } from '../shared/ReminderMotionRow';
+import { ReminderListPresence } from '../shared/ReminderListPresence';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import {
   REMINDER_LIST_FADE_TRANSITION,
   REMINDER_SECTION_TRANSITION,
-} from '../layoutConstants';
+} from '../shared/layoutConstants';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
+import { ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
 
 export interface CompletedSectionToggleProps {
   onPress: () => void;

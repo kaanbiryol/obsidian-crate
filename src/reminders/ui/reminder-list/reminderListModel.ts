@@ -2,8 +2,8 @@ import {
   getUpcomingReminders,
   sortReminders,
   sortRemindersByFileOrder,
-} from "@/reminders/utils/reminderSort";
-import { formatDateHeader, isReminderOverdue } from "@/reminders/utils/dateFormatting";
+} from "@/reminders/core/reminderSort";
+import { formatDateHeader, isReminderOverdue } from "@/reminders/ui/format/dateFormatting";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 

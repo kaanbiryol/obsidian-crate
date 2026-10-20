@@ -4,21 +4,21 @@ import { TFile } from 'obsidian';
 import type CratePlugin from "@/main";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
-import type { TabId } from "@/reminders/ui/layoutConstants";
+import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
-import { RemindersViewCloseButton } from "@/reminders/ui/RemindersViewCloseButton";
+import { RemindersViewCloseButton } from "@/reminders/ui/plugin/RemindersViewCloseButton";
 import {
     PluginRemindersAppShell,
     type PluginReminderCardRenderer,
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
-import { RemindersLoading } from "../RemindersLoading";
+import { RemindersLoading } from "./RemindersLoading";
 import "../reminders-view.scss";
 
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
-import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
+import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
 interface RemindersViewContentProps {
     plugin: CratePlugin;

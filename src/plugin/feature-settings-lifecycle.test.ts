@@ -12,7 +12,7 @@ vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn(
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('../reminders/ui/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
+vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 
 beforeEach(() => {
   vi.clearAllMocks();

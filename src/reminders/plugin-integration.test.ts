@@ -114,7 +114,7 @@ async function loadPluginIntegrationModule() {
 		},
 		VIEW_TYPE_REMINDERS: 'reminders-view',
 	}));
-	vi.doMock('./utils/logger', () => ({
+	vi.doMock('./logger', () => ({
 		configureLogger: vi.fn(),
 		createLogger: vi.fn(() => ({
 			info: vi.fn(),

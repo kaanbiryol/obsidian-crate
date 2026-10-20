@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { isObsidianOverlayActive } from '../../../ui/plugin/useObsidianOverlayActive';
-import type { RichTextInputHandle } from '../../components/RichTextInput';
+import type { RichTextInputHandle } from '../shared/RichTextInput';
 
 interface UseReminderModalPresentationOptions {
 	focusDelayMs: number;

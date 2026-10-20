@@ -10,7 +10,7 @@ import {
   buildUpcomingViewModel,
   getProjectStats,
 } from "./viewModels";
-import { getProjectColor } from "@/reminders/utils/projectColors";
+import { getProjectColor } from "@/reminders/ui/format/projectColors";
 
 function makeReminder(overrides: Partial<Reminder>): Reminder {
   return {

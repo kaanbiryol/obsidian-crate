@@ -3,14 +3,14 @@ import React from 'react';
 import { Button } from '../../../ui/shared/Button';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import type { RecurrenceRule } from '../../types';
-import { formatRecurrence } from '../../utils/rruleConverter';
-import { formatDueDate } from '../../utils/dateFormatting';
+import { formatRecurrence } from '../../core/recurrence/rruleConverter';
+import { formatDueDate } from '../format/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
-import { useReminderClock } from '../useReminderClock';
+import { useReminderClock } from '../shared/useReminderClock';
 import { AnimatedActionLabel } from './AnimatedActionLabel';
-import { calculateFirstOccurrence } from '../../utils/recurrenceCalculator';
-import { recurrenceCalendarDate } from '../../core/recurrenceCalendar';
-import { formatLocalDateKey } from '../../utils/reminderDate';
+import { calculateFirstOccurrence } from '../../core/recurrence/recurrenceCalculator';
+import { recurrenceCalendarDate } from '../../core/recurrence/recurrenceCalendar';
+import { formatLocalDateKey } from '../../core/dates/reminderDate';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;

@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
-import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
-import { RichTextInput } from '@/reminders/components/RichTextInput';
+import { PageTitleContext } from '@/reminders/ui/shared/lexical/pageTitles';
+import { RichTextInput } from '@/reminders/ui/shared/RichTextInput';
 
 
 const projects = ['Inbox', 'Work', 'Crate Demo'];

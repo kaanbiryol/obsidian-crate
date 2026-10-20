@@ -1,4 +1,4 @@
-import { createLogger } from "@/reminders/utils/logger";
+import { createLogger } from "@/reminders/logger";
 import type {
   MarkdownWriterContext,
 } from "./types";

@@ -154,7 +154,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/ui/shared/**/*.{ts,tsx}'],
+		files: ['src/ui/shared/**/*.{ts,tsx}', 'src/reminders/ui/shared/**/*.{ts,tsx}'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {
 				paths: [{ name: 'obsidian', message: 'Shared UI must work in both the plugin and PWA; keep Obsidian APIs in ui/plugin.' }],
@@ -178,7 +178,7 @@ export default tseslint.config(
 	{
 		// Shared by the plugin, PWA and Worker.
 		files: [
-			'src/reminders/{core,utils,types}/**/*.{ts,tsx}',
+			'src/reminders/{core,types}/**/*.{ts,tsx}',
 			'src/reading/{core,extraction}/**/*.{ts,tsx}',
 			'src/{protocol,encryption,platform}/**/*.{ts,tsx}',
 		],
@@ -193,7 +193,7 @@ export default tseslint.config(
 	},
 	{
 		// Shared and inert document adapters cannot use Obsidian's element helpers.
-		files: ['src/reminders/components/richTextInputDom.ts', 'src/reading/ui/reader-highlights.ts', 'src/reading/extraction/**/*.ts'],
+		files: ['src/reading/ui/reader-highlights.ts', 'src/reading/extraction/**/*.ts'],
 		rules: {
 			'obsidianmd/prefer-create-el': 'off',
 		},

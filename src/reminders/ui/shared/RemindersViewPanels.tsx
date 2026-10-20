@@ -1,0 +1,157 @@
+import React, { memo } from "react";
+import { motion } from "motion/react";
+import {
+  BrowseView,
+  InboxView,
+  ProjectDetailView,
+  TodayView,
+  UpcomingView,
+} from "@/reminders/ui/views";
+import {
+  EASE_EXPO_OUT,
+  PAGE_TRANSITION_DURATION,
+} from "@/reminders/ui/shared/layoutConstants";
+import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/types/plugin-reminder";
+import type { ViewMode } from "./remindersViewModel";
+import type { ProjectColorScheme } from "@/reminders/ui/format/projectColors";
+
+interface RemindersViewPanelsProps {
+  viewMode: ViewMode;
+  selectedProject: string | null;
+  hideProjectTitle?: boolean;
+  projectHeaderRightContent?: React.ReactNode;
+  projectHeaderTitleContent?: React.ReactNode;
+  projectHeaderMetaContent?: React.ReactNode;
+  projectBelowHeaderContent?: React.ReactNode;
+  isInitialLoadComplete: boolean;
+  reminders: Reminder[];
+  projects: string[];
+  showFab: boolean;
+  upcomingDays: number;
+  renderCard: (reminder: SharedReminder, index: number) => React.ReactNode;
+  renderToggleButton: (props: {
+    onPress: () => void;
+    showCompleted: boolean;
+    count: number;
+  }) => React.ReactNode;
+  onProjectSelect: (project: string) => void;
+  onBackToProjects: () => void;
+  onReorder: (orderedIds: string[]) => Promise<void> | void;
+  onReorderDragActiveChange?: (active: boolean) => void;
+  colorScheme: ProjectColorScheme;
+  reorderInteraction?: 'drag' | 'long-press';
+  animationsEnabled?: boolean;
+  pageTransitionsEnabled?: boolean;
+}
+
+export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
+  viewMode,
+  selectedProject,
+  hideProjectTitle = false,
+  projectHeaderRightContent,
+  projectHeaderTitleContent,
+  projectHeaderMetaContent,
+  projectBelowHeaderContent,
+  isInitialLoadComplete,
+  reminders,
+  projects,
+  showFab,
+  upcomingDays,
+  renderCard,
+  renderToggleButton,
+  onProjectSelect,
+  onBackToProjects,
+  onReorder,
+  onReorderDragActiveChange,
+  colorScheme,
+  reorderInteraction = 'drag',
+  animationsEnabled = true,
+  pageTransitionsEnabled = animationsEnabled,
+}) => {
+  const pageTransition = {
+    initial: pageTransitionsEnabled ? { opacity: 0 } : false,
+    animate: { opacity: 1 },
+    exit: pageTransitionsEnabled ? { opacity: 0 } : undefined,
+    transition: {
+      duration: pageTransitionsEnabled ? PAGE_TRANSITION_DURATION : 0,
+      ease: EASE_EXPO_OUT,
+    },
+  };
+
+  if (!isInitialLoadComplete) return null;
+
+  switch (viewMode) {
+    case "inbox":
+      return (
+        <motion.div key="inbox" className="reminders-view-panel" {...pageTransition}>
+          <InboxView
+            reminders={reminders}
+            renderCard={renderCard}
+            renderToggleButton={renderToggleButton}
+            hasFab={showFab}
+            onReorder={onReorder}
+            onReorderDragActiveChange={onReorderDragActiveChange}
+            colorScheme={colorScheme}
+            reorderInteraction={reorderInteraction}
+            animationConfig={{ enabled: animationsEnabled }}
+          />
+        </motion.div>
+      );
+    case "today":
+      return (
+        <motion.div key="today" className="reminders-view-panel" {...pageTransition}>
+          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} animationConfig={{ enabled: animationsEnabled }} />
+        </motion.div>
+      );
+    case "upcoming":
+      return (
+        <motion.div key="upcoming" className="reminders-view-panel" {...pageTransition}>
+          <UpcomingView
+            reminders={reminders}
+            renderCard={renderCard}
+            days={upcomingDays}
+            hasFab={showFab}
+            colorScheme={colorScheme}
+            animationConfig={{ enabled: animationsEnabled }}
+          />
+        </motion.div>
+      );
+    case "browse":
+      if (!selectedProject) {
+        return (
+          <motion.div key="browse" className="reminders-view-panel" {...pageTransition}>
+            <BrowseView
+              projects={projects}
+              reminders={reminders}
+              onProjectSelect={onProjectSelect}
+              colorScheme={colorScheme}
+              animationConfig={{ enabled: animationsEnabled }}
+            />
+          </motion.div>
+        );
+      }
+
+      return (
+        <motion.div key={`project-${selectedProject}`} className="reminders-view-panel" {...pageTransition}>
+          <ProjectDetailView
+            project={selectedProject}
+            hideTitle={hideProjectTitle}
+            headerRightContent={projectHeaderRightContent}
+            headerTitleContent={projectHeaderTitleContent}
+            headerMetaContent={projectHeaderMetaContent}
+            belowHeaderContent={projectBelowHeaderContent}
+            reminders={reminders}
+            onBack={onBackToProjects}
+            animationConfig={{ enabled: animationsEnabled }}
+            renderCard={renderCard}
+            hasFab={showFab}
+            onReorder={onReorder}
+            onReorderDragActiveChange={onReorderDragActiveChange}
+            colorScheme={colorScheme}
+            reorderInteraction={reorderInteraction}
+          />
+        </motion.div>
+      );
+  }
+});

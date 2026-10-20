@@ -4,7 +4,7 @@ import { usePwaPreferences } from '@/pwa/hooks/usePwaPreferences';
 import { usePwaInputModality } from '@/pwa/hooks/usePwaInputModality';
 import { ListStyleSetting } from '@/pwa/components/ListStyleSetting';
 import { ReadingFixture } from './ReadingFixture';
-import { ReorderableReminderList } from '@/reminders/components/ReorderableReminderList';
+import { ReorderableReminderList } from '@/reminders/ui/shared/ReorderableReminderList';
 import { HighlightList } from '@/reading/ui/HighlightList';
 import { BrowseView } from '@/reminders/ui/views/BrowseView';
 import { TodayView } from '@/reminders/ui/views/TodayView';

@@ -1,6 +1,6 @@
 import type { IndexedReminder } from "./reminder-index";
 import type { Reminder } from "@/reminders/types/reminder";
-import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
+import { normalizeRecurrenceRule } from "@/reminders/core/recurrence/recurrenceRule";
 
 /** Convert the persisted Markdown representation into the UI-facing reminder model. */
 export function toReminder(indexed: IndexedReminder): Reminder {

@@ -2,8 +2,8 @@ import { assertReminderMutationInput } from '@/reminders/core/reminderMutationIn
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildReminderUpdate } from '@/reminders/core/reminderMutationPlan';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
-import { parseStoredReminderDate, reminderHasTime } from '@/reminders/utils/reminderDate';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import { parseStoredReminderDate, reminderHasTime } from '@/reminders/core/dates/reminderDate';
+import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceRule';
 import { writeCommittedMarkdownFilePair } from '../../sync/atomic-markdown-write';
 import { corsResponse } from '../../cors';
 import {

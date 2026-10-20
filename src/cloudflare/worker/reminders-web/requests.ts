@@ -1,6 +1,6 @@
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
-import { validateRecurrence } from '@/reminders/core/validateRecurrence';
+import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
 import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../utils';
 import type { ReminderMutationWorkspace } from './types';

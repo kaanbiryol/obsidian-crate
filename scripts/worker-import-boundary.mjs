@@ -7,7 +7,7 @@ const allowed = [
   'src/cloudflare/worker/',
   'src/cloudflare/server-release.json', 'src/cloudflare/schema.sql', 'src/cloudflare/migrations/',
   'src/protocol/', 'src/encryption/', 'src/platform/',
-  'src/reminders/core/', 'src/reminders/types/', 'src/reminders/utils/',
+  'src/reminders/core/', 'src/reminders/types/',
   'src/reading/core/', 'src/reading/extraction/', 'src/reading/shortcut', 'src/reading/settings', 'src/reading/ui/reading.scss',
   'src/pwa/shell/', 'src/pwa/service-worker/config', 'src/pwa/styles/', 'src/pwa/reading/web.scss',
   'site/assets/',

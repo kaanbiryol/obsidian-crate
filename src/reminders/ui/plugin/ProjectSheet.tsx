@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Platform } from "obsidian";
 import type CratePlugin from "@/main";
 import { BaseModal } from "@/ui/plugin/BaseModal";
-import { ModalHeader } from "@/reminders/components/ModalHeader";
+import { ModalHeader } from "@/reminders/ui/plugin/ModalHeader";
 import { RemindersViewContent } from "./RemindersViewContent";
 
 interface ProjectSheetProps {

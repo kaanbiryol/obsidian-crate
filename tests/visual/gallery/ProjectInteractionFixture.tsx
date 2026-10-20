@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { AddReminderModal } from '@/reminders/ui/reminder-modal/AddReminderModal';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
-import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 
 const projects = Array.from({ length: 36 }, (_, index) => `Project ${String(index + 1).padStart(2, '0')}`);
 const plugin = { syncRuntime: { getApiClient: () => null } } as unknown as ReturnType<typeof PluginContext.use>;

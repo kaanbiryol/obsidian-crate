@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 import { PluginRemindersAppShell } from '@/reminders/ui/plugin/PluginRemindersAppShell';
-import { ReminderCard } from '@/reminders/components/ReminderCard';
+import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { IconButton } from '@/ui/shared/IconButton';
 import type { Reminder } from '@/reminders/types/reminder';
 

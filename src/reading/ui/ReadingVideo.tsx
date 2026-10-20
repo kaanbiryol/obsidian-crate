@@ -3,7 +3,7 @@ import { Button } from '@/ui/shared/Button';
 import { ToggleButton } from '@/ui/shared/ToggleButton';
 import { youtubeMomentUrl, youtubeStartTime } from '../core/youtube';
 import { connectYoutubePlayer } from './youtube-player';
-import { getEditorSelectionRange } from '@/reminders/utils/editorSelection';
+import { getEditorSelectionRange } from '@/ui/shared/editorSelection';
 import { revealTranscriptPassage, stopTranscriptScroll } from './transcript-scroll';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { useReadingVideoSize } from './useReadingVideoSize';

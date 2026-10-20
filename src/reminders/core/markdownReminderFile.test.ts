@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 import {
 	appendReminderBlockToContent,
 	deleteReminderBlockFromContent,
@@ -10,8 +10,8 @@ import {
 } from './markdownReminderFile';
 import { buildDescriptionBlock } from './reminderDescription';
 
-vi.mock('@/reminders/utils/reminderParser', async importOriginal => {
-	const actual = await importOriginal<typeof import('@/reminders/utils/reminderParser')>();
+vi.mock('@/reminders/core/grammar/reminderParser', async importOriginal => {
+	const actual = await importOriginal<typeof import('@/reminders/core/grammar/reminderParser')>();
 	return { ...actual, parseReminderContent: vi.fn(actual.parseReminderContent) };
 });
 

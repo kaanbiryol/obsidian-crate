@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { parseLocalDateKey } from '../../utils/reminderDate';
+import { parseLocalDateKey } from '../../core/dates/reminderDate';
 import { PickerNativeControl } from './PickerNativeControl';
 
 interface EditableDateControlProps {

@@ -1,4 +1,4 @@
-import { readableLinkText } from '../../../reminders/utils/markdownLinks';
+import { readableLinkText } from '../../../reminders/core/grammar/markdownLinks';
 import { fitPushDisplay } from './payload-budget';
 import {
 	deserializeVapidKeys,

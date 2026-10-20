@@ -3,7 +3,7 @@ import {
   buildDatePickerDateSelection,
   buildDatePickerTimeSelection,
 } from './datePickerSelection';
-import { parseReminderDateValue } from '../../utils/reminderDate';
+import { parseReminderDateValue } from '../../core/dates/reminderDate';
 
 describe('DatePickerModal selection helpers', () => {
   it('preserves date-only selections as local date strings', () => {

@@ -4,13 +4,13 @@ import type CratePlugin from '@/plugin/CratePlugin';
 import { getReadingLibrary, subscribeReadingRuntime } from '@/reading/runtime';
 import { LocalReadingLibrary } from '@/reading/ui/LocalReadingLibrary';
 import { RemindersViewContent } from '@/reminders/ui/plugin/RemindersViewContent';
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { ObsidianIcon } from '@/ui/obsidian-icon';
 import { normalizeDockTabs, type DockTab } from '../shared/navigation/dock-destinations';
 import { PluginWorkspaceNavigation } from './PluginWorkspaceNavigation';
-import type { TabId } from '@/reminders/ui/layoutConstants';
+import type { TabId } from '@/reminders/ui/shared/layoutConstants';
 import { useObsidianStatusBarInset } from '@/reminders/ui/hooks/useObsidianStatusBarInset';
 import './plugin-navigation.scss';
 

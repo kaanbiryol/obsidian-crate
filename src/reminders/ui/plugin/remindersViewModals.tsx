@@ -1,7 +1,7 @@
 import { useRemindersSettingsStore } from "../../settings";
 import { BaseUiModal } from "../../../ui/plugin/BaseUiModal";
 import type CratePlugin from "@/main";
-import { PluginContext } from "../reminders-context";
+import { PluginContext } from "./reminders-context";
 import { ProjectSheet } from "./ProjectSheet";
 import { hideNativeModalCloseButton } from "../../../ui/plugin/modalShell";
 import { createShadowReactMount, type ShadowReactMount } from "../../../ui/plugin/shadowReactMount";

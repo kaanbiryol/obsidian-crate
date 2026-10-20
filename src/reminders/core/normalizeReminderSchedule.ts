@@ -1,11 +1,11 @@
-import { parseCheckboxLine, type ParsedCheckbox } from '../utils/checkboxParser';
-import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
-import { formatLocalDateKey } from '../utils/reminderDate';
-import { calculateFirstOccurrence } from '../utils/recurrenceCalculator';
-import { recurrenceCalendarDate } from './recurrenceCalendar';
-import { appendRecurrenceMetadata } from './recurrenceMetadata';
+import { parseCheckboxLine, type ParsedCheckbox } from './grammar/checkboxParser';
+import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
+import { formatLocalDateKey } from './dates/reminderDate';
+import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
+import { recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
+import { appendRecurrenceMetadata } from './recurrence/recurrenceMetadata';
 import { setReminderIdMarker } from './reminderIdentity';
-import { recurrenceToText } from '../utils/rruleConverter';
+import { recurrenceToText } from './recurrence/rruleConverter';
 
 /** Resolve draft syntax once on the user's device before indexing/syncing it. */
 export function normalizeReminderScheduleLine(

@@ -1,5 +1,5 @@
 import { type Reminder } from "@/reminders/types/reminder";
-import { getProjectColor, type ProjectColorScheme } from "@/reminders/utils/projectColors";
+import { getProjectColor, type ProjectColorScheme } from "@/reminders/ui/format/projectColors";
 import {
   getCompletedTodayReminders,
   getOverdueReminders,
@@ -7,8 +7,8 @@ import {
   getUpcomingReminders,
   sortReminders,
   sortRemindersByFileOrder,
-} from "@/reminders/utils/reminderSort";
-import { DEFAULT_PROJECT } from "@/reminders/utils/constants";
+} from "@/reminders/core/reminderSort";
+import { DEFAULT_PROJECT } from "@/reminders/core/constants";
 
 export interface ProjectStats {
   active: number;

@@ -1,6 +1,6 @@
 import type React from 'react';
 
-import { getProjectColor } from '../../utils/projectColors';
+import { getProjectColor } from '../format/projectColors';
 
 export const ProjectDot: React.FC<{ projectName: string; isDark: boolean }> = ({ projectName, isDark }) => {
     const color = getProjectColor(projectName)[isDark ? 'dark' : 'light'].accent;

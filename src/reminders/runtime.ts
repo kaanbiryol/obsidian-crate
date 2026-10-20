@@ -3,7 +3,7 @@ import { createReminderIndex } from './data/reminder-index';
 import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository } from './data/reminder-repository';
 import { VaultWatcher } from './services/vaultWatcher';
-import { createLogger } from './utils/logger';
+import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { Notice } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';

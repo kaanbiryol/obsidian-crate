@@ -7,11 +7,11 @@ import React, {
 	useMemo,
 } from 'react';
 import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDraft';
-import { getProjectColor } from '@/reminders/utils/projectColors';
+import { getProjectColor } from '@/reminders/ui/format/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { usePreserveFieldFocus } from '@/ui/shared/usePreserveFieldFocus';
-import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
+import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
 import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActionChips';
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';

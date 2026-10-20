@@ -10,9 +10,9 @@ import {
   createShadowRootMount,
   type ShadowRootMount,
 } from "@/ui/plugin/shadowReactMount";
-import { PluginContext } from "@/reminders/ui/reminders-context";
+import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
-import { hashFileContent } from "@/reminders/utils/hashing";
+import { hashFileContent } from "@/reminders/query/hashing";
 import { parseRemindersBlockOptions, type RemindersBlockType } from "./remindersBlockOptions";
 
 export class ReminderQueryInjector {

@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
-import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
+import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
+import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 import type { ListStyle } from '@/ui/shared/list-style';
 

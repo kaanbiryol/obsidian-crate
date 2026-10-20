@@ -6,7 +6,7 @@ import { PickerTimeCard } from './PickerTimeCard';
 import { PickerContent } from './PickerContent';
 import { PickerFieldRow } from './PickerFieldRow';
 import { PickerSection } from './PickerSection';
-import { formatLocalDateKey } from '../../utils/reminderDate';
+import { formatLocalDateKey } from '../../core/dates/reminderDate';
 import type { ReminderDatePreset } from './datePresets';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 

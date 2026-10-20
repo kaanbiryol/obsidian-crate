@@ -5,12 +5,12 @@ import { ReminderListLayout } from './ReminderListLayout';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { Button } from '../../../ui/shared/Button';
 import type { Reminder } from '../../types/reminder';
-import { ReminderCard } from '../../components/ReminderCard';
-import { ReorderableReminderList } from '../../components/ReorderableReminderList';
-import { EmptyState } from '../../components/EmptyState';
+import { ReminderCard } from '../shared/ReminderCard';
+import { ReorderableReminderList } from '../shared/ReorderableReminderList';
+import { EmptyState } from '../shared/EmptyState';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
-import type { ProjectColorScheme } from '../../utils/projectColors';
+import type { ProjectColorScheme } from '../format/projectColors';
 import { useReminderOrder } from '../hooks/useReminderOrder';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 

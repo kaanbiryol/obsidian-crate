@@ -1,8 +1,8 @@
 import { assertReminderMutationInput } from './reminderMutationInput';
 import type { MarkdownReminderUpdate } from './markdownReminderMutation';
 import type { Priority, Reminder, UpdateReminderParams } from '../types/reminder';
-import { buildStoredReminderDates, parseReminderDateValue } from '../utils/reminderDate';
-import { normalizeRecurrenceRule } from '../utils/recurrenceRule';
+import { buildStoredReminderDates, parseReminderDateValue } from './dates/reminderDate';
+import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
 
 /** Normalized domain input consumed by both Obsidian and server Markdown writers. */
 export interface UpdateReminderInput extends MarkdownReminderUpdate { project?: string }

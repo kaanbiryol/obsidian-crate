@@ -9,7 +9,7 @@ const bundle = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', 
   import { createRoot } from 'react-dom/client';
   import { flushSync } from 'react-dom';
   import { ReadingReader } from './src/reading/ui/Reader';
-  import { ReminderCard } from './src/reminders/components/ReminderCard';
+  import { ReminderCard } from './src/reminders/ui/shared/ReminderCard';
   import { highlightReadingCode } from './src/reading/ui/code-highlighting';
   let root;
   const html = Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');

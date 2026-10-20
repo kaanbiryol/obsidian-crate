@@ -9,7 +9,7 @@
  */
 
 import { TFile, type TAbstractFile, type EventRef } from "obsidian";
-import { createLogger } from "@/reminders/utils/logger";
+import { createLogger } from "@/reminders/logger";
 import type CratePlugin from "@/main";
 import type { ReminderIndex } from "@/reminders/data/reminder-index";
 

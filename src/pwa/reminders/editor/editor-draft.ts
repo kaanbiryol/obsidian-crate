@@ -5,9 +5,9 @@ import {
 	type ReminderDraftContentMetadata,
 } from '@/reminders/core/reminderDraft';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
-import { formatDueDate } from '@/reminders/utils/dateFormatting';
-import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
-import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/utils/recurrenceRule';
+import { formatDueDate } from '@/reminders/ui/format/dateFormatting';
+import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/core/recurrence/recurrenceRule';
 import {
 	getReminderDateForPreset,
 	type ReminderDatePreset,

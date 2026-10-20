@@ -1,7 +1,7 @@
 import { useSharedFeatures } from '../shared-features';
 import React, { createContext, useContext } from 'react';
 import type { ReadingSection } from '@/reading/ui/reading-presentation';
-import type { TabId } from '@/reminders/ui/layoutConstants';
+import type { TabId } from '@/reminders/ui/shared/layoutConstants';
 import { IconButton } from '@/ui/shared/IconButton';
 
 export type CrateSection = 'reading' | 'reminders';

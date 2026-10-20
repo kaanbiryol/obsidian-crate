@@ -2,7 +2,7 @@ import type { IndexedReminder } from "../reminder-index";
 import type { Priority, Reminder } from "@/reminders/types/plugin-reminder";
 import {
   isReminderDueToday,
-} from "@/reminders/utils/reminderDate";
+} from "@/reminders/core/dates/reminderDate";
 import { toReminder } from "../toReminder";
 
 export function getTodayReminderIds(

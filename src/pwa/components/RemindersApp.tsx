@@ -1,4 +1,4 @@
-import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
+import { PageTitleContext } from '@/reminders/ui/shared/lexical/pageTitles';
 import { lazy, useCallback, useContext } from 'react';
 import { useLaunchReminderModal } from '../hooks/useLaunchReminderModal';
 import { usePrepareReminderEditor } from '../hooks/usePrepareReminderEditor';

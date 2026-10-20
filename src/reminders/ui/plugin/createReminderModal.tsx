@@ -3,14 +3,14 @@ import React, { useMemo, useRef } from "react";
 import { Notice } from "obsidian";
 import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
 import type { RecurrenceRule } from "@/reminders/types/reminder";
-import { createLogger } from "@/reminders/utils/logger";
+import { createLogger } from "@/reminders/logger";
 
 const log = createLogger('ReminderModal');
 
-import { today } from "@/reminders/utils/time";
-import { parseReminderDateValue } from "@/reminders/utils/reminderDate";
+import { today } from "@/reminders/core/dates/time";
+import { parseReminderDateValue } from "@/reminders/core/dates/reminderDate";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
-import { ModalContext, PluginContext } from "@/reminders/ui/reminders-context";
+import { ModalContext, PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { useObsidianKeyboardHeight } from "@/reminders/ui/hooks/useObsidianKeyboardHeight";
 

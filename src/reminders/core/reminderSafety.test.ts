@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
-import { rebuildCheckboxLine, parseCheckboxLine } from '../utils/checkboxParser';
+import { rebuildCheckboxLine, parseCheckboxLine } from './grammar/checkboxParser';
 import { scanReminderMarkdownContent } from './markdownScan';
 import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, setReminderCompletionInContent } from './markdownReminderMutation';
 import { deleteReminderBlockFromContent } from './markdownReminderFile';

@@ -17,8 +17,8 @@ import {
 	useRemindersSettingsStore,
 } from '../reminders/settings';
 import { type VaultWatcher } from '../reminders/services/vaultWatcher';
-import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
-import { configureLogger as configureRemindersLogger } from '../reminders/utils/logger';
+import { activateOrRevealRemindersLeaf } from '../reminders/ui/plugin/workspaceLayout';
+import { configureLogger as configureRemindersLogger } from '../reminders/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from '../sync/logger';

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ReminderIndex, IndexedReminder } from '../reminder-index';
 import type { MarkdownWriter } from '../markdown-writer';
 import { createReminderRepository } from '.';
-import { timezone as getLocalTimeZone } from '../../utils/time';
+import { timezone as getLocalTimeZone } from '../../core/dates/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {

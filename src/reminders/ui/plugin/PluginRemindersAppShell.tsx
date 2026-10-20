@@ -7,18 +7,18 @@ import { NavigationScreen } from '@/ui/shared/navigation/NavigationScreen';
 import { PWA_CONTROL_SPRING } from '@/ui/shared/navigation/motion';
 import { BackButton } from '@/ui/shared/BackButton';
 import { ProjectDetailView } from '../views';
-import type { TabId } from '../layoutConstants';
+import type { TabId } from '../shared/layoutConstants';
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 
 import { ThemeIcon } from "@/ui/shared/ThemeIcon";
 
-import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
+import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ViewHeader } from "@/ui/shared/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
-import { RemindersViewPanels } from "@/reminders/ui/RemindersViewPanels";
+import { RemindersViewPanels } from "@/reminders/ui/shared/RemindersViewPanels";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
-import { useReminderClock } from '../useReminderClock';
+import { useReminderClock } from '../shared/useReminderClock';
 import {
   getCurrentHeaderData,
   getReminderCreateProject,
@@ -27,7 +27,7 @@ import {
   getReorderProject,
   shouldShowReminderFab,
   type ViewMode,
-} from "@/reminders/ui/remindersViewModel";
+} from "@/reminders/ui/shared/remindersViewModel";
 
 export type PluginReminderCardRenderer = (props: {
   reminder: Reminder;

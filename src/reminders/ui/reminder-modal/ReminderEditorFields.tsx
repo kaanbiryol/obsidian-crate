@@ -1,9 +1,9 @@
 import { assertReminderMutationInput } from '../../core/reminderMutationInput';
-import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
+import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 import React, { useRef, useMemo, useContext } from 'react';
-import { PageTitleContext } from '../../components/lexical/pageTitles';
+import { PageTitleContext } from '../shared/lexical/pageTitles';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
-import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
+import { RichTextInput, type RichTextInputHandle } from '../shared/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
 
 interface ReminderEditorFieldsProps {

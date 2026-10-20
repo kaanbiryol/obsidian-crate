@@ -7,7 +7,7 @@ import {
 	recurrenceRuleFromPickerDraft,
 	summarizeRecurrencePickerState,
 } from './recurrencePickerShared';
-import { timezone as getLocalTimeZone } from '../../utils/time';
+import { timezone as getLocalTimeZone } from '../../core/dates/time';
 
 describe('recurrencePickerShared', () => {
 	it('builds picker drafts from existing recurrence rules', () => {

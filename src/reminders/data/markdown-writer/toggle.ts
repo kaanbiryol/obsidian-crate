@@ -1,5 +1,5 @@
 import { processVaultMarkdown } from '../vault-markdown';
-import { parseStoredReminderDate } from '@/reminders/utils/reminderDate';
+import { parseStoredReminderDate } from '@/reminders/core/dates/reminderDate';
 import {
 	buildReminderCompletionPlan,
 	setReminderCompletionInContent,

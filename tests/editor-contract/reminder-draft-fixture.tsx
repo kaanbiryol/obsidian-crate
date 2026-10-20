@@ -2,14 +2,14 @@ import { ReminderEditorScreen } from '@/pwa/components/ReminderEditorScreen';
 import type { ModalState } from '@/pwa/types';
 import React, { useRef, useState } from 'react';
 import type { Reminder } from '@/reminders/types';
-import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
+import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
 import { useReminderDraft } from '@/reminders/ui/reminder-modal/useReminderDraft';
 import { buildReminderSubmission } from '@/reminders/ui/reminder-modal/reminderMutation';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
 import { RecurrencePickerModal } from '@/reminders/ui/reminder-modal/RecurrencePickerModal';
 import { AddReminderModal } from '@/reminders/ui/reminder-modal/AddReminderModal';
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 
 const params = new URLSearchParams(location.search);
 const reminder = params.has('reminder') ? JSON.parse(params.get('reminder')!) as Reminder : undefined;

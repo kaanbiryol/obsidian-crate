@@ -8,16 +8,16 @@ import { FeatureNavigationContext } from './FeatureSwitcherButton';
 import { PwaDock, PwaDockAddButton } from './PwaDock';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';
 import { ScheduleSwitcher } from '../../ui/shared/navigation/ScheduleSwitcher';
-import { TABS } from '@/reminders/ui/layoutConstants';
+import { TABS } from '@/reminders/ui/shared/layoutConstants';
 import { Button } from '@/ui/shared/Button';
 import { ViewHeader } from '@/ui/shared/ViewHeader';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { Reminder } from '@/reminders/types/reminder';
-import type { TabId } from '@/reminders/ui/layoutConstants';
+import type { TabId } from '@/reminders/ui/shared/layoutConstants';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { NavigationScreen } from '../../ui/shared/navigation/NavigationScreen';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
-import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
+import { RemindersViewPanels } from '@/reminders/ui/shared/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
 import { BackButton } from '@/ui/shared/BackButton';
 import {
@@ -26,11 +26,11 @@ import {
 	getRemindersHeaderData,
 	getReorderProject,
 	shouldShowReminderFab,
-} from '@/reminders/ui/remindersViewModel';
+} from '@/reminders/ui/shared/remindersViewModel';
 import { PwaThemeIcon } from './PwaThemeIcon';
-import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
-import { EmptyStateMessageContext } from '@/reminders/components/EmptyState';
-import { useReminderClock } from '@/reminders/ui/useReminderClock';
+import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
+import { EmptyStateMessageContext } from '@/reminders/ui/shared/EmptyState';
+import { useReminderClock } from '@/reminders/ui/shared/useReminderClock';
 import { useReminderProjectNavigation } from '../hooks/useReminderProjectNavigation';
 
 const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };

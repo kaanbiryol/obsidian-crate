@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { getProjectColor } from '../../utils/projectColors';
+import { getProjectColor } from '../format/projectColors';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 
 function render(isDark: boolean): string {

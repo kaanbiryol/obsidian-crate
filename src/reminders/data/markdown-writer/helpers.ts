@@ -1,5 +1,5 @@
 import type { App, TFile } from "obsidian";
-import { createLogger } from "@/reminders/utils/logger";
+import { createLogger } from "@/reminders/logger";
 import type { ReminderIndex } from "../reminder-index";
 import { getInitialProjectFileContent } from "../../core/markdownReminderFile";
 import {

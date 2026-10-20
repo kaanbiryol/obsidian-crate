@@ -1,14 +1,14 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
+import { DeleteConfirmationModal } from '../plugin/DeleteConfirmationModal';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { DatePickerModal } from './DatePickerModal';
 import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
 import { ReminderEditorFields } from './ReminderEditorFields';
-import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
+import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.

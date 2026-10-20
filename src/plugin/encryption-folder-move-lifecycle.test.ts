@@ -15,7 +15,7 @@ import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));
-vi.mock('../reminders/ui/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
+vi.mock('../reminders/ui/plugin/workspaceLayout', () => ({ activateOrRevealRemindersLeaf: vi.fn() }));
 vi.mock('../reading/runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), waitForStoppedReading: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption/rename-checkpoint', () => ({ checkpointEncryptionRenames: vi.fn(async () => {}) }));
 vi.mock('../sync/encryption/conversion', async original => ({ ...await original<object>(), convertEncryptedVault: vi.fn(async () => {}) }));

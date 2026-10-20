@@ -2,18 +2,18 @@ import type React from "react";
 import { useRemindersSettingsStore } from "../../settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LayoutGroup } from "motion/react";
-import { ReminderMotionRow } from "@/reminders/components/ReminderMotionRow";
+import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { PluginContext } from "@/reminders/ui/reminders-context";
+import { PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
-import { ReminderListPresence } from "@/reminders/components/ReminderListPresence";
+import { ReminderListPresence } from "@/reminders/ui/shared/ReminderListPresence";
 import { useReminderOrder } from "@/reminders/ui/hooks/useReminderOrder";
-import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
-import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
+import { ReorderableReminderList } from "@/reminders/ui/shared/ReorderableReminderList";
+import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ObsidianIcon } from "@/ui/obsidian-icon";
 import { ThemeIconProvider } from "@/ui/shared/ThemeIcon";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorModals";
@@ -23,11 +23,11 @@ import {
   formatDateHeader,
   loadRemindersListData,
 } from "./reminderListModel";
-import { RemindersLoading } from "../RemindersLoading";
+import { RemindersLoading } from "../plugin/RemindersLoading";
 import "./styles.scss";
-import { useReminderClock } from '../useReminderClock';
-import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../reminder-pagination';
-import { groupRemindersByDate } from "@/reminders/utils/reminderSort";
+import { useReminderClock } from '../shared/useReminderClock';
+import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
+import { groupRemindersByDate } from "@/reminders/core/reminderSort";
 
 type Props = {
   projectFilter?: string; // If provided, only show reminders for this project

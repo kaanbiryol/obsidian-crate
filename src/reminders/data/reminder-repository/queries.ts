@@ -3,7 +3,7 @@ import { getTodayReminderIds } from "./shared";
 import { toReminder } from "../toReminder";
 import type { IndexedReminder } from "../reminder-index";
 import type { Reminder } from "@/reminders/types/reminder";
-import { isReminderDueToday, isReminderOverdue } from "@/reminders/utils/reminderDate";
+import { isReminderDueToday, isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 
 /** Converted reminders keep their identity while the indexed record is
  * unchanged, so memoized rows skip rendering after edits to other notes. The

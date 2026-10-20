@@ -2,7 +2,7 @@ import type CratePlugin from '../main';
 import type { SyncApiClient } from '../sync/api';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { normalizeRemindersFolderPath } from './settings';
-import { createLogger } from './utils/logger';
+import { createLogger } from './logger';
 import { validateReadingFolder } from '../reading/settings';
 
 const logger = createLogger('Reminders');

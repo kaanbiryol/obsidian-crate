@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PluginContext } from '@/reminders/ui/reminders-context';
+import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 
 /**
  * Hook that subscribes to ReminderIndex changes and triggers re-renders.

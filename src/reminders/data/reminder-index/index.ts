@@ -8,9 +8,9 @@
 
 import { TFile, type App } from "obsidian";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
-import { createLogger } from "@/reminders/utils/logger";
-import { isReminderDueToday, isReminderOverdue } from "@/reminders/utils/reminderDate";
-import { getUpcomingReminders } from "@/reminders/utils/reminderSort";
+import { createLogger } from "@/reminders/logger";
+import { isReminderDueToday, isReminderOverdue } from "@/reminders/core/dates/reminderDate";
+import { getUpcomingReminders } from "@/reminders/core/reminderSort";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";

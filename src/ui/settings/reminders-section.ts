@@ -7,7 +7,7 @@ import {
 	type DueDateDefaultSetting,
 	type RemindersSettings,
 } from '../../reminders/settings';
-import type { TabId } from '../../reminders/ui/layoutConstants';
+import type { TabId } from '../../reminders/ui/shared/layoutConstants';
 import { errorMessage } from '../../sync/logger';
 import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';

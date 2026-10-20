@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 
-import { ProgressMeter } from '../../components/ProgressMeter';
-import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
+import { ProgressMeter } from '../shared/ProgressMeter';
+import { ShadowDOMNativeMotionButton } from '../shared/ShadowDOMNativeMotionButton';
 import type { BrowseProjectCardViewModel } from './viewModels';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 

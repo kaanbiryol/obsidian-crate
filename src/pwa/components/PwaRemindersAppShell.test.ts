@@ -8,7 +8,7 @@ vi.mock('@/reminders/ui/views', async () => {
 	const { memo } = await import('react');
 	return { ProjectDetailView: memo(function ProjectDetailView() { projectDetailRenders.count++; return null; }) };
 });
-vi.mock('@/reminders/ui/RemindersViewPanels', () => ({ RemindersViewPanels: () => null }));
+vi.mock('@/reminders/ui/shared/RemindersViewPanels', () => ({ RemindersViewPanels: () => null }));
 vi.mock('@/ui/shared/ViewHeader', () => ({ ViewHeader: () => null }));
 vi.mock('./PwaDock', () => ({ PwaDock: () => null, PwaDockAddButton: () => null }));
 vi.mock('../../ui/shared/navigation/TabTransition', () => ({ TabTransition: ({ children }: { children: React.ReactNode }) => children }));

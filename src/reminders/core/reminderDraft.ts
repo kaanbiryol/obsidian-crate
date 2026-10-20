@@ -1,9 +1,9 @@
 import type { Priority, Reminder, RecurrenceRule } from '../types';
-import { recurrenceToEditorText } from '../utils/rruleConverter';
-import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
-import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
-import { findProjectMatches } from '../utils/richTextMatchers';
-import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '../utils/recurrenceRule';
+import { recurrenceToEditorText } from './recurrence/rruleConverter';
+import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
+import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
+import { findProjectMatches } from './grammar/richTextMatchers';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';
 
 export interface ReminderDraftContentState {
 	content: string;
