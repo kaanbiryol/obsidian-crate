@@ -4,7 +4,7 @@ import { cancelDetailHistoryOpen, installDetailHistory } from '../navigation/det
 import { dockDestinationIndex } from '../dock-preferences';
 import type { CrateSection, DockDestination } from '../components/FeatureSwitcherButton';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import type { SharedFeatures } from '../shared-features';
+import type { SharedFeatures } from '@/protocol/feature-policy';
 import { loadPwaPreferences } from '../preferences';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import { useSettingsOpen, useSettingsStore } from '../settings-context';

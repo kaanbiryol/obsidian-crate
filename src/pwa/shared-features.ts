@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { AUTH_TOKEN_KEY } from './config';
 import { readingSession } from './reading/storage';
+import { parseSharedFeatures, type SharedFeatures } from '@/protocol/feature-policy';
 
-export interface SharedFeatures { reading: boolean; reminders: boolean }
 const CACHE_KEY = 'crate-shared-features';
 const defaults: SharedFeatures = { reading: true, reminders: true };
 // Data refreshes can repeat often; paused responses always check immediately.
@@ -20,8 +20,8 @@ export function useServerFeatures(): SharedFeatures {
   const [features, setFeatures] = useState<SharedFeatures>(() => {
     try {
       if (!localStorage.getItem(AUTH_TOKEN_KEY) && !readingSession()?.token) return defaults;
-      const value = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as SharedFeatures | null;
-      if (value && typeof value.reading === 'boolean' && typeof value.reminders === 'boolean') return value;
+      const value = parseSharedFeatures(JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null'));
+      if (value) return value;
     } catch { /* Storage may be unavailable. */ }
     return defaults;
   });
@@ -36,10 +36,9 @@ export function useServerFeatures(): SharedFeatures {
         if (!token) return;
         const response = await fetch('/features', { cache: 'no-store', signal: AbortSignal.timeout(10_000), headers: { Authorization: `Bearer ${token}` } });
         if (!response.ok) return;
-        const next = await response.json() as SharedFeatures;
+        const value = parseSharedFeatures(await response.json());
         const currentToken = localStorage.getItem(AUTH_TOKEN_KEY) ?? readingSession()?.token;
-        if (alive && currentToken === token && typeof next.reading === 'boolean' && typeof next.reminders === 'boolean') {
-          const value = { reading: next.reading, reminders: next.reminders };
+        if (alive && currentToken === token && value) {
           const serialized = JSON.stringify(value);
           if (localStorage.getItem(CACHE_KEY) !== serialized) localStorage.setItem(CACHE_KEY, serialized);
           setFeatures(current => current.reading === value.reading && current.reminders === value.reminders ? current : value);

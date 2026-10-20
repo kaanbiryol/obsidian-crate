@@ -1,4 +1,5 @@
-import { featureEnabled, type FeaturePolicy } from '../feature-policy';
+import { featureEnabled } from '../feature-policy';
+import type { FeaturePolicy } from '../../../protocol/feature-policy';
 import { planNotificationOperations, type NotificationOperation } from './projection-plan';
 import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';

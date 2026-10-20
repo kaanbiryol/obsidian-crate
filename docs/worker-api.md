@@ -511,6 +511,8 @@ credentials cannot access this policy. Stale writes return 409. Writes are
 serialized through the projection coordinator, and a successful write wakes
 background work; reads return the last committed policy without entering the
 coordinator. Both features default on until explicitly changed.
+`src/protocol/feature-policy.ts` defines and validates this response for the
+Worker, plugin and PWA.
 
 Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
 access remain available. Reading policy and capture operations cannot override

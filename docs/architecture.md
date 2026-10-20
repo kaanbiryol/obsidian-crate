@@ -516,6 +516,7 @@ exposes a synchronous preparation guard for updates, without controlling the edi
 focus restoration together; `PwaRemindersAppShell` renders that navigation state.
 
 `protocol/shared-settings.ts` defines and validates shared settings for both hosts.
+`protocol/feature-policy.ts` does the same for the `/features` policy.
 `sync/connection/shared-settings.ts` applies them to plugin settings. Production Worker modules
 may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
 reminder and Reading domain folders, release metadata and the PWA shell in

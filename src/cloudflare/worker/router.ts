@@ -1,4 +1,4 @@
-import { featureEnabled, handleFeaturePolicy, parseFeaturePolicy } from './feature-policy';
+import { featureEnabled, handleFeaturePolicy, parseStoredFeaturePolicy } from './feature-policy';
 import { handleReadingRoute } from './reading/routes';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES } from '../../encryption/receipt-format';
 import { parseJsonObject } from './request-validation';
@@ -59,7 +59,7 @@ export async function handleAuthenticatedRoute(
 	}
 	const remindersEnabled = async () => featurePolicyValue === undefined
 		? await featureEnabled(env.DB, 'reminders')
-		: parseFeaturePolicy(featurePolicyValue).reminders;
+		: parseStoredFeaturePolicy(featurePolicyValue).reminders;
 	if (path.startsWith('/reminders/') && !await remindersEnabled()) return corsResponse({ error: 'Reminders are paused. Enable them in Crate settings.', code: 'feature_paused' }, 423);
 	if (principal.scope === 'reminders' && path.startsWith('/reminders/')) {
 		let folder: unknown = new URL(request.url).searchParams.get('folderPath');

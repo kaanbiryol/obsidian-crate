@@ -3,15 +3,16 @@ import type { SyncState } from '../sync/types';
 import { captureServerConnection, serverRequest } from './server-request';
 import { startReading, stopReading } from '../reading/runtime';
 import { getPluginLifecycleSignal } from './lifecycle-state';
+import { parseFeaturePolicy, type FeaturePolicy } from '../protocol/feature-policy';
 
-interface Features { reading: boolean; reminders: boolean; revision: string | null }
-function requestFeatures(plugin: CratePlugin, body?: unknown): Promise<Features> {
-  return serverRequest(plugin, '/features', body, { timeout: 5_000 });
+async function requestFeatures(plugin: CratePlugin, body?: unknown): Promise<FeaturePolicy> {
+  const policy = parseFeaturePolicy(await serverRequest<unknown>(plugin, '/features', body, { timeout: 5_000 }));
+  if (!policy) throw new Error('Could not read shared feature settings.');
+  return policy;
 }
 const tasks = new WeakMap<CratePlugin, Promise<void>>();
-async function apply(plugin: CratePlugin, policy: Features, activate: boolean, assertCurrent: () => void): Promise<void> {
+async function apply(plugin: CratePlugin, policy: FeaturePolicy, activate: boolean, assertCurrent: () => void): Promise<void> {
   assertCurrent();
-  if (typeof policy.reading !== 'boolean' || typeof policy.reminders !== 'boolean') throw new Error('Could not read shared feature settings.');
   if (plugin.settings.reading.enabled !== policy.reading) {
     await plugin.writeSettings({ reading: { ...plugin.settings.reading, enabled: policy.reading } }, assertCurrent);
     assertCurrent();

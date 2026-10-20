@@ -1,17 +1,18 @@
 import { corsResponse } from './cors';
 import { parseJsonObject } from './request-validation';
+import { parseFeaturePolicy, type FeaturePolicy } from '../../protocol/feature-policy';
 
-export interface FeaturePolicy { reading: boolean; reminders: boolean; revision: string | null }
 export const FEATURE_POLICY_KEY = 'crate_feature_policy';
 export async function featurePolicy(db: D1Database): Promise<FeaturePolicy> {
   const row = await db.prepare('SELECT value FROM maintenance_state WHERE key=?').bind(FEATURE_POLICY_KEY).first<{ value: string }>();
-  return parseFeaturePolicy(row?.value ?? null);
+  return parseStoredFeaturePolicy(row?.value ?? null);
 }
 /** Parses a stored policy row value; authentication loads it with the token. */
-export function parseFeaturePolicy(stored: string | null): FeaturePolicy {
+export function parseStoredFeaturePolicy(stored: string | null): FeaturePolicy {
   if (stored === null) return { reading: true, reminders: true, revision: null };
-  const value = JSON.parse(stored) as FeaturePolicy;
-  if (typeof value.reading !== 'boolean' || typeof value.reminders !== 'boolean' || typeof value.revision !== 'string') throw new Error('Invalid feature policy');
+  const value = parseFeaturePolicy(JSON.parse(stored));
+  // Saved policies always carry a revision.
+  if (!value || value.revision === null) throw new Error('Invalid feature policy');
   return value;
 }
 export async function featureEnabled(db: D1Database, feature: 'reading' | 'reminders'): Promise<boolean> {

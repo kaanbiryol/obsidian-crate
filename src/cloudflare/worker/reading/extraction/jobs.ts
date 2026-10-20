@@ -1,7 +1,8 @@
 import { readEncryptionState } from '../../encryption/state';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../../sync/file-identity';
 import { publishCapture, runCapture, type CapturePublication } from '../captures';
-import { featureEnabled, type FeaturePolicy } from '../../feature-policy';
+import { featureEnabled } from '../../feature-policy';
+import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';
 import { policy, readSource } from '../common';
