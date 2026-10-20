@@ -1,8 +1,8 @@
 import type { Priority, RecurrenceRule } from '../types/reminder';
 import { preserveReminderInstant } from './preserveReminderInstant';
 import { buildStoredReminderDates, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
-import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';
+import { parseReminderContent } from './grammar/reminderParser';
 
 interface ReminderSubmissionDraft {
 	content: string;
@@ -20,7 +20,7 @@ interface ReminderSubmissionDraft {
 /** Resolve the latest editor text before either host serializes a save. */
 export function resolveReminderSubmission(draft: ReminderSubmissionDraft) {
 	if (!draft.content.trim()) return null;
-	const parsed = parseReminderEditorContent(draft.content, draft.projects);
+	const parsed = parseReminderContent(draft.content, draft.projects);
 	if (parsed.dateError) throw new Error(parsed.dateError);
 	const content = parsed.cleanContent.trim();
 	if (!content) return null;

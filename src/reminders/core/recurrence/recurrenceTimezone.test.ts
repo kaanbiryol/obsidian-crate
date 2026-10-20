@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
-import { parseReminderEditorContent } from '../grammar/reminderEditorParsing';
 import { parseCheckboxLine } from '../grammar/checkboxParser';
 import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceCalculator';
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '../markdownReminderMutation';
@@ -11,6 +10,7 @@ import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '@/pwa/remi
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildRecurrencePickerState, recurrenceRuleFromPickerState } from '../../ui/reminder-modal/recurrencePickerShared';
 import { preserveRecurrenceMetadata } from './recurrenceRule';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -22,7 +22,7 @@ describe.each(['UTC', 'Asia/Tokyo', 'America/Los_Angeles'])('recurrence persiste
     it.each(['Europe/Berlin', 'America/New_York', '+14:00', '-03:30'])('keeps all-day weekday dates in %s through creation and completion', timezone => {
         vi.stubEnv('TZ', hostZone); resetLocalTimeZone();
         vi.setSystemTime(new Date('2026-10-24T23:30Z'));
-        const recurrence = parseReminderEditorContent(`Task every Monday ${timezone}`).recurrence!;
+        const recurrence = parseReminderContent(`Task every Monday ${timezone}`).recurrence!;
         const block = buildCreatedReminderBlock({ content: 'Task', priority: 4, dueDate: undefined,
             recurrence, reminderId: 'all-day-zone' });
         expect(block.dueDateKey).toBe('2026-10-26');
@@ -33,7 +33,7 @@ describe.each(['UTC', 'Asia/Tokyo', 'America/Los_Angeles'])('recurrence persiste
         const complete = buildReminderCompletionPlan(saved, true);
         expect(complete).toMatchObject({ completed: false, dueDate: '2026-11-02', recurrence: { timezone, completedCount: 1 } });
         expect(complete.dueDatetime).toBeUndefined();
-        expect(parseReminderEditorContent(buildModalDraft(saved, null).content).recurrence).toEqual(recurrence);
+        expect(parseReminderContent(buildModalDraft(saved, null).content).recurrence).toEqual(recurrence);
     });
 
     it.each(['Europe/Berlin', 'America/New_York', '+05:30', '-03:30', 'Pacific/Chatham', 'US/Eastern', 'CET', '+00:00'])('preserves %s through both editors and picker changes', timezone => {
@@ -85,7 +85,7 @@ it('changing or deleting an explicit timezone recalculates the occurrence in bot
         completed: false, recurrence, dueDatetime: '2026-10-26T13:00:00.000Z' };
     for (const zone of ['Europe/Berlin', '']) {
         const content = `Task every Mon 09:00 ${zone}`.trimEnd();
-        const parsed = parseReminderEditorContent(content);
+        const parsed = parseReminderContent(content);
         const updatedRule = preserveRecurrenceMetadata(parsed.recurrence, recurrence);
         expect(updatedRule).not.toBe(recurrence);
         expect(updatedRule?.timezone).toBe(zone || 'UTC');

@@ -8,7 +8,7 @@ import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
 import { ReminderEditorFields } from './ReminderEditorFields';
-import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
+import { parseReminderContent } from '../../core/grammar/reminderParser';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
@@ -65,8 +65,8 @@ describe('reminder editor chrome', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
         try {
-            const initial = parseReminderEditorContent('Plan next week every Fri #Work', ['Work']);
-            const edited = parseReminderEditorContent(`Plan next week every Fri${space}09:00 #Work`, ['Work']);
+            const initial = parseReminderContent('Plan next week every Fri #Work', ['Work']);
+            const edited = parseReminderContent(`Plan next week every Fri${space}09:00 #Work`, ['Work']);
             expect(initial.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5] });
             expect(edited.recurrence).toMatchObject({ frequency: 'weekly', daysOfWeek: [5], hour: 9, minute: 0 });
             expect(edited.dueDate).toBeUndefined();

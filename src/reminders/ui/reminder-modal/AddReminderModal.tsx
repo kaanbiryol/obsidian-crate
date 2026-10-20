@@ -13,8 +13,8 @@ import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../plugin/animations';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { Reminder } from '../../types';
-import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 import { DEFAULT_PROJECT } from '../../core/constants';
+import { parseReminderContent } from '../../core/grammar/reminderParser';
 
 interface AddReminderModalProps {
     onClose: () => void;
@@ -67,7 +67,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     });
     const { content, description, project, priority, dueDate, hasTime, recurrence, togglePriority } = draft;
     const hasTitle = useMemo(
-        () => Boolean(parseReminderEditorContent(content, projects).cleanContent.trim()),
+        () => Boolean(parseReminderContent(content, projects).cleanContent.trim()),
         [content, projects],
     );
     const {

@@ -2,9 +2,9 @@ import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { replaceReminderProject, toReminderCursorOffset } from '@/reminders/ui/editor/reminderEditorEdits';
-import { parseReminderEditorContent } from '@/reminders/core/grammar/reminderEditorParsing';
 import { ReminderDraftFixture, ReminderModalFixture, PwaSaveFixture } from './reminder-draft-fixture';
 import css from '@/styles/main.scss?inline';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 const params = new URLSearchParams(location.search);
 function Fixture() {
@@ -35,7 +35,7 @@ function Fixture() {
       }}
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); ref.current?.blur(); } }} />
     <pre data-testid="value">{value}</pre><output data-testid="query">{query === null ? '(none)' : query}</output>
-    <pre data-testid="parsed">{JSON.stringify(parseReminderEditorContent(value, projects))}</pre>
+    <pre data-testid="parsed">{JSON.stringify(parseReminderContent(value, projects))}</pre>
     <input aria-label="External value" value={replacement} onChange={event => setReplacement(event.target.value)} />
     <button onMouseDown={preserveFocus} onClick={() => setValue(replacement)}>Apply external value</button>
     <button onMouseDown={preserveFocus} onClick={() => { ref.current?.setCursorPosition(2); setValue(replacement); }}>Apply at offset two</button>

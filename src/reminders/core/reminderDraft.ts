@@ -1,10 +1,10 @@
 import type { Priority, Reminder, RecurrenceRule } from '../types';
 import { recurrenceToEditorText } from './recurrence/recurrenceText';
 import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
-import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
 import { findProjectMatches } from './grammar/richTextMatchers';
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';
 import { DEFAULT_PROJECT } from './constants';
+import { parseReminderContent } from './grammar/reminderParser';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -79,7 +79,7 @@ export function deriveReminderDraftContentMetadata(
 	projects: string[],
 	defaultProject: string,
 ): ReminderDraftContentMetadata {
-	const parsed = parseReminderEditorContent(content, projects);
+	const parsed = parseReminderContent(content, projects);
 	const recurrence = parsed.recurrence;
 	const hasTime = !recurrence && Boolean(parsed.dueDate && parsed.hasTime);
 	const dueDate = !recurrence && parsed.dueDate

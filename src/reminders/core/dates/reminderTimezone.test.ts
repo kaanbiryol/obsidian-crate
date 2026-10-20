@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
 import * as chrono from 'chrono-node';
-import { parseReminderEditorContent } from '../grammar/reminderEditorParsing';
 import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '../recurrence/recurrenceCalculator';
 import { parseRecurrenceFromContent } from '../recurrence/recurrenceParser';
@@ -10,6 +9,7 @@ import { buildReminderSubmission } from '../../ui/reminder-modal/reminderMutatio
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { canonicalReminderTimezone } from './reminderTimezone';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(() => {
     vi.stubEnv('TZ', 'UTC'); resetLocalTimeZone();
@@ -22,7 +22,7 @@ describe('shared schedule recognition', () => {
     it('resolves the one-off date once instead of reparsing the recognized text', () => {
         const parse = vi.spyOn(chrono.casual, 'parse');
         try {
-            expect(parseReminderEditorContent('Task tomorrow 09:00 UTC')).toMatchObject({ cleanContent: 'Task', dueDate: new Date('2026-09-22T09:00Z') });
+            expect(parseReminderContent('Task tomorrow 09:00 UTC')).toMatchObject({ cleanContent: 'Task', dueDate: new Date('2026-09-22T09:00Z') });
             expect(parse).toHaveBeenCalledTimes(1);
         } finally { parse.mockRestore(); }
     });
@@ -39,17 +39,17 @@ describe('shared schedule recognition', () => {
         ['Pacific/Chatham', 'Pacific/Chatham'], ['Etc/GMT+5', 'Etc/GMT+5'],
     ])('recognizes a complete repeat with %s', (zone, expected) => {
         const schedule = `every week Monday 09:00 ${zone}`;
-        const parsed = parseReminderEditorContent(`Task ${schedule}`);
+        const parsed = parseReminderContent(`Task ${schedule}`);
         expect(parsed).toMatchObject({ cleanContent: 'Task', dueDate: undefined, dateError: undefined,
             recurrencePart: schedule, recurrence: { frequency: 'weekly', daysOfWeek: [1], hour: 9, minute: 0, timezone: canonicalReminderTimezone(expected) } });
         expect(buildRichTextSegments(`Task ${schedule}`)).toEqual([
             { kind: 'text', text: 'Task ' }, { kind: 'chip', type: 'date', text: schedule },
         ]);
-        expect(parseReminderEditorContent(recurrenceToEditorText(parsed.recurrence!)).recurrence).toEqual(parsed.recurrence);
+        expect(parseReminderContent(recurrenceToEditorText(parsed.recurrence!)).recurrence).toEqual(parsed.recurrence);
     });
 
     it.each(['every day', 'every 2 weeks Monday, Wednesday', 'every weekend', 'monthly on the 31st'])('keeps the zone for %s', recurrence => {
-        expect(parseReminderEditorContent(`Task ${recurrence} at noon America/New_York`)).toMatchObject({
+        expect(parseReminderContent(`Task ${recurrence} at noon America/New_York`)).toMatchObject({
             cleanContent: 'Task', dateError: undefined, recurrence: { timezone: 'America/New_York', hour: 12, minute: 0 },
         });
     });
@@ -58,37 +58,37 @@ describe('shared schedule recognition', () => {
         'Europe/Invalid', 'America/New_York UTC', 'UTC PST', '-03:30 UTC', '+05:30foo'])('rejects malformed or conflicting zones: %s', zone => {
         for (const schedule of ['tomorrow 09:00', 'every Monday 09:00']) {
             const content = `Task Friday ${schedule} ${zone}`;
-            const parsed = parseReminderEditorContent(content);
+            const parsed = parseReminderContent(content);
             expect(parsed).toMatchObject({ cleanContent: content, dueDate: undefined, recurrence: undefined });
             expect(parsed.dateError).toBeTypeOf('string');
             expect(buildRichTextSegments(content)).toEqual([{ kind: 'text', text: content }]);
             expect(() => buildReminderSubmission({ content, priority: 4, project: 'Inbox', projects: [], dueDate: null })).toThrow();
             expect(() => buildReminderMutationBody({ config: { folderPath: 'Reminders' }, mode: 'create', projects: [], selectedProject: null,
                 draft: { ...buildModalDraft(null, null), content } })).toThrow();
-            expect(parseReminderEditorContent(`${content} Friday`)).toMatchObject({ cleanContent: content, datePart: 'Friday', dateError: undefined });
+            expect(parseReminderContent(`${content} Friday`)).toMatchObject({ cleanContent: content, datePart: 'Friday', dateError: undefined });
         }
     });
 
     it.each(['office/kitchen', 'notes/Monday.md', 'XYZ', 'ASAP', '- call Alex', '+ call Alex'])('leaves ordinary trailing text literal: %s', literal => {
-        expect(parseReminderEditorContent(`Task every Monday 09:00 ${literal}`)).toMatchObject({
+        expect(parseReminderContent(`Task every Monday 09:00 ${literal}`)).toMatchObject({
             cleanContent: `Task ${literal}`, dateError: undefined, recurrence: { frequency: 'weekly', timezone: 'UTC' },
         });
     });
 
     it.each(['in 5 minutes', 'now'])('keeps relative instants stable with a timezone suffix: %s', schedule => {
         const expected = chrono.parseDate(schedule, new Date());
-        expect(parseReminderEditorContent(`Task ${schedule} Europe/Berlin`)).toMatchObject({ cleanContent: 'Task', dueDate: expected });
-        expect(parseReminderEditorContent(`Task ${schedule} Europe/Berlin UTC`).dateError).toBe('Use one timezone per schedule.');
+        expect(parseReminderContent(`Task ${schedule} Europe/Berlin`)).toMatchObject({ cleanContent: 'Task', dueDate: expected });
+        expect(parseReminderContent(`Task ${schedule} Europe/Berlin UTC`).dateError).toBe('Use one timezone per schedule.');
     });
 
     it('protects timezone-looking project names and links and keeps earlier schedules literal', () => {
         const literal = '[Europe/Invalid](https://example.com)';
-        expect(parseReminderEditorContent(`Compare Monday UTC with Friday 09:00 +0530 ${literal} #Europe/Berlin`, ['Europe/Berlin']))
+        expect(parseReminderContent(`Compare Monday UTC with Friday 09:00 +0530 ${literal} #Europe/Berlin`, ['Europe/Berlin']))
             .toMatchObject({ cleanContent: `Compare Monday UTC with ${literal}`, project: 'Europe/Berlin', dueDate: new Date('2026-09-25T03:30Z') });
     });
 
     it.each(['tomorrow morning', 'tomorrow afternoon', 'this evening', 'tonight'])('preserves Chrono’s time-of-day interpretation: %s', schedule => {
-        expect(parseReminderEditorContent(`Task ${schedule}`)).toMatchObject({ cleanContent: 'Task', hasTime: true,
+        expect(parseReminderContent(`Task ${schedule}`)).toMatchObject({ cleanContent: 'Task', hasTime: true,
             dueDate: chrono.parseDate(schedule, new Date(), { forwardDate: true }) });
     });
 
@@ -99,7 +99,7 @@ describe('shared schedule recognition', () => {
         ['2026-09-21T23:30Z', 'tomorrow 09:00 Asia/Tokyo', '2026-09-23T00:00Z'],
     ])('resolves one-off IANA dates in the target zone at %s', (now, schedule, expected) => {
         vi.setSystemTime(new Date(now));
-        expect(parseReminderEditorContent(`Task ${schedule}`)).toMatchObject({ cleanContent: 'Task', hasTime: true, dueDate: new Date(expected) });
+        expect(parseReminderContent(`Task ${schedule}`)).toMatchObject({ cleanContent: 'Task', hasTime: true, dueDate: new Date(expected) });
     });
 });
 

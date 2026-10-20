@@ -179,7 +179,6 @@ export function createPersistedCheckboxParses() {
  * @param cleanContent - Task content (without date/priority markers)
  * @param dueDate - Optional due date
  * @param priority - Priority level (1 = important, 4 = normal)
- * @param project - Optional project tag (not written; project is determined by file location)
  * @param recurrence - Optional recurrence rule (added before date)
  * @returns Formatted markdown checkbox line
  */
@@ -189,7 +188,6 @@ export function rebuildCheckboxLine(
   cleanContent: string,
   dueDate: Date | undefined,
   priority: Priority,
-  project?: string,
   recurrence?: RecurrenceRule,
   hasTime?: boolean,
   reminderId?: string,
@@ -223,11 +221,3 @@ export function rebuildCheckboxLine(
   const line = appendRecurrenceMetadata(`${indentation}- ${checkbox} ${content}`, recurrence);
   return reminderId ? setReminderIdMarker(line, reminderId) : line;
 }
-
-/**
- * Get project name from file path
- * Extracts filename without extension
- *
- * @param filePath - Full file path (e.g., "folder/My Notes.md")
- * @returns Project name (e.g., "My Notes")
- */

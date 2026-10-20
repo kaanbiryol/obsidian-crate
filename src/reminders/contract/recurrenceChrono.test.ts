@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
 import * as chrono from 'chrono-node';
-import { parseReminderEditorContent } from '../core/grammar/reminderEditorParsing';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '../core/recurrence/recurrenceCalculator';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(() => {
     vi.stubEnv('TZ', 'UTC'); resetLocalTimeZone();
@@ -30,7 +30,7 @@ describe.each([
     ])('uses the same complete time as a one-off: %s', time => {
         const oneOff = chrono.parse(`Monday ${time}`, new Date(), { forwardDate: true })[0]!;
         expect(oneOff.text).toBe(`Monday ${time}`);
-        expect(parseReminderEditorContent(`Call Alex Monday ${time}`)).toMatchObject({
+        expect(parseReminderContent(`Call Alex Monday ${time}`)).toMatchObject({
             cleanContent: 'Call Alex', hasTime: true, dueDate: oneOff.start.date(), dateError: undefined,
         });
         const recurrence = { ...fields, hour: oneOff.start.get('hour'), minute: oneOff.start.get('minute'), timezone: 'UTC',
@@ -38,7 +38,7 @@ describe.each([
             ...(oneOff.start.get('millisecond') ? { millisecond: oneOff.start.get('millisecond') } : {}) };
         const schedule = `${cadence} ${time}`;
         const content = `Call Alex ${schedule}`;
-        expect(parseReminderEditorContent(content)).toMatchObject({
+        expect(parseReminderContent(content)).toMatchObject({
             cleanContent: 'Call Alex', recurrencePart: schedule, recurrence, dueDate: undefined, dateError: undefined,
         });
         expect(buildRichTextSegments(content)).toEqual([
@@ -52,7 +52,7 @@ describe.each([
 });
 
 it('keeps Monday and 09:00 through the first and following occurrences', () => {
-    const rule = parseReminderEditorContent('Call Alex every Monday at 9 in the morning').recurrence!;
+    const rule = parseReminderContent('Call Alex every Monday at 9 in the morning').recurrence!;
     const first = calculateFirstOccurrence(rule);
     expect(first.toISOString()).toBe('2026-09-28T09:00:00.000Z');
     expect(calculateNextOccurrence(first, rule)?.toISOString()).toBe('2026-10-05T09:00:00.000Z');
@@ -60,7 +60,7 @@ it('keeps Monday and 09:00 through the first and following occurrences', () => {
 
 it.each(['9'])('leaves a bare hour as text just as Chrono does: %s', hour => {
     expect(chrono.parse(`Monday ${hour}`)[0]?.text).toBe('Monday');
-    const parsed = parseReminderEditorContent(`Call Alex every Monday ${hour}`);
+    const parsed = parseReminderContent(`Call Alex every Monday ${hour}`);
     expect(parsed).toMatchObject({ cleanContent: `Call Alex ${hour}`, recurrencePart: 'every Monday',
         recurrence: { frequency: 'weekly', daysOfWeek: [1] }, dateError: undefined });
     expect(parsed.recurrence?.hour).toBeUndefined();
@@ -68,15 +68,15 @@ it.each(['9'])('leaves a bare hour as text just as Chrono does: %s', hour => {
 
 it.each(['Mon.', 'Thurs.', 'Thu.'])('keeps Chrono weekday abbreviations attached to their time: %s', day => {
     const oneOff = chrono.parse(`${day} at 9 in the morning`)[0]!;
-    expect(parseReminderEditorContent(`Task every ${day} at 9 in the morning`)).toMatchObject({
+    expect(parseReminderContent(`Task every ${day} at 9 in the morning`)).toMatchObject({
         cleanContent: 'Task', recurrence: { frequency: 'weekly', daysOfWeek: [oneOff.start.get('weekday')], hour: 9, minute: 0 },
     });
 });
 
 it.each(['UTC', 'CET', 'America/New_York', '+05:30', '-03:30'])('retains a timezone after a complete Chrono time: %s', zone => {
     const content = `Call Alex every Monday at 9 in the morning ${zone}`;
-    const ordinary = parseReminderEditorContent(`Task every Monday 09:00 ${zone}`).recurrence;
-    expect(parseReminderEditorContent(content)).toMatchObject({ cleanContent: 'Call Alex', recurrence: ordinary, dateError: undefined });
+    const ordinary = parseReminderContent(`Task every Monday 09:00 ${zone}`).recurrence;
+    expect(parseReminderContent(content)).toMatchObject({ cleanContent: 'Call Alex', recurrence: ordinary, dateError: undefined });
 });
 
 it.each([
@@ -88,7 +88,7 @@ it.each([
     ['09:00UTC', 'every Monday 09', ':00UTC', 9],
     ['morning 25:00', 'every Monday morning', '25:00', 6],
 ] as const)('leaves time text that Chrono does not consume: %s', (time, recurrencePart, suffix, hour) => {
-    const parsed = parseReminderEditorContent(`Task every Monday ${time}`);
+    const parsed = parseReminderContent(`Task every Monday ${time}`);
     expect(parsed).toMatchObject({ cleanContent: `Task ${suffix}`, recurrencePart, dateError: undefined,
         recurrence: { frequency: 'weekly', daysOfWeek: [1] } });
     expect(parsed.recurrence?.hour).toBe(hour);
@@ -96,18 +96,18 @@ it.each([
 });
 
 it.each(['tomorrow 09:00', 'Friday at 9 in the morning', 'in 5 minutes'])('keeps a separate later date authoritative: %s', date => {
-    const parsed = parseReminderEditorContent(`Task every Monday ${date}`);
+    const parsed = parseReminderContent(`Task every Monday ${date}`);
     expect(parsed).toMatchObject({ cleanContent: 'Task every Monday', datePart: date, recurrence: undefined, dateError: undefined });
 });
 
 it('keeps an earlier named-time recurrence literal when a later date wins', () => {
-    expect(parseReminderEditorContent('Task every morning tomorrow')).toMatchObject({
+    expect(parseReminderContent('Task every morning tomorrow')).toMatchObject({
         cleanContent: 'Task every morning', datePart: 'tomorrow', recurrence: undefined, dateError: undefined,
     });
 });
 
 it.each(['from 9 to 10', '09:00 - 10:00'])('rejects multiple repeat times that the rule cannot represent: %s', time => {
     const text = `Task every Monday ${time}`;
-    expect(parseReminderEditorContent(text)).toMatchObject({ cleanContent: text,
+    expect(parseReminderContent(text)).toMatchObject({ cleanContent: text,
         dueDate: undefined, recurrence: undefined, dateError: 'Use one time per repeat schedule.' });
 });

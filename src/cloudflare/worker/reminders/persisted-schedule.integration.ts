@@ -14,8 +14,8 @@ import type { ReminderRecord } from '@/pwa/types';
 import { handleCreateReminder } from '../reminders-web/routes/create';
 import { revalidateReminderSources } from './source-migration';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
-import { parseReminderEditorContent } from '@/reminders/core/grammar/reminderEditorParsing';
 import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await reset(); });
@@ -70,7 +70,7 @@ it.each([
   ['2026-09-25T09:00:30.123-03:30', '2026-09-25T12:30:30.123Z'],
 ])('preserves a range endpoint through create, source revalidation and update: %s', async (endpoint, dueDatetime) => {
   clock('2026-09-21T13:00:37.123Z');
-  const parsed = parseReminderEditorContent(`Compare Monday to ${endpoint}`);
+  const parsed = parseReminderContent(`Compare Monday to ${endpoint}`);
   expect(parsed).toMatchObject({ cleanContent: 'Compare Monday to', dueDate: new Date(dueDatetime), dateError: undefined });
   const operationId = newOperationId();
   const created = await handleCreateReminder(new Request('https://test/create', { method: 'POST', body: JSON.stringify({
@@ -108,7 +108,7 @@ it.each([
   ['+05:30', '2026-03-28T03:30:00.000Z', '2026-03-29T03:30:00.000Z', "at 9 o'clock"],
 ])('preserves a typed recurrence zone %s through API storage and source revalidation', async (zone, dueDatetime, next, time = '09:00') => {
   const operationId = newOperationId();
-  const recurrence = parseReminderEditorContent(`Task daily ${time} ${zone}`).recurrence!;
+  const recurrence = parseReminderContent(`Task daily ${time} ${zone}`).recurrence!;
   expect(calculateNextOccurrence(new Date(dueDatetime), recurrence)?.toISOString()).toBe(next);
   const created = await handleCreateReminder(new Request('https://test/create', { method: 'POST', body: JSON.stringify({
     id: operationId, operationId, folderPath: 'Reminders', project: 'Inbox', content: 'Task', priority: 4, dueDatetime, recurrence,

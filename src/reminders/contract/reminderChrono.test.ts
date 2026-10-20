@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as chrono from 'chrono-node';
-import { parseReminderEditorContent } from '../core/grammar/reminderEditorParsing';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
@@ -8,6 +7,7 @@ import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { buildCreatedReminderBlock } from '../core/markdownReminderMutation';
 import { buildInitialReminderContent } from '../core/reminderDraft';
 import { parseCheckboxLine } from '../core/grammar/checkboxParser';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 const now = new Date('2026-09-21T13:00:37.123Z');
 beforeEach(() => {
@@ -46,7 +46,7 @@ describe('Chrono date and time recognition', () => {
         const cleanContent = expected
             ? (content.slice(0, expected.index) + content.slice(expected.index + expected.text.length)).replace(/\s+/g, ' ').trim()
             : content;
-        expect(parseReminderEditorContent(content)).toMatchObject({
+        expect(parseReminderContent(content)).toMatchObject({
             cleanContent, datePart: expected?.text, dueDate, hasTime, dateError: undefined, recurrence: undefined,
         });
         expect(buildRichTextSegments(content).filter(segment => segment.kind === 'chip')).toEqual(
@@ -97,7 +97,7 @@ describe.each(['UTC', 'Europe/Berlin', 'America/New_York'])('Chrono reminder sch
         const content = `Call Alex ${schedule}`;
         const expected = chrono.parseDate(schedule, now, { forwardDate: true });
         expect(expected?.toISOString()).toBe(instant);
-        expect(parseReminderEditorContent(content)).toMatchObject({
+        expect(parseReminderContent(content)).toMatchObject({
             cleanContent: 'Call Alex', datePart: schedule, dueDate: expected, hasTime: true,
             recurrence: undefined, dateError: undefined,
         });
@@ -127,7 +127,7 @@ describe.each(['UTC', 'Europe/Berlin', 'America/New_York'])('Chrono reminder sch
 
 it.each(['UTC', 'America/New_York', '-03:30'])('preserves one-off fractional seconds with %s', zone => {
     vi.stubEnv('TZ', 'UTC');
-    const parsed = parseReminderEditorContent(`Task Friday 09:00:30.123 ${zone}`);
+    const parsed = parseReminderContent(`Task Friday 09:00:30.123 ${zone}`);
     const expected = zone === 'UTC' ? '2026-09-25T09:00:30.123Z'
         : zone === 'America/New_York' ? '2026-09-25T13:00:30.123Z' : '2026-09-25T12:30:30.123Z';
     expect(parsed).toMatchObject({ cleanContent: 'Task', dateError: undefined, dueDate: new Date(expected) });

@@ -70,7 +70,6 @@ export function buildCreatedReminderBlock(params: {
 			params.content,
 			dueDate,
 			params.priority,
-			undefined,
 			recurrence,
 			hasTime,
 			params.reminderId,
@@ -130,7 +129,6 @@ export function buildUpdatedReminderBlock(
 			content,
 			dueDate,
 			priority,
-			undefined,
 			recurrence,
 			hasTime,
 			reminder.id,
@@ -202,7 +200,7 @@ export function buildReminderCompletionPlan(
 			// Completing it again must restore the count, rather than double count it.
 			recurrence = { ...recurrence, completedCount: completedCount - 1 };
 			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', false, reminder.content,
-				currentDue, reminder.priority, undefined, recurrence, currentHasTime, reminder.id);
+				currentDue, reminder.priority, recurrence, currentHasTime, reminder.id);
 		} else nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
 	} else if (recurrence && !reminder.completed) {
 		const completedCount = recurrence.completedCount ?? 0;
@@ -220,7 +218,6 @@ export function buildReminderCompletionPlan(
 				reminder.content,
 				nextDue,
 				reminder.priority,
-				undefined,
 				recurrence,
 				currentHasTime,
 				reminder.id,
@@ -230,7 +227,7 @@ export function buildReminderCompletionPlan(
 				nextDate: nextDue.toISOString(),
 			};
 		} else {
-			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', true, reminder.content, currentDue, reminder.priority, undefined, recurrence, currentHasTime, reminder.id);
+			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', true, reminder.content, currentDue, reminder.priority, recurrence, currentHasTime, reminder.id);
 		}
 	} else {
 		nextLine = sourceLine.replace(/\[ \]/, '[x]');

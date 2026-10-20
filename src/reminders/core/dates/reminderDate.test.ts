@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { format } from 'date-fns';
 import { formatReminderDateText, parseLocalDateKey, formatLocalDateKey } from './reminderDate';
-import { parseReminderEditorContent } from '../grammar/reminderEditorParsing';
+import { parseReminderContent } from '../grammar/reminderParser';
 
 describe('fixed reminder date text', () => {
     it.each(['2026-02-30', '2026-02-29', '2026-13-01', '2026-00-10', '2026-01-00', '2026-04-31'])('rejects impossible calendar dates: %s', text => {
@@ -29,7 +29,7 @@ describe('fixed reminder date text', () => {
 
 	it('round-trips midnight, leap day, and daylight-saving transition dates through the editor parser', () => {
 		for (const date of [new Date(2028, 1, 29, 0, 0), new Date(2027, 2, 28, 3, 15), new Date(2027, 9, 31, 1, 30)]) {
-			const parsed = parseReminderEditorContent(`Task ${formatReminderDateText(date, true)}`, ['Inbox']);
+			const parsed = parseReminderContent(`Task ${formatReminderDateText(date, true)}`, ['Inbox']);
 			expect(parsed.cleanContent).toBe('Task');
 			expect(parsed.hasTime).toBe(true);
 			expect(parsed.dueDate?.getTime()).toBe(date.getTime());

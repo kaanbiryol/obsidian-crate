@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findAllMatches } from './richTextMatchers';
 import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
-import { parseReminderEditorContent } from './reminderEditorParsing';
+import { parseReminderContent } from './reminderParser';
 
 const projects = ['Home', 'Home Office', 'Tomorrow', 'Every Monday'];
 const markers = ['#Home', '#Home Office', '#Tomorrow', '#Every Monday',
@@ -20,7 +20,7 @@ describe('reminder marker boundaries', () => {
                 const reconstructed = buildRichTextSegments(text, projects)
                     .map(segment => segment.kind === 'link' ? segment.source : segment.text).join('');
                 expect(reconstructed, text).toBe(text);
-                const parsed = parseReminderEditorContent(text, projects);
+                const parsed = parseReminderContent(text, projects);
                 if (marker.startsWith('#')) expect(parsed.project, text).toBe(marker.slice(1));
                 else if (marker === '!') expect(parsed.priority, text).toBe(1);
                 else expect(parsed.cleanContent, text).toContain(marker);
@@ -34,7 +34,7 @@ describe('reminder marker boundaries', () => {
             const text = previous + letter;
             const rendered = buildRichTextSegments(text, projects).map(segment => segment.kind === 'link' ? segment.source : segment.text).join('');
             expect(rendered).toBe(text);
-            expect(parseReminderEditorContent(text, projects).project).toBe(project);
+            expect(parseReminderContent(text, projects).project).toBe(project);
             previous = text;
         }
     });

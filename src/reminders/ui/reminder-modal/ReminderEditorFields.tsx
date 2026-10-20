@@ -1,10 +1,10 @@
 import { assertReminderMutationInput } from '../../core/reminderMutationInput';
-import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 import React, { useRef, useMemo, useContext } from 'react';
 import { PageTitleContext } from '../shared/lexical/pageTitles';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../shared/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
+import { parseReminderContent } from '../../core/grammar/reminderParser';
 
 interface ReminderEditorFieldsProps {
     content: string;
@@ -54,7 +54,7 @@ export function ReminderEditorFields({
     const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
     const inputError = useMemo(() => {
         try {
-            const parsed = parseReminderEditorContent(content, projects);
+            const parsed = parseReminderContent(content, projects);
             if (parsed.dateError) return parsed.dateError;
             assertReminderMutationInput({ content: content.trim() ? parsed.cleanContent || content : undefined, description }, 'update');
             return null;

@@ -7,8 +7,8 @@ import { scanReminderMarkdownContent } from '../core/markdownScan';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { buildInitialReminderContent } from '../core/reminderDraft';
 import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
-import { parseReminderEditorContent } from '../core/grammar/reminderEditorParsing';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
+import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -35,7 +35,7 @@ describe.each(['UTC', 'Europe/Berlin', 'America/New_York'])('reminder range endp
         const content = `Compare Monday to ${endpoint}`;
         const cleanContent = 'Compare Monday to';
         const dueDate = new Date(instant);
-        const parsed = parseReminderEditorContent(content);
+        const parsed = parseReminderContent(content);
         expect(parsed).toMatchObject({ cleanContent, datePart: endpoint, dueDate, hasTime, dateError: undefined });
         expect(buildRichTextSegments(content)).toEqual([
             { kind: 'text', text: `${cleanContent} ` }, { kind: 'chip', type: 'date', text: endpoint },
@@ -65,7 +65,7 @@ describe.each(['UTC', 'Europe/Berlin', 'America/New_York'])('reminder range endp
 it.each(['to', 'through', 'until', 'till', '-', '–'])('keeps the title and complete ISO endpoint around %s', connector => {
     vi.stubEnv('TZ', 'UTC');
     const endpoint = '2026-09-25T09:00:30.123Z';
-    expect(parseReminderEditorContent(`Compare Monday ${connector} ${endpoint}`)).toMatchObject({
+    expect(parseReminderContent(`Compare Monday ${connector} ${endpoint}`)).toMatchObject({
         cleanContent: `Compare Monday ${connector}`, datePart: endpoint,
         dueDate: new Date(endpoint), hasTime: true, dateError: undefined,
     });
@@ -73,7 +73,7 @@ it.each(['to', 'through', 'until', 'till', '-', '–'])('keeps the title and com
 
 it.each([' to ', '-', ' – '])('uses the last written date even in a reversed range separated by %s', connector => {
     vi.stubEnv('TZ', 'UTC');
-    expect(parseReminderEditorContent(`Compare 2026-09-25${connector}2026-09-21`)).toMatchObject({
+    expect(parseReminderContent(`Compare 2026-09-25${connector}2026-09-21`)).toMatchObject({
         cleanContent: `Compare 2026-09-25${connector}`.trim(), datePart: '2026-09-21',
         dueDate: new Date('2026-09-21T00:00:00Z'), hasTime: false, dateError: undefined,
     });

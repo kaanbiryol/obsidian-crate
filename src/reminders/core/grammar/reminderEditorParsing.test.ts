@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as matchers from './richTextMatchers';
 import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
-import { parseReminderEditorContent } from './reminderEditorParsing';
 import { parseCheckboxLine, rebuildCheckboxLine } from './checkboxParser';
+import { parseReminderContent } from './reminderParser';
 
 describe('reminder editor metadata', () => {
     it.each([
@@ -11,7 +11,7 @@ describe('reminder editor metadata', () => {
         ['Task every Monday Friday', 'Task every Monday', 'Friday'],
         ['Task Tuesday Tuesday', 'Task Tuesday', 'Tuesday'],
     ])('keeps earlier schedule text when the last schedule wins: %s', (text, cleanContent, datePart) => {
-        expect(parseReminderEditorContent(text)).toMatchObject({ cleanContent, datePart, recurrence: undefined });
+        expect(parseReminderContent(text)).toMatchObject({ cleanContent, datePart, recurrence: undefined });
         expect(buildRichTextSegments(text).filter(segment => segment.kind === 'chip')).toEqual([
             { kind: 'chip', type: 'date', text: datePart },
         ]);
@@ -19,7 +19,7 @@ describe('reminder editor metadata', () => {
 
     it.each(['2026-02-30', '2026-02-29 09:00', 'February 30 at 9 in the morning'])('keeps the earlier Chrono date when later text has no match: %s', date => {
         const text = `Task tomorrow ${date}`;
-        expect(parseReminderEditorContent(text)).toMatchObject({
+        expect(parseReminderContent(text)).toMatchObject({
             cleanContent: `Task ${date}`, datePart: 'tomorrow', dateError: undefined,
         });
         expect(buildRichTextSegments(text)).toEqual([
@@ -28,7 +28,7 @@ describe('reminder editor metadata', () => {
     });
 
     it.each(['Café', 'Cafe\u0301', '日本語'])('keeps the full project name and removes no title letters: %s', project => {
-        expect(parseReminderEditorContent(`Task #${project}`)).toMatchObject({ cleanContent: 'Task', project });
+        expect(parseReminderContent(`Task #${project}`)).toMatchObject({ cleanContent: 'Task', project });
         expect(buildRichTextSegments(`Task #${project}`)).toEqual([
             { kind: 'text', text: 'Task ' }, { kind: 'chip', type: 'project', text: `#${project}` },
         ]);
@@ -42,13 +42,13 @@ describe('reminder editor metadata', () => {
             { kind: 'chip', type: 'project', text: '#Home' },
             { kind: 'text', text: ` ${suffix}` },
         ]);
-        expect(parseReminderEditorContent(text, ['Home'])).toMatchObject({
+        expect(parseReminderContent(text, ['Home'])).toMatchObject({
             cleanContent: suffix, project: 'Home', hasTime: true,
         });
     });
 
     it('does not extend a time across a Markdown link', () => {
-        expect(parseReminderEditorContent('tomorrow 12:00 [notes](https://example.com) p')).toMatchObject({
+        expect(parseReminderContent('tomorrow 12:00 [notes](https://example.com) p')).toMatchObject({
             cleanContent: '[notes](https://example.com) p', hasTime: true,
         });
     });
@@ -56,7 +56,7 @@ describe('reminder editor metadata', () => {
     it('scans the full title once when deriving metadata and cleaned content', () => {
         const scan = vi.spyOn(matchers, 'findAllMatches');
         try {
-            expect(parseReminderEditorContent('Task #Work ! Friday')).toMatchObject({ cleanContent: 'Task', project: 'Work', priority: 1 });
+            expect(parseReminderContent('Task #Work ! Friday')).toMatchObject({ cleanContent: 'Task', project: 'Work', priority: 1 });
             expect(scan.mock.calls.filter(([text]) => text === 'Task #Work ! Friday')).toHaveLength(1);
         } finally {
             scan.mockRestore();
@@ -70,7 +70,7 @@ describe('reminder editor metadata', () => {
             { kind: 'chip', type: 'priority', text: '!' },
             { kind: 'chip', type: 'date', text: 'every week' },
         ]);
-        expect(parseReminderEditorContent(text)).toMatchObject({
+        expect(parseReminderContent(text)).toMatchObject({
             cleanContent: 'Task #Personal/Health #pomla Tuesday weekly !', project: 'Personal/Health', priority: 1,
             recurrence: { frequency: 'weekly' }, dueDate: undefined,
         });
@@ -82,7 +82,7 @@ describe('reminder editor metadata', () => {
             { kind: 'text', text: 'Compare Tuesday with ' },
             { kind: 'chip', type: 'date', text: 'Friday' },
         ]);
-        expect(parseReminderEditorContent(text)).toMatchObject({ cleanContent: 'Compare Tuesday with', datePart: 'Friday' });
+        expect(parseReminderContent(text)).toMatchObject({ cleanContent: 'Compare Tuesday with', datePart: 'Friday' });
     });
 
     it.each([
@@ -102,23 +102,23 @@ describe('reminder editor metadata', () => {
             { kind: 'text', text: 'Task ' },
             { kind: 'chip', type: 'date', text: schedule },
         ]);
-        expect(parseReminderEditorContent(`Task ${schedule}`).cleanContent).toBe('Task');
+        expect(parseReminderContent(`Task ${schedule}`).cleanContent).toBe('Task');
     });
 
     it('does not interpret dates in project names or links', () => {
         const text = 'Read [Monday !](https://example.com/2026-04-03) #Tomorrow';
-        expect(parseReminderEditorContent(text, ['Tomorrow'])).toMatchObject({
+        expect(parseReminderContent(text, ['Tomorrow'])).toMatchObject({
             cleanContent: 'Read [Monday !](https://example.com/2026-04-03)',
             project: 'Tomorrow', priority: 4, dueDate: undefined,
         });
     });
 
     it('chooses projects by text position, retaining their canonical casing', () => {
-        expect(parseReminderEditorContent('Task #Long Project #work', ['Long Project', 'Work']).project).toBe('Work');
+        expect(parseReminderContent('Task #Long Project #work', ['Long Project', 'Work']).project).toBe('Work');
     });
 
     it.each(['Tuesday', '2026-04-01'])('preserves date mentions through a vault save and reload: %s', mention => {
-        const parsed = parseReminderEditorContent(`Compare ${mention} with 2026-04-03`);
+        const parsed = parseReminderContent(`Compare ${mention} with 2026-04-03`);
         const line = rebuildCheckboxLine('', false, parsed.cleanContent, parsed.dueDate, 4);
         const reloaded = parseCheckboxLine(line)?.parsed;
         expect(reloaded?.cleanContent).toBe(`Compare ${mention} with`);
@@ -127,7 +127,7 @@ describe('reminder editor metadata', () => {
 });
 
 it('consumes only the final project and priority markers', () => {
-    expect(parseReminderEditorContent('Compare #Home with #Work ! !')).toMatchObject({
+    expect(parseReminderContent('Compare #Home with #Work ! !')).toMatchObject({
         cleanContent: 'Compare #Home with !', project: 'Work', priority: 1,
     });
 });
