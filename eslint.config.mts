@@ -200,13 +200,6 @@ export default tseslint.config(
 		},
 	},
 	{
-		// Shared textarea sizing must work without Obsidian's DOM extensions.
-		files: ['src/reminders/ui/reminder-modal/useAutosizeTextarea.ts'],
-		rules: {
-			'obsidianmd/no-static-styles-assignment': 'off',
-		},
-	},
-	{
 		// The standalone visual fixture loads the selected host stylesheet explicitly.
 		files: ['tests/visual/gallery/main.tsx', 'tests/editor-contract/fixture.tsx'],
 		rules: { 'obsidianmd/no-forbidden-elements': 'off' },
