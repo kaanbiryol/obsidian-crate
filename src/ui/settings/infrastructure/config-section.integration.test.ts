@@ -35,7 +35,8 @@ async function loadConfigSectionModule(mobile = false) {
 	}));
 	vi.doMock('../../confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('../../external-browser-modal', () => ({ openExternalBrowserModal }));
-	vi.doMock('../section-helpers', () => ({ createSettingsSectionHeading: vi.fn(), createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));
+	vi.doMock('../section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
+	vi.doMock('../../plugin/settings-disclosure', () => ({ createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));
 
 	return import('./config-section');
 }
@@ -66,6 +67,7 @@ afterEach(() => {
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../external-browser-modal');
 	vi.doUnmock('./section-helpers');
+	vi.doUnmock('../../plugin/settings-disclosure');
 });
 
 describe('renderConfigSection integration', () => {

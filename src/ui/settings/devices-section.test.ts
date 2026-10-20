@@ -18,10 +18,6 @@ async function loadDevicesSectionModule() {
 	vi.doMock('../confirmation-modal', () => ({
 		openConfirmationModal,
 	}));
-	vi.doMock('./section-helpers', async importOriginal => ({
-		...await importOriginal<typeof import('./section-helpers')>(),
-		createSettingsSectionHeading: vi.fn(),
-	}));
 
 	return import('./devices-section');
 }
@@ -45,7 +41,6 @@ describe('renderDevicesSection', () => {
 		vi.clearAllMocks();
 		vi.doUnmock('obsidian');
 		vi.doUnmock('../confirmation-modal');
-		vi.doUnmock('./section-helpers');
 	});
 
 	it('renders connected devices, disables the current device action, and removes stale devices', async () => {
@@ -170,7 +165,6 @@ describe('device list caching', () => {
 		vi.resetModules();
 		vi.doUnmock('obsidian');
 		vi.doUnmock('../confirmation-modal');
-		vi.doUnmock('./section-helpers');
 	});
 
 	const device = {

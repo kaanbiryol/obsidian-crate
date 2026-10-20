@@ -3,7 +3,7 @@ import type { CachedDevicesState } from './settings-ui-state';
 import type CratePlugin from '../../main';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
-import { createSettingsDisclosure } from './section-helpers';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { createLogger, errorMessage } from '../../sync/logger';
 
 const log = createLogger('DeviceSettings');

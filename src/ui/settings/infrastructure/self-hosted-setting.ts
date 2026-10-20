@@ -1,7 +1,7 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../../sync/connection/self-hosted-connection';
 import type { ConfigSectionContext } from './config-types';
-import { createSettingsDisclosure } from '../section-helpers';
+import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 

@@ -2,7 +2,7 @@ import { Setting } from 'obsidian';
 import type CratePlugin from '../../../main';
 import type { UsageMetric } from '../../../cloudflare/usage/service';
 import type { UsageSnapshot } from '../../../cloudflare/usage/snapshot';
-import { createSettingsDisclosure } from '../section-helpers';
+import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 
 export function renderUsageSection(containerEl: HTMLElement, plugin: CratePlugin): () => void {
 	const accountId = plugin.settings.cloudflareDeployment?.accountId;

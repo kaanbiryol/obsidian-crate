@@ -2,7 +2,7 @@ import { setSharedFeature } from '../../../plugin/feature-settings';
 import { captureServerConnection } from '../../../plugin/server-request';
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';
-import { createSettingsDisclosure } from '../../../ui/settings/section-helpers';
+import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure';
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../../ui/settings/input-helpers';
 import { readReadingPolicy, writeReadingPolicy } from '../../server';

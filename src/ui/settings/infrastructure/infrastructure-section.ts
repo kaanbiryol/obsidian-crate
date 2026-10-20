@@ -3,7 +3,8 @@ import { renderServerRepairSetting } from './server-repair-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
 import type { InfrastructureSectionContext } from './infrastructure-types';
-import { createSettingsDisclosure, createSettingsSubsectionHeading } from '../section-helpers';
+import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
+import { createSettingsSubsectionHeading } from '../section-helpers';
 import { renderTroubleshootingSettings } from '../troubleshooting-section';
 import { Setting } from 'obsidian';
 

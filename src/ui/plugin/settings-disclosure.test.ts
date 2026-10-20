@@ -5,7 +5,7 @@ vi.mock('obsidian', () => createObsidianUiModule());
 afterEach(() => vi.clearAllMocks());
 
 it('mounts remote details only once on the first expansion', async () => {
-	const { createSettingsDisclosure } = await import('./section-helpers');
+	const { createSettingsDisclosure } = await import('./settings-disclosure');
 	const root = new FakeElement('div');
 	const onOpen = vi.fn();
 	createSettingsDisclosure(root as never, 'Account and devices', { summary: 'Personal account', onOpen });
@@ -21,7 +21,7 @@ it('mounts remote details only once on the first expansion', async () => {
 });
 
 it('ignores queued expansion events after the settings page is detached', async () => {
-	const { createSettingsDisclosure } = await import('./section-helpers');
+	const { createSettingsDisclosure } = await import('./settings-disclosure');
 	const root = new FakeElement('div');
 	const onOpen = vi.fn();
 	createSettingsDisclosure(root as never, 'Server', { onOpen });

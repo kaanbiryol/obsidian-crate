@@ -11,7 +11,7 @@ import type { TabId } from '../../reminders/ui/shared/layoutConstants';
 import { errorMessage } from '../../sync/logger';
 import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
-import { createSettingsDisclosure } from './section-helpers';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 
 export interface RemindersSectionContext {
 	containerEl: HTMLElement;

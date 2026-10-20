@@ -3,7 +3,8 @@
  */
 
 import { renderAppearanceSettings } from './settings/appearance-section';
-import { createSettingsDisclosure, createSettingsSectionHeading } from './settings/section-helpers';
+import { createSettingsDisclosure } from './plugin/settings-disclosure';
+import { createSettingsSectionHeading } from './settings/section-helpers';
 import { renderUsageSection } from './settings/infrastructure/usage-section';
 import { renderConnectionStatus } from './settings/infrastructure/connection-status';
 import { App, PluginSettingTab, Setting } from 'obsidian';

@@ -2,7 +2,7 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../sync/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
-import { createSettingsDisclosure } from './section-helpers';
+import { createSettingsDisclosure } from '../plugin/settings-disclosure';
 import { renderSyncInterval } from './sync-interval';
 import { renderEncryptionSection } from './encryption/encryption-section';
 import { renderExclusionsSetting } from './exclusions-setting';
