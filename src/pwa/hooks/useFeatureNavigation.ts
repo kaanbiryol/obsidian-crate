@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPushedScreenHistory } from '../navigation/pushed-screen-history';
 import { cancelDetailHistoryOpen, installDetailHistory } from '../navigation/detail-history';
 import { dockDestinationIndex } from '../dock-preferences';
-import type { CrateSection, DockDestination } from '../components/FeatureSwitcherButton';
+import type { CrateSection, DockDestination } from '../navigation/feature-navigation';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
 import type { SharedFeatures } from '@/protocol/feature-policy';
 import { loadPwaPreferences } from '../preferences';

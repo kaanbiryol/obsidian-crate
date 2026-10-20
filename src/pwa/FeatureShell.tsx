@@ -5,7 +5,7 @@ import { SharedFeaturesContext, useServerFeatures } from './shared-features';
 import { Button } from '@/ui/shared/Button';
 import { PwaUpdateProvider } from './components/PwaUpdateProvider';
 import React, { useState } from 'react';
-import { FeatureNavigationContext, type CrateSection } from './components/FeatureSwitcherButton';
+import { FeatureNavigationContext, type CrateSection } from './navigation/feature-navigation';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { PwaThemeProvider } from './components/PwaThemeProvider';
 import { PwaThemeIcon } from './components/PwaThemeIcon';

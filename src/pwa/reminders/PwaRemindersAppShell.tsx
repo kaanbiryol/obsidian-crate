@@ -3,7 +3,7 @@ import { PWA_CONTROL_SPRING, PWA_FADE } from '../../ui/shared/navigation/motion'
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
-import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 
 import { PwaDock, PwaDockAddButton } from '../components/PwaDock';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';

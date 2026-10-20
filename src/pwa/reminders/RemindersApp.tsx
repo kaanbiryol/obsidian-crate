@@ -3,7 +3,7 @@ import { lazy, useCallback, useContext } from 'react';
 import { useLaunchReminderModal } from './useLaunchReminderModal';
 import { usePrepareReminderEditor } from './editor/usePrepareReminderEditor';
 import { DeferredNotice } from '../components/DeferredNotice';
-import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from '../components/PwaChrome';
 import {
 	PwaRemindersAppShell,

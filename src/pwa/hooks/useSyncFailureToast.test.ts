@@ -1,6 +1,6 @@
 import { act, createElement, type ContextType } from 'react';
 import { renderHook } from '../../test/react-hooks';
-import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useSyncFailureToast } from './useSyncFailureToast';
 

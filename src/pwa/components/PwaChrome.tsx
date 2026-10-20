@@ -1,7 +1,7 @@
 import { PwaUpdateButton } from './PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
 import React, { useContext, useState } from 'react';
-import { FeatureNavigationContext } from './FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {

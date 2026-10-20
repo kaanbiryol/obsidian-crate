@@ -6,7 +6,7 @@ import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';
 import { useSettingsOpen, useSettingsStore } from '../settings-context';
 import { startUpdateChecks, fetchPwaAssetVersion } from '../update/update-checker';
-import type { CrateSection } from './FeatureSwitcherButton';
+import type { CrateSection } from '../navigation/feature-navigation';
 import type { ToastState } from '../types';
 
 interface AppUpdate {

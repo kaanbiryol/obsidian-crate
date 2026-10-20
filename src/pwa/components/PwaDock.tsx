@@ -8,7 +8,7 @@ import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';
 import type { NavigationItem } from '@/ui/shared/NavigationBar';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import { FeatureNavigationContext, type CrateSection } from './FeatureSwitcherButton';
+import { FeatureNavigationContext, type CrateSection } from '../navigation/feature-navigation';
 
 /** PWA navigation; shared feature panels supply their destinations and actions. */
 export function PwaDock<T extends string>({ section, items, activeTab, onTabChange, onAdd, inert = false, disabled = false, className = '' }: {

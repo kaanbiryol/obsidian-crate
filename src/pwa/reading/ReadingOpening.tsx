@@ -1,6 +1,7 @@
 import { PwaOpeningDock } from '../components/PwaOpeningDock';
 import React, { useContext } from 'react';
-import { FeatureSwitcherButton, FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ViewHeader } from '@/ui/shared/ViewHeader';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';

@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef } from 'react';
-import { FeatureNavigationContext } from '../components/FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import type { ShowToast } from '../types';
 
 /** Announce actionable failures once; persistent sync notices own recovery. */

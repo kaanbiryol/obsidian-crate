@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { FeatureNavigationContext } from './FeatureSwitcherButton';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { createPwaOpeningDockHtml } from '../shell/opening-dock';
 import type { StartTab } from '../types';
 import { useDockMorph } from '@/ui/shared/navigation/useDockMorph';

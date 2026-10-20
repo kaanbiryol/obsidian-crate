@@ -1,22 +1,7 @@
 import { useSharedFeatures } from '../shared-features';
-import React, { createContext, useContext } from 'react';
-import type { ReadingSection } from '@/reading/core/reading-presentation';
-import type { TabId } from '@/reminders/ui/shared/layoutConstants';
+import React, { useContext } from 'react';
+import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { IconButton } from '@/ui/shared/IconButton';
-
-export type CrateSection = 'reading' | 'reminders';
-export type DockDestination = { section: 'reading'; tab: ReadingSection } | { section: 'reminders'; tab: TabId };
-export const FeatureNavigationContext = createContext<{
-  section: CrateSection;
-  active: boolean;
-  toggle: () => void;
-  destination: DockDestination | null;
-  navigate: (destination: DockDestination) => void;
-  dockIndex: number | null;
-  rememberReminderDockIndex: (index: number) => void;
-  readingTab: ReadingSection;
-  rememberReadingTab: (tab: ReadingSection) => void;
-} | null>(null);
 
 /** Each app places the same switcher in its own existing header. */
 export function FeatureSwitcherButton() {
