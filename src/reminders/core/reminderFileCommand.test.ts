@@ -81,3 +81,11 @@ it.each([false, true])('keeps omitted fields but explicitly clears dates, recurr
 	expect(after.response.reminder?.recurrence).toBeUndefined();
 	expect(after.response.reminder?.filePath).toBe(move ? 'Reminders/Work.md' : path);
 });
+
+it('answers only the listed wire fields of a scanned reminder', async () => {
+	const scanned = scanReminderMarkdownContent(path, note, folder).reminders[0]!;
+	const payload = await reminderCommandPayload({ ...scanned, futureField: 'private' } as typeof scanned);
+	expect(Object.keys(payload)).toEqual(['revision', 'id', 'content', 'description', 'dueDate', 'dueDatetime', 'priority',
+		'completed', 'project', 'recurrence', 'filePath', 'lineNumber']);
+	expect(payload).not.toHaveProperty('rawLine');
+});

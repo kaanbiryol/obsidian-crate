@@ -17,7 +17,8 @@ import {
 	recurrenceInputResponse,
 } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { scanReminderMarkdownFile } from '../scan';
+import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
@@ -83,13 +84,13 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	});
 	const reminders = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath);
 	const reminder = reminders.find(candidate => candidate.id === reminderId);
-	const response = { success: true, reminder: reminder ? await toReminderPayload(reminder) : undefined };
+	const response = { success: true, reminder: reminder ? await reminderCommandPayload(reminder) : undefined };
 	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null,
 		reminderOperationEffects(env.DB, operation, response, reminderId));
 	await saveReminderFileCache(env.DB, workspaceResult.folderPath, filePath, write.hash, reminders);
 
 	return corsResponse({
 		success: true,
-		reminder: reminder ? await toReminderPayload(reminder) : undefined,
+		reminder: reminder ? await reminderCommandPayload(reminder) : undefined,
 	});
 }

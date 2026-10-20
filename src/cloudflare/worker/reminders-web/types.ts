@@ -1,19 +1,6 @@
-import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
+import type { ScannedReminderRecord } from '@/reminders/core/markdownScan';
 
-export interface RemoteReminderRecord {
-	id: string;
-	content: string;
-	description?: string;
-	dueDate?: string;
-	dueDatetime?: string;
-	priority: Priority;
-	completed: boolean;
-	project: string;
-	recurrence?: RecurrenceRule;
-	filePath: string;
-	lineNumber: number;
-	rawLine: string;
-}
+export type RemoteReminderRecord = ScannedReminderRecord;
 
 export interface ReminderMutationWorkspace {
 	folderPath: string;

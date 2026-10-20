@@ -6,7 +6,8 @@ import { parseJsonObject, parseOptionalString } from '../../request-validation';
 import { setReminderCompletedInFileContent } from '../file-content';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { scanReminderMarkdownFile } from '../scan';
+import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { loadReminderSource } from '../workspace';
 import { checkReminderRevision } from '../revision';
 
@@ -38,13 +39,13 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 	const nextContent = setReminderCompletedInFileContent(file.content, reminder, parsedBody.value.completed);
 	const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
 	const updatedReminder = reminders.find(candidate => candidate.id === id);
-	const response = { success: true, reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined };
+	const response = { success: true, reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined };
 	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash,
 		reminderOperationEffects(env.DB, operation, response));
 	await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
 
 	return corsResponse({
 		success: true,
-		reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined,
+		reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined,
 	});
 }

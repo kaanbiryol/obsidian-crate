@@ -6,7 +6,7 @@ import {
 	loadIncrementalReminderIndex,
 	REMINDER_CACHE_PARSER_VERSION,
 } from '../reminder-cache';
-import { toReminderPayload } from '../scan';
+import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../vault-change-token';
 import { sha256Hex } from '../../../../platform/sha256';
 
@@ -80,13 +80,13 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		return corsResponse({
 			delta: true,
 			changedPaths,
-			reminders: await Promise.all(workspace.reminders.filter(reminder => paths.has(reminder.filePath)).map(reminder => toReminderPayload(reminder))),
+			reminders: await Promise.all(workspace.reminders.filter(reminder => paths.has(reminder.filePath)).map(reminder => reminderCommandPayload(reminder))),
 			projects: workspace.projects,
 			issues: [],
 		}, 200, headers);
 	}
 	return corsResponse({
-		reminders: await Promise.all(workspace.reminders.map(reminder => toReminderPayload(reminder))),
+		reminders: await Promise.all(workspace.reminders.map(reminder => reminderCommandPayload(reminder))),
 		projects: workspace.projects,
 		issues: workspace.issues,
 	}, 200, headers);

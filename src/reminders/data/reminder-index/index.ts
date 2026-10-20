@@ -7,7 +7,7 @@
  */
 
 import { TFile, type App } from "obsidian";
-import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
+import type { ScannedReminderRecord } from "@/reminders/core/markdownScan";
 import { createLogger } from "@/reminders/logger";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
@@ -23,20 +23,9 @@ const log = createLogger("ReminderIndex");
 
 type IndexChangeListener = () => void;
 
-export interface IndexedReminder {
-  id: string;
-  content: string;
-  dueDate?: string;
-  dueDatetime?: string;
-  priority: Priority;
-  completed: boolean;
-  project?: string;
-  recurrence?: RecurrenceRule;
-  description?: string;
-  filePath: string;
-  lineNumber: number;
-  rawLine: string;
-}
+/** A scanned record; the index also accepts records without a project, which
+ * read as the default project. */
+export type IndexedReminder = Omit<ScannedReminderRecord, 'project'> & { project?: string };
 
 export interface ReminderIndex {
   readonly isInitialLoadComplete: boolean;

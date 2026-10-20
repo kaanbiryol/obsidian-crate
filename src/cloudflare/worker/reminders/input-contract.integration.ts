@@ -7,7 +7,8 @@ import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
-import { scanReminderMarkdownFile, toReminderPayload } from '../reminders-web/scan';
+import { scanReminderMarkdownFile } from '../reminders-web/scan';
+import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../storage';
 import { buildDescriptionBlock } from '@/reminders/core/reminderDescription';
 import type { ReminderRecord } from '@/pwa/reminders/types';
@@ -34,7 +35,7 @@ function editorBody(content: string, description: string, mode: 'create' | 'edit
 async function seed(description = 'Original description') {
 	const text = '# Inbox\n\n- [ ] Original task <!-- crate-id:original -->\n' + buildDescriptionBlock(description).join('\n') + '\n';
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, text, null);
-	return toReminderPayload(scanReminderMarkdownFile(filePath, text, 'Reminders')[0]!);
+	return reminderCommandPayload(scanReminderMarkdownFile(filePath, text, 'Reminders')[0]!);
 }
 async function update(reminder: Record<string, unknown>, patch: Record<string, unknown>) {
 	return request('/reminders/update', { folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath,

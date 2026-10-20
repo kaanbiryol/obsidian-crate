@@ -1,4 +1,4 @@
-import { scanReminderMarkdownContent } from './markdownScan';
+import { scanReminderMarkdownContent, type ScannedReminderRecord } from './markdownScan';
 import { reminderRevision } from './reminderRevision';
 import { assertReminderMutationInput, parseReminderRecurrenceInput, parseReminderUpdateParams } from './reminderMutationInput';
 import { getReminderProjectFilePath, normalizeReminderProjectPath } from './reminderProjectPath';
@@ -10,10 +10,23 @@ import { DEFAULT_PROJECT } from './constants';
 export class ReminderCommandError extends Error {
 	constructor(message: string, readonly status = 409, readonly code = 'version_conflict') { super(message); }
 }
-type ScannedReminder = ReturnType<typeof scanReminderMarkdownContent>['reminders'][number];
-export async function reminderCommandPayload(reminder: ScannedReminder) {
-	const { rawLine: _rawLine, ...value } = reminder;
-	return { ...value, revision: await reminderRevision(reminder) };
+/** The wire record answered by the Worker routes and encrypted web apps. Fields
+ * are listed explicitly so new scanner fields stay private until chosen. */
+export async function reminderCommandPayload(reminder: ScannedReminderRecord) {
+	return {
+		revision: await reminderRevision(reminder),
+		id: reminder.id,
+		content: reminder.content,
+		description: reminder.description,
+		dueDate: reminder.dueDate,
+		dueDatetime: reminder.dueDatetime,
+		priority: reminder.priority,
+		completed: reminder.completed,
+		project: reminder.project,
+		recurrence: reminder.recurrence,
+		filePath: reminder.filePath,
+		lineNumber: reminder.lineNumber,
+	};
 }
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() || undefined : undefined;
@@ -42,7 +55,7 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		return content;
 	};
 	const scan = (path: string, content: string) => scanReminderMarkdownContent(path, content, folderPath).reminders;
-	let reminder: ScannedReminder | undefined;
+	let reminder: ScannedReminderRecord | undefined;
 	let createdId: string | undefined;
 	if (action === 'create') {
 		assertReminderMutationInput(body, 'create');

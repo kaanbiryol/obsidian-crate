@@ -8,7 +8,7 @@ import { extractReminderId } from './reminderIdentity';
 import { markdownTaskContexts } from './markdownTaskContext';
 import { DEFAULT_PROJECT } from "./constants";
 
-interface ScannedReminderRecord {
+export interface ScannedReminderRecord {
   id: string;
   content: string;
   description?: string;

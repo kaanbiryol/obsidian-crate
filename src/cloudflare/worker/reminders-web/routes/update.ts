@@ -22,7 +22,8 @@ import {
 	recurrenceInputResponse,
 } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { scanReminderMarkdownFile } from '../scan';
+import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { loadReminderSource } from '../workspace';
 import { checkReminderRevision } from '../revision';
 
@@ -75,7 +76,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
 		const movedReminders = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath);
 		updatedReminder = movedReminders.find(candidate => candidate.id === id);
-		const response = { success: true, reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined };
+		const response = { success: true, reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined };
 		const writes = await writeCommittedMarkdownFilePair(
 			env.BUCKET,
 			env.DB,
@@ -105,7 +106,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		const nextContent = updateReminderInFileContent(oldFile.content, reminder, update);
 		const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
 		updatedReminder = reminders.find(candidate => candidate.id === id);
-		const response = { success: true, reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined };
+		const response = { success: true, reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined };
 		const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash,
 			reminderOperationEffects(env.DB, operation, response));
 		await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
@@ -115,6 +116,6 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 
 	return corsResponse({
 		success: true,
-		reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined,
+		reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined,
 	});
 }
