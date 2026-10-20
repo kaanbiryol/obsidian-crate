@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles } from './file-discovery';
 import { hasLocalFileChanges } from './local-file-changes';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 vi.mock('./file-discovery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./file-discovery')>();
@@ -111,5 +112,21 @@ describe('hasLocalFileChanges', () => {
 		getAllVaultFilesMock.mockResolvedValue([]);
 
 		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(true);
+	});
+
+	it('ignores oversized files that sync skips', async () => {
+		const tracked = 'notes/grown.md';
+		const modified = new Date(1_700_000_000_000).toISOString();
+		const vault = { adapter: { exists: vi.fn(async () => true) } } as unknown as Vault;
+		const manifest = {
+			getAllPaths: () => [tracked],
+			getEntry: (path: string) => path === tracked ? { hash: 'hash', size: 12, modified } : undefined,
+		};
+		getAllVaultFilesMock.mockResolvedValue([
+			{ path: 'video/untracked.mov', size: MAX_FILE_SIZE_BYTES + 1, mtime: 1_700_000_000_000, extension: 'mov' },
+			{ path: tracked, size: MAX_FILE_SIZE_BYTES + 1, mtime: 1_700_000_000_001, extension: 'md' },
+		]);
+
+		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(false);
 	});
 });
