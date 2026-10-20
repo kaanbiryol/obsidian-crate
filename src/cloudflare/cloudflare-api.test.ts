@@ -193,6 +193,17 @@ describe('Worker deletion', () => {
 	});
 });
 
+describe('Worker upload', () => {
+	it('encodes the worker name in the script path like the other script requests', async () => {
+		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: null }) }));
+		await new CloudflareApiClient('token', transport).uploadWorker({
+			publicOrigin: 'https://crate.example', accountId: 'account', workerName: 'crate server', d1DatabaseId: 'database', r2BucketName: 'crate-0123456789abcdef',
+			artifacts: { version: '1', fingerprint: 'fingerprint', workerBundle: 'export default {}', workerBundleSha256: 'a'.repeat(64), d1Schema: '', d1SchemaSha256: 'b'.repeat(64) },
+		});
+		expect(transport.mock.calls[0]?.[0]).toBe('https://api.cloudflare.com/client/v4/accounts/account/workers/scripts/crate%20server');
+	});
+});
+
 describe('R2 cursor pagination compatibility', () => {
 	it.each([undefined, {}, { cursor: '' }, { cursor: null }, { is_truncated: false }])('accepts a terminal page with metadata %j', async result_info => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: [{ key: 'file.md' }], result_info }) }));

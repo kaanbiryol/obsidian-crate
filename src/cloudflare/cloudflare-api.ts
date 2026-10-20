@@ -86,6 +86,11 @@ function asEnvelope<T>(value: unknown): CloudflareEnvelope<T> | null {
 	return value as CloudflareEnvelope<T>;
 }
 
+function apiError(status: number, envelope: CloudflareEnvelope<unknown> | null, fallback: string): CloudflareApiError {
+	const firstError = envelope?.errors?.[0];
+	return new CloudflareApiError(firstError?.message || fallback, status, typeof firstError?.code === 'number' ? firstError.code : null);
+}
+
 export class CloudflareApiClient {
 	constructor(
 		private readonly accessToken: string,
@@ -254,12 +259,10 @@ export class CloudflareApiClient {
 	}
 
 	async deleteWorker(accountId: string, workerName: string): Promise<void> {
-		const response = await this.transport(`${API_BASE_URL}/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
-			method: 'DELETE', headers: { Authorization: `Bearer ${this.accessToken}` },
-		});
-		const envelope = asEnvelope<unknown>(parseJson(response.text));
+		const { response, envelope } = await this.send<unknown>(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, { method: 'DELETE' });
+		// A successful script deletion may have an empty body instead of an envelope.
 		if (response.status < 200 || response.status >= 300 || (response.text.trim() && !envelope?.success)) {
-			throw new CloudflareApiError(envelope?.errors?.[0]?.message || `Worker deletion failed with HTTP ${response.status}`, response.status, null);
+			throw apiError(response.status, envelope, `Worker deletion failed with HTTP ${response.status}`);
 		}
 	}
 
@@ -306,7 +309,7 @@ export class CloudflareApiClient {
 		r2BucketName: string;
 	}): Promise<void> {
 		const multipart = buildWorkerMultipartBody(input);
-		await this.request(`/accounts/${input.accountId}/workers/scripts/${input.workerName}`, {
+		await this.request(`/accounts/${input.accountId}/workers/scripts/${encodeURIComponent(input.workerName)}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': multipart.contentType },
 			body: multipart.body,
@@ -373,6 +376,14 @@ export class CloudflareApiClient {
 	}
 
 	private async requestEnvelope<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<CloudflareEnvelope<T>> {
+		const { response, envelope } = await this.send<T>(path, request);
+		if (response.status < 200 || response.status >= 300 || !envelope?.success) {
+			throw apiError(response.status, envelope, `Cloudflare request failed with HTTP ${response.status}`);
+		}
+		return envelope;
+	}
+
+	private async send<T>(path: string, request: HttpRequest) {
 		const response = await this.transport(`${API_BASE_URL}${path}`, {
 			...request,
 			headers: {
@@ -380,16 +391,6 @@ export class CloudflareApiClient {
 				Authorization: `Bearer ${this.accessToken}`,
 			},
 		});
-		const parsed = parseJson(response.text);
-		const envelope = asEnvelope<T>(parsed);
-		if (response.status < 200 || response.status >= 300 || !envelope?.success) {
-			const firstError = envelope?.errors?.[0];
-			throw new CloudflareApiError(
-				firstError?.message || `Cloudflare request failed with HTTP ${response.status}`,
-				response.status,
-				typeof firstError?.code === 'number' ? firstError.code : null,
-			);
-		}
-		return envelope;
+		return { response, envelope: asEnvelope<T>(parseJson(response.text)) };
 	}
 }
