@@ -3,7 +3,7 @@ import type { RemoteFileVersion } from '../../protocol/sync-types';
 import type { EngineFileOperations } from './file-operations';
 import { createEngineHistory } from './history';
 import { createEnginePendingChanges } from './pending-changes';
-import { getSyncIssues, recordSyncError, syncErrorIssues } from '../issues';
+import { getSyncIssues, syncErrorIssues } from '../issues';
 import { findStartupPendingPaths } from '../pending/startup-pending';
 import { SyncTimingRecorder } from '../diagnostics/timings';
 /**
@@ -37,16 +37,17 @@ import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runInitialSyncWorkflow } from './initial-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
+import { completeWorkflowResult, handleWorkflowError } from './workflow-shared';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
-import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from '../sync-result';
+import { createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from '../sync-result';
 import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
 import { verifyUnchangedPendingPaths } from '../pending/pending-verification';
-import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
+import { MAX_DEBOUNCE_WAIT_MS, type SyncSettings } from '../settings';
 
 const logger = createLogger('SyncEngine');
 
@@ -157,6 +158,7 @@ export class SyncEngine {
 			getLocalManifest: () => this.localManifest,
 			shouldIgnore: this.shouldIgnore.bind(this),
 			updateState: this.updateState.bind(this),
+			setLastSync: value => this.contexts.setLastSync(value),
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
@@ -637,37 +639,25 @@ export class SyncEngine {
 		if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			const outcome = { updateState: this.updateState.bind(this), setLastSync: this.contexts.setLastSync };
 			this.updateState({ status: 'syncing' });
 			let result = createEmptySyncResult();
 			try {
 				result = await this.reconcilePaths(queueKeys, !selectedOnly);
-				if (result.outcome === 'cancelled') {
-					this.updateState({ status: 'idle' });
-					return result;
+				if (result.outcome !== 'cancelled') {
+					await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
+					if (result.success && !selectedOnly) await this.contexts.finishInitialSetup();
 				}
-				await this.pendingChanges().settleSynced(result, pendingRevisionSnapshot);
-				if (result.success) {
-					if (!selectedOnly) await this.contexts.finishInitialSetup();
-					const lastSync = new Date().toISOString();
-					updateSyncProgress(this.settings, { lastSync });
-					this.updateState({
-						status: 'idle',
-						lastSync,
-						lastError: null,
-					});
-					this.pruneMarkdownBaseCacheInBackground();
-				} else {
-					this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed', lastIssues: getSyncIssues(result) });
-				}
+				completeWorkflowResult(outcome, result, { errorFallback: 'Reconciliation failed' });
+				if (result.success) this.pruneMarkdownBaseCacheInBackground();
 				return result;
 			} catch (error) {
-				if (isAbortError(error)) {
-					this.updateState({ status: 'idle' });
-					return cancelSyncResult(result);
-				}
-				recordSyncError(result, error);
+				handleWorkflowError(outcome, result, error, {
+					abortLogMessage: 'Reconciliation aborted',
+					failureLogPrefix: 'Reconciliation failed',
+					logger,
+				});
 				finalizeSyncResult(result);
-				this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed', lastIssues: getSyncIssues(result) });
 				return result;
 			}
 		});

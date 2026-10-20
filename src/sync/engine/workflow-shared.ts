@@ -39,32 +39,44 @@ export interface WorkflowCompletionContext {
 	setLastSync(value: string): void;
 }
 
+interface OutcomeOptions {
+	/** Published with the outcome by queue flushes, which track the pending count. */
+	pendingChanges?: number;
+	/** Replaces the first recorded error, for queue flushes that list every failed file. */
+	errorSummary?: string;
+}
+
+/** Publishes a finished result. Every sync path, including queue flushes and queue
+ * reconciliation, uses it, so a success also records `lastSync` in settings. */
 export function completeWorkflowResult(
 	context: WorkflowCompletionContext,
 	result: SyncResult,
-	options: {
+	options: OutcomeOptions & {
 		errorFallback: string;
 	},
 ): void {
+	const pending = pendingUpdate(options);
 	if (finalizeSyncResult(result)) {
 		const lastSync = new Date().toISOString();
 		context.updateState({
 			status: 'idle',
 			lastSync,
 			lastError: null,
+			...pending,
 		});
 		context.setLastSync(lastSync);
 		return;
 	}
 
 	if (result.outcome === 'cancelled') {
-		context.updateState({ status: 'idle' });
+		context.updateState({ status: 'idle', ...pending });
 		return;
 	}
 	context.updateState({
 		status: 'error',
-		lastError: getSyncResultError(result, options.errorFallback),
+		lastError: options.errorSummary ?? getSyncResultError(result, options.errorFallback),
 		lastIssues: getSyncIssues(result),
+		...pending,
 	});
 }
 
@@ -72,29 +84,37 @@ export interface WorkflowErrorContext {
 	updateState(updates: Partial<SyncState>): void;
 }
 
+interface AuthFailureOptions extends Pick<OutcomeOptions, 'pendingChanges'> {
+	failureLogPrefix: string;
+	logger: Logger;
+}
+
+/** Revoked access reads the same on every path: the reconnect message and a notice. */
+export function publishAuthFailure(context: WorkflowErrorContext, result: SyncResult, options: AuthFailureOptions): void {
+	result.errors.push(AUTH_ERROR_MESSAGE);
+	options.logger.error(`${options.failureLogPrefix}: auth error (401)`);
+	new Notice(AUTH_ERROR_MESSAGE);
+	context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE, ...pendingUpdate(options) });
+}
+
 export function handleWorkflowError(
 	context: WorkflowErrorContext,
 	result: SyncResult,
 	error: unknown,
-	options: {
+	options: OutcomeOptions & AuthFailureOptions & {
 		abortLogMessage: string;
-		failureLogPrefix: string;
-		logger: Logger;
 		logGenericError?: boolean;
 	},
 ): void {
 	if (isAbortError(error)) {
 		cancelSyncResult(result);
-		context.updateState({ status: 'idle' });
+		context.updateState({ status: 'idle', ...pendingUpdate(options) });
 		options.logger.info(options.abortLogMessage);
 		return;
 	}
 
 	if (isAuthError(error)) {
-		result.errors.push(AUTH_ERROR_MESSAGE);
-		options.logger.error(`${options.failureLogPrefix}: auth error (401)`);
-		new Notice(AUTH_ERROR_MESSAGE);
-		context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+		publishAuthFailure(context, result, options);
 		return;
 	}
 
@@ -103,5 +123,14 @@ export function handleWorkflowError(
 	if (options.logGenericError) {
 		options.logger.error(`${options.failureLogPrefix}:`, errMsg);
 	}
-	context.updateState({ status: 'error', lastError: getSyncResultError(result, errMsg), lastIssues: getSyncIssues(result) });
+	context.updateState({
+		status: 'error',
+		lastError: options.errorSummary ?? getSyncResultError(result, errMsg),
+		lastIssues: getSyncIssues(result),
+		...pendingUpdate(options),
+	});
+}
+
+function pendingUpdate(options: Pick<OutcomeOptions, 'pendingChanges'>): Partial<SyncState> {
+	return options.pendingChanges === undefined ? {} : { pendingChanges: options.pendingChanges };
 }

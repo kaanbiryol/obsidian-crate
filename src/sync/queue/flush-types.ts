@@ -40,6 +40,8 @@ export interface QueueFlushContext {
 	api: QueueApi;
 	localManifest: QueueManifest;
 	updateState(updates: Partial<SyncState>): void;
+	/** Persists the time of a successful flush, as every other sync path does. */
+	setLastSync(value: string): void;
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;

@@ -28,6 +28,7 @@ export interface SyncQueueControllerContext {
 	getLocalManifest(): QueueFlushContext['localManifest'];
 	shouldIgnore(path: string): boolean;
 	updateState(updates: Partial<SyncState>): void;
+	setLastSync: QueueFlushContext['setLastSync'];
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]>;
@@ -168,6 +169,7 @@ export class SyncQueueController {
 			api: this.context.api,
 			localManifest: this.context.getLocalManifest(),
 			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),
+			setLastSync: (value: string) => this.context.setLastSync(value),
 			isDestroyed: () => this.context.isDestroyed(),
 			currentStatus: () => this.context.currentStatus(),
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),

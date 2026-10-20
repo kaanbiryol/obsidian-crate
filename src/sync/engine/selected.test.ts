@@ -8,6 +8,8 @@ import { arrayBufferToBase64 } from '../encoding';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { sha256Hex } from '../../platform/sha256';
+import { Notice } from '../../test/mocks/obsidian';
+import { AUTH_ERROR_MESSAGE } from './constants';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());
@@ -62,6 +64,19 @@ describe('selected sync with durable file operations', () => {
         expect(h.settings.lastSeq).toBe(42);
         expect(h.settings.lastSync).toBeNull();
         expect(h.engine.getState().status).toBe('idle');
+    });
+
+    it('reports revoked access with the reconnect message and keeps the selection pending', async () => {
+        Notice.reset();
+        const h = await harness();
+        const transport = h.transport.getMockImplementation()!;
+        h.transport.mockImplementation(async request => new URL(request.url).pathname === '/sync/metadata'
+            ? { ...response({ error: 'Unauthorized' }), status: 401 } : transport(request));
+        expect(await h.engine.syncSelected(['a.md'])).toMatchObject({ outcome: 'failed', success: false, errors: [AUTH_ERROR_MESSAGE] });
+        expect(h.engine.getState()).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+        expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+        expect(h.engine.getPendingPaths()).toEqual(['a.md', 'b.md']);
+        expect(h.settings.lastSync).toBeNull();
     });
 
     it('selects an upload named delete:note.md separately from deleting note.md', async () => {

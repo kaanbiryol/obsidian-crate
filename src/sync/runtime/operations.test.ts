@@ -252,7 +252,6 @@ describe('SyncRuntime operation wrappers', () => {
 
 		await callback.mock.calls[0]![0](result);
 
-		expect(settings.lastSync).toBe(state.lastSync);
 		expect(settings.syncHistory[0]).toEqual(expect.objectContaining({
 			type: 'sync',
 			uploaded: 1,

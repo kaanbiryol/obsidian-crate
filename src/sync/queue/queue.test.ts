@@ -5,6 +5,7 @@ import type { QueueFlushContext } from './flush-types';
 import { base64ToArrayBuffer } from '../encoding';
 import { pendingChangeKey } from '../pending/pending-change';
 import { TFolder } from 'obsidian';
+import { Notice } from '../../test/mocks/obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	clearSyncedPendingPaths,
@@ -20,6 +21,7 @@ import { HttpError } from '../api';
 import { LocalFilePresentError } from '../local/local-absence';
 import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
+import { AUTH_ERROR_MESSAGE } from '../engine/constants';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -81,6 +83,7 @@ function createFlushHarness(overrides: Partial<{
 	const triggerDebouncedSync = vi.fn();
 	const requestReconciliation = vi.fn();
 	const onFlushResult = vi.fn(async () => {});
+	const setLastSync = vi.fn();
 	const prepareUploadFromPath = vi.fn(
 		overrides.prepareUploadFromPath ??
 			(async () => null),
@@ -112,6 +115,7 @@ function createFlushHarness(overrides: Partial<{
 		triggerDebouncedSync,
 		requestReconciliation,
 		onFlushResult,
+		setLastSync,
 		prepareUploadFromPath,
 		uploadFile,
 		deleteFile,
@@ -171,6 +175,7 @@ function createFlushHarness(overrides: Partial<{
 				save,
 			},
 			updateState,
+			setLastSync,
 			isDestroyed: () => false,
 			currentStatus: () => state.status,
 			prepareUploadFromPath,
@@ -534,6 +539,7 @@ describe('processPendingChanges', () => {
 		expect(harness.save).toHaveBeenCalledTimes(1);
 		expect(harness.state.status).toBe('idle');
 		expect(harness.state.lastError).toBeNull();
+		expect(harness.setLastSync).toHaveBeenCalledExactlyOnceWith(harness.state.lastSync);
 		expect(harness.pendingPaths.size).toBe(0);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
@@ -624,6 +630,7 @@ describe('processPendingChanges', () => {
 	});
 
 	it('keeps authentication failures pending without attempting reconciliation or automatic retry', async () => {
+		Notice.reset();
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
@@ -643,7 +650,27 @@ describe('processPendingChanges', () => {
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
-		expect(harness.state.lastError).toContain('unauthorized');
+		expect(harness.state).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
+		expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+			success: false,
+			errors: ['notes/a.md: unauthorized', AUTH_ERROR_MESSAGE],
+		}));
+	});
+
+	it('reports revoked access found while recovering uploads with the reconnect message', async () => {
+		Notice.reset();
+		const harness = createFlushHarness();
+		vi.mocked(harness.context.recoverUploads).mockRejectedValue(new HttpError('unauthorized', 401));
+		harness.pendingPaths.add('notes/a.md');
+
+		await processPendingChanges(harness.context);
+
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.state).toMatchObject({ status: 'error', lastError: AUTH_ERROR_MESSAGE, pendingChanges: 1 });
+		expect(Notice.messages).toEqual([AUTH_ERROR_MESSAGE]);
+		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({ success: false, errors: [AUTH_ERROR_MESSAGE] }));
 	});
 
 	it('keeps a namespace conflict pending for explicit repair without reconciling or retrying it', async () => {

@@ -599,12 +599,9 @@ export class SyncRuntime {
 		emitStateChange(this.stateChangeListeners, this.getState());
 	}
 
+	/** The engine already recorded `lastSync` in these settings while publishing the result. */
 	private async recordAutomaticSyncResult(engine: SyncEngine, result: SyncResult): Promise<void> {
 		if (this.syncEngine !== engine || result.outcome === 'cancelled') return;
-		const state = engine.getState();
-		if (result.success && state.lastSync) {
-			updateSyncProgress(this.settings, { lastSync: state.lastSync });
-		}
 		await this.recordSyncResult(engine, 'sync', result);
 		if (this.syncEngine !== engine) return;
 		this.emitCurrentState();

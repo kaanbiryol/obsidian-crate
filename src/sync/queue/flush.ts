@@ -9,13 +9,15 @@ import type { QueueFlushContext } from './flush-types';
 import { uploadPendingFiles } from './upload';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
-import { recordSyncError, syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
+import { syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
 import { HttpError } from '../worker-api/http';
+import { completeWorkflowResult, handleWorkflowError, publishAuthFailure } from '../engine/workflow-shared';
 
 export type { QueueFlushContext } from './flush-types';
 
 const logger = createLogger('SyncQueue');
+const FLUSH_FAILURE = 'Queued sync failed';
 
 function buildQueueSyncResult(
 	uploads: Array<{ path: string }>,
@@ -138,16 +140,15 @@ export async function processPendingChanges(
 			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
 			const issues = [...failures.map(failure => ({ path: failure.path, message: failure.error })), ...skipped];
 			batch.release();
-			context.updateState({
-				status: 'error',
-				lastError: errors.join('; '),
-				lastIssues: issues,
-				pendingChanges: context.getPendingPathCount(),
-			});
-			await reportFlushResult(
-				context,
-				{ ...buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors), issues },
-			);
+			const failed = { ...buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors), issues };
+			const pendingChanges = context.getPendingPathCount();
+			// Transfers record a rejected request per file; one revoked token fails them all.
+			if (failures.some(failure => failure.status === 401)) {
+				publishAuthFailure(context, failed, { failureLogPrefix: FLUSH_FAILURE, logger, pendingChanges });
+			} else {
+				completeWorkflowResult(context, failed, { errorFallback: FLUSH_FAILURE, errorSummary: errors.join('; '), pendingChanges });
+			}
+			await reportFlushResult(context, failed);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 			return;
 		}
@@ -156,17 +157,13 @@ export async function processPendingChanges(
 		context.flushSucceeded?.();
 		const didWork = uploads.length > 0 || deletes.length > 0 || skipped.length > 0;
 		await context.finishInitialSetup();
-		context.updateState({
-			status: 'idle',
-			...(didWork ? { lastSync: new Date().toISOString(), lastError: null } : {}),
-			pendingChanges: context.getPendingPathCount(),
-		});
-		if (didWork) {
-			await reportFlushResult(
-				context,
-				{ ...buildQueueSyncResult(uploads, deletes, completedQueueKeys), ...(skipped.length ? { issues: skipped } : {}) },
-			);
+		if (!didWork) {
+			context.updateState({ status: 'idle', pendingChanges: context.getPendingPathCount() });
+			return;
 		}
+		const synced = { ...buildQueueSyncResult(uploads, deletes, completedQueueKeys), ...(skipped.length ? { issues: skipped } : {}) };
+		completeWorkflowResult(context, synced, { errorFallback: FLUSH_FAILURE, pendingChanges: context.getPendingPathCount() });
+		await reportFlushResult(context, synced);
 	} catch (error) {
 		if (isAbortError(error)) {
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
@@ -188,18 +185,18 @@ export async function processPendingChanges(
 				}
 			}
 			batch.release();
-			context.updateState({
-				status: 'error',
-				lastError: syncErrorIssues(error).map(formatSyncIssue).join('; '),
-				lastIssues: syncErrorIssues(error),
-				pendingChanges: context.getPendingPathCount(),
-			});
 			const failed = buildQueueSyncResult(
 				uploadPaths.map(path => ({ path })),
 				deletedPaths.map(path => ({ path })),
 				completedQueueKeys,
 			);
-			recordSyncError(failed, error);
+			handleWorkflowError(context, failed, error, {
+				abortLogMessage: 'Queue processing aborted',
+				failureLogPrefix: FLUSH_FAILURE,
+				logger,
+				errorSummary: syncErrorIssues(error).map(formatSyncIssue).join('; '),
+				pendingChanges: context.getPendingPathCount(),
+			});
 			finalizeSyncResult(failed);
 			await reportFlushResult(context, failed);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);

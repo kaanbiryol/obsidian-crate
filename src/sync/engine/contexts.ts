@@ -116,6 +116,8 @@ export class SyncEngineContexts {
 		await transferUploadPreparedFiles(this.transfer(), prepared, result, options);
 	}
 
+	setLastSync = (value: string): void => updateSyncProgress(this.dependencies.getSettings(), { lastSync: value });
+
 	deleteRemoteFiles: DeleteRemoteFiles = (files, result, options) => deleteRemoteFiles({
 		api: this.dependencies.files,
 		vault: this.dependencies.vault,
@@ -207,7 +209,7 @@ export class SyncEngineContexts {
 			updateState: dependencies.updateState,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			saveLocalManifest: () => dependencies.localManifest.save(),
-			setLastSync: (value: string) => updateSyncProgress(dependencies.getSettings(), { lastSync: value }),
+			setLastSync: this.setLastSync,
 		};
 	}
 

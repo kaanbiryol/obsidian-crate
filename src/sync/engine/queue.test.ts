@@ -140,6 +140,22 @@ describe('SyncEngine event queue behavior', () => {
 		harness.engine.destroy();
 	});
 
+	it('records a successful flush in settings for the runtime to persist', async () => {
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+		const settingsAtReport: Array<string | null> = [];
+		harness.engine.setAutomaticSyncResultCallback(() => { settingsAtReport.push(harness.settings.lastSync); });
+
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
+
+		const { lastSync } = harness.engine.getState();
+		expect(lastSync).not.toBeNull();
+		expect(settingsAtReport).toEqual([lastSync]);
+	});
+
 	it('keeps new paths queued when they arrive during pending flush', async () => {
 		const content = toArrayBuffer('A');
 		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => {
