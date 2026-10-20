@@ -1,4 +1,4 @@
-import type CratePlugin from '../main';
+import type CratePlugin from '../plugin/CratePlugin';
 import type { ReminderMoveJournal } from './data/reminder-move-journal';
 
 type SyncRuntimeView = Pick<CratePlugin['syncRuntime'], 'getState' | 'getApiClient' | 'isConfigured'>;
