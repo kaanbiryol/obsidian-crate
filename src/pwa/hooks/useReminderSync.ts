@@ -4,6 +4,7 @@ import { capturePwaSession } from '../session-generation';
 import { fetchReadyReminderList, readReminderListBody, type ReminderIndexingProgress } from '../reminders/reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminders/cache/reminder-cache';
 import { createReminderRequestCoordinator } from '../reminders/outbox/reminder-request-coordinator';
+import { createReminderListCursor } from '../reminders/reminder-list-cursor';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
 
@@ -67,13 +68,7 @@ export function useReminderSync({
 	const snapshotRef = useRef(snapshot);
 	const hydratedCacheRef = useRef(false);
 	const requestCoordinatorRef = useRef(createReminderRequestCoordinator());
-	const etagRef = useRef<string | undefined>(undefined);
-	// The ETag stored with the offline copy; 304 freshness is recorded against it.
-	const persistedEtagRef = useRef<string | undefined>(undefined);
-	// Server changelog position of the confirmed snapshot. Locally confirmed
-	// changes since then are in notes the next delta replaces, so it stays valid.
-	const deltaBaseRef = useRef<string | undefined>(undefined);
-	const lastCheckedAtRef = useRef<number | null>(null);
+	const [cursor] = useState(createReminderListCursor);
 	const activeReadRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
 	const lifetimeRef = useRef({ active: true });
@@ -100,16 +95,13 @@ export function useReminderSync({
 		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean } = {}) => {
 		const savedAt = Date.now();
 		publishSnapshot(nextReminders, nextProjects);
-		etagRef.current = etag;
-		persistedEtagRef.current = etag;
-		if (deltaBase !== undefined) deltaBaseRef.current = deltaBase;
-		lastCheckedAtRef.current = savedAt;
+		cursor.confirmed({ etag, deltaBase }, savedAt);
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
 		if (persist) await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
-			savedAt, etag, issues: issuesRef.current, deltaBase: deltaBaseRef.current });
-	}, [config.folderPath, publishSnapshot]);
+			savedAt, etag, issues: issuesRef.current, deltaBase: cursor.deltaBase });
+	}, [config.folderPath, cursor, publishSnapshot]);
 	const commitReminderState = useCallback((nextReminders: ReminderRecord[], nextProjects?: string[], options?: { persist?: boolean }) =>
 		commitConfirmedSnapshot(nextReminders, nextProjects, { persist: options?.persist }), [commitConfirmedSnapshot]);
 
@@ -119,23 +111,14 @@ export function useReminderSync({
 		publishSnapshot(snapshot.reminders, snapshot.projects);
 		issuesRef.current = snapshot.issues ?? [];
 		setIssues(issuesRef.current);
-		etagRef.current = snapshot.etag;
-		persistedEtagRef.current = snapshot.etag;
-		deltaBaseRef.current = snapshot.deltaBase;
-		lastCheckedAtRef.current = snapshot.savedAt;
+		cursor.hydrate(snapshot);
 		setLastUpdatedAt(snapshot.savedAt);
 		setDataMode('cached');
-	}, [publishSnapshot]);
+	}, [cursor, publishSnapshot]);
 
 	const loadReminders = useCallback((options: { silent?: boolean; maxAgeMs?: number } = {}) => {
 		if (!authToken || !enabledRef.current) return Promise.resolve();
-		if (
-			options.maxAgeMs !== undefined
-			&& lastCheckedAtRef.current !== null
-			&& Date.now() - lastCheckedAtRef.current < options.maxAgeMs
-		) {
-			return Promise.resolve();
-		}
+		if (cursor.isFresh(options.maxAgeMs)) return Promise.resolve();
 
 		const requestKey = `${config.folderPath}\0${authToken}`;
 		if (activeReadRef.current?.key === requestKey) return activeReadRef.current.promise;
@@ -152,13 +135,10 @@ export function useReminderSync({
 			setError(null);
 			setIndexingProgress(null);
 			try {
-				const headers = new Headers();
-				if (etagRef.current) headers.set('If-None-Match', etagRef.current);
-				// Ask for notes changed since a complete confirmed snapshot only.
-				const since = deltaBaseRef.current && issuesRef.current.length === 0 ? deltaBaseRef.current : undefined;
+				const { path, headers, since } = cursor.request(config.folderPath, issuesRef.current.length === 0);
 				const response = await fetchReadyReminderList(
 					apiFetch,
-					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}${since ? `&since=${encodeURIComponent(since)}` : ''}`,
+					path,
 					headers,
 					(remaining, total) => {
 						if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) {
@@ -168,18 +148,15 @@ export function useReminderSync({
 				);
 				if (response.status === 304) {
 					if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-					// Other vault changes refresh the ETag and delta base of unchanged reminders.
-					etagRef.current = response.headers.get('ETag') ?? etagRef.current;
-					deltaBaseRef.current = response.headers.get('X-Crate-Delta-Base') ?? deltaBaseRef.current;
 					const savedAt = Date.now();
-					lastCheckedAtRef.current = savedAt;
+					cursor.notModified(response.headers, savedAt);
 					setLastUpdatedAt(savedAt);
 					setDataMode('live');
 					setIsOffline(false);
 					void refreshCachedReminderSnapshot(
 						config.folderPath,
 						savedAt,
-						persistedEtagRef.current,
+						cursor.persistedEtag,
 					);
 					return;
 				}
@@ -187,12 +164,12 @@ export function useReminderSync({
 				const body: unknown = await response.json().catch(() => null);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const { result, dropDeltaBase } = readReminderListBody(body, config.folderPath, snapshotRef.current.reminders, since);
-				if (dropDeltaBase) deltaBaseRef.current = undefined;
+				if (dropDeltaBase) cursor.dropDeltaBase();
 				if (!result) {
 					// A contract failure cannot replace a valid revision or its ETag,
 					// including with an older disk snapshot after a recent acknowledgement.
 					setError('The server returned invalid reminder data. Refresh reminders.');
-					if (lastCheckedAtRef.current === null) setDataMode('error');
+					if (cursor.lastCheckedAt === null) setDataMode('error');
 					return;
 				}
 				setError(null);
@@ -205,7 +182,7 @@ export function useReminderSync({
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
 				// A loaded snapshot is at least as new as the disk copy; keep it and mark it stale.
-				if (lastCheckedAtRef.current !== null) {
+				if (cursor.lastCheckedAt !== null) {
 					setDataMode('cached');
 					setError(message);
 					return;
@@ -234,17 +211,15 @@ export function useReminderSync({
 		};
 		void promise.then(clearActiveRead, clearActiveRead);
 		return promise;
-	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot, commitConfirmedSnapshot]);
+	}, [apiFetch, authToken, config.folderPath, cursor, hydrateCachedSnapshot, commitConfirmedSnapshot]);
 
 	const rebuildOfflineCache = useCallback(async () => {
 		const sessionCurrent = capturePwaSession();
 		if (!await rebuildCachedReminderSnapshot(config.folderPath) || !sessionCurrent()) return;
-		etagRef.current = undefined;
-		deltaBaseRef.current = undefined;
-		lastCheckedAtRef.current = null;
+		cursor.forgetServerPosition();
 		activeReadRef.current = null;
 		await loadReminders({ silent: true });
-	}, [config.folderPath, loadReminders]);
+	}, [config.folderPath, cursor, loadReminders]);
 
 	const invalidateReads = useCallback(() => {
 		requestCoordinatorRef.current.invalidateReads();
@@ -288,11 +263,8 @@ export function useReminderSync({
 		setRefreshing(false);
 		setIndexingProgress(null);
 		setLastUpdatedAt(null);
-		etagRef.current = undefined;
-		persistedEtagRef.current = undefined;
-		deltaBaseRef.current = undefined;
-		lastCheckedAtRef.current = null;
-	}, [publishSnapshot]);
+		cursor.reset();
+	}, [cursor, publishSnapshot]);
 
 	return {
 		reminders,
