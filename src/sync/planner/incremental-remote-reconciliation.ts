@@ -5,7 +5,7 @@ import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './types';
 import type { DownloadRequest } from '../transfer/download';
-import { recordSyncError } from '../issues';
+import { oversizedRemoteFileIssue, recordSyncError, recordSyncIssue } from '../issues';
 import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { FileDiff, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
@@ -83,7 +83,7 @@ export async function reconcileIncrementalRemoteChanges(
 			}
 
 			if (entry.size > MAX_FILE_SIZE_BYTES) {
-				recordSyncError(result, 'Skipped remote file larger than 25MB', path);
+				recordSyncIssue(result, oversizedRemoteFileIssue(path));
 				continue;
 			}
 

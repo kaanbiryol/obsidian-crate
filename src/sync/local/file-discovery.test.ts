@@ -290,6 +290,8 @@ describe('getAllVaultFiles', () => {
 			adapter: { list, stat },
 		} as unknown as Vault;
 
-		await expect(getAllVaultFiles(vault, () => false)).rejects.toThrow('Vault scan incomplete: cannot stat .config-hidden/config.json: permission denied');
+		const scan = getAllVaultFiles(vault, () => false);
+		await expect(scan).rejects.toThrow('Vault scan incomplete: cannot stat .config-hidden/config.json: permission denied');
+		await expect(scan).rejects.toMatchObject({ issues: [{ path: '.config-hidden/config.json', code: 'vault-scan-incomplete' }] });
 	});
 });

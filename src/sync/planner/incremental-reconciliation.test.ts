@@ -303,6 +303,7 @@ describe('runIncrementalSync', () => {
 
 		expect(result?.success).toBe(false);
 		expect(result?.errors).toContain('notes/too-big.bin: Skipped remote file larger than 25MB');
+		expect(result?.issues).toContainEqual({ path: 'notes/too-big.bin', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
 		expect(settings.lastSeq).toBe(11);
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});

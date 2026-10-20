@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement } from '../../test/fakes/obsidian-ui';
 import { renderSyncIssues } from './sync-issues';
 import { explainSyncIssue } from './sync-issue-message';
+import type { SyncIssueCode } from '../../protocol/sync-issues';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -20,6 +21,30 @@ it.each([
   expect(result.summary).toContain(summary);
   expect(result.recovery).toContain(recovery);
   if (message.includes('on line')) expect(result.summary).toContain(message.match(/line \d+/)![0]);
+});
+
+it.each([
+  ['file-too-large', 'Skipped local file larger than 25MB'],
+  ['reminder-note-too-large', 'Split this note into files of 1 MiB or smaller to use its reminders.'],
+  ['invalid-description-block', 'Invalid reminder description block'],
+  ['invalid-description-encoding', 'Invalid reminder description encoding'],
+  ['unsupported-description-encoding', 'Unsupported reminder description encoding'],
+  ['invalid-markdown-encoding', 'Save this note as UTF-8 without null characters.'],
+  ['duplicate-reminder-id', 'Duplicate reminder identifiers.'],
+  ['more-reminder-issues', 'More reminder notes need attention.'],
+  ['vault-scan-incomplete', 'Vault scan incomplete: cannot list /: adapter down'],
+  ['transfer-unverified', 'Invalid initial upload metadata'],
+] satisfies Array<[SyncIssueCode, string]>)('explains %s by its code, whatever its message says', (code, legacyMessage) => {
+  // This wording would otherwise read as a connection failure.
+  const reworded = { code, path: 'notes/a.md', message: 'ETIMEDOUT 401 EACCES' };
+  expect(explainSyncIssue({ ...reworded, code: undefined })).not.toEqual(explainSyncIssue({ message: legacyMessage }));
+  expect(explainSyncIssue(reworded)).toEqual(explainSyncIssue({ message: legacyMessage }));
+});
+
+it('takes a coded issue’s line from the issue, not its message', () => {
+  const issue = { code: 'invalid-description-block' as const, line: 7, message: 'Reworded error on line 2' };
+  expect(explainSyncIssue(issue).summary).toBe('A reminder description could not be read. See line 7.');
+  expect(explainSyncIssue({ ...issue, line: undefined }).summary).toBe('A reminder description could not be read.');
 });
 
 it('opens the explicit file and keeps technical details copyable as text', async () => {

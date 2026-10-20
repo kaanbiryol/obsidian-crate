@@ -90,7 +90,8 @@ it('names the uploaded note when unsupported description metadata blocks setup',
   await pass();
   expect(await readiness()).toMatchObject({ ready: false, error: expect.stringContaining(`${path}: `) as string });
   expect((await readiness()).error).toContain('Unsupported reminder description encoding');
-  expect((await readiness()).issues).toEqual([{ path, message: expect.stringContaining('Unsupported reminder description encoding on line 2') as string }]);
+  expect((await readiness()).issues).toEqual([{ path, message: expect.stringContaining('Unsupported reminder description encoding on line 2') as string,
+    code: 'unsupported-description-encoding', line: 2 }]);
   const uploaded = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
   expect(await (await env.BUCKET.get(uploaded!.storage_key))!.text()).toBe(content);
 });
@@ -105,6 +106,7 @@ it('returns a bounded, stable list of affected notes and signals additional fail
   const status = await readiness();
   expect(status.ready).toBe(false);
   expect(status.issues?.map(issue => issue.path)).toEqual(paths.slice(0, 20));
+  expect(status.issues?.[0]).toMatchObject({ code: 'invalid-description-encoding', line: 2 });
   expect(status.moreIssues).toBe(true);
   expect(status.error).toContain(paths[0]);
 });
@@ -122,7 +124,7 @@ it('carries a source failure into sync activity and clears it after the note is 
   await runDurableObjectAlarm(coordinator);
   const result = await syncing;
   expect(result).toMatchObject({ success: false, uploaded: 1, issues: [{
-    path, scope: 'reminders', message: expect.stringContaining('on line 2') as string,
+    path, scope: 'reminders', message: expect.stringContaining('on line 2') as string, code: 'unsupported-description-encoding', line: 2,
   }] });
   expect(device.engine.getState().lastIssues).toEqual(result.issues);
   device.disk.write(path, `${task}\n<!-- crate-desc:v1:repaired -->\n`);

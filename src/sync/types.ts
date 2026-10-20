@@ -10,6 +10,10 @@ export interface SyncIssue {
 	message: string;
 	path?: string;
 	scope?: 'reminders';
+	/** Set where this repo owns the wording; explanations prefer it to the message. */
+	code?: import('../protocol/sync-issues').SyncIssueCode;
+	/** One-based source line, for reminder parser codes. */
+	line?: number;
 }
 
 export interface SyncWork {

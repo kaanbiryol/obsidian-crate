@@ -247,7 +247,7 @@ it('settles an oversized file without failing the rest of its batch', async () =
   await processPendingChanges(h.context);
   expect(h.pendingPaths.size).toBe(0);
   expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
-    success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE }],
+    success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }],
   }));
 });
 

@@ -1,6 +1,7 @@
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
+import { reminderSourceIssueCode } from '../reminders/source-parse';
 
 export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';
 
@@ -35,7 +36,7 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
   // Return enough context to repair several notes without an unbounded error payload.
   const sourceIssues = status.ready ? [] : (await db.prepare(
     'SELECT path, error AS message FROM notification_file_retries ORDER BY path LIMIT 21',
-  ).all<{ path: string; message: string }>()).results;
+  ).all<{ path: string; message: string }>()).results.map(issue => ({ ...issue, ...reminderSourceIssueCode(issue.message) }));
   const progress = status.ready ? undefined : await db.prepare(`SELECT
     NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
       ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,

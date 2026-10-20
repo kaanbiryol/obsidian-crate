@@ -1,4 +1,4 @@
-import { skippedFileIssue, withSyncFileContext } from '../issues';
+import { oversizedRemoteFileIssue, recordSyncIssue, skippedFileIssue, withSyncFileContext } from '../issues';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
@@ -83,8 +83,7 @@ export async function createFullSyncPlan(
       continue;
     }
     if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
-      errors.push(`${path}: Skipped remote file larger than 25MB`);
-      issues.push({ path, message: 'Skipped remote file larger than 25MB' });
+      recordSyncIssue({ errors, issues }, oversizedRemoteFileIssue(path));
       diffMap.delete(path);
       continue;
     }

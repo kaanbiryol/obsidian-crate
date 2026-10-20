@@ -80,7 +80,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
         for (const upload of batch) {
           const receipt = response.results.find(file => file.path === upload.path);
           if (!receipt?.success) { recordSyncError(result, `${receipt?.error ?? 'Upload interrupted'}`, upload.path); continue; }
-          if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata' }]);
+          if (receipt.hash !== upload.hash || typeof receipt.revision !== 'string' || !receipt.revision) throw new SyncIssueError('Invalid initial upload metadata', [{ path: upload.path, message: 'Invalid initial upload metadata', code: 'transfer-unverified' }]);
           const entry = { hash: upload.hash, size: upload.size, revision: receipt.revision, modified: UNVERIFIED_MODIFIED };
           transfer.localManifest.setEntry(upload.path, entry);
           inventory[upload.path] = entry;

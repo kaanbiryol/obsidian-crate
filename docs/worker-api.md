@@ -135,10 +135,12 @@ See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
 Request: `{ token }`, using the completed initial-import token. Returns `{ ready }`,
 optional `{ progress: { scanning, remainingFiles, remainingSchedules } }`, and an
 `error` string when reminder setup needs attention. Source failures additionally
-return `issues: [{ path, message }]` (up to 20 notes) and `moreIssues`. These fields
-are additive; responses without source failures contain only `error`.
+return `issues: [{ path, message, code?, line? }]` (up to 20 notes) and `moreIssues`.
+These fields are additive; responses without source failures contain only `error`.
 Paths identify vault notes; malformed description messages include a one-based
-source line. Repairing a note and syncing again resumes setup without repeating
+source line, also returned as `line`. `code` is one of the
+[stable issue codes](protocol.md#initial-import-readiness) when the Worker recognizes
+the failure. Repairing a note and syncing again resumes setup without repeating
 completed file uploads. See [initial import readiness](protocol.md#initial-import-readiness).
 
 ### PUT /sync/upload

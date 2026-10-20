@@ -100,8 +100,9 @@ describe('createFullSyncPlan', () => {
 		]);
 		// A local file over the limit is reported but does not fail the sync.
 		expect(plan.errors).not.toContain(expect.stringContaining('notes/local-big.bin'));
-		expect(plan.issues).toContainEqual({ path: 'notes/local-big.bin', message: 'Skipped local file larger than 25MB; this file is not synced' });
+		expect(plan.issues).toContainEqual({ path: 'notes/local-big.bin', message: 'Skipped local file larger than 25MB; this file is not synced', code: 'file-too-large' });
 		expect(plan.errors).toContain('notes/remote-big.md: Skipped remote file larger than 25MB');
+		expect(plan.issues).toContainEqual({ path: 'notes/remote-big.md', message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
 		expect(removeEntry).toHaveBeenCalledWith('notes/orphan.md');
 	});
 

@@ -1,5 +1,7 @@
 import { ReminderIdentityConflictError } from './source-identity';
 import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
+import { reminderDescriptionErrorFromMessage } from '@/reminders/core/reminderDescription';
+import type { SyncIssueCode } from '@/protocol/sync-issues';
 import { scanReminderMarkdownFile } from '../reminders-web/scan';
 import { REMINDER_INDEX_MAX_FILE_BYTES } from '../reminders-web/reminder-cache/types';
 import type { RemoteReminderRecord } from '../reminders-web/types';
@@ -16,6 +18,20 @@ type ParsedReminderSource =
 	| { reminders: []; issue: string };
 
 export const REMINDER_SOURCE_SIZE_ISSUE = 'Split this note into files of 1 MiB or smaller to use its reminders. The vault file remains synced.';
+export const REMINDER_PROJECTION_SIZE_ISSUE = 'Split this reminder note into smaller files to schedule notifications';
+export const DUPLICATE_COMMITTED_REMINDER_ISSUE = 'Duplicate reminder identity in committed file';
+const MARKDOWN_ENCODING_ISSUE = new MarkdownEncodingError().message;
+const IDENTITY_CONFLICT_ISSUE = new ReminderIdentityConflictError().message;
+
+/** Source failures persist as text. Recover the stable code of text written here
+ * so clients need not match its wording; other failures, such as transient
+ * storage errors, have no code. */
+export function reminderSourceIssueCode(issue: string): { code: SyncIssueCode; line?: number } | undefined {
+	if (issue === REMINDER_SOURCE_SIZE_ISSUE || issue === REMINDER_PROJECTION_SIZE_ISSUE) return { code: 'reminder-note-too-large' };
+	if (issue === IDENTITY_CONFLICT_ISSUE || issue === DUPLICATE_COMMITTED_REMINDER_ISSUE) return { code: 'duplicate-reminder-id' };
+	if (issue.endsWith(MARKDOWN_ENCODING_ISSUE)) return { code: 'invalid-markdown-encoding' };
+	return reminderDescriptionErrorFromMessage(issue);
+}
 
 /** Ciphertext includes base64/JWE overhead and bounded public scheduling data.
  * The client validates plaintext size; the server can only bound the transport. */

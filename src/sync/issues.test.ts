@@ -42,9 +42,20 @@ it('bounds saved and remote issues and removes unsafe file paths without losing 
   expect(normalizeSyncIssues(Array.from({ length: 60 }, () => ({ message: 'error' })))).toHaveLength(50);
 });
 
+it('keeps known issue codes and source lines, and drops codes this version does not know', () => {
+  expect(normalizeSyncIssues([
+    { path: 'Reminders/a.md', message: 'any wording', code: 'invalid-description-block', line: 3 },
+    { message: 'newer server', code: 'future-code', line: 0 },
+    { message: 'bad line', line: 1.5 },
+  ])).toEqual([
+    { path: 'Reminders/a.md', message: 'any wording', code: 'invalid-description-block', line: 3 },
+    { message: 'newer server' }, { message: 'bad line' },
+  ]);
+});
+
 it('reports skipped files as issues without failing the result', () => {
 	const result = { errors: [] as string[], issues: undefined as SyncIssue[] | undefined };
 	recordSyncError(result, new SkippedFileError('big.bin'));
 	expect(result.errors).toEqual([]);
-	expect(result.issues).toEqual([{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE }]);
+	expect(result.issues).toEqual([{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }]);
 });

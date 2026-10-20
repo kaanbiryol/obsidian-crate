@@ -9,7 +9,7 @@ import type { QueueFlushContext } from './flush-types';
 import { uploadPendingFiles } from './upload';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
-import { syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
+import { syncErrorIssues, formatSyncIssue, SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
 import type { SyncIssue } from '../types';
 import { HttpError } from '../worker-api/http';
 import { completeWorkflowResult, handleWorkflowError, publishAuthFailure } from '../engine/workflow-shared';
@@ -96,7 +96,7 @@ export async function processPendingChanges(
 				// Settle a skipped file rather than failing its batch; a later edit
 				// queues it again and is reported the same way.
 				completedQueueKeys.add(pendingChangeKey('upload', path));
-				skipped.push({ path, message: error.message });
+				skipped.push(skippedFileIssue(path));
 				return null;
 			}
 		});

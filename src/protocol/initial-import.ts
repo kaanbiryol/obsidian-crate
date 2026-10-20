@@ -1,4 +1,5 @@
 import { portablePathKey } from './portable-path';
+import type { SyncIssueCode } from './sync-issues';
 export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v1';
 // Initial imports omit the history/projection statements used by normal uploads.
 // Leave room for authentication, staging and cleanup within D1's 50-query limit.
@@ -39,6 +40,7 @@ export interface ReminderSetupStatus {
   ready: boolean;
   error?: string;
   progress?: ReminderSetupProgress;
-  issues?: Array<{ path: string; message: string }>;
+  /** `code` and the one-based source `line` are additive; older servers send neither. */
+  issues?: Array<{ path: string; message: string; code?: SyncIssueCode; line?: number }>;
   moreIssues?: boolean;
 }

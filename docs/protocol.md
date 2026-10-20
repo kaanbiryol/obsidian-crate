@@ -94,10 +94,21 @@ exists, records pending reminder setup.
 projection and schedule queues, then atomically acknowledges readiness. Probes
 return `{ ready: false }` while work remains, optionally with an error requiring
 attention. Source errors include the affected note path. An additive `issues` array
-contains up to 20 `{ path, message }` entries in path order; `moreIssues: true` means
-more notes need repair. Responses still include the `error` string.
+contains up to 20 `{ path, message }` entries in path order, with optional `code` and
+one-based source `line`; `moreIssues: true` means more notes need repair. Responses
+still include the `error` string.
 Plugin sync results and saved history keep explicit file context alongside their
 text errors, enabling safe file-opening actions without parsing filenames from messages.
+Issues whose wording Crate owns also carry a stable `code` from
+`src/protocol/sync-issues.ts`, and Sync Activity chooses its explanation by code rather
+than by message text. The Worker sends `reminder-note-too-large`,
+`duplicate-reminder-id`, `invalid-markdown-encoding` and the reminder description
+codes `invalid-description-block`, `invalid-description-encoding` and
+`unsupported-description-encoding`. The plugin adds `file-too-large`,
+`vault-scan-incomplete`, `transfer-unverified` and `more-reminder-issues`. Codes are
+additive: older plugins ignore them, newer plugins drop unknown codes, and issues
+without a code (OS, HTTP and transport errors, or older peers) fall back to message
+matching.
 `/sync/import` returns
 the completed-upload session while its reminder setup is pending, allowing a
 restarted client to resume without retransfers.

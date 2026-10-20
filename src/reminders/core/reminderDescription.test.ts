@@ -5,6 +5,7 @@ import {
 	encodeDescriptionForMarkdown,
 	readDescriptionBlock,
 	ReminderDescriptionError,
+	reminderDescriptionErrorFromMessage,
 } from './reminderDescription';
 
 describe('reminder descriptions', () => {
@@ -54,4 +55,13 @@ describe('reminder descriptions', () => {
 			expect(error).toMatchObject({ code, line: 4, message: `${message} on line 4` });
 		}
 	});
+
+	it.each(['invalid-description-block', 'invalid-description-encoding', 'unsupported-description-encoding'] as const)(
+		'recovers the %s code and line from a recorded message', code => {
+			const prefix = 'Repair the reminder metadata in this note. ';
+			expect(reminderDescriptionErrorFromMessage(prefix + new ReminderDescriptionError(code, 12).message)).toEqual({ code, line: 12 });
+			expect(reminderDescriptionErrorFromMessage(new ReminderDescriptionError(code).message)).toEqual({ code });
+			expect(reminderDescriptionErrorFromMessage(`${new ReminderDescriptionError(code).message} on line two`)).toBeUndefined();
+		},
+	);
 });

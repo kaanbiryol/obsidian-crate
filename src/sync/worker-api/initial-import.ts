@@ -90,7 +90,7 @@ export class InitialImportApi {
       if (status.error) {
         const summary = `Files uploaded. Reminder setup needs attention: ${status.error}`;
         const issues = normalizeSyncIssues(status.issues, 20).map(issue => ({ ...issue, scope: 'reminders' as const }));
-        if (status.moreIssues === true) issues.push({ scope: 'reminders', message: 'More reminder notes need attention. Repair the listed notes, then sync again to review the remaining files.' });
+        if (status.moreIssues === true) issues.push({ scope: 'reminders', code: 'more-reminder-issues', message: 'More reminder notes need attention. Repair the listed notes, then sync again to review the remaining files.' });
         throw new SyncIssueError(summary, issues.length ? issues : [{ message: summary, scope: 'reminders' }]);
       }
       await new Promise(resolve => setTimeout(resolve, 1000));

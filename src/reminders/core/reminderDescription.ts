@@ -11,6 +11,20 @@ export class ReminderDescriptionError extends Error {
 	}
 }
 
+/** Recover the code and line from text that ends with this error's message, as a
+ * server records it, so the format and its reader change together. */
+export function reminderDescriptionErrorFromMessage(text: string): { code: ReminderDescriptionError['code']; line?: number } | undefined {
+	for (const code of Object.keys(descriptionErrors) as Array<ReminderDescriptionError['code']>) {
+		const at = text.lastIndexOf(descriptionErrors[code]);
+		if (at < 0) continue;
+		const rest = text.slice(at + descriptionErrors[code].length);
+		if (!rest) return { code };
+		const line = /^ on line ([1-9]\d*)$/.exec(rest)?.[1];
+		if (line) return { code, line: Number(line) };
+	}
+	return undefined;
+}
+
 const DESCRIPTION_ENCODING_PREFIX = "v1:";
 
 export function encodeDescriptionForMarkdown(description: string): string {

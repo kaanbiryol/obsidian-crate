@@ -10,7 +10,7 @@ import { assertUniqueReminderSources } from '../reminders/source-identity';
 import { getStoredFileRow } from '../sync/storage';
 import { readStoredMarkdownFiles } from '../storage';
 import { getNotificationPolicy } from './policy';
-import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
+import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, REMINDER_PROJECTION_SIZE_ISSUE, DUPLICATE_COMMITTED_REMINDER_ISSUE, PermanentReminderSourceError, isPermanentSourceError, reminderSourceByteLimit } from '../reminders/source-parse';
 import { hasVerifiedReminderSource } from '../reminders/source-state';
 import type { Env } from '../types';
 import type { RemoteReminderRecord } from '../reminders-web/types';
@@ -33,7 +33,7 @@ function operationChunks(operations: Awaited<ReturnType<typeof planNotificationO
   let items: string[] = [], bytes = 2;
   for (const operation of operations) {
     const json = JSON.stringify(operation), size = encoder.encode(json).byteLength;
-    if (size + 2 > limit) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
+    if (size + 2 > limit) throw new PermanentReminderSourceError(REMINDER_PROJECTION_SIZE_ISSUE);
     if (bytes + size + (items.length ? 1 : 0) > limit) {
       chunks.push(`[${items.join(',')}]`); items = []; bytes = 2;
     }
@@ -75,7 +75,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
       const observed = new Map(sources.map(row => [row.reminder_id, row]));
       const ids = new Set<string>();
       const operations = reminders.map<NotificationOperation>(reminder => {
-        if (ids.has(reminder.id)) throw new PermanentReminderSourceError('Duplicate reminder identity in committed file');
+        if (ids.has(reminder.id)) throw new PermanentReminderSourceError(DUPLICATE_COMMITTED_REMINDER_ISSUE);
         ids.add(reminder.id);
         const dueDatetime = notificationDatetime(reminder, policy);
         const source = observed.get(reminder.id);

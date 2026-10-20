@@ -1,4 +1,5 @@
 import { getSyncPathIssue } from '../protocol/portable-path';
+import { isSyncIssueCode } from '../protocol/sync-issues';
 import { isRecord } from '../platform/validation';
 import { errorMessage } from './logger';
 import { isAbortError } from './abort';
@@ -26,10 +27,11 @@ export const OVERSIZED_LOCAL_FILE_MESSAGE = 'Skipped local file larger than 25MB
 /** A file sync deliberately leaves out. It is reported as an issue, but it is not a
  * failure: it must not block the sync cursor, the queue or a completed sync. */
 export class SkippedFileError extends Error {
-	constructor(readonly path: string, message = OVERSIZED_LOCAL_FILE_MESSAGE) { super(message); }
+	constructor(readonly path: string) { super(OVERSIZED_LOCAL_FILE_MESSAGE); }
 }
 
-export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE });
+export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' });
+export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
 
 export function normalizeSyncIssues(value: unknown, limit = 50): SyncIssue[] {
 	if (!Array.isArray(value)) return [];
@@ -38,6 +40,8 @@ export function normalizeSyncIssues(value: unknown, limit = 50): SyncIssue[] {
 		return [{ message: issue.message.slice(0, 4000),
 			...(typeof issue.path === 'string' && !getSyncPathIssue(issue.path) ? { path: issue.path } : {}),
 			...(issue.scope === 'reminders' ? { scope: 'reminders' as const } : {}),
+			...(isSyncIssueCode(issue.code) ? { code: issue.code } : {}),
+			...(typeof issue.line === 'number' && Number.isSafeInteger(issue.line) && issue.line > 0 ? { line: issue.line } : {}),
 		}];
 	});
 }
@@ -55,12 +59,16 @@ export function syncErrorIssues(error: unknown, path?: string): SyncIssue[] {
 /** Keep the legacy text log and explicit file context together at the failure site. */
 export function recordSyncError(result: Pick<SyncResult, 'errors' | 'issues'>, error: unknown, path?: string): void {
 	if (error instanceof SkippedFileError) {
-		(result.issues ??= []).push({ path: path ?? error.path, message: error.message });
+		(result.issues ??= []).push(skippedFileIssue(path ?? error.path));
 		return;
 	}
-	const issues = syncErrorIssues(error, path);
-	result.errors.push(...issues.map(formatSyncIssue));
-	(result.issues ??= []).push(...issues);
+	for (const issue of syncErrorIssues(error, path)) recordSyncIssue(result, issue);
+}
+
+/** Record a failure whose wording and code this repo owns. */
+export function recordSyncIssue(result: Pick<SyncResult, 'errors' | 'issues'>, issue: SyncIssue): void {
+	result.errors.push(formatSyncIssue(issue));
+	(result.issues ??= []).push(issue);
 }
 
 /** Older histories retain their original text; only explicit context enables file actions. */

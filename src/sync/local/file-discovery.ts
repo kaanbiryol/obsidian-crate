@@ -227,7 +227,7 @@ async function safeList(vault: Vault, folderPath: string, assertActive?: () => v
 		assertActive?.();
 		if (isAbortError(error)) throw error;
 		const message = `Vault scan incomplete: cannot list ${folderPath || '/'}: ${errorMessage(error)}`;
-		throw new SyncIssueError(message, [{ message, ...(folderPath ? { path: folderPath } : {}) }]);
+		throw new SyncIssueError(message, [{ message, code: 'vault-scan-incomplete', ...(folderPath ? { path: folderPath } : {}) }]);
 	}
 	assertActive?.();
 	return listing;
@@ -242,7 +242,7 @@ async function safeStat(vault: Vault, filePath: string, assertActive?: () => voi
 		assertActive?.();
 		if (isAbortError(error)) throw error;
 		const message = `Vault scan incomplete: cannot stat ${filePath}: ${errorMessage(error)}`;
-		throw new SyncIssueError(message, [{ path: filePath, message }]);
+		throw new SyncIssueError(message, [{ path: filePath, message, code: 'vault-scan-incomplete' }]);
 	}
 	assertActive?.();
 	return stat;
