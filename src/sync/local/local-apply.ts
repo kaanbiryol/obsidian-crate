@@ -1,13 +1,66 @@
 import type { TFile, Vault } from 'obsidian';
-import { LocalPathObstructionError, prepareLocalFilePath } from './local-path-topology';
-import { createConflictCopy } from '../conflict/conflict';
+import { createConflictCopy, getIncomingConflictFileName } from '../conflict/conflict';
 import { isHiddenPath } from './file-discovery';
-import { IncomingFileReviewError, preserveIncomingForReview } from '../conflict/incoming-file-review';
 import type { RecordConflictInput } from '../conflict/store';
 import { isVaultTFileLike } from './local-delete';
 import type { DiffApplyOutcome } from '../transfer/types';
 import { isCurrentVaultFile } from './vault-file-identity';
 import { sha256Hex } from '../../platform/sha256';
+import { assertLocalSyncPath } from './local-path-safety';
+
+class LocalPathObstructionError extends Error {
+	constructor(readonly path: string, readonly isParent = false) {
+		super(isParent
+			? `A local file blocks the folder ${path}. Preserve or move that file, then sync again.`
+			: `The local folder ${path} contains files or could not be removed. Preserve or move its contents, then sync again.`);
+	}
+}
+
+/** Only empty directories may be removed. The non-recursive host operation is
+ * the final guard against a child being created after our directory listing. */
+async function removeEmptyDirectory(vault: Vault, path: string): Promise<void> {
+	const children = await vault.adapter.list(path);
+	if (children.files.length) throw new LocalPathObstructionError(path);
+	for (const child of children.folders) await removeEmptyDirectory(vault, child);
+	await vault.adapter.rmdir(path, false);
+}
+
+async function prepareLocalFilePath(vault: Vault, path: string): Promise<void> {
+	assertLocalSyncPath(path);
+	for (let end = path.indexOf('/'); end >= 0; end = path.indexOf('/', end + 1)) {
+		const parent = path.slice(0, end);
+		if ((await vault.adapter.stat(parent))?.type === 'file') throw new LocalPathObstructionError(parent, true);
+	}
+	if ((await vault.adapter.stat(path))?.type !== 'folder') return;
+	try { await removeEmptyDirectory(vault, path); }
+	catch { throw new LocalPathObstructionError(path); }
+}
+
+class IncomingFileReviewError extends Error {}
+
+/** Preserve incoming bytes without replacing a path lacking an atomic writer. */
+async function preserveIncomingForReview(
+	context: { vault: Vault; conflictStore?: { record(input: RecordConflictInput): Promise<void> } },
+	path: string,
+	content: ArrayBuffer,
+	localHash: string,
+	reason = 'This file needs manual review because it cannot be replaced atomically.',
+): Promise<never> {
+	const hash = await sha256Hex(content);
+	let copy = getIncomingConflictFileName(path, hash);
+	for (let variant = 0; await context.vault.adapter.exists(copy); variant++) {
+		if (await sha256Hex(await context.vault.adapter.readBinary(copy)) === hash) break;
+		if (variant >= 100) throw new IncomingFileReviewError('Too many edited incoming copies. Review them before syncing this file again.');
+		copy = getIncomingConflictFileName(path, hash, variant + 1);
+	}
+	if (!await context.vault.adapter.exists(copy)) {
+		// A concurrent creator or an edited recovery copy must never be overwritten,
+		// including hidden paths. The host may return null for an unindexed file.
+		await context.vault.createBinary(copy, content);
+	}
+	await context.conflictStore?.record({ originalPath: path, conflictPath: copy, cause: 'incoming-review', copySide: 'remote', localHash, remoteHash: hash });
+	throw new IncomingFileReviewError(`${reason} Incoming file saved at ${copy}. Review both versions and replace the original when ready`);
+}
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
 const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
