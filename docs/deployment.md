@@ -12,7 +12,7 @@ The site in `site/` is independent of the `kaanbiryol.com` blog repository. The 
 
 1. In the `obsidian-crate` repository, open **Settings → Pages**.
 2. Under **Build and deployment → Source**, select **GitHub Actions**.
-3. Run **Deploy GitHub Pages** or merge a `site/` change into `master` and wait for the workflow to finish.
+3. Run **Deploy GitHub Pages** with `release_tag` left empty and wait for the workflow to finish. Merging a `site/` change into `master` only builds and checks it; the site deploys when a release is published or the workflow is run manually.
 4. In **Settings → Pages → Custom domain**, enter `crate.kaanbiryol.com` and save it.
 5. In the authoritative DNS zone for `kaanbiryol.com`, create exactly this record:
 
