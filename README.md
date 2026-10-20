@@ -2,467 +2,59 @@
 
 Self-hosted Obsidian vault sync and reminders using Cloudflare R2, Workers, D1, and push notifications.
 
-Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. Deploy into your own Cloudflare account, or run the same Worker on your own computer with Miniflare and persistent local storage.
-
-Crate is not a hosted service and does not require a Crate account.
-
-**New to Crate?** Start with the [documentation](https://crate.kaanbiryol.com/docs/):
-[install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/),
-[choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/),
-then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/).
-
-For everyday use, see [feature settings](https://crate.kaanbiryol.com/docs/features/settings/),
-[vault sync](https://crate.kaanbiryol.com/docs/features/sync/),
-[reminders](https://crate.kaanbiryol.com/docs/features/reminders/),
-[Reading](https://crate.kaanbiryol.com/docs/features/reading/), and
-[the web app](https://crate.kaanbiryol.com/docs/features/web-app/).
-The guides also cover [notification setup](https://crate.kaanbiryol.com/docs/features/notifications/)
-and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
-
-[Deployment and OAuth setup](docs/deployment.md)
-
-[Run on your own computer](docs/self-hosting.md) — local setup, remote access, device tokens, backups, and updates.
-
-With Docker running, use `docker compose up -d --build` from this checkout.
-Then run `docker compose logs -f crate` to get the HTTPS address and first single-use
-pairing code. Docker includes Node and the tunnel tool, keeps storage in a named volume,
-and restarts Crate automatically. No host Node installation is needed.
-See [Docker setup](docs/self-hosting.md#run-with-docker).
-
-After `npm ci`, run `npm run server -- setup`. It initializes local storage,
-downloads a verified `cloudflared` binary if needed, and prints a public HTTPS
-address and the first pairing code. No Cloudflare account or domain is needed.
-Quick Tunnel addresses change on restart; update the address in Obsidian and
-re-enroll the PWA. For a stable address, use `setup --hostname crate.example.com`
-with your own Cloudflare domain.
-
-`npm run pack:server` builds a standalone npm package with the Worker included.
-It can be tested locally with `npx ./dist/kaanbiryol-crate-server-0.1.0.tgz`.
-The intended public command is `npx @kaanbiryol/crate-server`; it becomes available
-after the package is published. Building or packing does not publish anything.
+Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. Deploy into your own Cloudflare account, or run the same Worker on your own computer with Miniflare and persistent local storage. Crate is not a hosted service and does not require a Crate account.
 
 ## Status
 
-Crate is early self-hosted software. Review the code, understand the Cloudflare resources it creates, and test with a non-critical vault before using it for important notes.
-
-It is not currently distributed through the Obsidian community plugin catalog. Install it from source or from release artifacts.
+Crate is early self-hosted software. Review the code, understand the Cloudflare resources it creates, and test with a non-critical vault before using it for important notes. It is not yet in the Obsidian community plugin catalog; install it from source or from release artifacts.
 
 ## Features
 
-- Sync vault files across desktop and mobile Obsidian
-- Store file contents in your own Cloudflare R2 bucket
-- Track sync metadata and registered devices in Cloudflare D1
-- Detect conflicts and preserve both versions instead of overwriting silently
-- Review files in **Sync activity → Pending**: file statuses are checked in the background when you open the list, and touched files stay visible until sync. Matching files are labeled **Unchanged**. Select a file to see changes since this device’s last sync alongside the list, or use the **Files** back button on narrow screens. Comparisons use the local sync manifest and cached Markdown copies without network requests. When the last-synced copy is unavailable locally, modified files show a status without line counts. These comparisons do not include newer edits from other devices. Binary and large files show a size summary.
-- Use **Sync all** for all pending files. Uncheck files to sync a subset with **Sync selected**; the bottom action is hidden when all or no files are checked. Unchecked files remain pending after syncing a subset; this selection does not disable automatic sync or permanently ignore files. Highlight rows separately for file actions: click one, Shift-click a range, or Cmd/Ctrl-click individual rows. Right-click a highlighted row to discard changes across that group; right-click another row to target only that file. The menu counts highlighted files; confirmation lists actual changes and skips unchanged files. Discard restores server versions or moves locally added files to trash. Use **Cmd+A** on macOS or **Ctrl+A** elsewhere to highlight all rows without changing sync checkboxes, **Space** to toggle the focused file’s sync checkbox, and **Shift+F10** to open its menu. The menu also opens indexed vault files in Obsidian and reveals files in the desktop file manager, including hidden configuration files. Confirm the affected filenames first. Replaced content has recovery copies in `<vault config>/plugins/crate/discard-recovery/`; discard never changes the server copy.
-- Sync creates, edits, deletes, renames, and attachments; updates to existing binary files require review
-- Deploy the sync server through Cloudflare without giving the plugin an account API token
-- Connect devices by signing in to the Cloudflare account that owns the server
-- Create and browse reminders stored as Markdown in your vault
-- Render reminder query blocks such as `reminders`, `reminders-today`, and `reminders-upcoming`
-- Schedule reminder push notifications through your own Worker
-- Enroll phones with short-lived web app links or QR codes
+- **Vault sync** across desktop and mobile, with attachments, deletes and renames, 30-day file history, and conflict copies instead of silent overwrites
+- **Your infrastructure:** file contents in your R2 bucket, metadata in your D1 database, deployed through Cloudflare sign-in without giving the plugin an account API token
+- **Local hosting:** run the same server on your own computer or in Docker, with no Cloudflare account required
+- **Reminders** stored as Markdown in your vault, with `reminders`, `reminders-today` and `reminders-upcoming` query blocks and push notifications through your own Worker
+- **Reading** list for saved links, articles and YouTube transcripts, with highlights stored as ordinary Markdown
+- **Web app** for reminders and Reading on your phone, installable to the Home Screen and usable without Obsidian open
+- **Optional end-to-end encryption** for notes, attachments, history and reminder text
 
-## Reading
+## Documentation
 
-Reading and Reminders are included with Crate. Choose a folder under **Settings → Crate → Reading**. Use
-**Crate: Add link to reading list** to save a URL and **Crate: Open reading library** for your
-inbox, favorites, archive, tags, and search. Reading metadata and article text
-live in ordinary Markdown notes, carried by normal vault sync.
+Start with the [documentation site](https://crate.kaanbiryol.com/docs/): [install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/), [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/), then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/). Feature guides cover [vault sync](https://crate.kaanbiryol.com/docs/features/sync/), [reminders](https://crate.kaanbiryol.com/docs/features/reminders/), [Reading](https://crate.kaanbiryol.com/docs/features/reading/), the [web app](https://crate.kaanbiryol.com/docs/features/web-app/), [encryption](https://crate.kaanbiryol.com/docs/features/encryption/) and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
 
-Reading and Reminders start enabled on new installs. Each has an **Enable reading**
-or **Enable reminders** switch in its settings. These switches apply to every device connected to this server.
-Pausing Reading stops scanning and article downloads; pausing Reminders stops
-scanning, processing, and notification delivery. Notes, indexes, device connections,
-and vault sync are preserved. Resume either feature without redeploying or setting
-it up again. Changes require a connection; plugins check on startup, focus, and
-every 30 seconds, and the web app checks on focus and every 15 seconds. Offline
-devices retain their last confirmed state until they reconnect.
-In Obsidian, saving a Reading link first writes a bookmark into your vault,
-then downloads and extracts the article on that device. No Crate server connection
-is required for that save; the resulting note uses normal vault sync. Failed or
-offline downloads keep the bookmark and offer **Try again** in the reader. Unencrypted PWA saves use server extraction. With E2EE enabled, the PWA downloads directly where the website allows it; other links wait for an unlocked Obsidian device to extract the article. Each save form explains which device
-downloads the article. There is no separate article-fetching switch.
-Notifications retain their own **Push notifications** opt-in.
-Under **Crate web app**, select **Open app** for this device, or **Connect another
-device** to show a QR code with a **Copy link** option. Reminders and Reading share the same web app.
-The web app works without Obsidian open.
-Without E2EE, the server saves the bookmark first, then extracts article text with Defuddle.
-Your server contacts the saved website without browser cookies or Crate credentials;
-there is no third-party extraction service. Failed or restricted pages remain saved
-links. Requests, extraction jobs, database operations, and files use your hosting resources.
-Reading displays website favicons when available. Opening the library can request
-an icon from the saved site or its icon host; that host sees the request, and the
-browser may include its cookies for that host. Crate sends no Reading credential
-or page referrer with the image. Each browser or Obsidian device may cache icons
-independently and may request them again. A letter appears when an icon cannot
-load, including offline. Article images remain suppressed.
+For operators and contributors:
 
-YouTube links share one Reading identity across watch, Shorts, and shortened URLs.
-Saving fetches public video details and attempts to save a transcript with bundled
-Defuddle. Caption availability depends on YouTube and the capture environment;
-failed captions leave a usable bookmark. Encrypted PWA requests stay on the device;
-blocked transcript requests leave an encrypted pending note for an unlocked
-Obsidian device. No third-party extraction service receives the link.
+- [Deploying and operating the server](docs/deployment.md), including R2 activation and billing, updates, and [deleting a server](docs/deployment.md#delete-a-crate-server)
+- [Run on your own computer or in Docker](docs/self-hosting.md)
+- [Architecture](docs/architecture.md), [sync pipeline](docs/sync-pipeline.md), [Worker API](docs/worker-api.md), [testing](docs/testing.md)
+- [Contributing](CONTRIBUTING.md) and [release preparation](docs/releases.md)
 
-Select the play icon, tap a transcript passage, or select transcript text to load
-YouTube's embedded player and play from that point. It contacts YouTube and
-may use YouTube cookies, display its player content, and send the embedding origin
-as a referrer; it never receives Crate credentials or your note contents.
-**Open in YouTube** appears if embedded playback fails. Playback requires
-an internet connection. Crate does not download videos. Reading may load thumbnails
-from `i.ytimg.com` with the same image privacy behavior described above.
+## Install from source
 
-Saved timestamped transcripts support seeking, ordinary Markdown highlights and
-annotations in both readers. **Pin video** keeps the video above the transcript
-and smoothly follows playback, including when you seek in the video. Tapping or
-selecting a passage starts playback there while preserving highlighting.
-Scrolling holds still while selecting or editing a highlight. **Unpin video** lets
-you scroll independently, with the video remaining in the page. Transcript text, highlights,
-and notes remain available offline once cached. In **Highlights**, open a passage
-in its transcript to seek to or open its YouTube moment. Plain transcripts without
-timestamps remain readable and highlightable.
-
-Drag the handle below a video up or down to resize it, up to the full reader
-width. Double-click the handle to reset its size; keyboard arrows resize it too.
-The transcript keeps its reading width. Videos too tall to fit while pinned scroll
-with the page, keeping the handle reachable. Select **Pin video** to automatically
-shrink an oversized video just enough to fit above the transcript.
-
-For desktop capture, set Obsidian Web Clipper to save into Crate's Reading folder
-in the intended vault, then clip normally. No Crate template is needed. Every
-Markdown note in that folder and its subfolders appears in Reading. Crate adds
-reading status, favorites, and identity automatically, preserves the body and
-filename, and syncs the note without re-extracting it. Existing Crate Reading
-templates still work. Notes without a source URL appear as vault notes.
-Changing the Reading folder does not move files.
-
-The optional [Crate Reading Clipper template](templates/crate-reading-clipper.json)
-saves the full extracted content, including available YouTube transcripts. Import
-it in Web Clipper's template settings and change **Note location** if your Reading
-folder differs. A template that saves only an embed does not save the transcript;
-check the preview before clipping. Opening YouTube's transcript panel before
-clipping can help when automatic caption fetching fails.
-
-**Review duplicate sources** lets you compare independently clipped notes. In
-Obsidian, **Fill empty bookmark** copies a clip into an empty saved-link note,
-preserving its identity, state, annotations, and personal text. Both originals stay
-in the vault; move the extra note outside Reading after reviewing them. Existing
-article text is never replaced by this action.
-
-Select **Tags** in an article to add or remove comma-separated tags. Clipper's
-existing tags carry over automatically. Filter by tag in the desktop sidebar or
-the **Tags** selector on smaller screens. Tags are saved in the note's `tags`
-property and sync with the article; no special Clipper template is needed.
-
-On iPhone with iOS 27 or later, open the web app’s **Reading settings → Set up
-iPhone shortcut**. Download **Save to Crate**, select **Add Shortcut**, then create
-and copy a pairing code. Run the shortcut from its library and paste the code;
-it connects to this server and remembers its own capture-only access. Codes work
-once and expire after 10 minutes. The download comes from Crate’s public website
-and contains no credentials; pairing stays on your server. In Obsidian, **Set up
-shortcut → Copy phone setup link** opens this flow on a newly connected phone.
-**Share → Save to Crate** opens the link in Crate using a private URL fragment. Unlock Reading if asked, then select **Save**. Reinstall the current shortcut after enabling E2EE. For unencrypted vaults, Android browsers supporting Web Share Target
-can use **Share → Crate** after installing the web app. Pasting a link works in
-both the plugin and web library.
-
-Opened article text is cached offline, up to 50 articles or 20 MB. The web app
-keeps offline saves and edits pending until the server confirms them. Export
-pending work before clearing browser data. The iPhone shortcut requires a connection.
-Article bodies suppress remote images and active HTML; **Open note** uses Obsidian's normal
-rendering rules. Browser and capture credentials are separate, last up to 90 days,
-and can be revoked in connected devices.
-
-See the [setup and testing guide](docs/read-it-later-testing.md),
-[implementation status](docs/read-it-later-plan.md#implementation-status), and
-[feature spec](docs/read-it-later-spec.md).
-
-## How It Works
-
-The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, sync metadata and parsed reminder caches in D1, and reminder notification alarms in Durable Objects.
-
-Cloudflare deployment and device connection use OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and saves the Cloudflare login in Obsidian secret storage for usage access. For local hosting, Miniflare runs the same storage API on your computer; the operator generates per-device access tokens using the local server CLI.
-
-## Privacy and Security
-
-- Vault files are sent to your Worker and stored in your R2 bucket.
-- Sync metadata, registered device records, and parsed reminder caches are stored in your D1 database.
-- In local hosting mode, these D1/R2 resources and reminder alarm state are stored on the host's disk. Selecting **Connect to your server** sends sync requests to the address you provide. Miniflare telemetry is disabled.
-- Running `server -- setup` opts into a public Cloudflare Quick Tunnel. Cloudflare terminates public HTTPS and handles traffic passing through the tunnel; data access still requires Crate credentials. The server's persistent storage remains on your computer. If `cloudflared` is missing, the CLI downloads a pinned release from Cloudflare's GitHub repository, verifies its SHA-256 checksum, and caches it in `~/.crate/bin`.
-- Choosing `setup --hostname` creates a named tunnel and DNS route through your Cloudflare account instead. That mode saves tunnel credentials in a private directory beside the server data; Cloudflare's browser login saves its management certificate in `~/.cloudflared`.
-- Crate does not include hidden telemetry.
-- Sync secrets are stored through Obsidian's secret storage.
-- OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases with schema 1; no migrations are registered. Unsupported schemas are rejected without modification. Deployment code is never fetched at runtime.
-- Cloudflare-hosted vault devices are authorized through the owning Cloudflare account. Locally hosted vault devices use tokens issued by the server operator.
-- Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
-- When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
-- Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
-- The reminders web app stores its scoped session and pending changes locally and caches confirmed reminders in IndexedDB for offline use. With end-to-end encryption enabled, private cache, queue and draft content is encrypted; remembered folder keys allow offline access and service-worker notification decryption. Signing out clears private data and keys. Browser storage can be evicted, so retain the recovery key.
-- Remote code is not fetched or evaluated at runtime.
-- Pasting a web URL into a reminder title or description automatically requests its page title through your Crate server and uses it as the link label. The server contacts the pasted website without your cookies or authorization headers. Selected text keeps its own label. Offline, blocked, slow, or untitled pages keep the URL label. This requires an updated plugin/web app and Crate server. With end-to-end encryption enabled, title lookup is disabled and pasted links keep their URL labels.
-- Optional [end-to-end encryption](docs/e2ee-implementation.md) protects notes, attachments, retained history, shared settings and reminder text on both hosting options. Enable it explicitly in **Crate settings → Sync → Manage encryption** and save the recovery key outside your vault. Paths, sizes and notification scheduling metadata remain visible. Without this option, your server operator can read synced content. In the PWA, select **Connect with Obsidian** and confirm matching codes on both devices to transfer its keys without copying. The same recovery key remains a fallback for Obsidian and the PWA. The browser remembers only Reading and Reminders keys; its server permissions remain limited to those features, including whole notes in their folders. Treat the PWA as a trusted client because it can access unlocked content and handles your vault recovery key if you use manual recovery. To turn encryption off, **Reset sync and turn off encryption** deletes remote files and history, then uploads this device’s local vault unencrypted. Other devices must reconnect; web apps must log out and enroll again. Encrypted external backups still need the old recovery key. Reading uses a separate folder key for articles, URLs, metadata and browser data; server capture is replaced by trusted-client extraction. Encrypted vaults use in-app link saving instead of Android’s native share-target POST. See [Reading encryption](docs/reading-e2ee-assessment.md).
-- Sync is not a backup. Keep an independent backup of any vault you use with Crate. **Server and usage → Restore backup…** restores an automatic upgrade backup into a separate Cloudflare server. The [recovery guide and paired D1/R2 CLI](docs/recovery.md) cover interrupted restores and downloadable archives.
-- Remote deletions always move local files into the vault's `.trash` folder, even if Obsidian is set to delete permanently. Check that folder when recovering an edit made during sync. Crate never syncs `.trash`.
-
-Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
-
-## Prerequisites
-
-- Either a computer running the [local server](docs/self-hosting.md), or a Cloudflare account with R2 enabled and a valid payment method on file, even when usage stays within R2's free allowance. See [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting).
-- Obsidian 1.13.0 or newer
-
-Building from source additionally requires Node.js 26.8.2+ (26.x) and npm; `.nvmrc` pins the version used by every CI workflow.
-
-## Install From Source
-
-Clone the repository and install dependencies:
+Requires Obsidian 1.13.0 or newer, and either a Cloudflare account with R2 enabled or a computer to run the [local server](docs/self-hosting.md). Building needs Node.js and npm; see `.nvmrc` and `package.json` for the supported version.
 
 ```bash
 git clone https://github.com/kaanbiryol/obsidian-crate.git
 cd obsidian-crate
 npm install
-```
-
-Build the plugin:
-
-```bash
 npm run build
 ```
 
-Build artifacts are written to `dist/`:
+Copy `dist/main.js`, `manifest.json` and `dist/styles.css` into `<Vault>/.obsidian/plugins/crate/`, reload Obsidian, and enable **Crate** in **Settings → Community plugins**. Then open **Settings → Crate** and select **Connect with Cloudflare** (activate R2 first; see [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting)), or connect to a [local server](docs/self-hosting.md).
 
-- `dist/main.js`
-- `dist/styles.css`
+Automatic sync is off by default on each device. After connecting, run **Crate: Sync now** for your first sync.
 
-Copy `dist/main.js`, `manifest.json`, and `dist/styles.css` into:
+## Privacy and security
 
-```text
-<Vault>/.obsidian/plugins/crate/
-```
+- Vault files go to your own server and storage. Crate has no hidden telemetry, fetches no remote code at runtime, and needs no Crate account.
+- Secrets and Cloudflare credentials are kept in Obsidian's secret storage.
+- Push notifications are optional. Payloads are encrypted, and the push provider sees only delivery metadata.
+- Optional [end-to-end encryption](docs/e2ee-implementation.md) hides note content from the server operator. Without it, the operator can read synced content.
+- Sync is not a backup. Keep an independent backup of any vault you use with Crate.
+- Remote deletions move local files to the vault's `.trash` folder.
 
-Then reload Obsidian and enable **Crate** in **Settings -> Community plugins**.
-
-Automatic sync is off by default on each new installation. After connecting a server, select **Crate: Sync now** to start your first sync, or enable **Automatic sync** in Crate settings. Opening **Sync activity** or **History** does not start a sync. Manual syncing leaves automatic sync off.
-
-To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.
-
-## Cloudflare Setup
-
-**Before connecting:** activate R2 once in the Cloudflare account that will own your server. Cloudflare requires checkout and a payment method; Crate does not activate the subscription or collect payment details. R2 Standard includes free monthly usage, with charges for usage above the allowance. Follow [R2 activation and billing](docs/deployment.md#activate-r2-before-connecting), then return here. Crate creates the bucket, database, and server automatically after authorization.
-
-After installing the plugin, open the Crate settings tab in Obsidian:
-
-1. Select **Connect with Cloudflare**. On mobile, select **Open Cloudflare** in the dialog to open the sign-in page in your browser.
-2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. If it does not, select **Open Obsidian** on that page. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
-4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
-5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
-
-If setup shows **R2 is not active for this Cloudflare account**, follow [the R2 activation error steps](docs/deployment.md#r2-activation-error) and retry with the same account.
-
-The OAuth deployment uses the build-time Worker and current schema included in the installed plugin. Unsupported databases are rejected without modification; see the [recovery runbook](docs/recovery.md) before changing deployments. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
-
-To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. For a vault without a saved server connection, Obsidian always asks which server to use, even if the account has only one. Reconnecting a previously configured vault reuses its saved server.
-
-Server choices show the vault name saved when the server was created. The name is stored in your Cloudflare Worker settings so other devices can see it; server addresses and storage IDs stay unchanged. Servers without a saved name show **Unnamed vault** until you select **Save vault name** in Crate’s server settings from the original vault. Duplicate names include a short ID to distinguish them.
-
-Multiple separate vaults can use the same Cloudflare account: create a separate Crate server for each vault. Connecting two vaults to the same server combines their files during sync; local vault names do not separate remote data.
-
-**Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
-
-Server updates use the saved Cloudflare login and renew it when needed. **Update server** opens Cloudflare authorization only when credentials are missing, revoked, cannot be renewed, or lack required permissions. Network and server errors are shown in Obsidian without starting another login. Reconnect, repair, reset, and deletion also reuse the saved login. Reset and deletion retain their destructive-action confirmations and resource checks. First-time setup and new devices sign in through Cloudflare.
-
-For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or schema artifacts, Obsidian shows a server-update notice and **Update server** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
-
-## Sync Scope and Limits
-
-- Automatic sync is off by default on this device. When enabled under **Settings → Crate → Sync → Automatic sync**, Crate syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. While automatic sync is off, Crate still makes a small read-only server availability check on startup and when Obsidian returns to the foreground; it does not transfer vault files. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
-- Crate syncs files inside the vault, including attachments. New attachments download automatically; updates to existing binary files are saved as incoming copies for review in **Activity → Conflicts**. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
-- Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
-- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, `.DS_Store`, `._*`, `Thumbs.db`, `desktop.ini`, `*.swp`, and `*.swo`. The `.git/` rule also excludes nested Git repositories' internals and `.git` pointer files. Git configuration files such as `.gitignore`, `.gitattributes`, and `.gitmodules` remain eligible for sync. Crate always ignores its own plugin folder, its Markdown merge cache, conflict copies, and `workspace*` files.
-- Other plugins and their settings sync with the vault, including `main.js`, `manifest.json`, `styles.css`, and `data.json`. Install and connect Crate separately on each device. After syncing finishes, restart Obsidian to load downloaded plugins and settings. Files transfer individually; retry any failed sync before restarting.
-- Plugin settings may include credentials or device-specific paths. To keep a plugin local, add its folder (for example, `.obsidian/plugins/plugin-id/`) to ignore patterns, using your vault's configuration folder if different.
-- Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
-- Adding an ignore pattern stops future transfers but does not silently delete an existing remote copy. Use **Settings → Crate → Infrastructure → Remove ignored remote files** to review and remove those copies explicitly.
-- Remote files replaced or deleted by sync are retained for 30 days. Open a file’s context menu and select **File history**, or use **Crate: Show file sync history** for the active file. You can also open files, including deleted files, from **Sync Activity → History → File history**. Local-only files may have no server versions. Saved versions can be compared with the local file and restored; a force full sync also keeps its remote deletions recoverable for that period.
-- **Sync Activity → History → Return to this state** restores the synced vault from a shared checkpoint, with a file-by-file preview and local recovery copies. The latest 20 checkpoints are available across your connected devices for up to 30 days. Checkpoints store file paths, hashes, and version references; file contents reuse existing server history. Update the Crate server to enable shared checkpoints, then run a successful sync. Existing local-only checkpoints remain on their original device. Files excluded on the restoring device stay untouched.
-- Synced paths must be portable across desktop and mobile filesystems. Windows-reserved names, unsupported characters, trailing dots/spaces, and case- or Unicode-normalization collisions are rejected before transfer.
-- Creating a server provisions Worker, R2, D1, and Durable Object resources in your Cloudflare account. Cloudflare plan limits and possible usage charges apply to those resources.
-
-## Reminders
-
-Crate stores reminders as Markdown in a configurable vault folder. Reminders are included by default. Choose their folder in **Settings → Crate → Reminders**. Crate scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
-
-When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` and times without a timezone are resolved once in that device's timezone and saved as explicit dates or UTC timestamps. Recurring reminders also save their timezone and first occurrence. Existing reminder IDs, titles, and descriptions are preserved. Editing a saved date back to natural language resolves it again on the next scan. The web app reports an unresolved schedule until Obsidian saves it; vault file sync continues. This keeps the same saved reminder date across devices, reloads, and midnight.
-
-Code fences, indented code, frontmatter, and hidden HTML examples are excluded from reminders and remain unchanged during adoption. Reorder supports simple task lists within the same section. Use the Markdown editor to reorder nested tasks or tasks with supporting paragraphs, or to move/delete a task together with its children. Crate rejects these structural changes in the reminder list before editing the note.
-
-Plugin project moves save a recovery record in the plugin's private configuration directory before changing either note. After an interruption, Crate checks both notes before indexing them and completes or rolls back only a verifiable move. If both copies changed, it keeps them and pauses reminder edits and normalization for those notes. Merge or keep the wanted text in one note, remove the duplicate from the other, then run **Crate: Recover interrupted reminder moves**. The notice identifies the affected notes and recovery-record location; damaged records are retained for manual recovery. These records remain on the device and are excluded from vault sync.
-
-Reminder code blocks can be embedded in notes:
-
-````markdown
-```reminders-today
-```
-
-```reminders-upcoming
-```
-````
-
-The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Reminders** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
-
-The web app checks browser permission and confirms push registration with the current server session when opened, resumed, or reconnected. **On** appears after confirmation. If registration fails, **Retry** repairs the existing browser subscription; if permission is blocked, allow notifications in browser settings and reopen Crate.
-
-To set up the web app on the same phone as Obsidian, select **Settings → Crate → Crate web app → Open app**. For another device, select **Connect another device**, then scan the QR code or select **Copy link**. If clipboard access fails, Crate shows a link you can open or select and copy.
-
-The reminders web app checks for updates during launch and when brought back to the foreground, including on iPhone Home Screen installs. During launch, it allows up to 2.5 seconds to prepare and safely apply an update before showing the list. If the check or download is slow, fails, or pending work prevents an update, the current app opens normally. Once the list is visible, updates download in the background and wait for you to select **Update**; reading, closing an editor, and returning to the app never trigger an automatic reload. Selecting **Update** shows the updating screen immediately and keeps it visible through download and reload. Its linear indicator advances through update stages and keeps its position across the reload. If the update fails, the screen closes and an error explains that you can retry. Offline launches use the existing app. An already-open editor in another tab is not reloaded.
-
-The reminders web app updates immediately when you save, complete, delete, or reorder a reminder. Pending changes are kept on the device and resume syncing when the app is open and connected, including after a reload. If a save is rejected, the app keeps your text with **Retry**, **Edit**, and **Discard** actions. Other rejected changes restore the confirmed state and offer **Retry** or **Dismiss**. A lost response leaves a change pending until the app can confirm the result. If your session expires or is renewed, pending changes and editor drafts remain on the device. Reconnect to the same deployment and reminders folder, review or export the saved changes, then select **Resume saved changes** to check their original receipts and retry safely. Changes from another folder are never resumed automatically. Browsing cached reminders while offline remains read-only; reconnect before starting a new change. Explicitly signing out clears pending changes along with the offline cache and drafts across tabs.
-
-If **Offline copy unavailable** appears, close older Crate tabs and select **Rebuild offline copy** while connected. This refreshes confirmed data and preserves pending changes and drafts. Unknown newer formats are left intact. Unreadable pending edits stay on the device under **Damaged pending changes**, where you can review and export their original text while healthy changes continue syncing; see [browser storage recovery](docs/pwa-storage-recovery.md).
-
-Completing a recurring reminder advances the same reminder to its next scheduled occurrence. After the final occurrence, it stays checked. **Reopen this occurrence** keeps that final occurrence's date and reduces its completion count once; completing it again restores that count. Earlier occurrences are not stored as separate tasks and cannot be restored through this action.
-
-Diagnostics flag exhausted delivery attempts. Repair session enrollment or provider access, then reschedule a missed reminder to a future time.
-
-Crate accepts push endpoints from [Apple](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/), [Mozilla](https://mozilla-services.github.io/autopush-rs/http.html), [Google FCM](https://firebase.google.com/docs/reference/fcm/rest), and [Microsoft WNS](https://learn.microsoft.com/en-us/windows/apps/develop/notifications/push-notifications/wns-overview). The server allows up to 20 subscriptions, with at most five per session, and limits test/enrollment requests. Other push providers need explicit support before they can subscribe.
-
-## Sync and reminder limits
-
-Vault files larger than 25 MiB produce a visible sync error and are left on the device. Reminder notes larger than 1 MiB, or whose parsed reminder data exceeds the cache limit, are omitted from the web list with a per-file explanation; healthy notes stay available. These explanations remain visible with cached reminders and clear after a successful refresh of repaired sources. Split the affected note to restore web editing and notification scheduling. Web edits cannot grow a reminder note beyond 1 MiB.
-
-Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies, even when only the other device edited the file. In **Activity → Conflicts**, compare **Local file** and **Incoming server copy**, then select **Use incoming copy** and **Apply choice** to accept the server version. Recovery preserves the displaced file in the vault's local trash and keeps recovery copies. If a file is recreated during replacement, Crate stops and keeps that file; reload the review before retrying. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
-
-The current wire protocol is 1, with oldest compatible version 1. See the checked [current contract](docs/current-contract.md). File restores require the durable restore capability. Follow the [upgrade order](docs/compatibility.md#upgrade-order), update the plugin/server and reload open web tabs before editing. Uploads are journaled locally before dispatch, and retries recover the original result before starting new work; see [upload recovery and rename preservation](docs/upload-recovery.md). Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
-
-Crate automatically removes superseded upload backups (`upload-*.previous-*` in its plugin folder) only after verifying their saved content still exists in the corresponding local file. It checks after startup, after sync returns to idle, and daily. Different or missing files, distinct merge preimages, unsupported or damaged records, and previous manifest checkpoints are preserved for recovery; age alone never deletes them. These private backups can contain note content and are excluded from sync.
-
-New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. See the [retry and retention policy](docs/reminder-retention.md).
-
-Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 1; existing schema-1 databases receive no implicit DDL. Self-hosted upgrades require the explicit stopped-server upgrade command. Other schemas are rejected without modification. Recovery tools preserve source archives and restore supported schemas into isolated resources. See the [compatibility matrix and rollback policy](docs/compatibility.md).
-
-## Development
-
-Set `CRATE_DEV_WORKER` in the ignored `.env.development.local` file to the exact
-Worker name of your development server (replace the example):
-
-```dotenv
-CRATE_DEV_WORKER=crate-0123456789abcdef
-```
-
-Development builds are restricted to that Worker. See
-[development deployments](docs/server-upgrades.md#testing-development-deployments)
-for server revision requirements. Shell values override the saved setting.
-
-Create the local test vault from the versioned sample notes, then run the dev watcher:
-
-```bash
-npm run vault:setup
-npm run dev
-```
-
-The baseline lives in `fixtures/test-vault/`; the working `test-vault/` stays
-ignored by Git. Setup adds missing notes and preserves existing edits. See
-[test vault setup](docs/testing.md#test-vault-setup) for restoring sample notes.
-
-Each successful development build is also installed into
-`test-vault/.obsidian/plugins/crate/`. Open `test-vault` as an Obsidian vault,
-enable **Crate** in **Settings → Community plugins**, and reload the plugin after
-changes. The installer only replaces `main.js`, `manifest.json`, and `styles.css`,
-so local plugin settings are preserved.
-
-Set `OBSIDIAN_TEST_VAULT` to use another development vault without changing the
-production deploy configuration:
-
-```bash
-OBSIDIAN_TEST_VAULT=/path/to/vault npm run dev
-```
-
-To save the path for future development builds, add `OBSIDIAN_TEST_VAULT=/path/to/vault`
-to `.env.development.local` (ignored by Git).
-
-To install each development build into multiple vaults, set `OBSIDIAN_DEV_VAULTS`
-to a JSON array in `.env.development.local`. This takes precedence over
-`OBSIDIAN_TEST_VAULT`:
-
-```dotenv
-OBSIDIAN_DEV_VAULTS='["./test-vault", "/path/to/another/vault"]'
-```
-
-Run tests:
-
-```bash
-npm test
-```
-
-Run lint:
-
-```bash
-npm run lint
-```
-
-Run TypeScript checks:
-
-```bash
-npm run typecheck
-npm run typecheck:worker
-```
-
-Run the main local verification suite:
-
-```bash
-npm run check
-```
-
-Run a production build:
-
-```bash
-npm run build
-```
-
-Prepare a draft release from committed source on a Mac signed into iCloud:
-
-```bash
-npm run release:prepare -- patch
-```
-
-The command prepares the version in an isolated checkout, signs the public shortcut,
-pushes the release commit and tag, and waits for CI. A successful exact-commit push
-build can supply verified artifacts; security, server-revision and clean-build
-reproducibility checks still run. Complete device and hosted acceptance before
-publishing the draft. See [release preparation](docs/releases.md).
-
-To reproduce the complete automated release gate locally:
-
-```bash
-npm run release:check
-```
-
-Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. **Release plugin** attaches `main.js`, `manifest.json`, and `styles.css` as individual assets to the prepared draft only after all gates pass. Tag pushes alone do not dispatch that workflow.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Deploying and operating the server](docs/deployment.md)
-- [Sync pipeline](docs/sync-pipeline.md)
-- [Worker API](docs/worker-api.md)
-- [Testing](docs/testing.md)
-
-## Deleting a Crate server
-
-**Settings → Crate → Advanced server actions → Delete server and all data** permanently removes the server and its remote files, history, and reminders for all devices. Local vault files are kept. To start over, delete the server, select **Connect with Cloudflare**, create a new server, then select **Crate: Sync now**. See [server deletion and recovery](docs/deployment.md#delete-a-crate-server).
+See [privacy and data handling](docs/privacy.md) for the full data-flow details and the [privacy policy](https://crate.kaanbiryol.com/privacy/). Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 
 ## License
 
-Crate is licensed under the [0BSD license](LICENSE).
-
-Licenses and notices for bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
-
-**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and valid Cloudflare authorization, reusing the saved login when available. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
-
-## Cloudflare usage
-
-Setup connects usage automatically using the same Cloudflare login. Open **Settings → Crate → Server and usage → Cloudflare usage** and select **Refresh** to see account-wide usage and estimated remaining free allowances. Older installations whose setup login was discarded must select **Reconnect Cloudflare** once. Crate obtains credentials with the OAuth app’s required server management and analytics permissions through Cloudflare login and saves them in Obsidian secret storage for that account. The last usage snapshot is saved in plugin settings and shown immediately when you return, with its update time and reporting dates. Refresh retrieves current usage and renews access when needed; there is no background polling. Failed refreshes keep the previous snapshot visible. You can revoke Crate’s authorization in Cloudflare. Revoke previously pasted API tokens separately in Cloudflare.
-
-Only Refresh queries Cloudflare Analytics, sending your account ID and token directly to Cloudflare, without vault contents or filenames. Nothing is polled in the background. Totals include other applications in the same account. Workers and D1 use today in UTC; R2 operations use the current calendar month. Analytics may lag and these free-allowance comparisons are not a bill or an indication of your subscribed plan. Paid allowances and billing periods can differ. Storage shows the sum of reported resource peaks for today, not GB-month billing or remaining storage quota. R2 Infrequent Access, Durable Objects, and other services are not included in the allowance estimates. Unavailable metrics are shown as unavailable.
+Crate is licensed under the [MIT license](LICENSE). Licenses for bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
