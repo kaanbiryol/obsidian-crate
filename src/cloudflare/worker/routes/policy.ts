@@ -19,8 +19,8 @@ const REMINDERS: readonly Scope[] = ['vault', 'reminders'];
 const LIBRARY: readonly Scope[] = ['vault', 'reminders', 'reading'];
 const ALL_SCOPES: readonly Scope[] = ['vault', 'reminders', 'reading', 'reading_capture'];
 
-/** Worker-local admission, token scope and execution policy.
- * Folder authority, feature state and encryption guards remain in the handlers.
+/** Worker-local admission, token scope and execution policy. Dispatch, folder
+ * authority, feature state and encryption guards are not declared here.
  */
 const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /encryption/pairing': { scopes: LIBRARY },

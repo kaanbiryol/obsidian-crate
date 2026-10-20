@@ -566,12 +566,24 @@ specialized SQL.
 
 `cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
 execution, notification wakeup and projection initialization requirements.
-Admission, scope authorization and request dispatch consume that policy. The
-request handler retains authentication and guard ordering, including public grant
-redemption and upload reauthentication. Route handlers retain folder,
-feature and encryption guards, while public assets and Shortcut compatibility
-handling retain their existing admission behavior. Reading handoff redemption
-checks issuer scopes against the preparation route's policy.
+Admission, scope authorization and the request handler's execution choice consume
+that policy; dispatch does not. `router.ts` checks the Reminders pause and a web
+session's enrolled folder, sends `/reading/` paths to the Reading routes, and
+otherwise tries each domain dispatcher in `routes/` in turn. Each dispatcher
+matches its own methods and paths and returns null for others; an unmatched
+request receives 404. Route modules hold no SQL. `routes/sync.ts` owns `/settings`
+and selects the encrypted or plaintext store from the current encryption state.
+
+The request handler retains authentication and guard ordering, including public
+grant redemption and upload reauthentication; `request-guards.ts` applies the
+stateless protocol and encryption checks. Reading handlers check their own
+feature and folder authority, and publication handlers keep their transactional
+encryption guards. Public assets and Shortcut compatibility handling retain their
+existing admission behavior. Reading handoff redemption checks issuer scopes
+against the preparation route's policy. Rate limits, read-only POST paths, the
+encryption guard path lists and the public asset set are separate tables:
+`route-tables.test.ts` checks that they name only declared routes, and
+`route-dispatch.integration.ts` checks that every declared route reaches a handler.
 
 The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The current candidate initializes schema 1 in `crate_schema`; see the checked [current contract](current-contract.md). Provisioning initializes empty databases and leaves current databases unchanged. Future upgrades use the explicit manifest and checkpoint boundary in [server upgrades](server-upgrades.md). Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
