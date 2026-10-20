@@ -14,6 +14,7 @@ import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
 import { CloudflareOAuthSession } from './oauth-session';
 import { provisionCloudflareDeployment } from './provisioner';
+import { workersDevOrigin } from './worker-origin';
 import { stableJson } from '../../platform/stable-json';
 import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './target';
 import {
@@ -212,7 +213,7 @@ export class CloudflareDeploymentService {
 			if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
 			metadata.workersSubdomain = subdomain;
 			await this.persistMetadata(metadata);
-			workerUrl = `https://${metadata.workerName}.${subdomain}.workers.dev`;
+			workerUrl = workersDevOrigin(metadata.workerName, subdomain);
 		} else {
 			const deploymentArtifacts = artifacts ?? await this.whileActive(this.options.loadArtifacts);
 			workerUrl = await this.whileActive(() => provisionCloudflareDeployment({

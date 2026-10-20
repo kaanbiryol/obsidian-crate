@@ -6,6 +6,7 @@ import { openCloudflareDeploymentModal, revealCloudflareOperation } from './depl
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import type { BackupChoice } from '../../cloudflare/restore/archive';
+import { workersDevOrigin } from '../../cloudflare/deployment/worker-origin';
 import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client';
 
 const renewLoginMessage = 'Your Cloudflare login needs renewing. Select Reconnect under Account and devices, then resume the restore.';
@@ -31,7 +32,7 @@ export async function openServerRestore(plugin: CratePlugin, chooseAnother = fal
   const saved = plugin.settings.cloudflareRestore;
   if (saved?.phase === 'complete' && !chooseAnother) {
     const progress = openCloudflareDeploymentModal(plugin.app, 'update', plugin.getSettingsDocument(), signal);
-    showCompleted(plugin, progress, `https://${saved.target.workerName}.${saved.target.workersSubdomain}.workers.dev`);
+    showCompleted(plugin, progress, workersDevOrigin(saved.target.workerName, saved.target.workersSubdomain!));
     return;
   }
   if (saved && saved.phase !== 'complete') { await runRestore(plugin, null); return; }

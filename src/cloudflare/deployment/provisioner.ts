@@ -4,6 +4,7 @@ import { readVaultName } from '../vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './database';
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
+import { workersDevOrigin } from './worker-origin';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { randomHex } from '../oauth/pkce';
@@ -185,7 +186,7 @@ export async function provisionCloudflareDeployment(input: {
     fence.requireVerification();
 		await fence.uploadWorker(uploadTag => input.api.uploadWorker({
       uploadTag,
-			publicOrigin: `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`,
+			publicOrigin: workersDevOrigin(input.metadata.workerName, workersSubdomain),
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,
 			vaultName: input.metadata.vaultName,
@@ -219,7 +220,7 @@ export async function provisionCloudflareDeployment(input: {
     const versions = (await input.api.queryD1(input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
     if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
     await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
-    await input.api.verifyWorkerDeployment(`https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`, input.artifacts.fingerprint);
+    await input.api.verifyWorkerDeployment(workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint);
     await releaseUpgradeGuards(input.api, input.accountId, databaseId, fence);
     await recordDeploymentRelease(schemaInput, fence);
     await fence.completeVerification();
@@ -235,6 +236,6 @@ export async function provisionCloudflareDeployment(input: {
 			input.metadata.lastDeployedFingerprint = input.artifacts.fingerprint;
 			await input.onMetadataChanged();
 		}
-		return `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`;
+		return workersDevOrigin(input.metadata.workerName, workersSubdomain);
 	});
 }

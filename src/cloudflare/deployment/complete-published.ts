@@ -3,6 +3,7 @@ import { releaseUpgradeGuards } from './upgrade-checkpoint';
 import type { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import type { CloudflareDeploymentMetadata } from './types';
+import { workersDevOrigin } from './worker-origin';
 import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
 import { type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation, withDeploymentFence } from './fence';
@@ -53,7 +54,7 @@ export async function completePublishedDeployment(
 			|| db?.type !== 'd1' || db.id !== databaseId || bucket?.type !== 'r2_bucket' || bucket.bucket_name !== target.r2BucketName) {
 			throw new Error('The published Worker or its storage changed. Recovery stopped.');
 		}
-		const live = await api.verifyPublishedWorkerDeployment(`https://${target.workerName}.${target.workersSubdomain}.workers.dev`, fingerprint);
+		const live = await api.verifyPublishedWorkerDeployment(workersDevOrigin(target.workerName, target.workersSubdomain!), fingerprint);
     if (live.developmentBuild && live.developmentBuild.worker !== target.workerName) throw new Error('The published development build belongs to another Worker.');
     publishedArtifacts.development = live.developmentBuild;
     const schema = { api, accountId, databaseId, artifacts: publishedArtifacts };

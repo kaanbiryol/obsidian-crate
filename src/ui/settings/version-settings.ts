@@ -4,10 +4,11 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import release from '../../cloudflare/server-release.json';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/deployment/embedded-artifacts';
 import type { CrateServerInfo } from '../../protocol/server-info';
+import { isManagedDeploymentUrl } from '../../cloudflare/deployment/worker-origin';
 
 function localRevision(plugin: CratePlugin): number | undefined {
 	const deployment = plugin.settings.cloudflareDeployment;
-	if (!deployment || plugin.settings.workerUrl !== `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`) return undefined;
+	if (!deployment || !isManagedDeploymentUrl(plugin.settings)) return undefined;
 	return deployment.lastKnownRevision;
 }
 
@@ -19,7 +20,7 @@ async function checkVersion(plugin: CratePlugin) {
 	if (url !== plugin.settings.workerUrl || deployment?.workerName !== current?.workerName
 		|| deployment?.accountId !== current?.accountId || deployment?.d1DatabaseId !== current?.d1DatabaseId) throw new Error('Server connection changed');
 	if (deployment && deployment === plugin.settings.cloudflareDeployment && url === plugin.settings.workerUrl
-		&& url === `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`
+		&& isManagedDeploymentUrl(plugin.settings)
 		&& info.serverRevision && deployment.lastKnownRevision !== info.serverRevision) {
 		await plugin.writeSettings({ cloudflareDeployment: { ...deployment, lastKnownRevision: info.serverRevision } });
 	}

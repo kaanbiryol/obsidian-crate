@@ -4,6 +4,7 @@ import type { CloudflareDeploymentArtifacts } from '../deployment/artifacts';
 import { provisionCloudflareDeployment } from '../deployment/provisioner';
 import { recoverDeployment } from '../deployment/recovery';
 import { completePublishedDeployment } from '../deployment/complete-published';
+import { workersDevOrigin } from '../deployment/worker-origin';
 import { literal, parseBackupRows, PREFIX, quote, readBackup, type BackupChoice, type BackupRow, type BackupSource } from './archive';
 import { validRestoreState, type ServerRestoreState } from './state';
 import { sha256Hex } from '../../platform/sha256';
@@ -78,7 +79,7 @@ export async function restoreUpgradeBackup(input: {
   const { source, target } = state, account = source.account;
   const backup = await readBackup(api, source, state.prefix);
   if (backup.hash !== state.archiveHash) throw new Error('The selected backup changed');
-  if (state.phase === 'complete') return `https://${target.workerName}.${target.workersSubdomain}.workers.dev`;
+  if (state.phase === 'complete') return workersDevOrigin(target.workerName, target.workersSubdomain!);
   if (state.phase === 'copying') {
     onProgress('Verifying the backup database and file inventory…');
     const databaseBytes = await api.getRecoveryObject(account, source.bucket, `${state.prefix}/database.sql`);
@@ -161,5 +162,5 @@ SELECT path,storage_key FROM files WHERE lower(path) LIKE '%.md' AND EXISTS (SEL
   if (recovery.status === 'verify' && recovery.resumeValue) await completePublishedDeployment(api, target, artifacts, recovery.resumeValue);
   else if (recovery.status !== 'completed') await provisionCloudflareDeployment({ api, accountId: account, metadata: target, artifacts, onMetadataChanged: save, onProgress, resumeUpdateValue: recovery.status === 'resume' ? recovery.resumeValue : undefined });
   state.phase = 'complete'; await save();
-  return `https://${target.workerName}.${target.workersSubdomain}.workers.dev`;
+  return workersDevOrigin(target.workerName, target.workersSubdomain!);
 }

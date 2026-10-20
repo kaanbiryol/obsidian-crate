@@ -1,6 +1,7 @@
 import { ResetBlockedError } from './reset-errors';
 import { inspectResumableDeletion } from './delete-recovery';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { workersDevOrigin } from '../deployment/worker-origin';
 import { assertDeploymentIsNotDowngrade } from '../deployment/update';
 import { deployedArtifact } from '../deployment/discovery';
 import { randomHex } from '../oauth/pkce';
@@ -74,7 +75,8 @@ export async function resetCrateServer(input: {
 	const cleanupToken = randomHex(32);
 	const subdomain = bucket ? await api.getWorkersSubdomain(accountId) : null;
 	if (bucket && (!subdomain || !/^[a-z0-9-]+$/.test(subdomain))) throw new ResetBlockedError('could not verify the cleanup Worker address.');
-	const origin = `https://${name}.${subdomain}.workers.dev`;
+	// Only bucket cleanup uses this origin, and a bucket requires the verified subdomain above.
+	const origin = workersDevOrigin(name, subdomain!);
 
 	const removeVerifiedResources = async (fence?: DeploymentFence) => {
 		input.onProgress?.('Stopping sync on this device before removing remote data…');

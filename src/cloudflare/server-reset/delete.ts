@@ -2,6 +2,7 @@ import { CloudflareApiError } from '../cloudflare-api';
 import { randomHex } from '../oauth/pkce';
 import { DeploymentRecoveryRequiredError, withDeploymentFence, type DeploymentFence } from '../deployment/fence';
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
+import { workersDevOrigin } from '../deployment/worker-origin';
 import { clearBucketObjects } from './reset-objects';
 import { inspectTerminalDeletionFence } from './delete-fence';
 import { assertDeletionHelper, assertDeletionIdentity, deletionWorkerSettings, inspectDeletionResources, type DeleteApi } from './delete-ownership';
@@ -89,7 +90,7 @@ export async function deleteCrateServer(input: {
 			const subdomain = await api.getWorkersSubdomain(accountId);
 			if (!subdomain || !/^[a-z0-9-]+$/.test(subdomain)) throw new Error('Deletion paused: the cleanup Worker address is unavailable.');
 			await mutate('enable-deletion-address', () => api.enableWorkerSubdomain(accountId, job.helperName));
-			const origin = `https://${job.helperName}.${subdomain}.workers.dev`;
+			const origin = workersDevOrigin(job.helperName, subdomain);
 			await api.verifyResetWorker(origin, job.id, true, uploadTag);
 			const verify = async () => {
 				const resources = await inspectDeletionResources(api, metadata);

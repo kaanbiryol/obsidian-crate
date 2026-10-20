@@ -23,6 +23,7 @@ import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecy
 
 import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';
 import { SECRET_KEYS } from "../platform/secret-keys";
+import { workersDevOrigin } from "../cloudflare/deployment/worker-origin";
 
 const logger = createLogger("Plugin");
 
@@ -105,7 +106,7 @@ async function restoreManagedWorkerConnection(plugin: CratePlugin): Promise<void
   }
 
   await plugin.writeSettings({
-    workerUrl: `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`,
+    workerUrl: workersDevOrigin(deployment.workerName, deployment.workersSubdomain),
   });
 }
 

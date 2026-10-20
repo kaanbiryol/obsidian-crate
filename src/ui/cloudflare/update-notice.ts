@@ -2,6 +2,7 @@ import { Notice } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment/update';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/deployment/embedded-artifacts';
+import { isManagedDeploymentUrl } from '../../cloudflare/deployment/worker-origin';
 import release from '../../cloudflare/server-release.json';
 
 export function showCloudflareServerUpdateNotice(plugin: CratePlugin): void {
@@ -17,7 +18,7 @@ export function showCloudflareServerUpdateNotice(plugin: CratePlugin): void {
 	}
 
 	const revision = plugin.syncRuntime.getCachedVersionInfo()?.serverRevision
-		?? (plugin.settings.workerUrl === `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`
+		?? (isManagedDeploymentUrl(plugin.settings)
 			? deployment.lastKnownRevision : undefined);
 	const serverIsNewer = revision !== undefined && revision > release.revision;
 	const fragment = new DocumentFragment();
