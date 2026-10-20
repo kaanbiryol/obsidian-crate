@@ -6,7 +6,7 @@ import type { Env } from '../types';
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
-import { COORDINATOR_PATHS, REMINDERS_ENABLED_HEADER } from './coordinator';
+import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER } from './coordinator';
 import { uploadInitialFiles } from '../sync/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/bulk-upload-dispatch';
@@ -46,7 +46,7 @@ export async function handleCoordinatorRequest(
     && await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
   // Schedule cleanup before queuing, so a running maintenance pass delays only
   // this request rather than every coordinated mutation behind it.
-  if (request.headers.get('X-Crate-Internal-Mutation') === '1') await scheduleMaintenance(env, state);
+  if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1') await scheduleMaintenance(env, state);
   return withStateLock(async () => {
     if (path === COORDINATOR_PATHS.readingWake && request.method === 'POST') {
       await state.storage.put('readingCoordinator', true);
@@ -75,9 +75,9 @@ export async function handleCoordinatorRequest(
 
 /** Internal endpoints; the caller holds the Durable Object's mutation lock. */
 async function handleLockedCoordinatorRequest(request: Request, state: DurableObjectState, env: Env): Promise<Response | null> {
-	if (request.headers.get('X-Crate-Internal-Mutation') === '1') {
+	if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1') {
 		const original = new Request(request);
-		original.headers.delete('X-Crate-Internal-Mutation');
+		original.headers.delete(INTERNAL_MUTATION_HEADER);
 		return fetchWorkerRequest(original, env, { kind: 'coordinator', state });
 	}
 	if (new URL(request.url).pathname === COORDINATOR_PATHS.maintain && request.method === 'POST') {

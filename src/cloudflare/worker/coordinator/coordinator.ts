@@ -27,6 +27,8 @@ type CoordinatorPath = typeof COORDINATOR_PATHS[keyof typeof COORDINATOR_PATHS];
 
 /** Set by a coordinator pass that has just loaded the feature policy. */
 export const REMINDERS_ENABLED_HEADER = 'X-Crate-Reminders-Enabled';
+/** Marks a public request that the Worker forwarded to run under the coordinator lock. */
+export const INTERNAL_MUTATION_HEADER = 'X-Crate-Internal-Mutation';
 
 type AlarmBinding = { REMINDER_ALARMS: DurableObjectNamespace };
 
@@ -40,6 +42,13 @@ function post(stub: DurableObjectStub, path: CoordinatorPath, init: Omit<Request
 
 export function coordinatorStub(env: AlarmBinding): DurableObjectStub {
 	return roleStub(env, COORDINATOR_NAME);
+}
+
+/** Runs a public request under the coordinator lock, after the Worker's own checks. */
+export function forwardToCoordinator(env: AlarmBinding, request: Request): Promise<Response> {
+	const forwarded = new Request(request);
+	forwarded.headers.set(INTERNAL_MUTATION_HEADER, '1');
+	return coordinatorStub(env).fetch(forwarded);
 }
 
 /** A random instance of the upload or read transfer pool. These hold no storage. */
