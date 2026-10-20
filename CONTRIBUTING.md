@@ -1,6 +1,6 @@
 # Contributing to Crate
 
-Crate's Obsidian plugin, reminders PWA and Cloudflare backend share a sync and reminder contract. Start with [the architecture](docs/architecture.md), [protocol documentation](docs/protocol.md), and [testing guide](docs/testing.md). Report vulnerabilities through [the security policy](SECURITY.md), and use synthetic notes in public bug reports.
+Crate's Obsidian plugin, reminders PWA and Cloudflare backend share a sync and reminder contract. Start with [the architecture](docs/architecture.md), [protocol documentation](docs/protocol.md), and [testing guide](docs/testing.md). The [documentation index](docs/README.md) lists the other guides. Report vulnerabilities through [the security policy](SECURITY.md), and use synthetic notes in public bug reports.
 
 ## Local setup
 
