@@ -52,7 +52,7 @@ it('reads a changed reminder note once per rescan', async () => {
   await index.rescanFile(file);
   // Before: once for the change digest and again for the scan.
   expect(read).toHaveBeenCalledOnce();
-  expect(index.getByFile(file.path).map(reminder => reminder.id)).toEqual(['rem-1']);
+  expect(index.getAll().filter(item => item.filePath === file.path).map(reminder => reminder.id)).toEqual(['rem-1']);
 });
 
 describe('vaultScanner', () => {

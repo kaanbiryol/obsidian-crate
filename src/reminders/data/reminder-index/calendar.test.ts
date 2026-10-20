@@ -30,7 +30,7 @@ it.each([
   { name: 'spring DST upper bound', zone: 'Europe/Berlin', now: '2026-03-29T00:00:00+01:00', dueDatetime: '2026-03-31T00:00:00+02:00', today: false, overdue: false, upcoming: false },
   { name: 'autumn DST next day', zone: 'Europe/Berlin', now: '2026-10-25T00:00:00+02:00', dueDate: '2026-10-26', today: false, overdue: false, upcoming: true },
   { name: 'autumn DST repeated hour', zone: 'Europe/Berlin', now: '2026-10-25T02:30:00+02:00', dueDatetime: '2026-10-25T02:15:00+01:00', today: true, overdue: false, upcoming: true },
-])('keeps index, embedded queries and shared views consistent: $name', test => {
+])('keeps repository queries and shared views consistent: $name', test => {
   process.env.TZ = test.zone ?? 'UTC';
   vi.useFakeTimers({ toFake: ['Date'] });
   const now = new Date(test.now);
@@ -39,13 +39,9 @@ it.each([
   const index = createReminderIndex({ vault: {} } as App, 'Reminders');
   index.applyOptimisticCreate(item);
   const repository = createReminderRepository(index, {} as never);
-  const activeToday = !item.completed && test.today;
   const inTodayView = !item.completed && (test.today || test.overdue);
   const completedToday = item.completed && test.today;
 
-  expect(index.getToday(now)).toHaveLength(Number(activeToday));
-  expect(index.getOverdue(now)).toHaveLength(Number(test.overdue));
-  expect(index.getUpcoming(1, now)).toHaveLength(Number(test.upcoming));
   expect(isReminderOverdue(item, now)).toBe(test.overdue);
   const today = buildTodayViewModel([item], now);
   expect(today.active).toHaveLength(Number(inTodayView));
@@ -66,9 +62,9 @@ it('uses one calendar snapshot when midnight falls between repository query stag
     reminder({ id: 'done-today', dueDate: '2026-09-08', completed: true }),
     reminder({ id: 'done-tomorrow', dueDate: '2026-09-09', completed: true }),
   ]) index.applyOptimisticCreate(item);
-  const getToday = index.getToday.bind(index);
-  vi.spyOn(index, 'getToday').mockImplementation(now => {
-    const result = getToday(now);
+  const getAll = index.getAll.bind(index);
+  vi.spyOn(index, 'getAll').mockImplementation(() => {
+    const result = getAll();
     vi.setSystemTime(new Date('2026-09-09T00:00:00Z'));
     return result;
   });

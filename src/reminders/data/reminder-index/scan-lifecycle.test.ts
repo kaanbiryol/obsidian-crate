@@ -41,7 +41,7 @@ it.each(['delete', 'rename'] as const)('does not publish a late file scan after 
   else { file.path = newPath; index.renameFile(oldPath, newPath); }
   result.resolve({ filePath: oldPath, reminders: [reminder()], lineCount: 1 });
   await scanning;
-  expect(index.getByFile(oldPath)).toEqual([]);
+  expect(index.getAll().filter(item => item.filePath === oldPath)).toEqual([]);
   expect(index.getAll()).toEqual(action === 'delete' ? [] : [reminder(newPath)]);
 });
 
@@ -106,8 +106,8 @@ it('keeps all read views consistent through rename, a failed rescan and recovery
   const { index, file } = await harness();
   const views = () => ({
     all: index.getAll(), byId: index.getById('one'),
-    oldFile: index.getByFile(oldPath), newFile: index.getByFile(newPath),
-    oldProject: index.getByProject('Old'), newProject: index.getByProject('New'),
+    oldFile: index.getAll().filter(item => item.filePath === oldPath), newFile: index.getAll().filter(item => item.filePath === newPath),
+    oldProject: index.getAll().filter(item => item.project === 'Old'), newProject: index.getAll().filter(item => item.project === 'New'),
     projects: index.getProjects(),
   });
   const published: ReturnType<typeof views>[] = [];

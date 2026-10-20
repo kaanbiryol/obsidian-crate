@@ -28,7 +28,9 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
     },
 
     getTodayReminders(includeCompleted = false) {
-      return selectTodayReminders(index.getAll(), new Date(), includeCompleted).map(convert);
+      // Read the clock before the index so the query reflects the moment it was requested.
+      const now = new Date();
+      return selectTodayReminders(index.getAll(), now, includeCompleted).map(convert);
     },
 
     getProjects() {

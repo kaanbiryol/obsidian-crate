@@ -39,7 +39,7 @@ describe('reminder identity ownership during moves', () => {
 		expect(files.get(destinationPath)).toContain('<!-- crate-desc:Important details -->');
 		expect(index.getAll().map(item => item.id).sort()).toEqual(['stable-id', 'unrelated']);
 		expect(index.getById('stable-id')).toMatchObject({ filePath: destinationPath, project: destination, description: 'Important details' });
-		expect(index.getByFile(sourcePath).map(item => item.id)).toEqual(['unrelated']);
+		expect(index.getAll().filter(item => item.filePath === sourcePath).map(item => item.id)).toEqual(['unrelated']);
 	});
 
 	it.each(['source first', 'destination first', 'concurrent'])('reconciles an externally moved reminder against current bytes with %s scans', async order => {

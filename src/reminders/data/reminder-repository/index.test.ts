@@ -15,12 +15,6 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 		remindersFolderPath: 'Reminders',
 		getAll: () => [],
 		getActive: () => [],
-		getCompleted: () => [],
-		getToday: () => [],
-		getUpcoming: () => [],
-		getOverdue: () => [],
-		getByProject: () => [],
-		getByFile: () => [],
 		getById: () => undefined,
 		getProjects: () => [],
 		load: async () => ({ reminders: [], issues: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
@@ -340,12 +334,11 @@ it('builds Today from one index read and reuses converted reminders', () => {
 	const reminder = (id: string, dueDate: string, completed = false): IndexedReminder => ({
 		id, content: id, priority: 4, completed, dueDate, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 0, rawLine: `- [ ] ${id}` });
 	const all = [reminder('today', today), reminder('late', '2020-01-01'), reminder('done', today, true), reminder('later', '2999-01-01')];
-	const getAll = vi.fn(() => all), getToday = vi.fn(() => []), getOverdue = vi.fn(() => []), getCompleted = vi.fn(() => []);
-	const repository = createReminderRepository(createIndex({ getAll, getToday, getOverdue, getCompleted }), {} as MarkdownWriter);
+	const getAll = vi.fn(() => all);
+	const repository = createReminderRepository(createIndex({ getAll }), {} as MarkdownWriter);
 	const first = repository.getTodayReminders(true);
 	expect(first.map(item => item.id)).toEqual(['today', 'late', 'done']);
 	expect(repository.getTodayReminders(true)[0]).toBe(first[0]);
 	// Before: three merged index reads per query and new reminder objects every time.
 	expect(getAll).toHaveBeenCalledTimes(2);
-	expect([getToday, getOverdue, getCompleted].every(read => read.mock.calls.length === 0)).toBe(true);
 });

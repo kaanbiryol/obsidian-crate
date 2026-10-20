@@ -9,8 +9,6 @@
 import { TFile, type App } from "obsidian";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/logger";
-import { isReminderDueToday, isReminderOverdue } from "@/reminders/core/dates/reminderDate";
-import { getUpcomingReminders } from "@/reminders/core/reminderSort";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
@@ -51,12 +49,6 @@ export interface ReminderIndex {
 
   getAll(): IndexedReminder[];
   getActive(): IndexedReminder[];
-  getCompleted(): IndexedReminder[];
-  getToday(now?: Date): IndexedReminder[];
-  getUpcoming(days: number, now?: Date): IndexedReminder[];
-  getOverdue(now?: Date): IndexedReminder[];
-  getByProject(project: string): IndexedReminder[];
-  getByFile(filePath: string): IndexedReminder[];
   getById(id: string): IndexedReminder | undefined;
   getProjects(): string[];
 
@@ -224,34 +216,6 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
 
     getActive() {
       return getMergedReminders().filter((reminder) => !reminder.completed);
-    },
-
-    getCompleted() {
-      return getMergedReminders().filter((reminder) => reminder.completed);
-    },
-
-    getToday(now = new Date()) {
-      return getMergedReminders().filter(
-        (reminder) => !reminder.completed && isReminderDueToday(reminder, now),
-      );
-    },
-
-    getUpcoming(days: number, now = new Date()) {
-      return getUpcomingReminders(getMergedReminders(), days, now);
-    },
-
-    getOverdue(now = new Date()) {
-      return getMergedReminders().filter((reminder) =>
-        isReminderOverdue(reminder, now),
-      );
-    },
-
-    getByProject(project: string) {
-      return getMergedReminders().filter((reminder) => reminder.project === project);
-    },
-
-    getByFile(filePath: string) {
-      return getMergedReminders().filter((reminder) => reminder.filePath === filePath);
     },
 
     getById(id: string) {

@@ -105,6 +105,6 @@ describe('incomplete reminder sources', () => {
 		await scanning;
 		expect(await h.readBytes('Outside.md')).toEqual(Buffer.from(content));
 		expect(h.vault.process).not.toHaveBeenCalled();
-		expect(h.index.getByFile(a)).toEqual([]);
+		expect(h.index.getAll().filter(item => item.filePath === a)).toEqual([]);
 	});
 });

@@ -90,36 +90,6 @@ describe('reminderIndex', () => {
     expect(index.isComplete).toBe(!hasIssues);
   });
 
-  it('filters today, upcoming, and overdue reminders correctly', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
-
-    const reminders = [
-      makeReminder({ id: 'today', dueDate: '2026-01-10', completed: false }),
-      makeReminder({ id: 'upcoming', dueDatetime: '2026-01-12T09:00:00.000Z', completed: false }),
-      makeReminder({ id: 'overdue', dueDate: '2026-01-05', completed: false }),
-      makeReminder({ id: 'done', dueDate: '2026-01-05', completed: true }),
-    ];
-
-    const scanResult: ScanResult = {
-      reminders,
-      filesScanned: 1,
-      totalLines: 4,
-      issues: [],
-      scanDurationMs: 10,
-      discoveredProjects: ['Work'],
-    };
-
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
-
-    const index = createReminderIndex(app, 'Reminders');
-    await index.load();
-
-    expect(index.getToday().map(r => r.id)).toEqual(['today']);
-    expect(index.getUpcoming(3).map(r => r.id)).toEqual(['upcoming']);
-    expect(index.getOverdue().map(r => r.id)).toEqual(['overdue']);
-  });
-
   it('updates indexes when renaming files', () => {
     const reminders = [
       makeReminder({ id: 'r1', project: 'Old', filePath: 'Reminders/Old.md' }),
@@ -143,9 +113,9 @@ describe('reminderIndex', () => {
     return index.load().then(() => {
       index.renameFile('Reminders/Old.md', 'Reminders/New.md');
 
-      expect(index.getByFile('Reminders/New.md')).toHaveLength(2);
-      expect(index.getByProject('New')).toHaveLength(2);
-      expect(index.getByProject('Old')).toHaveLength(0);
+      expect(index.getAll().filter(item => item.filePath === 'Reminders/New.md')).toHaveLength(2);
+      expect(index.getAll().filter(item => item.project === 'New')).toHaveLength(2);
+      expect(index.getAll().filter(item => item.project === 'Old')).toHaveLength(0);
       expect(index.getProjects()).toEqual(['New']);
     });
   });
@@ -174,8 +144,8 @@ describe('reminderIndex', () => {
 
     index.removeFile('Reminders/Work.md');
 
-    expect(index.getByFile('Reminders/Work.md')).toHaveLength(0);
-    expect(index.getByProject('Work')).toHaveLength(0);
+    expect(index.getAll().filter(item => item.filePath === 'Reminders/Work.md')).toHaveLength(0);
+    expect(index.getAll().filter(item => item.project === 'Work')).toHaveLength(0);
     expect(index.getProjects()).toEqual(['Home']);
   });
 
@@ -261,8 +231,8 @@ describe('reminderIndex', () => {
     );
 
     expect(index.getById('r1')?.content).toBe('Updated task');
-    expect(index.getCompleted().map((reminder) => reminder.id)).toEqual(['r1']);
-    expect(index.getByProject('Inbox').map((reminder) => reminder.id)).toEqual(['r2']);
+    expect(index.getAll().filter((reminder) => reminder.completed).map((reminder) => reminder.id)).toEqual(['r1']);
+    expect(index.getAll().filter(item => item.project === 'Inbox').map((reminder) => reminder.id)).toEqual(['r2']);
 
     index.applyOptimisticDelete('r1');
 

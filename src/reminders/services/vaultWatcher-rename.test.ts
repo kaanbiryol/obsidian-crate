@@ -33,7 +33,7 @@ describe('reminder edit and rename events', () => {
 		expect(rescan).toHaveBeenCalledOnce();
 		await rescan.mock.results[0]!.value;
 		expect(index.getById('one')).toMatchObject({ content: 'Edited title', dueDate: '2027-01-12', filePath: `Reminders/After-${renames - 1}.md` });
-		expect(index.getByFile(initial)).toEqual([]);
+		expect(index.getAll().filter(item => item.filePath === initial)).toEqual([]);
 		watcher.unregister();
 	});
 });
