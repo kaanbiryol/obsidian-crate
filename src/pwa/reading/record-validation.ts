@@ -1,5 +1,6 @@
 import { isRecord } from '@/platform/validation';
 import { validateReadingMetadata, type ReadingItem } from '@/reading/core/model';
+import { isSyncPath } from '@/protocol/sync-validation';
 
 /** Live responses and offline copies share the same item and article contract. */
 export function isReadingItem(value: unknown, folder: string): value is ReadingItem {
@@ -8,7 +9,7 @@ export function isReadingItem(value: unknown, folder: string): value is ReadingI
 
 function parseReadingItem(value: unknown, folder: string): ReadingItem | null {
   if (!isRecord(value) || typeof value.path !== 'string') return null;
-  if (value.path && (!value.path.startsWith(`${folder}/`) || value.path.split('/').some(part => !part || part === '.' || part === '..'))) return null;
+  if (value.path && (!value.path.startsWith(`${folder}/`) || !isSyncPath(value.path))) return null;
   try { return { ...validateReadingMetadata(value), path: value.path }; } catch { return null; }
 }
 

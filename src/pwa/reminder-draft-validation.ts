@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import { isStoredReminderDraft, storedObject, storedStringChoice } from './reminder-storage-validation';
 import type { ModalState } from './types';
+import { isSyncPath } from '../protocol/sync-validation';
 
 const optionalString = v.optional(v.string());
 const modalSchema = storedObject({
@@ -16,8 +17,7 @@ const modalSchema = storedObject({
 
 function filePath(value: string | undefined, folderPath: string): boolean {
 	return value === undefined || value.startsWith(`${folderPath}/`)
-		&& value.endsWith('.md') && !value.includes('\\')
-		&& !value.split('/').some(part => !part || part === '.' || part === '..');
+		&& value.toLowerCase().endsWith('.md') && isSyncPath(value);
 }
 
 /** Validate drafts without rewriting saved data. */

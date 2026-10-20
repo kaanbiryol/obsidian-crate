@@ -19,6 +19,7 @@ import { routeFolderPath } from './encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
+import { isSyncPath } from '@/protocol/sync-validation';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
@@ -42,7 +43,7 @@ export class EncryptedReminderApi {
 	constructor(private readonly keys: StoredReminderKeys, private readonly fetch: ApiFetch) {}
 	private get localFolder() { return this.keys.localFolderPath ?? this.keys.folderPath; }
 	private authority(path: string) {
-		if (!path.startsWith(`${this.keys.folderPath}/`) || path.includes('\\') || path.split('/').some(part => !part || part === '.' || part === '..')) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
+		if (!path.startsWith(`${this.keys.folderPath}/`) || !isSyncPath(path)) throw new ReminderCommandError('File is outside this enrollment', 403, 'scope_mismatch');
 		return { vaultId: this.keys.vaultId, scopeId: this.keys.scopeId, key: this.keys.data };
 	}
 	private assertCurrent(): void { if (!this.current()) throw new Error('Session changed. Reopen Crate before saving.'); }

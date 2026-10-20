@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { validateRecurrence } from '@/reminders/core/validateRecurrence';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from './types';
+import { isSyncPath } from '@/protocol/sync-validation';
 
 function isStoredCalendarDate(value: string): boolean {
 	return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
@@ -30,9 +31,7 @@ export const reminderRecordSchema = v.object({
 	project: v.string(),
 	completed: v.boolean(),
 	priority: prioritySchema,
-	filePath: v.pipe(v.string(), v.check(value => value.toLowerCase().endsWith('.md') && !value.includes('\\')
-		&& !Array.from(value).some(char => char.charCodeAt(0) < 32)
-		&& !value.split('/').some(part => !part || part === '.' || part === '..'))),
+	filePath: v.pipe(v.string(), v.check(value => value.toLowerCase().endsWith('.md') && isSyncPath(value))),
 	description: optionalString,
 	revision: optionalString,
 	lineNumber: v.optional(v.pipe(v.number(), v.check(value => Number.isSafeInteger(value) && value >= 0))),

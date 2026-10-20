@@ -70,6 +70,15 @@ describe('stored command schema compatibility', () => {
 		expect(validModal(modal)).toBe(true);
 	});
 
+	it.each(['Reminders/../Inbox.md', 'Reminders/In\u0000box.md', 'Reminders\\Inbox.md', 'Other/Inbox.md', 'Reminders/Inbox.txt'])(
+		'rejects an unsafe stored modal file path: %j', filePath => {
+			expect(validModal({ ...modal, filePath })).toBe(false);
+		});
+
+	it('accepts a modal file path inside the reminders folder', () => {
+		expect(validModal({ ...modal, filePath: 'Reminders/Projects/Inbox.MD' })).toBe(true);
+	});
+
 	it('rejects arrays masquerading as commands, modals or nested objects', () => {
 		expect(validChange(Object.assign([], save))).toBe(false);
 		expect(validModal(Object.assign([], modal))).toBe(false);

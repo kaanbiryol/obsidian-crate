@@ -8,10 +8,7 @@ export const isSyncSequence = (value: unknown): value is number => typeof value 
 // Reject control characters in all authoritative paths.
 /* eslint-disable no-control-regex -- Protocol paths and revisions reject control characters. */
 export function isSyncPath(value: unknown): value is string {
-	return typeof value === 'string' && value.length > 0 && value.length <= 1024
-		&& !/[\u0000-\u001f\u007f\\]/.test(value)
-		&& value.split('/').every(part => part.length > 0 && part !== '.' && part !== '..')
-		&& getSyncPathIssue(value) === null;
+	return typeof value === 'string' && getSyncPathIssue(value) === null;
 }
 
 export function isSyncDate(value: unknown): value is string {
