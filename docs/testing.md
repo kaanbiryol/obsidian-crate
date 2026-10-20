@@ -471,9 +471,11 @@ races ensure an older asynchronous read cannot replace or settle a newer baselin
 
 `reminders/moves.integration.ts` runs the production handlers against real D1/R2
 bindings, including completed reminders, source conflicts and destination write
-failures. Unit tests retain lightweight reorder coverage without simulating the
-atomic SQL publication. Operation-expiry and upload-retry integration tests exercise
-the shared receipt cleanup owner, including monotonic floors and batch rollback.
+failures. The other reminder route and list-cache tests also use real D1/R2;
+`reminders/plaintext-parity.integration.ts` compares the plaintext routes with the
+shared file command used by encrypted web apps. Operation-expiry and upload-retry
+integration tests exercise the shared receipt cleanup owner, including monotonic
+floors and batch rollback.
 
 `maintenance/object-cleanup.test.ts` and `maintenance/run.test.ts` distinguish nonfatal
 post-commit cleanup from scheduled failure reporting. The corresponding
