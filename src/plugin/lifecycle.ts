@@ -5,7 +5,8 @@ import { stopReading } from '../reading/runtime';
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "../sync/logger";
 import { CrateSettingTab } from "../ui/settings-tab";
-import { initializeReminders, ensureReminderNotificationPolicy } from "../reminders/plugin-integration";
+import { initializeReminders } from "../reminders/plugin-integration";
+import { ensureReminderNotificationPolicy } from "../reminders/notification-policy-sync";
 import {
   initializeSyncManagers,
   registerSyncCommands,

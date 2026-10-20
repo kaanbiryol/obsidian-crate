@@ -9,7 +9,7 @@ import { ActivityModal } from '../ui/activity/activity-modal';
 import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
-import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
+import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import type { ForegroundSyncReason } from './runtime/foreground-sync';
 

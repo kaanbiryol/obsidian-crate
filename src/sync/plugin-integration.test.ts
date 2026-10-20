@@ -8,7 +8,7 @@ import { setSyncReady } from '../plugin/lifecycle-state';
 vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
 vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
 vi.mock('./runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
-vi.mock('../reminders/runtime', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
+vi.mock('../reminders/notification-policy-sync', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
 
 function setup() {

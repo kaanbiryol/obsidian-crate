@@ -1,16 +1,12 @@
 import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderIntegrations } from './register-integrations';
-import {
-	ensureReminderNotificationPolicy,
-	setupReminderBackend,
-} from './runtime';
+import { setupReminderBackend } from './runtime';
+import { ensureReminderNotificationPolicy } from './notification-policy-sync';
 import { normalizeRemindersFolderPath } from './settings';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 
 const remindersLogger = createLogger('Reminders');
-
-export { ensureReminderNotificationPolicy };
 
 export async function initializeReminders(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);

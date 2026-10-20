@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ensureReminderNotificationPolicy } from './runtime';
+import { ensureReminderNotificationPolicy } from './notification-policy-sync';
 import type CratePlugin from '../plugin/CratePlugin';
 
 function harness(pushEnabled = true) {

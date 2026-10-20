@@ -79,6 +79,8 @@ async function loadLifecycleModule() {
 	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
 		initializeReminders,
+	}));
+	vi.doMock('../reminders/notification-policy-sync', () => ({
 		ensureReminderNotificationPolicy,
 	}));
 	vi.doMock('../sync/plugin-integration', () => ({

@@ -10,7 +10,6 @@ import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
 
 const remindersLogger = createLogger('Reminders');
-export { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from './notification-policy-sync';
 const backends = new WeakMap<CratePlugin, AbortController>();
 const moveJournals = new WeakMap<CratePlugin, ReminderMoveJournal>();
 
