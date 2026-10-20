@@ -72,3 +72,21 @@ it('reauthenticates inside the transfer queue before a revoked upload can be dis
 	expect(forwardTransferRequest).toHaveBeenCalledTimes(1);
 	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
 });
+
+it.each([['POST', '/reading/exchange'], ['PUT', '/settings']])('returns the coordinator request ID for a forwarded %s %s', async (method, path) => {
+	const forwarded: Request[] = [];
+	const coordinatorEnv = { DB: {}, REMINDER_ALARMS: {
+		idFromName: (name: string) => name,
+		get: () => ({ fetch: async (request: Request) => {
+			forwarded.push(request);
+			return new Response(null, { status: 204, headers: { 'X-Crate-Request-Id': 'coordinator-request' } });
+		} }),
+	} } as unknown as Env;
+	const response = await fetchWorkerRequest(new Request(`https://worker.test${path}`, {
+		method, body: '{}', headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer device' },
+	}), coordinatorEnv);
+	expect(response.headers.get('X-Crate-Request-Id')).toBe('coordinator-request');
+	expect(forwarded).toHaveLength(1);
+	expect(forwarded[0]!.headers.get('X-Crate-Internal-Mutation')).toBe('1');
+	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
+});

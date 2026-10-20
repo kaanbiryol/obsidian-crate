@@ -108,7 +108,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const routePolicy = apiRoutePolicy(path, method);
 	const routeExecution = routePolicy?.execution;
 	const readingGrant = routeExecution?.kind === 'reading-grant';
-	if (readingGrant && execution.kind !== 'coordinator') return forwardToCoordinator(env, request);
+	if (readingGrant && execution.kind !== 'coordinator') return forwardedResponse(await forwardToCoordinator(env, request), context);
 	if (execution.kind === 'coordinator' && readingGrant) return handleReadingRoute(request, env, undefined, execution.state);
 	const publicResponse = await handlePublicRoute(request, env, path, method);
 	if (publicResponse) return publicResponse;
