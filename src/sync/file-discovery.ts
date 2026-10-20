@@ -6,7 +6,7 @@ import { isAbortError } from './abort';
  */
 
 import type { Vault, TFile } from 'obsidian';
-import { errorMessage } from '../plugin/logger';
+import { errorMessage } from './logger';
 import { assertPortablePaths } from '../protocol/portable-path';
 
 /**

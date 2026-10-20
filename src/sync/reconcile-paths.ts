@@ -10,7 +10,7 @@ import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult } from './s
 import { RemoteVersionChangedError } from './transfer/download';
 import type { FileDiff, SyncResult, SyncWork, UploadDiff } from './types';
 import type { FileEntry } from '../protocol/sync-types';
-import { errorMessage } from '../plugin/logger';
+import { errorMessage } from './logger';
 import type { DiffApplyOutcome } from './transfer/types';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
 import type { DeleteRemoteFiles } from './transfer/delete';

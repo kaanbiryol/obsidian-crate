@@ -5,7 +5,7 @@ import { isAbortError } from "../abort";
 import { isTransientSyncFailure } from "../engine/utils";
 import type { IncrementalSyncPlannerContext } from "./types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "../sync-result";
-import { createLogger, errorMessage } from "../../plugin/logger";
+import { createLogger, errorMessage } from "../logger";
 import type { FileEntry } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { applyIncrementalLocalDeletes } from '../incremental-local-deletes';

@@ -8,7 +8,7 @@ import type { CrateServerInfo } from '../../protocol/server-info';
 import { createConflictReview } from '../conflict/review';
 import type { SyncActivityProgress } from '../types';
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';

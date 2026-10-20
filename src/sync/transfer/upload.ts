@@ -7,7 +7,7 @@ import type { TransferContext } from "./types";
 import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
-import { createLogger } from "../../plugin/logger";
+import { createLogger } from "../logger";
 import type { VaultFile } from "../file-discovery";
 import { HttpError } from '../api';
 import { isQueueVersionConflict } from '../queue/failure';

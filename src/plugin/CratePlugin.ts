@@ -21,7 +21,7 @@ import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
 import { configureLogger as configureRemindersLogger } from '../reminders/utils/logger';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
-import { configureSyncLogger } from './logger';
+import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { publishSavedSettings } from './settings-persistence';

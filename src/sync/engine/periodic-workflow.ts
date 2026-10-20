@@ -1,6 +1,6 @@
 import { notifyConflicts } from '../conflict/conflict';
 import { MAX_CHECK_BACKOFF_MULTIPLIER } from './constants';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import type { SyncResult } from '../types';
 import type { SyncStatus } from './workflow-shared';
 import { isAbortError } from '../abort';

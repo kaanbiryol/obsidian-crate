@@ -11,7 +11,7 @@ import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnost
  */
 
 import type { App, PluginManifest } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { createLogger } from './logger';
 import type { FileManifest, FileEntry } from '../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../protocol/path-record';
 

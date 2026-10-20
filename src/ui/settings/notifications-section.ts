@@ -1,7 +1,7 @@
 import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonComponent } from 'obsidian';
 import { createSettingsDisclosure } from './section-helpers';
 import type CratePlugin from '../../main';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/api';

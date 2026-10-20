@@ -11,7 +11,7 @@ import {
 	BULK_NEW_UPLOAD_MAX_FILES,
 	MAX_FILE_SIZE_BYTES,
 } from '../../protocol/sync-limits';
-import { createLogger } from "../../plugin/logger";
+import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
 
 const logger = createLogger("SyncTransfer");

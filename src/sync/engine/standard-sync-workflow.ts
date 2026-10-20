@@ -11,7 +11,7 @@ import {
 	PREPARE_CONCURRENCY,
 } from './constants';
 import { uploadFullSyncPlan, type FullSyncUploadContext } from './full-sync-upload';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import type { FileDiff, SyncResult, SyncState } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';

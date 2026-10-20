@@ -8,7 +8,7 @@ import {
 	type RemindersSettings,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { FolderSuggest } from './folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { createSettingsDisclosure } from './section-helpers';

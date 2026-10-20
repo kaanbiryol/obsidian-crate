@@ -1,7 +1,7 @@
 import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 import { isAbortError } from './abort';
 import { HttpError } from './api';
-import { errorMessage } from '../plugin/logger';
+import { errorMessage } from './logger';
 import type { MutationFailure } from '../protocol/sync-types';
 import { LocalFilePresentError } from './local-absence';
 import { BATCH_DELETE_CONCURRENCY } from './engine/constants';

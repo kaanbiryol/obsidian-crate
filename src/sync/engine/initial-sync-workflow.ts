@@ -4,7 +4,7 @@ import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from '../sync-result';
-import { createLogger } from '../../plugin/logger';
+import { createLogger } from '../logger';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
 import {
 	completeWorkflowResult,

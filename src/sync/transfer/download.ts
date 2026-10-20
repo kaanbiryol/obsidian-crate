@@ -5,7 +5,7 @@ import { computeHash } from "../hasher";
 import { applyRemoteContentIfUnchanged } from "../local-apply";
 import { recordAppliedContent } from '../applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
-import { createLogger, errorMessage } from "../../plugin/logger";
+import { createLogger, errorMessage } from "../logger";
 import type { SyncResult } from '../types';
 import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 

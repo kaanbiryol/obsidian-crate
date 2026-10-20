@@ -4,7 +4,7 @@ import type React from "react";
 import type { Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
-import { errorMessage } from "@/plugin/logger";
+import { errorMessage } from "@/sync/logger";
 import {
   createShadowReactRoot,
   createShadowRootMount,

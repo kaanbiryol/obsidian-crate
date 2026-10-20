@@ -9,7 +9,7 @@ import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
-import { errorMessage } from '../plugin/logger';
+import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
 import { SECRET_KEYS } from '../plugin/settings-types';

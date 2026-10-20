@@ -1,5 +1,5 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 
 interface RunButtonTaskContext {
 	setButtonText: (text: string) => void;

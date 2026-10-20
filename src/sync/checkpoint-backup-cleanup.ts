@@ -1,5 +1,5 @@
 import type { DataAdapter, Plugin } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { createLogger } from './logger';
 import { isRecord } from '../platform/validation';
 import { validateUploadIntent, type JournalUpload } from './upload-intent';
 import { computeHash } from './hasher';

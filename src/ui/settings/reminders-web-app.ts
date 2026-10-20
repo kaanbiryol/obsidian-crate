@@ -1,6 +1,6 @@
 import { Notice, Platform, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { QRModal } from '../qr-modal';
 import { openExternalBrowserModal } from '../external-browser-modal';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';

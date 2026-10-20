@@ -1,7 +1,7 @@
 import { pendingChangeKey, decodePendingChange } from '../pending-change';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { createAbortError } from '../abort';
-import { createLogger } from '../../plugin/logger';
+import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
 import { isRetryableSyncError } from '../engine/utils';
 import { deletePendingFiles } from './delete';

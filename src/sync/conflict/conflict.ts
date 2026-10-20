@@ -3,7 +3,7 @@
  */
 
 import { Notice, type Vault } from 'obsidian';
-import { createLogger } from '../../plugin/logger';
+import { createLogger } from '../logger';
 import { isHiddenPath } from '../file-discovery';
 
 const logger = createLogger('Conflict');

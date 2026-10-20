@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { normalizeListStyle } from '../shared/list-style';
 import { createSettingsSectionHeading } from './section-helpers';
 

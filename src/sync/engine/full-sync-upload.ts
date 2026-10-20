@@ -1,5 +1,5 @@
 import { recordSyncError } from '../issues';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../logger';
 import type { FileEntry } from '../../protocol/sync-types';
 import { pipelineUploadChunks } from '../transfer/budget';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';

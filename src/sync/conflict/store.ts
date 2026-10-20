@@ -1,7 +1,7 @@
 import type { App, PluginManifest } from 'obsidian';
 import { isRecord } from '../../platform/validation';
 import type { ConflictRecord } from '../types';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
 import { getAllVaultFiles } from '../file-discovery';
 import { computeHash } from '../hasher';

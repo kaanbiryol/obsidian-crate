@@ -64,7 +64,7 @@ async function loadLifecycleModule() {
 			has = secretStorageHas;
 		},
 	}));
-	vi.doMock('./logger', () => ({
+	vi.doMock('../sync/logger', () => ({
 		createLogger: vi.fn(() => ({
 			info: vi.fn(),
 			warn: vi.fn(),

@@ -20,7 +20,7 @@ import { isHiddenPath, type VaultFile } from '../file-discovery';
 import { assertLocalSyncPath } from '../local-path-safety';
 import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError as isSyncAbortError } from '../abort';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';

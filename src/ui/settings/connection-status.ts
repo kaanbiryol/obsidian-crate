@@ -3,7 +3,7 @@ import type CratePlugin from '../../main';
 import { ActivityModal } from '../activity/activity-modal';
 import { notifyConflicts } from '../../sync/conflict/conflict';
 import { showSyncErrorNotice } from '../sync-error-notice';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { syncConnectionFailureMessage } from './self-hosted-errors';
 
 export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePlugin): () => void {

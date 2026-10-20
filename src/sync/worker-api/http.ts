@@ -4,7 +4,7 @@ import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../request-diagnostics';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
 import { requestUrl } from 'obsidian';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
 import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../request-diagnostics';

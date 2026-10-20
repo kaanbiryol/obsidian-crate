@@ -1,6 +1,6 @@
 import { ConnectionSetupError } from '../connection-errors';
 import { saveEncryptionKeys } from '../../plugin/encryption-storage';
-import { createLogger } from '../../plugin/logger';
+import { createLogger } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import type { SyncApiClient } from '../api';

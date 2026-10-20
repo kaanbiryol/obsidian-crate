@@ -1,6 +1,6 @@
 import { getSyncPathIssue } from '../protocol/portable-path';
 import { isRecord } from '../platform/validation';
-import { errorMessage } from '../plugin/logger';
+import { errorMessage } from './logger';
 import { isAbortError } from './abort';
 import type { SyncIssue, SyncResult } from './types';
 

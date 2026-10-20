@@ -1,5 +1,5 @@
 import { HttpError, SyncTransportError } from '../api';
-import { createLogger } from '../../plugin/logger';
+import { createLogger } from '../logger';
 import { createAbortError } from '../abort';
 
 const logger = createLogger('SyncEngine');

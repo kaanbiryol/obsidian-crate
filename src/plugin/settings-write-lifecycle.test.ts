@@ -3,7 +3,7 @@ import CratePlugin from './CratePlugin';
 import { beginPluginLifecycle, endPluginLifecycle } from './lifecycle-state';
 import { normalizeCrateSettings } from './settings';
 import { DEFAULT_REMINDERS_SETTINGS, useRemindersSettingsStore } from '../reminders/settings';
-import * as syncLogger from './logger';
+import * as syncLogger from '../sync/logger';
 import * as remindersLogger from '../reminders/utils/logger';
 
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));

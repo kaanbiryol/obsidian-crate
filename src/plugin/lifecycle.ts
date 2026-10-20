@@ -3,7 +3,7 @@ import { Notice } from "obsidian";
 import { registerReading } from '../reading/register-integrations';
 import { stopReading } from '../reading/runtime';
 import { SecretStorageService } from "./secret-storage";
-import { createLogger, errorMessage } from "./logger";
+import { createLogger, errorMessage } from "../sync/logger";
 import { CrateSettingTab } from "../ui/settings-tab";
 import { initializeReminders, ensureReminderNotificationPolicy } from "../reminders/plugin-integration";
 import {

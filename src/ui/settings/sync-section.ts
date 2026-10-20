@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { renderSyncInterval } from './sync-interval';

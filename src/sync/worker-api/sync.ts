@@ -10,7 +10,7 @@ import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILI
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../logger';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,

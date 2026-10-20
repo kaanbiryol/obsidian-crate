@@ -6,7 +6,7 @@ import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from '../sync-result';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 import type { LocalManifestView } from '../manifest';
 import { getPathEntry } from '../../protocol/path-record';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';

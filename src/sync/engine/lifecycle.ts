@@ -3,7 +3,7 @@ import { createAbortError, isAbortError } from '../abort';
 import { LOCAL_CONTENT_CHECK_INTERVAL_MS, MAX_RETRIES, RETRY_BASE_DELAY_MS } from './constants';
 import { runPeriodicCheckWorkflow } from './periodic-workflow';
 import { retryWithBackoff, runConcurrentTasks } from './utils';
-import { createLogger, errorMessage } from '../../plugin/logger';
+import { createLogger, errorMessage } from '../logger';
 
 const logger = createLogger('SyncEngine');
 

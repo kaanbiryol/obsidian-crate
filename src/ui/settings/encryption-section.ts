@@ -9,7 +9,7 @@ import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecov
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
 import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } from '../../sync/encryption/conversion';
 import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
-import { errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../sync/logger';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { normalizeWorkerUrl } from '../../sync/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';

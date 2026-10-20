@@ -1,5 +1,5 @@
 import { ConnectionSetupError } from './connection-errors';
-import { createLogger } from '../plugin/logger';
+import { createLogger } from './logger';
 import type { CrateSettings } from '../plugin/settings-types';
 
 const logger = createLogger('WorkerUrl');
