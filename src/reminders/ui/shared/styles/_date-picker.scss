@@ -1,0 +1,222 @@
+// Schedule picker quick dates and its date and time fields.
+@mixin styles {
+
+.date-quick-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--crate-divider);
+  border-radius: var(--crate-radius-card);
+  background: var(--crate-control-bg);
+}
+
+.date-quick-button {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
+  cursor: pointer;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--crate-control-hover-bg);
+    }
+  }
+
+  &.is-active {
+    grid-template-columns: minmax(0, 1fr) 16px;
+    background: var(--crate-picker-selection-bg);
+    color: var(--crate-picker-selection-color);
+  }
+
+  & + & {
+    border-left: 1px solid var(--crate-divider);
+  }
+
+  &:nth-child(n + 3) {
+    border-top: 1px solid var(--crate-divider);
+  }
+
+  &:nth-child(3) {
+    border-left: 0;
+  }
+}
+
+.date-quick-button-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+
+  strong,
+  small {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--text-normal);
+    font-size: var(--reminder-font-sm);
+    font-weight: var(--reminder-font-weight-medium);
+  }
+
+  small {
+    color: var(--text-faint);
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
+  }
+}
+
+.date-quick-button-check {
+  color: var(--crate-accent);
+}
+
+.date-quick-button.is-active .date-quick-button-copy {
+  strong {
+    color: currentColor;
+  }
+
+  small {
+    color: currentColor;
+    opacity: 0.75;
+  }
+}
+
+.reminder-date-picker .date-quick-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.reminder-date-picker .date-quick-button {
+  height: var(--crate-picker-row-height);
+  grid-template-columns: 16px minmax(0, 1fr);
+  min-height: var(--crate-picker-row-height);
+  gap: 7px;
+  padding: 0 var(--picker-row-inline);
+  border: 0;
+  border-radius: calc(var(--crate-radius-control) - 2px);
+  background: transparent;
+  transition:
+    background-color var(--crate-motion-duration-fast) var(--crate-motion-easing),
+    color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+
+  & + &,
+  &:nth-child(n + 3) {
+    border: 0;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--crate-control-hover-bg);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--crate-accent-text) 38%, transparent);
+    outline-offset: -2px;
+  }
+
+  &.is-active {
+    grid-template-columns: 16px minmax(0, 1fr);
+    border-radius: 4px;
+    background: var(--picker-selected-bg);
+    color: var(--text-normal);
+  }
+}
+
+.reminder-date-picker .date-quick-button-icon {
+  grid-column: 1;
+  color: color-mix(in srgb, var(--text-faint) 76%, transparent);
+}
+
+.reminder-date-picker .date-quick-button-copy {
+  grid-column: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  strong {
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-medium);
+  }
+
+  small {
+    flex: 0 0 auto;
+    font-weight: var(--reminder-font-weight-normal);
+    line-height: 1.15;
+    text-align: right;
+  }
+}
+
+.reminder-date-picker .date-quick-button-check {
+  grid-column: 1;
+  color: var(--crate-accent-text);
+}
+
+.reminder-date-picker .date-quick-button.is-active .date-quick-button-copy {
+  strong {
+    color: var(--text-normal);
+  }
+
+  small {
+    color: color-mix(in srgb, var(--crate-accent-text) 68%, var(--text-muted));
+    opacity: 1;
+  }
+}
+
+.reminder-date-picker .picker-schedule-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 40%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2%, transparent);
+}
+
+.reminder-date-picker .picker-schedule-fields .picker-control-row {
+  display: grid;
+  min-height: var(--crate-picker-row-height);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  padding: 2px var(--picker-row-inline);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: text;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+
+  & + .picker-control-row {
+    border-top: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  }
+}
+
+.reminder-date-picker .picker-schedule-fields .picker-field-copy strong {
+  color: var(--text-normal);
+  font-weight: var(--reminder-font-weight-medium);
+}
+}

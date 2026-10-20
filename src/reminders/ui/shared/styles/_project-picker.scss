@@ -1,0 +1,85 @@
+// Project picker rows.
+@mixin styles {
+
+.project-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: var(--crate-picker-space-section) var(--crate-picker-space-inline) 2px;
+}
+
+.project-picker-row {
+  display: flex;
+  width: 100%;
+  min-height: var(--crate-picker-row-height);
+  align-items: center;
+  gap: 7px;
+  padding: 0 var(--picker-row-inline);
+  border: 0;
+  border-radius: var(--picker-row-radius);
+  color: var(--text-normal);
+  background: transparent;
+  box-shadow: none;
+  transition: border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+  -webkit-tap-highlight-color: transparent;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+    }
+  }
+
+  &.is-selected {
+    background: var(--picker-selected-bg);
+    color: var(--text-normal);
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--crate-focus-ring);
+    outline-offset: -2px;
+    box-shadow: none;
+  }
+}
+
+.project-picker-row .project-picker-dot {
+  width: 10px;
+  height: 10px;
+  box-shadow: none;
+}
+
+.project-picker-row-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: currentColor;
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.is-selected {
+    font-weight: var(--reminder-font-weight-medium);
+  }
+}
+
+.project-picker-row-check {
+  flex: 0 0 auto;
+  color: var(--crate-accent-text);
+}
+
+.project-picker-scroll {
+  min-height: 0;
+  max-height: calc(70dvh - 100px);
+  flex: 1;
+  overflow-y: auto;
+  overflow-scrolling: touch;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  scroll-padding: 8px;
+  touch-action: pan-y;
+}
+}

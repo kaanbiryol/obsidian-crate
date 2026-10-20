@@ -13,6 +13,10 @@ async function readEditorStyles() {
     './shared/styles/_editor-fields.scss',
     './shared/styles/_editor-actions.scss',
     './shared/styles/_pickers.scss',
+    './shared/styles/_picker-fields.scss',
+    './shared/styles/_date-picker.scss',
+    './shared/styles/_recurrence-picker.scss',
+    './shared/styles/_project-picker.scss',
   ];
   return (await Promise.all(paths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))).join('\n');
 }
@@ -150,7 +154,11 @@ describe('plugin reminder layout styles', () => {
       '../../ui/shared/styles/_modal-header.scss',
       './shared/styles/_editor-fields.scss',
       './shared/styles/_editor-actions.scss',
-    './shared/styles/_pickers.scss',
+      './shared/styles/_pickers.scss',
+      './shared/styles/_picker-fields.scss',
+      './shared/styles/_date-picker.scss',
+      './shared/styles/_recurrence-picker.scss',
+      './shared/styles/_project-picker.scss',
       './shared/styles/_shell.scss',
       './shared/styles/_projects.scss',
       './shared/styles/_project-detail.scss',

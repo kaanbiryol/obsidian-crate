@@ -1,0 +1,184 @@
+// Repeat picker frequency tabs, steppers and weekday buttons.
+@mixin styles {
+
+.recurrence-frequency-detail {
+  overflow: hidden;
+}
+
+.recurrence-frequency-detail-content {
+  padding-top: 4px;
+
+  .recurrence-day-list {
+    min-height: var(--crate-picker-row-height);
+    align-items: center;
+  }
+}
+
+.recurrence-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  padding-top: 8px;
+
+  .picker-repeat-remove {
+    margin-left: auto;
+  }
+}
+
+.reminder-recurrence-picker .picker-current-summary {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  min-height: 0;
+  font-size: var(--reminder-font-xs);
+  line-height: 1.4;
+
+  > .picker-current-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .picker-current-value {
+    align-items: center;
+
+    strong {
+      line-height: 1.4;
+    }
+  }
+}
+
+.recurrence-frequency-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
+}
+
+.recurrence-frequency-button {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: calc(var(--crate-radius-control) - 1px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+
+  & + & {
+    border-left: 0;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+      color: var(--text-normal);
+    }
+  }
+
+}
+
+.recurrence-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  margin: 0;
+  outline: 0;
+}
+
+.recurrence-option-row {
+  flex: 0 0 auto;
+}
+
+
+
+.recurrence-stepper-button {
+  --crate-icon-button-control-size: 28px;
+}
+
+.recurrence-stepper {
+  --stepper-button-size: 28px;
+
+  display: grid;
+  grid-template-columns: var(--stepper-button-size) 10ch var(--stepper-button-size);
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: auto;
+  // Align the visible icon with the time value, keeping its full hit area.
+  margin-inline-end: calc((var(--icon-s, 16px) - var(--stepper-button-size)) / 2);
+  justify-self: end;
+  font-size: var(--reminder-font-xs);
+  flex: 0 0 auto;
+}
+
+.recurrence-stepper-value {
+  min-width: 28px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
+  text-align: center;
+
+  small {
+    color: var(--text-muted);
+    font-size: inherit;
+    font-weight: var(--reminder-font-weight-normal);
+  }
+
+  &.is-ordinal {
+    min-width: 40px;
+  }
+}
+
+.recurrence-day-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.recurrence-day-button {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  height: 32px;
+  aspect-ratio: auto;
+  border: 1px solid transparent;
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
+  color: var(--text-muted);
+  font-size: var(--reminder-font-xxs);
+  font-weight: var(--reminder-font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(.is-selected) {
+      background: var(--crate-control-hover-bg);
+      color: var(--text-normal);
+    }
+  }
+
+  &.is-selected {
+    border-color: color-mix(in srgb, var(--crate-accent-text) 18%, transparent);
+    background: var(--picker-selected-bg);
+    color: var(--crate-accent-text);
+  }
+}
+}
