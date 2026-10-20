@@ -4,7 +4,7 @@ import { errorMessage } from '../../sync/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { renderSyncInterval } from './sync-interval';
-import { renderEncryptionSection } from './encryption-section';
+import { renderEncryptionSection } from './encryption/encryption-section';
 import { renderExclusionsSetting } from './exclusions-setting';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 

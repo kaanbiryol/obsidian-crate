@@ -854,7 +854,7 @@ code at the saved address and keep the existing local connection on failure.
 Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 `src/cloudflare/deployment/service.test.ts`,
 `src/sync/connection/self-hosted-connection.test.ts`, and the affected settings tests.
-`self-hosted-pairing.test.ts` and `ui/settings/self-hosted-errors.test.ts` check
+`self-hosted-pairing.test.ts` and `ui/settings/infrastructure/self-hosted-errors.test.ts` check
 typed setup failures, including address-update guidance and pairing status handling
 that does not depend on server error wording.
 Browser OAuth handoff and real hosted credentials still require manual acceptance.
@@ -985,7 +985,7 @@ Obsidian `app.css` to repeat the checks with the actual host stylesheet; it is
 used only locally and is not committed. The synthetic host also includes the
 modal settings-row selector that previously overrode the key field’s spacing.
 Physical Obsidian mobile and keyboard behavior still need
-manual verification. Unit tests in `src/ui/settings/encryption-section.test.ts`
+manual verification. Unit tests in `src/ui/settings/encryption/encryption-section.test.ts`
 cover automatic key-verification failure before setup and recovery of missing,
 damaged or incorrect local keys before resuming conversion. The optional saved-key
 check retains wrong-key, edit and stale-result coverage.

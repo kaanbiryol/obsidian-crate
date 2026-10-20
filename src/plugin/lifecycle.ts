@@ -18,7 +18,7 @@ import {
   createCloudflareUsageConnection,
   handleCloudflareOAuthProtocol,
 } from "../cloudflare/plugin-integration";
-import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
+import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';

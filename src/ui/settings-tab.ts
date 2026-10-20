@@ -4,14 +4,14 @@
 
 import { renderAppearanceSettings } from './settings/appearance-section';
 import { createSettingsDisclosure, createSettingsSectionHeading } from './settings/section-helpers';
-import { renderUsageSection } from './settings/usage-section';
-import { renderConnectionStatus } from './settings/connection-status';
+import { renderUsageSection } from './settings/infrastructure/usage-section';
+import { renderConnectionStatus } from './settings/infrastructure/connection-status';
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type CratePlugin from '../main';
-import { renderForgetServerSetting } from './settings/server-selection-setting';
-import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/config-section';
+import { renderForgetServerSetting } from './settings/infrastructure/server-selection-setting';
+import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/infrastructure/config-section';
 import { renderDevicesSection } from './settings/devices-section';
-import { renderInfrastructureSection, renderServerActions } from './settings/infrastructure-section';
+import { renderInfrastructureSection, renderServerActions } from './settings/infrastructure/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';

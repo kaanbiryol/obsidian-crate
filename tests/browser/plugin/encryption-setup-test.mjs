@@ -7,8 +7,8 @@ import { chromium, webkit, expect } from '@playwright/test';
 // Only the Obsidian host is mocked; key generation, verification and setup UI are production code.
 const { outputFiles } = await build({
   stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
-    import { renderEncryptionLoading, renderEncryptionSetup } from './src/ui/settings/encryption-setup-ui';
-    import { renderEncryptionManagement } from './src/ui/settings/encryption-manage-ui';
+    import { renderEncryptionLoading, renderEncryptionSetup } from './src/ui/settings/encryption/encryption-setup-ui';
+    import { renderEncryptionManagement } from './src/ui/settings/encryption/encryption-manage-ui';
     import { verifyRecoveryCode } from './src/encryption/recovery-verification';
     import { mountModalHeader } from './src/ui/plugin/mountModalHeader';
     import { createVaultKeyBundle, addReminderScope, generateRecoveryCode, sealRecoveryBundle } from './src/encryption/key-bundle';

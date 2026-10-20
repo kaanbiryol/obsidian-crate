@@ -21,8 +21,8 @@ const { outputFiles } = await build({
     import { openCloudflareAuthorizationModal } from './src/ui/cloudflare/authorization-modal';
     import { openCloudflareDeploymentModal } from './src/ui/cloudflare/deployment-modal';
     import { selectCloudflareServer } from './src/ui/cloudflare/server-picker-modal';
-    import { EncryptionResetModal } from './src/ui/settings/encryption-reset-modal';
-    import { renderEncryptionManagement } from './src/ui/settings/encryption-manage-ui';
+    import { EncryptionResetModal } from './src/ui/settings/encryption/encryption-reset-modal';
+    import { renderEncryptionManagement } from './src/ui/settings/encryption/encryption-manage-ui';
     import { WebAppPairingModal } from './src/ui/settings/web-app-pairing-modal';
     ${obsidianDomHelpers}
     const row = container => new Setting(container).setName('Recovery key').setDesc('Keep a copy for recovery.').addButton(button => button.setButtonText('Copy'));

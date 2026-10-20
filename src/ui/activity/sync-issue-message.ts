@@ -1,5 +1,5 @@
 import type { SyncIssue } from '../../sync/types';
-import { syncConnectionFailureMessage } from '../settings/self-hosted-errors';
+import { syncConnectionFailureMessage } from '../settings/infrastructure/self-hosted-errors';
 
 interface IssueExplanation { summary: string; recovery: string }
 

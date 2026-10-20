@@ -94,7 +94,7 @@ async function loadLifecycleModule() {
 		createCloudflareUsageConnection: vi.fn(() => ({})),
 		handleCloudflareOAuthProtocol,
 	}));
-	vi.doMock('../cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
+	vi.doMock('../ui/cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
 
 	return import('./lifecycle');
 }

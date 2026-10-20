@@ -3,7 +3,7 @@ import { ResetBlockedError } from './server-reset/reset-errors';
 import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment/types';
 import type { ConnectionTestResult } from '../sync/types';
 import { SyncApiClient, HttpError } from '../sync/api';
-import { checkAndRecoverUpdate } from './deployment/recovery-ui';
+import { checkAndRecoverUpdate } from '../ui/cloudflare/recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment/fence';
 import { Notice, Platform } from 'obsidian';
 import { CloudflareReauthorizationRequired } from './oauth/client';
