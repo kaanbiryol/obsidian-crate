@@ -1,8 +1,11 @@
 import type CratePlugin from './CratePlugin';
 
+// Keyed by instance so a reloaded plugin never sees its predecessor's state.
 const lifetimes = new WeakMap<CratePlugin, AbortController>();
 const syncReadiness = new WeakMap<CratePlugin, Promise<void>>();
 
+/** Work that starts before onload begins a lifecycle gets a provisional signal,
+ * which the next beginPluginLifecycle aborts because that lifecycle did not start it. */
 export function getPluginLifecycleSignal(plugin: CratePlugin): AbortSignal {
 	let controller = lifetimes.get(plugin);
 	if (!controller) {
@@ -20,8 +23,10 @@ export function beginPluginLifecycle(plugin: CratePlugin): AbortSignal {
 }
 
 export function endPluginLifecycle(plugin: CratePlugin): void {
-	getPluginLifecycleSignal(plugin);
-	lifetimes.get(plugin)!.abort();
+	// Later lookups must see an ended lifecycle even if none was begun.
+	const controller = lifetimes.get(plugin) ?? new AbortController();
+	controller.abort();
+	lifetimes.set(plugin, controller);
 }
 
 export function setSyncReady(plugin: CratePlugin, ready: Promise<void>): void {
