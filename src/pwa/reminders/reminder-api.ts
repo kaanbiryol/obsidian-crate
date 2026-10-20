@@ -46,15 +46,14 @@ export function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths
 	return [...notes.keys()].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).flatMap(path => notes.get(path)!);
 }
 
-const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 1000;
+// The Worker asks for one second; a proxy that strips the header must not cause a request burst.
+const DEFAULT_REMINDER_INDEX_RETRY_DELAY_MS = 1_000;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;
 const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 10 * 60_000;
 
 function retryDelayMs(response: Response): number {
-	const retryAfter = response.headers.get('Retry-After');
-	if (!retryAfter) return 0;
-	const seconds = Number(retryAfter);
-	if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+	const seconds = Number(response.headers.get('Retry-After') ?? '');
+	if (!Number.isFinite(seconds) || seconds <= 0) return DEFAULT_REMINDER_INDEX_RETRY_DELAY_MS;
 	return Math.min(seconds * 1000, MAX_REMINDER_INDEX_RETRY_DELAY_MS);
 }
 
@@ -68,18 +67,15 @@ export async function fetchReadyReminderList(
 	headers: Headers,
 	onProgress?: (remaining: number, total: number) => void,
 ): Promise<Response> {
-	let totalWaitMs = 0;
-	for (let attempt = 0; attempt < MAX_REMINDER_INDEX_WARMUP_REQUESTS; attempt += 1) {
+	for (let totalWaitMs = 0; ;) {
 		const response = await apiFetch(path, { headers });
 		if (response.status !== 202) return response;
 		const progress = await response.json() as { remainingFiles?: number; totalFiles?: number };
 		onProgress?.(progress.remainingFiles ?? 0, progress.totalFiles ?? 0);
 		const waitMs = retryDelayMs(response);
-		if (waitMs > 0) {
-			if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;
-			await delay(waitMs);
-			totalWaitMs += waitMs;
-		}
+		if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;
+		await delay(waitMs);
+		totalWaitMs += waitMs;
 	}
 	throw new Error('Reminder index is still preparing. Try again in a moment.');
 }

@@ -5,28 +5,32 @@ describe('fetchReadyReminderList', () => {
 	afterEach(() => vi.useRealTimers());
 
 	it('retries bounded cache-warming responses until the full list is ready', async () => {
+		vi.useFakeTimers();
 		const apiFetch = vi.fn()
 			.mockResolvedValueOnce(new Response(JSON.stringify({ warming: true }), { status: 202 }))
 			.mockResolvedValueOnce(new Response(JSON.stringify({ warming: true }), { status: 202 }))
 			.mockResolvedValueOnce(new Response(JSON.stringify({ reminders: [] }), { status: 200 }));
 
-		const response = await fetchReadyReminderList(apiFetch, '/reminders/list', new Headers());
+		const result = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers());
+		await vi.advanceTimersByTimeAsync(2_000);
 
-		expect(response.status).toBe(200);
+		expect((await result).status).toBe(200);
 		expect(apiFetch).toHaveBeenCalledTimes(3);
 	});
 
-	it('stops after the warm-up request limit', async () => {
+	it('waits one second between requests when Retry-After is missing', async () => {
+		vi.useFakeTimers();
 		const apiFetch = vi.fn().mockImplementation(async () =>
 			new Response(JSON.stringify({ warming: true }), { status: 202 }),
 		);
 
-		await expect(fetchReadyReminderList(
-			apiFetch,
-			'/reminders/list',
-			new Headers(),
-		)).rejects.toThrow('Reminder index is still preparing. Try again in a moment.');
-		expect(apiFetch).toHaveBeenCalledTimes(1000);
+		const result = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers());
+		const rejection = expect(result).rejects.toThrow('Reminder index is still preparing. Try again in a moment.');
+		await vi.advanceTimersByTimeAsync(999);
+		expect(apiFetch).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(600_000);
+		await rejection;
+		expect(apiFetch).toHaveBeenCalledTimes(601);
 	});
 
 	it('caps the total server-requested warm-up delay', async () => {
