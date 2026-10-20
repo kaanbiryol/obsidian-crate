@@ -26,6 +26,8 @@ test('packed npx installation starts without repository files and preserves data
 	assert.ok(!paths.some(path => /node_modules\/.*(workerd|sharp)/.test(path)));
 	assert.ok(paths.includes('npm-shrinkwrap.json'));
 	assert.ok(!paths.some(path => path.includes('.test.') || path.includes('node_modules') || path.includes('.remote/') || path.includes('build-worker')));
+	// Server tests and Docker image scripts stay in the repository.
+	assert.ok(!paths.some(path => /^(test|docker)\//.test(path)));
 	const tarball = join(directory, packed.filename);
 	const cache = join(directory, 'cache');
 	const { stdout: help } = await exec('npx', ['--yes', '--cache', cache, '--package', tarball, 'crate-server', '--help'], { cwd: directory, maxBuffer: 1024 * 1024 });

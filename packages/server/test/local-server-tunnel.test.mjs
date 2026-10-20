@@ -7,8 +7,8 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, remotePaths, setupRemoteAccess } from '../packages/server/src/local-server-tunnel.mjs';
-import { tunnelEnvironment } from '../packages/server/src/local-server-process.mjs';
+import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, remotePaths, setupRemoteAccess } from '../src/local-server-tunnel.mjs';
+import { tunnelEnvironment } from '../src/local-server-process.mjs';
 
 const tunnelId = '11111111-1111-4111-8111-111111111111';
 const credentials = { TunnelID: tunnelId, AccountTag: 'test-account', TunnelSecret: Buffer.alloc(32).toString('base64') };
@@ -102,7 +102,7 @@ if (args.includes('run')) {
 	await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
 	const port = socket.address().port;
 	await new Promise(resolve => socket.close(resolve));
-	const cli = new URL('./local-server.mjs', import.meta.url).pathname;
+	const cli = new URL('../../../scripts/local-server.mjs', import.meta.url).pathname;
 	let child;
 	let tunnelPid;
 	t.after(async () => {

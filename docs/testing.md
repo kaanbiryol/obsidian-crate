@@ -333,9 +333,11 @@ the original startup error, and verifies HTTP draining before storage disposal.
 `npm run test:server-package`
 installs a packed artifact through npx in an isolated cache and exercises real
 HTTP and storage across changing public URLs, using a fake connector.
-Production launcher modules live in `packages/server/src/`; these tests cover
-both repository execution through the thin script entry and the complete package
-copied into the installed `scripts/` directory.
+Production launcher modules live in `packages/server/src/`. Their tests live in
+`packages/server/test/`, which the packager does not ship; `npm run test:local-server`
+runs every `*.test.mjs` there, so new files need no registration. Together with
+`test:server-package` they cover both repository execution through the thin script
+entry and the complete package copied into the installed `scripts/` directory.
 Pairing tests cover expiry, concurrent redemption, and hash-only credential
 storage. Readiness tests reject stale instance identities and retry DNS failures.
 Backup tests restore R2 data, device credentials, and a real scheduled Durable

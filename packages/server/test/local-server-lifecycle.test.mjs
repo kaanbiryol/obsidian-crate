@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { closeLocalServerResources } from '../packages/server/src/local-server-lifecycle.mjs';
+import { closeLocalServerResources } from '../src/local-server-lifecycle.mjs';
 
 test('shutdown attempts later resources after any cleanup failure', async t => {
 	for (const failed of ['readiness', 'control', 'tunnel', 'server', 'runtime']) {

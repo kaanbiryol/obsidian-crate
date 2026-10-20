@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../packages/server/src/local-server-backup.mjs';
-import { issueLocalDevice, openLocalRuntime } from '../packages/server/src/local-server-runtime.mjs';
+import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../src/local-server-backup.mjs';
+import { issueLocalDevice, openLocalRuntime } from '../src/local-server-runtime.mjs';
 
 test('verified backup restores files, credentials and durable alarm storage into a fresh server', { timeout: 60_000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'crate-backup-test-'));
@@ -15,7 +15,7 @@ test('verified backup restores files, credentials and durable alarm storage into
 		runtime = await openLocalRuntime({ dataDir: source });
 		const credential = await issueLocalDevice(runtime.db, 'Test');
 		await (await runtime.mf.getR2Bucket('BUCKET')).put('backup-test', 'persistent bytes');
-		const parser = await readFile(new URL('../src/cloudflare/worker/reminders-web/reminder-cache/types.ts', import.meta.url), 'utf8');
+		const parser = await readFile(new URL('../../../src/cloudflare/worker/reminders-web/reminder-cache/types.ts', import.meta.url), 'utf8');
 		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parser)[1]);
 		await runtime.db.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('backup.txt', 'backup.txt', 'backup-test')").run();
 		await runtime.db.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();

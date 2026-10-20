@@ -16,8 +16,8 @@ RUN apt-get update \
 WORKDIR /opt/crate
 COPY --from=build /build/dist/server ./
 COPY --from=build --chmod=755 /tmp/cloudflared /usr/local/bin/cloudflared
-COPY --chmod=755 scripts/docker-entrypoint.sh /usr/local/bin/crate-entrypoint
-COPY --chmod=755 scripts/docker-cli.sh /usr/local/bin/crate
+COPY --chmod=755 packages/server/docker/docker-entrypoint.sh /usr/local/bin/crate-entrypoint
+COPY --chmod=755 packages/server/docker/docker-cli.sh /usr/local/bin/crate
 RUN mkdir /data && chown node:node /data
 USER node
 ENV CRATE_DOCKER=1

@@ -143,7 +143,7 @@ jobs:
       - name: Verify Reading extraction, server and shortcut contracts
         run: npm run test:reading-server
       - name: Verify persistent local hosting
-        run: node --test scripts/local-server.test.mjs scripts/local-server-lifecycle.test.mjs scripts/local-server-tunnel.test.mjs scripts/local-server-quick.test.mjs scripts/local-server-pairing.test.mjs scripts/local-server-backup.test.mjs
+        run: node --test "packages/server/test/*.test.mjs"
       - name: Verify standalone npx server package
         run: npm run test:server-package
 

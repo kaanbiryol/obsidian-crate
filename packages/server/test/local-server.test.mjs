@@ -9,8 +9,8 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin } from '../packages/server/src/local-server-runtime.mjs';
-import { listenLocalServer } from '../packages/server/src/local-server-http.mjs';
+import { openLocalRuntime, issueLocalDevice, normalizeLocalOrigin } from '../src/local-server-runtime.mjs';
+import { listenLocalServer } from '../src/local-server-http.mjs';
 
 test('local origin requires HTTPS except on the server computer', () => {
 	assert.equal(normalizeLocalOrigin('http://localhost:8787/'), 'http://localhost:8787');
@@ -41,7 +41,7 @@ test('CLI initializes a device offline and releases the directory on SIGTERM', {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-cli-'));
 	let child;
 	try {
-		const cli = new URL('./local-server.mjs', import.meta.url).pathname;
+		const cli = new URL('../../../scripts/local-server.mjs', import.meta.url).pathname;
 		const { stdout } = await promisify(execFile)(process.execPath, [cli, 'add-device', '--name', 'CLI test', '--data-dir', dataDir]);
 		const token = /Access token \(shown once\): ([a-f0-9]{64})/.exec(stdout)?.[1];
 		assert.ok(token, 'CLI must issue a private per-device credential');
@@ -79,7 +79,7 @@ test('CLI initializes a device offline and releases the directory on SIGTERM', {
 
 test('interrupting CLI during storage startup still releases its lock', { timeout: 20_000 }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-interrupt-'));
-	const child = spawn(process.execPath, [new URL('./local-server.mjs', import.meta.url).pathname, 'start', '--data-dir', dataDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+	const child = spawn(process.execPath, [new URL('../../../scripts/local-server.mjs', import.meta.url).pathname, 'start', '--data-dir', dataDir], { stdio: ['ignore', 'pipe', 'pipe'] });
 	const exited = once(child, 'exit');
 	let output = '';
 	let errors = '';
@@ -151,7 +151,7 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		// Persist a real ReminderAlarm with verified authority. With no push
 		// recipients it completes locally when its alarm wakes after restart.
 		const due = new Date(Date.now() + 3000).toISOString();
-		const parserSource = await readFile(new URL('../src/cloudflare/worker/reminders-web/reminder-cache/types.ts', import.meta.url), 'utf8');
+		const parserSource = await readFile(new URL('../../../src/cloudflare/worker/reminders-web/reminder-cache/types.ts', import.meta.url), 'utf8');
 		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parserSource)[1]);
 		const file = await runtime.db.prepare("SELECT storage_key FROM files WHERE path = 'hello.txt'").first();
 		await runtime.db.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();

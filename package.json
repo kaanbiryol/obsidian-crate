@@ -29,7 +29,7 @@
 		"build:server": "npm run build:worker && node scripts/package-server.mjs",
 		"pack:server": "npm run build:server && npm pack ./dist/server --pack-destination ./dist",
 		"server": "node scripts/local-server.mjs",
-		"test:local-server": "npm run build:worker && node --test scripts/local-server.test.mjs scripts/local-server-lifecycle.test.mjs scripts/local-server-tunnel.test.mjs scripts/local-server-quick.test.mjs scripts/local-server-pairing.test.mjs scripts/local-server-backup.test.mjs",
+		"test:local-server": "npm run build:worker && node --test \"packages/server/test/*.test.mjs\"",
 		"test:server-package": "npm run build:server && node --test scripts/server-package.test.mjs",
 		"test:docker": "docker compose build && node --test scripts/docker-server.test.mjs",
 		"build:plugin": "vite build",

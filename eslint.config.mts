@@ -42,7 +42,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['scripts/**/*.mjs', 'tests/browser/**/*.mjs', 'packages/server/src/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
+		files: ['scripts/**/*.mjs', 'tests/browser/**/*.mjs', 'packages/server/{src,test}/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
 		extends: [tseslint.configs.disableTypeChecked],
 		languageOptions: {
 			globals: {
@@ -94,7 +94,7 @@ export default tseslint.config(
 		files: [
 			'scripts/**/*.{js,mjs}',
 			'tests/browser/**/*.mjs',
-			'packages/server/src/**/*.mjs',
+			'packages/server/{src,test}/**/*.mjs',
 			'site/**/*.js',
 			'src/cloudflare/worker/**/*.{ts,tsx}',
 			'src/pwa/**/*.{ts,tsx}',

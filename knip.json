@@ -5,6 +5,8 @@
 		"src/cloudflare/worker/index.ts!",
 		"src/pwa/main.tsx!",
 		"scripts/*.mjs",
+		"packages/server/src/crate-server.mjs",
+		"packages/server/test/*.test.mjs",
 		"tests/browser/**/*.mjs",
 		"tests/editor-contract/fixture.tsx",
 		"tests/editor-contract/*.spec.ts",
@@ -19,7 +21,7 @@
 		"scripts/*.mjs",
 		"tests/browser/**/*.mjs",
 		"*.{js,mjs,mts,ts}",
-		"packages/server/src/**/*.mjs",
+		"packages/server/{src,test}/**/*.mjs",
 		"!src/**/*-test-harness.ts!",
 		"!src/test/**!",
 		"tests/reading-extraction/*.ts"
