@@ -105,4 +105,25 @@ describe('recurrenceCalculator', () => {
 
     vi.useRealTimers();
   });
+
+  describe('recurrence end conditions', () => {
+    const due = new Date('2026-03-10T09:00:00.000Z');
+    const daily = { frequency: 'daily' as const, hour: 9, minute: 0, timezone: 'UTC' };
+
+    it('stops after a date-only end date in the rule timezone', () => {
+      expect(calculateNextOccurrence(due, { ...daily, endDate: '2026-03-11' })?.toISOString()).toBe('2026-03-11T09:00:00.000Z');
+      expect(calculateNextOccurrence(due, { ...daily, endDate: '2026-03-10' })).toBeNull();
+    });
+
+    it('compares a timestamped end date as an instant', () => {
+      expect(calculateNextOccurrence(due, { ...daily, endDate: '2026-03-11T09:00:00Z' })?.toISOString()).toBe('2026-03-11T09:00:00.000Z');
+      expect(calculateNextOccurrence(due, { ...daily, endDate: '2026-03-11T08:59:59Z' })).toBeNull();
+    });
+
+    it('stops when the completed count reaches the occurrence count', () => {
+      expect(calculateNextOccurrence(due, { ...daily, count: 3 }, 1)?.toISOString()).toBe('2026-03-11T09:00:00.000Z');
+      expect(calculateNextOccurrence(due, { ...daily, count: 3 }, 2)).toBeNull();
+      expect(calculateNextOccurrence(due, { ...daily, count: 1 })).toBeNull();
+    });
+  });
 });
