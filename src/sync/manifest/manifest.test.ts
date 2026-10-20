@@ -161,6 +161,16 @@ describe('LocalManifest', () => {
 		expect(readPersisted(adapter)).toMatchObject({ generation: 2, files: { 'a.md': { hash: 'a'.repeat(64) }, 'b.md': { hash: 'b'.repeat(64) } } });
 	});
 
+	it('stays writable after waiting for queued saves', async () => {
+		const entry = { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z' };
+		manifest.setEntry('a.md', entry);
+		void manifest.save();
+		await manifest.whenSaved();
+		manifest.setEntry('b.md', { ...entry, hash: 'b'.repeat(64) });
+		await manifest.save();
+		expect(readPersisted(adapter)).toMatchObject({ files: { 'b.md': { hash: 'b'.repeat(64) } } });
+	});
+
 	it('serializes overlapping saves', async () => {
 		let active = 0;
 		let peak = 0;

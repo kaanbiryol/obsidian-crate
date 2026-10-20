@@ -736,9 +736,10 @@ export class SyncEngine {
 		finally { this.activeWork.delete(active); finish(); }
 	}
 
+	/** After destroy, resolves once shutdown drains; before it, waits for accepted work without closing stores. */
 	async waitForIdle(): Promise<void> {
 		if (this.shutdownTask) return this.shutdownTask;
-		await Promise.allSettled([...this.activeWork, this.queueController.waitForIdle(), this.localManifest.close()]);
+		await Promise.allSettled([...this.activeWork, this.queueController.waitForIdle(), this.localManifest.whenSaved()]);
 		// A shutdown begun during this wait may own additional accepted work.
 		return this.shutdownTask ?? undefined;
 	}
