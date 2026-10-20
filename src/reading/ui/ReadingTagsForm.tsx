@@ -1,6 +1,7 @@
 import React, { useId, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
+import { useOpenReadingForm } from './open-forms';
 
 function parseTags(value: string): string[] {
 	return value.split(/[\s,]+/u).map(tag => tag.replace(/^#+/, '')).filter(Boolean);
@@ -10,6 +11,7 @@ export function ReadingTagsForm({ id: formId, initialTags, busy, error, onSave }
 	id: string; initialTags: string[]; busy: boolean; error: string | null;
 	onSave: (tags: string[]) => void;
 }) {
+	useOpenReadingForm();
 	const [tags, setTags] = useState(() => [...new Set(initialTags)]);
 	const [draft, setDraft] = useState('');
 	const input = useRef<HTMLInputElement>(null);
