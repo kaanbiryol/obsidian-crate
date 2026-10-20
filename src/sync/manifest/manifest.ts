@@ -15,11 +15,10 @@ import { createLogger } from '../logger';
 import type { FileManifest, FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 
+import { syncStoragePaths } from './storage-paths';
+
 const logger = createLogger('Manifest');
 
-const MANIFEST_FILENAME = 'file-manifest.json';
-const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
-const MANIFEST_LOG_FILENAME = 'file-manifest.log';
 // Compact into a full checkpoint once replaying the log costs about as much as
 // a small rewrite; the log also caps the work of the next load.
 const MAX_LOG_BYTES = 8 * 1024 * 1024;
@@ -60,10 +59,11 @@ export class LocalManifest {
 
 	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
 		this.app = app;
-		this.uploadJournal = new UploadJournal(app.vault.adapter, `${pluginManifest.dir}/pending-uploads`, authority);
-		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
-		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
-		this.logPath = `${pluginManifest.dir}/${MANIFEST_LOG_FILENAME}`;
+		const paths = syncStoragePaths(pluginManifest.dir!);
+		this.uploadJournal = new UploadJournal(app.vault.adapter, paths.uploadJournal, authority);
+		this.manifestPath = paths.manifest;
+		this.tmpPath = paths.manifestTmp;
+		this.logPath = paths.manifestLog;
 		this.manifest = { version: 1, files: createPathRecord() };
 		this.dirty = false;
 	}

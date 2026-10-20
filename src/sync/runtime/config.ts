@@ -5,6 +5,7 @@ import { requireNormalizedWorkerUrl } from "../connection/worker-url";
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { SyncSettings } from '../settings';
+import { syncStoragePaths, retiredUploadPath, previousCheckpointCopy } from '../manifest/storage-paths';
 
 interface ApplyInfrastructureConfigInput {
   workerUrl: string;
@@ -16,21 +17,21 @@ interface ApplyInfrastructureConfigInput {
 export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   const adapter = plugin.app.vault.adapter;
-  const mainPath = `${plugin.manifest.dir}/file-manifest.json`;
+  const paths = syncStoragePaths(plugin.manifest.dir!);
   const checkpoints: Array<{ path: string; content: string; backupPath?: string }> = [];
-  for (const path of [mainPath, `${mainPath}.tmp`, `${plugin.manifest.dir}/file-manifest.log`]) {
+  for (const path of [paths.manifest, paths.manifestTmp, paths.manifestLog]) {
     if (await adapter.exists(path)) {
       signal?.throwIfAborted();
       checkpoints.push({ path, content: await adapter.read(path) });
     }
     signal?.throwIfAborted();
   }
-  const journalDirectory = `${plugin.manifest.dir}/pending-uploads`;
+  const journalDirectory = paths.uploadJournal;
   if (await adapter.exists(journalDirectory)) {
     const listing = await adapter.list(journalDirectory);
     for (const path of listing.files) {
       signal?.throwIfAborted();
-      checkpoints.push({ path, content: await adapter.read(path), backupPath: `${plugin.manifest.dir}/upload-${path.split('/').at(-1)!}` });
+      checkpoints.push({ path, content: await adapter.read(path), backupPath: retiredUploadPath(plugin.manifest.dir!, path.split('/').at(-1)!) });
     }
   }
   // Preserve both generations for investigation/recovery before invalidating
@@ -38,7 +39,7 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
   const recoveryId = crypto.randomUUID();
   for (const checkpoint of checkpoints) {
     signal?.throwIfAborted();
-    const backup = `${checkpoint.backupPath ?? checkpoint.path}.previous-${recoveryId}`;
+    const backup = previousCheckpointCopy(checkpoint.backupPath ?? checkpoint.path, recoveryId);
     await adapter.write(backup, checkpoint.content);
     signal?.throwIfAborted();
     if (await adapter.read(backup) !== checkpoint.content) throw new Error('Could not verify the previous sync checkpoint backup');

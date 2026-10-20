@@ -5,10 +5,9 @@ import { validateUploadIntent, type JournalUpload } from './upload-intent';
 import { UPLOAD_JOURNAL_VERSION } from './upload-journal';
 import type { SyncState } from '../types';
 import { sha256Hex } from '../../platform/sha256';
+import { RETIRED_UPLOAD_BACKUP } from '../manifest/storage-paths';
 
 const DAY = 24 * 60 * 60 * 1000;
-const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const backupName = new RegExp(`^upload-(e1_[0-9]{8}_${uuid})\\.json\\.previous-${uuid}$`);
 const logger = createLogger('Checkpoint cleanup');
 
 /** Retired upload copies are redundant only when ALL saved bytes still exist locally.
@@ -22,7 +21,7 @@ export async function pruneCheckpointBackups(adapter: DataAdapter, directory: st
 	for (const path of listing.files) {
 		if (signal.aborted) break;
 		if (!path.startsWith(`${directory}/`)) continue;
-		const match = backupName.exec(path.slice(directory.length + 1));
+		const match = RETIRED_UPLOAD_BACKUP.exec(path.slice(directory.length + 1));
 		if (!match) continue;
 		try {
 			const original = await adapter.read(path);
