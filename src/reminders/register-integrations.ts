@@ -23,19 +23,19 @@ export async function registerReminderIntegrations(plugin: CratePlugin): Promise
 	const queryProcessor = new ReminderQueryInjector(plugin);
 	plugin.registerMarkdownCodeBlockProcessor(
 		'reminders',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onNewBlock(source, el, ctx),
+		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders', source, el, ctx),
 	);
 	plugin.registerMarkdownCodeBlockProcessor(
 		'reminders-tasks',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onNewBlock(source, el, ctx),
+		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders', source, el, ctx),
 	);
 	plugin.registerMarkdownCodeBlockProcessor(
 		'reminders-today',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onTodayBlock(source, el, ctx),
+		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders-today', source, el, ctx),
 	);
 	plugin.registerMarkdownCodeBlockProcessor(
 		'reminders-upcoming',
-		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onUpcomingBlock(source, el, ctx),
+		(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onBlock('reminders-upcoming', source, el, ctx),
 	);
 
 	try {

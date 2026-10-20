@@ -19,8 +19,6 @@ describe('reminders block options', () => {
 		expect(blockInfo).toEqual({
 			content: 'project: Work\nshow-completed: true',
 			type: 'reminders-upcoming',
-			isToday: false,
-			isUpcoming: true,
 		});
 	});
 
@@ -30,7 +28,7 @@ describe('reminders block options', () => {
 		expect(isRemindersBlockStart('```tasks')).toBe(false);
 	});
 
-	it('parses live-preview options for special reminders block types', () => {
+	it('parses options for special reminders block types', () => {
 		const todayBlock = extractRemindersBlockInfo('```reminders-today\nproject: Work\n```');
 		const upcomingBlock = extractRemindersBlockInfo('```reminders-upcoming\nproject: Work\n```');
 
@@ -39,12 +37,26 @@ describe('reminders block options', () => {
 		expect(parseRemindersBlockOptions(todayBlock!)).toMatchObject({
 			showToday: true,
 			showUpcoming: false,
-			projectFilter: undefined,
+			projectFilter: 'Work',
 		});
 		expect(parseRemindersBlockOptions(upcomingBlock!)).toMatchObject({
 			showToday: false,
 			showUpcoming: true,
 			projectFilter: 'Work',
+		});
+	});
+
+	it('parses the same options from reading view block sources', () => {
+		expect(parseRemindersBlockOptions({ type: 'reminders', content: 'project: Work\nshow-completed: true' })).toEqual({
+			projectFilter: 'Work',
+			showCompleted: true,
+			showToday: false,
+			showUpcoming: false,
+		});
+		expect(parseRemindersBlockOptions({ type: 'reminders-today', content: '' })).toEqual({
+			showCompleted: false,
+			showToday: true,
+			showUpcoming: false,
 		});
 	});
 

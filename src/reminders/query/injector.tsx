@@ -13,7 +13,7 @@ import {
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";
-import { parseQuery } from "./queryOptions";
+import { parseRemindersBlockOptions, type RemindersBlockType } from "./remindersBlockOptions";
 
 export class ReminderQueryInjector {
   private readonly plugin: CratePlugin;
@@ -22,15 +22,15 @@ export class ReminderQueryInjector {
     this.plugin = plugin;
   }
 
-  onNewBlock(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-    const parsed = parseQuery(source);
+  onBlock(type: RemindersBlockType, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+    const options = parseRemindersBlockOptions({ type, content: source });
 
     const sectionInfo = ctx.getSectionInfo(el);
-    const preferenceKey = buildQueryPreferenceKey(ctx.sourcePath, source, sectionInfo, "reminders");
+    const preferenceKey = buildQueryPreferenceKey(ctx.sourcePath, source, sectionInfo, type);
     const savedPreference = preferenceKey
       ? this.plugin.remindersSettings.queryViewPreferences[preferenceKey]?.showCompleted
       : undefined;
-    const effectiveShowCompleted = savedPreference ?? parsed.showCompleted;
+    const effectiveShowCompleted = savedPreference ?? options.showCompleted;
 
     const toggleShowCompleted = preferenceKey
       ? this.createPreferenceSaver(preferenceKey)
@@ -41,65 +41,10 @@ export class ReminderQueryInjector {
       this.plugin,
       RemindersList,
       {
-        projectFilter: parsed.projectFilter,
+        projectFilter: options.projectFilter,
         showCompleted: effectiveShowCompleted,
-        showToday: parsed.showToday,
-        onToggleShowCompleted: toggleShowCompleted,
-      }
-    );
-    ctx.addChild(child);
-  }
-
-  onTodayBlock(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-    const parsed = parseQuery(source);
-
-    const sectionInfo = ctx.getSectionInfo(el);
-    const preferenceKey = buildQueryPreferenceKey(ctx.sourcePath, source, sectionInfo, "reminders-today");
-    const savedPreference = preferenceKey
-      ? this.plugin.remindersSettings.queryViewPreferences[preferenceKey]?.showCompleted
-      : undefined;
-    const effectiveShowCompleted = savedPreference ?? parsed.showCompleted;
-
-    const toggleShowCompleted = preferenceKey
-      ? this.createPreferenceSaver(preferenceKey)
-      : undefined;
-
-    const child = new ReactRenderer(
-      el,
-      this.plugin,
-      RemindersList,
-      {
-        projectFilter: parsed.projectFilter, // Show all projects unless filtered
-        showCompleted: effectiveShowCompleted,
-        showToday: true,
-        onToggleShowCompleted: toggleShowCompleted,
-      }
-    );
-    ctx.addChild(child);
-  }
-
-  onUpcomingBlock(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-    const parsed = parseQuery(source);
-
-    const sectionInfo = ctx.getSectionInfo(el);
-    const preferenceKey = buildQueryPreferenceKey(ctx.sourcePath, source, sectionInfo, "reminders-upcoming");
-    const savedPreference = preferenceKey
-      ? this.plugin.remindersSettings.queryViewPreferences[preferenceKey]?.showCompleted
-      : undefined;
-    const effectiveShowCompleted = savedPreference ?? parsed.showCompleted;
-
-    const toggleShowCompleted = preferenceKey
-      ? this.createPreferenceSaver(preferenceKey)
-      : undefined;
-
-    const child = new ReactRenderer(
-      el,
-      this.plugin,
-      RemindersList,
-      {
-        projectFilter: parsed.projectFilter,
-        showCompleted: effectiveShowCompleted,
-        showUpcoming: true,
+        showToday: options.showToday,
+        showUpcoming: options.showUpcoming,
         onToggleShowCompleted: toggleShowCompleted,
       }
     );
@@ -130,7 +75,7 @@ function buildQueryPreferenceKey(
   filePath: string,
   source: string,
   sectionInfo: MarkdownSectionInformation | null,
-  blockType: "reminders" | "reminders-today" | "reminders-upcoming",
+  blockType: RemindersBlockType,
 ): string | undefined {
   if (!filePath || !sectionInfo) {
     return undefined;

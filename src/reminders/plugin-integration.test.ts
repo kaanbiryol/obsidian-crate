@@ -53,9 +53,7 @@ const reminderIndexFlushDeferredScans = vi.fn(async () => {});
 const reminderIndexFactory = vi.fn();
 const createMarkdownWriter = vi.fn();
 const createReminderRepository = vi.fn();
-const reminderQueryOnNewBlock = vi.fn();
-const reminderQueryOnTodayBlock = vi.fn();
-const reminderQueryOnUpcomingBlock = vi.fn();
+const reminderQueryOnBlock = vi.fn();
 const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
 const recoverMoves = vi.fn(async (): Promise<string[]> => []);
@@ -94,9 +92,7 @@ async function loadPluginIntegrationModule() {
 	}));
 	vi.doMock('./query/injector', () => ({
 		ReminderQueryInjector: class ReminderQueryInjector {
-			onNewBlock = reminderQueryOnNewBlock;
-			onTodayBlock = reminderQueryOnTodayBlock;
-			onUpcomingBlock = reminderQueryOnUpcomingBlock;
+			onBlock = reminderQueryOnBlock;
 		},
 	}));
 	vi.doMock('./query/remindersBlockLivePreview', () => ({
@@ -178,9 +174,7 @@ beforeEach(() => {
 	reminderIndexFactory.mockReset();
 	createMarkdownWriter.mockReset();
 	createReminderRepository.mockReset();
-	reminderQueryOnNewBlock.mockReset();
-	reminderQueryOnTodayBlock.mockReset();
-	reminderQueryOnUpcomingBlock.mockReset();
+	reminderQueryOnBlock.mockReset();
 	createRemindersBlockExtension.mockReset();
 	registerReminderCommands.mockReset();
 
@@ -236,6 +230,10 @@ describe('initializeReminders', () => {
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
+		for (const [language, processor] of plugin.registerMarkdownCodeBlockProcessor.mock.calls as Array<[string, (source: string, el: unknown, ctx: unknown) => void]>) {
+			processor('source', 'el', 'ctx');
+			expect(reminderQueryOnBlock).toHaveBeenLastCalledWith(language === 'reminders-tasks' ? 'reminders' : language, 'source', 'el', 'ctx');
+		}
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
 		expect(plugin.registerView).toHaveBeenCalledWith('reminders-view', expect.any(Function));
 		expect(plugin.addRibbonIcon).toHaveBeenCalledWith('crate-logo', 'Open reminders', expect.any(Function));

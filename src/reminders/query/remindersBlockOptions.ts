@@ -6,13 +6,11 @@ const REMINDERS_BLOCK_TYPES = [
   "reminders-upcoming",
 ] as const;
 
-type RemindersBlockType = (typeof REMINDERS_BLOCK_TYPES)[number];
+export type RemindersBlockType = (typeof REMINDERS_BLOCK_TYPES)[number];
 
 export type RemindersBlockInfo = {
   content: string;
   type: RemindersBlockType;
-  isToday: boolean;
-  isUpcoming: boolean;
 };
 
 function isRemindersBlockType(type: string): type is RemindersBlockType {
@@ -51,23 +49,21 @@ export function extractRemindersBlockInfo(blockText: string): RemindersBlockInfo
   return {
     content: contentLines.join("\n"),
     type,
-    isToday: type === "reminders-today",
-    isUpcoming: type === "reminders-upcoming",
   };
 }
 
+/** Shared by Reading view and Live Preview so both render a block identically. */
 export function parseRemindersBlockOptions(blockInfo: RemindersBlockInfo): ReminderQueryOptions {
   const parsed = parseQuery(blockInfo.content);
 
-  if (blockInfo.isToday) {
+  if (blockInfo.type === "reminders-today") {
     return {
       ...parsed,
       showToday: true,
-      projectFilter: undefined,
     };
   }
 
-  if (blockInfo.isUpcoming) {
+  if (blockInfo.type === "reminders-upcoming") {
     return {
       ...parsed,
       showUpcoming: true,
