@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySharedSettings } from './shared-settings';
+import { applySharedSettings, buildSharedSettings } from './shared-settings';
 
 describe('shared-settings helpers', () => {
 	it('applies shared settings without changing local status bar visibility', () => {
@@ -21,4 +21,12 @@ describe('shared-settings helpers', () => {
 			pushEnabled: true,
 		});
 	});
+});
+
+it('round-trips every replicated field', () => {
+	const source = { ignorePatterns: ['Archive/', '*.tmp'], syncInterval: 120, pushEnabled: true };
+	const target = { ignorePatterns: [], syncInterval: 300, pushEnabled: false };
+	applySharedSettings(target, buildSharedSettings(source));
+	expect(target).toEqual(source);
+	expect(target.ignorePatterns).not.toBe(source.ignorePatterns);
 });

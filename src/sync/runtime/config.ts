@@ -1,4 +1,3 @@
-import type { SharedSettings } from '../../protocol/shared-settings';
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../../plugin/secret-storage";
 import { requireNormalizedWorkerUrl } from "../connection/worker-url";
@@ -75,14 +74,6 @@ export function clearSyncConfigurationState(
     if (secretStorage.get(key)) throw new Error('Could not remove this device’s previous sync credentials');
   }
   settings.workerUrl = "";
-}
-
-export function buildSharedSettings(settings: SyncSettings): SharedSettings {
-  return {
-    ignorePatterns: settings.ignorePatterns,
-    syncInterval: settings.syncInterval,
-    pushEnabled: settings.pushEnabled,
-  };
 }
 
 export type { ApplyInfrastructureConfigInput };

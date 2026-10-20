@@ -21,11 +21,7 @@ import { SyncApiClient } from '../api';
 import { isConflictFile, notifyConflicts } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
-import {
-	buildSharedSettings,
-	deleteManifestFile,
-	type ApplyInfrastructureConfigInput,
-} from './config';
+import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
 import { checkpointDue, recordSyncHistory } from './history';
 import { emitStateChange, emitSyncProgress } from './listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
@@ -34,6 +30,7 @@ import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import { updateSyncProgress } from '../settings';
 import type { CrateSettings } from '../../plugin/settings-types';
+import { buildSharedSettings } from '../connection/shared-settings';
 
 const logger = createLogger('SyncRuntime');
 const NOT_CONFIGURED = 'Sync is not configured.';
