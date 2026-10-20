@@ -135,8 +135,10 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		const uploadCommitters: UploadCommitters = execution.kind === 'coordinator'
 			? { commitUpload: commitStagedFile, commitNewFiles }
 			: { commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) };
-		const response = await handleAuthenticatedRoute(request, env, uploadCommitters, path, method, authResult.principal, authResult.resetGeneration, requestId, encryption, authResult.featurePolicyValue)
-			?? corsResponse({ error: 'Not found' }, 404);
+		const response = await handleAuthenticatedRoute(request, env, {
+			uploadCommitters, path, method, principal: authResult.principal, resetGeneration: authResult.resetGeneration,
+			requestId, encryption, featurePolicyValue: authResult.featurePolicyValue,
+		}) ?? corsResponse({ error: 'Not found' }, 404);
 		if (mutation) await logMutation(request, response, requestId, authResult.principal);
 		return withRequestId(response, requestId, started, encryptionState);
 	} catch (error) {

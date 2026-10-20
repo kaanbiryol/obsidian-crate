@@ -36,22 +36,23 @@ export function isAuthenticatedRouteAllowed(
 	return policy ? policy.scopes.includes(principal.scope) : principal.scope === 'vault';
 }
 
+interface AuthenticatedRouteContext {
+	uploadCommitters: UploadCommitters;
+	path: string;
+	method: RouteMethod;
+	principal: AuthPrincipal;
+	resetGeneration: string | null;
+	requestId?: string;
+	encryption?: EncryptionServerState | null;
+	featurePolicyValue?: string | null;
+}
+
+/** Dispatch a request whose principal the caller has already checked with isAuthenticatedRouteAllowed. */
 export async function handleAuthenticatedRoute(
 	request: Request,
 	env: Env,
-	uploadCommitters: UploadCommitters,
-	path: string,
-	method: RouteMethod,
-	principal: AuthPrincipal,
-	resetGeneration: string | null,
-	requestId?: string,
-	encryption?: EncryptionServerState | null,
-	featurePolicyValue?: string | null,
+	{ uploadCommitters, path, method, principal, resetGeneration, requestId, encryption, featurePolicyValue }: AuthenticatedRouteContext,
 ): Promise<Response | null> {
-	if (!isAuthenticatedRouteAllowed(principal, path, method)) {
-		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
-	}
-
 	if (path === '/features' && ['GET', 'POST'].includes(method)) {
 		const limited = await limitNotificationAction(request, env.DB, principal.tokenId);
 		return limited ?? handleFeaturePolicy(request, env.DB);

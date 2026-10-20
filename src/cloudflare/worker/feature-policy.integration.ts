@@ -48,7 +48,10 @@ it('gates reminder routes on the feature policy loaded with the token', async ()
   const auth = await authenticateWorkerRequest(request, env.DB);
   if (auth.response) throw new Error('Authentication failed');
   expect(JSON.parse(auth.featurePolicyValue!)).toMatchObject({ reminders: false });
-  const response = await handleAuthenticatedRoute(request, env, {} as never, '/reminders/list', 'GET', auth.principal, auth.resetGeneration, undefined, null, auth.featurePolicyValue);
+  const response = await handleAuthenticatedRoute(request, env, {
+    uploadCommitters: {} as never, path: '/reminders/list', method: 'GET', principal: auth.principal,
+    resetGeneration: auth.resetGeneration, encryption: null, featurePolicyValue: auth.featurePolicyValue,
+  });
   expect(response?.status).toBe(423);
 });
 it('blocks capture and publication while paused and resumes the retained article job', async () => {
