@@ -1,4 +1,4 @@
-import type { DiagnosticResult } from '../../sync/diagnostics';
+import type { DiagnosticResult } from '../../sync/diagnostics/checks';
 import { createSettingsSubsectionHeading } from './section-helpers';
 import { getDiagnosticStatusPrefix } from './infrastructure-helpers';
 

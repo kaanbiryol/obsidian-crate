@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { App, PluginManifest } from 'obsidian';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
-import { LocalManifest } from '../manifest';
+import { LocalManifest } from '../manifest/manifest';
 
 afterEach(() => vi.restoreAllMocks());
 it('recovers a failed checkpoint and never applies a nested folder prefix twice', async () => {

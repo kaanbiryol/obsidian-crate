@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { App, PluginManifest, Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
-import { LocalManifest } from '../manifest';
+import { LocalManifest } from '../manifest/manifest';
 import { createFullSyncPlan } from './full';
 import type { FullSyncPlannerContext } from './types';
-import { classifyPaths } from '../reconciliation';
-import { reconcileQueuePaths, type TargetedReconcileContext } from '../reconcile-paths';
+import { classifyPaths } from './reconciliation';
+import { reconcileQueuePaths, type TargetedReconcileContext } from '../engine/reconcile-paths';
 
 const paths = ['__proto__', 'constructor', 'toString'];
 const entry: FileEntry = { hash: 'file-hash', size: 1, modified: 'now', revision: 'r1' };

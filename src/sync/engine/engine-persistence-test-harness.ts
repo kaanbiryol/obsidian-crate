@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-type
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { SyncApiClient } from '../api';
 import { SyncEngine } from './engine';
-import type { LocalManifest } from '../manifest';
+import type { LocalManifest } from '../manifest/manifest';
 import type { ApiHttpTransport } from '../worker-api/http';
 
 const engines = new Set<SyncEngine>();

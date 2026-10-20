@@ -13,7 +13,7 @@ const conflictMocks = vi.hoisted(() => ({
 	classifyPaths: vi.fn(),
 }));
 
-vi.mock('../file-discovery', () => ({
+vi.mock('../local/file-discovery', () => ({
 	getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
 	isHiddenPath: fileDiscoveryMocks.isHiddenPath,
 }));
@@ -22,8 +22,8 @@ vi.mock('../conflict/conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
 }));
 
-vi.mock('../reconciliation', async (importOriginal) => ({
-	...await importOriginal<typeof import('../reconciliation')>(),
+vi.mock('./reconciliation', async (importOriginal) => ({
+	...await importOriginal<typeof import('./reconciliation')>(),
 	classifyPaths: conflictMocks.classifyPaths,
 }));
 

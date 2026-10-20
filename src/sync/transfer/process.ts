@@ -1,9 +1,9 @@
-import { assertLocalSyncPath } from '../local-path-safety';
-import { recordAppliedContent, UNVERIFIED_MODIFIED } from '../applied-content';
-import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "../local-apply";
-import { isMarkdownPath } from "../markdown-base-cache";
+import { assertLocalSyncPath } from '../local/local-path-safety';
+import { recordAppliedContent, UNVERIFIED_MODIFIED } from './applied-content';
+import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "../local/local-apply";
+import { isMarkdownPath } from "../merge/markdown-base-cache";
 import { mergeMarkdownContent } from "../merge/markdown-merge";
-import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "../planner/helpers";
+import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "../local/local-delete";
 import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "../sync-result";
 import { downloadAndSaveFile, validateDownloadedContent } from "./download";
 import { prepareUploadFromPath } from "./prepare";
@@ -11,7 +11,7 @@ import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
-import { assertLocalFileAbsent, LocalFilePresentError } from '../local-absence';
+import { assertLocalFileAbsent, LocalFilePresentError } from '../local/local-absence';
 import { sha256Hex } from '../../platform/sha256';
 
 export async function processDiff(

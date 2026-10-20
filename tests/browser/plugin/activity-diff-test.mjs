@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { compileString } from 'sass';
 import { chromium, webkit, expect } from '@playwright/test';
-import { pendingChangeKey } from '../../../src/sync/pending-change.ts';
+import { pendingChangeKey } from '../../../src/sync/pending/pending-change.ts';
 
 // Exercise the production renderer with Obsidian's small DOM helper surface.
 const { outputFiles } = await build({
@@ -11,7 +11,7 @@ const { outputFiles } = await build({
         resolveDir: process.cwd(), loader: 'ts', contents: `
             import { renderPendingPanel } from './src/ui/activity/panels';
             import { PendingDiscardModal } from './src/ui/activity/pending-discard-modal';
-            import { pendingChangeKey, decodePendingChange } from './src/sync/pending-change';
+            import { pendingChangeKey, decodePendingChange } from './src/sync/pending/pending-change';
             HTMLElement.prototype.createEl = function(tag, options = {}) {
                 const el = document.createElement(tag);
                 if (options.cls) el.className = options.cls;

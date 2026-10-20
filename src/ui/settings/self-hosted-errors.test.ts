@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selfHostedConnectionMessage, syncConnectionFailureMessage } from './self-hosted-errors';
-import { ConnectionSetupError } from '../../sync/connection-errors';
+import { ConnectionSetupError } from '../../sync/connection/connection-errors';
 
 describe('self-hosted connection messages', () => {
 	it('explains the connection-refused error and Docker address choice', () => {

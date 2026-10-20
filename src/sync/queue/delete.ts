@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type {
 	QueueDeleteCandidate,
 	QueueDeleteFailure,

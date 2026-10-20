@@ -1,8 +1,8 @@
 import { FileSystemAdapter, Platform, type App } from 'obsidian';
 import type { ConflictRecord } from '../types';
 import { conflictReviewFile } from './review-file';
-import { TEXT_PATH } from '../local-apply';
-import { decodePreviewText } from '../preview-format';
+import { TEXT_PATH } from '../local/local-apply';
+import { decodePreviewText } from '../history/preview-format';
 
 export type ConflictChoice = 'current' | 'saved' | 'both' | 'manual';
 export interface ConflictReview {

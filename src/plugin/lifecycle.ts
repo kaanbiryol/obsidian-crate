@@ -21,7 +21,7 @@ import {
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
-import { registerCheckpointBackupCleanup } from '../sync/checkpoint-backup-cleanup';
+import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';
 import { SECRET_KEYS } from "../platform/secret-keys";
 
 const logger = createLogger("Plugin");

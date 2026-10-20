@@ -1,12 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
-import { LocalManifest } from '../manifest';
-import { DurableUploads } from '../durable-uploads';
+import { LocalManifest } from '../manifest/manifest';
+import { DurableUploads } from '../durability/durable-uploads';
 import { EncryptedFiles } from './encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { arrayBufferToBase64 } from '../encoding';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
-import type { JournalUpload } from '../upload-intent';
+import type { JournalUpload } from '../durability/upload-intent';
 import type { BatchUploadFile } from '../../protocol/sync-types';
 import { sha256Hex } from '@/platform/sha256';
 

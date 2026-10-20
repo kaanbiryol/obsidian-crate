@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError, skippedFileIssue } from '../issues';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { isAbortError } from "../abort";
@@ -8,10 +8,10 @@ import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresol
 import { createLogger, errorMessage } from "../logger";
 import type { FileEntry } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
-import { applyIncrementalLocalDeletes } from '../incremental-local-deletes';
-import { reconcileIncrementalRemoteChanges } from '../incremental-remote-reconciliation';
+import { applyIncrementalLocalDeletes } from './incremental-local-deletes';
+import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
-import { readIncrementalChangelog } from '../incremental-changelog';
+import { readIncrementalChangelog } from './incremental-changelog';
 
 const logger = createLogger("SyncPlanner");
 

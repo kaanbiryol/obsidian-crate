@@ -1,4 +1,4 @@
-import { pendingChangeKey, decodePendingChange } from '../pending-change';
+import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { createAbortError } from '../abort';
 import { createLogger } from '../logger';

@@ -853,7 +853,7 @@ code at the saved address and keep the existing local connection on failure.
 
 Focused coverage: `src/cloudflare/plugin-integration.test.ts`,
 `src/cloudflare/deployment/service.test.ts`,
-`src/sync/self-hosted-connection.test.ts`, and the affected settings tests.
+`src/sync/connection/self-hosted-connection.test.ts`, and the affected settings tests.
 `self-hosted-pairing.test.ts` and `ui/settings/self-hosted-errors.test.ts` check
 typed setup failures, including address-update guidance and pairing status handling
 that does not depend on server error wording.

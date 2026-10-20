@@ -1,11 +1,11 @@
 import type { Vault } from 'obsidian';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { createAbortError } from '../abort';
-import { deleteFilesInBatches, type ConditionalDeleteApi, type ConditionalDeleteCandidate } from '../delete-batches';
+import { deleteFilesInBatches, type ConditionalDeleteApi, type ConditionalDeleteCandidate } from './delete-batches';
 import { recordSyncError } from '../issues';
-import { assertLocalFileAbsent } from '../local-absence';
+import { assertLocalFileAbsent } from '../local/local-absence';
 import { isQueueVersionConflict } from '../queue/failure';
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type { SyncResult, SyncWork } from '../types';
 
 interface DeleteContext {

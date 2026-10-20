@@ -1,0 +1,226 @@
+import type { App, PluginManifest } from 'obsidian';
+import { createLogger, errorMessage } from '../logger';
+import type { FileEntry } from '../../protocol/sync-types';
+import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { sha256Hex } from '../../platform/sha256';
+
+const logger = createLogger('MarkdownBaseCache');
+const CACHE_DIRNAME = 'markdown-base-cache';
+const HASH_RE = /^[a-f0-9]{64}$/;
+const SEED_CONCURRENCY = 2;
+const SEED_BATCH_FILES = 32;
+const SEED_BATCH_BYTES = 8 * 1024 * 1024;
+// Unreferenced bases are hash-verified, local-only and small, so cleanup after
+// syncs can wait instead of listing the whole cache folder every time.
+export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+export interface MarkdownBaseCacheManifest {
+	getAllPaths(): string[];
+	getEntry(path: string): Readonly<FileEntry> | undefined;
+}
+
+export interface MarkdownBaseCacheSeedOptions {
+	isDestroyed(): boolean;
+	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+}
+
+export function isMarkdownPath(path: string): boolean {
+	return path.toLowerCase().endsWith('.md');
+}
+
+export class MarkdownBaseCache {
+	private readonly app: App;
+	private readonly cacheDir: string;
+	private readonly writtenHashes = new Set<string>();
+	private readonly pendingWrites = new Map<string, Promise<void>>();
+	private readonly invalidHashes = new Set<string>();
+	private lastPruneAt: number | null = null;
+
+	constructor(app: App, pluginManifest: PluginManifest) {
+		this.app = app;
+		this.cacheDir = `${pluginManifest.dir}/${CACHE_DIRNAME}`;
+	}
+
+	getIgnoredPrefix(): string {
+		return `${this.cacheDir}/`;
+	}
+
+	async readBase(path: string, hash: string): Promise<ArrayBuffer | null> {
+		if (!isMarkdownPath(path) || !isValidHash(hash)) {
+			return null;
+		}
+
+		const cachePath = this.getCachePath(hash);
+		try {
+			if (!await this.app.vault.adapter.exists(cachePath)) {
+				this.writtenHashes.delete(hash);
+				return null;
+			}
+			const content = await this.app.vault.adapter.readBinary(cachePath);
+			if (content.byteLength > MAX_FILE_SIZE_BYTES || await sha256Hex(content) !== hash) {
+				this.invalidHashes.add(hash);
+				this.writtenHashes.delete(hash);
+				logger.warn(`Ignoring corrupt Markdown base cache for ${path}`);
+				return null;
+			}
+			return content;
+		} catch (error) {
+			logger.warn(`Failed to read Markdown base cache for ${path}:`, errorMessage(error));
+			return null;
+		}
+	}
+
+	async putBase(path: string, hash: string, content: ArrayBuffer): Promise<void> {
+		if (!isMarkdownPath(path) || !isValidHash(hash) || content.byteLength > MAX_FILE_SIZE_BYTES) {
+			return;
+		}
+
+        if (this.writtenHashes.has(hash)) return;
+        const pending = this.pendingWrites.get(hash);
+        if (pending) return pending;
+        const write = (async () => {
+            try {
+                await this.ensureCacheDir();
+                await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
+                this.invalidHashes.delete(hash);
+                this.writtenHashes.add(hash);
+                // Bound session bookkeeping; an evicted hash can safely be written again.
+                if (this.writtenHashes.size > 4096) {
+                    const oldest = this.writtenHashes.values().next();
+                    if (!oldest.done) this.writtenHashes.delete(oldest.value);
+                }
+            } catch (error) {
+                logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
+            }
+        })();
+        this.pendingWrites.set(hash, write);
+        try { await write; } finally { this.pendingWrites.delete(hash); }
+	}
+
+	async seedFromManifest(
+		manifest: MarkdownBaseCacheManifest,
+		options: MarkdownBaseCacheSeedOptions,
+	): Promise<void> {
+		// One listing replaces an exists() call per note; it also serves the prune below.
+		const listing = await this.listCacheFiles();
+		const cachedHashes = new Set(listing.map(getHashFromCachePath));
+		const paths = manifest.getAllPaths()
+			.filter(isMarkdownPath)
+			.filter((path) => {
+				const entry = manifest.getEntry(path);
+				return entry !== undefined
+					&& isValidHash(entry.hash)
+					&& entry.size <= MAX_FILE_SIZE_BYTES
+					&& (this.invalidHashes.has(entry.hash) || !cachedHashes.has(entry.hash));
+			});
+
+		const seed = (path: string) => async () => {
+			if (options.isDestroyed()) {
+				return;
+			}
+
+			const entry = manifest.getEntry(path);
+			if (!entry) {
+				return;
+			}
+
+			try {
+				if (!this.invalidHashes.has(entry.hash) && this.writtenHashes.has(entry.hash)) {
+					return;
+				}
+				const content = await this.app.vault.adapter.readBinary(path);
+				if (content.byteLength > MAX_FILE_SIZE_BYTES) {
+					return;
+				}
+				const hash = await sha256Hex(content);
+				if (hash === entry.hash) {
+					await this.putBase(path, entry.hash, content);
+				}
+			} catch (error) {
+				logger.debug(`Skipped Markdown base cache seed for ${path}:`, errorMessage(error));
+			}
+		};
+
+		let batch: Array<() => Promise<void>> = [];
+		let bytes = 0;
+		for (const path of paths) {
+			if (options.isDestroyed()) return;
+			const size = manifest.getEntry(path)?.size ?? 0;
+			if (batch.length && (batch.length >= SEED_BATCH_FILES || bytes + size > SEED_BATCH_BYTES)) {
+				await options.runConcurrent(batch, SEED_CONCURRENCY);
+				batch = [];
+				bytes = 0;
+				await new Promise<void>(resolve => setTimeout(resolve, 0));
+				if (options.isDestroyed()) return;
+			}
+			batch.push(seed(path));
+			bytes += size;
+		}
+		await options.runConcurrent(batch, SEED_CONCURRENCY);
+		if (!options.isDestroyed()) await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
+	}
+
+	async pruneReferencedHashes(referencedHashes: Set<string>): Promise<void> {
+		await this.removeUnreferenced(await this.listCacheFiles(), referencedHashes);
+	}
+
+	/** Prune after syncs at most once per interval; startup seeding always prunes. */
+	async pruneUnreferenced(manifest: MarkdownBaseCacheManifest): Promise<void> {
+		if (this.lastPruneAt !== null && Date.now() - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+		await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
+	}
+
+	private async listCacheFiles(): Promise<string[]> {
+		try {
+			return (await this.app.vault.adapter.list(this.cacheDir)).files.filter((path) => path.endsWith('.md'));
+		} catch {
+			// Cache directory may not exist yet.
+			return [];
+		}
+	}
+
+	private async removeUnreferenced(listing: string[], referencedHashes: Set<string>): Promise<void> {
+		this.lastPruneAt = Date.now();
+		// Pruning is best effort; a failed removal is retried by a later prune.
+		await Promise.allSettled(
+			listing
+				.filter((path) => !referencedHashes.has(getHashFromCachePath(path)))
+				.map(async (path) => {
+                        this.writtenHashes.delete(getHashFromCachePath(path));
+                        await this.app.vault.adapter.remove(path);
+                    }),
+		);
+	}
+
+	private async ensureCacheDir(): Promise<void> {
+		try {
+			await this.app.vault.adapter.mkdir(this.cacheDir);
+		} catch {
+			// Directory may already exist.
+		}
+	}
+
+	private getCachePath(hash: string): string {
+		return `${this.cacheDir}/${hash}.md`;
+	}
+}
+
+function isValidHash(hash: string): boolean {
+	return HASH_RE.test(hash);
+}
+
+function getReferencedMarkdownHashes(manifest: MarkdownBaseCacheManifest): Set<string> {
+	const hashes = new Set<string>();
+	for (const path of manifest.getAllPaths()) {
+		const entry = manifest.getEntry(path);
+		if (entry && isMarkdownPath(path) && isValidHash(entry.hash)) {
+			hashes.add(entry.hash);
+		}
+	}
+	return hashes;
+}
+
+function getHashFromCachePath(path: string): string {
+	const fileName = path.split('/').pop() ?? '';
+	return fileName.endsWith('.md') ? fileName.slice(0, -3) : fileName;
+}

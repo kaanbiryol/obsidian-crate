@@ -1,7 +1,7 @@
 import type { PreparedUpload } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { Platform } from 'obsidian';
-import type { VaultFile } from '../file-discovery';
+import type { VaultFile } from '../local/file-discovery';
 
 const MIB = 1024 * 1024;
 

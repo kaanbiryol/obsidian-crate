@@ -1,14 +1,14 @@
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
-import type { LocalManifestView } from '../manifest';
+import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncApiClient } from '../api';
 import { HistoryCheckpoints } from '../history/checkpoint';
 import { compareHistorySnapshots, type HistoryComparison, type HistorySnapshot } from '../history/comparison';
-import { getAllVaultFiles } from '../file-discovery';
-import { readLocalFileEntry } from '../local-file-entry';
+import { getAllVaultFiles } from '../local/file-discovery';
+import { readLocalFileEntry } from '../local/local-file-entry';
 import { createHistoryRestore } from '../history/restore';
 import { findHistorySource } from '../history/source';
-import { getCheckpointAuthority } from '../worker-url';
+import { getCheckpointAuthority } from '../connection/worker-url';
 import type { SyncSettings } from '../settings';
 
 interface EngineHistoryContext {

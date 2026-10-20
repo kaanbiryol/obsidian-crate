@@ -1,0 +1,53 @@
+import { ConnectionSetupError } from './connection-errors';
+import { createLogger } from '../logger';
+import type { SyncSettings } from '../settings';
+
+const logger = createLogger('WorkerUrl');
+const LOCALHOST_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+
+export function normalizeWorkerUrl(workerUrl: string): string {
+	const raw = workerUrl.trim();
+	if (!raw) {
+		return '';
+	}
+
+	try {
+		const parsed = new URL(raw);
+		const hostname = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
+		const isLocalhost = LOCALHOST_HOSTNAMES.has(hostname);
+		const isSecure = parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLocalhost);
+		if (!isSecure) {
+			logger.warn(`Rejected worker URL with insecure protocol: ${parsed.protocol}`);
+			return '';
+		}
+		if (parsed.username || parsed.password) {
+			logger.warn('Rejected worker URL with embedded credentials');
+			return '';
+		}
+		if (parsed.search || parsed.hash) {
+			logger.warn('Rejected worker URL with query string or fragment');
+			return '';
+		}
+
+		const normalizedPath = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/+$/, '');
+		return `${parsed.origin}${normalizedPath}`;
+	} catch {
+		logger.warn('Rejected invalid worker URL');
+		return '';
+	}
+}
+
+export function requireNormalizedWorkerUrl(workerUrl: string): string {
+	const normalized = normalizeWorkerUrl(workerUrl);
+	if (!normalized) {
+		throw new ConnectionSetupError('invalid-address');
+	}
+	return normalized;
+}
+
+/** A verified relocation changes transport, not ownership of pending disk work. */
+export function getCheckpointAuthority(settings: Pick<SyncSettings, 'workerUrl' | 'checkpointScope'>): string {
+	const workerUrl = normalizeWorkerUrl(settings.workerUrl);
+	return settings.checkpointScope?.workerUrl === workerUrl
+		? requireNormalizedWorkerUrl(settings.checkpointScope.authority) : workerUrl;
+}

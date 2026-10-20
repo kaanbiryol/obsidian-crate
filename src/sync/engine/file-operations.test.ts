@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { SyncApiClient } from '../api';
-import { LocalManifest } from '../manifest';
-import { MarkdownBaseCache } from '../markdown-base-cache';
+import { LocalManifest } from '../manifest/manifest';
+import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ApiHttpTransport } from '../worker-api/http';
 import { sha256Hex } from '@/platform/sha256';
 

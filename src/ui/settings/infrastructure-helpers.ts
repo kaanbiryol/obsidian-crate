@@ -1,4 +1,4 @@
-import type { DiagnosticResult } from '../../sync/diagnostics';
+import type { DiagnosticResult } from '../../sync/diagnostics/checks';
 
 export interface DiagnosticSummary {
 	failures: number;

@@ -2,7 +2,7 @@ import { Notice, Platform, setIcon, type App } from 'obsidian';
 import { SharedModal } from '../plugin/SharedModal';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import type { SyncRuntime } from '../../sync/runtime/runtime';
-import type { FileHistoryPreview } from '../../sync/file-history-preview';
+import type { FileHistoryPreview } from '../../sync/history/file-history-preview';
 import { buildDiff } from './diff-model';
 import { renderFileText } from './history-text';
 import { renderDiffLines } from './diff-renderer';

@@ -4,7 +4,7 @@
 
 import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../logger';
-import { isHiddenPath } from '../file-discovery';
+import { isHiddenPath } from '../local/file-discovery';
 
 const logger = createLogger('Conflict');
 const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}|remote [a-f0-9]{64}(?:-\d+)?)\)(?=\.[^/]+$|$)/;

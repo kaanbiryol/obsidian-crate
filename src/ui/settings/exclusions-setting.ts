@@ -1,6 +1,6 @@
 import { Notice, Setting, type TextAreaComponent } from 'obsidian';
 import { matchIgnorePattern } from '../../sync/engine/ignore';
-import { getAllVaultFiles } from '../../sync/file-discovery';
+import { getAllVaultFiles } from '../../sync/local/file-discovery';
 import type CratePlugin from '../../main';
 import { ExclusionPreviewModal } from '../exclusion-preview-modal';
 import { renderExclusionCleanup } from './exclusion-cleanup';

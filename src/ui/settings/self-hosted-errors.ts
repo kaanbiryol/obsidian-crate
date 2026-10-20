@@ -1,4 +1,4 @@
-import { CONNECTION_SETUP_MESSAGES, ConnectionSetupError } from '../../sync/connection-errors';
+import { CONNECTION_SETUP_MESSAGES, ConnectionSetupError } from '../../sync/connection/connection-errors';
 
 /** Translate connection failures at the UI boundary without exposing response
  * bodies, credentials, or platform-specific network diagnostics in a notice. */

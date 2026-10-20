@@ -1,4 +1,4 @@
-import type { PendingDiff } from '../../sync/pending-diff';
+import type { PendingDiff } from '../../sync/pending/pending-diff';
 
 const MAX_CACHED_CHARACTERS = 1_000_000;
 

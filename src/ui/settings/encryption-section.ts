@@ -10,7 +10,7 @@ import { convertEncryptedVault, readServerEncryption, assertEncryptionKeys } fro
 import { isReadingScopeExtension, createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { errorMessage } from '../../sync/logger';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
-import { normalizeWorkerUrl } from '../../sync/worker-url';
+import { normalizeWorkerUrl } from '../../sync/connection/worker-url';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { renderRecoveryVerification } from './recovery-verification';
 import { verifyRecoveryCode } from '../../encryption/recovery-verification';

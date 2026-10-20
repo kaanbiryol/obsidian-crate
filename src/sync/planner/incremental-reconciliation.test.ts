@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type { DownloadRequest } from '../transfer/download';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../types';
@@ -15,7 +15,7 @@ const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
 }));
 
-vi.mock('../file-discovery', () => ({
+vi.mock('../local/file-discovery', () => ({
 	getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
 	isHiddenPath: fileDiscoveryMocks.isHiddenPath,
 }));

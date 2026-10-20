@@ -1,10 +1,10 @@
-import { ConnectionSetupError } from '../connection-errors';
+import { ConnectionSetupError } from '../connection/connection-errors';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { prepareEncryptedAddressChange } from '../encryption/encrypted-connection';
 import { loadEncryptionReset, saveEncryptionReset, verifyEncryptionResetAddress } from '../encryption/reset';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { resetStoredSyncState } from './history';
-import { getCheckpointAuthority, requireNormalizedWorkerUrl } from '../worker-url';
+import { getCheckpointAuthority, requireNormalizedWorkerUrl } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { CrateSettings } from '../../plugin/settings-types';

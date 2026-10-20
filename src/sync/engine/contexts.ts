@@ -1,14 +1,14 @@
 import { deleteRemoteFiles, type DeleteRemoteFiles } from '../transfer/delete';
 import type { EngineFileOperations } from './file-operations';
-import { PlannedContent } from '../planned-content';
+import { PlannedContent } from '../planner/planned-content';
 import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from '../api';
-import type { LocalManifest, LocalManifestView } from '../manifest';
-import type { MarkdownBaseCache } from '../markdown-base-cache';
+import type { LocalManifest, LocalManifestView } from '../manifest/manifest';
+import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { ConflictStore } from '../conflict/store';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
-import type { VaultFile } from '../file-discovery';
+import type { VaultFile } from '../local/file-discovery';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { LocalChangeScan } from '../planner/types';
 import {
@@ -28,9 +28,9 @@ import { createByteBudgetedVaultFileChunks } from '../transfer/budget';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './constants';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
-import { runInitialImport } from '../initial-import';
-import { finishInitialSetup } from '../initial-setup';
-import type { InitialConfigPull } from '../initial-config-pull';
+import { runInitialImport } from './initial-import';
+import { finishInitialSetup } from './initial-setup';
+import type { InitialConfigPull } from './initial-config-pull';
 import { updateSyncProgress, type SyncSettings } from '../settings';
 
 interface SyncEngineContextDependencies {

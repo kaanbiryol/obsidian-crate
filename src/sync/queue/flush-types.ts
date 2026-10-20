@@ -1,6 +1,6 @@
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { DeleteRemoteFiles } from '../transfer/delete';
-import type { ConditionalDeleteCandidate } from '../delete-batches';
+import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
 

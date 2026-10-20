@@ -1,11 +1,11 @@
 import { skippedFileIssue, withSyncFileContext } from '../issues';
-import { classifyPaths } from "../reconciliation";
-import { getAllVaultFiles } from "../file-discovery";
+import { classifyPaths } from "./reconciliation";
+import { getAllVaultFiles } from "../local/file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
-import { prepareInitialConfigPull } from '../initial-config-pull';
+import { prepareInitialConfigPull } from '../engine/initial-config-pull';
 import { sha256Hex } from '../../platform/sha256';
 
 /** `reuseUnchangedHashes` trusts the baseline hash when size and mtime match,

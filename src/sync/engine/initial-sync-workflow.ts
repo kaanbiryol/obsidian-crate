@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { getAllVaultFiles, type VaultFile } from '../file-discovery';
+import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,

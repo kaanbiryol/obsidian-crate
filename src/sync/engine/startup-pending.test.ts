@@ -1,10 +1,10 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type { TFile } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { createHarness, createSyncResult, runPeriodicCheck, spyOnConflictRecovery, spyOnIncrementalSync, toArrayBuffer } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { normalizeCrateSettings } from '../../plugin/settings';
-import { VERIFICATION_FILE_BUDGET } from '../content-verifier';
+import { VERIFICATION_FILE_BUDGET } from './content-verifier';
 import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './constants';
 import { sha256Hex } from '../../platform/sha256';
 

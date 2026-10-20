@@ -1,4 +1,4 @@
-import { pendingChangeKey, decodePendingChange } from '../pending-change';
+import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
 import type { TAbstractFile } from 'obsidian';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
 import { createEmptySyncResult } from '../sync-result';

@@ -1,6 +1,6 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { withSyncFileContext } from '../issues';
-import { getAllVaultFiles } from "../file-discovery";
+import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';

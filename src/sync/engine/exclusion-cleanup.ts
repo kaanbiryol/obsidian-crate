@@ -1,8 +1,8 @@
 import type { FileManifest } from '../../protocol/sync-types';
 import { createAbortError } from '../abort';
-import { deleteFilesInBatches } from '../delete-batches';
+import { deleteFilesInBatches } from '../transfer/delete-batches';
 import type { EngineFileOperations } from './file-operations';
-import type { LocalManifest } from '../manifest';
+import type { LocalManifest } from '../manifest/manifest';
 
 interface ExclusionCleanupContext {
 	getManifest(): Promise<FileManifest>;

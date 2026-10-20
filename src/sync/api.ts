@@ -1,11 +1,11 @@
 import { createEngineFileOperations } from './engine/file-operations';
 import type { ConnectionTestResult } from './types';
 import { SharedHistoryApi } from './worker-api/history-checkpoints';
-import type { RequestDiagnostics } from './request-diagnostics';
-import type { MarkdownBaseCache } from './markdown-base-cache';
-import { normalizeWorkerUrl } from './worker-url';
+import type { RequestDiagnostics } from './diagnostics/request-diagnostics';
+import type { MarkdownBaseCache } from './merge/markdown-base-cache';
+import { normalizeWorkerUrl } from './connection/worker-url';
 import type { Vault } from 'obsidian';
-import type { LocalManifest } from './manifest';
+import type { LocalManifest } from './manifest/manifest';
 import type { NotificationPolicy } from '../protocol/notification-policy';
 /**
  * Worker API client facade for sync, setup, and reminder endpoints.

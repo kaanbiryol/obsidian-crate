@@ -1,9 +1,9 @@
-import type { PlannedContent } from '../planned-content';
+import type { PlannedContent } from '../planner/planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { DownloadedBatch, DownloadedFile } from '../worker-api/sync';
 import type { BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../../protocol/sync-types';
 import type { RecordConflictInput } from '../conflict/store';
-import type { UploadApplyPhase } from '../upload-diagnostics';
+import type { UploadApplyPhase } from '../diagnostics/upload-diagnostics';
 
 interface TransferManifest {
   getEntry(path: string): Readonly<FileEntry> | undefined;

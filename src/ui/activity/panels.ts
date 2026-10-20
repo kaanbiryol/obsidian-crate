@@ -3,7 +3,7 @@ import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
-import { decodePendingChange } from '../../sync/pending-change';
+import { decodePendingChange } from '../../sync/pending/pending-change';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
 	const checking = state?.initializing && !hasError && state.status !== 'offline';

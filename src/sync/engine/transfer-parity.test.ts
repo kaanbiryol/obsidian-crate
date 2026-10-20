@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { BatchUploadFile, FileEntry } from '../../protocol/sync-types';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { createDeferred } from '../runtime/runtime-test-harness';

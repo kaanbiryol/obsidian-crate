@@ -1,5 +1,5 @@
 import { FileSystemAdapter, Platform, TFile, type App } from 'obsidian';
-import { assertLocalSyncPath } from '../../sync/local-path-safety';
+import { assertLocalSyncPath } from '../../sync/local/local-path-safety';
 
 export interface PendingFileAction {
     id: 'open' | 'reveal';

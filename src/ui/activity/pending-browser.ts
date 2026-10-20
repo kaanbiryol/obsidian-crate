@@ -1,7 +1,7 @@
 import { Notice, setIcon } from 'obsidian';
-import type { PendingDiff } from '../../sync/pending-diff';
-import { isBinaryPreviewPath } from '../../sync/preview-format';
-import { decodePendingChange } from '../../sync/pending-change';
+import type { PendingDiff } from '../../sync/pending/pending-diff';
+import { isBinaryPreviewPath } from '../../sync/history/preview-format';
+import { decodePendingChange } from '../../sync/pending/pending-change';
 import { buildDiff } from './diff-model';
 import { renderDiffPreview } from './pending-diff';
 import { PendingComparisons } from './pending-comparisons';

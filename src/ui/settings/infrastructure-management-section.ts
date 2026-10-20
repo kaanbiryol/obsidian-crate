@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import { SyncDiagnosticsModal } from '../sync-diagnostics-modal';
-import { runSyncDiagnostics } from '../../sync/diagnostics';
+import { runSyncDiagnostics } from '../../sync/diagnostics/checks';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 import {
 	getDiagnosticsNoticeMessage,

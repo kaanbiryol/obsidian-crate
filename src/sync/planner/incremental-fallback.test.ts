@@ -14,7 +14,7 @@ const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
 }));
 
-vi.mock('../file-discovery', () => ({
+vi.mock('../local/file-discovery', () => ({
 	getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
 	isHiddenPath: fileDiscoveryMocks.isHiddenPath,
 }));

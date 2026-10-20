@@ -77,8 +77,8 @@ export interface SyncHistoryEntry {
     sharedCheckpoint?: string;
     checkpointFileCount?: number;
 	historyCheckpoint?: string;
-	timings?: import('./timings').SyncTimings;
-	requestDiagnostics?: import('./request-diagnostics').RequestDiagnostics;
+	timings?: import('./diagnostics/timings').SyncTimings;
+	requestDiagnostics?: import('./diagnostics/request-diagnostics').RequestDiagnostics;
 	timestamp: string;
 	type: 'sync' | 'initial' | 'force';
 	success: boolean;

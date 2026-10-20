@@ -1,7 +1,7 @@
 import { SkippedFileError, withSyncFileContext } from '../issues';
-import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../file-discovery";
-import { isVaultTFileLike } from '../planner/helpers';
-import type { VaultFile } from "../file-discovery";
+import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../local/file-discovery";
+import { isVaultTFileLike } from '../local/local-delete';
+import type { VaultFile } from "../local/file-discovery";
 import type { PreparedUpload } from '../types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,

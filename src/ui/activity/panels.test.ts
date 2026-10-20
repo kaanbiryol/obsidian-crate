@@ -3,7 +3,7 @@ import { FakeElement, createObsidianUiModule } from '../../test/fakes/obsidian-u
 
 vi.mock('obsidian', () => createObsidianUiModule());
 import { renderConflictsPanel, renderPendingPanel } from './panels';
-import { pendingChangeKey } from '../../sync/pending-change';
+import { pendingChangeKey } from '../../sync/pending/pending-change';
 
 afterEach(() => vi.clearAllMocks());
 

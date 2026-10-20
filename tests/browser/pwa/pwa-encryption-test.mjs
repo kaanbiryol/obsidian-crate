@@ -28,7 +28,7 @@ export * from './src/sync/worker-api/http';
 export * from './src/sync/api';
 export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
-export * from './src/sync/durable-restores';
+export * from './src/sync/durability/durable-restores';
 export { makeApiFetch } from './src/pwa/api';
 export { AUTH_TOKEN_KEY } from './src/pwa/config';
 export * from './src/pwa/encrypted-push';

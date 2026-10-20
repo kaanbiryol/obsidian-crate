@@ -3,7 +3,7 @@ import { deleteRemoteFiles } from '../transfer/delete';
 import { runConcurrentTasks } from '../engine/utils';
 import type { QueueFlushContext } from './flush-types';
 import { base64ToArrayBuffer } from '../encoding';
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { TFolder } from 'obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -17,7 +17,7 @@ import { processPendingChanges } from './flush';
 import { OVERSIZED_LOCAL_FILE_MESSAGE, SkippedFileError } from '../issues';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
 import { HttpError } from '../api';
-import { LocalFilePresentError } from '../local-absence';
+import { LocalFilePresentError } from '../local/local-absence';
 import { createEmptySyncResult } from '../sync-result';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 

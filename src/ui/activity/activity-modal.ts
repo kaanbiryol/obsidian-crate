@@ -5,7 +5,7 @@ import { mergeSharedHistory } from './shared-history';
 import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
 import { BaseUiModal } from '../plugin/BaseUiModal';
 import { getPendingFileActions } from './file-actions';
-import type { PendingDiscardReview } from '../../sync/pending-discard';
+import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
 import { PendingDiscardModal } from './pending-discard-modal';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictReview } from '../../sync/conflict/review';

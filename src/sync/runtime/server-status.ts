@@ -1,7 +1,7 @@
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { createLogger, errorMessage } from '../logger';
 import type { SyncApiClient } from '../api';
-import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from '../server-reachability';
+import { checkServerReachability, SERVER_CHECK_TIMEOUT_MS } from '../connection/server-reachability';
 import type { CrateSettings } from '../../plugin/settings-types';
 
 const logger = createLogger('RuntimeServerStatus');

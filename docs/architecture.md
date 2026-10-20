@@ -112,7 +112,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 ```
 
 Sync history checkpoint and restore policy lives in `sync/engine/history.ts`.
-`sync/manifest-checkpoint.ts` owns checkpoint parsing, encoding and recovery
+`sync/manifest/manifest-checkpoint.ts` owns checkpoint parsing, encoding and recovery
 equivalence. `LocalManifest` retains generation selection, file I/O and ordered
 saves. Its baseline readers expose readonly views with stable entry identities;
 mutations replace entries through the manifest so revision tracking and checks
@@ -123,7 +123,7 @@ accepted flush batches. Each batch captures its revision snapshot and releases i
 in-flight paths once before publishing idle/error. Result recording can overlap a
 later transfer without an older finalizer clearing that transfer's pending work.
 Discard keeps baseline persistence and queue settlement in one ordered operation.
-`sync/pending-change.ts` owns the operation/path representation used by the queue,
+`sync/pending/pending-change.ts` owns the operation/path representation used by the queue,
 reconciliation, discard and Activity selection. Deletion keys use a marker that
 cannot occur in a valid sync path; a file named `delete:note.md` remains an ordinary
 upload. These keys are volatile and are rebuilt from local files at startup, so
@@ -141,7 +141,7 @@ settling an earlier upload cannot silently bypass the guard for a newer local ed
 verification and resumption together; the runtime supplies connection identity checks
 and the ordinary sync-operation wrapper.
 
-`sync/preview-format.ts` owns text decoding, binary control-character rejection and
+`sync/history/preview-format.ts` owns text decoding, binary control-character rejection and
 the 256 KB preview limit. Each preview loader retains its storage access and integrity
 checks. File history hides the UTF-8 BOM for display; pending diffs, restore comparisons
 and conflict review preserve it. Conflict review retains its separate 1 MB edit limit.
@@ -156,7 +156,7 @@ a restore after successful reconciliation by the same engine.
 `sync/transfer/upload.ts` and `sync/transfer/delete.ts` own ordinary transfer
 execution across sync modes. Automatic queue adapters retain revision settlement
 and retry scheduling while delegating batching, concurrency, acknowledgements and
-manifest updates to these executors. `sync/delete-batches.ts` bounds deletion
+manifest updates to these executors. `sync/transfer/delete-batches.ts` bounds deletion
 requests and drains accepted siblings on cancellation. Sync modes supply their
 planning and conflict-reconciliation policy.
 
@@ -245,13 +245,13 @@ workflows do not calculate lifecycle generations or register events.
 The configuration queue captures authority when accepting each operation and verifies
 it before dispatch; workflows also check it after asynchronous work. Shutdown invalidates
 queued resets, address changes, connection changes and encryption setup even when the
-caller supplies no cancellation signal. `sync/connection-errors.ts` defines stable
+caller supplies no cancellation signal. `sync/connection/connection-errors.ts` defines stable
 codes for owned setup failures; settings presentation uses those codes to preserve
 recovery guidance while redacting unknown transport failures.
 `sync/engine/contexts.ts` binds planners and transfers directly to their dependencies.
 The engine supplies live state, pending paths, lifecycle guards and reconciliation;
 planner and transfer calls do not round-trip through engine forwarding methods.
-The ordered completion of the initial configuration pull and reminder setup lives in `sync/initial-setup.ts`.
+The ordered completion of the initial configuration pull and reminder setup lives in `sync/engine/initial-setup.ts`.
 Planner cancellation checks, transfer baseline reads and workflow setup completion
 are required context dependencies, including in test fixtures.
 `sync/planner/types.ts` owns `FullSyncPlan`, shared by the planner and the workflow
@@ -516,7 +516,7 @@ exposes a synchronous preparation guard for updates, without controlling the edi
 focus restoration together; `PwaRemindersAppShell` renders that navigation state.
 
 `protocol/shared-settings.ts` defines and validates shared settings for both hosts.
-`sync/shared-settings.ts` applies them to plugin settings. Production Worker modules
+`sync/connection/shared-settings.ts` applies them to plugin settings. Production Worker modules
 may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
 reminder and Reading domain folders, release metadata and the PWA shell in
 `pwa/shell/`. `scripts/worker-import-boundary.mjs` enforces it through ESLint.

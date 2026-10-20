@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { createEmptySyncResult } from '../sync-result';
 import type { PreparedUpload } from '../types';
 import type { QueueFlushContext, QueueUploadFailure } from './flush-types';

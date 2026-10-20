@@ -1,5 +1,5 @@
 import type { FileEntry } from '../../protocol/sync-types';
-import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from '../preview-format';
+import { decodePreviewText, isBinaryPreviewPath, MAX_PREVIEW_BYTES } from './preview-format';
 import { sha256Hex } from '../../platform/sha256';
 
 export type HistoryRestorePreview = { current: string; saved: string } | { unavailable: string };

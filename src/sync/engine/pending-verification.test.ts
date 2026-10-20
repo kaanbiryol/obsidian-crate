@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { arrayBufferToBase64 } from '../encoding';
 import { createHarness, createSyncResult, spyOnIncrementalSync, toArrayBuffer, type Harness } from './engine-test-harness';

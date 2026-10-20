@@ -1,4 +1,4 @@
-import type { PendingDiff } from '../../sync/pending-diff';
+import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { buildDiff } from './diff-model';
 import { renderDiffLines } from './diff-renderer';
 

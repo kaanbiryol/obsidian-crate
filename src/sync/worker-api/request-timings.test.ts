@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient, type ApiHttpTransport } from './http';
-import { normalizeSyncTimings } from '../timings';
+import { normalizeSyncTimings } from '../diagnostics/timings';
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('aggregates every request, including failures, beyond the diagnostic history limit', async () => {

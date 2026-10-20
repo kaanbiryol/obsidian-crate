@@ -1,7 +1,7 @@
 import type CratePlugin from '../../plugin/CratePlugin';
 import { readFolderMoves } from '../../plugin/encryption-folder-move-journal';
-import { LocalManifest } from '../manifest';
-import { getCheckpointAuthority } from '../worker-url';
+import { LocalManifest } from '../manifest/manifest';
+import { getCheckpointAuthority } from '../connection/worker-url';
 import { shouldIgnoreSyncPath } from '../engine/ignore';
 
 /** Called only inside runEncryptionSetup, after the stopped engine's I/O settles. */

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
 import { arrayBufferToBase64 } from '../encoding';
-import { VERIFICATION_FILE_BUDGET } from '../content-verifier';
-import { MarkdownBaseCache } from '../markdown-base-cache';
+import { VERIFICATION_FILE_BUDGET } from './content-verifier';
+import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { sha256Hex } from '../../platform/sha256';
 
 const path = 'note.md';

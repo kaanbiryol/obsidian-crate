@@ -1,15 +1,15 @@
 import type { Vault } from 'obsidian';
 import { findHistorySource } from './source';
 import type { FileEntry } from '../../protocol/sync-types';
-import type { LocalManifestView } from '../manifest';
+import type { LocalManifestView } from '../manifest/manifest';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertPortablePaths } from '../../protocol/portable-path';
 import type { SyncApiClient } from '../api';
-import { getAllVaultFiles } from '../file-discovery';
-import { assertLocalSyncPath } from '../local-path-safety';
-import { readLocalFileEntry } from '../local-file-entry';
-import { deletePathLocallyIfUnchanged } from '../planner/helpers';
-import { applyRemoteContentIfUnchanged, TEXT_PATH } from '../local-apply';
+import { getAllVaultFiles } from '../local/file-discovery';
+import { assertLocalSyncPath } from '../local/local-path-safety';
+import { readLocalFileEntry } from '../local/local-file-entry';
+import { deletePathLocallyIfUnchanged } from '../local/local-delete';
+import { applyRemoteContentIfUnchanged, TEXT_PATH } from '../local/local-apply';
 import { loadHistoryRestorePreview, type HistoryRestorePreview } from './restore-preview';
 import { sha256Hex } from '../../platform/sha256';
 

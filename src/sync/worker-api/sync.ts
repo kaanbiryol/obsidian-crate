@@ -1,9 +1,9 @@
 import type { ConnectionTestResult } from '../types';
 import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
-import type { JournalUpload } from '../upload-intent';
+import type { JournalUpload } from '../durability/upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE, parseEncryptedFile } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
-import type { RestoreIntent } from '../restore-intent';
+import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';

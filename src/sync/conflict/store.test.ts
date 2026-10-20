@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAllVaultFiles } from '../file-discovery';
+import { getAllVaultFiles } from '../local/file-discovery';
 import { ConflictStore } from './store';
 import { createDeferred } from '../runtime/runtime-test-harness';
 
-vi.mock('../file-discovery', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('../file-discovery')>();
+vi.mock('../local/file-discovery', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../local/file-discovery')>();
 	return { ...actual, getAllVaultFiles: vi.fn() };
 });
 

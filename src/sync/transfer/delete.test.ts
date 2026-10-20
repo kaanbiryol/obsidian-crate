@@ -3,7 +3,7 @@ import { createDeferred } from '../runtime/runtime-test-harness';
 import { deleteRemoteFiles } from './delete';
 import { createEmptySyncResult } from '../sync-result';
 import { HttpError } from '../api';
-import type { ConditionalDeleteApi } from '../delete-batches';
+import type { ConditionalDeleteApi } from './delete-batches';
 
 const files = (count: number) => Array.from({ length: count }, (_, i) => ({ path: `old-${i}.md`, expectedHash: 'base', expectedRevision: `r${i}` }));
 

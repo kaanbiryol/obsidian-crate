@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../../schema.sql?raw';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
-import { pendingChangeKey } from '../../../sync/pending-change';
+import { pendingChangeKey } from '../../../sync/pending/pending-change';
 
 let device: SyncTestDevice;
 beforeEach(async () => {

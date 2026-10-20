@@ -1,9 +1,9 @@
 import { TFile, type App } from 'obsidian';
-import { isHiddenPath } from '../file-discovery';
-import { assertLocalSyncPath } from '../local-path-safety';
-import { isCurrentVaultFile } from '../vault-file-identity';
-import { replaceLocalFileWithRecovery } from '../local-recovery-write';
-import { deletePathLocallyIfUnchanged } from '../planner/helpers';
+import { isHiddenPath } from '../local/file-discovery';
+import { assertLocalSyncPath } from '../local/local-path-safety';
+import { isCurrentVaultFile } from '../local/vault-file-identity';
+import { replaceLocalFileWithRecovery } from '../local/local-recovery-write';
+import { deletePathLocallyIfUnchanged } from '../local/local-delete';
 import { sha256Hex } from '../../platform/sha256';
 
 /** Hidden configuration files are not represented by Obsidian TFiles. */

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PendingComparisons } from './pending-comparisons';
-import type { PendingDiff } from '../../sync/pending-diff';
+import type { PendingDiff } from '../../sync/pending/pending-diff';
 
 const snapshot: PendingDiff = { before: 'old', after: 'new', beforeSize: 3, afterSize: 3, kind: 'modified' };
 function deferred() {

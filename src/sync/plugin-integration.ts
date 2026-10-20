@@ -7,7 +7,7 @@ import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime/runtime';
 import { notifyConflicts } from './conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
-import { applySharedSettings } from './shared-settings';
+import { applySharedSettings } from './connection/shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';

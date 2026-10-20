@@ -1,6 +1,6 @@
 import { TFile, TFolder, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
-import { isCurrentVaultFile } from '@/sync/vault-file-identity';
+import { isCurrentVaultFile } from '@/sync/local/vault-file-identity';
 import type { ReadingFile, ReadingVault } from './data/library';
 
 /** Bind Reading snapshots to Obsidian file identities, even across equal-mtime edits. */

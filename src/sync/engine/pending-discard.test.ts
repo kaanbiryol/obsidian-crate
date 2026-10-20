@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FileEntry } from '../../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';

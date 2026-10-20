@@ -1,8 +1,8 @@
 import { recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
-import { applyRemoteContentIfUnchanged } from "../local-apply";
-import { recordAppliedContent } from '../applied-content';
+import { applyRemoteContentIfUnchanged } from "../local/local-apply";
+import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import { createLogger, errorMessage } from "../logger";
 import type { SyncResult } from '../types';

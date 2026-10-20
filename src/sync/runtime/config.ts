@@ -1,7 +1,7 @@
 import type { SharedSettings } from '../../protocol/shared-settings';
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../../plugin/secret-storage";
-import { requireNormalizedWorkerUrl } from "../worker-url";
+import { requireNormalizedWorkerUrl } from "../connection/worker-url";
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 import type { SyncSettings } from '../settings';

@@ -1,9 +1,9 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { createAbortError } from '../abort';
 import type { ConnectionTestResult } from '../types';
 import { createRuntimeHistoryRestore, loadRuntimeHistoryComparison } from './history-workflow';
 import type { SharedCheckpoint } from '../../protocol/history-checkpoints';
-import { loadFileHistoryPreview, loadCurrentSyncedPreview } from '../file-history-preview';
+import { loadFileHistoryPreview, loadCurrentSyncedPreview } from '../history/file-history-preview';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { createConflictReview } from '../conflict/review';
 import type { SyncActivityProgress } from '../types';
@@ -20,7 +20,7 @@ import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../.
 import { SyncApiClient } from '../api';
 import { isConflictFile, notifyConflicts } from '../conflict/conflict';
 import { SyncEngine } from '../engine/engine';
-import { buildDiagnosticExport } from '../diagnostic-export';
+import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import {
 	buildSharedSettings,
 	deleteManifestFile,

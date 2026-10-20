@@ -1,7 +1,7 @@
 import type { TAbstractFile } from 'obsidian';
 import { TFolder } from 'obsidian';
 import type { SyncResult, SyncState } from '../types';
-import { pendingChangeKey, type PendingChange } from '../pending-change';
+import { pendingChangeKey, type PendingChange } from '../pending/pending-change';
 
 export interface QueueDebounceContext {
 	pendingPaths: Set<string>;

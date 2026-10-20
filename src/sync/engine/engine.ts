@@ -1,23 +1,23 @@
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import type { EngineFileOperations } from './file-operations';
 import { createEngineHistory } from './history';
 import { createEnginePendingChanges } from './pending-changes';
 import { getSyncIssues, recordSyncError, syncErrorIssues } from '../issues';
-import { findStartupPendingPaths } from '../startup-pending';
-import { SyncTimingRecorder } from '../timings';
+import { findStartupPendingPaths } from '../pending/startup-pending';
+import { SyncTimingRecorder } from '../diagnostics/timings';
 /**
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
 import { TFolder, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
 import { SyncApiClient } from '../api';
-import { LocalManifest } from '../manifest';
-import { MarkdownBaseCache } from '../markdown-base-cache';
+import { LocalManifest } from '../manifest/manifest';
+import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { ConflictStore } from '../conflict/store';
 import { isConflictFile } from '../conflict/conflict';
-import { isHiddenPath, type VaultFile } from '../file-discovery';
-import { assertLocalSyncPath } from '../local-path-safety';
+import { isHiddenPath, type VaultFile } from '../local/file-discovery';
+import { assertLocalSyncPath } from '../local/local-path-safety';
 import { SyncQueueController } from '../queue/controller';
 import { createAbortError, isAbortError as isSyncAbortError } from '../abort';
 import { createLogger, errorMessage } from '../logger';
@@ -30,7 +30,7 @@ import {
 	shouldIgnoreConfiguredPath,
 	shouldIgnoreSyncPath,
 } from './ignore';
-import { hasLocalFileChanges } from '../local-file-changes';
+import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import {
 	runForceFullSyncWorkflow,
@@ -39,13 +39,13 @@ import {
 } from './workflows';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
-import { reconcileQueuePaths } from '../reconcile-paths';
+import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult, finalizeSyncResult } from '../sync-result';
 import { mergeSyncResults } from '../sync-result';
-import { getCheckpointAuthority } from '../worker-url';
-import { LocalContentVerifier } from '../content-verifier';
-import { verifyUnchangedPendingPaths } from '../pending-verification';
+import { getCheckpointAuthority } from '../connection/worker-url';
+import { LocalContentVerifier } from './content-verifier';
+import { verifyUnchangedPendingPaths } from '../pending/pending-verification';
 import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
 
 const logger = createLogger('SyncEngine');

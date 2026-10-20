@@ -1,0 +1,121 @@
+import { SyncWorkerApi } from '../worker-api/sync';
+import { InitialImportApi } from '../worker-api/initial-import';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildDiagnosticExport } from './diagnostic-export';
+import { createRuntimeHarness } from '../runtime/runtime-test-harness';
+import { normalizeCrateSettings } from '../../plugin/settings';
+import { SyncApiClient } from '../api';
+import { WorkerApiHttpClient, type ApiHttpTransport } from '../worker-api/http';
+import { MAX_REQUEST_DIAGNOSTICS } from './request-diagnostics';
+import { SyncEngine } from '../engine/engine';
+import { runPeriodicCheck } from '../engine/engine-test-harness';
+
+const requestId = 'e9ffeb0c-7610-4cdb-a129-913c45c2a053';
+const sensitive = 'private-client-name-and-secret';
+const response = (status = 200) => ({ status, headers: { 'X-Crate-Request-Id': requestId, 'Set-Cookie': sensitive }, text: JSON.stringify({ ok: true, private: sensitive }), arrayBuffer: new ArrayBuffer(0) });
+beforeEach(() => {
+  vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
+  vi.spyOn(InitialImportApi.prototype, 'begin').mockResolvedValue(null);
+});
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe('safe diagnostic export', () => {
+	it('correlates actual outgoing IDs and responses, whitelists fields and bounds storage', async () => {
+		const transport = vi.fn<ApiHttpTransport>(async () => response());
+		const client = new WorkerApiHttpClient(`https://${sensitive}.example`, sensitive, transport);
+		await client.requestJson(`/sync/download?path=${sensitive}.md`);
+		const requests = client.getRequestDiagnostics();
+		expect(requests.clientSession).toBe(transport.mock.calls[0]![0].headers!['X-Crate-Client-Session']);
+		expect(requests.requests[0]).toMatchObject({ operationId: transport.mock.calls[0]![0].headers!['X-Crate-Operation-Id'], requestId, route: '/sync/download', status: 200, outcome: 'response' });
+		for (let i = 0; i < MAX_REQUEST_DIAGNOSTICS; i++) await client.requestJson('/health');
+		expect(client.getRequestDiagnostics().requests).toHaveLength(MAX_REQUEST_DIAGNOSTICS);
+		expect(JSON.stringify(client.getRequestDiagnostics())).not.toContain(sensitive);
+	});
+
+	it('records failed/HTTP-error attempts without exporting error bodies or headers', async () => {
+		const transport = vi.fn<ApiHttpTransport>().mockRejectedValueOnce(new Error(sensitive)).mockResolvedValueOnce(response(503));
+		const client = new WorkerApiHttpClient('https://worker.example', sensitive, transport);
+		await expect(client.requestJson('/health')).rejects.toThrow();
+		await expect(client.requestJson('/health')).rejects.toThrow();
+		expect(client.getRequestDiagnostics().requests.map(({ status, outcome }) => ({ status, outcome }))).toEqual([{ status: 0, outcome: 'failed' }, { status: 503, outcome: 'response' }]);
+		expect(JSON.stringify(client.getRequestDiagnostics())).not.toContain(sensitive);
+	});
+
+	it('persists safe correlation through settings reload while excluding local history details from export', async () => {
+		const h = createRuntimeHarness({ automaticSync: false });
+		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
+		await h.runtime.initialize({ skipStartupSync: true });
+		const client = h.runtime.getApiClient()!;
+		const source = new WorkerApiHttpClient('https://worker.example', sensitive, async () => response());
+		await source.requestJson('/sync/check');
+		vi.spyOn(client, 'getRequestDiagnostics').mockReturnValue(source.getRequestDiagnostics());
+		vi.spyOn(client, 'getManifest').mockRejectedValue(new Error(`${sensitive}.md: ${sensitive}`));
+		await h.runtime.sync();
+		const settings = normalizeCrateSettings(h.settings, '.obsidian');
+		expect(settings.syncHistory[0]?.requestDiagnostics?.requests[0]?.requestId).toBe(requestId);
+		const report = buildDiagnosticExport(settings, h.runtime.getState(), '0.1.0');
+		expect(report).toContain(requestId);
+		expect(report).not.toContain(sensitive);
+		expect(JSON.parse(report)).toMatchObject({ history: [{ success: false, errors: 1 }] });
+		settings.syncHistory[0]!.timings = { totalMs: 100, phases: { uploading: 90 }, requests: {
+			count: 3, totalMs: 150, maxMs: 75, serverCount: 2, serverMs: 80,
+			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1 },
+		} };
+		const measured = buildDiagnosticExport(settings, h.runtime.getState(), '0.1.0');
+		expect(JSON.parse(measured)).toMatchObject({ history: [{ timings: { requests: {
+			d1: { rowsRead: 25, rowsWritten: 12, reportedRequests: 2, completeRequests: 1 },
+		} } }] });
+		expect(measured).not.toContain(sensitive);
+		h.runtime.destroy();
+	});
+
+	it('rejects arbitrary strings smuggled into persisted correlation fields', () => {
+		const h = createRuntimeHarness();
+		const value = { clientSession: requestId, requests: [{ at: new Date().toISOString(), operationId: requestId, method: 'GET', route: `/sync/${sensitive}`, status: 200, outcome: 'response', requestId: sensitive, headers: sensitive }] };
+		const report = buildDiagnosticExport(h.settings, h.runtime.getState(), '0.1.0', value as never);
+		expect(report).not.toContain(sensitive);
+		expect(JSON.parse(report)).toMatchObject({ requests: { requests: [{ route: 'other' }] } });
+	});
+});
+
+describe('periodic sync activity', () => {
+	it.each([true, false])('records a periodic result once and persists it (success: %s)', async success => {
+		const h = createRuntimeHarness({ automaticSync: true, lastSeq: 10 });
+		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
+		await h.runtime.initialize({ skipStartupSync: true });
+		vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: true, lastSeq: 11 });
+		const changes = vi.spyOn(SyncWorkerApi.prototype, 'getChanges').mockResolvedValue({ changes: [], hasMore: false, lastSeq: 11 });
+		if (!success) changes.mockRejectedValue(new Error('temporary changelog failure'));
+		vi.spyOn(SyncApiClient.prototype, 'getManifest').mockRejectedValue(new Error('temporary manifest failure'));
+		const engine = (h.runtime as unknown as { syncEngine: SyncEngine }).syncEngine;
+		await runPeriodicCheck(engine);
+		expect(h.settings.syncHistory).toHaveLength(1);
+		expect(h.settings.syncHistory[0]?.success).toBe(success);
+		expect(h.persistSettings).toHaveBeenCalledOnce();
+		h.runtime.destroy();
+	});
+
+	it('does not create history for an idle check', async () => {
+		const h = createRuntimeHarness({ automaticSync: true });
+		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
+		await h.runtime.initialize({ skipStartupSync: true });
+		const check = vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: false, lastSeq: 0 });
+		const engine = (h.runtime as unknown as { syncEngine: SyncEngine }).syncEngine;
+		await runPeriodicCheck(engine);
+		expect(check).toHaveBeenCalledOnce();
+		expect(h.settings.syncHistory).toEqual([]);
+		expect(h.persistSettings).not.toHaveBeenCalled();
+		h.runtime.destroy();
+	});
+});
+
+it('includes observed server versions and marks unavailable versions as unknown', () => {
+	const settings = normalizeCrateSettings({}, '.obsidian');
+	const state = { status: 'idle' as const, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
+	const server = { service: 'crate' as const, serverVersion: 'crate', serverRevision: 43, pwaAssetVersion: 'build-123',
+		deploymentFingerprint: 'a'.repeat(64), protocol: { current: 10, oldestCompatible: 7 }, capabilities: [] };
+	expect(JSON.parse(buildDiagnosticExport(settings, state, '0.2.0', undefined, server))).toMatchObject({
+		pluginVersion: '0.2.0', serverRevision: 43, serverWebAppBuild: 'build-123', serverFingerprint: 'a'.repeat(64),
+	});
+	expect(JSON.parse(buildDiagnosticExport(settings, state, '0.2.0'))).toMatchObject({ serverRevision: null, serverWebAppBuild: null });
+});

@@ -3,12 +3,12 @@ import { openFile, openFileMetadata, sealFile, type PrivateFileMetadata } from '
 import { ENCRYPTED_FILE_CONTENT_TYPE, validateFileDescriptor } from '../../encryption/file-format';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
-import type { EncryptedUploadWire, JournalUpload } from '../upload-intent';
+import type { EncryptedUploadWire, JournalUpload } from '../durability/upload-intent';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import { parseFileMetadata } from '../worker-api/read-contracts';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
 import { validateEncryptedSettings, type EncryptedSettings } from '../../encryption/settings-format';
-import type { RestoreIntent } from '../restore-intent';
+import type { RestoreIntent } from '../durability/restore-intent';
 import { parseFileVersions } from '../worker-api/version-contract';
 import type { UploadResult } from '../../protocol/sync-types';
 import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../protocol/sync-limits';

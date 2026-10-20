@@ -1,5 +1,5 @@
 import { TFile, type Vault } from 'obsidian';
-import { getExtensionFromPath, isHiddenPath } from '../../sync/file-discovery';
+import { getExtensionFromPath, isHiddenPath } from '../../sync/local/file-discovery';
 
 export const TEST_PLUGIN_DIR = '.obsidian/plugins/crate';
 

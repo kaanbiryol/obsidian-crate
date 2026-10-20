@@ -1,6 +1,6 @@
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import type { SyncApiClient } from '../../sync/api';
-import type { DiagnosticResult } from '../../sync/diagnostics';
+import type { DiagnosticResult } from '../../sync/diagnostics/checks';
 import type { CrateSettings } from '../../plugin/settings-types';
 
 interface CachedDiagnosticsState {

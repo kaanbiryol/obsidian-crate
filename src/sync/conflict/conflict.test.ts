@@ -7,7 +7,7 @@ import {
 	getOriginalPathFromConflictFile,
 	isConflictFile,
 } from './conflict';
-import { classifyPaths } from '../reconciliation';
+import { classifyPaths } from '../planner/reconciliation';
 
 const CONFIG_DIR = '.vault-config';
 

@@ -1,17 +1,17 @@
-import { pendingChangeKey, decodePendingChange } from '../pending-change';
+import { pendingChangeKey, decodePendingChange } from '../pending/pending-change';
 import type { Vault } from 'obsidian';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { SyncApiClient } from '../api';
-import type { LocalManifest } from '../manifest';
-import type { MarkdownBaseCache } from '../markdown-base-cache';
+import type { LocalManifest } from '../manifest/manifest';
+import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import type { SyncQueueController } from '../queue/controller';
 import type { SyncResult } from '../types';
-import { assertLocalSyncPath } from '../local-path-safety';
-import { readLocalFileEntry } from '../local-file-entry';
-import { UNVERIFIED_MODIFIED } from '../applied-content';
-import { loadRemotePendingBase } from '../pending-baseline';
-import { loadPendingDiff } from '../pending-diff';
-import { createPendingDiscard } from '../pending-discard';
+import { assertLocalSyncPath } from '../local/local-path-safety';
+import { readLocalFileEntry } from '../local/local-file-entry';
+import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
+import { loadRemotePendingBase } from '../pending/pending-baseline';
+import { loadPendingDiff } from '../pending/pending-diff';
+import { createPendingDiscard } from '../pending/pending-discard';
 import { createEmptySyncResult } from '../sync-result';
 
 interface EnginePendingChangesContext {

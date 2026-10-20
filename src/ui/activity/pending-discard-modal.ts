@@ -1,5 +1,5 @@
 import { Notice, type App } from 'obsidian';
-import type { PendingDiscardReview } from '../../sync/pending-discard';
+import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
 import { createModalFooter } from '../plugin/modal-elements';
 import { SharedModal } from '../plugin/SharedModal';
 

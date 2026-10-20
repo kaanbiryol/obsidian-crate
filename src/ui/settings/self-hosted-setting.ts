@@ -1,5 +1,5 @@
 import { Notice, Setting, type TextComponent } from 'obsidian';
-import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../sync/self-hosted-connection';
+import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../sync/connection/self-hosted-connection';
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { selfHostedConnectionMessage } from './self-hosted-errors';

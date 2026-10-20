@@ -1,6 +1,6 @@
 import type { BatchUploadFile } from '../../protocol/sync-types';
 import { base64ToArrayBuffer } from '../encoding';
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeferred } from '../runtime/runtime-test-harness';

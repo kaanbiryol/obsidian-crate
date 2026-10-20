@@ -1,13 +1,13 @@
-import type { PlannedContent } from '../planned-content';
+import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, UploadDiff } from '../types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
-import type { VaultFile } from '../file-discovery';
-import type { InitialConfigPull } from '../initial-config-pull';
-import type { LocalManifestView } from '../manifest';
+import type { VaultFile } from '../local/file-discovery';
+import type { InitialConfigPull } from '../engine/initial-config-pull';
+import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncSettings } from '../settings';
 
 interface PlannerManifest {

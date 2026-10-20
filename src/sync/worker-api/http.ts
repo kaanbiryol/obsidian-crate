@@ -1,13 +1,13 @@
 import { D1_USAGE_HEADER, parseD1Usage } from '@/protocol/d1-usage';
-import { emptyRequestTimings } from '../timings';
+import { emptyRequestTimings } from '../diagnostics/timings';
 import type { CrateServerInfo } from '../../protocol/server-info';
-import { normalizeUploadOperationIds } from '../request-diagnostics';
+import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
 import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../logger';
 import { createAbortError } from '../abort';
-import { normalizeWorkerUrl } from '../worker-url';
-import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../request-diagnostics';
+import { normalizeWorkerUrl } from '../connection/worker-url';
+import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { isAbortError } from '../abort';
 import { ENCRYPTION_CAPABILITY, ENCRYPTION_STATE_HEADER } from '../../encryption/server-state';
 

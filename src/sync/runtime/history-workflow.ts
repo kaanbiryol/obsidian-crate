@@ -1,4 +1,4 @@
-import { decodePendingChange } from '../pending-change';
+import { decodePendingChange } from '../pending/pending-change';
 import { createAbortError } from '../abort';
 import type { SyncEngine } from '../engine/engine';
 import type { SyncHistoryEntry, SyncResult } from '../types';

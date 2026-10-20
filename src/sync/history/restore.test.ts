@@ -4,8 +4,8 @@ import { createHistoryRestore } from './restore';
 import { HistoryCheckpoints } from './checkpoint';
 import { sha256Hex } from '../../platform/sha256';
 
-vi.mock('../file-discovery', async importOriginal => ({
-    ...await importOriginal<typeof import('../file-discovery')>(),
+vi.mock('../local/file-discovery', async importOriginal => ({
+    ...await importOriginal<typeof import('../local/file-discovery')>(),
     getAllVaultFiles: async (vault: { getFiles(): Array<{ path: string }> }, ignore: (path: string) => boolean) => vault.getFiles().filter(file => !ignore(file.path)),
 }));
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;

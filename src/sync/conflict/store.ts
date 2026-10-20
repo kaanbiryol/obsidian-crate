@@ -3,7 +3,7 @@ import { isRecord } from '../../platform/validation';
 import type { ConflictRecord } from '../types';
 import { createLogger, errorMessage } from '../logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
-import { getAllVaultFiles } from '../file-discovery';
+import { getAllVaultFiles } from '../local/file-discovery';
 import { createAbortError } from '../abort';
 import { sha256Hex } from '../../platform/sha256';
 

@@ -1,13 +1,13 @@
 import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { Vault } from 'obsidian';
 import { recordSyncError } from '../issues';
-import { getAllVaultFiles, type VaultFile } from '../file-discovery';
+import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
 } from '../sync-result';
 import { createLogger, errorMessage } from '../logger';
-import type { LocalManifestView } from '../manifest';
+import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';
 import type { PreparedUpload, SyncResult, SyncState } from '../types';
 import {

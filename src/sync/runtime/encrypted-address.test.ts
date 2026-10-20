@@ -5,8 +5,8 @@ import { readFolderMoves, writeFolderMoves } from '../../plugin/encryption-folde
 import { SecretStorageService } from '../../plugin/secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
-import { LocalManifest } from '../manifest';
-import { getCheckpointAuthority } from '../worker-url';
+import { LocalManifest } from '../manifest/manifest';
+import { getCheckpointAuthority } from '../connection/worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { createRuntimeHarness } from './runtime-test-harness';
 import { resetStoredSyncState } from './history';

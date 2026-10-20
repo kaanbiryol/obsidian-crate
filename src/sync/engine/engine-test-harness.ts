@@ -6,7 +6,7 @@ import { createEmptySyncResult } from '../sync-result';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { FileManifest, UploadResult } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
-import type { LocalManifest } from '../manifest';
+import type { LocalManifest } from '../manifest/manifest';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;

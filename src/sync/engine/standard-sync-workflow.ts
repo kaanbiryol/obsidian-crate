@@ -1,5 +1,5 @@
 import type { DeleteRemoteFiles } from '../transfer/delete';
-import { pendingChangeKey } from '../pending-change';
+import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError } from '../issues';
 import {
 	createEmptySyncResult,

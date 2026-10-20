@@ -1,5 +1,5 @@
 import { Menu, Notice, Platform, setIcon } from 'obsidian';
-import { decodePendingChange } from '../../sync/pending-change';
+import { decodePendingChange } from '../../sync/pending/pending-change';
 import type { PendingFileAction } from './file-actions';
 import type { PendingRowSelection } from './pending-row-selection';
 
