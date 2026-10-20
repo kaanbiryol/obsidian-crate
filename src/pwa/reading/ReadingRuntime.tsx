@@ -9,6 +9,7 @@ import { useFeatureSettings, useSettingsOpen } from '../settings-context';
 import { readingSyncStatus } from '../sync/reading-status';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { assertReadingSession, exportReadingData } from './storage';
+import { sameReadingSession } from './session';
 import { useReadingSession } from './useReadingSession';
 import { useReadingSync } from './useReadingSync';
 import { useReadingMutations } from './useReadingMutations';
@@ -41,7 +42,7 @@ function useReadingController() {
     feature: 'Reading', showToast,
     isCurrent: () => { if (!session) return false; try { assertReadingSession(session); return true; } catch { return false; } },
   });
-  const confirmed = Boolean(session && syncedSession?.id === session.id && syncedSession.token === session.token && syncedSession.generation === session.generation);
+  const confirmed = Boolean(session && sameReadingSession(syncedSession, session));
   const status = readingSyncStatus({ pending, isOffline, loading: !cache, refreshing: syncing, confirmed, error, recovery });
   const readingDisabled = !session && connectionState !== 'available';
   useFeatureSettings('reading', {

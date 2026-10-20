@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createReminderOutbox } from './reminder-outbox';
+import { createReminderOutbox, reminderNeedsAttention } from './reminder-outbox';
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ReminderRecord } from '../types';
@@ -434,5 +434,15 @@ describe('optimistic reminder outbox', () => {
 		await draining;
 		expect(state.storage.load()).toMatchObject([{ status: 'uncertain', operationId: change.operationId, body: change.body }]);
 		expect(state.commit).not.toHaveBeenCalled();
+	});
+});
+
+describe('reminderNeedsAttention', () => {
+	it('flags rejected commands and uncertain ones after their automatic retries', () => {
+		const change = completion();
+		expect(reminderNeedsAttention({ ...change, status: 'failed' })).toBe(true);
+		expect(reminderNeedsAttention({ ...change, status: 'uncertain', attempts: 2 })).toBe(false);
+		expect(reminderNeedsAttention({ ...change, status: 'uncertain', attempts: 3 })).toBe(true);
+		expect(reminderNeedsAttention({ ...change, status: 'pending', attempts: 3 })).toBe(false);
 	});
 });

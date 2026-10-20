@@ -5,6 +5,7 @@ import { LocalStateCipher } from '../../encryption/local-state';
 import { importNotificationFingerprintKey } from '../../encryption/reminder-projection';
 import { isEncryptionId } from '../../encryption/encoding';
 import { clearSessionStore } from '../storage/clear-session-store';
+import { abortTransaction } from '../storage/abort-transaction';
 import { openEncryptedDatabase } from '../storage/encrypted-storage-database';
 import { verifyScopeBinding, type BoundScopeState } from '../../encryption/scope-binding';
 
@@ -83,7 +84,7 @@ export async function rememberReminderKeys(grant: ReminderKeyGrant, isCurrent = 
 			if (!isCurrent()) throw new Error('Session changed before enrollment');
 			const tx = database.transaction('keys', 'readwrite');
 			const current = await tx.store.get(id(scope.vaultId, scope.scopeId));
-			if (current?.localState !== previous?.localState || !isCurrent()) { tx.abort(); await tx.done.catch(() => {}); throw new Error('Encryption enrollment changed in another tab. Retry the link.'); }
+			if (current?.localState !== previous?.localState || !isCurrent()) { await abortTransaction(tx); throw new Error('Encryption enrollment changed in another tab. Retry the link.'); }
 			await tx.store.put(stored, id(scope.vaultId, scope.scopeId));
 			await tx.done;
 			return stored;
@@ -114,7 +115,7 @@ export async function followEncryptionScope(previous: StoredReminderKeys, state:
 		const tx = db.transaction('keys', 'readwrite');
 		const current = await tx.store.get(id(previous.vaultId, previous.scopeId));
 		if (!current || !matches(current) || current.localState !== previous.localState || current.generation > state.generation || !isCurrent()) {
-			tx.abort(); await tx.done.catch(() => {}); throw new Error('The saved folder connection changed. Retry.');
+			await abortTransaction(tx); throw new Error('The saved folder connection changed. Retry.');
 		}
 		const next = { ...current, folderPath: state.scope.folderPath, localFolderPath: current.localFolderPath ?? previous.folderPath, generation: state.generation };
 		await tx.store.put(next, id(next.vaultId, next.scopeId)); await tx.done;

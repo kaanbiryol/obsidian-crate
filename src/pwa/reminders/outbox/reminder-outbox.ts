@@ -14,6 +14,11 @@ export function reminderRetryAt(change: PendingReminderChange): number | undefin
 	return change.status === 'uncertain' && !change.reviewRequired && hasAutomaticRetry(change.attempts) ? change.retryAt : undefined;
 }
 
+/** Rejected commands and uncertain ones past their automatic retry budget need the user. */
+export function reminderNeedsAttention(change: PendingReminderChange): boolean {
+	return change.status === 'failed' || change.status === 'uncertain' && !hasAutomaticRetry(change.attempts);
+}
+
 export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutation, commit, onChange, onScan = () => {}, onError, onSettled, withLock = work => work(), canSend = () => true }: {
 	storage: ReminderOutboxStorage;
 	apiFetch: ApiFetch;

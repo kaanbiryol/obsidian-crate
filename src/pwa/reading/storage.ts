@@ -2,6 +2,7 @@ import { decodeReadingValue } from './private-storage';
 import type { PendingReading } from './outbox';
 import { isPendingReading, isReadingDraft } from './storage-validation';
 import { downloadJson } from '../storage/download';
+import { abortTransaction } from '../storage/abort-transaction';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_SESSION_KEY, type ReadingSession } from './session';
 import { readingKeys, isPendingReadingKey } from './storage-keys';
@@ -80,7 +81,7 @@ export async function clearReadingData(isCurrent: () => boolean = () => true): P
   if (!isCurrent() || localStorage.getItem(READING_SESSION_KEY) !== null) return;
   const tx = db.transaction('values', 'readwrite');
   await tx.store.clear();
-  if (!isCurrent() || localStorage.getItem(READING_SESSION_KEY) !== null) { tx.abort(); await tx.done.catch(() => {}); return; }
+  if (!isCurrent() || localStorage.getItem(READING_SESSION_KEY) !== null) { await abortTransaction(tx); return; }
   await tx.done;
   window.dispatchEvent(new Event('crate-reading-change'));
 }
@@ -113,5 +114,5 @@ export async function pruneReadingAttempts(session: ReadingSession): Promise<voi
   try {
     for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !retained.has(key.slice(prefix.length))) await tx.store.delete(key);
     assertReadingSession(session); await tx.done;
-  } catch (error) { try { tx.abort(); } catch { /* already aborted */ } await tx.done.catch(() => {}); throw error; }
+  } catch (error) { await abortTransaction(tx); throw error; }
 }

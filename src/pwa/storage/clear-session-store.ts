@@ -1,4 +1,5 @@
 import type { DBSchema, IDBPDatabase, StoreNames } from 'idb';
+import { abortTransaction } from './abort-transaction';
 
 /** Recheck authority inside an active IDB transaction and roll back even when
  * reading session storage throws. A queued clear must not erase newer work. */
@@ -13,9 +14,6 @@ export async function clearSessionStore<DB extends DBSchema>(database: IDBPDatab
 		await tx.done;
 		committed = true;
 	} finally {
-		if (!committed) {
-			try { tx.abort(); } catch { /* A failed transaction may already have aborted. */ }
-			await tx.done.catch(() => {});
-		}
+		if (!committed) await abortTransaction(tx);
 	}
 }

@@ -6,6 +6,7 @@ import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionV
 import type { ScopedEncryptionState } from '../encryption/encryption-scope';
 import { unlockLocalState, type StoredReminderKeys } from '../encryption/encryption-keys';
 import { pendingReadingKey, forgetReadingKey, forgetReadingCapture } from '../encryption/encryption-fragments';
+import { abortTransaction } from '../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from './private-storage';
 import { assertReadingSession, type ReadingSession } from './session';
 import { readingDatabase } from './database';
@@ -50,7 +51,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
       }
       if (!current()) throw new Error('Reading sign-in changed.');
       await tx.done;
-    } catch (error) { try { tx.abort(); } catch { /* already aborted */ } await tx.done.catch(() => {}); throw error; }
+    } catch (error) { await abortTransaction(tx); throw error; }
     if (!current()) throw new Error('Reading sign-in changed.');
     rememberEncryptionUnlock(state.vaultId);
     verifiedIdentity = identity;

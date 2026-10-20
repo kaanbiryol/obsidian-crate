@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
-import { reminderRetryAt, type createReminderOutbox } from './outbox/reminder-outbox';
+import { reminderNeedsAttention, reminderRetryAt, type createReminderOutbox } from './outbox/reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from './outbox/reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
 import { createReminderSettlementChannel } from './outbox/reminder-settlement';
@@ -85,7 +85,7 @@ export function useReminderOutbox(options: {
 	useSyncFailureToast({
 		scope: authToken ? JSON.stringify([authToken, folderPath]) : null,
 		ready,
-		operationIds: changes.filter(change => change.status === 'failed' || change.status === 'uncertain' && change.attempts >= 3).map(change => change.operationId),
+		operationIds: changes.filter(reminderNeedsAttention).map(change => change.operationId),
 		feature: 'Reminder', showToast: options.showToast,
 		isCurrent: () => currentOutbox !== null && outboxRef.current === currentOutbox,
 	});

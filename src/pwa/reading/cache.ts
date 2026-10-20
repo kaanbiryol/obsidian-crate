@@ -3,6 +3,7 @@ import type { EncryptedReadingIndexEntry } from '@/pwa/reading/encrypted-api';
 import { isRecord } from '@/platform/validation';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
+import { abortTransaction } from '../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from './session';
 import { isReadingArticleCache, isReadingCache } from './storage-validation';
 import { isReadingItem } from './record-validation';
@@ -87,8 +88,7 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
     await tx.store.put(encodeReadingValue(readingKeys.list(session.id), cache), readingKeys.list(session.id));
     await tx.done;
   } catch (error) {
-    try { tx.abort(); } catch { /* The transaction may already have aborted. */ }
-    await tx.done.catch(() => {});
+    await abortTransaction(tx);
     throw error;
   }
   return cache;
@@ -141,5 +141,5 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
     await tx.store.put(encodeReadingValue(indexKey, { version: 1, entries: kept }), indexKey);
     assertReadingSession(session);
     await tx.done;
-  } catch (error) { try { tx.abort(); } catch { /* already aborted */ } await tx.done.catch(() => {}); throw error; }
+  } catch (error) { await abortTransaction(tx); throw error; }
 }

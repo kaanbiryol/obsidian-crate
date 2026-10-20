@@ -13,8 +13,11 @@ export function readingSession(): ReadingSession | null {
   if (value.source === 'reminders' && localStorage.getItem(AUTH_TOKEN_KEY) !== value.token) return null;
   return value;
 }
+/** The same sign-in: identity, credential and server generation all match. */
+export function sameReadingSession(current: ReadingSession | null | undefined, expected: ReadingSession): boolean {
+  return current?.id === expected.id && current.token === expected.token && current.generation === expected.generation;
+}
 export function assertReadingSession(session: ReadingSession) {
   const current = readingSession();
-  if (current?.id !== session.id || current.token !== session.token || current.generation !== session.generation
-    || current.folderPath !== session.folderPath) throw new Error('Reading sign-in changed. Reload this page.');
+  if (!sameReadingSession(current, session) || current?.folderPath !== session.folderPath) throw new Error('Reading sign-in changed. Reload this page.');
 }

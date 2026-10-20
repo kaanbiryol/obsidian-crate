@@ -2,6 +2,7 @@ import type { DBSchema } from 'idb';
 import { reminderOperationDay, REMINDER_RETRY_DAYS } from '../../protocol/reminder-operation';
 import { sealPrivateValue, openPrivateValue } from './private-storage';
 import { clearSessionStore } from '../storage/clear-session-store';
+import { abortTransaction } from '../storage/abort-transaction';
 import { openEncryptedDatabase } from '../storage/encrypted-storage-database';
 import { isSha256Hex } from '../../platform/validation';
 import { REMINDER_OUTBOX_PREFIX, REMINDER_DRAFT_PREFIX } from './outbox/reminder-storage-keys';
@@ -32,7 +33,7 @@ export async function saveEncryptedReminderAttempt(key: string, attempt: Encrypt
 		const tx = db.transaction('attempts', 'readwrite');
 		const raw = await tx.store.get(key);
 		const current = raw === undefined ? undefined : decodeAttempt(raw, key);
-		if (JSON.stringify(current) !== JSON.stringify(previous) || !isCurrent()) { tx.abort(); await tx.done.catch(() => {}); throw new Error('This encrypted save changed in another tab. Retry its saved attempt.'); }
+		if (JSON.stringify(current) !== JSON.stringify(previous) || !isCurrent()) { await abortTransaction(tx); throw new Error('This encrypted save changed in another tab. Retry its saved attempt.'); }
 		await tx.store.put(encoded, key); await tx.done;
 	} finally { db.close(); }
 }
@@ -56,7 +57,7 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; s
 		let cursor = await tx.store.openCursor(IDBKeyRange.bound(after?.startsWith(prefix) ? after : prefix, prefix + '\uffff', true, true));
 		let last: string | undefined, visited = 0;
 		while (cursor && visited++ < 100) {
-			if (!isCurrent()) { tx.abort(); await tx.done.catch(() => {}); return after; }
+			if (!isCurrent()) { await abortTransaction(tx); return after; }
 			last = cursor.key;
 			const operationId = cursor.key.slice(prefix.length), day = reminderOperationDay(operationId);
 			let attempt: EncryptedReminderAttempt | undefined;
@@ -67,7 +68,7 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; s
 			}
 			cursor = await cursor.continue();
 		}
-		if (!isCurrent()) { tx.abort(); await tx.done.catch(() => {}); return after; }
+		if (!isCurrent()) { await abortTransaction(tx); return after; }
 		await tx.done;
 		return cursor ? last : undefined;
 	} finally { db.close(); }

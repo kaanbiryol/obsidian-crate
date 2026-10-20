@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { connectReadingFromReminders, loadReading } from './api';
 import { assertReadingSession, pendingReading, readingLock, readingSession, readReadingCache, READING_SESSION_KEY, type ReadingCache, type ReadingSession } from './storage';
+import { sameReadingSession } from './session';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 
@@ -34,8 +35,8 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
     if (!current || !enabledRef.current || !isCurrentSession(current)) return;
     if (refreshing.current) {
       const queued = refreshQueued.current;
-      const sameSession = queued?.session.id === current.id && queued.session.token === current.token && queued.session.generation === current.generation;
-      refreshQueued.current = { session: current, mode: sameSession && queued.mode === 'manual' ? 'manual' : mode };
+      const sameSession = sameReadingSession(queued?.session, current);
+      refreshQueued.current = { session: current, mode: sameSession && queued?.mode === 'manual' ? 'manual' : mode };
       return;
     }
     refreshing.current = true; setSyncing(true); setSyncedSession(null);
@@ -46,7 +47,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
       if (current.source === 'reminders' && navigator.onLine) {
         const connected = await connectReadingFromReminders();
         if (!isCurrentSession(current)) return;
-        if (!connected || connected.id !== current.id || connected.token !== current.token || connected.generation !== current.generation) {
+        if (!sameReadingSession(connected, current)) {
           resetSession(); return;
         }
         if (!enabledRef.current) return;
@@ -104,7 +105,7 @@ export function useReadingSync({ session, ready, pending, publishSyncResult, isC
         resetSession(cause instanceof Error ? cause.message : 'Reading sign-in could not be read. Reconnect from Obsidian settings.');
         return;
       }
-      if (current?.id !== session.id || current.generation !== session.generation || current.token !== session.token) resetSession();
+      if (!sameReadingSession(current, session)) resetSession();
       else reload();
     };
     const storageChanged = (event: StorageEvent) => {
