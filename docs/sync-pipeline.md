@@ -47,7 +47,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
 Returns `null` to signal fallback to full sync (on cursor expiry or a non-transient error). Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault.
 
-Entry point: `planner/incremental.ts:runIncrementalSync()` (exported through `planner.ts`).
+Entry point: `planner/incremental.ts:runIncrementalSync()`.
 The coordinator retains phase ordering, progress, manifest saves and cursor
 advancement. `incremental-changelog.ts` handles pagination and path deduplication;
 `incremental-remote-reconciliation.ts` keeps fresh local reads and guarded deletes
@@ -64,7 +64,7 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 4. 3-way diff using `reconciliation.ts:classifyPaths()`, which applies the same `classifyPath()` policy as incremental sync
 5. Execute uploads, downloads, conflicts, deletes
 
-Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
+Entry point: `engine/engine.ts:sync()` -> `planner/full.ts:createFullSyncPlan()`
 
 On a device with no successful sync, no existing file checkpoint, and no eligible
 local files outside the active Obsidian configuration folder, the first sync
@@ -85,13 +85,13 @@ removed after successful reconciliation.
 
 First-time upload of all vault files. Files are prepared and uploaded in sequential byte-budgeted chunks so binary contents cannot accumulate without bound in memory.
 
-Entry point: `engine.ts:initialSync()`
+Entry point: `engine/engine.ts:initialSync()`
 
 ### 6. Force Full Sync
 
 Snapshots and clears the local manifest, uploads all local files regardless of hash, and only then deletes remote-only files. If any upload fails or the operation is aborted, remote deletion never begins and the previous local manifest is restored. Replaced and deleted remote objects remain recoverable for 30 days. Restoring a retained version verifies its bytes and stages them under a fresh immutable object key before the conditional metadata commit. The retained key stays eligible for its original expiry, so cleanup cannot remove the newly restored content. An uncertain commit response leaves the staged object for reference-aware orphan cleanup. Orphan reference lookups check at most 50 keys per query (100 D1 bindings across live files and retained versions).
 
-Entry point: `engine.ts:forceFullSync()`
+Entry point: `engine/engine.ts:forceFullSync()`
 
 ## Change Detection (3-Way Hash)
 
@@ -229,8 +229,8 @@ Release and transfer values are also checked against source in [current contract
 | Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
 | `BATCH_UPLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `engine/constants.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `engine/constants.ts` |
-| `MAX_RETRIES` | 3 | `engine.ts` |
-| `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
+| `MAX_RETRIES` | 3 | `engine/constants.ts` |
+| `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/constants.ts` |
 
 ## Batching Strategy
 
@@ -269,7 +269,7 @@ File events (create, modify, delete, rename) are debounced before syncing:
 
 If a local Markdown file changes after an automatic merge has already been accepted remotely, Crate keeps the uploaded local snapshot as a virtual merge base and immediately replans the path. This prevents both overwriting the newer local edit and duplicating changes already included in the remote merge.
 
-Implementation: `queue.ts`
+Implementation: `queue/controller.ts` and `queue/flush.ts`
 
 Selected-file sync classifies only the selected paths against current server
 metadata. Ordinary uploads and deletes use the shared transfer executors and
