@@ -40,7 +40,7 @@ function post(stub: DurableObjectStub, path: CoordinatorPath, init: Omit<Request
 	return stub.fetch(`https://do${path}`, { method: 'POST', ...init });
 }
 
-export function coordinatorStub(env: AlarmBinding): DurableObjectStub {
+function coordinatorStub(env: AlarmBinding): DurableObjectStub {
 	return roleStub(env, COORDINATOR_NAME);
 }
 
