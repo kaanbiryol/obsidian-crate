@@ -218,16 +218,9 @@ export async function loadCachedReminderSnapshot(folderPath: string): Promise<Ca
 	}
 }
 
-export async function saveCachedReminderSnapshot(
-	folderPath: string,
-	reminders: ReminderRecord[],
-	projects: string[],
-	savedAt = Date.now(),
-	etag?: string,
-	issues: ReminderSourceIssue[] = [],
-	deltaBase?: string,
-): Promise<void> {
-	const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt, etag, issues, ...(deltaBase ? { deltaBase } : {}) };
+export async function saveCachedReminderSnapshot(input: Omit<CachedReminderSnapshot, 'savedAt' | 'issues'> & Partial<Pick<CachedReminderSnapshot, 'savedAt' | 'issues'>>): Promise<void> {
+	const { folderPath, deltaBase, ...rest } = input;
+	const snapshot: CachedReminderSnapshot = { ...rest, folderPath, savedAt: input.savedAt ?? Date.now(), issues: input.issues ?? [], ...(deltaBase ? { deltaBase } : {}) };
 	try {
 		// Callers pass confirmed in-memory records, each validated when it entered the app.
 		if (!normalizeSnapshot(snapshot, folderPath, true)) { reportCacheProblem('damaged'); return; }

@@ -21,7 +21,7 @@ for (const browserType of [chromium, webkit]) {
 		const result = await page.evaluate(async () => {
 			const cache = reminderCache;
 			const reminder = id => ({ id, content: 'Task', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md' });
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder('original')], ['Inbox'], 100, 'old', [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder('original')], projects: ['Inbox'], savedAt: 100, etag: 'old', issues: [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }] });
 			const initial = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 200, 'old');
 			const refreshed = await cache.loadCachedReminderSnapshot('Reminders');
@@ -39,10 +39,10 @@ for (const browserType of [chromium, webkit]) {
 			const note = (id, filePath) => ({ ...reminder(id), filePath });
 			// Only notes whose reminders changed are rewritten; a note another tab
 			// replaced is rewritten too, so the metadata always matches the notes.
-			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b', 'Reminders/B.md')], ['Inbox'], 110, 'two-notes');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [note('a', 'Reminders/A.md'), note('b', 'Reminders/B.md')], projects: ['Inbox'], savedAt: 110, etag: 'two-notes' });
 			const versions = async () => Object.fromEntries((await readStore('notes')).map(row => [row.path, row.version]));
 			const before = await versions();
-			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 120, 'one-changed');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], projects: ['Inbox'], savedAt: 120, etag: 'one-changed' });
 			const afterPartial = await versions();
 			// Replace note A; another tab also updates the metadata in the same transaction.
 			const replaceNoteA = (withMetadata, nextVersion = 'other-tab') => new Promise((resolve, reject) => {
@@ -64,15 +64,15 @@ for (const browserType of [chromium, webkit]) {
 			await replaceNoteA(true);
 			const peerWritten = await cache.loadCachedReminderSnapshot('Reminders');
 			await replaceNoteA(true, 'other-tab-2');
-			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 130, 'after-peer');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], projects: ['Inbox'], savedAt: 130, etag: 'after-peer' });
 			const afterPeer = await versions();
 			await replaceNoteA(false);
 			const tampered = await cache.loadCachedReminderSnapshot('Reminders');
-			await cache.saveCachedReminderSnapshot('Reminders', [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], ['Inbox'], 140, 'after-tamper');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [note('a', 'Reminders/A.md'), note('b2', 'Reminders/B.md')], projects: ['Inbox'], savedAt: 140, etag: 'after-tamper' });
 			const merged = await cache.loadCachedReminderSnapshot('Reminders');
 			// A save reads no note records: the metadata lists the stored versions.
 			const many = Array.from({ length: 50 }, (_, index) => note(`n${index}`, `Reminders/N${index}.md`));
-			await cache.saveCachedReminderSnapshot('Reminders', many, ['Inbox'], 150, 'many');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: many, projects: ['Inbox'], savedAt: 150, etag: 'many' });
 			let noteRecordsRead = 0;
 			const originals = {};
 			for (const method of ['get', 'getAll', 'openCursor']) {
@@ -86,19 +86,19 @@ for (const browserType of [chromium, webkit]) {
 				};
 			}
 			try {
-				await cache.saveCachedReminderSnapshot('Reminders', [...many.slice(1), note('changed', 'Reminders/N0.md')], ['Inbox'], 160, 'one-of-many');
+				await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [...many.slice(1), note('changed', 'Reminders/N0.md')], projects: ['Inbox'], savedAt: 160, etag: 'one-of-many' });
 			} finally {
 				Object.assign(IDBObjectStore.prototype, originals);
 			}
 			const afterMany = await cache.loadCachedReminderSnapshot('Reminders');
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder('new')], ['Inbox'], 300, 'new');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder('new')], projects: ['Inbox'], savedAt: 300, etag: 'new' });
 			await cache.refreshCachedReminderSnapshot('Reminders', 400, 'old');
 			const afterStaleRefresh = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 250, 'new');
 			const afterOldTimestamp = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.clearCachedReminderSnapshots();
 			const cleared = await cache.loadCachedReminderSnapshot('Reminders');
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder('next')], ['Inbox'], 50, 'new');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder('next')], projects: ['Inbox'], savedAt: 50, etag: 'new' });
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Missing', 500, 'missing');
 			const missing = await cache.loadCachedReminderSnapshot('Missing');
@@ -116,7 +116,7 @@ for (const browserType of [chromium, webkit]) {
                 request.onerror = () => reject(request.error);
             });
             await cache.clearCachedReminderSnapshots();
-            await cache.saveCachedReminderSnapshot('Reminders', [reminder('fresh')], ['Inbox'], 600, 'fresh');
+            await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder('fresh')], projects: ['Inbox'], savedAt: 600, etag: 'fresh' });
             const fresh = await cache.loadCachedReminderSnapshot('Reminders');
             return { initial, refreshed, stored, before, afterPartial, peerWritten, afterPeer, tampered, merged, noteRecordsRead, afterMany, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing, unsupported, preservedVersion, fresh };
 		});
@@ -155,7 +155,7 @@ for (const browserType of [chromium, webkit]) {
 					tx.oncomplete = () => { db.close(); resolve(read.result); };
 				};
 			});
-			await cache.saveCachedReminderSnapshot('Private', [{ id: 'p', content: 'Plaintext task', priority: 4, completed: false, project: 'Inbox', filePath: 'Private/Inbox.md' }], ['Inbox'], 700, 'plain');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Private', reminders: [{ id: 'p', content: 'Plaintext task', priority: 4, completed: false, project: 'Inbox', filePath: 'Private/Inbox.md' }], projects: ['Inbox'], savedAt: 700, etag: 'plain' });
 			await cache.refreshCachedReminderSnapshot('Private', 800, 'plain');
 			const before = { notes: await count('notes'), freshness: await count('freshness') };
 			cache.requirePrivateStorageUnlock();

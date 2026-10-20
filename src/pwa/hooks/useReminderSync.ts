@@ -97,7 +97,8 @@ export function useReminderSync({
 	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
 	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
 
-	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects, etag?: string, deltaBase?: string, persist = true) => {
+	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects,
+		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean } = {}) => {
 		const savedAt = Date.now();
 		publishSnapshot(nextReminders, nextProjects);
 		etagRef.current = etag;
@@ -107,10 +108,11 @@ export function useReminderSync({
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
-		if (persist) await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, issuesRef.current, deltaBaseRef.current);
+		if (persist) await saveCachedReminderSnapshot({ folderPath: config.folderPath, reminders: nextReminders, projects: nextProjects,
+			savedAt, etag, issues: issuesRef.current, deltaBase: deltaBaseRef.current });
 	}, [config.folderPath, publishSnapshot]);
 	const commitReminderState = useCallback((nextReminders: ReminderRecord[], nextProjects?: string[], options?: { persist?: boolean }) =>
-		commitConfirmedSnapshot(nextReminders, nextProjects, undefined, undefined, options?.persist), [commitConfirmedSnapshot]);
+		commitConfirmedSnapshot(nextReminders, nextProjects, { persist: options?.persist }), [commitConfirmedSnapshot]);
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		hydratedCacheRef.current = true;
@@ -204,8 +206,9 @@ export function useReminderSync({
 				setError(null);
 				issuesRef.current = result.issues;
 				setIssues(result.issues);
-				void commitConfirmedSnapshot(result.reminders, result.projects, response.headers.get('ETag') ?? undefined,
-					response.headers.get('X-Crate-Delta-Base') ?? undefined);
+				void commitConfirmedSnapshot(result.reminders, result.projects, {
+					etag: response.headers.get('ETag') ?? undefined, deltaBase: response.headers.get('X-Crate-Delta-Base') ?? undefined,
+				});
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);

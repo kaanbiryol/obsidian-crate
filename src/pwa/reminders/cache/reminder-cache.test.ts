@@ -19,7 +19,7 @@ describe('PWA reminder cache', () => {
 	afterEach(() => vi.unstubAllGlobals());
 
 	it('treats unavailable IndexedDB as an empty best-effort cache', async () => {
-		await saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 1234, '"revision"');
+		await saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 1234, etag: '"revision"' });
 
 		await expect(loadCachedReminderSnapshot('Reminders')).resolves.toBeNull();
 	});

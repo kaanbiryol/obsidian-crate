@@ -147,16 +147,16 @@ describe('PWA reminder refresh around local writes', () => {
 		const issues = [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }];
 		await settle(0, new Response(JSON.stringify({ reminders: [original], projects: ['Inbox'], issues })), load());
 		expect(rendered.current.issues).toEqual(issues);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original], ['Inbox'], expect.any(Number), undefined, issues, undefined);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: expect.any(Number) as number, etag: undefined, issues, deltaBase: undefined });
 		const corrected = { ...original, content: 'Healthy reminder stays editable' };
 		await commit([corrected]);
 		expect(rendered.current.reminders).toEqual([corrected]);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), undefined, issues, undefined);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith({ folderPath: 'Reminders', reminders: [corrected], projects: ['Inbox'], savedAt: expect.any(Number) as number, etag: undefined, issues, deltaBase: undefined });
 		await settle(1, new Response(null, { status: 304 }), load());
 		expect(rendered.current.issues).toEqual(issues);
 		await settle(2, response([corrected]), load());
 		expect(rendered.current.issues).toEqual([]);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), 'latest-list', [], undefined);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith({ folderPath: 'Reminders', reminders: [corrected], projects: ['Inbox'], savedAt: expect.any(Number) as number, etag: 'latest-list', issues: [], deltaBase: undefined });
 	});
 
 	it('restores cached source issues after a network error and clears them on logout', async () => {
@@ -341,7 +341,7 @@ describe('delta refresh', () => {
 		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md', 'Reminders/Gone.md'], reminders: [edited], projects: ['Inbox', 'Work'], issues: [] }),
 			{ headers: { ETag: 'second', 'X-Crate-Delta-Base': '9.base' } }), pending);
 		expect(rendered.current.reminders).toEqual([original, edited]);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original, edited], ['Inbox', 'Work'], expect.any(Number), 'second', [], '9.base');
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith({ folderPath: 'Reminders', reminders: [original, edited], projects: ['Inbox', 'Work'], savedAt: expect.any(Number) as number, etag: 'second', issues: [], deltaBase: '9.base' });
 	});
 
 	it('never reads a malformed delta as a full list and falls back to a full read', async () => {

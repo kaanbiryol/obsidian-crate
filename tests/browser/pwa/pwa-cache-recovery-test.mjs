@@ -58,7 +58,7 @@ for (const browserType of [chromium, webkit]) {
 			// Another tab holding the database while it is being replaced blocks
 			// opening; the cache reports it instead of hanging.
 			await cache.clearCachedReminderSnapshots();
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 100, 'one');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 100, etag: 'one' });
 			const held = await open();
 			const replacing = indexedDB.deleteDatabase('crate-reminders');
 			const started = performance.now();
@@ -69,7 +69,7 @@ for (const browserType of [chromium, webkit]) {
 			await new Promise(resolve => { replacing.onsuccess = replacing.onerror = resolve; });
 			const unblocked = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.clearCachedReminderSnapshots();
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 100, 'one');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 100, etag: 'one' });
 
 			let db = await open();
 			await put(db, { ...snapshot, reminders: [null] });
@@ -79,14 +79,14 @@ for (const browserType of [chromium, webkit]) {
 			const beforeRebuild = await inspect();
 			const rebuilt = await cache.rebuildCachedReminderSnapshot('Reminders');
 			const afterRebuild = await inspect();
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 200, 'two');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 200, etag: 'two' });
 			const healthy = await cache.loadCachedReminderSnapshot('Reminders');
 			const nativePut = IDBObjectStore.prototype.put;
 			IDBObjectStore.prototype.put = function (...args) {
 				if (this.name === 'snapshots') throw new DOMException('Injected quota failure', 'QuotaExceededError');
 				return nativePut.apply(this, args);
 			};
-			await cache.saveCachedReminderSnapshot('Reminders', [{ ...reminder, content: 'Uncached change' }], ['Inbox'], 300, 'three');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [{ ...reminder, content: 'Uncached change' }], projects: ['Inbox'], savedAt: 300, etag: 'three' });
 			const quotaProblem = cache.reminderCacheHealth.getSnapshot();
 			IDBObjectStore.prototype.put = nativePut;
 			const afterQuota = await cache.loadCachedReminderSnapshot('Reminders');
@@ -97,7 +97,7 @@ for (const browserType of [chromium, webkit]) {
 				if (this.name === 'snapshots') request.addEventListener('success', () => this.transaction.abort());
 				return request;
 			};
-			await cache.saveCachedReminderSnapshot('Reminders', [{ ...reminder, content: 'Aborted write' }], ['Inbox'], 350, 'aborted');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [{ ...reminder, content: 'Aborted write' }], projects: ['Inbox'], savedAt: 350, etag: 'aborted' });
 			const abortedWriteProblem = cache.reminderCacheHealth.getSnapshot();
 			IDBObjectStore.prototype.put = nativePut;
 			const afterAbortedWrite = await cache.loadCachedReminderSnapshot('Reminders');
@@ -134,7 +134,7 @@ for (const browserType of [chromium, webkit]) {
 			db = await open();
 			const blockedClear = await cache.clearCachedReminderSnapshots();
 			db.close();
-			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 400, 'four');
+			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 400, etag: 'four' });
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
 			return { snapshot, migrated, migration, blocked, blockedMs, blockedProblem, unblocked,
 				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota,
