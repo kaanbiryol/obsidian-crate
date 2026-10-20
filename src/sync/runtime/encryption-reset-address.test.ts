@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { createEncryptionReset, loadEncryptionReset, saveEncryptionReset, type EncryptionReset } from '../encryption/reset';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { createRuntimeHarness } from './runtime-test-harness';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 afterEach(() => vi.restoreAllMocks());
 const oldUrl = 'https://old.trycloudflare.com', newUrl = 'https://new.trycloudflare.com';

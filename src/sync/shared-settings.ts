@@ -1,8 +1,8 @@
-import type { CrateSettings } from '../plugin/settings-types';
 import type { SharedSettings } from '../protocol/shared-settings';
+import type { SyncSettings } from './settings';
 
 type SharedSettingsTarget = Pick<
-	CrateSettings,
+	SyncSettings,
 	'ignorePatterns' | 'syncInterval' | 'pushEnabled'
 >;
 

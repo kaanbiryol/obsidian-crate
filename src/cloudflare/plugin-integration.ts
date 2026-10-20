@@ -2,7 +2,6 @@ import { CloudflareOperationPresentation } from '../ui/cloudflare/operation-pres
 import { ResetBlockedError } from './server-reset/reset-errors';
 import { supportsSavedAuthorization, type DeploymentIntent, type SavedDeploymentIntent } from './deployment/types';
 import type { ConnectionTestResult } from '../sync/types';
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { SyncApiClient, HttpError } from '../sync/api';
 import { checkAndRecoverUpdate } from './deployment/recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment/fence';
@@ -25,6 +24,7 @@ import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
 	isCloudflareOAuthConfigured,
 } from './oauth/config';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 export function createCloudflareUsageConnection(plugin: CratePlugin): CloudflareUsageConnection {
 	return new CloudflareUsageConnection({

@@ -1,5 +1,4 @@
 import type { Vault } from 'obsidian';
-import type { CrateSettings } from '../../plugin/settings-types';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest';
 import type { SyncApiClient } from '../api';
@@ -10,12 +9,13 @@ import { readLocalFileEntry } from '../local-file-entry';
 import { createHistoryRestore } from '../history/restore';
 import { findHistorySource } from '../history/source';
 import { getCheckpointAuthority } from '../worker-url';
+import type { SyncSettings } from '../settings';
 
 interface EngineHistoryContext {
   vault: Vault;
   api: SyncApiClient;
   pluginDir: string;
-  getSettings(): Pick<CrateSettings, 'workerUrl' | 'checkpointScope' | 'ignorePatterns'>;
+  getSettings(): Pick<SyncSettings, 'workerUrl' | 'checkpointScope' | 'ignorePatterns'>;
   getManifest(): LocalManifestView;
   shouldIgnore: (path: string) => boolean;
   assertActive(): void;

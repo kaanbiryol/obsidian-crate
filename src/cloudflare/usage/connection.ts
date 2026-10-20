@@ -1,10 +1,10 @@
 import type { UsageSnapshot } from './snapshot';
-import type { SecretKey } from '../../plugin/settings-types';
 import type { HttpTransport } from '../http';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
 import { CLOUDFLARE_OAUTH_AUTHORIZE_URL, CLOUDFLARE_OAUTH_REDIRECT_URL, CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
 import { constantTimeEqual, createPkcePair, randomBase64Url } from '../oauth/pkce';
 import { fetchCloudflareUsage } from './service';
+import type { SecretKey } from '../../platform/secret-keys';
 
 const USAGE_SCOPE = CLOUDFLARE_ANALYTICS_SCOPE;
 interface Credentials extends CloudflareOAuthTokens { expiresAt: number }

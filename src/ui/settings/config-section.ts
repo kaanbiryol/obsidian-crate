@@ -1,4 +1,3 @@
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { renderVersionSettings, renderUpdateVersions } from './version-settings';
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment/recovery-ui';
 import { Notice, Platform, Setting, type ButtonComponent } from 'obsidian';
@@ -10,6 +9,7 @@ import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading } from './section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../external-browser-modal';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export function renderConfigSection(context: ConfigSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;

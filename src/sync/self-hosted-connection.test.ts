@@ -3,8 +3,8 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { connectSelfHostedServer, updateSelfHostedServerAddress } from './self-hosted-connection';
 import { createVaultKeyBundle } from '../encryption/key-bundle';
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { ConnectionSetupError } from './connection-errors';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const api = vi.hoisted(() => ({
 	setAbortSignal: vi.fn(), testConnection: vi.fn(), listTokens: vi.fn(), getSharedSettings: vi.fn(), getEncryptionState: vi.fn(),

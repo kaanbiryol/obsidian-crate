@@ -1,18 +1,19 @@
 import { createAbortError } from '../abort';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import { createEncryptionReset, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
 import type { SyncEngine } from '../engine/engine';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { resetStoredSyncState } from './history';
 import { WorkerApiHttpClient } from '../worker-api/http';
+import { SECRET_KEYS } from '../../platform/secret-keys';
+import type { SyncSettings } from '../settings';
 
 interface EncryptionResetContext {
-	settings: CrateSettings;
+	settings: SyncSettings;
 	secretStorage: SecretStorageService;
 	transition: RuntimeConfigurationTransition;
-	persistSettings: (update?: Partial<CrateSettings>) => Promise<void>;
+	persistSettings: (update?: Partial<SyncSettings>) => Promise<void>;
 	clearLocalState: () => Promise<void>;
 	getResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
 	pushSharedSettings: () => Promise<boolean>;

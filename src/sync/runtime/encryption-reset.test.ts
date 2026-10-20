@@ -7,9 +7,9 @@ import { createRuntimeHarness, createDeferred } from './runtime-test-harness';
 import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult } from '../sync-result';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import type { EncryptionReset } from '../encryption/reset';
 import { loadEncryptionReset, EncryptionResetRejectedError } from '../encryption/reset';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 const remote = vi.hoisted(() => vi.fn<(_reset: EncryptionReset) => Promise<void>>(async () => {}));
 vi.mock('../encryption/reset', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/reset')>(), resetRemoteEncryption: remote }));

@@ -1,6 +1,5 @@
 import { SyncEngine } from '../engine/engine';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../../plugin/settings-types';
 import type { SyncResult } from '../types';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
@@ -13,6 +12,7 @@ import {
 	mockApiClient,
 	initializeRuntime,
 } from './runtime-test-harness';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../settings';
 
 describe('SyncRuntime operation wrappers', () => {
 	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history or checkpoint progress', async mode => {

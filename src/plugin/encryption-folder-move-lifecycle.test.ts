@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { SecretStorageService } from './secret-storage';
 import { normalizeCrateSettings } from './settings';
-import { SECRET_KEYS } from './settings-types';
 import { endPluginLifecycle } from './lifecycle-state';
 import { saveEncryptionKeys } from './encryption-storage';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from './encryption-folder-moves';
@@ -12,6 +11,7 @@ import { SyncRuntime } from '../sync/runtime/runtime';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 import { convertEncryptedVault } from '../sync/encryption/conversion';
 import { startReading } from '../reading/runtime';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./lifecycle', () => ({ bootstrapPlugin: vi.fn(), shutdownPlugin: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({ initializeReminders: vi.fn(), reinitializeReminders: vi.fn() }));

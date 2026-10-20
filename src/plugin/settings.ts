@@ -12,13 +12,8 @@ import { normalizeUsageSnapshot } from '../cloudflare/usage/snapshot';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import { normalizeRequestDiagnostics } from '../sync/request-diagnostics';
 import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';
-import {
-	type CrateSettings,
-	type PersistedCrateSettings,
-	DEFAULT_SETTINGS,
-	MAX_SYNC_HISTORY,
-	MAX_SYNC_HISTORY_PATHS,
-} from './settings-types';
+import { type CrateSettings, type PersistedCrateSettings, DEFAULT_SETTINGS } from './settings-types';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../sync/settings';
 
 function normalizeString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value.trim() : fallback;

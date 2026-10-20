@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode } from '../../encryption/key-bundle';
-import { SECRET_KEYS } from '../../plugin/settings-types';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 const openExternalBrowserModal = vi.fn<(app: unknown, url: string, options: { linkText: string }) => void>();
 

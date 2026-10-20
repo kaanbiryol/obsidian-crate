@@ -3,7 +3,6 @@ import { createModalActions } from '../plugin/modal-elements';
 import { Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { SharedModal } from '../plugin/SharedModal';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../../plugin/encryption-storage';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, openRecoveryBundle, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
@@ -19,6 +18,7 @@ import { resumeEncryptedFolderMoves, useServerEncryptionFolders } from '../../pl
 import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-setup-ui';
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from './web-app-pairing-modal';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 function encryptionModalTitle(state: EncryptionServerState | null): string {
 	return state?.mode === 'converting' ? 'Resume encryption' : state ? 'Manage encryption' : 'Enable encryption';

@@ -3,7 +3,6 @@ import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, moveEncry
 import { createEncryptionState } from '../../encryption/server-state';
 import { readFolderMoves, writeFolderMoves } from '../../plugin/encryption-folder-move-journal';
 import { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { LocalManifest } from '../manifest';
@@ -11,6 +10,7 @@ import { getCheckpointAuthority } from '../worker-url';
 import { WorkerApiHttpClient } from '../worker-api/http';
 import { createRuntimeHarness } from './runtime-test-harness';
 import { resetStoredSyncState } from './history';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 afterEach(() => vi.restoreAllMocks());
 const oldUrl = 'https://old.trycloudflare.com', newUrl = 'https://new.trycloudflare.com';

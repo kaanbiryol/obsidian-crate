@@ -1,6 +1,6 @@
 import { ConnectionSetupError } from './connection-errors';
 import { createLogger } from './logger';
-import type { CrateSettings } from '../plugin/settings-types';
+import type { SyncSettings } from './settings';
 
 const logger = createLogger('WorkerUrl');
 const LOCALHOST_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
@@ -46,7 +46,7 @@ export function requireNormalizedWorkerUrl(workerUrl: string): string {
 }
 
 /** A verified relocation changes transport, not ownership of pending disk work. */
-export function getCheckpointAuthority(settings: Pick<CrateSettings, 'workerUrl' | 'checkpointScope'>): string {
+export function getCheckpointAuthority(settings: Pick<SyncSettings, 'workerUrl' | 'checkpointScope'>): string {
 	const workerUrl = normalizeWorkerUrl(settings.workerUrl);
 	return settings.checkpointScope?.workerUrl === workerUrl
 		? requireNormalizedWorkerUrl(settings.checkpointScope.authority) : workerUrl;

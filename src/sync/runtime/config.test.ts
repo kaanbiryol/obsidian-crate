@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
+import { type CrateSettings } from '../../plugin/settings-types';
 import { clearSyncConfigurationState, deleteManifestFile } from './config';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 describe('clearSyncConfigurationState', () => {
 	it('deletes the scoped credential before clearing its Worker URL scope', () => {

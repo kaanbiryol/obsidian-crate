@@ -3,7 +3,7 @@ import { connectSelfHostedServer, updateSelfHostedServerAddress } from '../../sy
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsDisclosure } from './section-helpers';
 import { selfHostedConnectionMessage } from './self-hosted-errors';
-import { SECRET_KEYS } from '../../plugin/settings-types';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export function renderSelfHostedAddressSetting({ containerEl, plugin, rerender }: ConfigSectionContext): void {
 	if (!plugin.syncRuntime.isConfigured() || plugin.settings.cloudflareDeployment) return;

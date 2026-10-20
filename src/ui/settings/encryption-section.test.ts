@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createObsidianUiModule, FakeElement, MockSetting, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import type { EncryptionProgress } from '../../sync/encryption/conversion';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 let state: EncryptionServerState | null;
 let body: FakeElement;

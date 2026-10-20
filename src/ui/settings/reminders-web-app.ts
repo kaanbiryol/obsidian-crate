@@ -4,7 +4,7 @@ import { errorMessage } from '../../sync/logger';
 import { QRModal } from '../qr-modal';
 import { openExternalBrowserModal } from '../external-browser-modal';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';
-import { SECRET_KEYS } from '../../plugin/settings-types';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export function renderCrateWebApp(containerEl: HTMLElement, plugin: CratePlugin): void {
 	if (!plugin.syncRuntime.getApiClient()) return;

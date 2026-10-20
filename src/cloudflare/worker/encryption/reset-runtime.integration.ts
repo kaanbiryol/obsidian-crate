@@ -6,7 +6,7 @@ import { reset } from 'cloudflare:test';
 import schema from '../../schema.sql?raw';
 import worker from '../index';
 import { SyncRuntime } from '../../../sync/runtime/runtime';
-import { DEFAULT_SETTINGS, SECRET_KEYS } from '../../../plugin/settings-types';
+import { DEFAULT_SETTINGS } from '../../../plugin/settings-types';
 import { SecretStorageService } from '../../../plugin/secret-storage';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../../encryption/key-bundle';
 import { createEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
@@ -14,6 +14,7 @@ import { loadEncryptionReset } from '../../../sync/encryption/reset';
 import { sha256Hex } from '../auth/crypto';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { SECRET_KEYS } from '../../../platform/secret-keys';
 
 const bridge = vi.hoisted(() => vi.fn());
 vi.mock('obsidian', async importOriginal => ({ ...await importOriginal<typeof import('obsidian')>(), requestUrl: bridge }));

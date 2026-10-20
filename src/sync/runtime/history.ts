@@ -1,10 +1,9 @@
-import { MAX_SYNC_HISTORY_PATHS, type CrateSettings } from '../../plugin/settings-types';
-import { updateSyncProgress } from '../../plugin/settings-persistence';
 import type { SyncHistoryEntry, SyncResult } from '../types';
 import { getSyncIssues } from '../issues';
+import { MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
 
 export function recordSyncHistory(
-  settings: CrateSettings,
+  settings: SyncSettings,
   type: SyncHistoryEntry["type"],
   result: SyncResult,
   details: Pick<SyncHistoryEntry, 'timings' | 'requestDiagnostics'> = {},
@@ -35,7 +34,7 @@ export function recordSyncHistory(
   return entry;
 }
 
-export function resetStoredSyncState(settings: CrateSettings): void {
+export function resetStoredSyncState(settings: SyncSettings): void {
 	delete settings.checkpointScope;
   updateSyncProgress(settings, { lastSeq: 0, lastSync: null, syncHistory: [] });
 }

@@ -24,8 +24,6 @@ import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
-import type { CrateSettings } from '../../plugin/settings-types';
-import { MAX_DEBOUNCE_WAIT_MS } from '../../plugin/settings-types';
 import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY } from './constants';
 import {
 	type IgnoreMatcherContext,
@@ -47,8 +45,8 @@ import { cancelSyncResult, createEmptySyncResult, createSyncFailureResult, final
 import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../worker-url';
 import { LocalContentVerifier } from '../content-verifier';
-import { updateSyncProgress } from '../../plugin/settings-persistence';
 import { verifyUnchangedPendingPaths } from '../pending-verification';
+import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
 
 const logger = createLogger('SyncEngine');
 
@@ -60,7 +58,7 @@ export class SyncEngine {
 	private localManifest: LocalManifest;
 	private markdownBaseCache: MarkdownBaseCache;
 	private conflictStore: ConflictStore;
-	private settings: CrateSettings;
+	private settings: SyncSettings;
 	private state: SyncState;
 	private queueController: SyncQueueController;
 	private lifecycle: SyncEngineLifecycle;
@@ -84,7 +82,7 @@ export class SyncEngine {
 	constructor(
 		plugin: Plugin,
 		api: SyncApiClient,
-		settings: CrateSettings
+		settings: SyncSettings
 	) {
 		this.plugin = plugin;
 		this.vault = plugin.app.vault;
@@ -235,7 +233,7 @@ export class SyncEngine {
 		this.onAutomaticSyncResult = callback;
 	}
 
-	updateSettings(settings: CrateSettings): void {
+	updateSettings(settings: SyncSettings): void {
 		this.patternCache.clear();
 		this.settings = settings;
 		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
@@ -435,7 +433,7 @@ export class SyncEngine {
 		};
 	}
 
-	private getIgnoredDirPrefixes(settings: CrateSettings): string[] {
+	private getIgnoredDirPrefixes(settings: SyncSettings): string[] {
 		const pluginDir = this.plugin.manifest.dir?.replace(/\/+$/, '');
 		return [...new Set([
 			...(pluginDir ? [`${pluginDir}/`] : []),

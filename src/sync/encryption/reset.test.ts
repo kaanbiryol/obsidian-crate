@@ -3,7 +3,7 @@ import { createEncryptionReset, loadEncryptionReset, resetRemoteEncryption, save
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
-import { SECRET_KEYS } from '../../plugin/settings-types';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 async function checkpoint() {
 	const bundle = createVaultKeyBundle();

@@ -1,7 +1,6 @@
 import type { PlannedContent } from '../planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
-import type { CrateSettings } from '../../plugin/settings-types';
 import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, UploadDiff } from '../types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
@@ -9,6 +8,7 @@ import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { VaultFile } from '../file-discovery';
 import type { InitialConfigPull } from '../initial-config-pull';
 import type { LocalManifestView } from '../manifest';
+import type { SyncSettings } from '../settings';
 
 interface PlannerManifest {
   getEntry(path: string): Readonly<FileEntry> | undefined;
@@ -56,7 +56,7 @@ export interface LocalDiffPlannerContext {
 export interface IncrementalSyncPlannerContext {
   reportWork?(phase: import('../types').SyncWork['phase'], current?: number, total?: number): void;
   throwIfDestroyed(): void;
-  settings: Readonly<Pick<CrateSettings, 'lastSeq'>>;
+  settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
   setLastSeq(value: number): void;
   vault: Vault;
   fileManager: {

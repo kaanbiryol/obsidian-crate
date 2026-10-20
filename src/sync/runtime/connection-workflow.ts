@@ -2,17 +2,18 @@ import { ConnectionSetupError } from '../connection-errors';
 import { saveEncryptionKeys } from '../../plugin/encryption-storage';
 import { createLogger } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import type { SyncApiClient } from '../api';
 import type { RuntimeConfigurationTransition } from './runtime';
 import { applyInfrastructureConfigState, clearSyncConfigurationState, type ApplyInfrastructureConfigInput } from './config';
 import { resetStoredSyncState } from './history';
 import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from '../worker-url';
+import { SECRET_KEYS } from '../../platform/secret-keys';
+import type { SyncSettings } from '../settings';
 
 const logger = createLogger('SyncRuntime');
 
 interface ConnectionWorkflowContext {
-	settings: CrateSettings;
+	settings: SyncSettings;
 	secretStorage: SecretStorageService;
 	transition: RuntimeConfigurationTransition;
 	persistSettings: () => Promise<void>;

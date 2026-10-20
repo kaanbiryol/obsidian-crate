@@ -1,4 +1,3 @@
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { captureDesktopArticle } from './desktop-capture';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Platform, TFile, TFolder } from 'obsidian';
@@ -8,6 +7,7 @@ import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
 import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readingServerRequest } from './server';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
 vi.mock('./server', () => ({ readingServerRequest: vi.fn() }));

@@ -3,7 +3,6 @@ import type { ReadingSettings } from '../reading/settings';
 import type { RemindersSettings } from '../reminders/settings';
 import type { SecretStorageService } from './secret-storage';
 import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
-import { SECRET_KEYS } from './settings-types';
 import {
   applyFolderSetting,
   completeFolderMoveHead,
@@ -12,6 +11,7 @@ import {
   readFolderMoves,
   replaceFolderMoveHead,
 } from './encryption-folder-move-journal';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 interface FolderMoveWorkflowContext {
   storage: SecretStorageService;

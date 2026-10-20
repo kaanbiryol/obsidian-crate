@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import { SECRET_KEYS, type SecretKey } from './settings-types';
+import { SECRET_KEYS, type SecretKey } from '../platform/secret-keys';
 
 export class SecretStorageService {
 	private secretStorage: App['secretStorage'];

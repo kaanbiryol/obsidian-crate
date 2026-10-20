@@ -10,7 +10,6 @@ import type { SyncActivityProgress } from '../types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';
 import { runEncryptionReset } from './encryption-reset-workflow';
 import { changeEncryptedServerAddress, changeEncryptionResetAddress } from './address-workflow';
@@ -28,10 +27,12 @@ import {
 	type ApplyInfrastructureConfigInput,
 } from './config';
 import { recordSyncHistory } from './history';
-import { updateSyncProgress } from '../../plugin/settings-persistence';
 import { emitStateChange, emitSyncProgress } from './listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
+import { SECRET_KEYS } from '../../platform/secret-keys';
+import { updateSyncProgress } from '../settings';
+import type { CrateSettings } from '../../plugin/settings-types';
 
 const CHECKPOINT_INTERVAL_PER_FILE_MS = 360;
 const logger = createLogger('SyncRuntime');

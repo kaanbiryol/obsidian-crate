@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildDiagnosticsSettingsStateKey } from '../../plugin/settings-ui-state';
+import { buildDiagnosticsSettingsStateKey } from './settings-ui-state';
 import {
 	FakeElement,
 	createObsidianUiModule,

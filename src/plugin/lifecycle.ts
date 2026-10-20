@@ -12,7 +12,6 @@ import {
   registerVaultSyncEventHandlers,
 } from "../sync/plugin-integration";
 import { ensurePluginDeviceId } from "./deviceId";
-import { SECRET_KEYS } from "./settings-types";
 import type CratePlugin from "./CratePlugin";
 import {
   createCloudflareDeploymentService,
@@ -23,6 +22,7 @@ import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
 import { beginPluginLifecycle, endPluginLifecycle, setSyncReady } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/checkpoint-backup-cleanup';
+import { SECRET_KEYS } from "../platform/secret-keys";
 
 const logger = createLogger("Plugin");
 

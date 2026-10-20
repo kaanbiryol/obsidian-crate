@@ -2,9 +2,9 @@ import { openRecoveryBundle } from '../../encryption/key-bundle';
 import { readFolderMoves } from '../../plugin/encryption-folder-move-journal';
 import { loadEncryptionKeys } from '../../plugin/encryption-storage';
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { assertEncryptionKeys, readServerEncryption } from './conversion';
 import type { WorkerApiHttpClient } from '../worker-api/http';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 /** Verify the encrypted identity before copying connection-scoped secrets.
  * Folder conversion may have advanced local keys before the server accepted it;

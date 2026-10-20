@@ -1,5 +1,4 @@
 import { loadEncryptionKeys } from '../plugin/encryption-storage';
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { readingServerRequest } from './server';
 import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
@@ -9,6 +8,7 @@ import { shouldIgnoreSyncPath } from '../sync/engine/ignore';
 import { ReadingLibrary } from './data/library';
 import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const runtimes = new WeakMap<CratePlugin, { library: ReadingLibrary; stop: () => Promise<void> }>();
 const stopping = new WeakMap<CratePlugin, Promise<void>>();

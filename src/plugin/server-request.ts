@@ -1,8 +1,8 @@
 import { loadEncryptionKeys } from './encryption-storage';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { SECRET_KEYS } from './settings-types';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 interface ServerRequestOptions {
 	timeout?: number;

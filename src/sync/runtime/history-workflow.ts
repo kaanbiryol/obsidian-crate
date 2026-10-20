@@ -1,17 +1,17 @@
 import { decodePendingChange } from '../pending-change';
 import { createAbortError } from '../abort';
 import type { SyncEngine } from '../engine/engine';
-import type { CrateSettings } from '../../plugin/settings-types';
 import type { SyncHistoryEntry, SyncResult } from '../types';
 import { mergeSyncResults } from '../sync-result';
+import type { SyncSettings } from '../settings';
 
 type HistoryEngine = Pick<SyncEngine, 'createHistoryRestore' | 'updateSettings' | 'getPendingPaths' | 'syncSelected' | 'sync'>;
 interface HistoryRestoreContext {
   engine: HistoryEngine;
-  settings: CrateSettings;
+  settings: SyncSettings;
   verify: () => void;
   clearForegroundSyncTimer: () => void;
-  persistSettings: (update?: Partial<CrateSettings>) => Promise<void>;
+  persistSettings: (update?: Partial<SyncSettings>) => Promise<void>;
   runSyncOperation: (operation: (engine: HistoryEngine, progress: (current: number, total: number) => void) => Promise<SyncResult>) => Promise<SyncResult>;
 }
 

@@ -12,8 +12,8 @@ import { SyncApiClient } from './api';
 import { errorMessage } from './logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from '../plugin/lifecycle-state';
 import { queueEncryptedFolderMove, resumeEncryptedFolderMoves } from '../plugin/encryption-folder-moves';
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 

@@ -4,10 +4,10 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { SyncApiClient } from './api';
 import { requireNormalizedWorkerUrl } from './worker-url';
 import { applySharedSettings } from './shared-settings';
-import { SECRET_KEYS } from '../plugin/settings-types';
 import { exchangeSelfHostedPairingCode } from './self-hosted-pairing';
 import { loadEncryptionKeys } from '../plugin/encryption-storage';
 import { isSha256Hex } from '../platform/validation';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const connecting = new WeakSet<CratePlugin>();
 

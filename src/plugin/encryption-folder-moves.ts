@@ -1,6 +1,5 @@
 import type CratePlugin from './CratePlugin';
 import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
-import { SECRET_KEYS } from './settings-types';
 import { captureServerConnection } from './server-request';
 import { moveEncryptionScopes, openRecoveryBundle } from '../encryption/key-bundle';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
@@ -9,6 +8,7 @@ import { startReading, stopReading, waitForStoppedReading } from '../reading/run
 import { checkpointEncryptionRenames } from '../sync/encryption/rename-checkpoint';
 import { folderMoveTarget, movedPath, readFolderMoves, writeFolderMoves } from './encryption-folder-move-journal';
 import { applyNextEncryptedFolderMove } from './encryption-folder-move-workflow';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const running = new WeakMap<CratePlugin, Promise<void>>();
 

@@ -2,10 +2,10 @@ import serverRelease from '../cloudflare/server-release.json';
 import type { CrateServerInfo } from '../protocol/server-info';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { normalizeSyncTimings } from './timings';
-import { MAX_SYNC_HISTORY, type CrateSettings } from '../plugin/settings-types';
 import type { SyncState } from './types';
 import { normalizeRequestDiagnostics, type RequestDiagnostics } from './request-diagnostics';
 import { isSha256Hex } from '../platform/validation';
+import { MAX_SYNC_HISTORY, type SyncSettings } from './settings';
 
 const count = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 function timestamp(value: unknown): string | null {
@@ -13,7 +13,7 @@ function timestamp(value: unknown): string | null {
 }
 
 /** Explicitly select safe fields; raw settings, filenames and errors stay local. */
-export function buildDiagnosticExport(settings: CrateSettings, state: SyncState, version: string, requests?: RequestDiagnostics, server?: CrateServerInfo): string {
+export function buildDiagnosticExport(settings: SyncSettings, state: SyncState, version: string, requests?: RequestDiagnostics, server?: CrateServerInfo): string {
 	return JSON.stringify({
 		format: 'crate-sync-diagnostics', version: 1, exportedAt: new Date().toISOString(),
 		pluginVersion: /^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(version) ? version : 'unknown',

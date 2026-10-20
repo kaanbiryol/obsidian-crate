@@ -3,9 +3,9 @@ import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { SharedModal } from '../plugin/SharedModal';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { getPluginLifecycleSignal } from '../../plugin/lifecycle-state';
 import { errorMessage } from '../../sync/logger';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export class EncryptionResetModal extends SharedModal {
 	private running = false;

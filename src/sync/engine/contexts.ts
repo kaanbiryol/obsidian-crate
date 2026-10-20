@@ -26,13 +26,12 @@ import {
 } from '../transfer/transfer';
 import { createByteBudgetedVaultFileChunks } from '../transfer/budget';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './constants';
-import type { CrateSettings } from '../../plugin/settings-types';
-import { updateSyncProgress } from '../../plugin/settings-persistence';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runInitialImport } from '../initial-import';
 import { finishInitialSetup } from '../initial-setup';
 import type { InitialConfigPull } from '../initial-config-pull';
+import { updateSyncProgress, type SyncSettings } from '../settings';
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
@@ -43,7 +42,7 @@ interface SyncEngineContextDependencies {
 	getLocalManifest: () => LocalManifest;
 	markdownBaseCache: MarkdownBaseCache;
 	conflictStore: ConflictStore;
-	getSettings: () => CrateSettings;
+	getSettings: () => SyncSettings;
 	getStatus: () => SyncState['status'];
 	shouldIgnore: (path: string) => boolean;
 	runConcurrent: <T>(tasks: (() => Promise<T>)[], concurrency: number) => Promise<T[]>;

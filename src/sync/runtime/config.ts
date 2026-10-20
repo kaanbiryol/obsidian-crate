@@ -1,9 +1,10 @@
 import type { SharedSettings } from '../../protocol/shared-settings';
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../../plugin/secret-storage";
-import { SECRET_KEYS, type CrateSettings } from '../../plugin/settings-types';
 import { requireNormalizedWorkerUrl } from "../worker-url";
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
+import { SECRET_KEYS } from '../../platform/secret-keys';
+import type { SyncSettings } from '../settings';
 
 interface ApplyInfrastructureConfigInput {
   workerUrl: string;
@@ -51,7 +52,7 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
 }
 
 export function applyInfrastructureConfigState(
-  settings: CrateSettings,
+  settings: SyncSettings,
   secretStorage: SecretStorageService,
   config: ApplyInfrastructureConfigInput,
 ): void {
@@ -65,7 +66,7 @@ export function applyInfrastructureConfigState(
 }
 
 export function clearSyncConfigurationState(
-  settings: CrateSettings,
+  settings: SyncSettings,
   secretStorage: SecretStorageService,
 ): void {
   for (const key of [SECRET_KEYS.ENCRYPTION_KEYS, SECRET_KEYS.ENCRYPTION_RECOVERY, SECRET_KEYS.AUTH_TOKEN]) {
@@ -75,7 +76,7 @@ export function clearSyncConfigurationState(
   settings.workerUrl = "";
 }
 
-export function buildSharedSettings(settings: CrateSettings): SharedSettings {
+export function buildSharedSettings(settings: SyncSettings): SharedSettings {
   return {
     ignorePatterns: settings.ignorePatterns,
     syncInterval: settings.syncInterval,

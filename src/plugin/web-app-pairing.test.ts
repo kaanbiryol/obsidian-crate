@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
-import { SECRET_KEYS } from './settings-types';
 import { addReminderScope, createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../encryption/key-bundle';
 import { createEncryptionState } from '../encryption/server-state';
 import { openWebAppPairing } from './web-app-pairing';
 import { PAIRING_CAPABILITY, type PairingContext } from '../encryption/pairing/protocol';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 const mocks = vi.hoisted(() => ({
   info: vi.fn(async () => ({ capabilities: ['web-pairing-v1'] })),

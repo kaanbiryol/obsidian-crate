@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SECRET_KEYS } from './settings-types';
 import { SecretStorageService } from './secret-storage';
 import { createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
 import { loadEncryptionKeys, saveEncryptionKeys } from './encryption-storage';
+import { SECRET_KEYS } from '../platform/secret-keys';
 
 function createSecretStorage(scopeProvider?: () => string | null) {
 	const secrets = new Map<string, string>();

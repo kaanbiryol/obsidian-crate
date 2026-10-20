@@ -1,10 +1,10 @@
 import type { SecretStorageService } from '../../plugin/secret-storage';
-import { SECRET_KEYS } from '../../plugin/settings-types';
 import { isEncryptionId } from '../../encryption/encoding';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { HttpError, WorkerApiHttpClient, TRANSFER_TIMEOUT_MS } from '../worker-api/http';
 import { readServerEncryption } from './conversion';
 import { isSha256Hex } from '../../platform/validation';
+import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export interface EncryptionReset {
 	version: 1;
