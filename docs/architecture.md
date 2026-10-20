@@ -196,6 +196,13 @@ plugin repository, shared file commands and Worker routes. Its update contract
 belongs to the domain; core code does not depend on the Obsidian writer interface.
 Repository queries and optimistic fallback records remain in the data layer.
 
+`reminders/core/reminderFileCommand.ts` applies web app edits to Markdown notes.
+Encrypted web apps run it in the browser. The plaintext Worker routes run it with
+their released size and verification options, then add operation receipts,
+identity checks, conditional writes and parsed caches. They map its failures to
+their released responses; `reminders/plaintext-parity.integration.ts` records
+where those differ from the web app's answers.
+
 `cloudflare/worker/request-handler.ts` distinguishes public, coordinator and
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around

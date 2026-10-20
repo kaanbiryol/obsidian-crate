@@ -10,7 +10,7 @@ import {
 } from './sync/storage';
 import { sha256Hex } from '@/platform/sha256';
 
-export interface StoredTextFile {
+interface StoredTextFile {
 	path: string;
 	content: string;
 	hash: string;

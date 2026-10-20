@@ -1,25 +1,14 @@
 import { assertReminderMutationInput, parseReminderRecurrenceInput } from '@/reminders/core/reminderMutationInput';
-import { beginReminderOperation, reminderOperationEffects } from '../operations';
-import { buildCreateReminderArgs } from '@/reminders/core/reminderMutationPlan';
+import { beginReminderOperation } from '../operations';
 import { corsResponse } from '../../cors';
-import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
-import { parseJsonObject, parseOptionalString } from '../../request-validation';
-import {
-	createReminderInFileContent,
-	getInitialProjectFileContent,
-	getProjectFilePath,
-} from '../file-content';
+import { parseJsonObject } from '../../request-validation';
 import {
 	hasNonEmptyStringValue,
 	parseProjectPath,
 	parseReminderMutationWorkspace,
-	recurrenceInputResponse,
 } from '../requests';
-import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile } from '../scan';
-import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
-import { DEFAULT_PROJECT } from '@/reminders/core/constants';
+import { commitReminderCommand, plaintextFailureResponse } from '../command';
 
 export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -36,61 +25,17 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		return workspaceResult;
 	}
 
-	const parsedProject = parseProjectPath(parsedBody.value.project);
-	if (hasNonEmptyStringValue(parsedBody.value.project) && !parsedProject) {
+	// The shared command repeats these checks; checking first keeps the order
+	// in which this route has reported invalid input.
+	if (hasNonEmptyStringValue(parsedBody.value.project) && !parseProjectPath(parsedBody.value.project)) {
 		return corsResponse({ error: 'Invalid project' }, 400);
 	}
 	assertReminderMutationInput(parsedBody.value, 'create');
-	const project = parsedProject || DEFAULT_PROJECT;
-	const content = parseOptionalString(parsedBody.value.content, 1024);
-	if (!content) {
-		return corsResponse({ error: 'content required' }, 400);
-	}
-	let recurrence;
 	try {
-		recurrence = parseReminderRecurrenceInput(parsedBody.value.recurrence);
+		parseReminderRecurrenceInput(parsedBody.value.recurrence);
 	} catch (error) {
-		return recurrenceInputResponse(error);
+		return plaintextFailureResponse(error, parsedBody.value);
 	}
 
-	const priority = parsedBody.value.priority === 1 ? 1 : 4;
-	const description = typeof parsedBody.value.description === 'string' ? parsedBody.value.description.trim() || undefined : undefined;
-	const createArgs = buildCreateReminderArgs({
-		content,
-		description,
-		project,
-		priority,
-		recurrence: recurrence ?? undefined,
-		dueDate: parseOptionalString(parsedBody.value.dueDate, 64) || undefined,
-		dueDatetime: parseOptionalString(parsedBody.value.dueDatetime, 128) || undefined,
-		id: parseOptionalString(parsedBody.value.id, 128) || undefined,
-	});
-	const reminderId = operation.id;
-	const filePath = getProjectFilePath(workspaceResult.folderPath, project);
-	const existingFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
-	const existingContent = existingFile?.content ?? getInitialProjectFileContent(project);
-	if (scanReminderMarkdownFile(filePath, existingContent, workspaceResult.folderPath).some(reminder => reminder.id === reminderId)
-		|| await env.DB.prepare('SELECT reminder_id FROM reminder_identities WHERE reminder_id = ?').bind(reminderId).first()) {
-		return corsResponse({ error: 'This reminder already exists. Reload to see its committed state.' }, 409);
-	}
-	const nextContent = createReminderInFileContent(existingContent, {
-		content,
-		description,
-		dueDate: createArgs.dueDate,
-		priority: createArgs.priority,
-		recurrence: createArgs.recurrence,
-		hasTime: createArgs.hasTime,
-		reminderId,
-	});
-	const reminders = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath);
-	const reminder = reminders.find(candidate => candidate.id === reminderId);
-	const response = { success: true, reminder: reminder ? await reminderCommandPayload(reminder) : undefined };
-	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null,
-		reminderOperationEffects(env.DB, operation, response, reminderId));
-	await saveReminderFileCache(env.DB, workspaceResult.folderPath, filePath, write.hash, reminders);
-
-	return corsResponse({
-		success: true,
-		reminder: reminder ? await reminderCommandPayload(reminder) : undefined,
-	});
+	return commitReminderCommand(env, operation, 'create', parsedBody.value, workspaceResult.folderPath);
 }

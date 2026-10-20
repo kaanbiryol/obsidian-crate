@@ -1,15 +1,10 @@
-import { beginReminderOperation, reminderOperationEffects } from '../operations';
+import { beginReminderOperation } from '../operations';
 import { corsResponse } from '../../cors';
-import { writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../request-validation';
-import { setReminderCompletedInFileContent } from '../file-content';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
-import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile } from '../scan';
-import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
-import { loadReminderSource } from '../workspace';
-import { checkReminderRevision } from '../revision';
+import { assertUniqueReminderSources } from '../../reminders/source-identity';
+import { commitReminderCommand } from '../command';
 
 export async function handleSetReminderCompleted(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -30,22 +25,8 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 	if (!sourceFilePath) {
 		return corsResponse({ error: 'Valid filePath required' }, 400);
 	}
-	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath);
-	if (!source) return corsResponse({ error: 'Reminder not found' }, 404);
-	const { file, reminder } = source;
-	const revisionError = await checkReminderRevision(parsedBody.value, reminder);
-	if (revisionError) return revisionError;
+	await assertUniqueReminderSources(env.DB, workspaceResult.folderPath, [id]);
 
-	const nextContent = setReminderCompletedInFileContent(file.content, reminder, parsedBody.value.completed);
-	const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
-	const updatedReminder = reminders.find(candidate => candidate.id === id);
-	const response = { success: true, reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined };
-	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash,
-		reminderOperationEffects(env.DB, operation, response));
-	await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
-
-	return corsResponse({
-		success: true,
-		reminder: updatedReminder ? await reminderCommandPayload(updatedReminder) : undefined,
-	});
+	return commitReminderCommand(env, operation, 'set-completed', { ...parsedBody.value, id, filePath: sourceFilePath },
+		workspaceResult.folderPath, parsedBody.value);
 }

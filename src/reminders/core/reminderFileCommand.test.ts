@@ -89,3 +89,24 @@ it('answers only the listed wire fields of a scanned reminder', async () => {
 		'completed', 'project', 'recurrence', 'filePath', 'lineNumber']);
 	expect(payload).not.toHaveProperty('rawLine');
 });
+
+it('limits only written notes and allows unverifiable results when the plaintext Worker asks', async () => {
+	const large = `${note}${'x'.repeat(1024 * 1024)}\n`;
+	const body = await request(large);
+	await expect(applyReminderFileCommand('delete', body, folder, async () => large)).rejects.toMatchObject({ status: 413, code: 'file_too_large' });
+	const deleted = await applyReminderFileCommand('delete', body, folder, async () => large, { limitWrittenNotesOnly: true });
+	expect(deleted.files[0]!.content).not.toContain('crate-id:r1');
+	await expect(applyReminderFileCommand('update', { ...body, content: 'Renamed' }, folder, async () => large, { limitWrittenNotesOnly: true }))
+		.rejects.toMatchObject({ status: 413, code: 'file_too_large' });
+	const id = op();
+	const hidden = { folderPath: folder, operationId: id, id, content: '<!-- crate-id:x -->' };
+	await expect(applyReminderFileCommand('create', hidden, folder, async () => null)).rejects.toThrow('could not be verified');
+	expect((await applyReminderFileCommand('create', hidden, folder, async () => null, { allowUnverifiedResult: true })).response).toEqual({ success: true });
+});
+
+it('distinguishes conflicts that share a status and code', async () => {
+	const body = await request();
+	await expect(applyReminderFileCommand('delete', { ...body, id: 'r-gone' }, folder, async () => note)).rejects.toMatchObject({ status: 409, reason: 'missing' });
+	await expect(applyReminderFileCommand('delete', body, folder, async () => `${note}- [ ] Copy <!-- crate-id:r1 -->\n`)).rejects.toMatchObject({ status: 409, reason: 'duplicate' });
+	await expect(applyReminderFileCommand('delete', { ...body, expectedRevision: 'stale' }, folder, async () => note)).rejects.toMatchObject({ status: 409, reason: 'stale' });
+});

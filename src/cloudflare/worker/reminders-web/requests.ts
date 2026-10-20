@@ -1,5 +1,4 @@
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
-import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../request-validation';
 import type { ReminderMutationWorkspace } from './types';
@@ -27,12 +26,6 @@ export function parseReminderSourceFilePath(value: unknown, folderPath: string):
 
 export function hasNonEmptyStringValue(value: unknown): boolean {
 	return typeof value === 'string' && value.trim().length > 0;
-}
-
-/** Plaintext routes answer an invalid repeat without an input field or code. */
-export function recurrenceInputResponse(error: unknown): Response {
-	if (error instanceof ReminderInputError && error.field === 'recurrence') return corsResponse({ error: error.message }, 400);
-	throw error;
 }
 
 export function parseReminderMutationWorkspace(

@@ -10,10 +10,10 @@ import { handleNotificationPolicy } from '../notifications/policy';
 import { handleListReminders } from '../reminders-web/routes/list';
 import { handleDelete } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
-import { loadReminderSource } from '../reminders-web/workspace';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { handleDiagnostics } from '../maintenance/diagnostics';
+import { assertUniqueReminderSources } from './source-identity';
 
 vi.mock('../notifications/push', () => ({
   listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]),
@@ -93,7 +93,7 @@ it.each(['A', 'Z'])('quarantines duplicate ownership, rejects edits, and resumes
   expect(listing.reminders).toEqual([]);
   expect(listing.issues.map(issue => issue.path).sort()).toEqual([originalPath, duplicatePath].sort());
   for (const issue of listing.issues) expect(issue.reason).toContain('Duplicate');
-  await expect(loadReminderSource(env, 'Reminders', id, originalPath)).rejects.toThrow('Duplicate');
+  await expect(assertUniqueReminderSources(env.DB, 'Reminders', [id])).rejects.toThrow('Duplicate');
   await remove(duplicatePath);
   await drainNotificationProjections(env);
   expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL').all()).results).toEqual([]);

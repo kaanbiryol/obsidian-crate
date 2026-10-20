@@ -1,14 +1,10 @@
-import { beginReminderOperation, reminderOperationEffects } from '../operations';
+import { beginReminderOperation } from '../operations';
 import { corsResponse } from '../../cors';
-import { writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../request-validation';
-import { deleteReminderFromFileContent } from '../file-content';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
-import { saveReminderFileCache } from '../reminder-cache';
-import { scanReminderMarkdownFile } from '../scan';
-import { loadReminderSource } from '../workspace';
-import { checkReminderRevision } from '../revision';
+import { assertUniqueReminderSources } from '../../reminders/source-identity';
+import { commitReminderCommand } from '../command';
 
 export async function handleDeleteReminder(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -27,21 +23,8 @@ export async function handleDeleteReminder(request: Request, env: Env): Promise<
 	if (!sourceFilePath) {
 		return corsResponse({ error: 'Valid filePath required' }, 400);
 	}
-	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath);
-	if (!source) return corsResponse({ error: 'Reminder not found' }, 404);
-	const { file, reminder } = source;
-	const revisionError = await checkReminderRevision(parsedBody.value, reminder);
-	if (revisionError) return revisionError;
+	await assertUniqueReminderSources(env.DB, workspaceResult.folderPath, [id]);
 
-	const nextContent = deleteReminderFromFileContent(file.content, reminder);
-	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash,
-		reminderOperationEffects(env.DB, operation, { success: true, id }));
-	await saveReminderFileCache(
-		env.DB,
-		workspaceResult.folderPath,
-		reminder.filePath,
-		write.hash,
-		scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath),
-	);
-	return corsResponse({ success: true, id });
+	return commitReminderCommand(env, operation, 'delete', { ...parsedBody.value, id, filePath: sourceFilePath },
+		workspaceResult.folderPath, parsedBody.value);
 }
