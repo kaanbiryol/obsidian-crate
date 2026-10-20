@@ -18,4 +18,6 @@ it.each(['create', 'edit'] as const)('builds a durable %s command and snapshots 
 		id: mode === 'create' ? change.operationId : 'existing', folderPath: 'Reminders' });
 	modal.draft.content = 'Later edit';
 	expect(change.modal?.draft.content).toBe('Task');
+	expect(change.modal?.operationId).toBe(change.operationId);
+	expect(reminderOperationDay(modal.operationId!)).toBeNull();
 });

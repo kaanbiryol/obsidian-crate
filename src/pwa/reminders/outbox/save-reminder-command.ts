@@ -22,6 +22,8 @@ export async function createSaveReminderChange(modal: ModalState, config: Stored
 	const input = buildReminderMutationBody({ draft: modal.draft, mode: modal.mode, config, projects, selectedProject });
 	if (!input.content.trim()) throw new Error('Reminder title required');
 	// Opening the editor creates a local draft identity; saving assigns a dated operation ID.
-	if (!modal.operationId || reminderOperationDay(modal.operationId) === null) modal.operationId = await newReminderOperationId();
-	return fromInput(modal, input, previous);
+	// The caller's modal state stays untouched; the recorded change carries the dated copy.
+	const dated = modal.operationId && reminderOperationDay(modal.operationId) !== null
+		? modal : { ...modal, operationId: await newReminderOperationId() };
+	return fromInput(dated, input, previous);
 }

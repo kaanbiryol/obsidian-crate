@@ -97,11 +97,14 @@ describe('PWA optimistic mutations', () => {
 		expect(apiFetch).not.toHaveBeenCalled();
 		expect(commitReminderState).not.toHaveBeenCalled();
 		expect(showToast).not.toHaveBeenCalled();
+		// Saving assigns a dated operation id to the recorded change, never to the caller's state.
+		const operationId = changes[0]!.operationId;
+		expect(operationId).not.toBe(modal.operationId);
 		expect(changes[0]).toMatchObject({ kind: 'save', path: '/reminders/create', status: 'pending',
-			operationId: modal.operationId, recordId: modal.operationId, modal });
+			operationId, recordId: operationId, modal: { ...modal, operationId } });
 		expect(body(changes[0]!)).toMatchObject({ content: 'My reminder', description: 'Details',
-			folderPath: 'Reminders', id: modal.operationId, operationId: modal.operationId });
-		expect(render().visibleReminders.at(-1)).toMatchObject({ id: modal.operationId, content: 'My reminder', completed: false });
+			folderPath: 'Reminders', id: operationId, operationId });
+		expect(render().visibleReminders.at(-1)).toMatchObject({ id: operationId, content: 'My reminder', completed: false });
 	});
 
 	it('keeps the editor and saved draft when durable enqueue fails', async () => {
@@ -202,13 +205,13 @@ describe('PWA optimistic mutations', () => {
 		remindersRef.current[0] = { ...remindersRef.current[0]!, revision: 'latest-revision', filePath: 'Reminders/Moved.md' };
 
 		const prepared = render().prepareEdit(changes[0]!.operationId);
-		expect(prepared).toEqual({ ...modal, expectedRevision: 'latest-revision', filePath: 'Reminders/Moved.md', recovery: true });
+		expect(prepared).toEqual({ ...modal, operationId: changes[0]!.operationId, expectedRevision: 'latest-revision', filePath: 'Reminders/Moved.md', recovery: true });
 		expect(prepared!.draft).not.toBe(changes[0]!.modal!.draft);
 		prepared!.draft.content = 'Updated correction';
 		expect(changes[0]!.modal!.draft.content).toBe('My correction');
 		const updated = render();
 		await act(async () => { await updated.saveReminder(prepared!); });
-		expect(body(changes[1]!)).toMatchObject({ id: 'one', operationId: modal.operationId,
+		expect(body(changes[1]!)).toMatchObject({ id: 'one', operationId: changes[0]!.operationId,
 			expectedRevision: 'latest-revision', filePath: 'Reminders/Moved.md', content: 'Updated correction' });
 	});
 
