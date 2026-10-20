@@ -1,4 +1,4 @@
-import { formatLocalDateKey, serializeReminderDateValue } from '../../core/dates/reminderDate';
+import { formatLocalDateKey, serializeReminderDateValue } from '../../../core/dates/reminderDate';
 
 export function buildDatePickerDateSelection(
   selectedDate: Date,

@@ -20,10 +20,10 @@ const { outputFiles } = await build({
     import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
     import { createRoot } from 'react-dom/client';
     import { Button } from './src/ui/shared/Button';
-    import { AddReminderModal } from './src/reminders/ui/reminder-modal/AddReminderModal';
+    import { AddReminderModal } from './src/reminders/ui/plugin/reminder-modal/AddReminderModal';
     import { PluginContext } from './src/reminders/ui/plugin/reminders-context';
     import { BaseUiModal } from './src/ui/plugin/BaseUiModal';
-    import { useReminderModalPresentation } from './src/reminders/ui/reminder-modal/useReminderModalPresentation';
+    import { useReminderModalPresentation } from './src/reminders/ui/plugin/reminder-modal/useReminderModalPresentation';
     import { BaseModal } from './src/ui/shared/BaseModal';
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';

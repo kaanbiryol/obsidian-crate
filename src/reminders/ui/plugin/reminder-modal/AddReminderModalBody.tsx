@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react';
-import { PluginContext } from '../plugin/reminders-context';
-import { PageTitleContext } from '../shared/lexical/pageTitles';
-import type { RichTextInputHandle } from '../shared/RichTextInput';
+import { PluginContext } from '../reminders-context';
+import { PageTitleContext } from '../../shared/lexical/pageTitles';
+import type { RichTextInputHandle } from '../../shared/RichTextInput';
 import type { ReminderDraft } from './useReminderDraft';
-import { getProjectColor } from '../format/projectColors';
-import { ReminderActionChips } from './ReminderActionChips';
-import { PluginReminderEditorFields as ReminderEditorFields } from '../plugin/PluginReminderEditorFields';
-import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
-import { ObsidianIcon } from '../../../ui/obsidian-icon';
+import { getProjectColor } from '../../format/projectColors';
+import { ReminderActionChips } from '../../reminder-modal/ReminderActionChips';
+import { PluginReminderEditorFields as ReminderEditorFields } from '../PluginReminderEditorFields';
+import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
+import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 
 interface AddReminderModalBodyProps {
     isDark: boolean;

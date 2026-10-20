@@ -22,7 +22,7 @@ import { ModalLayout } from '@/ui/shared/ModalLayout';
 import { StatusContent } from '@/ui/shared/StatusContent';
 import { Button } from '@/ui/shared/Button';
 import { DeleteConfirmationModal } from '@/reminders/ui/plugin/DeleteConfirmationModal';
-import { AddReminderModalHeader } from '@/reminders/ui/reminder-modal/AddReminderModalHeader';
+import { AddReminderModalHeader } from '@/reminders/ui/plugin/reminder-modal/AddReminderModalHeader';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styles';
 import pluginStyles from '@plugin-build/styles.css?raw';

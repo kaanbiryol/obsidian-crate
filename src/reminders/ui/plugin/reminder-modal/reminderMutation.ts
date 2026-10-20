@@ -1,5 +1,5 @@
-import type { CreateReminderParams, Priority, Reminder, RecurrenceRule } from '../../types';
-import { resolveReminderSubmission } from '../../core/reminderSubmission';
+import type { CreateReminderParams, Priority, Reminder, RecurrenceRule } from '../../../types';
+import { resolveReminderSubmission } from '../../../core/reminderSubmission';
 
 export interface ReminderSubmissionInput {
 	content: string;

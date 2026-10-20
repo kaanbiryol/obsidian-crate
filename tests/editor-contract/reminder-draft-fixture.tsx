@@ -4,11 +4,11 @@ import React, { useRef, useState } from 'react';
 import type { Reminder } from '@/reminders/types';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
-import { useReminderDraft } from '@/reminders/ui/reminder-modal/useReminderDraft';
-import { buildReminderSubmission } from '@/reminders/ui/reminder-modal/reminderMutation';
+import { useReminderDraft } from '@/reminders/ui/plugin/reminder-modal/useReminderDraft';
+import { buildReminderSubmission } from '@/reminders/ui/plugin/reminder-modal/reminderMutation';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
-import { RecurrencePickerModal } from '@/reminders/ui/reminder-modal/RecurrencePickerModal';
-import { AddReminderModal } from '@/reminders/ui/reminder-modal/AddReminderModal';
+import { RecurrencePickerModal } from '@/reminders/ui/plugin/reminder-modal/RecurrencePickerModal';
+import { AddReminderModal } from '@/reminders/ui/plugin/reminder-modal/AddReminderModal';
 import { PluginContext } from '@/reminders/ui/plugin/reminders-context';
 
 const params = new URLSearchParams(location.search);

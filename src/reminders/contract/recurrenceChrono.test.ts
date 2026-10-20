@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLocalTimeZone } from '@internationalized/date';
 import * as chrono from 'chrono-node';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
-import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
+import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '../core/recurrence/recurrenceCalculator';

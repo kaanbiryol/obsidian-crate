@@ -1,18 +1,18 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DeleteConfirmationModal } from '../plugin/DeleteConfirmationModal';
+import { DeleteConfirmationModal } from '../DeleteConfirmationModal';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { DatePickerModal } from './DatePickerModal';
 import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
-import { ReminderActionChips } from './ReminderActionChips';
-import { ReminderEditorFields } from './ReminderEditorFields';
-import { parseReminderContent } from '../../core/grammar/reminderParser';
+import { ReminderActionChips } from '../../reminder-modal/ReminderActionChips';
+import { ReminderEditorFields } from '../../reminder-modal/ReminderEditorFields';
+import { parseReminderContent } from '../../../core/grammar/reminderParser';
 
 // Portals do not render during SSR; keep these assertions focused on the editor's content.
 // Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
-vi.mock('../../../ui/shared/BaseModal', () => ({
+vi.mock('../../../../ui/shared/BaseModal', () => ({
     BaseModal: ({ children, isOpen = true, className, role = 'dialog', ariaLabel, ariaLabelledBy, ariaDescribedBy }: {
         children: React.ReactNode; isOpen?: boolean; className?: string; role?: string;
         ariaLabel?: string; ariaLabelledBy?: string; ariaDescribedBy?: string;

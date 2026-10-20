@@ -1,7 +1,7 @@
 import React from 'react';
 
-import { IconButton } from '../plugin/IconButton';
-import { ModalHeader } from '../plugin/ModalHeader';
+import { IconButton } from '../IconButton';
+import { ModalHeader } from '../ModalHeader';
 
 interface AddReminderModalHeaderProps {
     isEditing: boolean;

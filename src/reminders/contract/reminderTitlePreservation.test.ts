@@ -7,7 +7,7 @@ import { buildCreatedReminderBlock, buildUpdatedReminderBlock } from '../core/ma
 import { scanReminderMarkdownContent } from '../core/markdownScan';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { buildInitialReminderContent, rebuildReminderContent } from '../core/reminderDraft';
-import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
+import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 

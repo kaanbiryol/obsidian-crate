@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Reminder, RecurrenceRule } from '../../types';
+import type { Reminder, RecurrenceRule } from '../../../types';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
@@ -8,7 +8,7 @@ import {
 	reconcileReminderDraftMetadata,
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
-} from '../../core/reminderDraft';
+} from '../../../core/reminderDraft';
 
 interface UseReminderDraftOptions {
 	reminder?: Reminder;

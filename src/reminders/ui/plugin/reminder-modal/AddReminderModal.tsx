@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 
-import type { RichTextInputHandle } from '../shared/RichTextInput';
-import { BaseModal } from '../../../ui/shared/BaseModal';
+import type { RichTextInputHandle } from '../../shared/RichTextInput';
+import { BaseModal } from '../../../../ui/shared/BaseModal';
 import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { AddReminderModalOverlays } from './AddReminderModalOverlays';
@@ -9,12 +9,12 @@ import { useReminderModalActions } from './useReminderModalActions';
 import type { NewReminder } from './reminderMutation';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
-import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
-import { AnimationConfig } from '../plugin/animations';
-import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { Reminder } from '../../types';
-import { DEFAULT_PROJECT } from '../../core/constants';
-import { parseReminderContent } from '../../core/grammar/reminderParser';
+import { useObsidianDarkMode } from '../../hooks/useObsidianDarkMode';
+import { AnimationConfig } from '../animations';
+import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
+import { Reminder } from '../../../types';
+import { DEFAULT_PROJECT } from '../../../core/constants';
+import { parseReminderContent } from '../../../core/grammar/reminderParser';
 
 interface AddReminderModalProps {
     onClose: () => void;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Reminder } from '@/reminders/types';
-import { useReminderDraft } from '@/reminders/ui/reminder-modal/useReminderDraft';
+import { useReminderDraft } from '@/reminders/ui/plugin/reminder-modal/useReminderDraft';
 
 const projects = ['Inbox', 'Work'];
 const recurring: Reminder = {

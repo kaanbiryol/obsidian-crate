@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '../core/recurrence/recurrenceCalculator';
 import { buildRichTextSegments } from '../ui/editor/richTextRenderer';
-import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
+import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { parseReminderContent } from '@/reminders/core/grammar/reminderParser';
 

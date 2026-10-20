@@ -1,8 +1,8 @@
 import { reminderRevision } from '../../core/reminderRevision';
 import React, { useMemo, useRef } from "react";
 import { Notice } from "obsidian";
-import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
-import type { NewReminder } from "@/reminders/ui/reminder-modal/reminderMutation";
+import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/plugin/reminder-modal/AddReminderModal";
+import type { NewReminder } from "@/reminders/ui/plugin/reminder-modal/reminderMutation";
 import { createLogger } from "@/reminders/logger";
 import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../core/constants';
 

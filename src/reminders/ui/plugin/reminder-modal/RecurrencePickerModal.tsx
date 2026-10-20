@@ -1,19 +1,19 @@
-import { RecurrencePickerContent } from './RecurrencePickerContent';
-import { ThemeIconProvider } from '../../../ui/shared/ThemeIcon';
-import { ObsidianIcon } from '../../../ui/obsidian-icon';
+import { RecurrencePickerContent } from '../../reminder-modal/RecurrencePickerContent';
+import { ThemeIconProvider } from '../../../../ui/shared/ThemeIcon';
+import { ObsidianIcon } from '../../../../ui/obsidian-icon';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { BaseModal } from '../../../ui/shared/BaseModal';
-import type { AnimationConfig } from '../plugin/animations';
-import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { RecurrenceRule } from '../../types';
-import { getPickerModalProps } from '../plugin/glassStyles';
+import { BaseModal } from '../../../../ui/shared/BaseModal';
+import type { AnimationConfig } from '../animations';
+import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
+import { RecurrenceRule } from '../../../types';
+import { getPickerModalProps } from '../glassStyles';
 import {
 	buildRecurrencePickerState,
 	isRecurrencePickerStateUnchanged,
 	recurrenceRuleFromPickerState,
-} from './recurrencePickerShared';
-import { REMINDER_PICKER_COPY } from './pickerCopy';
+} from '../../reminder-modal/recurrencePickerShared';
+import { REMINDER_PICKER_COPY } from '../../reminder-modal/pickerCopy';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;

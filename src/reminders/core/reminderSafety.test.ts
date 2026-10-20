@@ -6,7 +6,7 @@ import { buildCreatedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedRem
 import { deleteReminderBlockFromContent } from './markdownReminderFile';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
-import { buildReminderSubmission } from '../ui/reminder-modal/reminderMutation';
+import { buildReminderSubmission } from '../ui/plugin/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 
 const originalTZ = process.env.TZ;

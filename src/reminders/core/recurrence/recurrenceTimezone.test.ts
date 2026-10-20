@@ -4,7 +4,7 @@ import { parseCheckboxLine } from '../grammar/checkboxParser';
 import { calculateFirstOccurrence, calculateNextOccurrence } from './recurrenceCalculator';
 import { buildCreatedReminderBlock, buildReminderCompletionPlan } from '../markdownReminderMutation';
 import { buildInitialReminderContent, applyReminderDraftContentUpdate } from '../reminderDraft';
-import { buildReminderSubmission } from '../../ui/reminder-modal/reminderMutation';
+import { buildReminderSubmission } from '../../ui/plugin/reminder-modal/reminderMutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';
 import { applyReminderTextUpdate, deriveDraftPatchFromContent } from '@/pwa/reminders/editor/editor-draft';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
