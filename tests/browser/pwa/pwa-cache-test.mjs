@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 
 const { outputFiles } = await build({
-	entryPoints: ['src/pwa/reminders/cache/reminder-cache.ts'],
+	stdin: { contents: `export * from './src/pwa/reminders/cache/reminder-cache'; export { requirePrivateStorageUnlock, useUnencryptedStorage } from './src/pwa/storage/private-storage';`, resolveDir: process.cwd(), loader: 'ts' },
 	bundle: true,
 	format: 'iife',
 	globalName: 'reminderCache',
@@ -145,7 +145,29 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(result.unsupported, null);
 		assert.equal(result.preservedVersion, 1, 'Unsupported cache must remain untouched');
 		assert.equal(result.fresh.reminders[0].id, 'fresh');
-		console.log(`${browserType.name()}: cache creation, per-note partial writes, peer-replaced notes, metadata-only refresh, revision guards and clearing passed`);
+		const privacy = await page.evaluate(async () => {
+			const cache = reminderCache;
+			const count = store => new Promise((resolve, reject) => {
+				const request = indexedDB.open('crate-reminders');
+				request.onerror = () => reject(request.error);
+				request.onsuccess = () => {
+					const db = request.result, tx = db.transaction(store, 'readonly'), read = tx.objectStore(store).count();
+					tx.oncomplete = () => { db.close(); resolve(read.result); };
+				};
+			});
+			await cache.saveCachedReminderSnapshot('Private', [{ id: 'p', content: 'Plaintext task', priority: 4, completed: false, project: 'Inbox', filePath: 'Private/Inbox.md' }], ['Inbox'], 700, 'plain');
+			await cache.refreshCachedReminderSnapshot('Private', 800, 'plain');
+			const before = { notes: await count('notes'), freshness: await count('freshness') };
+			cache.requirePrivateStorageUnlock();
+			const loaded = await cache.loadCachedReminderSnapshot('Private');
+			const after = { notes: await count('notes'), freshness: await count('freshness') };
+			cache.useUnencryptedStorage();
+			return { loaded, before, after };
+		});
+		assert.equal(privacy.loaded, null);
+		assert.ok(privacy.before.notes > privacy.after.notes, 'Plaintext notes are removed once private storage is required');
+		assert.ok(privacy.before.freshness > privacy.after.freshness, 'Plaintext freshness records are removed too');
+		console.log(`${browserType.name()}: cache creation, per-note partial writes, peer-replaced notes, metadata-only refresh, revision guards, clearing and private storage cleanup passed`);
 	} finally {
 		await browser.close();
 	}

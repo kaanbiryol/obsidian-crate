@@ -89,7 +89,14 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 			]))(),
 		]);
 		if (raw && !raw.encrypted && privateStorageEnabled()) {
-			await database.delete(CACHE_STORE_NAME, folderPath);
+			// Plaintext reminders must not outlive the switch to private storage.
+			const cleanup = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
+			await Promise.all([
+				cleanup.objectStore(CACHE_STORE_NAME).delete(folderPath),
+				cleanup.objectStore(FRESHNESS_STORE_NAME).delete(folderPath),
+				cleanup.objectStore(NOTES_STORE_NAME).delete(noteRange(folderPath)),
+				cleanup.done,
+			]);
 			return null;
 		}
 		if (!raw || raw.sessionScope !== sessionScope) return null;
