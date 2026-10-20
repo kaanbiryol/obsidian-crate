@@ -20,17 +20,11 @@ import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/shared/RemindersViewPanels';
 import { ProjectDetailView } from '@/reminders/ui/views';
 import { BackButton } from '@/ui/shared/BackButton';
-import {
-	getCurrentHeaderData,
-	getReminderCreateProject,
-	getRemindersHeaderData,
-	getReorderProject,
-	shouldShowReminderFab,
-} from '@/reminders/ui/shared/remindersViewModel';
+import { shouldShowReminderFab } from '@/reminders/ui/shared/remindersViewModel';
+import { useRemindersShellModel } from '@/reminders/ui/shared/useRemindersShellModel';
 import { PwaThemeIcon } from './PwaThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/shared/reminder-pagination';
 import { EmptyStateMessageContext } from '@/reminders/ui/shared/EmptyState';
-import { useReminderClock } from '@/reminders/ui/shared/useReminderClock';
 import { useReminderProjectNavigation } from '../hooks/useReminderProjectNavigation';
 
 const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };
@@ -123,29 +117,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		return () => animations.forEach(animation => animation.cancel());
 	}, [showLoadingIndicator, reduceMotion]);
 
-	const clock = useReminderClock(reminders);
-	const headerData = useMemo(() => {
-		return getRemindersHeaderData(reminders, projects, upcomingDays, clock.now);
-	}, [reminders, projects, upcomingDays, clock]);
-
-	const currentHeader = useMemo(() => {
-		return getCurrentHeaderData(viewMode, headerData);
-	}, [headerData, viewMode]);
-	const primaryTab = viewMode === 'upcoming' ? 'today' : viewMode;
-
-	const handleAdd = useCallback(() => {
-		if (backgroundInert) return;
-		onAdd(getReminderCreateProject(viewMode, selectedProject));
-	}, [backgroundInert, onAdd, selectedProject, viewMode]);
-
-	const panelCardRenderer = useCallback((reminder: Reminder, index: number) => {
-		return renderCard({
-			reminder,
-			index,
-			hideProject: viewMode === 'browse' && selectedProject !== null,
-		});
-	}, [renderCard, selectedProject, viewMode]);
-	const listCardRenderer = useCallback((reminder: Reminder, index: number) => renderCard({ reminder, index, hideProject: viewMode === 'inbox' }), [renderCard, viewMode]);
+	const { currentHeader, primaryTab, handleAdd, panelCardRenderer, listCardRenderer, handleReorder } = useRemindersShellModel({
+		reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder, addDisabled: backgroundInert,
+	});
 
 	const renderToggleButton = useCallback(({ onPress, showCompleted, count }: {
 		onPress: () => void;
@@ -170,13 +144,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			}
 		</Button>
 	), [reduceMotion]);
-
-	const currentProject = getReorderProject(viewMode, selectedProject);
-
-	const handleReorder = useCallback((orderedIds: string[]) => {
-		if (!currentProject) return;
-		return onReorder(currentProject, orderedIds);
-	}, [currentProject, onReorder]);
 
 	// The project detail view is memoized, so keep its element props stable
 	// across shell renders that do not change them.

@@ -18,13 +18,9 @@ import { ViewHeader } from "@/ui/shared/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
 import { RemindersViewPanels } from "@/reminders/ui/shared/RemindersViewPanels";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
-import { useReminderClock } from '../shared/useReminderClock';
+import { useRemindersShellModel } from '../shared/useRemindersShellModel';
 import {
-  getCurrentHeaderData,
-  getReminderCreateProject,
   getReminderProjects,
-  getRemindersHeaderData,
-  getReorderProject,
   shouldShowReminderFab,
   type ViewMode,
 } from "@/reminders/ui/shared/remindersViewModel";
@@ -135,30 +131,13 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     button?.focus({ preventScroll: true });
   }, [selectedProject, closingProject]);
 
-  const clock = useReminderClock(reminders);
-  const headerData = useMemo(() => {
-    return getRemindersHeaderData(reminders, projects, upcomingDays, clock.now);
-  }, [reminders, projects, upcomingDays, clock]);
-
-  const currentHeader = useMemo(() => {
-    return getCurrentHeaderData(viewMode, headerData);
-  }, [headerData, viewMode]);
+  const { currentHeader, primaryTab, handleAdd, panelCardRenderer, listCardRenderer, handleReorder } = useRemindersShellModel({
+    reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder,
+  });
 
   const showFab = shouldShowReminderFab(viewMode, selectedProject);
-  const primaryTab = viewMode === 'upcoming' ? 'today' : viewMode;
   const rootCovered = Boolean(selectedProject) || closingProject;
 
-  const handleAdd = useCallback(() => {
-    onAdd(getReminderCreateProject(viewMode, selectedProject));
-  }, [onAdd, selectedProject, viewMode]);
-
-  const panelCardRenderer = useCallback((reminder: Reminder, index: number) => {
-    return renderCard({
-      reminder,
-      index,
-      hideProject: viewMode === "browse" && selectedProject !== null,
-    });
-  }, [renderCard, selectedProject, viewMode]);
 
   const renderToggleButton = useCallback(({ onPress, showCompleted, count }: {
     onPress: () => void;
@@ -185,12 +164,6 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     </ShadowDOMButton>
   ), [prefersReducedMotion]);
 
-  const currentProject = getReorderProject(viewMode, selectedProject);
-
-  const handleReorder = useCallback((orderedIds: string[]) => {
-    if (!currentProject) return;
-    return onReorder(currentProject, orderedIds);
-  }, [currentProject, onReorder]);
 
   const viewPanels = (
     <RemindersViewPanels
@@ -201,7 +174,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       projects={projects}
       showFab={!suppressFab}
       upcomingDays={upcomingDays}
-      renderCard={(reminder, index) => renderCard({ reminder, index, hideProject: viewMode === 'inbox' })}
+      renderCard={listCardRenderer}
       renderToggleButton={renderToggleButton}
       onProjectSelect={handleProjectSelect}
       onBackToProjects={handleBackToProjects}
