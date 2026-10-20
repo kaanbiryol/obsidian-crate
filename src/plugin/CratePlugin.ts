@@ -81,11 +81,7 @@ export default class CratePlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
-			const normalizedSettings = normalizePersistedCrateSettings(this.settings, this.app.vault.configDir);
-			await this.saveData({
-				...normalizedSettings,
-				reminders: this.remindersSettings,
-			});
+			await this.persist(normalizePersistedCrateSettings(this.settings, this.app.vault.configDir));
 			signal.throwIfAborted();
 		});
 	}
@@ -98,10 +94,7 @@ export default class CratePlugin extends Plugin {
 				{ ...this.settings, ...requested },
 				this.app.vault.configDir,
 			);
-			await this.saveData({
-				...nextSettings,
-				reminders: this.remindersSettings,
-			});
+			await this.persist(nextSettings);
 			signal.throwIfAborted();
 			assertCurrent?.();
 			publishSavedSettings(this.settings, requested, nextSettings);
@@ -115,10 +108,7 @@ export default class CratePlugin extends Plugin {
 				...this.remindersSettings,
 				...(typeof update === 'function' ? update(this.remindersSettings) : update),
 			});
-			await this.saveData({
-				...buildPersistedCrateSettings(this.settings),
-				reminders: nextSettings,
-			});
+			await this.persist(buildPersistedCrateSettings(this.settings), nextSettings);
 			signal.throwIfAborted();
 			assertCurrent?.();
 			useRemindersSettingsStore.setState(nextSettings, true);
@@ -126,17 +116,9 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async setDebugLogging(enabled: boolean): Promise<void> {
-		await this.enqueueSettingsWrite(async signal => {
-			const nextSettings = { ...this.settings, debugLogging: enabled };
-			await this.saveData({
-				...buildPersistedCrateSettings(nextSettings),
-				reminders: this.remindersSettings,
-			});
-			signal.throwIfAborted();
-			publishSavedSettings(this.settings, { debugLogging: enabled }, nextSettings);
-			configureSyncLogger({ enabled });
-			configureRemindersLogger({ prefix: 'Crate', enabled });
-		});
+		await this.writeSettings({ debugLogging: enabled });
+		configureSyncLogger({ enabled });
+		configureRemindersLogger({ prefix: 'Crate', enabled });
 	}
 
 	async setRemindersEnabled(enabled: boolean, assertCurrent?: () => void): Promise<void> {
@@ -209,6 +191,11 @@ export default class CratePlugin extends Plugin {
 
 	refreshSettingsTab(): void {
 		this.settingTab?.update();
+	}
+
+	/** Core and reminder settings share one plugin data record. */
+	private persist(settings: PersistedCrateSettings, reminders = this.remindersSettings): Promise<void> {
+		return this.saveData({ ...settings, reminders });
 	}
 
 	private enqueueSettingsWrite(operation: (signal: AbortSignal) => Promise<void>): Promise<void> {

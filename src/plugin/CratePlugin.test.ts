@@ -162,6 +162,7 @@ describe('CratePlugin settings persistence', () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const saveData = vi.fn(async (_data: unknown) => {});
 		Object.assign(plugin, {
+			app: { vault: { configDir: '.obsidian' } },
 			settings: normalizeCrateSettings({ debugLogging: !enabled }, '.obsidian'),
 			saveData,
 		});
@@ -177,6 +178,7 @@ describe('CratePlugin settings persistence', () => {
 	it('leaves the debug setting unchanged if saving fails', async () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		Object.assign(plugin, {
+			app: { vault: { configDir: '.obsidian' } },
 			settings: normalizeCrateSettings({}, '.obsidian'),
 			saveData: vi.fn().mockRejectedValue(new Error('disk full')),
 		});
