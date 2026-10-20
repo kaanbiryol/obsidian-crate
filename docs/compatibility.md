@@ -69,8 +69,9 @@ The parser also recognizes task lines ending in CRLF. The plugin validates raw M
 
 Wire protocol 1 is the current contract, with oldest compatible version 1. Server revision and database schema are listed in the [current contract](current-contract.md). Native Shortcuts use an independent capture contract. Use matching plugin, Worker and PWA builds when recreating a development deployment.
 
-`protocol/rolling-upgrade.test.ts` exercises plugin and PWA writes against frozen
-protocol-1 metadata and preserves saved operation bodies. The Worker compatibility
+`protocol/rolling-upgrade.test.ts` exercises plugin writes against frozen
+protocol-1 metadata and preserves saved operation bodies. The PWA is served by
+its own Worker and requires that matching server; it has no older-server fallbacks. The Worker compatibility
 suite verifies duplicate receipts and rejects unsupported headers and restores
 without durable operations before changing data. Future compatible protocol
 increments should retain this baseline while its writers remain safe.

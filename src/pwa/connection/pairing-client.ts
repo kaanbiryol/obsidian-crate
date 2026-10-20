@@ -26,7 +26,7 @@ export function pairingConnection(feature: 'reading' | 'reminders', signal: Abor
     current();
     if (response.status === 401) reportExpiredConnection(token!);
     const data = await response.json() as T & { error?: string };
-    if (!response.ok) throw Object.assign(new Error(response.status === 404 ? 'Update your Crate server in Obsidian to connect without a recovery key.' : data.error ?? 'Could not connect. Try again.'), { status: response.status });
+    if (!response.ok) throw Object.assign(new Error(data.error ?? 'Could not connect. Try again.'), { status: response.status });
     return data;
   }
   const transport: PairingTransport = {

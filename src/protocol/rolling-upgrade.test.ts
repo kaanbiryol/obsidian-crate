@@ -1,8 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
-import { makeApiFetch } from '../pwa/api';
 
-vi.mock('../pwa/session-label', () => ({ detectWebSessionName: () => 'Compatibility test' }));
 // Frozen launch protocol-1 wire metadata: do not derive this fixture from current code.
 const baselineServer = { service: 'crate' as const, serverVersion: '0.1.0', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['sync-v1'], reminderOperationDay: 20707 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -18,15 +16,3 @@ it('the current plugin negotiates protocol 1 for an ordinary mutation on the bas
 	expect(transport.mock.calls[1]![0].headers?.['X-Crate-Protocol']).toBe('1');
 	expect(client.getRequestDiagnostics().requests.at(-1)?.uploadOperationIds).toEqual(['e1_00020707_saved-operation-id-123456']);
 });
-
-it('the current PWA negotiates protocol 1 without altering a saved operation body', async () => {
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'crate-auth-token' ? 'token' : null });
-	const network = vi.fn(async (path: string, _init?: RequestInit) => path === '/encryption' ? new Response(null, { status: 404 }) : Response.json(path === '/.well-known/crate' ? baselineServer : { success: true }));
-	vi.stubGlobal('fetch', network);
-	const body = JSON.stringify({ operationId: 'e1_00020707_00000000-0000-4000-8000-000000000001', id: 'e1_00020707_00000000-0000-4000-8000-000000000001', folderPath: 'Reminders', content: 'Saved offline' });
-	await makeApiFetch('token', vi.fn())('/reminders/create', { method: 'POST', body });
-	const init = network.mock.calls.find(([path]) => path === '/reminders/create')![1];
-	expect(new Headers(init?.headers).get('X-Crate-Protocol')).toBe('1');
-	expect(init?.body).toBe(body);
-});
-

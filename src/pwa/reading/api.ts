@@ -26,7 +26,7 @@ export async function connectReadingFromReminders(): Promise<ReadingSession | nu
   if (!response.ok) throw new ReadingApiError(data.error ?? 'Reading is unavailable.', response.status, data.code);
   if (typeof data.id !== 'string' || !data.id || typeof data.folderPath !== 'string' || !data.folderPath
     || typeof data.generation !== 'string' || !data.generation || typeof data.expiresAt !== 'number' || !Number.isFinite(data.expiresAt)) {
-    throw new Error('Update your Crate server to use Reading with this app.');
+    throw new Error('The server returned an invalid Reading session.');
   }
   const existing = readingSession();
   if (existing && existing.source !== 'reminders') return existing;

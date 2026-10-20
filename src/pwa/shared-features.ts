@@ -44,7 +44,7 @@ export function useServerFeatures(): SharedFeatures {
           if (localStorage.getItem(CACHE_KEY) !== serialized) localStorage.setItem(CACHE_KEY, serialized);
           setFeatures(current => current.reading === value.reading && current.reminders === value.reminders ? current : value);
         }
-      } catch { /* Keep confirmed state while offline. Older servers retain both features. */ }
+      } catch { /* Keep confirmed state while offline. */ }
       finally { busy = false; }
     };
     const requested = (immediate: boolean) => {

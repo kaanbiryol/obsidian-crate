@@ -3,7 +3,7 @@ import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from '../components/SettingsSection';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { READING_SHORTCUT_URL } from '@/reading/shortcut';
-import { ReadingApiError, readingRequest } from './api';
+import { readingRequest } from './api';
 import { assertReadingSession, type ReadingSession } from './storage';
 
 interface Pairing { pairingCode: string; expiresAt: number }
@@ -27,9 +27,9 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
     try {
       const next = await readingRequest<Pairing>('/reading/shortcut-pairing', session, '{}');
       const url = new URL(next.pairingCode);
-      if (url.origin !== location.origin || url.pathname !== '/reading/shortcut-exchange' || url.search || !/^#[a-f0-9]{64}$/.test(url.hash) || !Number.isFinite(next.expiresAt)) throw new Error('Could not verify the pairing code. Update your Crate server and try again.');
+      if (url.origin !== location.origin || url.pathname !== '/reading/shortcut-exchange' || url.search || !/^#[a-f0-9]{64}$/.test(url.hash) || !Number.isFinite(next.expiresAt)) throw new Error('Could not verify the pairing code. Try again.');
       if (alive.current) { setPairing(next); setNow(Date.now()); }
-    } catch (cause) { if (alive.current) setError(cause instanceof ReadingApiError && [404, 428].includes(cause.status) ? 'Update your Crate server, then reopen shortcut setup.' : cause instanceof Error ? cause.message : 'Could not create a pairing code. Try again.'); }
+    } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Could not create a pairing code. Try again.'); }
     finally { working.current = false; if (alive.current) setBusy(false); }
   };
   return <div className="crate-reading-shortcut">

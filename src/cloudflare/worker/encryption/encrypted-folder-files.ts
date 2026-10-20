@@ -47,8 +47,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
 		const sequence = await env.DB.prepare("SELECT MAX(COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'changelog'), 0), COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS seq").first<{ seq: number }>();
 		// Page in primary-key order from a single lower bound, so each page reads only
-		// its own rows. The cursor is opaque to clients; normalizing it also resumes
-		// an original-case path cursor from an older server.
+		// its own rows. The cursor is opaque to clients.
 		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
 		const afterKey = portablePathKey(after);
 		const [lower, lowerBound] = afterKey >= keyStart ? ['portable_path > ?', afterKey] : ['portable_path >= ?', keyStart];

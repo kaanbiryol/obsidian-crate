@@ -42,14 +42,12 @@ templates keep saving and the live page offers an optional download when their
 revision is older. Users install updates themselves; no fetched shortcut or
 plugin code executes automatically.
 
-For a breaking capture change, add a new versioned route and an explicit adapter
-for each retained contract before distributing its native template. Keep old
-request meanings and capture scope limits intact. Add regression fixtures for
-both old and new requests. Do not broaden the general wire gate to admit old
-versions. Retire a contract or raise the minimum template revision only when
-continuing support would violate current invariants, with explicit update
-guidance. A newer client reaching an older supported Worker receives
-**Update your Crate server**; a retired client receives **Update your shortcut**.
+The Worker admits only the current contract's routes; other contract versions
+receive 404. For a breaking capture change, replace the versioned route and
+distribute the new native template with the release. Keep capture scope limits
+intact and add regression fixtures for the new requests. Do not broaden the
+general wire gate. A template below the minimum revision receives
+**Update your shortcut**.
 
 New installations use a fresh pairing code from the enrolled Crate app. Failed re-pairing must leave previous
 stored configuration intact; a lost successful exchange needs a new one-use code.

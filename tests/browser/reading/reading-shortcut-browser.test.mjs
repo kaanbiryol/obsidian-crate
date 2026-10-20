@@ -126,7 +126,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(input).toHaveCount(0);
     unavailable = true;
     await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toContainText('Update your Crate server');
+    await expect(dialog.getByRole('alert')).toContainText('Not found');
     unavailable = false;
     await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();
     await expect(input).toHaveValue(/shortcut-exchange#/);

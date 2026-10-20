@@ -89,7 +89,7 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 				if (!response.ok) throw new Error(await response.text());
 				const result = await response.json() as { id?: unknown; notificationsEnabled?: unknown };
 				if (typeof result.id !== 'string' || !result.id) throw new Error('The server did not confirm notification registration.');
-				if (typeof result.notificationsEnabled !== 'boolean') throw new Error('This device is registered. Update your Crate server to confirm its notification settings.');
+				if (typeof result.notificationsEnabled !== 'boolean') throw new Error('The server did not confirm this vault’s notification settings.');
 				// Provider permission and endpoints can change during a request.
 				const currentSubscription = await manager.getSubscription();
 				const currentBody = currentSubscription?.toJSON();

@@ -232,11 +232,11 @@ async function pausedVault(browser) {
     await resume(page);
     await page.getByText('Off for vault', { exact: true }).waitFor();
     await expect(on(page)).toHaveCount(0);
-    // An older or malformed response cannot turn an unconfirmed server green.
+    // A malformed response cannot turn an unconfirmed server green.
     control.notificationsEnabled = undefined;
     await resume(page);
     await retry(page).waitFor();
-    await expect(section).toContainText('Update your Crate server');
+    await expect(section).toContainText('did not confirm this vault’s notification settings');
     await expect(on(page)).toHaveCount(0);
     control.notificationsEnabled = true;
     await retry(page).click();
