@@ -1,5 +1,5 @@
 import type { Priority, Reminder, RecurrenceRule } from '../types';
-import { recurrenceToEditorText } from './recurrence/rruleConverter';
+import { recurrenceToEditorText } from './recurrence/recurrenceText';
 import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
 import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
 import { findProjectMatches } from './grammar/richTextMatchers';

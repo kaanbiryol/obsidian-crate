@@ -1,7 +1,7 @@
 import { getLocalTimeZone } from '@internationalized/date';
 import { describe, expect, it } from 'vitest';
 import { parseRecurrenceFromContent } from './recurrenceParser';
-import { recurrenceToText } from './rruleConverter';
+import { recurrenceToText } from './recurrenceText';
 
 describe('parseRecurrenceFromContent', () => {
   it.each([

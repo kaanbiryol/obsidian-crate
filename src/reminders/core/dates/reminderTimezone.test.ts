@@ -5,7 +5,7 @@ import { parseReminderEditorContent } from '../grammar/reminderEditorParsing';
 import { buildRichTextSegments } from '../../ui/editor/richTextRenderer';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '../recurrence/recurrenceCalculator';
 import { parseRecurrenceFromContent } from '../recurrence/recurrenceParser';
-import { recurrenceToEditorText } from '../recurrence/rruleConverter';
+import { recurrenceToEditorText } from '../recurrence/recurrenceText';
 import { buildReminderSubmission } from '../../ui/reminder-modal/reminderMutation';
 import { buildReminderMutationBody } from '@/pwa/reminders/outbox/reminder-mutation';
 import { buildModalDraft } from '@/pwa/reminders/editor/reminder-modal-draft';

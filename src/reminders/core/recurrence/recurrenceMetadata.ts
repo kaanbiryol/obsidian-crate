@@ -1,6 +1,6 @@
 import { validateRecurrence } from './validateRecurrence';
 import type { RecurrenceRule } from '../../types/reminder';
-import { recurrenceToText } from './rruleConverter';
+import { recurrenceToText } from './recurrenceText';
 import { normalizeRecurrenceRule } from './recurrenceRule';
 
 const MARKER = /\s*<!-- crate-rule:([^>]*?) -->/g;

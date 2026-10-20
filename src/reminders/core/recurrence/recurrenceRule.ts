@@ -1,4 +1,4 @@
-import { recurrenceToText } from './rruleConverter';
+import { recurrenceToText } from './recurrenceText';
 import type { RecurrenceRule } from '../../types/reminder';
 import { timezone as getLocalTimeZone } from '../dates/time';
 import { canonicalReminderTimezone } from '../dates/reminderTimezone';

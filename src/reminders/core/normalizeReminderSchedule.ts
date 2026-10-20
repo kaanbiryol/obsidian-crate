@@ -5,7 +5,7 @@ import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
 import { recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
 import { appendRecurrenceMetadata } from './recurrence/recurrenceMetadata';
 import { setReminderIdMarker } from './reminderIdentity';
-import { recurrenceToText } from './recurrence/rruleConverter';
+import { recurrenceToText } from './recurrence/recurrenceText';
 
 /** Resolve draft syntax once on the user's device before indexing/syncing it. */
 export function normalizeReminderScheduleLine(

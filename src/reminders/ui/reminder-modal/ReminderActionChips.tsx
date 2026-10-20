@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '../../../ui/shared/Button';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import type { RecurrenceRule } from '../../types';
-import { formatRecurrence } from '../../core/recurrence/rruleConverter';
+import { formatRecurrence } from '../../core/recurrence/recurrenceText';
 import { formatDueDate } from '../format/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { useReminderClock } from '../shared/useReminderClock';

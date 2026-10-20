@@ -1,6 +1,7 @@
 import type { RecurrenceRule } from '../../types';
 import { normalizeRecurrenceRule } from '../../core/recurrence/recurrenceRule';
 import { getUiLocale } from '../format/uiLocale';
+import { formatOrdinal } from '../../core/recurrence/recurrenceText';
 
 export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
 
@@ -61,10 +62,7 @@ export interface RecurrencePickerDraft {
 }
 
 export function getOrdinalSuffix(value: number): string {
-	if (value === -1) return 'Last';
-	const endings = ['th', 'st', 'nd', 'rd'];
-	const mod = value % 100;
-	return `${value}${endings[(mod - 20) % 10] || endings[mod] || endings[0]}`;
+	return value === -1 ? 'Last' : formatOrdinal(value);
 }
 
 export function buildRecurrencePickerState(

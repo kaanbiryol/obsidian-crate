@@ -52,8 +52,7 @@ export function formatRecurrence(rule: RecurrenceRule): string {
   if (rule.frequency === 'monthly') {
     let base = interval === 1 ? 'Monthly' : `Every ${interval} months`;
     if (rule.dayOfMonth) {
-      const suffix = getOrdinalSuffix(rule.dayOfMonth);
-      base += ` on the ${rule.dayOfMonth}${suffix}`;
+      base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
     }
     return base + timeStr;
   }
@@ -61,10 +60,11 @@ export function formatRecurrence(rule: RecurrenceRule): string {
   return 'Repeating';
 }
 
-function getOrdinalSuffix(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
+/** English ordinal such as 1st, 22nd or 13th. */
+export function formatOrdinal(n: number): string {
+  const suffixes = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
-	return s[(v - 20) % 10] || s[v] || 'th';
+  return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || 'th'}`;
 }
 
 /**
@@ -119,8 +119,7 @@ export function recurrenceToText(rule: RecurrenceRule): string {
   if (rule.frequency === 'monthly') {
     let base = interval === 1 ? 'monthly' : `every ${interval} months`;
     if (rule.dayOfMonth) {
-      const suffix = getOrdinalSuffix(rule.dayOfMonth);
-      base += ` on the ${rule.dayOfMonth}${suffix}`;
+      base += ` on the ${formatOrdinal(rule.dayOfMonth)}`;
     }
     return base + timeStr;
   }

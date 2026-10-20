@@ -12,7 +12,7 @@
 import { parseReminderContent, UnresolvedReminderScheduleError, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../../types';
 import { formatReminderDateText } from '../dates/reminderDate';
-import { recurrenceToText } from '../recurrence/rruleConverter';
+import { recurrenceToText } from '../recurrence/recurrenceText';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../reminderIdentity';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../recurrence/recurrenceMetadata';
 
