@@ -1,0 +1,62 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../../schema.sql?raw';
+import { apiRoutePolicy, apiRoutes } from './policy';
+import { PUBLIC_ASSET_PATHS } from './admission';
+import { handleAuthenticatedRoute, handlePublicRoute } from '../router';
+import { updatePolicy } from '../reading/access';
+import { policy } from '../reading/common';
+import { commitStagedFile } from '../sync/mutations';
+import { commitNewFiles } from '../sync/bulk-new-file-commit';
+import type { AuthPrincipal } from '../auth/authenticate';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
+
+beforeEach(async () => {
+	for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	// Reading handlers check their folder before matching the path.
+	await updatePolicy(env.DB, { enabled: false, folderPath: 'Reading', revision: null });
+});
+afterEach(async () => { await reset(); });
+
+/** The router's unmatched result and Reading's own catch-all response. */
+async function fellThrough(response: Response | null): Promise<boolean> {
+	if (!response) return true;
+	if (response.status !== 404) return false;
+	const body: unknown = await response.clone().json().catch(() => null);
+	return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'Not found';
+}
+
+it('dispatches every declared API route to a handler', async () => {
+	const reading = (await policy(env.DB))!;
+	const unhandled: string[] = [];
+	for (const { method, path } of apiRoutes()) {
+		const scope = apiRoutePolicy(path, method)!.scopes[0]!;
+		const principal: AuthPrincipal = scope === 'vault' ? { tokenId: 'route-dispatch', scope }
+			: { tokenId: 'route-dispatch', scope, folderPath: reading.folder_path, readingGeneration: reading.generation };
+		const request = new Request(`https://worker.test${path}`, {
+			method,
+			headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) },
+			body: method === 'GET' ? undefined : '{}',
+		});
+		let response: Response | null;
+		try {
+			response = await handlePublicRoute(request, env, path, method) ?? await handleAuthenticatedRoute(request, env, {
+				uploadCommitters: { commitUpload: commitStagedFile, commitNewFiles }, path, method, principal,
+				resetGeneration: null, encryption: null,
+			});
+		} catch {
+			// Handlers match their path before validating; a rejection means one was reached.
+			continue;
+		}
+		if (await fellThrough(response)) unhandled.push(`${method} ${path}`);
+	}
+	expect(unhandled).toEqual([]);
+});
+
+it('serves every public asset admitted before authentication', async () => {
+	for (const path of PUBLIC_ASSET_PATHS) {
+		expect(await handlePublicRoute(new Request(`https://worker.test${path}`), env, path, 'GET'), path).not.toBeNull();
+	}
+});

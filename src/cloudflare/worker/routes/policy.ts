@@ -122,6 +122,14 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	[`POST ${shortcut.exchangePath}`]: { scopes: VAULT, execution: READING_GRANT },
 };
 
+/** Every declared route, so tests can check the other route tables against this one. */
+export function apiRoutes(): Array<{ method: string; path: string }> {
+	return Object.keys(routes).map(key => {
+		const [method = '', path = ''] = key.split(' ');
+		return { method, path };
+	});
+}
+
 export function apiRoutePolicy(path: string, method: string): ApiRoutePolicy | undefined {
 	const key = `${method} ${path}`;
 	return Object.hasOwn(routes, key) ? routes[key] : undefined;

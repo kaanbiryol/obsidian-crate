@@ -19,15 +19,19 @@ export function checkRequestProtocol(request: Request, shortcut: ShortcutTranspo
 	return null;
 }
 
+/** Routes that remain available while an encryption reset is in progress. */
+export const ENCRYPTION_RESET_PATHS: readonly string[] = ['/encryption/reset', '/encryption', '/health'];
+/** Feature visibility is authenticated public policy, not private vault content. */
+export const KEYLESS_ENCRYPTED_READ_PATHS: readonly string[] = ['/features', '/reading/encryption', '/reading/session'];
+
 /** Uses freshly authenticated state before any forwarding or route dispatch. */
 export function assertRequestEncryption(request: Request, encryption: EncryptionServerState | null): void {
 	const path = new URL(request.url).pathname;
 	const method = request.method;
-	if (encryption?.mode === 'resetting' && !['/encryption/reset', '/encryption', '/health'].includes(path)) {
+	if (encryption?.mode === 'resetting' && !ENCRYPTION_RESET_PATHS.includes(path)) {
 		throw new EncryptionStateError('Encryption reset is in progress. Resume it on the device that started it.', 423);
 	}
-	// Feature visibility is authenticated public policy, not private vault content.
-	if (encryption && !(['/features', '/reading/encryption', '/reading/session'].includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
+	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
 		const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
 		if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 			throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
