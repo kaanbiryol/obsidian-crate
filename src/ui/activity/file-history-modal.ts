@@ -28,7 +28,7 @@ function filePreview(container: HTMLElement, text: string, label: string): void 
 	renderFileText(pre, text || '(Empty file)');
 }
 
-class RemoteRecoveryModal extends SharedModal {
+class FileHistoryModal extends SharedModal {
 	private closed = false;
 	private cancelInitialFocus?: () => void;
 	private previewRevision = 0;
@@ -272,6 +272,6 @@ class RemoteRecoveryModal extends SharedModal {
 	}
 }
 
-export function openRemoteRecoveryModal(app: App, runtime: FileHistoryRuntime, path: string): void {
-	new RemoteRecoveryModal(app, runtime, path).open();
+export function openFileHistoryModal(app: App, runtime: FileHistoryRuntime, path: string): void {
+	new FileHistoryModal(app, runtime, path).open();
 }

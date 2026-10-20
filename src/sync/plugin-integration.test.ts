@@ -1,11 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
-import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
+import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { registerSyncCommands } from './plugin-integration';
 import { setSyncReady } from '../plugin/lifecycle-state';
 
-vi.mock('../ui/activity/remote-recovery-modal', () => ({ openRemoteRecoveryModal: vi.fn() }));
+vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
 vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
 vi.mock('./runtime/runtime', () => ({ SyncRuntime: vi.fn() }));
 vi.mock('../reminders/runtime', () => ({ ensureReminderNotificationPolicy: vi.fn(), refreshReminderNotificationPolicy: vi.fn() }));
@@ -30,15 +30,15 @@ it('opens the active file only when the history command is executed', async () =
  const { plugin, workspace, file, commands } = setup();
  const command = commands.find(command => command.id === 'show-file-history')!;
  expect(command.checkCallback!(true)).toBe(true);
- expect(openRemoteRecoveryModal).not.toHaveBeenCalled();
+ expect(openFileHistoryModal).not.toHaveBeenCalled();
  command.checkCallback!(false);
- await vi.waitFor(() => expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, file.path));
+ await vi.waitFor(() => expect(openFileHistoryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, file.path));
  workspace.getActiveFile.mockReturnValue(null);
  expect(command.checkCallback!(false)).toBe(false);
  workspace.getActiveFile.mockReturnValue(file);
  plugin.syncRuntime.isConfigured.mockReturnValue(false);
  expect(command.checkCallback!(false)).toBe(false);
- expect(openRemoteRecoveryModal).toHaveBeenCalledTimes(1);
+ expect(openFileHistoryModal).toHaveBeenCalledTimes(1);
 });
 
 it('registers a file-only context action that opens the clicked file', async () => {
@@ -51,7 +51,7 @@ it('registers a file-only context action that opens the clicked file', async () 
  fileMenu(menu as unknown as Menu, clicked);
  expect(item.setTitle).toHaveBeenCalledWith('File history');
  click();
- await vi.waitFor(() => expect(openRemoteRecoveryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, clicked.path));
+ await vi.waitFor(() => expect(openFileHistoryModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime, clicked.path));
  fileMenu(menu as unknown as Menu, new TFolder());
  plugin.syncRuntime.isConfigured.mockReturnValue(false);
  fileMenu(menu as unknown as Menu, file);

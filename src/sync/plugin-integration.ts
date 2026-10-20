@@ -1,5 +1,5 @@
 import { registerSyncStatus } from '../plugin/sync-status';
-import { openRemoteRecoveryModal } from '../ui/activity/remote-recovery-modal';
+import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
@@ -95,7 +95,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
 	const signal = getPluginLifecycleSignal(plugin);
 	void waitForSyncReady(plugin).then(() => {
-		if (!signal.aborted) openRemoteRecoveryModal(plugin.app, plugin.syncRuntime, path);
+		if (!signal.aborted) openFileHistoryModal(plugin.app, plugin.syncRuntime, path);
 	});
 }
 

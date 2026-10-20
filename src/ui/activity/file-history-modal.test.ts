@@ -25,10 +25,10 @@ const button = (text: string) => {
 const row = { path: 'older.md', hash: 'a'.repeat(64), storage_key: 'retained', size: 10, created_at: '2026-09-09', expires_at: Date.now() + 300_000, reason: 'deleted' as const };
 async function open(listRecentFileVersions = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>().mockResolvedValue({ versions: [row], hasMore: false }), pending: RemoteFileVersion[] = [], initialPath = 'new.md') {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: false } }));
-	const { openRemoteRecoveryModal } = await import('./remote-recovery-modal');
+	const { openFileHistoryModal } = await import('./file-history-modal');
 	const runtime = { getSyncHistory: () => [{ timestamp: '2026-09-19T16:00:00Z', type: 'sync', success: true, uploaded: 0, downloaded: 1, merged: 0, deleted: 0, conflictCount: 0, errorCount: 0, downloadedPaths: ['older.md'] }], loadCurrentSyncedPreview: vi.fn().mockResolvedValue({ file: { hash: 'a'.repeat(64), revision: 'current', size: 12, modified: '2026-09-19' }, text: 'synced contents' }), loadFileHistoryPreview: vi.fn().mockResolvedValue({ saved: 'saved text', current: 'local text' }), getPendingRestores: vi.fn().mockReturnValue(pending), listRecentFileVersions, restoreRecentFileVersion: vi.fn().mockResolvedValue({ success: true, errors: [] }) };
 	const file = { path: 'new.md', extension: 'md', stat: { size: 12, mtime: 1 } };
-	openRemoteRecoveryModal({ vault: { getFiles: () => [file], getFileByPath: (path: string) => path === file.path ? file : null, cachedRead: async () => 'local contents' } } as never, runtime, initialPath);
+	openFileHistoryModal({ vault: { getFiles: () => [file], getFileByPath: (path: string) => path === file.path ? file : null, cachedRead: async () => 'local contents' } } as never, runtime, initialPath);
 	return { runtime, modal: MockModal.instances[0]! };
 }
 

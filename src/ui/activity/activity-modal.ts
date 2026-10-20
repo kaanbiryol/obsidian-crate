@@ -2,7 +2,7 @@ import { SharedHistoryLoader } from './shared-history-loader';
 import { describeActivityStatus } from './activity-status';
 import type { SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { mergeSharedHistory } from './shared-history';
-import { openRemoteRecoveryModal, type FileHistoryRuntime } from './remote-recovery-modal';
+import { openFileHistoryModal, type FileHistoryRuntime } from './file-history-modal';
 import { BaseUiModal } from '../plugin/BaseUiModal';
 import { getPendingFileActions } from './file-actions';
 import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
@@ -360,7 +360,7 @@ export class ActivityModal extends BaseUiModal {
             } : undefined;
             this.activityHistory = new ActivityHistory(this.app, this.historyPanel, {
                 load: deps.loadHistoryComparison?.bind(deps),
-                openFile: historyRuntime ? path => openRemoteRecoveryModal(this.app, historyRuntime, path) : undefined,
+                openFile: historyRuntime ? path => openFileHistoryModal(this.app, historyRuntime, path) : undefined,
                 restore: deps.createHistoryRestore ? entry => {
                     new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore!(entry), () => this.refresh()).open();
                 } : undefined,

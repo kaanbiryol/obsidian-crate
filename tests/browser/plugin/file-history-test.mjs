@@ -6,7 +6,7 @@ import { chromium, webkit, expect } from '@playwright/test';
 const { outputFiles } = await build({
  external: ['electron'],
  stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
- import { openRemoteRecoveryModal } from './src/ui/activity/remote-recovery-modal';
+ import { openFileHistoryModal } from './src/ui/activity/file-history-modal';
  import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
  import { ActivityHistory } from './src/ui/activity/activity-history';
  import { mergeSharedHistory } from './src/ui/activity/shared-history';
@@ -103,7 +103,7 @@ const { outputFiles } = await build({
   window.refreshHistoryDetails = () => {history[0]={...history[0],errors:[]};window.updateHistory();};
   window.updateHistory();
  };
- window.mount = (path = 'Reminders/Inbox.md') => { document.querySelectorAll('.modal').forEach(el => el.remove()); openRemoteRecoveryModal({vault:{getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}},runtime,path); };
+ window.mount = (path = 'Reminders/Inbox.md') => { document.querySelectorAll('.modal').forEach(el => el.remove()); openFileHistoryModal({vault:{getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}},runtime,path); };
  ` },
  plugins: [{name:'obsidian',setup(builder) {
   builder.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'fixture'}));
