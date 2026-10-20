@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSyncFailureToast } from './useSyncFailureToast';
-import { createReminderOutbox, reminderRetryAt } from '../reminders/outbox/reminder-outbox';
+import { reminderRetryAt, type createReminderOutbox } from '../reminders/outbox/reminder-outbox';
 import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminders/outbox/reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
-import { applyReminderListEffect } from '../reminders/outbox/reminder-list-state';
 import { createReminderSettlementChannel } from '../reminders/outbox/reminder-settlement';
-import { subscribeReminderOutboxEvents } from '../reminders/outbox/reminder-outbox-events';
+import { createReminderOutboxSession } from '../reminders/outbox/reminder-outbox-session';
 import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { ConfirmedReminderSnapshot } from './useReminderSync';
-import { REMINDER_OUTBOX_LOCK } from '../reminders/outbox/reminder-storage-keys';
 
 export function useReminderOutbox(options: {
 	enabled?: boolean;
@@ -52,87 +50,23 @@ export function useReminderOutbox(options: {
 		removeQuarantinedRef.current = null;
 		recoverRef.current = null;
 		if (!authToken || !bootstrapped) return;
-		let cleanup = () => {};
+		let dispose = () => {};
 		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath), createReminderSettlementChannel(authToken, folderPath)]).then(([storage, recovery, settlement]) => {
 			if (!isCurrent()) return;
-			if (!navigator.locks) throw new Error('Update this browser to safely sync changes between tabs.');
-			const refreshQuarantine = () => {
-				if (isCurrent()) setQuarantinedChanges([...storage.quarantined(), ...recovery.quarantined()]);
-			};
-			const outbox = createReminderOutbox({
-				storage, apiFetch: optionsRef.current.apiFetch, isCurrent,
-				withLock: work => navigator.locks.request(REMINDER_OUTBOX_LOCK, work),
-				canSend: () => optionsRef.current.enabled !== false && optionsRef.current.hasSnapshot !== false,
-				beginMutation: () => optionsRef.current.beginLocalMutation(),
-				onChange: setChanges,
-				onScan: refreshQuarantine,
-			onError: message => { setStorageError(message); optionsRef.current.showToast('error', message); },
-				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
-				commit: async (change, result) => {
-					const current = optionsRef.current;
-					let list = current.getSnapshot();
-					if (result.reminder) list = applyReminderListEffect(list, { kind: 'upsert', record: result.reminder });
-					else if (change.kind === 'delete') list = applyReminderListEffect(list, { kind: 'delete', recordId: change.recordId });
-					else if (change.kind === 'reorder') list = applyReminderListEffect(list, change);
-					await current.commitReminderState(list.reminders, list.projects);
-					if (isCurrent()) settlement.publish(change, result);
-					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
-					if (isCurrent() && change.kind === 'save' && !result.notificationWarning) {
-						current.showToast('success', change.path === '/reminders/create' ? 'Reminder created' : 'Reminder updated');
-					}
-					return undefined;
-				},
+			const session = createReminderOutboxSession({
+				storage, recovery, settlement, isCurrent, current: () => optionsRef.current,
+				onChanges: setChanges, onRecoveryChanges: setRecoveryChanges, onQuarantine: setQuarantinedChanges, onStorageError: setStorageError,
 			});
-			outbox.refresh();
-			setRecoveryChanges(recovery.load());
-			outboxRef.current = outbox;
+			dispose = session.dispose;
+			outboxRef.current = session.outbox;
+			removeQuarantinedRef.current = session.removeQuarantined;
+			recoverRef.current = session.recover;
 			setReady(true);
-			removeQuarantinedRef.current = async entries => {
-				try {
-					await navigator.locks.request(REMINDER_OUTBOX_LOCK, () => {
-						if (!isCurrent()) return;
-						storage.removeQuarantined(entries);
-						recovery.removeQuarantined(entries);
-						refreshQuarantine();
-					});
-					return isCurrent();
-				} catch (error) {
-					if (isCurrent()) optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error));
-					return false;
-				}
-			};
-			const resume = () => {
-				if (!isCurrent()) return;
-				try {
-					outbox.refresh();
-					void outbox.drain();
-				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
-			};
-			recoverRef.current = async () => {
-				if (!isCurrent() || optionsRef.current.canRecover === false || optionsRef.current.hasSnapshot === false) return;
-				try {
-					await navigator.locks.request(REMINDER_OUTBOX_LOCK, () => {
-						if (!isCurrent()) return;
-						const recovered = new Set(recovery.load().map(change => change.operationId));
-						recovery.adopt();
-						setRecoveryChanges(recovery.load());
-						// Selecting recovery explicitly resumes these earlier-session attempts.
-						for (const change of outbox.refresh()) {
-							if (recovered.has(change.operationId) && change.status === 'uncertain') outbox.retry(change.operationId);
-						}
-					});
-					resume();
-				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
-			};
-			cleanup = subscribeReminderOutboxEvents({
-				storage, recovery, settlement, outbox, isCurrent, resume, setRecoveryChanges,
-				current: () => optionsRef.current,
-			});
-			resume();
+			session.resume();
 		}).catch((error: unknown) => {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);
 		});
-		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; removeQuarantinedRef.current = null; cleanup(); };
+		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; removeQuarantinedRef.current = null; dispose(); };
 	}, [authToken, bootstrapped, folderPath, initialization]);
 
 	useEffect(() => {
