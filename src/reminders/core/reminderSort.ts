@@ -59,25 +59,13 @@ export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
   });
 }
 
-/**
- * Get reminders due today
- */
-export function getTodayReminders(reminders: Reminder[], now = new Date()): Reminder[] {
-  return reminders.filter((reminder) => !reminder.completed && isReminderDueToday(reminder, now));
-}
-
-/**
- * Get completed reminders due today
- */
-export function getCompletedTodayReminders(reminders: Reminder[], now = new Date()): Reminder[] {
-  return reminders.filter((reminder) => reminder.completed && isReminderDueToday(reminder, now));
-}
-
-/**
- * Get overdue reminders
- */
-export function getOverdueReminders(reminders: Reminder[], now = new Date()): Reminder[] {
-  return reminders.filter(reminder => isReminderOverdue(reminder, now));
+/** Today's list: overdue reminders plus those due today, completed ones only when requested. Each id appears once. */
+export function selectTodayReminders<T extends Pick<Reminder, 'id' | 'completed' | 'dueDate' | 'dueDatetime'>>(reminders: T[], now: Date, includeCompleted: boolean): T[] {
+  const selected = new Map<string, T>();
+  for (const reminder of reminders) {
+    if (isReminderOverdue(reminder, now) || (isReminderDueToday(reminder, now) && (includeCompleted || !reminder.completed))) selected.set(reminder.id, reminder);
+  }
+  return [...selected.values()];
 }
 
 /**

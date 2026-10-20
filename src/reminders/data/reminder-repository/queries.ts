@@ -1,9 +1,8 @@
 import type { ReminderRepositoryContext } from "./types";
-import { getTodayReminderIds } from "./shared";
 import { toReminder } from "../toReminder";
 import type { IndexedReminder } from "../reminder-index";
 import type { Reminder } from "@/reminders/types/reminder";
-import { isReminderDueToday, isReminderOverdue } from "@/reminders/core/dates/reminderDate";
+import { selectTodayReminders } from "../../core/reminderSort";
 
 /** Converted reminders keep their identity while the indexed record is
  * unchanged, so memoized rows skip rendering after edits to other notes. The
@@ -29,15 +28,7 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
     },
 
     getTodayReminders(includeCompleted = false) {
-      const now = new Date();
-      // One merged index read instead of three, with the shared converted rows.
-      const activeToday: IndexedReminder[] = [], overdue: IndexedReminder[] = [], completed: IndexedReminder[] = [];
-      for (const reminder of index.getAll()) {
-        if (!reminder.completed && isReminderDueToday(reminder, now)) activeToday.push(reminder);
-        if (isReminderOverdue(reminder, now)) overdue.push(reminder);
-        if (reminder.completed) completed.push(reminder);
-      }
-      return getTodayReminderIds(activeToday, overdue, completed, includeCompleted, now, convert);
+      return selectTodayReminders(index.getAll(), new Date(), includeCompleted).map(convert);
     },
 
     getProjects() {

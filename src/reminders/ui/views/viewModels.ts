@@ -1,13 +1,6 @@
 import { type Reminder } from "@/reminders/types/reminder";
 import { getProjectColor, type ProjectColorScheme } from "@/reminders/ui/format/projectColors";
-import {
-  getCompletedTodayReminders,
-  getOverdueReminders,
-  getTodayReminders,
-  getUpcomingReminders,
-  sortReminders,
-  sortRemindersByFileOrder,
-} from "@/reminders/core/reminderSort";
+import { getUpcomingReminders, selectTodayReminders, sortReminders, sortRemindersByFileOrder } from "@/reminders/core/reminderSort";
 import { DEFAULT_PROJECT } from "@/reminders/core/constants";
 
 export interface ProjectStats {
@@ -59,13 +52,7 @@ export function buildTodayViewModel(reminders: Reminder[], now = new Date()): {
   active: Reminder[];
   completed: Reminder[];
 } {
-  const combined = [
-    ...getOverdueReminders(reminders, now),
-    ...getTodayReminders(reminders, now),
-    ...getCompletedTodayReminders(reminders, now),
-  ];
-  const unique = Array.from(new Map(combined.map((reminder) => [reminder.id, reminder])).values());
-  const sorted = sortReminders(unique);
+  const sorted = sortReminders(selectTodayReminders(reminders, now, true));
 
   return {
     active: sorted.filter((reminder) => !reminder.completed),
