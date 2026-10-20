@@ -6,6 +6,7 @@ import {
 import { formatDateHeader, isReminderOverdue } from "@/reminders/ui/format/dateFormatting";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
+import { DEFAULT_PROJECT } from "../../core/constants";
 
 export interface RemindersListLoadOptions {
   repository: ReminderRepository;
@@ -69,10 +70,10 @@ export function buildRemindersListPresentation(
   } = options;
 
   const supportsReorder = Boolean(projectFilter && !showToday && !showUpcoming);
-  const effectiveProject = projectFilter?.trim() || "Inbox";
+  const effectiveProject = projectFilter?.trim() || DEFAULT_PROJECT;
   const normalizedProject = projectFilter?.toLowerCase().trim();
   const filteredReminders = normalizedProject
-    ? rawReminders.filter((reminder) => (reminder.project || "Inbox").toLowerCase() === normalizedProject)
+    ? rawReminders.filter((reminder) => (reminder.project || DEFAULT_PROJECT).toLowerCase() === normalizedProject)
     : [...rawReminders];
   const reminders = supportsReorder
     ? sortRemindersByFileOrder(filteredReminders)

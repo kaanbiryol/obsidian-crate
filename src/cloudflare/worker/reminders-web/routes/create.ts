@@ -18,6 +18,7 @@ import {
 } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -39,7 +40,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		return corsResponse({ error: 'Invalid project' }, 400);
 	}
 	assertReminderMutationInput(parsedBody.value, 'create');
-	const project = parsedProject || 'Inbox';
+	const project = parsedProject || DEFAULT_PROJECT;
 	const content = parseOptionalString(parsedBody.value.content, 1024);
 	if (!content) {
 		return corsResponse({ error: 'content required' }, 400);

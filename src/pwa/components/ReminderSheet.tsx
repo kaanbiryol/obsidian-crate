@@ -20,6 +20,7 @@ import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
 import { PWA_SURFACE_SPRING, PWA_PICKER_EXIT, PWA_PICKER_RETURN } from '../../ui/shared/navigation/motion';
 import { PwaSheetSurface } from './PwaSheetSurface';
+import { projectOptionsWithDefault } from '@/reminders/core/constants';
 const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet }));
 const ReminderPickerSheet = lazy(loadReminderPickerSheet);
@@ -96,7 +97,7 @@ function ReminderEditorSheet({
 	const keyboardInset = useKeyboardHeight();
 	const prefersReducedMotion = useReducedMotion();
 	const projectOptions = useMemo(
-		() => ['Inbox', ...projects.filter((project) => project !== 'Inbox')],
+		() => projectOptionsWithDefault(projects),
 		[projects],
 	);
 	const dismissEditorKeyboard = useCallback(() => {

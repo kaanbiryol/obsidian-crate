@@ -1,5 +1,6 @@
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 import type { ReminderRecord } from '../../types';
+import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 // Unchanged records keep the same card data, so memoized cards skip re-rendering.
 const sharedReminders = new WeakMap<ReminderRecord, SharedReminder>();
@@ -19,7 +20,7 @@ function convertReminder(reminder: ReminderRecord): SharedReminder {
 		dueDatetime: reminder.dueDatetime,
 		priority: reminder.priority,
 		completed: reminder.completed,
-		project: reminder.project || 'Inbox',
+		project: reminder.project || DEFAULT_PROJECT,
 		recurrence: reminder.recurrence,
 		fileLink: reminder.filePath,
 		lineNumber: reminder.lineNumber,
@@ -44,7 +45,7 @@ export function reorderProjectReminders(reminders: ReminderRecord[], project: st
 }
 
 function mergeProject(projects: string[], project: string): string[] {
-	const normalized = project.trim() || 'Inbox';
+	const normalized = project.trim() || DEFAULT_PROJECT;
 	return projects.includes(normalized) ? projects : [...projects, normalized].sort((a, b) => a.localeCompare(b));
 }
 

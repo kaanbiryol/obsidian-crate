@@ -5,6 +5,7 @@ import { Toolbar } from '@base-ui/react/toolbar';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { ProjectDot } from './ProjectDot';
+import { DEFAULT_PROJECT } from '../../core/constants';
 
 interface ProjectPickerContentProps {
     isOpen: boolean;
@@ -63,7 +64,7 @@ export const ProjectPickerContent: React.FC<ProjectPickerContentProps> = ({
     isDark,
     onSelectProject,
 }) => {
-    const selectedProject = project || defaultProject || 'Inbox';
+    const selectedProject = project || defaultProject || DEFAULT_PROJECT;
     const selectedIndex = Math.max(0, projects.indexOf(selectedProject));
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const rowRefs = useRef(new Map<number, HTMLButtonElement>());

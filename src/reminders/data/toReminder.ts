@@ -1,6 +1,7 @@
 import type { IndexedReminder } from "./reminder-index";
 import type { Reminder } from "@/reminders/types/reminder";
 import { normalizeRecurrenceRule } from "@/reminders/core/recurrence/recurrenceRule";
+import { DEFAULT_PROJECT } from "../core/constants";
 
 /** Convert the persisted Markdown representation into the UI-facing reminder model. */
 export function toReminder(indexed: IndexedReminder): Reminder {
@@ -12,7 +13,7 @@ export function toReminder(indexed: IndexedReminder): Reminder {
     dueDatetime: indexed.dueDatetime,
     priority: indexed.priority,
     completed: indexed.completed,
-    project: indexed.project || "Inbox",
+    project: indexed.project || DEFAULT_PROJECT,
     recurrence: normalizeRecurrenceRule(indexed.recurrence),
     lineNumber: indexed.lineNumber,
   };

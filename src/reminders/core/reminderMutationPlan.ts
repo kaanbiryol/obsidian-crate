@@ -3,6 +3,7 @@ import type { MarkdownReminderUpdate } from './markdownReminderMutation';
 import type { Priority, Reminder, UpdateReminderParams } from '../types/reminder';
 import { buildStoredReminderDates, parseReminderDateValue } from './dates/reminderDate';
 import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
+import { DEFAULT_PROJECT } from './constants';
 
 /** Normalized domain input consumed by both Obsidian and server Markdown writers. */
 export interface UpdateReminderInput extends MarkdownReminderUpdate { project?: string }
@@ -18,7 +19,7 @@ export function buildCreateReminderArgs(params: {
   id?: string;
 }) {
   assertReminderMutationInput(params, "create");
-  const project = params.project || "Inbox";
+  const project = params.project || DEFAULT_PROJECT;
   const reminderId = params.id?.trim();
   const recurrence = normalizeRecurrenceRule(params.recurrence);
   const dueDate = parseReminderDateValue(

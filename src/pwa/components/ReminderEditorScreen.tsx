@@ -24,6 +24,7 @@ import {
 	formatModalDueSummary,
 } from '../reminders/editor/editor-draft';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
+import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 export interface ReminderEditorScreenHandle {
 	dismissKeyboard(): void;
@@ -230,7 +231,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					dueDate={draft.dueDate || null}
 					dueDateLabel={draft.dueDate ? formatModalDueSummary(draft) : undefined}
 					project={draft.project}
-					defaultProject={draft.defaultProject || 'Inbox'}
+					defaultProject={draft.defaultProject || DEFAULT_PROJECT}
 					priority={draft.priority}
 					recurrence={draft.recurrence}
 					disabled={saving}

@@ -6,6 +6,7 @@ import { readDescriptionBlock } from "./reminderDescription";
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 import { extractReminderId } from './reminderIdentity';
 import { markdownTaskContexts } from './markdownTaskContext';
+import { DEFAULT_PROJECT } from "./constants";
 
 interface ScannedReminderRecord {
   id: string;
@@ -39,7 +40,7 @@ export function getProjectFromPath(filePath: string, remindersFolderPath: string
     relativePath = relativePath.slice(0, -3);
   }
 
-  return relativePath || "Inbox";
+  return relativePath || DEFAULT_PROJECT;
 }
 
 export function scanReminderMarkdownContent(

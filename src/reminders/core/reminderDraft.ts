@@ -4,6 +4,7 @@ import { formatReminderDateText, parseReminderDateValue, serializeReminderDateVa
 import { parseReminderEditorContent } from './grammar/reminderEditorParsing';
 import { findProjectMatches } from './grammar/richTextMatchers';
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';
+import { DEFAULT_PROJECT } from './constants';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -70,7 +71,7 @@ export function reconcileReminderDraftMetadata(
 }
 
 export function getDefaultProject(defaultProject: string): string {
-	return defaultProject || 'Inbox';
+	return defaultProject || DEFAULT_PROJECT;
 }
 
 export function deriveReminderDraftContentMetadata(

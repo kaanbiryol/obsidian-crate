@@ -9,6 +9,7 @@ import { deleteReminderBlockFromContent, getInitialProjectFileContent, reorderRe
 import { parseStoredReminderDate, reminderHasTime } from './dates/reminderDate';
 import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
 import type { UpdateReminderParams, RecurrenceRule } from '../types/reminder';
+import { DEFAULT_PROJECT } from './constants';
 
 export class ReminderCommandError extends Error {
 	constructor(message: string, readonly status = 409, readonly code = 'version_conflict') { super(message); }
@@ -27,7 +28,7 @@ function recurrence(value: unknown): RecurrenceRule | null | undefined {
 }
 const text = (value: unknown) => typeof value === 'string' ? value.trim() || undefined : undefined;
 function project(value: unknown): string {
-	if (value === undefined || value === null || value === '') return 'Inbox';
+	if (value === undefined || value === null || value === '') return DEFAULT_PROJECT;
 	const normalized = normalizeReminderProjectPath(value);
 	if (!normalized) throw new ReminderCommandError('Invalid reminder project', 400, 'invalid_reminder_input');
 	return normalized;

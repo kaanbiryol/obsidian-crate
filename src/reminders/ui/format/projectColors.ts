@@ -1,3 +1,4 @@
+import { DEFAULT_PROJECT } from '../../core/constants';
 /**
  * Curated 50-color project palette
  * Gem-inspired colors optimized for both light and dark Obsidian themes
@@ -173,7 +174,7 @@ export interface ProjectColorConfig {
  */
 export function getProjectColor(projectName: string): ProjectColorConfig {
     // Ensure projectName is a string and handle edge cases
-    const safeProjectName = String(projectName || 'Inbox');
+    const safeProjectName = String(projectName || DEFAULT_PROJECT);
 
     // Normalize the project name (remove # prefix if present, lowercase)
     const normalized = safeProjectName.replace(/^#/, '').toLowerCase().trim();

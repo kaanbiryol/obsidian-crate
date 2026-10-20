@@ -19,6 +19,7 @@ import {
   markdownWriterLog,
   notifyFileWritten,
 } from "./operation-shared";
+import { DEFAULT_PROJECT } from '../../core/constants';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -54,7 +55,7 @@ export async function updateReminderInMarkdown(
   if (requestedProject && !newProject) {
     throw new Error(`Invalid reminder project: ${requestedProject}`);
   }
-  const oldProject = reminder.project || "Inbox";
+  const oldProject = reminder.project || DEFAULT_PROJECT;
   const mutation = buildUpdatedReminderBlock(reminder, updates);
 
   if (newProject && newProject !== oldProject) {

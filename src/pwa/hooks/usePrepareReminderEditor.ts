@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDraft';
+import { DEFAULT_PROJECT } from '@/reminders/core/constants';
 
 let prepared = false;
 
@@ -11,7 +12,7 @@ export function usePrepareReminderEditor(enabled: boolean): void {
 			if (document.visibilityState !== 'visible') return;
 			// Exercise the same matching and parsing paths as an existing reminder.
 			// Discard the result; no user content or relative dates are cached.
-			deriveReminderDraftContentMetadata('Prepare reminder Jan 15, 2030 at 10am', ['Inbox'], 'Inbox');
+			deriveReminderDraftContentMetadata('Prepare reminder Jan 15, 2030 at 10am', [DEFAULT_PROJECT], DEFAULT_PROJECT);
 			prepared = true;
 		};
 		if (typeof window.requestIdleCallback === 'function') {

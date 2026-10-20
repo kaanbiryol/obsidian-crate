@@ -4,6 +4,7 @@ import { Notice } from "obsidian";
 import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
 import type { RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/logger";
+import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../core/constants';
 
 const log = createLogger('ReminderModal');
 
@@ -33,7 +34,7 @@ const calculateDefaultDueDate = (setting: DueDateDefaultSetting): string | undef
 };
 
 export const ReminderModal: React.FC<ReminderModalProps> = ({
-  initialProject = "Inbox",
+  initialProject = DEFAULT_PROJECT,
   reminder,
   onSave,
   onDelete,
@@ -49,7 +50,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   // Get projects and active reminders from index (sync, fast)
   const projects = plugin.reminderRepository.getProjects();
-  const projectsList = ['Inbox', ...projects.filter((p: string) => p !== 'Inbox')];
+  const projectsList = projectOptionsWithDefault(projects);
 
   // Calculate default due date
   const defaultDueDate = useMemo(() => {

@@ -28,6 +28,7 @@ import "./styles.scss";
 import { useReminderClock } from '../shared/useReminderClock';
 import { ReminderPageSizeContext, ReminderPagination, useReminderPagination } from '../shared/reminder-pagination';
 import { groupRemindersByDate } from "@/reminders/core/reminderSort";
+import { DEFAULT_PROJECT } from "../../core/constants";
 
 type Props = {
   projectFilter?: string; // If provided, only show reminders for this project
@@ -129,7 +130,7 @@ const ActiveRemindersList: React.FC<Props> = ({
   const handleAdd = () => {
     void openReminderCreationModal(
       plugin,
-      projectFilter || "Inbox",
+      projectFilter || DEFAULT_PROJECT,
       () => {
         triggerRefresh();
       }

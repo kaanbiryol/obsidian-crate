@@ -1,6 +1,7 @@
 import { assertReminderMutationInput, ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { resolveReminderSubmission } from '@/reminders/core/reminderSubmission';
 import type { ModalDraft, ModalMode, ReminderMutationBody, StoredConfig } from '../../types';
+import { DEFAULT_PROJECT, projectOptionsWithDefault } from '@/reminders/core/constants';
 
 export function buildReminderMutationBody({
 	config,
@@ -15,8 +16,8 @@ export function buildReminderMutationBody({
 	projects: string[];
 	selectedProject: string | null;
 }): ReminderMutationBody {
-	const createDefaultProject = selectedProject ?? 'Inbox';
-	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
+	const createDefaultProject = selectedProject ?? DEFAULT_PROJECT;
+	const projectOptions = projectOptionsWithDefault(projects);
 	const rawContent = draft.content.replace(/\s+/g, ' ').trim();
 	const rawDate = draft.dueDate.trim();
 	const rawTime = draft.dueTime.trim();

@@ -1,5 +1,6 @@
 import type { Reminder } from '../types/reminder';
 import { sha256Hex } from '../../platform/sha256';
+import { DEFAULT_PROJECT } from './constants';
 
 /** Hash only domain state, excluding line positions, caches and presentation. */
 export async function reminderRevision(reminder: Reminder & { filePath?: string }): Promise<string> {
@@ -7,7 +8,7 @@ export async function reminderRevision(reminder: Reminder & { filePath?: string 
 	const value = JSON.stringify([
 		reminder.id, reminder.filePath ?? '', reminder.content, reminder.description ?? '',
 		reminder.dueDate ?? null, reminder.dueDatetime ?? null, reminder.priority,
-		reminder.completed, reminder.project ?? 'Inbox',
+		reminder.completed, reminder.project ?? DEFAULT_PROJECT,
 		rule ? [rule.frequency, rule.interval ?? 1, [...(rule.daysOfWeek ?? [])].sort(), rule.dayOfMonth ?? null,
 			rule.endDate ?? null, rule.count ?? null, rule.completedCount ?? 0,
 			rule.hour ?? null, rule.minute ?? null, rule.timezone ?? null,

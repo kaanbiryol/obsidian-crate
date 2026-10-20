@@ -13,6 +13,7 @@ import { AnimationConfig } from '../plugin/animations';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { Reminder, RecurrenceRule } from '../../types';
 import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
+import { DEFAULT_PROJECT } from '../../core/constants';
 
 interface AddReminderModalProps {
     onClose: () => void;
@@ -48,7 +49,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     onError,
     reminder,
     projects = [],
-    defaultProject = 'Inbox',
+    defaultProject = DEFAULT_PROJECT,
     initialDueDate,
     animationConfig = { enabled: true },
     variant = 'bottom-sheet',

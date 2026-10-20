@@ -1,3 +1,4 @@
+import { DEFAULT_PROJECT } from '../../core/constants';
 export const REMINDER_PICKER_COPY = {
 	schedule: {
 		title: 'Schedule',
@@ -40,7 +41,7 @@ export const REMINDER_PICKER_COPY = {
 	},
 	editor: {
 		date: 'Date',
-		defaultProject: 'Inbox',
+		defaultProject: DEFAULT_PROJECT,
 		priority: 'Priority',
 		repeat: 'Repeat',
 		recurrenceLabel: 'Recurrence',
