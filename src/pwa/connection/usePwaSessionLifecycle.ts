@@ -1,4 +1,4 @@
-import { SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
+import { SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
 import { clearReadingData, readingSession, READING_SESSION_KEY } from '../reading/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';

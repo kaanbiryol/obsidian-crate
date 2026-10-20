@@ -1,5 +1,5 @@
-import { preserveIncomingShare } from '../connection/incoming-share';
-import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../connection/issues';
+import { preserveIncomingShare } from './incoming-share';
+import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from './issues';
 import { capturePwaSession } from '../session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { useEffect, useRef } from 'react';

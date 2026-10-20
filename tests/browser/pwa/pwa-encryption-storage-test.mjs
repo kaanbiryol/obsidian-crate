@@ -23,7 +23,7 @@ export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 export { AUTH_TOKEN_KEY } from './src/pwa/config';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { usePwaSessionLifecycle } from './src/pwa/hooks/usePwaSessionLifecycle';
+import { usePwaSessionLifecycle } from './src/pwa/connection/usePwaSessionLifecycle';
 const noop = () => {};
 function Harness() {
  window.lifecycle = usePwaSessionLifecycle({ apiFetch: async () => Response.json({}),

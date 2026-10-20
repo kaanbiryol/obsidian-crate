@@ -9,7 +9,7 @@ import { handleSubscribe, handleUnsubscribe } from './notifications/subscription
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
 import { makeApiFetch } from '@/pwa/api';
-import { performPwaLogout } from '@/pwa/hooks/usePwaSessionLifecycle';
+import { performPwaLogout } from '@/pwa/connection/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/session-generation';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { sha256Hex } from '@/platform/sha256';

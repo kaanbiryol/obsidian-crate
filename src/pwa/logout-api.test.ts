@@ -4,7 +4,7 @@ import { makeApiFetch } from './api';
 import { AUTH_TOKEN_KEY } from './config';
 import { READING_SESSION_KEY } from './reading/storage';
 import { invalidatePwaSession } from './session-generation';
-import { performPwaLogout } from './hooks/usePwaSessionLifecycle';
+import { performPwaLogout } from './connection/usePwaSessionLifecycle';
 
 vi.mock('./session-label', () => ({ detectWebSessionName: () => 'iPhone · Safari' }));
 

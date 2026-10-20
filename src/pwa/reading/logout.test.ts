@@ -2,7 +2,7 @@ import type { ConnectionIssue } from '../connection/issues';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test/react-hooks';
-import { usePwaSessionLifecycle } from '../hooks/usePwaSessionLifecycle';
+import { usePwaSessionLifecycle } from '../connection/usePwaSessionLifecycle';
 import { clearReadingData, READING_SESSION_KEY } from './storage';
 import { AUTH_TOKEN_KEY } from '../config';
 import { clearReminderDrafts } from '../reminders/editor/reminder-drafts';
