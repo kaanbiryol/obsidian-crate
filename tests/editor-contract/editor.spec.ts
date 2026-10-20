@@ -123,7 +123,7 @@ for (const [schedule, dueDatetime, content = 'Call Alex', datePart = schedule] o
     await expect(page.getByRole('alert')).toHaveCount(0);
     await page.getByRole('button', { name: 'Add reminder', exact: true }).click();
     await expect.poll(async () => JSON.parse((await page.getByTestId('saved').textContent()) || 'null') as unknown)
-      .toMatchObject({ content, dueDate: dueDatetime });
+      .toMatchObject({ content, dueDatetime });
     params.set('reminder', JSON.stringify({ id: 'chrono-reopen', content, project: 'Inbox',
       priority: 4, completed: false, dueDatetime }));
     await page.goto(`/?${params}`);

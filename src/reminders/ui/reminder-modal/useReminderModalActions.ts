@@ -5,6 +5,7 @@ import { buildDeleteConfirmationMessage } from './deleteConfirmation';
 import {
 	buildReminderSubmission,
 	executeReminderAction,
+	type NewReminder,
 } from './reminderMutation';
 
 const log = createLogger('AddReminderModal');
@@ -19,7 +20,7 @@ interface UseReminderModalActionsOptions {
 	recurrence?: RecurrenceRule;
 	reminder?: Reminder;
 	onClose: () => void;
-	onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => Promise<void>;
+	onAdd?: (reminder: NewReminder) => Promise<void>;
 	onSave?: (reminder: Reminder) => Promise<void>;
 	onDelete?: (reminder: Reminder) => Promise<void>;
 	onError?: (error: Error) => void;
@@ -75,16 +76,8 @@ export function useReminderModalActions({
 			action: async () => {
 				if (submission.updatedReminder && onSave) {
 					await onSave(submission.updatedReminder);
-				} else if (onAdd) {
-					await onAdd(
-						submission.content,
-						submission.project,
-						submission.priority,
-						submission.dueDate,
-						submission.recurrence,
-						submission.hasTime,
-						submission.description,
-					);
+				} else if (submission.newReminder && onAdd) {
+					await onAdd(submission.newReminder);
 				}
 			},
 			onError: (error) => {

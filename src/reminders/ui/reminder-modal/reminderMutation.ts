@@ -1,4 +1,4 @@
-import type { Priority, Reminder, RecurrenceRule } from '../../types';
+import type { CreateReminderParams, Priority, Reminder, RecurrenceRule } from '../../types';
 import { resolveReminderSubmission } from '../../core/reminderSubmission';
 
 export interface ReminderSubmissionInput {
@@ -13,6 +13,8 @@ export interface ReminderSubmissionInput {
 	reminder?: Reminder;
 }
 
+export type NewReminder = Pick<CreateReminderParams, 'content' | 'description' | 'project' | 'priority' | 'recurrence' | 'dueDate' | 'dueDatetime'>;
+
 export interface ReminderSubmission {
 	content: string;
 	description?: string;
@@ -21,6 +23,7 @@ export interface ReminderSubmission {
 	dueDate?: string;
 	hasTime?: boolean;
 	recurrence?: RecurrenceRule;
+	newReminder?: NewReminder;
 	updatedReminder?: Reminder;
 }
 
@@ -65,18 +68,17 @@ export function buildReminderSubmission({
 		recurrence: resolved.recurrence,
 	};
 
-	if (reminder) {
-		submission.updatedReminder = {
-			...reminder,
-			content: resolved.content,
-			description: resolved.description,
-			project: resolved.project,
-			priority: resolved.priority,
-			dueDatetime: resolved.dueDatetime,
-			dueDate: resolved.dueDate,
-			recurrence: resolved.recurrence,
-		};
-	}
+	const fields = {
+		content: resolved.content,
+		description: resolved.description,
+		project: resolved.project,
+		priority: resolved.priority,
+		dueDatetime: resolved.dueDatetime,
+		dueDate: resolved.dueDate,
+		recurrence: resolved.recurrence,
+	};
+	if (reminder) submission.updatedReminder = { ...reminder, ...fields };
+	else submission.newReminder = fields;
 
 	return submission;
 }

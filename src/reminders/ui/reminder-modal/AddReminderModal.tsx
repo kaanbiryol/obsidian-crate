@@ -6,18 +6,19 @@ import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { AddReminderModalOverlays } from './AddReminderModalOverlays';
 import { useReminderModalActions } from './useReminderModalActions';
+import type { NewReminder } from './reminderMutation';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../plugin/animations';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { Reminder, RecurrenceRule } from '../../types';
+import { Reminder } from '../../types';
 import { parseReminderEditorContent } from '../../core/grammar/reminderEditorParsing';
 import { DEFAULT_PROJECT } from '../../core/constants';
 
 interface AddReminderModalProps {
     onClose: () => void;
-    onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => Promise<void>;
+    onAdd?: (reminder: NewReminder) => Promise<void>;
     onSave?: (reminder: Reminder) => Promise<void>;
     onDelete?: (reminder: Reminder) => Promise<void>;
     onError?: (error: Error) => void;

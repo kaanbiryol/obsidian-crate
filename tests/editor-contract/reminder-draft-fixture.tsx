@@ -24,9 +24,7 @@ export function ReminderModalFixture() {
   return <main className="crate-reminders-ui reminders-shadow-root">
     {open && <PluginContext.Provider value={plugin}><AddReminderModal reminder={reminder} projects={projects} defaultProject={defaultProject}
       animationConfig={{ enabled: false }} onClose={() => setOpen(false)}
-      onAdd={async (content, project, priority, dueDate, recurrence) => {
-        setSaved(JSON.stringify({ content, project, priority, dueDate, recurrence }));
-      }}
+      onAdd={async newReminder => { setSaved(JSON.stringify(newReminder)); }}
       onSave={async updated => { setSaved(JSON.stringify(updated)); }} /></PluginContext.Provider>}
     <output data-testid="saved">{saved}</output>
   </main>;

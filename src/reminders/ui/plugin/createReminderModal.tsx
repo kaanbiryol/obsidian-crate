@@ -2,14 +2,13 @@ import { reminderRevision } from '../../core/reminderRevision';
 import React, { useMemo, useRef } from "react";
 import { Notice } from "obsidian";
 import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
-import type { RecurrenceRule } from "@/reminders/types/reminder";
+import type { NewReminder } from "@/reminders/ui/reminder-modal/reminderMutation";
 import { createLogger } from "@/reminders/logger";
 import { DEFAULT_PROJECT, projectOptionsWithDefault } from '../../core/constants';
 
 const log = createLogger('ReminderModal');
 
 import { today } from "@/reminders/core/dates/time";
-import { parseReminderDateValue } from "@/reminders/core/dates/reminderDate";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
 import { ModalContext, PluginContext } from "@/reminders/ui/plugin/reminders-context";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
@@ -58,24 +57,9 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     return calculateDefaultDueDate(settings.taskCreationDefaultDueDate);
   }, [reminder, settings.taskCreationDefaultDueDate]);
 
-  const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => {
-    // Parse due date
-    const parsedDueDate = parseReminderDateValue(dueDate, hasTime);
-
+  const handleAdd = async (newReminder: NewReminder) => {
     try {
-      await plugin.reminderRepository.create({
-        id: createId.current,
-        content: content.trim(),
-        project,
-        priority: priority as 1 | 4,
-        recurrence,
-        description,
-        ...(hasTime && parsedDueDate
-          ? { dueDatetime: parsedDueDate.toISOString() }
-          : dueDate
-            ? { dueDate }
-            : {}),
-      });
+      await plugin.reminderRepository.create({ id: createId.current, ...newReminder });
 
       new Notice("Reminder created!");
       if (onSave) onSave(null); // Trigger refresh
