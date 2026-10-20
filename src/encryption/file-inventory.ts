@@ -1,6 +1,7 @@
 import { isRecord, isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
 import { openFile, type FileEncryptionAuthority } from './file-codec';
+import { isSyncPath } from '@/protocol/sync-validation';
 
 export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string }
 export interface EncryptedInventoryPage {
@@ -24,8 +25,7 @@ export function parseEncryptedInventoryPage(value: unknown, folder: string, gene
 	const files: EncryptedInventoryFile[] = [];
 	const paths = new Set<string>();
 	for (const file of value.files) {
-		if (!isRecord(file) || typeof file.path !== 'string' || !file.path.startsWith(`${folder}/`) || file.path.includes('\\')
-			|| file.path.split('/').some(part => !part || part === '.' || part === '..')
+		if (!isRecord(file) || !isSyncPath(file.path) || !file.path.startsWith(`${folder}/`)
 			|| !isSha256Hex(file.hash)
 			|| typeof file.size !== 'number' || !Number.isSafeInteger(file.size) || file.size < 0 || typeof file.revision !== 'string' || !file.revision) {
 			throw new Error('Invalid encrypted file metadata');
