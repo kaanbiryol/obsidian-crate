@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
+import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { fetchReadyReminderList, readReminderListBody, type ReminderIndexingProgress } from './reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from './cache/reminder-cache';
 import { createReminderRequestCoordinator } from './outbox/reminder-request-coordinator';
@@ -25,6 +26,8 @@ export interface ReminderSyncState {
 	dataMode: DataMode;
 	lastUpdatedAt: number | null;
 	isOffline: boolean;
+	/** Startup hydration finished for the current connection, whether or not an offline copy existed. */
+	hydrated: boolean;
 	getSnapshot: () => ConfirmedReminderSnapshot;
 	hasHydratedCache: () => boolean;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
@@ -43,14 +46,25 @@ export interface ReminderSyncState {
 export function useReminderSync({
 	apiFetch,
 	authToken,
+	authority,
+	bootstrapped,
 	config,
+	prepareSession,
+	onSignedOut,
 	setSelectedProject,
 	enabled = true,
 }: {
 	enabled?: boolean;
 	apiFetch: ApiFetch;
 	authToken: string | null;
+	/** Identifies the app connection whose offline copy is hydrated. */
+	authority: object;
+	/** App startup finished, so the offline copy can be read. */
+	bootstrapped: boolean;
 	config: StoredConfig;
+	prepareSession: () => Promise<void>;
+	/** Resets presentation outside this hook when no session remains. */
+	onSignedOut: () => void;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 }): ReminderSyncState {
 	const enabledRef = useRef(enabled);
@@ -65,6 +79,7 @@ export function useReminderSync({
 	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
 	const [issues, setIssues] = useState<ReminderSourceIssue[]>([]);
+	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
 	const issuesRef = useRef<ReminderSourceIssue[]>([]);
 	const snapshotRef = useRef(snapshot);
 	const hydratedCacheRef = useRef(false);
@@ -267,6 +282,23 @@ export function useReminderSync({
 		cursor.reset();
 	}, [cursor, publishSnapshot]);
 
+	useEffect(() => {
+		if (!bootstrapped) return;
+		let cancelled = false;
+		const current = capturePwaSession();
+		void (async () => {
+			try {
+				if (!authToken) { onSignedOut(); resetReminderState(); return; }
+				await prepareSession();
+				const cached = await loadCachedReminderSnapshot(config.folderPath);
+				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
+			} catch (cause) {
+				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) setError(cause instanceof Error ? cause.message : String(cause));
+			} finally { if (!cancelled) setHydratedAuthority(authority); }
+		})();
+		return () => { cancelled = true; };
+	}, [bootstrapped, authority, authToken, prepareSession, config.folderPath, hydrateCachedSnapshot, onSignedOut, resetReminderState]);
+
 	return {
 		reminders,
 		projects,
@@ -278,6 +310,7 @@ export function useReminderSync({
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
+		hydrated: hydratedAuthority === authority,
 		getSnapshot,
 		hasHydratedCache,
 		hydrateCachedSnapshot,

@@ -26,7 +26,7 @@ function harness() {
 	const requests: Array<{ resolve: (value: Response) => void }> = [];
 	const options = {
 		apiFetch: vi.fn<ApiFetch>(() => new Promise<Response>(resolve => { requests.push({ resolve }); })),
-		authToken: 'token',
+		authToken: 'token', authority: {}, bootstrapped: false, prepareSession: async () => {}, onSignedOut: vi.fn(),
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn(),
 	};
 	const rendered = renderHook(() => useReminderSync(options));
@@ -314,6 +314,7 @@ describe('PWA reminder refresh around local writes', () => {
 
 it('does not start reminder refreshes while paused, including retained callbacks', async () => {
 	const options = { enabled: false, apiFetch: vi.fn<ApiFetch>(async () => response([])), authToken: 'token',
+		authority: {}, bootstrapped: false, prepareSession: async () => {}, onSignedOut: vi.fn(),
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn() };
 	const rendered = renderHook(() => useReminderSync(options));
 	const retained = rendered.current.loadReminders;
@@ -376,5 +377,44 @@ describe('delta refresh', () => {
 		expect(new Headers(options.apiFetch.mock.lastCall![1]!.headers).get('If-None-Match')).toBe('refreshed');
 		expect(saveCachedReminderSnapshot).not.toHaveBeenCalled();
 		await settle(2, new Response(null, { status: 304 }), pending);
+	});
+});
+
+describe('PWA reminder offline copy hydration', () => {
+	function hydration(authToken: string | null) {
+		const options = { apiFetch: vi.fn<ApiFetch>(), authToken, authority: {}, bootstrapped: false,
+			prepareSession: vi.fn(async () => {}), onSignedOut: vi.fn(),
+			config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn() };
+		return { options, rendered: renderHook(() => useReminderSync(options)) };
+	}
+
+	it('reads the offline copy after app startup and reports hydration', async () => {
+		vi.mocked(loadCachedReminderSnapshot).mockResolvedValueOnce({ folderPath: 'Reminders', reminders: [reminder('cached')], projects: ['Inbox'], savedAt: 5 });
+		const { options, rendered } = hydration('token');
+		expect(rendered.current.hydrated).toBe(false);
+		expect(loadCachedReminderSnapshot).not.toHaveBeenCalled();
+		options.bootstrapped = true;
+		rendered.rerender();
+		await act(async () => {});
+		expect(options.prepareSession).toHaveBeenCalledOnce();
+		expect(loadCachedReminderSnapshot).toHaveBeenCalledWith('Reminders');
+		expect(rendered.current.hydrated).toBe(true);
+		expect(rendered.current.reminders.map(item => item.id)).toEqual(['cached']);
+		expect(rendered.current.dataMode).toBe('cached');
+		expect(options.onSignedOut).not.toHaveBeenCalled();
+		options.authority = {};
+		rendered.rerender();
+		expect(rendered.current.hydrated).toBe(false);
+	});
+
+	it('resets the view without reading storage when signed out', async () => {
+		const { options, rendered } = hydration(null);
+		options.bootstrapped = true;
+		rendered.rerender();
+		await act(async () => {});
+		expect(options.onSignedOut).toHaveBeenCalledOnce();
+		expect(options.prepareSession).not.toHaveBeenCalled();
+		expect(loadCachedReminderSnapshot).not.toHaveBeenCalled();
+		expect(rendered.current.hydrated).toBe(true);
 	});
 });

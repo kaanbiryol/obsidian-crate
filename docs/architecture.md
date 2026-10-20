@@ -506,8 +506,8 @@ reminder data, session, outbox, and editor hooks independently of the lazy scree
 Its screen-facing contract groups connection, sync, mutations, editor, status and
 presentation models. The always-mounted provider retains hydration, recovery and
 update-readiness registration when the reminders screen is hidden.
-`useReminderSync` owns the confirmed snapshot and exposes reads and explicit
-commit/reset operations. Indexing progress is separate from failure state, so an
+`useReminderSync` owns the confirmed snapshot, hydrates it from the offline copy
+after startup and exposes reads and explicit commit/reset operations. Indexing progress is separate from failure state, so an
 HTTP 202 preparation response remains a syncing status without recovery attention.
 Outbox consumers cannot independently replace its refs or React state. `useReminderEditor`
 owns editor presentation, synchronous tap opening, close transitions, recovered

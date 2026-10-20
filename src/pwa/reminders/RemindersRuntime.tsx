@@ -2,9 +2,6 @@ import { reminderUpdateReadiness } from '../sync/update-readiness';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { isStandaloneApp } from '../config';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
-import { capturePwaSession } from '../session-generation';
-import { loadCachedReminderSnapshot } from './cache/reminder-cache';
-import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
 import { exportPendingChanges } from './outbox/export-pending-changes';
 import { usePushNotifications } from './usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
@@ -15,6 +12,7 @@ import { useReminderEditorActions } from './editor/useReminderEditorActions';
 import { useReminderEditor } from './editor/useReminderEditor';
 import { useReminderMutations } from './useReminderMutations';
 import { useReminderSync } from './useReminderSync';
+import { fetchPageTitle } from './reminder-api';
 import { useSyncFeedback } from '../sync/SyncFeedback';
 import { isInitialPwaContentReady } from '../initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
@@ -31,8 +29,6 @@ function useRemindersController() {
 	const connection = useAppConnection();
 	const { authority, authToken, apiFetch, config: storedConfig, logOut, loggingOut,
 		selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, registerPushCleanup } = connection;
-	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
-	const bootstrapped = connection.bootstrapped && hydratedAuthority === authority;
 	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const { preferences } = usePwaPreferences();
@@ -42,13 +38,10 @@ function useRemindersController() {
 	const { modal, saving, resetEditor } = editor;
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const showToast = useSyncFeedback();
-	const reminderSync = useReminderSync({ apiFetch, authToken, config, setSelectedProject, enabled });
-	const resolvePageTitle = useCallback(async (url: string) => {
-		const response = await apiFetch('/links/title', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(7000) });
-		if (!response.ok) return null;
-		const result = await response.json() as { title?: unknown };
-		return typeof result.title === 'string' ? result.title : null;
-	}, [apiFetch]);
+	const reminderSync = useReminderSync({ apiFetch, authToken, authority, bootstrapped: connection.bootstrapped, config,
+		prepareSession: apiFetch.ready, onSignedOut: resetEditor, setSelectedProject, enabled });
+	const bootstrapped = connection.bootstrapped && reminderSync.hydrated;
+	const resolvePageTitle = useCallback((url: string) => fetchPageTitle(apiFetch, url), [apiFetch]);
 	const {
 		push,
 		initialCheckComplete,
@@ -68,34 +61,16 @@ function useRemindersController() {
 		isOffline,
 		getSnapshot,
 		hasHydratedCache,
-		hydrateCachedSnapshot,
 		loadReminders,
 		beginLocalMutation,
 		invalidateReads,
 		commitReminderState,
 		resetReminderState,
 		refreshPresentation,
-		reportError,
 	} = reminderSync;
 	const resetView = useCallback(() => { resetEditor(); resetReminderState(); }, [resetEditor, resetReminderState]);
 	useConnectionReset(resetView);
 	useEffect(() => registerPushCleanup(disablePushNotifications), [registerPushCleanup, disablePushNotifications]);
-	useEffect(() => {
-		if (!connection.bootstrapped) return;
-		let cancelled = false;
-		const current = capturePwaSession();
-		void (async () => {
-			try {
-				if (!authToken) { resetView(); return; }
-				await apiFetch.ready();
-				const cached = await loadCachedReminderSnapshot(config.folderPath);
-				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
-			} catch (cause) {
-				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) reportError(cause instanceof Error ? cause.message : String(cause));
-			} finally { if (!cancelled) setHydratedAuthority(authority); }
-		})();
-		return () => { cancelled = true; };
-	}, [connection.bootstrapped, authority, authToken, apiFetch, config.folderPath, hydrateCachedSnapshot, reportError, resetView]);
 
 	usePwaRefreshLifecycle({
 		enabled,

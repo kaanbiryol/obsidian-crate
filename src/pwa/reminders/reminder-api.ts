@@ -95,3 +95,11 @@ export async function fetchReadyReminderList(
 	}
 	throw new Error('Reminder index is still preparing. Try again in a moment.');
 }
+
+/** Look up a linked page's title for the editor; lookup failures leave the link as typed. */
+export async function fetchPageTitle(apiFetch: ApiFetch, url: string): Promise<string | null> {
+	const response = await apiFetch('/links/title', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(7000) });
+	if (!response.ok) return null;
+	const result = await response.json() as { title?: unknown };
+	return typeof result.title === 'string' ? result.title : null;
+}
