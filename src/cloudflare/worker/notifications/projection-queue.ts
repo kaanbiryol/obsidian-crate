@@ -1,5 +1,5 @@
 import { readEncryptionState } from '../encryption/state';
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { parseReminderSource } from '../reminders/source-parse';
 import { summarizeReminderSources } from '../reminders/source-summary';
@@ -10,9 +10,9 @@ import { getReminderFolder, isReminderPath } from '../reminders/scope';
 export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false, encrypted?: boolean, knownFolder?: string | null): Promise<D1PreparedStatement[]> {
   const folder = knownFolder === undefined ? await getReminderFolder(db) : knownFolder;
   if (!isReminderPath(path, folder)) return [];
-  const guard = storageKey === null ? `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`
-    : `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;
-  const args = storageKey === null ? filePathArgs(path) : [...filePathArgs(path), storageKey];
+  const { sql: guard, args } = storageKey === null
+    ? { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(path) }
+    : fileRevisionGuard(path, storageKey);
   const token = crypto.randomUUID();
   const parsed = content === null ? { reminders: [], issue: undefined } : parseReminderSource(path, content, folder!, encrypted ?? (await readEncryptionState(db))?.mode === 'active');
   const reset = preserveRetries ? [] : [db.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(path, ...args)];

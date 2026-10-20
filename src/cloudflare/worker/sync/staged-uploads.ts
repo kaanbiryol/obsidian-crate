@@ -1,4 +1,4 @@
-import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { fileRevisionGuard } from './file-identity';
 import type { ObjectReference } from '../storage-references';
 import { ENCRYPTION_STATE_KEY, EncryptionStateError, encryptionWriteGuard } from '../encryption/state';
 import { changedRows } from '../db';
@@ -24,8 +24,9 @@ export function stagedUploadGuard(storageKey: string): { sql: string; args: stri
 
 /** Remove the intent only in the transaction that makes its object live. */
 export function finishStagedUpload(db: D1Database, storageKey: string, path: string): D1PreparedStatement {
+  const revision = fileRevisionGuard(path, storageKey);
   return db.prepare(`DELETE FROM staged_uploads WHERE storage_key = ?
-    AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`).bind(storageKey, ...filePathArgs(path), storageKey);
+    AND ${revision.sql}`).bind(storageKey, ...revision.args);
 }
 
 /** One durable lease registration for the whole request, before any R2 puts. */

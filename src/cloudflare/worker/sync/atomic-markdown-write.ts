@@ -1,6 +1,6 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { publishedChangelogStatement, retainReplacedVersionStatement } from './file-publication-statements';
-import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
@@ -31,8 +31,9 @@ function destinationMutation(
 	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args, ...encryption.args];
 	for (const file of [source, destination]) {
 		if (file.expectedRevision) {
-			namespaceGuard += ` AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`;
-			namespaceArgs.push(...filePathArgs(file.path), file.expectedRevision);
+			const revision = fileRevisionGuard(file.path, file.expectedRevision);
+			namespaceGuard += ` AND ${revision.sql}`;
+			namespaceArgs.push(...revision.args);
 		}
 	}
 	if (destination.expectedHash === null) {
@@ -79,10 +80,11 @@ function sourceMutation(
 	source: StagedMarkdownFile,
 	destination: StagedMarkdownFile,
 ): D1PreparedStatement {
+	const destinationRevision = fileRevisionGuard(destination.path, destination.objectKey);
 	return db.prepare(`/* atomic-source-update */
 		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
-		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
+		AND ${destinationRevision.sql}`)
 		.bind(
 			portablePathKey(source.path),
 			source.hash,
@@ -90,8 +92,7 @@ function sourceMutation(
 			source.objectKey,
 			...filePathArgs(source.path),
 			source.expectedHash,
-			...filePathArgs(destination.path),
-			destination.objectKey,
+			...destinationRevision.args,
 		);
 }
 

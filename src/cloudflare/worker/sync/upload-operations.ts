@@ -1,4 +1,4 @@
-import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { corsResponse } from '../cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
@@ -48,9 +48,10 @@ export async function beginUploadOperation(db: D1Database, id: unknown, payload:
 export function recordUploadReceipt(db: D1Database, operation: UploadOperation, file: { path: string; hash: string; objectKey: string }): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(file.path);
 	const conflict = namespacePredicate(file.path);
+	const revision = fileRevisionGuard(file.path, file.objectKey);
 	return db.prepare(`INSERT INTO upload_operations (operation_id, request_hash, response_json)
 		SELECT ?, ?, CASE WHEN ${OPERATION_VALID} THEN
-			CASE WHEN EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
+			CASE WHEN ${revision.sql}
 			THEN json_object('success', json('true'), 'path', ?, 'hash', ?, 'revision', ?)
 			ELSE json_object('success', json('false'), 'path', ?, 'status', 409,
 				'code', CASE WHEN ${namespace.sql} THEN 'version_conflict' ELSE 'namespace_conflict' END,
@@ -59,6 +60,6 @@ export function recordUploadReceipt(db: D1Database, operation: UploadOperation, 
 				'conflictingPath', (SELECT path FROM files WHERE ${conflict.sql} LIMIT 1)) END
 		ELSE NULL END WHERE NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)
 		RETURNING response_json`)
-		.bind(operation.id, operation.requestHash, operation.day, operation.day, ...filePathArgs(file.path), file.objectKey,
+		.bind(operation.id, operation.requestHash, operation.day, operation.day, ...revision.args,
 			file.path, file.hash, file.objectKey, file.path, ...namespace.args, ...filePathArgs(file.path), ...conflict.args, operation.id);
 }

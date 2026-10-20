@@ -1,5 +1,5 @@
 import { readEncryptionState } from '../encryption/state';
-import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from '../sync/file-identity';
+import { FILE_FOLDER_MATCH, fileFolderArgs, fileRevisionGuard } from '../sync/file-identity';
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
@@ -57,13 +57,14 @@ export async function projectReading(env: Env, current: ReadingPolicy): Promise<
       if (!block || block.text.trim()) error = 'Article text was edited. Set extraction_status to ready in Obsidian to keep it as your saved article.';
       else job = { hash: await sha256Hex(block.text), url: metadata.source_url };
     }
+    const revision = fileRevisionGuard(row.path, row.revision);
     await db.batch([
       db.prepare(`INSERT INTO reading_sources(path, revision, generation, item_id, url_identity, metadata_json, error)
-        SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
+        SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${revision.sql}
         ON CONFLICT(path) DO UPDATE SET revision=excluded.revision, generation=excluded.generation, item_id=excluded.item_id,
         url_identity=excluded.url_identity, metadata_json=excluded.metadata_json, error=excluded.error`)
         .bind(row.path, row.revision, current.generation, metadata?.crate_reading_id ?? null,
-          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: PROJECTION_FORMAT }) : null, error, ...filePathArgs(row.path), row.revision),
+          metadata?.source_url ? readingUrlIdentity(metadata.source_url) : null, metadata ? JSON.stringify({ ...metadata, _highlightIndex: PROJECTION_FORMAT }) : null, error, ...revision.args),
       ...(job && metadata ? [db.prepare(`INSERT INTO reading_jobs(path, item_id, generation, source_revision, block_hash, url, available_at)
         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM reading_sources WHERE path = ? AND revision = ?) AND (SELECT count(*) FROM reading_jobs)<1000
         ON CONFLICT(path) DO NOTHING`).bind(row.path, metadata.crate_reading_id, current.generation, row.revision, job.hash, job.url, Date.now(), row.path, row.revision)] : []),

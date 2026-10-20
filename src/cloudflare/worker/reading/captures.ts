@@ -3,7 +3,7 @@ import { readingCapturePath } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
 import { portablePathKey } from '@/protocol/portable-path';
 import { namespacePredicate } from '../sync/file-namespace';
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { fileRevisionGuard } from '../sync/file-identity';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
@@ -37,8 +37,10 @@ export async function publishCapture(env: Env, id: string, generation: string, r
   const path = await capturePath(env, current.folder_path, title, id);
   const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null);
   const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, previousFile: null,
-    effects: files => [env.DB.prepare(`DELETE FROM reading_captures WHERE id=? AND generation=? AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key=?)`)
-      .bind(id, generation, ...filePathArgs(files[0]!.path), files[0]!.storageKey)] });
+    effects: files => {
+      const revision = fileRevisionGuard(files[0]!.path, files[0]!.storageKey);
+      return [env.DB.prepare(`DELETE FROM reading_captures WHERE id=? AND generation=? AND ${revision.sql}`).bind(id, generation, ...revision.args)];
+    } });
   if (!committed.committed) throw new Error('Reading capture publication must retry.');
 }
 

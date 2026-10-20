@@ -11,3 +11,14 @@ export function fileFolderArgs(folder: string): string[] {
   const key = portablePathKey(folder);
   return [`${key}/`, `${key}0`, `${folder}/`, `${folder}0`];
 }
+
+/** The file still has this exact revision. Evaluate inside the dependent write. */
+export function fileRevisionGuard(path: string, storageKey: string): { sql: string; args: string[] } {
+  return { sql: `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`, args: [...filePathArgs(path), storageKey] };
+}
+
+/** Every listed file still has its exact revision. */
+export function fileRevisionsGuard(files: ReadonlyArray<{ path: string; storageKey: string }>): { sql: string; args: string[] } {
+  const guards = files.map(file => fileRevisionGuard(file.path, file.storageKey));
+  return { sql: guards.map(guard => guard.sql).join(' AND '), args: guards.flatMap(guard => guard.args) };
+}

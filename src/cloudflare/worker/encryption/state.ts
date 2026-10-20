@@ -1,6 +1,6 @@
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 
 export const ENCRYPTION_STATE_KEY = 'e2ee:state';
@@ -86,7 +86,8 @@ export function validateEncryptedContent(state: EncryptionServerState, path: str
 /** An immutable descriptor is published only if its file publication succeeds. */
 export function recordEncryptedFile(db: D1Database, path: string, storageKey: string, descriptor?: EncryptedFileDescriptor): D1PreparedStatement[] {
 	if (!descriptor) return [];
+	const revision = fileRevisionGuard(path, storageKey);
 	return [db.prepare(`INSERT INTO maintenance_state (key, value, updated_at)
-		SELECT ?, ?, datetime('now') WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
-		ON CONFLICT(key) DO NOTHING`).bind(ENCRYPTION_FILE_PREFIX + storageKey, JSON.stringify(descriptor), ...filePathArgs(path), storageKey)];
+		SELECT ?, ?, datetime('now') WHERE ${revision.sql}
+		ON CONFLICT(key) DO NOTHING`).bind(ENCRYPTION_FILE_PREFIX + storageKey, JSON.stringify(descriptor), ...revision.args)];
 }

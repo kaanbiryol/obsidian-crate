@@ -1,7 +1,7 @@
 import { featureEnabled } from '../feature-policy';
 import type { FeaturePolicy } from '../../../protocol/feature-policy';
 import { planNotificationOperations, type NotificationOperation } from './projection-plan';
-import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
+import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
@@ -88,10 +88,12 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
       });
       const token = crypto.randomUUID();
       const chunks = operationChunks(await planNotificationOperations(env.DB, operations, token));
+      const fileGuard = file ? fileRevisionGuard(job.path, file.storageKey)
+        : { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(job.path) };
       const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
-        AND ${file ? `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)` : `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`} `;
-      const args = [job.path, job.job_token, policy.revision, ...filePathArgs(job.path), ...(file ? [file.storageKey] : [])];
+        AND ${fileGuard.sql} `;
+      const args = [job.path, job.job_token, policy.revision, ...fileGuard.args];
       const upsertJob = `ON CONFLICT(reminder_id) DO UPDATE SET job_token = excluded.job_token,
         operation = excluded.operation, payload_json = excluded.payload_json, attempts = 0, available_at = 0, last_error = NULL, updated_at = datetime('now')`;
       // Only changed alarms need commands. Unchanged alarms retain their tokens
