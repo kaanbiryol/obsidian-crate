@@ -1,7 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { resolve } from 'node:path';
-const root = process.env.EDITOR_CONTRACT_ROOT ?? process.cwd();
-const output = process.env.EDITOR_CONTRACT_OUTPUT ?? resolve('.generated/editor-contract/current');
+const output = resolve('.generated/editor-contract/current');
 export default defineConfig({
   testDir: '.', testMatch: 'editor.spec.ts', fullyParallel: true, workers: 2, retries: 0,
   outputDir: resolve(output, 'artifacts'),
@@ -11,6 +10,6 @@ export default defineConfig({
   projects: ['chromium', 'webkit'].flatMap(browserName => ['pwa', 'plugin'].map(host => ({
     name: `${browserName}-${host}`, use: { browserName: browserName as 'chromium' | 'webkit' }, metadata: { host },
   }))),
-  webServer: { command: 'node node_modules/vite/bin/vite.js --config tests/editor-contract/vite.config.mts', cwd: root,
+  webServer: { command: 'node node_modules/vite/bin/vite.js --config tests/editor-contract/vite.config.mts', cwd: process.cwd(),
     url: 'http://127.0.0.1:8791', reuseExistingServer: false },
 });
