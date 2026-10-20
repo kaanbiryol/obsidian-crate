@@ -10,7 +10,7 @@ import { invalidatePwaSession } from '../session-generation';
 import { prepareReadingEncryption } from './encryption-session';
 
 vi.mock('./encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
-vi.mock('../api', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
+vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./api', async importOriginal => ({
   ...await importOriginal<typeof import('./api')>(), connectReadingFromReminders: vi.fn(async () => null),
 }));

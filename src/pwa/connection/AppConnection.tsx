@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { makeApiFetch, registerPwaServiceWorker } from '../api';
+import { makeApiFetch } from '../api';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { READING_SESSION_KEY, readingSession } from '../reading/storage';
@@ -14,6 +14,7 @@ import { useSettingsOpen } from '../settings-context';
 import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';
 import type { StartTab } from '../types';
+import { registerPwaServiceWorker } from '../service-worker-registration';
 
 /** Owns authentication, enrollment, encryption readiness and logout for one Crate app. */
 function useConnection() {

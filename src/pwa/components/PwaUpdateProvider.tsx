@@ -1,12 +1,11 @@
 import { pwaSyncState } from '../sync/state';
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { fetchPwaAssetVersion } from '../api';
 import { usePwaUpdate } from '../hooks/usePwaUpdate';
 import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';
 import { useSettingsOpen, useSettingsStore } from '../settings-context';
-import { startUpdateChecks } from '../update/update-checker';
+import { startUpdateChecks, fetchPwaAssetVersion } from '../update/update-checker';
 import type { CrateSection } from './FeatureSwitcherButton';
 import type { ToastState } from '../types';
 

@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { parseCrateServerInfo, type CrateServerInfo } from '@/protocol/server-info';
 import release from '@/cloudflare/server-release.json';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
-import { fetchPwaAssetVersion } from '../api';
 import { CopyableText } from '@/ui/shared/CopyableText';
 import { SettingsRow } from './SettingsRow';
+import { fetchPwaAssetVersion } from '../update/update-checker';
 
 export function VersionSettings() {
 	const [server, setServer] = useState<CrateServerInfo | null>(null);

@@ -2,10 +2,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { consumeEncryptionFragment, encryptionSnapshot, preparePwaEncryption, resetPwaEncryption } from './encryption-session';
 import { invalidatePwaSession } from '../session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
-import { getPwaPushManager } from '../api';
 import { LocalStateCipher } from '../../encryption/local-state';
 import { unlockPrivateStorage, privateStorageEnabled, sealPrivateValue, openPrivateValue } from '../storage/private-storage';
 import { createReminderOutboxStorage } from '../reminders/outbox/reminder-outbox-storage';
+import { getPwaPushManager } from '../service-worker-registration';
 
 function storage(): Storage {
 	const values: Record<string, string> = {};

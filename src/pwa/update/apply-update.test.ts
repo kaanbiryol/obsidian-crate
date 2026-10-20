@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hasUnsettledReminders } from '../reminders/outbox/reminder-outbox-storage';
 import { hasUnsettledReading } from '../reading/update-guard';
-import { fetchPwaAssetVersion } from '../api';
 import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
+import { fetchPwaAssetVersion } from './update-checker';
 
 vi.mock('../reading/update-guard', () => ({ hasUnsettledReading: vi.fn(async () => false) }));
 vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({ hasUnsettledReminders: vi.fn(() => false) }));
-vi.mock('../api', () => ({ fetchPwaAssetVersion: vi.fn() }));
+vi.mock('./update-checker', async importOriginal => ({ ...await importOriginal<object>(), fetchPwaAssetVersion: vi.fn() }));
 
 class UpdateWorker extends EventTarget {
 	state: ServiceWorkerState = 'installing';

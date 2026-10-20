@@ -1,6 +1,6 @@
 import { hasUnsettledReminders } from '../reminders/outbox/reminder-outbox-storage';
 import { hasUnsettledReading } from '../reading/update-guard';
-import { fetchPwaAssetVersion } from '../api';
+import { fetchPwaAssetVersion } from './update-checker';
 
 function waitForWorker(worker: ServiceWorker, activate: boolean): Promise<void> {
 	return new Promise((resolve, reject) => {

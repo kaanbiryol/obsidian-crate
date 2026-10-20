@@ -20,3 +20,10 @@ export function startUpdateChecks(check: () => Promise<void>): () => void {
 		document.removeEventListener('visibilitychange', resume);
 	};
 }
+
+export async function fetchPwaAssetVersion(): Promise<string | null> {
+	const response = await fetch(`/notifications/version.json?ts=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+	if (!response.ok) return null;
+	const result = await response.json() as { assetVersion?: string };
+	return typeof result.assetVersion === 'string' && result.assetVersion.trim() ? result.assetVersion : null;
+}

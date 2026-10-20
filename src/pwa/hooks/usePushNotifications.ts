@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
-import { getPwaPushManager, urlBase64ToUint8Array } from '../api';
 import { capturePwaSession } from '../session-generation';
 import type { ApiFetch, PushState, ShowToast } from '../types';
+import { getPwaPushManager, urlBase64ToUint8Array } from '../service-worker-registration';
 
 const CHECKING: PushState = { phase: 'checking', status: 'Checking notification registration…' };
 const ENABLED: PushState = { phase: 'enabled', status: 'Notifications enabled on this device.' };
