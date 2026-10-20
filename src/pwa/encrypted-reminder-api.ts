@@ -18,6 +18,7 @@ import type { ApiFetch, ReminderSourceIssue } from './types';
 import { routeFolderPath } from './encryption-folder-routing';
 import { createEncryptedInventoryProgress, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage } from '../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
+import { isReminderOperationId } from '@/protocol/reminder-operation';
 
 const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
 const NOTE_CONCURRENCY = 6;
@@ -186,7 +187,7 @@ export class EncryptedReminderApi {
 
 	private async mutate(action: string, source: string): Promise<Response> {
 		const original = JSON.parse(source) as Record<string, unknown>;
-		if (original.folderPath !== this.localFolder || typeof original.operationId !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(original.operationId)) throw new ReminderCommandError('Invalid encrypted reminder operation', 400, 'invalid_reminder_input');
+		if (original.folderPath !== this.localFolder || !isReminderOperationId(original.operationId)) throw new ReminderCommandError('Invalid encrypted reminder operation', 400, 'invalid_reminder_input');
 		const body = { ...original, operationId: original.operationId };
 		const key = this.attemptKey(body.operationId);
 		const semanticHash = await computeHash(new TextEncoder().encode(JSON.stringify([action, source])).buffer);

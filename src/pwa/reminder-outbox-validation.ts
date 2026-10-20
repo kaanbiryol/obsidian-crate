@@ -1,9 +1,9 @@
 import * as v from 'valibot';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { isStoredReminderDraft, isStoredReminderRecord, storedObject, storedStringChoice } from './reminder-storage-validation';
+import { isReminderOperationId } from '../protocol/reminder-operation';
 
-export const OPERATION_ID = /^[a-zA-Z0-9_-]{16,128}$/;
-const operationIdSchema = v.pipe(v.string(), v.check(value => OPERATION_ID.test(value)));
+const operationIdSchema = v.pipe(v.string(), v.check(value => isReminderOperationId(value)));
 const nonNegativeNumber = v.pipe(v.number(), v.check(value => Number.isFinite(value) && value >= 0));
 const common = {
 	operationId: operationIdSchema,

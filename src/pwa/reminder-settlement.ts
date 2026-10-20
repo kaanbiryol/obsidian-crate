@@ -5,6 +5,7 @@ import { mergeProject, reorderProjectReminders } from './reminder-list-state';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ReminderRecord } from './types';
 import { sealPrivateValue, openPrivateValue } from './private-storage';
+import { isReminderOperationId } from '../protocol/reminder-operation';
 
 interface ReminderSettlement {
 	version: 1;
@@ -41,8 +42,7 @@ export async function createReminderSettlementChannel(authToken: string, folderP
 			if (event.key !== key || !event.newValue) return null;
 			try {
 				const value = JSON.parse(openPrivateValue(event.newValue, key)) as Partial<ReminderSettlement> | null;
-				if (!value || value.version !== 1 || typeof value.operationId !== 'string'
-					|| !/^[a-zA-Z0-9_-]{16,128}$/.test(value.operationId)
+				if (!value || value.version !== 1 || !isReminderOperationId(value.operationId)
 					|| (value.previousRevision !== undefined && typeof value.previousRevision !== 'string')) return null;
 				if (value.kind === 'reorder') {
 					return typeof value.project === 'string' && strings(value.orderedIds) && strings(value.expectedOrder) ? value as ReminderSettlement : null;

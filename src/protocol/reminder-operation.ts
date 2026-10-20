@@ -1,5 +1,10 @@
 export const REMINDER_RETRY_DAYS = 180;
 
+/** Client-chosen idempotency key shared by the PWA outbox and Worker reminder routes. */
+export function isReminderOperationId(value: unknown): value is string {
+	return typeof value === 'string' && /^[a-zA-Z0-9_-]{16,128}$/.test(value);
+}
+
 export function reminderOperationDay(id: string): number | null {
 	const match = /^e1_(\d{8})_[a-zA-Z0-9_-]{16,100}$/.exec(id);
 	return match ? Number(match[1]) : null;

@@ -3,13 +3,13 @@ import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { reminderRequestHash } from '../../../encryption/reminder-receipt';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
-import { reminderOperationDay } from '@/protocol/reminder-operation';
+import { reminderOperationDay, isReminderOperationId } from '@/protocol/reminder-operation';
 import { expiredReminderOperation } from './operation-expiry';
 import { OPERATION_VALID } from '../operation-expiry';
 
 export interface ReminderOperation { id: string; requestHash: string; day: number }
 export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string): Promise<ReminderOperation | Response> {
-	if (typeof body.operationId !== 'string' || !/^[a-zA-Z0-9_-]{16,128}$/.test(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
+	if (!isReminderOperationId(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
 	const requestHash = await reminderRequestHash(action, body);
 	const receipt = await readReminderReceipt(db, { id: body.operationId, requestHash });
 	if (receipt) return receipt;

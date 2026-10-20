@@ -1,9 +1,10 @@
 import { stringDigest } from './string-digest';
 import * as v from 'valibot';
-import { isStoredReminderChange, OPERATION_ID, storedChangeSchema } from './reminder-outbox-validation';
+import { isStoredReminderChange, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { privateStorage } from './private-storage';
 import { isSha256Hex } from '../platform/validation';
+import { isReminderOperationId } from '../protocol/reminder-operation';
 
 const PREFIX = 'crate-reminder-outbox:';
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
@@ -127,7 +128,7 @@ export async function createReminderOutboxStorage(authToken: string, folderPath:
 			try { storage.setItem(key, JSON.stringify(stored)); } catch { throw new Error(STORAGE_ERROR); }
 		},
 		remove(operationId) {
-			if (!OPERATION_ID.test(operationId)) throw new Error(CORRUPT_ERROR);
+			if (!isReminderOperationId(operationId)) throw new Error(CORRUPT_ERROR);
 			try { storage.removeItem(scope + operationId); } catch { throw new Error(STORAGE_ERROR); }
 		},
 		acceptsKey(key) { return key === null || key.startsWith(scope); },
