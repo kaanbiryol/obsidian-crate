@@ -31,7 +31,7 @@ import {
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
 	shouldIgnoreSyncPath,
-} from './ignore';
+} from '../local/ignore';
 import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';

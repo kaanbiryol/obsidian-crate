@@ -2,7 +2,7 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { readFolderMoves } from './folder-move-journal';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
-import { createIgnoreMatcherContext, shouldIgnoreSyncPath } from '../engine/ignore';
+import { createIgnoreMatcherContext, shouldIgnoreSyncPath } from '../local/ignore';
 
 /** Called only inside runEncryptionSetup, after the stopped engine's I/O settles. */
 export async function checkpointEncryptionRenames(plugin: CratePlugin): Promise<void> {
