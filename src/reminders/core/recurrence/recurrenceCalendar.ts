@@ -1,7 +1,7 @@
 import { fromDate, parseDateTime, toZoned } from '@internationalized/date';
 import type { RecurrenceRule } from '../../types/reminder';
 import { getRecurrenceTimeZone } from './recurrenceRule';
-import { formatLocalDateKey, parseLocalDateKey } from '../dates/reminderDate';
+import { formatLocalDateKey, parseLocalDateKey, formatDateKeyParts } from '../dates/reminderDate';
 
 /** Date-only values are calendar days, never host-zone instants. */
 export function recurrenceCalendarInstant(date: Date, rule: RecurrenceRule): Date {
@@ -9,5 +9,5 @@ export function recurrenceCalendarInstant(date: Date, rule: RecurrenceRule): Dat
 }
 export function recurrenceCalendarDate(instant: Date, rule: RecurrenceRule): Date {
 	const zoned = fromDate(instant, getRecurrenceTimeZone(rule));
-	return parseLocalDateKey(`${String(zoned.year).padStart(4, '0')}-${String(zoned.month).padStart(2, '0')}-${String(zoned.day).padStart(2, '0')}`);
+	return parseLocalDateKey(formatDateKeyParts(zoned.year, zoned.month, zoned.day));
 }

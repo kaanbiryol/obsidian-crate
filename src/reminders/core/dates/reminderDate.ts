@@ -22,11 +22,13 @@ export function isDateOnlyString(value: string | null | undefined): value is str
   return !!value && DATE_ONLY_PATTERN.test(value);
 }
 
+/** YYYY-MM-DD from calendar components; month is 1-based. */
+export function formatDateKeyParts(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function formatLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatDateKeyParts(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 export function isReminderDueToday(input: {

@@ -5,7 +5,7 @@ import type { TextMatch } from './richTextTypes';
 import { parseMarkdownLinks } from './markdownLinks';
 import { findRecurrenceCandidates } from '../recurrence/recurrenceParser';
 import { hasReminderTime } from '../dates/reminderTime';
-import { formatReminderTime, parseLocalDateKey } from '../dates/reminderDate';
+import { formatReminderTime, parseLocalDateKey, formatDateKeyParts } from '../dates/reminderDate';
 import { findReminderLiteralRanges } from './reminderLiteralRanges';
 import { parseReminderTimezoneSuffix } from '../dates/reminderTimezone';
 
@@ -16,7 +16,7 @@ export type ReminderSchedule =
 function fromChrono(result: chrono.ParsedResult): ReminderSchedule {
     const hasTime = hasReminderTime(result);
     const dueDate = hasTime ? result.start.date() : parseLocalDateKey(
-        `${String(result.start.get('year')).padStart(4, '0')}-${String(result.start.get('month')).padStart(2, '0')}-${String(result.start.get('day')).padStart(2, '0')}`,
+        formatDateKeyParts(result.start.get('year')!, result.start.get('month')!, result.start.get('day')!),
     );
     const absolute = /\b\d{4}\b/.test(result.text)
         && (['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))
@@ -83,7 +83,7 @@ function chronoMatch(result: chrono.ParsedResult, source: string, referenceDate:
             schedule = fromChrono(zoned);
             if (schedule.kind === 'date' && schedule.hasTime) {
                 const c = zoned.start;
-                const date = `${String(c.get('year')).padStart(4, '0')}-${String(c.get('month')).padStart(2, '0')}-${String(c.get('day')).padStart(2, '0')}`;
+                const date = formatDateKeyParts(c.get('year')!, c.get('month')!, c.get('day')!);
                 const time = formatReminderTime(c.get('hour')!, c.get('minute') ?? 0, c.get('second') ?? 0, c.get('millisecond') ?? 0);
                 schedule.dueDate = toZoned(parseDateTime(`${date}T${time}`), suffix.timezone).toDate();
                 schedule.absolute = /\b\d{4}\b/.test(result.text)
