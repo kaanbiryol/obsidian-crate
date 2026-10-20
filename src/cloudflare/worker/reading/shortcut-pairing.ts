@@ -1,7 +1,8 @@
 import type { AuthPrincipal } from '../auth/authenticate';
 import { changedRows } from '../db';
 import { limitNotificationAction } from '../rate-limit';
-import { ReadingError, readingResponse, type ReadingPolicy } from './common';
+import { ReadingError, readingResponse } from './common';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { READING_SHORTCUT_CONTRACT as contract } from '@/reading/shortcut';
 import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';

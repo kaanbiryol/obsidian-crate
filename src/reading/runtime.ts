@@ -1,5 +1,5 @@
 import { loadEncryptionKeys } from '../plugin/encryption-storage';
-import { readingServerRequest } from './server';
+import { readReadingPolicy, writeReadingPolicy } from './server';
 import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
@@ -78,10 +78,10 @@ export function startReading(plugin: CratePlugin): void {
       void (async () => {
         const connection = captureServerConnection(plugin);
         const assertCurrent = () => { controller.signal.throwIfAborted(); connection.assertCurrent(); };
-        const { policy } = await readingServerRequest<{ policy: { folder_path: string; enabled: number; revision: string } | null }>(plugin, '/reading/policy');
+        const policy = await readReadingPolicy(plugin);
         assertCurrent();
         if (!policy || !policy.enabled) {
-          await readingServerRequest(plugin, '/reading/policy', { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
+          await writeReadingPolicy(plugin, { enabled: true, folderPath: policy?.folder_path ?? folder, revision: policy?.revision ?? null });
           assertCurrent();
         }
         if (policy && policy.folder_path !== folder) {

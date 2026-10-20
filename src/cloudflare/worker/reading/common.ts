@@ -9,8 +9,8 @@ import { parseReadingNote } from '@/reading/core/notes';
 import { apiRoutePolicy } from '../routes/policy';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { sha256Hex } from '@/platform/sha256';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 
-export interface ReadingPolicy { enabled: number; folder_path: string; generation: string; revision: string }
 /** Preparation and capability redemption must recognize the same issuer scopes. */
 export function canPrepareReadingHandoff(scope: string): scope is AuthPrincipal['scope'] {
   return apiRoutePolicy(shortcut.preparePath, 'POST')!.scopes.some(allowed => allowed === scope);

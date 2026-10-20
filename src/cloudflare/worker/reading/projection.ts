@@ -3,7 +3,8 @@ import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs } from
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { readingUrlIdentity } from '@/reading/core/model';
-import { ReadingError, readSource, type ReadingPolicy } from './common';
+import { ReadingError, readSource } from './common';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 import type { Env } from '../types';
 import { vaultChangeToken } from '../vault-change-token';
 import { sha256Hex } from '@/platform/sha256';

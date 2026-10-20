@@ -5,7 +5,7 @@ import type CratePlugin from '../../../plugin/CratePlugin';
 import { createSettingsDisclosure } from '../../../ui/settings/section-helpers';
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText } from '../../../ui/settings/input-helpers';
-import { readingServerRequest, type ServerReadingPolicy } from '../../server';
+import { readReadingPolicy, writeReadingPolicy } from '../../server';
 import { startReading, stopReading, validateReadingConfiguration } from '../../runtime';
 import { READING_VIEW_TYPE } from './reading-view';
 
@@ -36,15 +36,15 @@ export function renderReadingSettings(container: HTMLElement, plugin: CratePlugi
 						const { changeEncryptedFolder } = await import('../../../plugin/encryption-folder-moves');
 						if (await changeEncryptedFolder(plugin, plugin.settings.reading.folderPath, folderPath)) { rerender(); return; }
 						if (plugin.settings.workerUrl) {
-							const { policy } = await readingServerRequest<{ policy: ServerReadingPolicy | null }>(plugin, '/reading/policy');
+							const policy = await readReadingPolicy(plugin);
 							assertCurrent();
 							if (policy?.enabled && policy.folder_path !== folderPath) {
-								const paused = await readingServerRequest<{ policy: ServerReadingPolicy }>(plugin, '/reading/policy', { enabled: false, folderPath: policy.folder_path, revision: policy.revision });
+								const paused = await writeReadingPolicy(plugin, { enabled: false, folderPath: policy.folder_path, revision: policy.revision });
 								assertCurrent();
-								policy.revision = paused.policy.revision;
+								policy.revision = paused.revision;
 								policy.enabled = 0;
 							}
-							await readingServerRequest(plugin, '/reading/policy', { enabled: Boolean(policy?.enabled), folderPath, revision: policy?.revision ?? null });
+							await writeReadingPolicy(plugin, { enabled: Boolean(policy?.enabled), folderPath, revision: policy?.revision ?? null });
 						}
 						assertCurrent();
 						await plugin.writeSettings({ reading }, assertCurrent);

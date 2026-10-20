@@ -1,7 +1,8 @@
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
 import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
-import { ReadingError, readingResponse, type ReadingPolicy } from './common';
+import { ReadingError, readingResponse } from './common';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { CommitEffects } from '../commit-effects';
 import { sha256Hex } from '@/platform/sha256';

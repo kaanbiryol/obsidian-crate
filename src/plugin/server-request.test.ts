@@ -3,7 +3,6 @@ import type { RequestUrlParam, RequestUrlResponse } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { endPluginLifecycle } from './lifecycle-state';
 import { serverRequest } from './server-request';
-import { readingServerRequest } from '../reading/server';
 import { createVaultKeyBundle } from '../encryption/key-bundle';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol/server-info';
 import { SECRET_KEYS } from '../platform/secret-keys';
@@ -77,7 +76,7 @@ it('checks capabilities and mutation compatibility with one validated metadata r
 it('rejects invalid metadata before dispatching the feature request', async () => {
 	const { plugin } = harness();
 	transport.mockResolvedValueOnce(response({ capabilities: ['reading-v1'] }));
-	await expect(readingServerRequest(plugin, '/reading/policy', {})).rejects.toThrow('invalid Crate compatibility metadata');
+	await expect(serverRequest(plugin, '/reading/policy', {})).rejects.toThrow('invalid Crate compatibility metadata');
 	expect(transport).toHaveBeenCalledOnce();
 });
 

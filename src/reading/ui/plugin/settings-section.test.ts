@@ -11,7 +11,7 @@ beforeEach(() => {
 	vi.doMock('../../../plugin/encryption-folder-moves', () => ({ changeEncryptedFolder: vi.fn(async () => false) }));
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
-	vi.doMock('../../server', () => ({ readingServerRequest: request }));
+	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
 	vi.doMock('../../runtime', () => ({ startReading: vi.fn(), stopReading: vi.fn(), validateReadingConfiguration: validate }));
 	vi.doMock('./reading-view', () => ({ READING_VIEW_TYPE: 'crate-reading' }));
 	request.mockImplementation(async (_plugin, path) => path === '/reading/fetching' ? { enabled: true, revision: 'r' } : { policy });
@@ -21,7 +21,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../ui/settings/folder-suggest');
-	vi.doUnmock('../server');
+	vi.doUnmock('../../../plugin/server-request');
 	vi.doUnmock('../runtime');
 	vi.doUnmock('../../plugin/encryption-folder-moves');
 	vi.doUnmock('./reading-view');

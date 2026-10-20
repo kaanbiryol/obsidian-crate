@@ -10,7 +10,8 @@ import { commitStagedFile } from '../sync/mutations';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
-import { ReadingError, readingResponse, sourceById, type ReadingPolicy } from './common';
+import { ReadingError, readingResponse, sourceById } from './common';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { projectReading } from './projection';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {

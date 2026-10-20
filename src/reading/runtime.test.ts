@@ -6,11 +6,11 @@ import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
 import { getReadingLibrary, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
-import { readingServerRequest } from './server';
+import { readReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
-vi.mock('./server', () => ({ readingServerRequest: vi.fn() }));
+vi.mock('./server', () => ({ readReadingPolicy: vi.fn(), writeReadingPolicy: vi.fn() }));
 
 function harness() {
 	vi.useFakeTimers(); vi.stubGlobal('window', globalThis);
@@ -92,7 +92,7 @@ describe('Reading runtime lifecycle', () => {
     Object.assign(h.plugin.secretStorage, { get: (key: string) => key === SECRET_KEYS.ENCRYPTION_FOLDER_MOVES ? 'pending' : null });
     startReading(h.plugin);
     expect(getReadingLibrary(h.plugin)).toBeUndefined();
-    expect(readingServerRequest).not.toHaveBeenCalled();
+    expect(readReadingPolicy).not.toHaveBeenCalled();
     expect(h.events.size).toBe(0);
   });
   it.each(['missing', 'different folder'])('discards an old server’s %s policy before mutation or local save', async kind => {
@@ -101,14 +101,14 @@ describe('Reading runtime lifecycle', () => {
     h.workspace.layoutReady = true;
     const writeSettings = vi.fn();
     Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings });
-    vi.mocked(readingServerRequest).mockImplementationOnce(async () => {
+    vi.mocked(readReadingPolicy).mockImplementationOnce(async () => {
       h.plugin.settings.workerUrl = 'https://replacement.example';
-      return { policy: kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', revision: 'old' } };
+      return kind === 'missing' ? null : { enabled: 1, folder_path: 'Other reading', generation: 'old', revision: 'old' };
     });
     startReading(h.plugin);
     try {
       await vi.advanceTimersByTimeAsync(400);
-      expect(readingServerRequest).toHaveBeenCalledOnce();
+      expect(readReadingPolicy).toHaveBeenCalledOnce();
       expect(writeSettings).not.toHaveBeenCalled();
       expect(h.plugin.settings.reading.folderPath).toBe('Reading');
     } finally { stopReading(h.plugin); }

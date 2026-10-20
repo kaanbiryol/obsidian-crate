@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
-import { ReadingError, sourceById, type ReadingPolicy } from './common';
+import { ReadingError, sourceById } from './common';
+import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { validateReadingMetadata } from '@/reading/core/model';
