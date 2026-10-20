@@ -22,7 +22,6 @@ function convertReminder(reminder: ReminderRecord): SharedReminder {
 		completed: reminder.completed,
 		project: reminder.project || DEFAULT_PROJECT,
 		recurrence: reminder.recurrence,
-		fileLink: reminder.filePath,
 		lineNumber: reminder.lineNumber,
 	};
 }

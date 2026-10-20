@@ -17,7 +17,6 @@ function makeReminder(overrides: Partial<Reminder>): Reminder {
     dueDatetime: overrides.dueDatetime,
     recurrence: overrides.recurrence,
     description: overrides.description,
-    fileLink: overrides.fileLink,
     lineNumber: overrides.lineNumber,
   };
 }

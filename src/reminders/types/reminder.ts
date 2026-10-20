@@ -27,7 +27,6 @@ export interface Reminder {
   priority: Priority;
   completed: boolean;
   project?: string; // Project tag for organizing reminders (defaults to "Inbox")
-  fileLink?: string; // Link to the markdown file where this reminder was created
   recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
   lineNumber?: number; // Line position in source markdown file (for manual ordering)
 }
@@ -39,7 +38,6 @@ export interface CreateReminderParams {
   dueDatetime?: string;
   priority?: Priority;
   project?: string; // Project tag (defaults to "Inbox")
-  fileLink?: string; // Link to the markdown file where this reminder was created
   id?: string; // Optional: specify custom ID
   recurrence?: RecurrenceRule; // Optional recurrence rule
 }
