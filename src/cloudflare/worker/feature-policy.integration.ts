@@ -14,7 +14,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from './storage';
 import { handleNotificationPolicy } from './notifications/policy';
 import { drainNotificationProjections } from './notifications/projection';
-import { ReminderAlarm } from './notifications/reminder-alarm';
+import { ReminderAlarm } from './coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
 import { authenticateWorkerRequest } from './auth/authenticate';

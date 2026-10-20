@@ -28,7 +28,7 @@ import { scheduleMaintenance } from './maintenance/schedule';
 import { commitStagedFile } from './sync/mutations';
 import { commitNewFiles } from './sync/bulk-new-file-commit';
 import type { UploadCommitters } from './sync/upload-committers';
-import { coordinatorStub } from '@/cloudflare/worker/coordinator';
+import { coordinatorStub } from '@/cloudflare/worker/coordinator/coordinator';
 
 function withRequestId(response: Response, requestId: string, started: number, encryptionState?: 'on' | 'off'): Response {
 	const headers = new Headers(response.headers);

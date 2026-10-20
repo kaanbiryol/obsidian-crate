@@ -16,7 +16,7 @@ import { storeEncryptedCheckpoint, streamCheckpointObject } from '../sync/histor
 import { MAX_ENCRYPTED_CHECKPOINT_BYTES } from '../../../protocol/history-checkpoints';
 import { readLimitedRequestBody } from '../body-reader';
 import { HISTORY_CHECKPOINT_PREFIX, SHARED_SETTINGS_KEY, MANAGED_FILES_PREFIX } from '../../../protocol/storage-keys';
-import { notificationDispatcherStub } from '../coordinator';
+import { notificationDispatcherStub } from '../coordinator/coordinator';
 
 const CONVERSION_PAGE_SIZE = 25;
 const CONVERSION_INDEX = 'files_conversion_storage_key_idx';

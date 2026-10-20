@@ -1,7 +1,7 @@
 import { featureEnabled } from '../feature-policy';
 import { queryRows } from '../db';
 import type { Env } from '../types';
-import { notificationDispatcherStub } from '../coordinator';
+import { notificationDispatcherStub } from '../coordinator/coordinator';
 
 interface SchedulePayload {
 	reminderId: string;

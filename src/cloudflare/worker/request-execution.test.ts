@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { authenticateWorkerRequest } from './auth/index';
-import { handleCoordinatorRequest } from './notifications/coordinator-requests';
+import { handleCoordinatorRequest } from './coordinator/coordinator-requests';
 import { fetchWorkerRequest } from './request-handler';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from './router';
 import { forwardTransferRequest } from './sync/transfer-dispatch';

@@ -25,7 +25,7 @@ import { pruneInitialImport } from '../sync/initial-import-prune';
 import { forwardTransferRequest } from '../sync/transfer-dispatch';
 import { finishInitialReminderSetup } from '../sync/initial-import-readiness';
 import type { UploadCommitters } from '../sync/upload-committers';
-import { coordinatorStub } from '../coordinator';
+import { coordinatorStub } from '../coordinator/coordinator';
 
 export async function handleSyncRoute(
 	request: Request,

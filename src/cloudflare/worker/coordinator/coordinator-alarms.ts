@@ -1,6 +1,6 @@
 import { runReadingExtraction } from '../reading/extraction/jobs';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
-import { runBoundedNotificationCoordinator } from './lifecycle';
+import { runBoundedNotificationCoordinator } from '../notifications/lifecycle';
 import type { StateLock } from './coordinator-requests';
 import type { Env } from '../types';
 

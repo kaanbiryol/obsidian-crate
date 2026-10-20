@@ -8,7 +8,7 @@ import { isReminderPath } from '../reminders/scope';
 import { getNotificationPolicy } from '../notifications/policy';
 import { readEncryptionState } from '../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
-import { coordinatorStub } from '../coordinator';
+import { coordinatorStub } from '../coordinator/coordinator';
 
 type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];

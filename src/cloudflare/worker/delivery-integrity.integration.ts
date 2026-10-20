@@ -6,7 +6,7 @@ import schema from '../schema.sql?raw';
 import { writeCommittedMarkdownFile } from './storage';
 import { drainNotificationProjections } from './notifications/projection';
 import { handleNotificationPolicy } from './notifications/policy';
-import { ReminderAlarm } from './notifications/reminder-alarm';
+import { ReminderAlarm } from './coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { handleDiagnostics } from './maintenance/diagnostics';
 vi.mock('./notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));

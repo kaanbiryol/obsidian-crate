@@ -11,7 +11,7 @@ import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
 import { pruneEncryptionMetadata } from './encryption-metadata';
-import { coordinatorStub } from '../coordinator';
+import { coordinatorStub } from '../coordinator/coordinator';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }

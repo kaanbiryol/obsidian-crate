@@ -7,7 +7,7 @@ import { writeCommittedMarkdownFile } from '../storage';
 import { drainNotificationProjections } from '../notifications/projection';
 import { revalidateReminderSources } from './source-migration';
 import { handleNotificationPolicy } from '../notifications/policy';
-import { ReminderAlarm } from '../notifications/reminder-alarm';
+import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';

@@ -1,6 +1,6 @@
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staged-upload-dispatch';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { ReminderAlarm } from './reminder-alarm';
+import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { handleAuthenticatedRoute } from '../router';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';

@@ -10,7 +10,7 @@ import type { Env } from '../types';
 import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
-import { coordinatorStub } from '@/cloudflare/worker/coordinator';
+import { coordinatorStub } from '@/cloudflare/worker/coordinator/coordinator';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }

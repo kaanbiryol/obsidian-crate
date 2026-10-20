@@ -7,7 +7,7 @@ import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
-import { notificationDispatcherStub } from '../coordinator';
+import { notificationDispatcherStub } from '../coordinator/coordinator';
 import { sha256Hex } from '../../../platform/sha256';
 
 const PREFIX = 'encryption-reset:';

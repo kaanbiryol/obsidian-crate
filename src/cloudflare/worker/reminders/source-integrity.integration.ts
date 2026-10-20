@@ -11,7 +11,7 @@ import { handleListReminders } from '../reminders-web/routes/list';
 import { handleDelete } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
 import { loadReminderSource } from '../reminders-web/workspace';
-import { ReminderAlarm } from '../notifications/reminder-alarm';
+import { ReminderAlarm } from '../coordinator/reminder-alarm';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 

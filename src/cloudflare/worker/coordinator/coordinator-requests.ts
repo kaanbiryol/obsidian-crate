@@ -1,11 +1,11 @@
-import { armNotificationCoordinator } from './lifecycle';
+import { armNotificationCoordinator } from '../notifications/lifecycle';
 import { fetchWorkerRequest } from '../request-handler';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 import type { Env } from '../types';
 
 import { publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { createSharedCheckpoint, getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
-import { drainNotificationJobs, REMINDERS_ENABLED_HEADER } from './outbox';
+import { drainNotificationJobs, REMINDERS_ENABLED_HEADER } from '../notifications/outbox';
 import { uploadInitialFiles } from '../sync/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/bulk-upload-dispatch';

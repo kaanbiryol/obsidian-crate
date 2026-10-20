@@ -4,7 +4,7 @@ import type { Env } from '../types';
 import { isReminderPath } from '../reminders/scope';
 import { getNotificationPolicy } from '../notifications/policy';
 import { FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
-import { coordinatorStub } from '../coordinator';
+import { coordinatorStub } from '../coordinator/coordinator';
 
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
   return async (bucket, db, files) => {

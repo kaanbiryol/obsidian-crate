@@ -8,7 +8,7 @@ import { runNotificationCoordinator } from './coordinator';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 import { writeCommittedMarkdownFile } from '../storage';
-import { ReminderAlarm } from './reminder-alarm';
+import { ReminderAlarm } from '../coordinator/reminder-alarm';
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
