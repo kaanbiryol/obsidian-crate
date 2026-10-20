@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeCrateSettings } from '../../plugin/settings';
 import {
 	matchIgnorePattern,
+	createIgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
 	shouldIgnoreSyncPath,
 } from './ignore';
@@ -123,5 +124,15 @@ describe('shouldIgnoreSyncPath', () => {
 
 		expect(shouldIgnoreConfiguredPath('.trash/a (conflict 2026-01-02 03-04-05 a1b2).md', context)).toBe(true);
 		expect(shouldIgnoreConfiguredPath('notes/a (conflict 2026-01-02 03-04-05 a1b2).md', context)).toBe(false);
+	});
+
+	it('builds a context from host folders and configured directory patterns', () => {
+		const cache = new Map<string, RegExp>();
+		const context = createIgnoreMatcherContext(['.obsidian/plugins/crate/', 'Archive/'], ['Archive/', '*.tmp'], cache);
+		expect(context.ignoredDirPrefixes).toEqual(['.obsidian/plugins/crate/', 'Archive/']);
+		expect(context.patternCache).toBe(cache);
+		expect(shouldIgnoreConfiguredPath('.obsidian/plugins/crate/data.json', context)).toBe(true);
+		expect(shouldIgnoreConfiguredPath('notes/scratch.tmp', context)).toBe(true);
+		expect(shouldIgnoreConfiguredPath('notes/keep.md', context)).toBe(false);
 	});
 });

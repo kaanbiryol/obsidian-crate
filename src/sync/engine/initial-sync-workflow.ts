@@ -24,7 +24,6 @@ export interface InitialSyncWorkflowContext {
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
-	isAbortError(error: unknown): boolean;
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void

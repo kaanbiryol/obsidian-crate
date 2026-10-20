@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { downloadAndSaveFile } from './download';
-import { parallelDownloadAndSaveFiles, processDiff } from './transfer';
+import { parallelDownloadAndSaveFiles } from './download';
+import { processDiff } from './process';
 import { createNamedAbortError, createTransferHarness, emptyResult } from './transfer-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 

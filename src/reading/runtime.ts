@@ -4,7 +4,7 @@ import { captureServerConnection } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { shouldIgnoreSyncPath } from '../sync/engine/ignore';
+import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/engine/ignore';
 import { ReadingLibrary } from './data/library';
 import { createObsidianReadingVault } from './obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
@@ -31,10 +31,8 @@ export async function waitForStoppedReading(plugin: CratePlugin): Promise<void> 
 // Compiled patterns are keyed by their text, so one cache serves every check.
 const readingPatternCache = new Map<string, RegExp>();
 function allowedReadingPath(plugin: CratePlugin, path: string): boolean {
-	return !shouldIgnoreSyncPath(path, {
-		ignoredDirPrefixes: [...plugin.settings.ignorePatterns.filter(pattern => pattern.endsWith('/')), `${plugin.app.vault.configDir}/`],
-		ignorePatterns: plugin.settings.ignorePatterns, patternCache: readingPatternCache,
-	});
+	return !shouldIgnoreSyncPath(path, createIgnoreMatcherContext(
+		[`${plugin.app.vault.configDir}/`], plugin.settings.ignorePatterns, readingPatternCache));
 }
 
 export function validateReadingConfiguration(plugin: CratePlugin, settings: ReadingSettings): string {

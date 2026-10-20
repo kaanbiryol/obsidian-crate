@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../types';
-import { runIncrementalSync } from './planner';
+import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 import { sha256Hex } from '../../platform/sha256';
 

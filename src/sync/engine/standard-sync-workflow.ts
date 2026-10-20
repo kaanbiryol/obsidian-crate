@@ -25,6 +25,7 @@ import {
 	type RemoteManifest,
 	type SyncStatus,
 } from './workflow-shared';
+import { isAbortError } from '../abort';
 
 const logger = createLogger('SyncEngine');
 
@@ -40,7 +41,6 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 	incrementalSync(
 		progressCallback?: (current: number, total: number) => void
 	): Promise<SyncResult | null>;
-	isAbortError(error: unknown): boolean;
 	throwIfDestroyed(): void;
 	createFullSyncPlan(
 		remoteFiles: Record<string, FileEntry>,
@@ -202,7 +202,7 @@ export async function runSyncWorkflow(
 					recordSyncError(result, `${outcome.reason}`, diff.path);
 				}
 			} catch (error) {
-				if (context.isAbortError(error)) throw error;
+				if (isAbortError(error)) throw error;
 				recordSyncError(result, `${errorMessage(error)}`, diff.path);
 			}
 			current++;

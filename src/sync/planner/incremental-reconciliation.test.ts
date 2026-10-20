@@ -3,7 +3,7 @@ import type { DownloadRequest } from '../transfer/download';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
-import { runIncrementalSync } from './planner';
+import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({

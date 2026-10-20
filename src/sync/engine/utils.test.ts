@@ -66,7 +66,6 @@ describe('retryWithBackoff', () => {
 			retryWithBackoff(fn, {
 				maxRetries: 3,
 				baseDelayMs: 10,
-				isAbortError: () => false,
 				isDestroyed: () => destroyed,
 			}),
 		).rejects.toThrow('first failure');
@@ -89,7 +88,6 @@ describe('retryWithBackoff', () => {
 		const promise = retryWithBackoff(fn, {
 			maxRetries: 3,
 			baseDelayMs: 10,
-			isAbortError: () => false,
 			isDestroyed: () => false,
 		});
 
@@ -110,7 +108,6 @@ describe('retryWithBackoff', () => {
 		await expect(retryWithBackoff(fn, {
 			maxRetries: 3,
 			baseDelayMs: 10,
-			isAbortError: () => false,
 			isDestroyed: () => false,
 		})).rejects.toThrow('conflict');
 

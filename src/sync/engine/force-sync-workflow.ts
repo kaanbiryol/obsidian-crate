@@ -28,7 +28,6 @@ export interface ForceSyncWorkflowContext {
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
-	isAbortError(error: unknown): boolean;
 	getManifest(): Promise<RemoteManifest>;
 	snapshotLocalManifest(): LocalManifestView;
 	clearLocalManifest(): void;

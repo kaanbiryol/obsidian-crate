@@ -11,22 +11,19 @@ import type { DiffApplyOutcome } from '../transfer/types';
 import type { VaultFile } from '../local/file-discovery';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { LocalChangeScan } from '../planner/types';
+import { createFullSyncPlan } from '../planner/full';
+import { runIncrementalSync } from '../planner/incremental';
+import { getLocalChanges as planLocalChanges, getLocalDeletes as planLocalDeletes } from '../planner/local';
+import { prepareUploadFromPath as prepareTransferUploadFromPath } from '../transfer/prepare';
+import { parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles } from '../transfer/download';
+import { processDiff as transferProcessDiff } from '../transfer/process';
 import {
-	createFullSyncPlan,
-	getLocalChanges as planLocalChanges,
-	getLocalDeletes as planLocalDeletes,
-	runIncrementalSync,
-} from '../planner/planner';
-import {
-	prepareUploadFromPath as prepareTransferUploadFromPath,
-	parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles,
-	processDiff as transferProcessDiff,
 	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
 	uploadPreparedFiles as transferUploadPreparedFiles,
-} from '../transfer/transfer';
+} from '../transfer/upload';
 import { createByteBudgetedVaultFileChunks } from '../transfer/budget';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from './constants';
-import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from '../types';
+import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState, SyncWork } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
@@ -39,7 +36,7 @@ interface SyncEngineContextDependencies {
 	fileManager: FileManager;
 	api: SyncApiClient;
 	files: EngineFileOperations;
-	getLocalManifest: () => LocalManifest;
+	localManifest: LocalManifest;
 	markdownBaseCache: MarkdownBaseCache;
 	conflictStore: ConflictStore;
 	getSettings: () => SyncSettings;
@@ -52,7 +49,6 @@ interface SyncEngineContextDependencies {
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	reconcileVersionConflicts: (paths: string[], result: SyncResult) => Promise<void>;
 	updateState: (updates: Partial<SyncState>) => void;
-	isAbortError: (error: unknown) => boolean;
 	throwIfDestroyed: () => void;
 }
 
@@ -123,7 +119,7 @@ export class SyncEngineContexts {
 	deleteRemoteFiles: DeleteRemoteFiles = (files, result, options) => deleteRemoteFiles({
 		api: this.dependencies.files,
 		vault: this.dependencies.vault,
-		localManifest: this.dependencies.getLocalManifest(),
+		localManifest: this.dependencies.localManifest,
 		reportWork: work => this.dependencies.updateState({ work }),
 	}, files, result, options);
 
@@ -134,7 +130,7 @@ export class SyncEngineContexts {
 			plannedContent: this.plannedContent,
 			fileManager: dependencies.fileManager,
 			api: dependencies.files,
-			localManifest: dependencies.getLocalManifest(),
+			localManifest: dependencies.localManifest,
 			markdownBaseCache: dependencies.markdownBaseCache,
 			conflictStore: dependencies.conflictStore,
 			runConcurrent: dependencies.runConcurrent,
@@ -149,7 +145,7 @@ export class SyncEngineContexts {
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
-			localManifest: dependencies.getLocalManifest(),
+			localManifest: dependencies.localManifest,
 			shouldIgnore: dependencies.shouldIgnore,
 			verifyContent: dependencies.verifyContent,
 			runConcurrent: dependencies.runConcurrent,
@@ -161,12 +157,12 @@ export class SyncEngineContexts {
 		return {
 			settings: dependencies.getSettings(),
 			setLastSeq: (lastSeq: number) => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
-			reportWork: (phase: import('../types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
+			reportWork: (phase: SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			fileManager: dependencies.fileManager,
 			api: dependencies.files,
-			localManifest: dependencies.getLocalManifest(),
+			localManifest: dependencies.localManifest,
 			shouldIgnore: dependencies.shouldIgnore,
 			getLocalChanges: this.getLocalChanges.bind(this),
 			getLocalDeletes: this.getLocalDeletes.bind(this),
@@ -183,9 +179,9 @@ export class SyncEngineContexts {
 		return {
 			initialConfigPull: {
 				firstSync: dependencies.getSettings().lastSync === null && dependencies.getSettings().lastSeq === 0,
-				get: () => dependencies.getLocalManifest().getInitialConfigPull(),
+				get: () => dependencies.localManifest.getInitialConfigPull(),
 				save: async (state: InitialConfigPull) => {
-					const manifest = dependencies.getLocalManifest();
+					const manifest = dependencies.localManifest;
 					manifest.setInitialConfigPull(state);
 					await manifest.save();
 				},
@@ -193,27 +189,36 @@ export class SyncEngineContexts {
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			plannedContent: this.plannedContent,
-			localManifest: dependencies.getLocalManifest(),
+			localManifest: dependencies.localManifest,
 			shouldIgnore: dependencies.shouldIgnore,
 			runConcurrent: dependencies.runConcurrent,
+		};
+	}
+
+	/** Members shared by the standard, initial and forced sync workflows. */
+	private workflowBase() {
+		const dependencies = this.dependencies;
+		return {
+			finishInitialSetup: () => this.finishInitialSetup(),
+			apiConfigured: () => dependencies.api.isConfigured(),
+			reportWork: (phase: SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
+			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
+			getStatus: dependencies.getStatus,
+			updateState: dependencies.updateState,
+			throwIfDestroyed: dependencies.throwIfDestroyed,
+			saveLocalManifest: () => dependencies.localManifest.save(),
+			setLastSync: (value: string) => updateSyncProgress(dependencies.getSettings(), { lastSync: value }),
 		};
 	}
 
 	syncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
-      finishInitialSetup: () => this.finishInitialSetup(),
-      tryInitialImport: (result: import('../types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
-			apiConfigured: () => dependencies.api.isConfigured(),
+			...this.workflowBase(),
+			tryInitialImport: (result: SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			deleteRemoteFiles: this.deleteRemoteFiles,
-			reportWork: (phase: import('../types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
-			getStatus: dependencies.getStatus,
-			updateState: dependencies.updateState,
 			getManifest: () => dependencies.api.getManifest(),
 			incrementalSync: this.incrementalSync.bind(this),
-			isAbortError: dependencies.isAbortError,
-			throwIfDestroyed: dependencies.throwIfDestroyed,
 			hasSyncCursor: () => dependencies.getSettings().lastSeq > 0,
 			createFullSyncPlan: (remoteFiles: Record<string, FileEntry>, concurrency: number, options?: { reuseUnchangedHashes?: boolean }) =>
 				createFullSyncPlan(this.fullSyncPlanner(), remoteFiles, concurrency, options),
@@ -222,13 +227,9 @@ export class SyncEngineContexts {
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			reconcileVersionConflicts: dependencies.reconcileVersionConflicts,
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles.bind(this),
-			getLocalManifestEntry: (path: string) => dependencies.getLocalManifest().getEntry(path),
+			getLocalManifestEntry: (path: string) => dependencies.localManifest.getEntry(path),
 			setLocalManifestEntry: (path: string, entry: FileEntry) => {
-				dependencies.getLocalManifest().setEntry(path, entry);
-			},
-			saveLocalManifest: () => dependencies.getLocalManifest().save(),
-			setLastSync: (value: string) => {
-				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
+				dependencies.localManifest.setEntry(path, entry);
 			},
 			setLastSeq: (value: number) => {
 				updateSyncProgress(dependencies.getSettings(), { lastSeq: value });
@@ -239,42 +240,31 @@ export class SyncEngineContexts {
 	initialSyncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
-      finishInitialSetup: () => this.finishInitialSetup(),
-      tryInitialImport: (result: import('../types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
+			...this.workflowBase(),
+			tryInitialImport: (result: SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			vault: dependencies.vault,
-			apiConfigured: () => dependencies.api.isConfigured(),
-			reportWork: (phase: import('../types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
-			getStatus: dependencies.getStatus,
-			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
-			isAbortError: dependencies.isAbortError,
 			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
-			saveLocalManifest: () => dependencies.getLocalManifest().save(),
-			throwIfDestroyed: dependencies.throwIfDestroyed,
-			setLastSync: (value: string) => {
-				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
-			},
 		};
 	}
 
 	finishInitialSetup(): Promise<void> {
 		const dependencies = this.dependencies;
 		return finishInitialSetup({
-			manifest: dependencies.getLocalManifest(), lastSeq: dependencies.getSettings().lastSeq,
+			manifest: dependencies.localManifest, lastSeq: dependencies.getSettings().lastSeq,
 			initialImport: dependencies.api.initialImport, prepareReminderScope: dependencies.prepareReminderScope,
 			reportWork: work => dependencies.updateState({ work }), assertActive: dependencies.throwIfDestroyed,
 		});
 	}
 
-  private tryInitialImport(result: import('../types').SyncResult, progress?: (current: number, total: number) => void) {
+  private tryInitialImport(result: SyncResult, progress?: (current: number, total: number) => void) {
     const dependencies = this.dependencies;
     return runInitialImport({ transfer: this.transfer(), api: dependencies.api,
       prepareReminderScope: dependencies.prepareReminderScope,
       shouldIgnore: dependencies.shouldIgnore, throwIfDestroyed: dependencies.throwIfDestroyed,
-      save: () => dependencies.getLocalManifest().save(),
+      save: () => dependencies.localManifest.save(),
       setLastSeq: lastSeq => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
       report: work => dependencies.updateState({ work }),
     }, result, progress);
@@ -283,28 +273,17 @@ export class SyncEngineContexts {
 	forceSyncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
-      finishInitialSetup: () => this.finishInitialSetup(),
+			...this.workflowBase(),
 			vault: dependencies.vault,
-			apiConfigured: () => dependencies.api.isConfigured(),
 			deleteRemoteFiles: this.deleteRemoteFiles,
-			reportWork: (phase: import('../types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
-			recoverUploads: () => dependencies.files.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
-			getStatus: dependencies.getStatus,
-			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
-			isAbortError: dependencies.isAbortError,
 			getManifest: () => dependencies.api.getManifest(),
-			snapshotLocalManifest: () => structuredClone(dependencies.getLocalManifest().getManifest()),
-			clearLocalManifest: () => dependencies.getLocalManifest().clear(),
-			replaceLocalManifest: (manifest: LocalManifestView) => dependencies.getLocalManifest().replaceManifest(manifest),
+			snapshotLocalManifest: () => structuredClone(dependencies.localManifest.getManifest()),
+			clearLocalManifest: () => dependencies.localManifest.clear(),
+			replaceLocalManifest: (manifest: LocalManifestView) => dependencies.localManifest.replaceManifest(manifest),
 			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			createVaultFileChunks: createByteBudgetedVaultFileChunks,
-			throwIfDestroyed: dependencies.throwIfDestroyed,
-			saveLocalManifest: () => dependencies.getLocalManifest().save(),
-			setLastSync: (value: string) => {
-				updateSyncProgress(dependencies.getSettings(), { lastSync: value });
-			},
 		};
 	}
 }

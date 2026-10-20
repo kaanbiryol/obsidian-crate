@@ -11,6 +11,7 @@ import {
 	getSyncResultError,
 	SYNC_ERROR_MESSAGES,
 } from '../sync-result';
+import { isAbortError } from '../abort';
 
 export type SyncStatus = SyncState['status'];
 
@@ -67,7 +68,6 @@ export function completeWorkflowResult(
 }
 
 export interface WorkflowErrorContext {
-	isAbortError(error: unknown): boolean;
 	updateState(updates: Partial<SyncState>): void;
 }
 
@@ -82,7 +82,7 @@ export function handleWorkflowError(
 		logGenericError?: boolean;
 	},
 ): void {
-	if (context.isAbortError(error)) {
+	if (isAbortError(error)) {
 		cancelSyncResult(result);
 		context.updateState({ status: 'idle' });
 		options.logger.info(options.abortLogMessage);

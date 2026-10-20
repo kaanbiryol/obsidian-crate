@@ -9,6 +9,19 @@ export interface IgnoreMatcherContext {
 	patternCache: Map<string, RegExp>;
 }
 
+/** Configured patterns plus folders the host owns; directory patterns join the prefixes. */
+export function createIgnoreMatcherContext(
+	fixedPrefixes: string[],
+	ignorePatterns: string[],
+	patternCache = new Map<string, RegExp>(),
+): IgnoreMatcherContext {
+	return {
+		ignoredDirPrefixes: [...new Set([...fixedPrefixes, ...ignorePatterns.filter(pattern => pattern.endsWith('/'))])],
+		ignorePatterns,
+		patternCache,
+	};
+}
+
 export function matchIgnorePattern(
 	path: string,
 	pattern: string,

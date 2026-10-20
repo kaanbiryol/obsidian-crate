@@ -19,24 +19,23 @@ import { isConflictFile } from '../conflict/conflict';
 import { isHiddenPath, type VaultFile } from '../local/file-discovery';
 import { assertLocalSyncPath } from '../local/local-path-safety';
 import { SyncQueueController } from '../queue/controller';
-import { createAbortError, isAbortError as isSyncAbortError } from '../abort';
+import { createAbortError, isAbortError } from '../abort';
 import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
 import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY } from './constants';
 import {
+	createIgnoreMatcherContext,
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
 	shouldIgnoreSyncPath,
 } from './ignore';
 import { hasLocalFileChanges } from '../local/local-file-changes';
 import { createExclusionCleanupReview } from './exclusion-cleanup';
-import {
-	runForceFullSyncWorkflow,
-	runInitialSyncWorkflow,
-	runSyncWorkflow,
-} from './workflows';
+import { runForceFullSyncWorkflow } from './force-sync-workflow';
+import { runInitialSyncWorkflow } from './initial-sync-workflow';
+import { runSyncWorkflow } from './standard-sync-workflow';
 import { SyncEngineContexts } from './contexts';
 import { SyncEngineLifecycle } from './lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
@@ -74,8 +73,7 @@ export class SyncEngine {
 	private prepareReminderScope?: () => Promise<void>;
 	private rawEventRevisions = new Map<string, object>();
 	private rawVerificationTask: Promise<unknown> = Promise.resolve();
-	private patternCache = new Map<string, RegExp>();
-	private ignoredDirPrefixes: string[] = [];
+	private ignore: IgnoreMatcherContext;
 	private syncActivityRevision = 0;
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -111,7 +109,7 @@ export class SyncEngine {
 		this.conflictStore = new ConflictStore(plugin.app, plugin.manifest, (conflictCount) => {
 			this.updateState({ conflictCount });
 		});
-		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
+		this.ignore = this.createIgnoreContext(settings);
 		this.lifecycle = new SyncEngineLifecycle({
 			apiConfigured: () => this.api.isConfigured(),
 			getStatus: () => this.state.status,
@@ -173,7 +171,7 @@ export class SyncEngine {
 			fileManager: this.plugin.app.fileManager,
 			api: this.api,
 			files: this.files,
-			getLocalManifest: () => this.localManifest,
+			localManifest: this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
 			conflictStore: this.conflictStore,
 			getSettings: () => this.settings,
@@ -186,7 +184,6 @@ export class SyncEngine {
 			verifyContent: files => this.verifyContent(files),
 			reconcileVersionConflicts: (paths, result) => this.reconcileVersionConflicts(paths, result),
 			updateState: this.updateState.bind(this),
-			isAbortError: this.isAbortError.bind(this),
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
 		});
 	}
@@ -234,9 +231,8 @@ export class SyncEngine {
 	}
 
 	updateSettings(settings: SyncSettings): void {
-		this.patternCache.clear();
 		this.settings = settings;
-		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
+		this.ignore = this.createIgnoreContext(settings);
 		this.lifecycle.settingsChanged();
 		this.queueController.settingsChanged();
 	}
@@ -422,24 +418,21 @@ export class SyncEngine {
 	}
 
 	private shouldIgnore(path: string): boolean {
-		return shouldIgnoreSyncPath(path, this.getIgnoreMatcherContext());
+		return shouldIgnoreSyncPath(path, this.ignoreContext());
 	}
 
-	private getIgnoreMatcherContext(): IgnoreMatcherContext {
-		return {
-			ignoredDirPrefixes: this.ignoredDirPrefixes,
-			ignorePatterns: this.settings.ignorePatterns,
-			patternCache: this.patternCache,
-		};
+	/** Settings writes can replace the pattern list in place before updateSettings runs. */
+	private ignoreContext(): IgnoreMatcherContext {
+		if (this.ignore.ignorePatterns !== this.settings.ignorePatterns) this.ignore = this.createIgnoreContext(this.settings);
+		return this.ignore;
 	}
 
-	private getIgnoredDirPrefixes(settings: SyncSettings): string[] {
+	private createIgnoreContext(settings: SyncSettings): IgnoreMatcherContext {
 		const pluginDir = this.plugin.manifest.dir?.replace(/\/+$/, '');
-		return [...new Set([
-			...(pluginDir ? [`${pluginDir}/`] : []),
-			...settings.ignorePatterns.filter(p => p.endsWith('/')),
-			this.markdownBaseCache.getIgnoredPrefix(),
-		])];
+		return createIgnoreMatcherContext(
+			[...(pluginDir ? [`${pluginDir}/`] : []), this.markdownBaseCache.getIgnoredPrefix()],
+			settings.ignorePatterns,
+		);
 	}
 
 	private restoreStartupPendingChanges(): void {
@@ -463,7 +456,7 @@ export class SyncEngine {
 					this.queueController.restorePendingPaths(paths);
 				}
 			} catch (error) {
-				if (!this.isAbortError(error) && revision === this.syncActivityRevision) {
+				if (!isAbortError(error) && revision === this.syncActivityRevision) {
 					this.updateState({ status: 'error', lastError: `Could not check local changes: ${errorMessage(error)}`, lastIssues: syncErrorIssues(error) });
 				}
 			} finally {
@@ -483,7 +476,7 @@ export class SyncEngine {
 
 	private recoverConflictStoreInBackground(): void {
 		if (this.lifecycle.isDestroyed) return;
-		const ignoreMatcherContext = this.getIgnoreMatcherContext();
+		const ignoreMatcherContext = this.ignoreContext();
 		void this.trackWork(() => this.conflictStore.recoverFromVault(
 			(path) => shouldIgnoreConfiguredPath(path, ignoreMatcherContext),
 			() => this.lifecycle.isDestroyed,
@@ -507,9 +500,6 @@ export class SyncEngine {
 		});
 	}
 
-	private isAbortError(error: unknown): boolean {
-		return isSyncAbortError(error);
-	}
 
 	private verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean): Promise<string[]> {
 		const revision = this.syncActivityRevision;
@@ -670,7 +660,7 @@ export class SyncEngine {
 				}
 				return result;
 			} catch (error) {
-				if (this.isAbortError(error)) {
+				if (isAbortError(error)) {
 					this.updateState({ status: 'idle' });
 					return cancelSyncResult(result);
 				}

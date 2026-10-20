@@ -2,14 +2,13 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { readFolderMoves } from '../../plugin/encryption-folder-move-journal';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
-import { shouldIgnoreSyncPath } from '../engine/ignore';
+import { createIgnoreMatcherContext, shouldIgnoreSyncPath } from '../engine/ignore';
 
 /** Called only inside runEncryptionSetup, after the stopped engine's I/O settles. */
 export async function checkpointEncryptionRenames(plugin: CratePlugin): Promise<void> {
   const moves = readFolderMoves(plugin.secretStorage).moves;
   if (!moves.length) return;
-  const matcher = { ignoredDirPrefixes: [`${plugin.manifest.dir}/`], ignorePatterns: plugin.settings.ignorePatterns, patternCache: new Map<string, RegExp>() };
-  matcher.ignoredDirPrefixes.push(...matcher.ignorePatterns.filter(pattern => pattern.endsWith('/')));
+  const matcher = createIgnoreMatcherContext([`${plugin.manifest.dir}/`], plugin.settings.ignorePatterns);
   const manifest = new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(plugin.settings));
   try {
     await manifest.load();

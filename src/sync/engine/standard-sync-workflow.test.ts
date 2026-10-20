@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FileDiff, SyncResult } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
-import { isAbortError } from '../abort';
 
 function createContext(options: {
 	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];
@@ -29,7 +28,6 @@ function createContext(options: {
 		updateState: vi.fn(),
 		getManifest: vi.fn(async () => ({ files: {}, lastSeq: 9 })),
 		incrementalSync: vi.fn(async () => null),
-		isAbortError: vi.fn(() => false),
 		throwIfDestroyed: vi.fn(),
 		createFullSyncPlan: vi.fn(async () => ({
 			localFiles,
@@ -59,7 +57,6 @@ function createContext(options: {
 		updateState: spies.updateState,
 		getManifest: spies.getManifest,
 		incrementalSync: spies.incrementalSync,
-		isAbortError: spies.isAbortError,
 		throwIfDestroyed: spies.throwIfDestroyed,
 		createFullSyncPlan: spies.createFullSyncPlan,
 		processDiff: spies.processDiff,
@@ -87,7 +84,6 @@ describe('runSyncWorkflow', () => {
 
 	it('retains acknowledged uploads and prior issues when a later transfer is cancelled', async () => {
 		const { context, spies } = createContext();
-		context.isAbortError = isAbortError;
 		spies.uploadPreparedFiles.mockImplementation(async (_uploads, result) => {
 			result.uploaded = 1;
 			result.uploadedPaths.push('saved.md');

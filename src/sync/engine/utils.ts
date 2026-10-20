@@ -1,6 +1,6 @@
 import { HttpError, SyncTransportError } from '../api';
 import { createLogger } from '../logger';
-import { createAbortError } from '../abort';
+import { createAbortError, isAbortError } from '../abort';
 
 const logger = createLogger('SyncEngine');
 const MAX_SERVER_RETRY_DELAY_MS = 60_000;
@@ -55,7 +55,6 @@ export async function retryWithBackoff<T>(
 	options: {
 		maxRetries: number;
 		baseDelayMs: number;
-		isAbortError: (error: unknown) => boolean;
 		isDestroyed: () => boolean;
 	}
 ): Promise<T> {
@@ -63,7 +62,7 @@ export async function retryWithBackoff<T>(
 		try {
 			return await fn();
 		} catch (error) {
-			if (options.isAbortError(error) || options.isDestroyed()) throw error;
+			if (isAbortError(error) || options.isDestroyed()) throw error;
 			if (!isRetryableSyncError(error)) throw error;
 			if (attempt === options.maxRetries) throw error;
 			let delay: number;

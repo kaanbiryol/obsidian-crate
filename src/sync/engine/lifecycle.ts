@@ -83,7 +83,6 @@ export class SyncEngineLifecycle {
 		return retryWithBackoff(fn, {
 			maxRetries: MAX_RETRIES,
 			baseDelayMs: RETRY_BASE_DELAY_MS,
-			isAbortError,
 			isDestroyed: () => this.destroyed,
 		});
 	}
