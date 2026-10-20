@@ -1,6 +1,7 @@
 import { rememberEncryptionUnlock } from '../encryption/encryption-onboarding';
 import { onReadingEncryptionReset } from './encryption-lifecycle';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
+import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { loadEncryptionState, loadScopeKeys, assertEncryptionActive, EncryptionVerificationUnavailableError } from '../connection/encryption';
 import type { ScopedEncryptionState } from '../encryption/encryption-scope';
 import { unlockLocalState, type StoredReminderKeys } from '../encryption/encryption-keys';
@@ -17,7 +18,7 @@ let expected: ReadingEncryptionState | null = null;
 let verifiedIdentity: string | undefined;
 onReadingEncryptionReset(() => { pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined; forgetReadingKey(); forgetReadingCapture(); lockReadingStorage(); });
 export function readingEncryptionHeaders(): Record<string, string> {
-  return expected ? { 'X-Crate-Encryption-Vault': expected.vaultId, 'X-Crate-Encryption-Generation': String(expected.generation) } : {};
+  return expected ? { [ENCRYPTION_VAULT_HEADER]: expected.vaultId, [ENCRYPTION_GENERATION_HEADER]: String(expected.generation) } : {};
 }
 export function prepareReadingEncryption(session: ReadingSession, refresh = false): Promise<StoredReminderKeys | null> {
   assertReadingSession(session);

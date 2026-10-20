@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
-import { ENCRYPTION_STATE_KEY, readEncryptionState } from './state';
+import { ENCRYPTION_STATE_KEY, hasEncryptionAuthority, readEncryptionState } from './state';
 import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
@@ -35,8 +35,7 @@ export async function handleEncryptionReset(request: Request, env: Env, path: st
 	if (request.method !== 'POST') return corsResponse({ error: 'Method not allowed' }, 405);
 	const state = await readEncryptionState(env.DB);
 	if (!state || state.mode !== 'active') return corsResponse({ error: 'An active encrypted vault is required to start this reset' }, 409);
-	if (request.headers.get('X-Crate-Encryption-Vault') !== state.vaultId
-		|| request.headers.get('X-Crate-Encryption-Generation') !== String(state.generation)) return corsResponse({ error: 'Unlock this vault before resetting it' }, 428);
+	if (!hasEncryptionAuthority(request, state)) return corsResponse({ error: 'Unlock this vault before resetting it' }, 428);
 	const parsed = await parseJsonObject(request, 2048);
 	if (!parsed.ok) return parsed.response;
 	const { replacementToken, confirmation } = parsed.value;

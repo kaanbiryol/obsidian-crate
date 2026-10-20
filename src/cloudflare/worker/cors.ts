@@ -1,12 +1,13 @@
 import { D1_USAGE_HEADER } from '@/protocol/d1-usage';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../protocol/web-session';
+import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '../../encryption/server-state';
 
 export function corsHeaders(): Record<string, string> {
 	return {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-		'Access-Control-Allow-Headers': `Content-Type, Authorization, If-None-Match, X-File-Hash, X-File-Size, X-Crate-Expected-Hash, X-Crate-Import, X-Crate-Upload-Operation, X-Crate-Upload-Operations, X-Crate-Protocol, X-Crate-Operation-Id, X-Crate-Client-Session, X-Crate-Encryption-Vault, X-Crate-Encryption-Generation, ${CRATE_WEB_SESSION_NAME_HEADER}`,
-		'Access-Control-Expose-Headers': `${D1_USAGE_HEADER}, Server-Timing, ETag, X-Crate-Revision, X-File-Hash, X-File-Size, X-Crate-Request-Id, X-Crate-Encryption-State, Content-Type, Content-Length`,
+		'Access-Control-Allow-Headers': `Content-Type, Authorization, If-None-Match, X-File-Hash, X-File-Size, X-Crate-Expected-Hash, X-Crate-Import, X-Crate-Upload-Operation, X-Crate-Upload-Operations, X-Crate-Protocol, X-Crate-Operation-Id, X-Crate-Client-Session, ${ENCRYPTION_VAULT_HEADER}, ${ENCRYPTION_GENERATION_HEADER}, ${CRATE_WEB_SESSION_NAME_HEADER}`,
+		'Access-Control-Expose-Headers': `${D1_USAGE_HEADER}, Server-Timing, ETag, X-Crate-Revision, X-File-Hash, X-File-Size, X-Crate-Request-Id, ${ENCRYPTION_STATE_HEADER}, Content-Type, Content-Length`,
 	};
 }
 

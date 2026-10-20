@@ -2,7 +2,7 @@ import { convertedCapturePath, convertReadingCapture } from './conversion-readin
 import { isReadingScopeExtension, isEncryptionScopeMove, validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { prepareEncryptionScopeMove } from './scope-move';
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES, validateEncryptedSettings } from '../../../encryption/settings-format';
-import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX, readEncryptionState } from './state';
+import { ENCRYPTION_STATE_KEY, ENCRYPTION_FILE_PREFIX, hasEncryptionAuthority, readEncryptionState } from './state';
 import { ENCRYPTED_SETTINGS_KEY } from './settings';
 import { CONVERSION_FILES, convertFile } from './conversion-objects';
 import { corsResponse } from '../cors';
@@ -49,8 +49,7 @@ export async function handleEncryptionConversion(request: Request, env: Env, pat
 	if (state?.mode === 'resetting') return corsResponse({ error: 'Resume the encryption reset before making other changes' }, 423);
 	if (path === '/encryption/conversion' && request.method === 'POST') return beginConversion(request, env, state);
 	if (!state) return corsResponse({ error: 'Start encryption conversion first' }, 409);
-	if (request.headers.get('X-Crate-Encryption-Vault') !== state.vaultId
-		|| request.headers.get('X-Crate-Encryption-Generation') !== String(state.generation)) {
+	if (!hasEncryptionAuthority(request, state)) {
 		return corsResponse({ error: 'Recover the conversion keys before continuing' }, 428);
 	}
 	if (state.mode === 'active') {

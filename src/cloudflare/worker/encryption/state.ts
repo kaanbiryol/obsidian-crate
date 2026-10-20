@@ -1,4 +1,4 @@
-import { validateEncryptionState, encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
+import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, encryptionScopeForPath, type EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
 import { FILE_PATH_MATCH, filePathArgs } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
@@ -16,6 +16,12 @@ export async function readEncryptionState(db: D1Database): Promise<EncryptionSer
 	const state: unknown = JSON.parse(row.value);
 	validateEncryptionState(state);
 	return state;
+}
+
+/** Whether the request was made with this vault's current encryption keys. */
+export function hasEncryptionAuthority(request: Request, state: EncryptionServerState): boolean {
+	return request.headers.get(ENCRYPTION_VAULT_HEADER) === state.vaultId
+		&& request.headers.get(ENCRYPTION_GENERATION_HEADER) === String(state.generation);
 }
 
 /** Use in the SAME transaction as publishing bytes. A request authorized before

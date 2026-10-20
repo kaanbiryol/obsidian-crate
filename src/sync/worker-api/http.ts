@@ -9,7 +9,7 @@ import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../connection/worker-url';
 import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { isAbortError } from '../abort';
-import { ENCRYPTION_CAPABILITY, ENCRYPTION_STATE_HEADER } from '../../encryption/server-state';
+import { ENCRYPTION_CAPABILITY, ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '../../encryption/server-state';
 
 const logger = createLogger('ApiClient');
 
@@ -140,7 +140,7 @@ export class WorkerApiHttpClient {
 	private authToken: string;
 	private encryptionHeaders: Record<string, string> = {};
 	setEncryptionAuthority(vaultId: string, generation: number): void {
-		this.encryptionHeaders = { 'X-Crate-Encryption-Vault': vaultId, 'X-Crate-Encryption-Generation': String(generation) };
+		this.encryptionHeaders = { [ENCRYPTION_VAULT_HEADER]: vaultId, [ENCRYPTION_GENERATION_HEADER]: String(generation) };
 	}
 	private externalSignal: AbortSignal | undefined;
 	private requestTimings = emptyRequestTimings();
@@ -231,7 +231,7 @@ export class WorkerApiHttpClient {
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 			const route = path.split('?')[0]!;
-			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders['X-Crate-Encryption-Vault'] && !this.encryptionOff
+			if (info.capabilities.includes(ENCRYPTION_CAPABILITY) && !this.encryptionHeaders[ENCRYPTION_VAULT_HEADER] && !this.encryptionOff
 				&& (['/sync/', '/reading/', '/reminders/'].some(prefix => route.startsWith(prefix)) || route === '/settings')) {
 				// Another device may have enabled encryption since this client last
 				// synced. Probe without a private body before dispatching plaintext,

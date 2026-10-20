@@ -8,7 +8,7 @@ import type { EncryptedReminderApi } from './reminders/encrypted-reminder-api';
 import type { StoredReminderKeys } from './encryption/encryption-keys';
 import { EncryptionScopeChangedError, routeFolderRequest } from './encryption/encryption-folder-routing';
 import { requestSharedFeaturesRefresh } from './shared-features';
-import { ENCRYPTION_STATE_HEADER } from '@/encryption/server-state';
+import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { requireCompatibleServer as fetchCompatibleServer } from './server-compatibility';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
@@ -58,8 +58,8 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (!sessionCurrent() && !revokingSession) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (keys) {
-			headers.set('X-Crate-Encryption-Vault', keys.vaultId);
-			headers.set('X-Crate-Encryption-Generation', String(keys.generation));
+			headers.set(ENCRYPTION_VAULT_HEADER, keys.vaultId);
+			headers.set(ENCRYPTION_GENERATION_HEADER, String(keys.generation));
 		}
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 

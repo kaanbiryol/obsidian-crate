@@ -1,7 +1,7 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol/server-info';
 import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './cors';
-import { EncryptionStateError } from './encryption/state';
+import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, type ShortcutTransport } from './reading/shortcut-transport';
 
 /** Runs after admission, before public grants or authenticated route handling. */
@@ -32,8 +32,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 		if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
 			throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
 		}
-		if (request.headers.get('X-Crate-Encryption-Vault') !== encryption.vaultId
-			|| request.headers.get('X-Crate-Encryption-Generation') !== String(encryption.generation)) {
+		if (!hasEncryptionAuthority(request, encryption)) {
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
 		}
 		if (encryption.mode !== 'active') throw new EncryptionStateError('Encryption conversion is in progress. Resume it before syncing.', 423);

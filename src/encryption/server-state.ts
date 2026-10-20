@@ -6,6 +6,9 @@ export const READING_ENCRYPTION_CAPABILITY = 'e2ee-reading-v1';
 /** Authenticated responses say whether the vault is encrypted ('on' or 'off'),
  * so clients can skip probing /encryption before plaintext requests. */
 export const ENCRYPTION_STATE_HEADER = 'X-Crate-Encryption-State';
+/** Requests to an encrypted vault name the vault and key generation they use. */
+export const ENCRYPTION_VAULT_HEADER = 'X-Crate-Encryption-Vault';
+export const ENCRYPTION_GENERATION_HEADER = 'X-Crate-Encryption-Generation';
 export const ENCRYPTION_FOLDER_MOVES_CAPABILITY = 'e2ee-folder-moves-v1';
 
 export interface EncryptionScope {
