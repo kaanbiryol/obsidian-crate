@@ -2,8 +2,8 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { withSyncFileContext } from '../issues';
 import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
+import { isOversizedSyncFile, hasLocalMetadataChange } from '../local/local-file-changes';
 
 export async function getLocalDeletes(
   context: LocalDiffPlannerContext,
@@ -40,19 +40,11 @@ export async function getLocalChanges(
 
   // Oversized files stay discovered (never local deletes) but are not changes:
   // each would fail every sync and hold back the changelog cursor.
-  const skippedPaths = allFiles.filter(file => file.size > MAX_FILE_SIZE_BYTES).map(file => file.path);
+  const skippedPaths = allFiles.filter(isOversizedSyncFile).map(file => file.path);
 
-  const candidates = allFiles.filter((file) => {
-    if (file.size > MAX_FILE_SIZE_BYTES) return false;
-
-    if (context.pendingPaths?.has(pendingChangeKey('upload', file.path))) return true;
-    const existing = context.localManifest.getEntry(file.path);
-    if (!existing) return true;
-    if (existing.size !== file.size) return true;
-
-    const manifestMtime = new Date(existing.modified).getTime();
-    return Number.isNaN(manifestMtime) || manifestMtime !== file.mtime;
-  });
+  const candidates = allFiles.filter(file => !isOversizedSyncFile(file)
+    && (context.pendingPaths?.has(pendingChangeKey('upload', file.path))
+      || hasLocalMetadataChange(file, context.localManifest.getEntry(file.path))));
 
   const tasks = candidates.map((file) => async () => {
     context.throwIfDestroyed();

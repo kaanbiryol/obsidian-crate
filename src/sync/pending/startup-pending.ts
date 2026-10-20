@@ -2,9 +2,9 @@ import { pendingChangeKey } from './pending-change';
 import type { Vault } from 'obsidian';
 import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { getAllVaultFiles, type VaultFile } from '../local/file-discovery';
 import { sha256Hex } from '../../platform/sha256';
+import { isOversizedSyncFile, hasLocalMetadataChange } from '../local/local-file-changes';
 
 /** Rebuild the volatile queue from local bytes without changing sync authority. */
 export async function findStartupPendingPaths(context: {
@@ -23,10 +23,9 @@ export async function findStartupPendingPaths(context: {
 	const changes = await context.runConcurrent(files.map(file => async () => {
 		context.throwIfDestroyed();
 		const entry = getPathEntry(context.baseline, file.path);
-		// Oversized files are skipped by sync, so they are never pending.
-		if (file.size > MAX_FILE_SIZE_BYTES) return null;
+		if (isOversizedSyncFile(file)) return null;
 		if (!entry) return pendingChangeKey('upload', file.path);
-		if (entry.size === file.size && Date.parse(entry.modified) === file.mtime) return null;
+		if (!hasLocalMetadataChange(file, entry)) return null;
 		const hash = await sha256Hex(await context.vault.adapter.readBinary(file.path));
 		return hash === entry.hash ? null : pendingChangeKey('upload', file.path);
 	}), concurrency);

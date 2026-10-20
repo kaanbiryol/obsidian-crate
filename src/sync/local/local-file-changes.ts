@@ -3,6 +3,14 @@ import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 
+/** Oversized files stay discovered (never local deletes) but sync never transfers them. */
+export const isOversizedSyncFile = (file: Pick<VaultFile, 'size'>): boolean => file.size > MAX_FILE_SIZE_BYTES;
+
+/** Untracked, resized or retimed files need their bytes checked; an unreadable baseline time counts as changed. */
+export function hasLocalMetadataChange(file: Pick<VaultFile, 'size' | 'mtime'>, entry: Pick<FileEntry, 'size' | 'modified'> | undefined): boolean {
+	return !entry || entry.size !== file.size || Date.parse(entry.modified) !== file.mtime;
+}
+
 interface LocalFileManifest {
 	getAllPaths(): string[];
 	getEntry(path: string): Readonly<FileEntry> | undefined;
@@ -25,12 +33,7 @@ export async function hasLocalFileChanges(
 	const currentPaths = new Set(currentFiles.map((file) => file.path));
 
 	for (const file of currentFiles) {
-		// Oversized files are skipped by sync, so they never settle into the manifest.
-		if (file.size > MAX_FILE_SIZE_BYTES) continue;
-		const tracked = manifest.getEntry(file.path);
-		if (!tracked || tracked.size !== file.size || Date.parse(tracked.modified) !== file.mtime) {
-			return true;
-		}
+		if (!isOversizedSyncFile(file) && hasLocalMetadataChange(file, manifest.getEntry(file.path))) return true;
 	}
 
 	for (const path of manifest.getAllPaths()) {
