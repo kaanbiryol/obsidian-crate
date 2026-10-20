@@ -6,9 +6,6 @@ import {
   getReminderProjectFilePath,
   normalizeReminderProjectPath,
 } from "../../core/reminderProjectPath";
-export {
-  findReminderLineNumber,
-} from "../../core/markdownReminderFile";
 
 const log = createLogger("MarkdownWriter");
 

@@ -2,8 +2,6 @@ import type { RecurrenceRule } from '../../types/reminder';
 import { formatLocalDateKey, parseReminderDateValue } from '../../core/dates/reminderDate';
 import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
 
-export { isReminderOverdue } from '../../core/dates/reminderDate';
-
 // Formatters are reused per locale and options. Formatters without an explicit
 // timeZone capture the local timezone when created, so the cache is cleared
 // when the reminder clock detects a timezone change.

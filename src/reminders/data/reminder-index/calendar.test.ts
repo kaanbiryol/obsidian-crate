@@ -3,7 +3,7 @@ import type { App } from 'obsidian';
 import { createReminderIndex, type IndexedReminder } from '.';
 import { createReminderRepository } from '../reminder-repository';
 import { buildTodayViewModel, buildUpcomingViewModel } from '../../ui/views/viewModels';
-import { isReminderOverdue } from '../../ui/format/dateFormatting';
+import { isReminderOverdue } from '../../core/dates/reminderDate';
 
 const originalTimezone = process.env.TZ;
 afterEach(() => {

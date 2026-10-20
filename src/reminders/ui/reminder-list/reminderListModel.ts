@@ -3,7 +3,7 @@ import {
   sortReminders,
   sortRemindersByFileOrder,
 } from "@/reminders/core/reminderSort";
-import { formatDateHeader, isReminderOverdue } from "@/reminders/ui/format/dateFormatting";
+import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/reminder";
 import { DEFAULT_PROJECT } from "../../core/constants";
@@ -111,5 +111,3 @@ function buildEmptyMessage(options: {
   }
   return "No reminders";
 }
-
-export { formatDateHeader };

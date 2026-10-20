@@ -20,9 +20,9 @@ import { openReminderCreationModal } from "@/reminders/ui/plugin/reminderEditorM
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import {
   buildRemindersListPresentation,
-  formatDateHeader,
   loadRemindersListData,
 } from "./reminderListModel";
+import { formatDateHeader } from "@/reminders/ui/format/dateFormatting";
 import { RemindersLoading } from "../plugin/RemindersLoading";
 import "./styles.scss";
 import { useReminderClock } from '../shared/useReminderClock';

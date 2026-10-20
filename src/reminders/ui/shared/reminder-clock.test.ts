@@ -3,7 +3,8 @@ import { getLocalTimeZone, resetLocalTimeZone } from '@internationalized/date';
 import { createReminderClock } from './reminder-clock';
 import { buildTodayViewModel, buildUpcomingViewModel } from '../views/viewModels';
 import { getRemindersHeaderData } from './remindersViewModel';
-import { formatDueDate, isReminderOverdue } from '../format/dateFormatting';
+import { formatDueDate } from '../format/dateFormatting';
+import { isReminderOverdue } from '../../core/dates/reminderDate';
 import type { Reminder } from '../../types/reminder';
 
 const originalTimezone = process.env.TZ;

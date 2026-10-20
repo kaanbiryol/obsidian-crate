@@ -1,10 +1,10 @@
 import type { UpdateReminderInput } from '../../core/reminderMutationPlan';
 import { processVaultMarkdown } from '../vault-markdown';
 import type { IndexedReminder } from "../reminder-index";
-import { findReminderLineNumber } from "./helpers";
 import {
   appendReminderBlockToContent,
   deleteReminderBlockFromContent,
+  findReminderLineNumber,
 } from "../../core/markdownReminderFile";
 import {
   buildCreatedReminderBlock,

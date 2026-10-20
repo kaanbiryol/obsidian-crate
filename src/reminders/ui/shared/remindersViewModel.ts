@@ -2,7 +2,7 @@ import {
   DEFAULT_PROJECT,
 } from "@/reminders/core/constants";
 import { getUpcomingReminders, selectTodayReminders } from "@/reminders/core/reminderSort";
-import { isReminderOverdue } from "@/reminders/ui/format/dateFormatting";
+import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { Reminder } from "@/reminders/types/reminder";
 import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 
