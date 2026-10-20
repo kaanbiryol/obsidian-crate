@@ -8,6 +8,7 @@ import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { SYNC_RESET_GENERATION_KEY } from '../sync/reset-generation';
 import { isSha256Hex } from '../../../platform/validation';
+import { notificationDispatcherStub } from '../coordinator';
 
 const PREFIX = 'encryption-reset:';
 const READING_TABLES = ['reading_policy', 'reading_sources', 'reading_jobs', 'reading_operations',
@@ -74,7 +75,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 		return corsResponse({ error: 'The vault changed during reset. Stop and reconnect.' }, 409);
 	}
 	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
-	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	const dispatcher = notificationDispatcherStub(env);
 	if (!(await dispatcher.fetch('https://do/dispatch-jobs', { method: 'POST' })).ok) throw new Error('Could not cancel previous notification schedules');
 	if (await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first()) return corsResponse(receipt);
 	// Delete from the start each time. No cursor can skip objects after deletion,

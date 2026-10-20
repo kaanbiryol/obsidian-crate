@@ -16,6 +16,7 @@ import { storeEncryptedCheckpoint, streamCheckpointObject } from '../sync/histor
 import { MAX_ENCRYPTED_CHECKPOINT_BYTES } from '../../../protocol/history-checkpoints';
 import { readLimitedRequestBody } from '../body-reader';
 import { HISTORY_CHECKPOINT_PREFIX, SHARED_SETTINGS_KEY, MANAGED_FILES_PREFIX } from '../../../protocol/storage-keys';
+import { notificationDispatcherStub } from '../coordinator';
 
 const CONVERSION_PAGE_SIZE = 25;
 const CONVERSION_INDEX = 'files_conversion_storage_key_idx';
@@ -224,7 +225,7 @@ async function finishConversion(env: Env, state: EncryptionServerState): Promise
 	// The dispatch DO drains cancellation jobs in bounded batches. A lost reply is
 	// harmless: cancellation is token-checked and removes its private DO state.
 	await env.DB.prepare("UPDATE notification_jobs SET available_at = 0 WHERE operation = 'cancel'").run();
-	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	const dispatcher = notificationDispatcherStub(env);
 	const dispatched = await dispatcher.fetch('https://do/dispatch-jobs', { method: 'POST' });
 	if (!dispatched.ok) throw new Error('Could not cancel old plaintext notification schedules');
 	if (await env.DB.prepare('SELECT 1 FROM notification_jobs UNION SELECT 1 FROM scheduled_reminders LIMIT 1').first()) return corsResponse({ pending: true });

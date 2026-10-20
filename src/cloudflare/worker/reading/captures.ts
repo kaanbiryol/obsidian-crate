@@ -10,6 +10,7 @@ import type { Env } from '../types';
 import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
+import { coordinatorStub } from '@/cloudflare/worker/coordinator';
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
@@ -55,7 +56,7 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
       result = captureResult.article; resolvedUrl = captureResult.url;
     } catch { if (capture.attempts < 2) return; }
   }
-  const response = await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch('https://do/reading-publish', {
+  const response = await coordinatorStub(env).fetch('https://do/reading-publish', {
     method: 'POST', body: JSON.stringify({ captureId: capture.id, generation: capture.generation, result, resolvedUrl }),
   });
   if (!response.ok) throw new Error('Reading capture publication unavailable');

@@ -4,6 +4,7 @@ import type { Env } from '../types';
 import { isReminderPath } from '../reminders/scope';
 import { getNotificationPolicy } from '../notifications/policy';
 import { FRAMED_CONTENT_HEADER, frameUpload, hasFramedMarkdown, readFrame } from './staged-upload-dispatch';
+import { coordinatorStub } from '../coordinator';
 
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
   return async (bucket, db, files) => {
@@ -12,7 +13,7 @@ export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
     // Small Markdown bytes follow the metadata in order, so the coordinator need
     // not read them back from R2.
     const body = frameUpload(metadata, files.filter(hasFramedMarkdown).map(file => file.content));
-    const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+    const stub = coordinatorStub(env);
     const response = await stub.fetch('https://do/commit-new-files', { method: 'POST', body, headers: { [FRAMED_CONTENT_HEADER]: '1' } });
     if (!response.ok) throw new Error('Bulk upload commit is uncertain; retry the same operations');
     return response.json() as Promise<Awaited<ReturnType<typeof commitNewFiles>>>;

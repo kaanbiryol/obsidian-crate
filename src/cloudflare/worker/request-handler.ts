@@ -28,6 +28,7 @@ import { scheduleMaintenance } from './maintenance/schedule';
 import { commitStagedFile } from './sync/mutations';
 import { commitNewFiles } from './sync/bulk-new-file-commit';
 import type { UploadCommitters } from './sync/upload-committers';
+import { coordinatorStub } from '@/cloudflare/worker/coordinator';
 
 function withRequestId(response: Response, requestId: string, started: number, encryptionState?: 'on' | 'off'): Response {
 	const headers = new Headers(response.headers);
@@ -86,7 +87,7 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		if (readingGrant && execution.kind !== 'coordinator') {
 			const forwarded = new Request(request);
 			forwarded.headers.set('X-Crate-Internal-Mutation', '1');
-			return withRequestId(await env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')).fetch(forwarded), requestId, started, encryptionState);
+			return withRequestId(await coordinatorStub(env).fetch(forwarded), requestId, started, encryptionState);
 		}
 		if (execution.kind === 'coordinator' && readingGrant) return withRequestId(await handleReadingRoute(request, env, undefined, execution.state), requestId, started, encryptionState);
 		const publicResponse = await handlePublicRoute(request, env, path, method);
@@ -115,14 +116,14 @@ async function handleWorkerRequest(request: Request, env: Env, admissionDb: D1Da
 		}
 		const mutation = isCrateMutation(path, method);
 		if (routeExecution?.kind === 'coordinator' && execution.kind !== 'coordinator') {
-			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+			const stub = coordinatorStub(env);
 			const forwarded = new Request(request);
 			forwarded.headers.set('X-Crate-Internal-Mutation', '1');
 			const forwardedResponse = await stub.fetch(forwarded);
 			return withRequestId(forwardedResponse, forwardedResponse.headers.get('X-Crate-Request-Id') ?? requestId, started, encryptionState);
 		}
 		if (!mutation && execution.kind !== 'coordinator' && routePolicy?.initializeProjection && !ensuredProjections.has(projectionBinding)) {
-			const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+			const stub = coordinatorStub(env);
 			const ensured = await stub.fetch('https://do/ensure', { method: 'POST' });
 			if (!ensured.ok) throw new Error('Unable to initialize notification processing');
 			ensuredProjections.add(projectionBinding);

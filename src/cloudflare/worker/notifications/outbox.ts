@@ -1,6 +1,7 @@
 import { featureEnabled } from '../feature-policy';
 import { queryRows } from '../db';
 import type { Env } from '../types';
+import { notificationDispatcherStub } from '../coordinator';
 
 interface SchedulePayload {
 	reminderId: string;
@@ -25,7 +26,7 @@ const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
 export async function dispatchNotificationJobs(env: Env, remindersEnabled?: boolean): Promise<void> {
-	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	const dispatcher = notificationDispatcherStub(env);
 	const response = await dispatcher.fetch('https://do/dispatch-jobs', {
 		method: 'POST', headers: remindersEnabled ? { [REMINDERS_ENABLED_HEADER]: '1' } : undefined,
 	});
