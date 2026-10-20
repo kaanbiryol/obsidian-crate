@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 import { expect, it } from 'vitest';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import { sha256Hex } from '../../platform/sha256';
@@ -28,6 +30,17 @@ it('rejects missing paths, edited manifest identities and unsupported source ver
     expect(() => planDatabaseUpgrade(1, { ...future, migrations: [invalid] })).toThrow('Invalid');
   }
   expect(() => planDatabaseUpgrade(3, future)).toThrow('Unsupported');
+});
+
+it('bundles migration SQL from the folder that server packaging and recovery read', async () => {
+  // With no registered migrations the glob is empty, so also check where it points.
+  const module = 'src/cloudflare/deployment/database-upgrades.ts';
+  const pattern = /import\.meta\.glob<string>\('([^']+)'/.exec(readFileSync(module, 'utf8'))?.[1];
+  expect(pattern && relative('.', resolve(module, '..', pattern))).toBe('src/cloudflare/migrations/*.sql');
+  for (const migration of SERVER_RELEASE.migrations) {
+    const sql = readFileSync(`src/cloudflare/migrations/${migration.file}`, 'utf8');
+    await expect(migrationTransaction(migration)).resolves.toContain(sql);
+  }
 });
 
 it('verifies exact migration bytes before assembling an atomic upgrade', async () => {

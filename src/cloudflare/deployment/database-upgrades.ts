@@ -20,7 +20,9 @@ export interface DatabaseRelease {
 export const SERVER_RELEASE: DatabaseRelease = release;
 
 // Migration SQL is bundled locally, never fetched or evaluated from a remote source.
-const sources = import.meta.glob<string>('./migrations/*.sql', { query: '?raw', import: 'default', eager: true });
+// Glob keys are module-relative paths, so index the SQL by manifest file name.
+const sources = new Map(Object.entries(import.meta.glob<string>('../migrations/*.sql', { query: '?raw', import: 'default', eager: true }))
+  .map(([path, sql]): [string, string] => [path.slice(path.lastIndexOf('/') + 1), sql]));
 
 export function planDatabaseUpgrade(version: number | null, target: DatabaseRelease = SERVER_RELEASE): DatabaseMigration[] {
   if (!Number.isSafeInteger(target.revision) || target.revision < 1
@@ -57,7 +59,7 @@ export function validateMigrationHistory(version: number, createdVersion: unknow
   }
 }
 
-export async function migrationTransaction(migration: DatabaseMigration, sql = sources[`./migrations/${migration.file}`]): Promise<string> {
+export async function migrationTransaction(migration: DatabaseMigration, sql = sources.get(migration.file)): Promise<string> {
   if (!sql || await sha256Hex(sql) !== migration.checksum) throw new Error('Database migration failed its integrity check');
   // Run the precondition, DDL/data changes, receipt and version marker in ONE
   // D1 transaction. An unexpected source version deliberately fails CHECK(id=1).
