@@ -8,6 +8,7 @@ import {
 	handleTestPush,
 	handleUnsubscribe,
 } from '../notifications/subscription-handlers';
+import { retryPausedNotifications } from '../notifications/retry-handler';
 import type { RouteMethod } from './shared';
 
 export async function handleNotificationsRoute(
@@ -33,6 +34,7 @@ export async function handleNotificationsRoute(
 	if (path === '/notifications/test' && method === 'POST') {
 		return await handleTestPush(db, new URL(request.url).origin);
 	}
+	if (path === '/notifications/retry' && method === 'POST') return await retryPausedNotifications(db);
 
 	return null;
 }

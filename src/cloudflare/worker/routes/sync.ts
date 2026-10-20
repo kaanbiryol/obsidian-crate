@@ -11,13 +11,12 @@ import {
 	handleGetFileMetadata,
 	handleGetManifest,
 	handleGetSettings,
-	handleHealth,
 	handlePutSettings,
 	handleUpload,
 } from '../sync/index';
 import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-versions/handlers';
-import { retryPausedNotifications } from '../notifications/retry-handler';
-import { handleDiagnostics } from '../maintenance/diagnostics';
+import { handleEncryptedSettings } from '../encryption/settings';
+import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import type { MutationAuditContext } from '../request-diagnostics';
@@ -39,7 +38,6 @@ export async function handleSyncRoute(
 	encryption?: EncryptionServerState | null,
 ): Promise<Response | null> {
 	const db = env.DB;
-  if (path === '/notifications/retry' && method === 'POST') return retryPausedNotifications(db);
 	const bucket = env.BUCKET;
     if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket);
     if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
@@ -59,10 +57,6 @@ export async function handleSyncRoute(
     return forwardTransferRequest(request, env, '/import-upload');
   }
 
-	if (path === '/health' && method === 'GET') return await handleHealth();
-	if (path === '/diagnostics' && method === 'GET') {
-		return await handleDiagnostics(db);
-	}
 	if (path === '/sync/check' && method === 'GET') {
 		return await handleCheckChanges(request, db);
 	}
@@ -102,8 +96,12 @@ export async function handleSyncRoute(
 	if (path === '/sync/restore-version' && method === 'POST') {
 		return await handleRestoreFileVersion(request, bucket, db);
 	}
-	if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
-	if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
+	if (path === '/settings' && (method === 'GET' || method === 'PUT')) {
+		// Encrypted vaults keep shared settings as a D1 ciphertext record instead of the R2 file.
+		const encryptionState = await readEncryptionState(db);
+		if (encryptionState) return await handleEncryptedSettings(request, db, encryptionState);
+		return method === 'GET' ? await handleGetSettings(bucket) : await handlePutSettings(request, bucket);
+	}
 
 	return null;
 }

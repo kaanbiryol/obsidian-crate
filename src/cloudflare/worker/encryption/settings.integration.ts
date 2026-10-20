@@ -42,19 +42,20 @@ it.each([66_200, MAX_SHARED_SETTINGS_BYTES])('converts and updates settings acce
 	}), env, '/encryption/conversion/settings');
 	expect(converted?.status, await converted?.clone().text()).toBe(200);
 	expect((await control('/encryption/conversion/finish', {}))?.status).toBe(200);
-	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
+	const active = (await readEncryptionState(env.DB))!;
+	expect(active.mode).toBe('active');
 	expect(await env.BUCKET.get('__crate__/settings.json')).toBeNull();
-	const read = async () => (await handleEncryptedSettings(new Request('https://test/settings'), env.DB))!.json() as Promise<{ settings: typeof encrypted; settingsVersion: string }>;
+	const read = async () => (await handleEncryptedSettings(new Request('https://test/settings'), env.DB, active)).json() as Promise<{ settings: typeof encrypted; settingsVersion: string }>;
 	const saved = await read();
 	await expect(decryptJson(saved.settings.envelope, key, context)).resolves.toEqual(settings);
 	settings.syncInterval++;
 	encrypted.envelope = await encryptJson(settings, key, context);
-	const update = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: encrypted, expectedVersion: saved.settingsVersion }) }), env.DB);
-	expect(update?.status, await update?.clone().text()).toBe(200);
+	const update = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: encrypted, expectedVersion: saved.settingsVersion }) }), env.DB, active);
+	expect(update.status, await update.clone().text()).toBe(200);
 	await expect(decryptJson((await read()).settings.envelope, key, context)).resolves.toEqual(settings);
 	// The larger allowance remains bounded and a rejection preserves committed data.
-	const oversized = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: { ...encrypted, envelope: 'a'.repeat(MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES) }, expectedVersion: saved.settingsVersion }) }), env.DB);
-	expect(oversized?.status).toBe(413);
+	const oversized = await handleEncryptedSettings(new Request('https://test/settings', { method: 'PUT', body: JSON.stringify({ settings: { ...encrypted, envelope: 'a'.repeat(MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES) }, expectedVersion: saved.settingsVersion }) }), env.DB, active);
+	expect(oversized.status).toBe(413);
 	await expect(decryptJson((await read()).settings.envelope, key, context)).resolves.toEqual(settings);
 });
 

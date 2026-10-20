@@ -6,7 +6,6 @@ import { validateFileDescriptor } from '../../../encryption/file-format';
 import { parseJsonObject } from '../request-validation';
 import { corsResponse } from '../cors';
 import type { AuthPrincipal } from '../auth/index';
-import { handleEncryptedSettings } from '../encryption/settings';
 import { reminderOperationDay } from '../../../protocol/reminder-operation';
 import { OPERATION_VALID } from '../operation-expiry';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -44,7 +43,6 @@ export async function handleEncryptionRoute(request: Request, db: D1Database, pa
 		const converted = row ? (await readEncryptedReceipt(db, 'reminder', id, row.response_json) as { e2eeLegacy?: { scopes: Array<{ id: string; envelope: string }> } }).e2eeLegacy : undefined;
 		return corsResponse({ envelope: converted?.scopes.find(item => item.id === scope.id)?.envelope ?? null });
 	}
-	if (path === '/settings' && principal.scope === 'vault') return handleEncryptedSettings(request, db);
 	if (path === '/encryption' && request.method === 'GET') {
 		// Authentication already read and validated this public configuration.
 		const state = authenticatedState === undefined ? await readEncryptionState(db) : authenticatedState;

@@ -7,6 +7,7 @@ import { handleAuthRoute } from './routes/auth';
 import { handleNotificationsRoute } from './routes/notifications';
 import { handlePublicRoute } from './routes/public';
 import { handleRemindersRoute } from './routes/reminders';
+import { handleServerRoute } from './routes/server';
 import { handleSyncRoute } from './routes/sync';
 import type { RouteMethod } from './routes/shared';
 import type { Env } from './types';
@@ -88,5 +89,6 @@ export async function handleAuthenticatedRoute(
 		?? await handleSyncRoute(request, env, uploadCommitters, path, method, resetGeneration, mutationAuditContext(request, principal, requestId), encryption)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
-		?? await handleNotificationsRoute(request, db, path, method, principal);
+		?? await handleNotificationsRoute(request, db, path, method, principal)
+		?? await handleServerRoute(db, path, method);
 }

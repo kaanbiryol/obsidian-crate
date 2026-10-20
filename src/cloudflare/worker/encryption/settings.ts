@@ -1,19 +1,18 @@
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, validateEncryptedSettings } from '../../../encryption/settings-format';
-import { readEncryptionState, encryptionWriteGuard } from './state';
+import { encryptionWriteGuard } from './state';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { corsResponse } from '../cors';
 import { parseJsonObject } from '../request-validation';
 import { changedRows } from '../db';
 
 export const ENCRYPTED_SETTINGS_KEY = 'e2ee:settings';
 
-export async function handleEncryptedSettings(request: Request, db: D1Database): Promise<Response | null> {
-	const state = await readEncryptionState(db);
-	if (!state) return null;
+/** GET and PUT /settings for an encrypted vault. */
+export async function handleEncryptedSettings(request: Request, db: D1Database, state: EncryptionServerState): Promise<Response> {
 	if (request.method === 'GET') {
 		const row = await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(ENCRYPTED_SETTINGS_KEY).first<{ value: string }>();
 		return corsResponse(row ? JSON.parse(row.value) : { settings: null, settingsVersion: null });
 	}
-	if (request.method !== 'PUT') return null;
 	const parsed = await parseJsonObject(request, MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const { settings, expectedVersion } = parsed.value;
