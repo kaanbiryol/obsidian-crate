@@ -10,6 +10,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
 import { errorMessage } from '../logger';
+import { refusedUploadResult } from '../failures';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,
@@ -302,8 +303,7 @@ export class SyncWorkerApi {
 					results.push(await this.uploadFile(file.path, base64ToArrayBuffer(file.content), file.hash,
 						file.size, file.contentType, file.expectedHash, file.operationId));
 				} catch (error) {
-					if (!(error instanceof HttpError) || error.status !== 409 || (error.code !== 'version_conflict' && error.code !== 'namespace_conflict')) throw error;
-					results.push({ path: file.path, success: false, status: error.status, code: error.code, error: error.message });
+					results.push(refusedUploadResult(file.path, error));
 				}
 			}
 			return { success: results.every(result => result.success), results };

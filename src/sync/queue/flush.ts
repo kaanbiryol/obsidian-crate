@@ -3,11 +3,10 @@ import { pipelineUploadChunks } from '../transfer/budget';
 import { createAbortError } from '../abort';
 import { createLogger } from '../logger';
 import { isAbortError } from '../abort';
-import { isRetryableSyncError } from '../engine/utils';
+import { isQueueTerminalFailure, isRetryableSyncError, isVersionConflict } from '../failures';
 import { deletePendingFiles } from './delete';
 import type { QueueFlushContext } from './flush-types';
 import { uploadPendingFiles } from './upload';
-import { isQueueTerminalFailure, isQueueVersionConflict } from './failure';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { SyncResult } from '../types';
 import { recordSyncError, syncErrorIssues, formatSyncIssue, SkippedFileError, withSyncFileContext } from '../issues';
@@ -111,7 +110,7 @@ export async function processPendingChanges(
 			for (const failure of uploadFailures) {
 				const key = pendingChangeKey('upload', failure.path);
 				batch.requeue([key]);
-				if (isQueueVersionConflict(failure.status, failure.code)) reconciliationPaths.add(key);
+				if (isVersionConflict(failure.status, failure.code)) reconciliationPaths.add(key);
 				if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
 			}
 			failures.push(...uploadFailures);
@@ -180,7 +179,7 @@ export async function processPendingChanges(
 			const retryable = isRetryableSyncError(error);
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
 			if (!retryable) {
-				if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
+				if (error instanceof HttpError && isVersionConflict(error.status, error.code)) {
 					for (const path of paths) {
 						if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
 					}

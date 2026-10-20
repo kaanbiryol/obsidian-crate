@@ -4,7 +4,7 @@ import { recordSyncError } from '../issues';
 import type { Vault } from 'obsidian';
 import { readLocalFileEntry } from '../local/local-file-entry';
 import { classifyPath } from '../planner/reconciliation';
-import { isQueueVersionConflict } from '../queue/failure';
+import { isVersionConflict } from '../failures';
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import { RemoteVersionChangedError } from '../transfer/download';
 import type { FileDiff, SyncResult, SyncWork, UploadDiff } from '../types';
@@ -111,7 +111,7 @@ export async function reconcileQueuePaths(
 							const failures = await context.deleteRemoteFiles([{ path, expectedHash: decision.remoteHash, expectedRevision: decision.remoteRevision }], result, { onVersionConflicts: async () => {} });
 							if (failures.length) {
 								const failure = failures[0]!;
-								if (isQueueVersionConflict(failure.status, failure.code)) {
+								if (isVersionConflict(failure.status, failure.code)) {
 									throw new HttpError(failure.error, failure.status ?? 409, null, failure.code);
 								}
 								break;
@@ -140,7 +140,7 @@ export async function reconcileQueuePaths(
 				} catch (error) {
 					if (isAbortError(error)) throw error;
 					const remoteVersionChanged = error instanceof RemoteVersionChangedError
-						|| (error instanceof HttpError && isQueueVersionConflict(error.status, error.code));
+						|| (error instanceof HttpError && isVersionConflict(error.status, error.code));
 					if (remoteVersionChanged && attempt < MAX_RECONCILE_ATTEMPTS) {
 						await refreshRemoteEntry(context, remoteEntries, path);
 						continue;

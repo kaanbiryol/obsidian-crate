@@ -5,7 +5,7 @@ import type {
 	QueueFlushContext,
 } from './flush-types';
 import { createEmptySyncResult } from '../sync-result';
-import { isQueueTerminalFailure, isQueueVersionConflict } from './failure';
+import { isQueueTerminalFailure, isVersionConflict } from '../failures';
 
 export async function deletePendingFiles(
 	context: QueueFlushContext,
@@ -23,7 +23,7 @@ export async function deletePendingFiles(
 	const reconciliationPaths: string[] = [];
 	let hasTerminalFailure = false;
 	for (const failure of failures) {
-		if (isQueueVersionConflict(failure.status, failure.code)) {
+		if (isVersionConflict(failure.status, failure.code)) {
 			reconciliationPaths.push(pendingChangeKey('delete', failure.path));
 		}
 		if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;

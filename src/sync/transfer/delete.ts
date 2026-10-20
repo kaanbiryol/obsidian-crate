@@ -4,7 +4,7 @@ import { createAbortError } from '../abort';
 import { deleteFilesInBatches, type ConditionalDeleteApi, type ConditionalDeleteCandidate } from './delete-batches';
 import { recordSyncError } from '../issues';
 import { assertLocalFileAbsent } from '../local/local-absence';
-import { isQueueVersionConflict } from '../queue/failure';
+import { isVersionConflict } from '../failures';
 import { pendingChangeKey } from '../pending/pending-change';
 import type { SyncResult, SyncWork } from '../types';
 
@@ -41,7 +41,7 @@ export async function deleteRemoteFiles(context: DeleteContext, files: Condition
 	}
 	const conflicts: MutationFailure[] = [];
 	for (const failure of response.errors) {
-		if (options.onVersionConflicts && (failure.code === 'version_conflict' || isQueueVersionConflict(failure.status, failure.code))) conflicts.push(failure);
+		if (options.onVersionConflicts && isVersionConflict(failure.status, failure.code)) conflicts.push(failure);
 		else recordSyncError(result, failure.error, failure.path);
 	}
 	if (response.outcome === 'cancelled') {

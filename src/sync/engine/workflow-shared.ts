@@ -3,7 +3,8 @@ import { getSyncIssues, recordSyncError } from '../issues';
 import { errorMessage, type Logger } from '../logger';
 import type { SyncResult, SyncState } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
-import { AUTH_ERROR_MESSAGE, isAuthError } from './constants';
+import { AUTH_ERROR_MESSAGE } from './constants';
+import { isAuthError } from '../failures';
 import {
 	cancelSyncResult,
 	createSyncFailureResult,

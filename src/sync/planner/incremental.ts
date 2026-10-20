@@ -2,7 +2,7 @@ import { pendingChangeKey } from '../pending/pending-change';
 import { recordSyncError, skippedFileIssue } from '../issues';
 import { pipelineUploadChunks } from '../transfer/budget';
 import { isAbortError } from "../abort";
-import { isTransientSyncFailure } from "../engine/utils";
+import { isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
 import { cancelSyncResult, createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "../sync-result";
 import { createLogger, errorMessage } from "../logger";

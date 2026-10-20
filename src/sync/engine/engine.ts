@@ -24,7 +24,8 @@ import { createLogger, errorMessage } from '../logger';
 import type { SyncState, SyncResult, ConflictRecord } from '../types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
-import { AUTH_ERROR_MESSAGE, isAuthError, PREPARE_CONCURRENCY } from './constants';
+import { AUTH_ERROR_MESSAGE, PREPARE_CONCURRENCY } from './constants';
+import { isAuthError } from '../failures';
 import {
 	createIgnoreMatcherContext,
 	type IgnoreMatcherContext,

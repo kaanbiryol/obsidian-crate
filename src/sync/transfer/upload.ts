@@ -9,7 +9,7 @@ import type { PreparedUpload, SyncResult } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { VaultFile } from "../local/file-discovery";
-import { isQueueVersionConflict } from '../queue/failure';
+import { isVersionConflict } from '../failures';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from '../engine/constants';
 import { HttpError } from '../worker-api/http';
 
@@ -106,7 +106,7 @@ export async function uploadPreparedFiles(
             if (isMarkdownPath(upload.path)) {
               await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
             }
-          } else if (fileResult.code === 'version_conflict' || isQueueVersionConflict(fileResult.status, fileResult.code)) {
+          } else if (isVersionConflict(fileResult.status, fileResult.code)) {
             versionConflictPaths.add(upload.path);
           } else {
             recordUploadError(result, new HttpError(fileResult.error || "Upload failed", fileResult.status ?? 503, null, fileResult.code), upload.path, options);
@@ -196,13 +196,13 @@ async function uploadPreparedFilesIndividually(
         return null;
       }
 
-      if (uploadResult.code === 'version_conflict' || isQueueVersionConflict(uploadResult.status, uploadResult.code)) {
+      if (isVersionConflict(uploadResult.status, uploadResult.code)) {
         return upload.path;
       }
       recordUploadError(result, new HttpError(uploadResult.error || "Upload failed", uploadResult.status ?? 503, null, uploadResult.code), upload.path, options);
     } catch (error) {
       if (isAbortError(error)) throw error;
-      if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
+      if (error instanceof HttpError && isVersionConflict(error.status, error.code)) {
         return upload.path;
       }
       recordUploadError(result, error, upload.path, options);

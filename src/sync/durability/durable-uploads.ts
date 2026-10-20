@@ -7,7 +7,7 @@ import { base64ToArrayBuffer } from '../encoding';
 import { mergeUploadIntent, uploadWire, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import type { UploadApplyPhase, UploadPhase } from '../diagnostics/upload-diagnostics';
-import { HttpError } from '../worker-api/http';
+import { isRefusedWrite, isStalePreparedUpload, refusedUploadResult } from '../failures';
 import type { UploadPreconditions } from '../encryption/encrypted-files';
 import { sha256Hex } from '@/platform/sha256';
 
@@ -43,8 +43,8 @@ export class DurableUploads {
 			} catch (error) {
 				// Encryption resolves the plaintext precondition before journaling.
 				// A stale file has not been dispatched and can reconcile independently.
-				if (!(error instanceof HttpError) || error.status !== 409 || error.code !== 'version_conflict') throw error;
-				rejected.push({ success: false, path: file.path, status: error.status, code: error.code, error: error.message });
+				if (!isStalePreparedUpload(error)) throw error;
+				rejected.push(refusedUploadResult(file.path, error));
 			}
 		}
 		const response = durable.length ? await this.sendBatch(durable) : { success: true, results: [] };
@@ -147,8 +147,7 @@ export class DurableUploads {
 					result = await this.transport.uploadFile(wire.path, base64ToArrayBuffer(wire.content), wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
 				}
 			} catch (error) {
-				if (!(error instanceof HttpError) || !['version_conflict', 'namespace_conflict'].includes(error.code ?? '')) throw error;
-				result = { success: false, path: file.path, status: error.status, code: error.code as 'version_conflict' | 'namespace_conflict', error: error.message };
+				result = refusedUploadResult(file.path, error);
 			}
 			this.validate(file, result);
 			await this.accept(file, result);
@@ -157,7 +156,7 @@ export class DurableUploads {
 	}
 
 	private definitive(result: UploadResult): boolean {
-		return result.status === 409 && (result.code === 'version_conflict' || result.code === 'namespace_conflict');
+		return isRefusedWrite(result.status, result.code);
 	}
 	private validate(file: JournalUpload, result?: UploadResult): void {
 		if (!result || result.path !== file.path || (result.success && (result.hash !== (file.encryptedWire?.hash ?? file.hash) || !result.revision))) throw new Error('Server returned an invalid upload receipt; the original upload is preserved for recovery');

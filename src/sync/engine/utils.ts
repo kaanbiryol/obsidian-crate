@@ -1,21 +1,10 @@
 import { createLogger } from '../logger';
 import { createAbortError, isAbortError } from '../abort';
-import { HttpError, SyncTransportError } from '../worker-api/http';
+import { HttpError } from '../worker-api/http';
+import { isRetryableSyncError } from '../failures';
 
 const logger = createLogger('SyncEngine');
 const MAX_SERVER_RETRY_DELAY_MS = 60_000;
-
-const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
-
-export function isRetryableSyncError(error: unknown): boolean {
-	return !(error instanceof HttpError) || RETRYABLE_HTTP_STATUSES.has(error.status);
-}
-
-/** Only transport failures and retryable server statuses; local or protocol
- * errors may need a full reconciliation. */
-export function isTransientSyncFailure(error: unknown): boolean {
-	return error instanceof SyncTransportError || (error instanceof HttpError && RETRYABLE_HTTP_STATUSES.has(error.status));
-}
 
 export async function runConcurrentTasks<T>(
 	tasks: Array<() => Promise<T>>,

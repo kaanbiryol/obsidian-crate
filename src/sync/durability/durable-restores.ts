@@ -4,6 +4,7 @@ import type { FileMetadataResponse, RemoteFileVersion, RestoreFileRequest, Uploa
 import { getPathEntry } from '../../protocol/path-record';
 import type { LocalManifest } from '../manifest/manifest';
 import { HttpError } from '../worker-api/http';
+import { isRefusedWrite } from '../failures';
 import type { RestoreIntent } from './restore-intent';
 
 interface RestoreTransport {
@@ -53,7 +54,7 @@ export class DurableRestores {
 				throw new Error('Invalid restore receipt. The original restore is preserved; retry after checking the server.');
 			}
 		} catch (error) {
-			if (error instanceof HttpError && ['version_conflict', 'namespace_conflict'].includes(error.code ?? '')) {
+			if (error instanceof HttpError && isRefusedWrite(error.status, error.code)) {
 				this.manifest.removeRestoreIntent(version.storage_key);
 				await this.manifest.save();
 			}
