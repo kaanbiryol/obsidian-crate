@@ -253,20 +253,20 @@ export class SyncEngine {
 		return { ...this.state };
 	}
 
-    private pendingChanges() {
-        return createEnginePendingChanges({
-            vault: this.vault, api: this.api, manifest: this.localManifest,
-            cache: this.markdownBaseCache, queue: this.queueController,
-            backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
-            assertActive: () => this.lifecycle.throwIfDestroyed(),
-            isDestroyed: () => this.lifecycle.isDestroyed,
-            beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
-        });
-    }
+	private pendingChanges() {
+		return createEnginePendingChanges({
+			vault: this.vault, api: this.api, manifest: this.localManifest,
+			cache: this.markdownBaseCache, queue: this.queueController,
+			backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
+			assertActive: () => this.lifecycle.throwIfDestroyed(),
+			isDestroyed: () => this.lifecycle.isDestroyed,
+			beforeBinaryReplace: path => this.prepareRecoverableReplacement(path),
+		});
+	}
 
-    async loadPendingDiff(path: string, deleted: boolean) {
-        return this.pendingChanges().loadDiff(path, deleted);
-    }
+	async loadPendingDiff(path: string, deleted: boolean) {
+		return this.pendingChanges().loadDiff(path, deleted);
+	}
 
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
@@ -280,65 +280,65 @@ export class SyncEngine {
 		return this.queueController.hasPendingPath(key);
 	}
 
-    private history() {
-        return createEngineHistory({
-            vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
-            getSettings: () => this.settings, getManifest: () => this.localManifest.getManifest(),
-            shouldIgnore: path => this.shouldIgnore(path),
-            assertActive: () => this.lifecycle.throwIfDestroyed(),
-            hasPendingMutations: () => Boolean(this.getActiveConflicts().length
-                || this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
-            canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
-            runExclusive: operation => this.runExclusiveOperation(operation),
-            applied: (path, removed) => this.queueController.restorePendingPaths([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
-        });
-    }
+	private history() {
+		return createEngineHistory({
+			vault: this.vault, api: this.api, pluginDir: `${this.plugin.manifest.dir}`,
+			getSettings: () => this.settings, getManifest: () => this.localManifest.getManifest(),
+			shouldIgnore: path => this.shouldIgnore(path),
+			assertActive: () => this.lifecycle.throwIfDestroyed(),
+			hasPendingMutations: () => Boolean(this.getActiveConflicts().length
+				|| this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
+			canCheckpoint: () => !this.lifecycle.isDestroyed && this.state.status !== 'syncing',
+			runExclusive: operation => this.runExclusiveOperation(operation),
+			applied: (path, removed) => this.queueController.restorePendingPaths([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
+		});
+	}
 
-    async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
-    trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
+	async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
+	trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
 
-    async saveHistoryCheckpoint(): Promise<string | undefined> { return this.trackWork(() => this.history().saveLocal()); }
+	async saveHistoryCheckpoint(): Promise<string | undefined> { return this.trackWork(() => this.history().saveLocal()); }
 
-    async loadHistoryComparison(checkpoint: string, shared = false) {
-        return this.history().compare(checkpoint, shared);
-    }
+	async loadHistoryComparison(checkpoint: string, shared = false) {
+		return this.history().compare(checkpoint, shared);
+	}
 
-    async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
-        return this.history().prepareRestore(checkpoint, beforeApply, shared);
-    }
+	async createHistoryRestore(checkpoint: string, beforeApply: () => Promise<void>, shared = false) {
+		return this.history().prepareRestore(checkpoint, beforeApply, shared);
+	}
 
-    private async runExclusiveOperation<T>(operation: () => Promise<T>, busyMessage = 'Wait for sync to finish, then try again.'): Promise<T> {
-        this.lifecycle.throwIfDestroyed();
-        if (this.state.status === 'syncing') throw new Error(busyMessage);
-        this.updateState({ status: 'syncing' });
-        return this.trackWork(async () => {
-            try { return await operation(); }
-            finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
-        });
-    }
+	private async runExclusiveOperation<T>(operation: () => Promise<T>, busyMessage = 'Wait for sync to finish, then try again.'): Promise<T> {
+		this.lifecycle.throwIfDestroyed();
+		if (this.state.status === 'syncing') throw new Error(busyMessage);
+		this.updateState({ status: 'syncing' });
+		return this.trackWork(async () => {
+			try { return await operation(); }
+			finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
+		});
+	}
 
-    async syncSelected(keys: string[]): Promise<SyncResult> {
-        this.assertPendingSelection(keys);
-        return this.reconcileFromQueue([...new Set(keys)], true);
-    }
+	async syncSelected(keys: string[]): Promise<SyncResult> {
+		this.assertPendingSelection(keys);
+		return this.reconcileFromQueue([...new Set(keys)], true);
+	}
 
-    private assertPendingSelection(keys: string[]): void {
-        this.lifecycle.throwIfDestroyed();
-        if (!this.api.isConfigured()) throw new Error('Sync is not configured.');
-        if (this.state.status === 'syncing') throw new Error('Wait for the current sync to finish.');
-        if (this.localManifest.uploadJournal.pending().length > 0) throw new Error('Run Sync now to recover interrupted uploads before changing individual files.');
-        const pending = new Set(this.getPendingPaths());
-        if (!keys.length || keys.some(key => !pending.has(key))) throw new Error('Pending files changed. Review the current selection and try again.');
-    }
+	private assertPendingSelection(keys: string[]): void {
+		this.lifecycle.throwIfDestroyed();
+		if (!this.api.isConfigured()) throw new Error('Sync is not configured.');
+		if (this.state.status === 'syncing') throw new Error('Wait for the current sync to finish.');
+		if (this.localManifest.uploadJournal.pending().length > 0) throw new Error('Run Sync now to recover interrupted uploads before changing individual files.');
+		const pending = new Set(this.getPendingPaths());
+		if (!keys.length || keys.some(key => !pending.has(key))) throw new Error('Pending files changed. Review the current selection and try again.');
+	}
 
-    async createPendingDiscard(keys: string[]) {
-        this.assertPendingSelection(keys);
-        const review = await this.pendingChanges().prepareDiscard(keys);
-        return { ...review, discard: async () => {
-            this.assertPendingSelection(keys);
-            return this.runExclusiveOperation(() => review.discard());
-        } };
-    }
+	async createPendingDiscard(keys: string[]) {
+		this.assertPendingSelection(keys);
+		const review = await this.pendingChanges().prepareDiscard(keys);
+		return { ...review, discard: async () => {
+			this.assertPendingSelection(keys);
+			return this.runExclusiveOperation(() => review.discard());
+		} };
+	}
 
 	async runConflictResolution<T>(operation: () => Promise<T>): Promise<T> {
 		return this.runExclusiveOperation(operation, 'Wait for sync to finish before resolving this conflict.');
@@ -633,7 +633,7 @@ export class SyncEngine {
 
 
 	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
-        if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
+		if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			this.updateState({ status: 'syncing' });

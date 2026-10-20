@@ -112,7 +112,7 @@ export class SyncRuntime {
 		private settings: CrateSettings,
 		private secretStorage: SecretStorageService,
 		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
-    private prepareReminderScope?: () => Promise<void>,
+	private prepareReminderScope?: () => Promise<void>,
 	) {
 		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
@@ -583,14 +583,14 @@ export class SyncRuntime {
 			trackedFiles: engine.trackedFileCount(), now: Date.now(),
 		})) {
 			try {
-                const shared = await engine.saveSharedHistoryCheckpoint();
-                if (this.syncEngine !== engine) return;
-                if (shared) attachCheckpoint({ sharedCheckpoint: shared.id });
-                else {
-                    const checkpoint = await engine.saveHistoryCheckpoint();
-                    attachCheckpoint({ historyCheckpoint: checkpoint });
-                }
-            }
+				const shared = await engine.saveSharedHistoryCheckpoint();
+				if (this.syncEngine !== engine) return;
+				if (shared) attachCheckpoint({ sharedCheckpoint: shared.id });
+				else {
+					const checkpoint = await engine.saveHistoryCheckpoint();
+					attachCheckpoint({ historyCheckpoint: checkpoint });
+				}
+			}
 			catch (error) { if (this.syncEngine === engine) logger.warn('Could not save the history checkpoint:', errorMessage(error)); }
 		}
 	}
@@ -669,40 +669,40 @@ export class SyncRuntime {
 		);
 	}
 
-    async syncSelected(keys: string[]): Promise<SyncResult> {
-        return this.runSyncOperation('sync', engine => engine.syncSelected(keys));
-    }
+	async syncSelected(keys: string[]): Promise<SyncResult> {
+		return this.runSyncOperation('sync', engine => engine.syncSelected(keys));
+	}
 
-    async createPendingDiscard(keys: string[]) {
-        return this.requireEngine().createPendingDiscard(keys);
-    }
+	async createPendingDiscard(keys: string[]) {
+		return this.requireEngine().createPendingDiscard(keys);
+	}
 
-    async listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
-        const api = this.requireApi();
-        const checkpoints = await api.sharedHistory.list();
-        if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
-        return checkpoints;
-    }
+	async listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
+		const api = this.requireApi();
+		const checkpoints = await api.sharedHistory.list();
+		if (api !== this.apiClient) throw new Error('Sync connection changed. Reopen history.');
+		return checkpoints;
+	}
 
-    async loadHistoryComparison(entry: SyncHistoryEntry) {
-        const engine = this.requireEngine();
-        return loadRuntimeHistoryComparison(engine, () => this.verifyHistoryEngine(engine), entry);
-    }
+	async loadHistoryComparison(entry: SyncHistoryEntry) {
+		const engine = this.requireEngine();
+		return loadRuntimeHistoryComparison(engine, () => this.verifyHistoryEngine(engine), entry);
+	}
 
-    async createHistoryRestore(entry: SyncHistoryEntry) {
-        const engine = this.requireEngine();
-        return createRuntimeHistoryRestore({
-            engine, settings: this.settings,
-            verify: () => this.verifyHistoryEngine(engine),
-            clearForegroundSyncTimer: () => this.foregroundSync.cancel(),
-            persistSettings: update => this.persistSettings(update),
-            runSyncOperation: operation => this.runSyncOperation('sync', operation),
-        }, entry);
-    }
+	async createHistoryRestore(entry: SyncHistoryEntry) {
+		const engine = this.requireEngine();
+		return createRuntimeHistoryRestore({
+			engine, settings: this.settings,
+			verify: () => this.verifyHistoryEngine(engine),
+			clearForegroundSyncTimer: () => this.foregroundSync.cancel(),
+			persistSettings: update => this.persistSettings(update),
+			runSyncOperation: operation => this.runSyncOperation('sync', operation),
+		}, entry);
+	}
 
-    private verifyHistoryEngine(engine: SyncEngine): void {
-        if (engine !== this.syncEngine) throw new Error('Sync connection changed. Reopen history.');
-    }
+	private verifyHistoryEngine(engine: SyncEngine): void {
+		if (engine !== this.syncEngine) throw new Error('Sync connection changed. Reopen history.');
+	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.runSyncOperation(

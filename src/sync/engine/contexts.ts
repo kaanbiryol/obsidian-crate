@@ -259,16 +259,16 @@ export class SyncEngineContexts {
 		});
 	}
 
-  private tryInitialImport(result: SyncResult, progress?: (current: number, total: number) => void) {
-    const dependencies = this.dependencies;
-    return runInitialImport({ transfer: this.transfer(), api: dependencies.api,
-      prepareReminderScope: dependencies.prepareReminderScope,
-      shouldIgnore: dependencies.shouldIgnore, throwIfDestroyed: dependencies.throwIfDestroyed,
-      save: () => dependencies.localManifest.save(),
-      setLastSeq: lastSeq => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
-      report: work => dependencies.updateState({ work }),
-    }, result, progress);
-  }
+	private tryInitialImport(result: SyncResult, progress?: (current: number, total: number) => void) {
+		const dependencies = this.dependencies;
+		return runInitialImport({ transfer: this.transfer(), api: dependencies.api,
+			prepareReminderScope: dependencies.prepareReminderScope,
+			shouldIgnore: dependencies.shouldIgnore, throwIfDestroyed: dependencies.throwIfDestroyed,
+			save: () => dependencies.localManifest.save(),
+			setLastSeq: lastSeq => updateSyncProgress(dependencies.getSettings(), { lastSeq }),
+			report: work => dependencies.updateState({ work }),
+		}, result, progress);
+	}
 
 	forceSyncWorkflow() {
 		const dependencies = this.dependencies;

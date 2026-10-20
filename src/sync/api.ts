@@ -54,7 +54,7 @@ export class SyncApiClient {
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
 		this.encryption = encryption;
 	}
-  readonly initialImport: InitialImportApi;
+	readonly initialImport: InitialImportApi;
 	private fileOperationAuthority?: string;
 	createFileOperations(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache) {
 		this.fileOperationAuthority = this.getWorkerUrl();
@@ -65,17 +65,17 @@ export class SyncApiClient {
 	/** Raw writes that bypass the durable upload journal and rename guards. Sync uses
 	 * the engine's file operations; these serve tests and tools acting as another device. */
 	readonly unjournaled: Pick<SyncWorkerApi, 'uploadFile' | 'deleteFile' | 'batchUpload' | 'batchDelete'>;
-    readonly sharedHistory: SharedHistoryApi;
+	readonly sharedHistory: SharedHistoryApi;
 	private readonly authApi: AuthWorkerApi;
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
 	private readonly notificationsApi: NotificationsWorkerApi;
 
 	constructor(workerUrl: string, authToken: string, transport?: ApiHttpTransport) {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
-    this.initialImport = new InitialImportApi(this.http);
+		this.initialImport = new InitialImportApi(this.http);
 		this.syncApi = new SyncWorkerApi(this.http);
 		this.unjournaled = this.syncApi;
-        this.sharedHistory = new SharedHistoryApi(this.http);
+		this.sharedHistory = new SharedHistoryApi(this.http);
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);
 		this.notificationsApi = new NotificationsWorkerApi(this.http);
