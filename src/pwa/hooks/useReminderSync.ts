@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
-import { applyReminderDelta, fetchReadyReminderList, parseReminderDeltaResponse, parseReminderListResponse, type ReminderIndexingProgress } from '../reminders/reminder-api';
-import { isScopedReminderList } from '../reminders/cache/reminder-storage-validation';
+import { fetchReadyReminderList, readReminderListBody, type ReminderIndexingProgress } from '../reminders/reminder-api';
 import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminders/cache/reminder-cache';
 import { createReminderRequestCoordinator } from '../reminders/outbox/reminder-request-coordinator';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -187,15 +186,8 @@ export function useReminderSync({
 				if (!response.ok) throw new Error(await response.text());
 				const body: unknown = await response.json().catch(() => null);
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-				// A delta lists only changed notes: it must never be read as a full list.
-				const isDelta = Boolean(body && typeof body === 'object' && (body as { delta?: unknown }).delta === true);
-				const delta = isDelta && since ? parseReminderDeltaResponse(body, config.folderPath) : null;
-				const merged = delta ? applyReminderDelta(snapshotRef.current.reminders, delta) : null;
-				// Delta records were validated above and base records on entry; recheck only their combination.
-				const result = !isDelta ? parseReminderListResponse(body, config.folderPath)
-					: delta && merged && isScopedReminderList(merged, config.folderPath) ? { reminders: merged, projects: delta.projects, issues: [] } : null;
-				// An unusable delta drops the base, so the next read is a full one.
-				if (isDelta && !result) deltaBaseRef.current = undefined;
+				const { result, dropDeltaBase } = readReminderListBody(body, config.folderPath, snapshotRef.current.reminders, since);
+				if (dropDeltaBase) deltaBaseRef.current = undefined;
 				if (!result) {
 					// A contract failure cannot replace a valid revision or its ETag,
 					// including with an older disk snapshot after a recent acknowledgement.

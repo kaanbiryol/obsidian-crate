@@ -1,5 +1,5 @@
 import type { ApiFetch, ReminderRecord, ReminderSourceIssue } from '../types';
-import { isReminderList } from './cache/reminder-storage-validation';
+import { isReminderList, isScopedReminderList } from './cache/reminder-storage-validation';
 import { parseReminderSourceIssues } from './cache/reminder-source-issues';
 
 export interface ReminderIndexingProgress {
@@ -33,6 +33,21 @@ export function parseReminderDeltaResponse(value: unknown, folderPath: string): 
 	const changed = new Set(changedPaths as string[]);
 	if (!result.reminders.every(reminder => changed.has(reminder.filePath))) return null;
 	return { changedPaths: changedPaths as string[], reminders: result.reminders, projects: result.projects };
+}
+
+/** Reads a list response against the confirmed base. A delta is never read as a
+ * full list; an unusable delta reports `dropDeltaBase` so the next read is full. */
+export function readReminderListBody(body: unknown, folderPath: string, base: ReminderRecord[], requestedSince: string | undefined): {
+	result: { reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[] } | null;
+	dropDeltaBase: boolean;
+} {
+	const isDelta = Boolean(body && typeof body === 'object' && (body as { delta?: unknown }).delta === true);
+	if (!isDelta) return { result: parseReminderListResponse(body, folderPath), dropDeltaBase: false };
+	const delta = requestedSince ? parseReminderDeltaResponse(body, folderPath) : null;
+	const merged = delta ? applyReminderDelta(base, delta) : null;
+	// Delta records were validated above and base records on entry; recheck only their combination.
+	const result = delta && merged && isScopedReminderList(merged, folderPath) ? { reminders: merged, projects: delta.projects, issues: [] } : null;
+	return { result, dropDeltaBase: !result };
 }
 
 /** Rebuild the full list in the server's order: notes by path, reminders by line. */
