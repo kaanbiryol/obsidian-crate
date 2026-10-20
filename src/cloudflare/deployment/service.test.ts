@@ -661,6 +661,18 @@ it('stops a saved update if the selected server changes while renewing authoriza
 	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 });
 
+it('continues a saved update when the selected server is rewritten with reordered keys', async () => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	provisionCloudflareDeployment.mockClear();
+	await h.service.deployWithSavedAuthorization('update', operation => {
+		h.settings.cloudflareDeployment = Object.fromEntries(Object.entries(h.settings.cloudflareDeployment!).reverse()) as typeof h.settings.cloudflareDeployment;
+		return operation({ accessToken: 'saved' });
+	});
+	expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+});
+
 it('resets with saved authorization and registers the replacement device', async () => {
 	const h = createHarness();
 	await h.service.startDeployment();

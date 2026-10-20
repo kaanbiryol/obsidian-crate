@@ -25,6 +25,7 @@ import {
 	isCloudflareOAuthConfigured,
 } from './oauth/config';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { stableJson } from '../platform/stable-json';
 
 export function createCloudflareUsageConnection(plugin: CratePlugin): CloudflareUsageConnection {
 	return new CloudflareUsageConnection({
@@ -143,7 +144,7 @@ async function executeCloudflareOperation(
         return;
     }
 	const intent = savedIntent ?? plugin.cloudflareDeploymentService.pendingIntent;
-	const originalDeployment = JSON.stringify(plugin.settings.cloudflareDeployment);
+	const originalDeployment = stableJson(plugin.settings.cloudflareDeployment);
 	const originalWorkerUrl = plugin.settings.workerUrl;
 	const originalToken = intent === 'reconnect' ? plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) : null;
 	const isReconnect = intent === 'reconnect';
@@ -187,7 +188,7 @@ async function executeCloudflareOperation(
 			platform: getCurrentPlatformCode(),
 		} : undefined;
 		if (signal.aborted) return;
-		if ((savedIntent || isReconnect) && originalDeployment !== JSON.stringify(plugin.settings.cloudflareDeployment)) throw new Error('Server settings changed. Confirm the operation again.');
+		if ((savedIntent || isReconnect) && originalDeployment !== stableJson(plugin.settings.cloudflareDeployment)) throw new Error('Server settings changed. Confirm the operation again.');
 		const onProgress = (message: string) => {
 			if (!signal.aborted) presentation.advance(message);
 		};

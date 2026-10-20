@@ -18,6 +18,7 @@ import {
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
 import { constantTimeEqual, createPkcePair, randomBase64Url } from '../oauth/pkce';
 import { provisionCloudflareDeployment } from './provisioner';
+import { stableJson } from '../../platform/stable-json';
 import { createCloudflareDeploymentMetadata, resolveDeploymentTarget, type SelectDeployment } from './target';
 import {
 	registerCloudflareAuthorizedDevice,
@@ -97,7 +98,7 @@ export class CloudflareDeploymentService {
 			createdAt: this.now(),
 			request: {
 				metadata,
-				originalMetadata: JSON.stringify(existingMetadata),
+				originalMetadata: stableJson(existingMetadata),
 				discoverExisting: intent === 'switch' || (intent === 'connect' && (!existingMetadata || Boolean(existingMetadata.lastDeployedVersion))),
 				intent,
 			},
@@ -180,10 +181,10 @@ export class CloudflareDeploymentService {
 			const saved = this.options.settingsOwner.settings.cloudflareDeployment;
 			if (saved?.deletion && request.intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
 			if (request.intent !== 'reset' && request.intent !== 'delete' && saved?.reset) throw new Error('Resume the server reset before connecting or updating.');
-			if ((request.intent === 'reset' || request.intent === 'delete') && JSON.stringify(request.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
+			if ((request.intent === 'reset' || request.intent === 'delete') && stableJson(request.metadata) !== stableJson(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
 			}
-			if ((request.intent === 'switch' || request.intent === 'create') && request.originalMetadata !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
+			if ((request.intent === 'switch' || request.intent === 'create') && request.originalMetadata !== stableJson(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
 			if (request.intent === 'reconnect') this.checkSavedTarget(request.metadata, request.intent);
 			const { metadata, account, reuseExisting } = await this.whileActive(() => resolveDeploymentTarget({
 				request, api, getVaultName: this.options.getVaultName, selectDeployment, onProgress,
@@ -294,13 +295,13 @@ export class CloudflareDeploymentService {
 		this.handlingCallback = true;
 		const request: DeploymentRequest = {
 			metadata: structuredClone(metadata), intent, discoverExisting: false,
-			originalMetadata: JSON.stringify(metadata),
+			originalMetadata: stableJson(metadata),
 		};
 		try {
 			const result = await withAuthorization(async tokens => {
 				this.lifetime.signal.throwIfAborted();
 				this.checkSavedTarget(request.metadata, request.intent);
-				if (JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
+				if (stableJson(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
 				return this.runAuthorizedDeployment(request, tokens, device, onProgress, selectDeployment, true);
 			});
 			if (result.status === 'deleted') await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
